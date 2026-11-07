@@ -17,7 +17,6 @@ import GridLayout, { type Layout, useContainerWidth, verticalCompactor } from "r
 import { useTranslation } from "react-i18next";
 
 import { HOME_WIDGETS } from "@/components/home/widgets";
-import { Button } from "@/components/ui/button";
 import {
   HOME_GRID_COLUMNS,
   type HomeLayout,
@@ -26,7 +25,8 @@ import {
   readingOrder,
 } from "@/lib/home/layout";
 import { HOME_WIDGET_SIZES } from "@/lib/home/widgetTypes";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
 
 import "react-grid-layout/css/styles.css";
 

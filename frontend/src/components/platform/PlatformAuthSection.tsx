@@ -16,12 +16,12 @@ import { useTranslation } from "react-i18next";
 
 import type { LoginMethod } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Label } from "@/components/ui/label";
 import { usePlatformAuthSettings, useUpdatePlatformAuthSettings } from "@/hooks/useSettings";
 import { getErrorCode, getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Checkbox } from "@/ui/checkbox";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Label } from "@/ui/label";
 
 /** The two refusals that come with a number to acknowledge. */
 const ACKNOWLEDGEABLE = new Set([

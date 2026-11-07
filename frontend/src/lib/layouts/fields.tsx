@@ -30,18 +30,18 @@ import { TagBadgeList } from "@/components/tags/TagBadge";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
 import { DateCell } from "@/components/tasks/TaskDateCell";
 import { TaskTypeMark, TaskTypeOption } from "@/components/tasks/TaskTypeOption";
-import { Badge } from "@/components/ui/badge";
 import { MentionText } from "@/components/user/MentionText";
 import { useStepCounter } from "@/hooks/useProperties";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { formatBytes } from "@/lib/fileUtils";
 import { formatDateTime } from "@/lib/formatDate";
 import { summarizeStored } from "@/lib/recurrence";
 import { truncateText } from "@/lib/text";
 import { entityRefRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
 import type { TranslateFn } from "@/types/i18n";
+import { Badge } from "@/ui/badge";
+import { formatBytes } from "@/ui/lib/fileUtils";
+import { cn } from "@/ui/lib/utils";
 
 import { PluginField, type PluginFieldDecl, type PluginOnItems } from "./plugins";
 

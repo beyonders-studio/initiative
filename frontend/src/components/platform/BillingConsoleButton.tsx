@@ -14,17 +14,6 @@ import { useTranslation } from "react-i18next";
 
 import type { SecondFactorAnswer } from "@/api/generated/initiativeAPI.schemas";
 import { createPlatformCommunityBillingServiceHandoff } from "@/api/generated/settings/settings";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useBreakGlassRequirements } from "@/hooks/useAccessGrants";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { getErrorCode, getErrorMessage } from "@/lib/errorMessage";
@@ -32,6 +21,17 @@ import { toast } from "@/lib/mascotToast";
 import { openExternal, reserveTab } from "@/lib/openExternal";
 import { assertForBreakGlass, describePasskeyPromptError, passkeysRunHere } from "@/lib/passkeys";
 import { classifySecondFactorAnswer } from "@/lib/secondFactorAnswer";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 type BillingConsole = "support" | "operator";
 

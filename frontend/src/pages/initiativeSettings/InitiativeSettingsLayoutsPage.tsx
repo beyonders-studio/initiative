@@ -13,8 +13,6 @@ import { type InitiativeToolLayoutsRead, Tool } from "@/api/generated/initiative
 import { InitiativeSettingsPermissionRequired } from "@/components/initiatives/settings/InitiativeSettingsGuard";
 import { SHARED_LAYOUTS } from "@/components/layouts/details";
 import { LayoutList } from "@/components/layouts/LayoutList";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
 import {
   INSTANCE_LAYOUT_TOOLS,
@@ -23,7 +21,6 @@ import {
   useInitiativeLayouts,
   useToolLayouts,
 } from "@/hooks/useToolLayouts";
-import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
 import { useCommunityPath } from "@/lib/communityUrl";
 import {
   isToolEnabled,
@@ -32,6 +29,9 @@ import {
   toolListRoute,
   toolNavLabelKey,
 } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 
 export const InitiativeSettingsLayoutsPage = () => {
   const { initiativeId, initiative, canManageMembers } = useInitiativeSettings();

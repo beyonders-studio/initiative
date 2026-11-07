@@ -4,6 +4,11 @@ import { useTranslation } from "react-i18next";
 import { CommunityStatus, SupportTopic } from "@/api/generated/initiativeAPI.schemas";
 import { ContactDialog } from "@/components/tickets/ContactDialog";
 import { FileTicketDialog } from "@/components/tickets/FileTicketDialog";
+import { useBillingPortal } from "@/hooks/useBillingPortal";
+import type { CommunityEntry } from "@/hooks/useCommunities";
+import { useCommunityPaymentIssue } from "@/hooks/useCommunityPaymentIssue";
+import { useTicketAvailability } from "@/hooks/useTickets";
+import { getSessionItem, setSessionItem } from "@/lib/storage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,12 +18,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useBillingPortal } from "@/hooks/useBillingPortal";
-import type { CommunityEntry } from "@/hooks/useCommunities";
-import { useCommunityPaymentIssue } from "@/hooks/useCommunityPaymentIssue";
-import { useTicketAvailability } from "@/hooks/useTickets";
-import { getSessionItem, setSessionItem } from "@/lib/storage";
+} from "@/ui/alert-dialog";
 
 // The key keeps its old name, so a notice already seen stays dismissed.
 const SEEN_KEY_PREFIX = "guild-status-notice:";

@@ -1,8 +1,8 @@
 import { KeyRound, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
 import { useDismissHistoryAsk, useHistoryAsk } from "@/hooks/useMyMessages";
+import { Button } from "@/ui/button";
 
 /**
  * This device, waiting to be verified by another of the account's and sent

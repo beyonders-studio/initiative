@@ -3,10 +3,10 @@ import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ExportWizard } from "@/components/exports/ExportWizard";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Label } from "@/ui/label";
+import { Switch } from "@/ui/switch";
 
 interface InitiativeSettingsExportTabProps {
   initiativeId: number;

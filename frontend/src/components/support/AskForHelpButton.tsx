@@ -16,9 +16,9 @@ import { useTranslation } from "react-i18next";
 import { SupportTopic } from "@/api/generated/initiativeAPI.schemas";
 import { ContactDialog } from "@/components/tickets/ContactDialog";
 import { FileTicketDialog } from "@/components/tickets/FileTicketDialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useTicketAvailability } from "@/hooks/useTickets";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 export const AskForHelpButton = () => {
   const { t } = useTranslation("intake");

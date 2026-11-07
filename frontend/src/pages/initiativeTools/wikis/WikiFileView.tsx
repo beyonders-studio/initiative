@@ -17,16 +17,16 @@ import {
   WikiPageConnections,
 } from "@/components/initiativeTools/wikis/WikiPageConnections";
 import { WikiPageNav } from "@/components/initiativeTools/wikis/WikiPageNav";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useFile } from "@/hooks/useFiles";
-import { atLeast, useRegionWidthClass } from "@/hooks/useWidthClass";
 import { useWiki } from "@/hooks/useWikis";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolDetailRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Card, CardHeader, CardTitle } from "@/ui/card";
+import { atLeast, useRegionWidthClass } from "@/ui/lib/useWidthClass";
+import { cn } from "@/ui/lib/utils";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
+import { Skeleton } from "@/ui/skeleton";
 
 /**
  * A file, read as a page of the wiki it was put in.

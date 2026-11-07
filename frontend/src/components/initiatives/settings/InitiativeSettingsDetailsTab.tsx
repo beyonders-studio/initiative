@@ -4,13 +4,13 @@ import { useTranslation } from "react-i18next";
 
 import type { InitiativeRoleRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { ToolsSection } from "@/components/initiatives/ToolsToggles";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useInitiativeDefaults } from "@/hooks/useInitiativeRoles";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader } from "@/ui/card";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Textarea } from "@/ui/textarea";
 
 interface InitiativeSettingsDetailsTabProps {
   name: string;

@@ -11,7 +11,8 @@ import { useTranslation } from "react-i18next";
 import type { TaskTypeCreate, TaskTypeRead } from "@/api/generated/initiativeAPI.schemas";
 import { ReadyMadeGallery } from "@/components/shared/ReadyMadeGallery";
 import { TaskTypeIcon, TaskTypeOption } from "@/components/tasks/TaskTypeOption";
-import { Button } from "@/components/ui/button";
+import { useTaskTypeGallery } from "@/hooks/useProjects";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -19,18 +20,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useTaskTypeGallery } from "@/hooks/useProjects";
-import { listFormat } from "@/lib/intl";
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { listFormat } from "@/ui/lib/intl";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** Where a new type starts: nothing, a ready-made one, or one of the project's. */
 type Start = { kind: "blank" } | { kind: "gallery"; key: string } | { kind: "type"; id: number };

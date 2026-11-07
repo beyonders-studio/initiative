@@ -3,8 +3,11 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { PostRead } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
+import { useSetPostPin } from "@/hooks/usePosts";
+import { formatDateTime, fromLocalDateTimeInput, toLocalDateTimeInput } from "@/lib/formatDate";
+import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { DateTimePicker } from "@/ui/date-time-picker";
 import {
   Dialog,
   DialogContent,
@@ -12,12 +15,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { useSetPostPin } from "@/hooks/usePosts";
-import { formatDateTime, fromLocalDateTimeInput, toLocalDateTimeInput } from "@/lib/formatDate";
-import { toast } from "@/lib/mascotToast";
-import { cn } from "@/lib/utils";
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
 
 interface PinnedBannerProps {
   post: PostRead;

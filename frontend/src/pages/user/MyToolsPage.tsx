@@ -24,18 +24,18 @@ import {
   getListInitiativesQueryKey,
   listInitiatives,
 } from "@/api/generated/initiatives/initiatives";
-import { SkeletonRegion, TableSkeleton } from "@/components/skeletons/PageSkeletons";
 import { NodeRail, TRAY_SURFACE } from "@/components/toolBrowser/NodeRail";
 import { CROSS_COMMUNITY_TOOL_SORT_FIELDS, ToolTable } from "@/components/toolBrowser/ToolTable";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { MultiSelect } from "@/components/ui/multi-select";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useCommunities } from "@/hooks/useCommunities";
 import { toolsWithContent, useMyToolCounts, useMyToolRows } from "@/hooks/useMyTools";
 import { useToolBrowserSearch } from "@/hooks/useToolBrowserSearch";
 import { TOOL_ICONS, toolNavLabelKey, toolRouteSegment } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
+import { MultiSelect } from "@/ui/multi-select";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 const ROUTE = "/my-tools";
 

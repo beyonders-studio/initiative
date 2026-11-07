@@ -30,13 +30,6 @@ import type {
   AuthProviderProbeResult,
 } from "@/api/generated/initiativeAPI.schemas";
 import { ProviderMark } from "@/components/auth/ProviderMark";
-import { Button } from "@/components/ui/button";
-import { CopyButton } from "@/components/ui/copy-button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { SuggestCombobox } from "@/components/ui/suggest-combobox";
-import { Switch } from "@/components/ui/switch";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import { useWizard } from "@/hooks/useWizard";
 import {
   buildIssuer,
@@ -52,6 +45,13 @@ import {
 import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { isValidProviderSlug } from "@/lib/providerSlug";
+import { Button } from "@/ui/button";
+import { CopyButton } from "@/ui/copy-button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { SuggestCombobox } from "@/ui/suggest-combobox";
+import { Switch } from "@/ui/switch";
+import { WizardDialog } from "@/ui/wizard-dialog";
 
 type Step = "choose" | "address" | "credentials" | "options";
 

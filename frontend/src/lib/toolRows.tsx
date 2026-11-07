@@ -25,9 +25,9 @@ import type {
   WikiListResponse,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { Badge } from "@/components/ui/badge";
-import { ProgressCircle } from "@/components/ui/progress-circle";
 import { TOOLS, toolDetailRoute } from "@/lib/tools";
+import { Badge } from "@/ui/badge";
+import { ProgressCircle } from "@/ui/progress-circle";
 
 /** One row of a tool table, in terms every tool can answer. */
 export interface ToolRow {

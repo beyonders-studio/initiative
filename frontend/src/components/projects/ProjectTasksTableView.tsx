@@ -25,14 +25,8 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
 import { TaskAssigneesCell } from "@/components/projects/TaskQuickActions";
-import { SortHeader } from "@/components/SortIcon";
 import { sharedTaskColumns } from "@/components/tasks/globalTaskColumns";
 import { statusTriggerStyle, TaskStatusOption } from "@/components/tasks/TaskStatusOption";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { DataTable, type DataTableRowWrapperProps } from "@/components/ui/data-table";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import { TableRow } from "@/components/ui/table";
 import { type ColumnLimits, NO_COLUMN_LIMITS } from "@/hooks/useColumnLimits";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
 import type { useProjectTaskTableState } from "@/hooks/useProjectTaskView";
@@ -46,9 +40,15 @@ import { useCounterSteps, useProjectLayoutEnv, withDisplays } from "@/lib/layout
 import { groupRowId, groupRows, NO_GROUP, uniqueTasksFromRows } from "@/lib/layouts/grouping";
 import { pluginFields, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { taskFields } from "@/lib/layouts/tasks";
-import type { AppColumnDef, AppRow } from "@/lib/table";
 import { flattenTaskTree, nestTaskRows, type TaskTreeRow, treeParents } from "@/lib/taskTree";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { DataTable, type DataTableRowWrapperProps } from "@/ui/data-table";
+import type { AppColumnDef, AppRow } from "@/ui/lib/table";
+import { cn } from "@/ui/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
+import { SortHeader } from "@/ui/sort-icon";
+import { TableRow } from "@/ui/table";
 
 type ProjectTasksListViewProps = {
   projectId: number;

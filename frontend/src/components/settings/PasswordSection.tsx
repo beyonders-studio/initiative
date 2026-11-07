@@ -12,17 +12,6 @@ import type { UserRead, UserSelfUpdate } from "@/api/generated/initiativeAPI.sch
 import { NewPasswordFields } from "@/components/auth/NewPasswordFields";
 import { RecoveryCodesPanel } from "@/components/settings/RecoveryCodesPanel";
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useServer } from "@/hooks/useServer";
 import { useUpdateCurrentUser } from "@/hooks/useUsers";
@@ -30,6 +19,17 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { checkNewPassword } from "@/lib/passwordPolicy";
 import { queryClient } from "@/lib/queryClient";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 interface PasswordSectionProps {
   user: UserRead;

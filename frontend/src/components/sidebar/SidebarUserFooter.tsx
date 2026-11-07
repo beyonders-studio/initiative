@@ -23,8 +23,17 @@ import { SidebarFooter } from "@/components/sidebar/sidebar";
 import { AskForHelpButton } from "@/components/support/AskForHelpButton";
 import { openFeedback, useFeedbackOffered } from "@/components/tickets/FeedbackSheet";
 import { UserHandle } from "@/components/UserHandle";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { PresenceDot } from "@/components/user/PresenceDot";
+import { PresenceMenuItems } from "@/components/user/PresenceMenuItems";
+import { ProfileAvatar } from "@/components/user/ProfileAvatar";
+import { isStatusEmpty, StatusBubble, StatusEditor } from "@/components/user/ProfileStatus";
+import { VersionDialog } from "@/components/VersionDialog";
+import { docsUrl } from "@/lib/links";
+import { presenceLabelKey } from "@/lib/presence";
+import { decorationSrc, resolveDecoration } from "@/lib/profileDecorations";
+import { getUrlHandle, getUserDisplayName } from "@/lib/userDisplay";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,19 +45,10 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { PresenceDot } from "@/components/user/PresenceDot";
-import { PresenceMenuItems } from "@/components/user/PresenceMenuItems";
-import { ProfileAvatar } from "@/components/user/ProfileAvatar";
-import { isStatusEmpty, StatusBubble, StatusEditor } from "@/components/user/ProfileStatus";
-import { VersionDialog } from "@/components/VersionDialog";
-import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
-import { docsUrl } from "@/lib/links";
-import { presenceLabelKey } from "@/lib/presence";
-import { decorationSrc, resolveDecoration } from "@/lib/profileDecorations";
-import { getUrlHandle, getUserDisplayName } from "@/lib/userDisplay";
+} from "@/ui/dropdown-menu";
+import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
+import { Popover, PopoverAnchor, PopoverContent } from "@/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 
 export interface SidebarUserFooterProps {
   /** The signed-in account, or null while it is still being fetched. */

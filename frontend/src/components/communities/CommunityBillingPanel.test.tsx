@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildCommunity, communityCan } from "@/__tests__/factories";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import type { CommunityBillingSummaryRead } from "@/api/generated/initiativeAPI.schemas";
-import { dateTimeFormat } from "@/lib/intl";
+import { dateTimeFormat } from "@/ui/lib/intl";
 
 // Mutable state the mocked hooks read, so each test can vary billing config,
 // the active community, and what the summary route answered.

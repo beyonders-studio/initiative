@@ -1,7 +1,7 @@
 import { type SVGProps, useId } from "react";
 
 import { usePride } from "@/hooks/usePride";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 type LogoIconProps = SVGProps<SVGSVGElement>;
 

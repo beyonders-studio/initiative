@@ -4,19 +4,19 @@ import { useTranslation } from "react-i18next";
 
 import type { OperatorUserRead } from "@/api/generated/initiativeAPI.schemas";
 import { ConfirmPhraseField, EligibilityStep } from "@/components/account/DeletionSteps";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { DialogFooter } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import { useOperatorDeleteUser, useUserDeletionEligibility } from "@/hooks/useOperatorUsers";
 import { useWizard } from "@/hooks/useWizard";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import type { DialogWithSuccessProps } from "@/types/dialog";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { DialogFooter } from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
+import { WizardDialog } from "@/ui/wizard-dialog";
 
 /**
  * Three actions are exposed in the operator dialog:

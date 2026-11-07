@@ -23,22 +23,22 @@ import { useTranslation } from "react-i18next";
 import { pluginWidgetSample, pluginWidgetSource } from "@/api/pluginData";
 import { WidgetProvenance } from "@/components/initiativeTools/dashboards/WidgetProvenance";
 import { WidgetTile } from "@/components/initiativeTools/dashboards/WidgetTile";
-import { Button } from "@/components/ui/button";
+import { useWidgetCatalog } from "@/hooks/useDashboards";
+import { usePluginWidgetCatalog } from "@/hooks/usePluginData";
+import { useWidgetData, type WidgetBinding } from "@/hooks/useWidgetData";
+import { useWidgetMeta } from "@/hooks/useWidgetMeta";
+import { type DefinitionWidget, isPluginWidgetType, unboundSlots } from "@/lib/widgets/definition";
+import { SAMPLE_NOW, sampleFor } from "@/lib/widgets/sampleData";
+import { canDraw, resolveMapping } from "@/lib/widgets/shape";
+import { shapeFor } from "@/lib/widgets/shapes";
+import { Button } from "@/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useWidgetCatalog } from "@/hooks/useDashboards";
-import { usePluginWidgetCatalog } from "@/hooks/usePluginData";
-import { useWidgetData, type WidgetBinding } from "@/hooks/useWidgetData";
-import { useWidgetMeta } from "@/hooks/useWidgetMeta";
-import { cn } from "@/lib/utils";
-import { type DefinitionWidget, isPluginWidgetType, unboundSlots } from "@/lib/widgets/definition";
-import { SAMPLE_NOW, sampleFor } from "@/lib/widgets/sampleData";
-import { canDraw, resolveMapping } from "@/lib/widgets/shape";
-import { shapeFor } from "@/lib/widgets/shapes";
+} from "@/ui/dropdown-menu";
+import { cn } from "@/ui/lib/utils";
 
 export interface DashboardWidgetProps {
   widget: DefinitionWidget;

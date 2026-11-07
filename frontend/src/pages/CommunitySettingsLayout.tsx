@@ -4,9 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { SupportTopic } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsTabsNav } from "@/components/settings/SettingsTabsNav";
-import { SettingsPaneSkeleton } from "@/components/skeletons/PageSkeletons";
 import { HelpLink } from "@/components/support/HelpLink";
-import { Badge } from "@/components/ui/badge";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityBillingSummary } from "@/hooks/useCommunityBillingSummary";
 import { useCommunitySettingsTabs } from "@/hooks/useCommunitySettingsTabs";
@@ -14,6 +12,8 @@ import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { trialDaysLeft } from "@/lib/billingSummary";
 import { extractSubPath, isCommunityScopedPath } from "@/lib/communityUrl";
 import { matchActiveTab } from "@/lib/tabs";
+import { Badge } from "@/ui/badge";
+import { SettingsPaneSkeleton } from "@/ui/page-skeletons";
 
 export const CommunitySettingsLayout = () => {
   const { t } = useTranslation(["settings"]);

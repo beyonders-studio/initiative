@@ -9,6 +9,9 @@
 import { Trans, useTranslation } from "react-i18next";
 
 import type { InitiativeMemberRead } from "@/api/generated/initiativeAPI.schemas";
+import { useRemoveInitiativeMember } from "@/hooks/useInitiatives";
+import { toast } from "@/lib/mascotToast";
+import { getUserDisplayName } from "@/lib/userDisplay";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,10 +21,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useRemoveInitiativeMember } from "@/hooks/useInitiatives";
-import { toast } from "@/lib/mascotToast";
-import { getUserDisplayName } from "@/lib/userDisplay";
+} from "@/ui/alert-dialog";
 
 export interface RemoveInitiativeMemberDialogProps {
   initiativeId: number;

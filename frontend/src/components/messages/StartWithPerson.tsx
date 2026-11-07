@@ -2,7 +2,6 @@ import { useTranslation } from "react-i18next";
 
 import type { UserProfile } from "@/api/generated/initiativeAPI.schemas";
 import { UserHandle } from "@/components/UserHandle";
-import { Button } from "@/components/ui/button";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import {
   useAcceptMessageRequest,
@@ -11,6 +10,7 @@ import {
   useRequestMessage,
 } from "@/hooks/useDirectMessages";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
 
 /**
  * Somebody you were sent here to talk to, and cannot yet.

@@ -12,9 +12,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { GrantCaseRead } from "@/api/generated/initiativeAPI.schemas";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
 import { useGrantCases } from "@/hooks/useAccessGrants";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { AsyncCombobox } from "@/ui/async-combobox";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 
 /** The value the "no case" row is chosen by, where a case is optional. */
 const NO_CASE = "none";

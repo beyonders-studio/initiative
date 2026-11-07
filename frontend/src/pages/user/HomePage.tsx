@@ -23,21 +23,9 @@ import { HomeViewBanner } from "@/components/home/HomeViewBanner";
 import { HomeViewTabs } from "@/components/home/HomeViewTabs";
 import { HomeWidgetSettingsDialog } from "@/components/home/HomeWidgetSettingsDialog";
 import { HomeActionsContext } from "@/components/home/homeActions";
-import { PullToRefresh } from "@/components/PullToRefresh";
-import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { useHomeViews } from "@/hooks/useHomeViews";
 import { useMyDecorations } from "@/hooks/useUsers";
-import { atLeast, useRegionWidthClass } from "@/hooks/useWidthClass";
 import {
   addWidget,
   applyGrid,
@@ -50,7 +38,19 @@ import {
 } from "@/lib/home/layout";
 import { presetLayout } from "@/lib/home/presets";
 import { decorationSrc, resolveDecoration } from "@/lib/profileDecorations";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/ui/empty";
+import { atLeast, useRegionWidthClass } from "@/ui/lib/useWidthClass";
+import { cn } from "@/ui/lib/utils";
+import { PullToRefresh } from "@/ui/pull-to-refresh";
+import { Skeleton } from "@/ui/skeleton";
 
 export const HomePage = () => {
   const { t } = useTranslation(["home", "common"]);

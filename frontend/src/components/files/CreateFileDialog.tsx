@@ -17,8 +17,15 @@ import type { FileRead, ResourceGrantSchema } from "@/api/generated/initiativeAP
 import { FileType, SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import { CreateAccessSection } from "@/components/access/CreateAccessSection";
 import { DEFAULT_GRANTS } from "@/components/access/grants";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
-import { Button } from "@/components/ui/button";
+import { useCreateFile, useUploadFile } from "@/hooks/useFiles";
+import { useInitiative } from "@/hooks/useInitiatives";
+import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
+import type { EditorFileType } from "@/lib/fileTypes";
+import { toast } from "@/lib/mascotToast";
+import { matchSmartLinkProvider, SUPPORTED_PROVIDER_BADGES } from "@/lib/smartLinkProviders";
+import type { DialogProps } from "@/types/dialog";
+import { AsyncCombobox } from "@/ui/async-combobox";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -26,29 +33,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { FileDropArea } from "@/components/ui/file-drop";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
-import { useCreateFile, useUploadFile } from "@/hooks/useFiles";
-import { useInitiative } from "@/hooks/useInitiatives";
-import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
-import type { EditorFileType } from "@/lib/fileTypes";
-import { formatBytes, getFileTypeLabel, nameWithoutExtension } from "@/lib/fileUtils";
-import { numberFormat } from "@/lib/intl";
-import { toast } from "@/lib/mascotToast";
-import { matchSmartLinkProvider, SUPPORTED_PROVIDER_BADGES } from "@/lib/smartLinkProviders";
-import type { DialogProps } from "@/types/dialog";
+} from "@/ui/dialog";
+import { FileDropArea } from "@/ui/file-drop";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { formatBytes, getFileTypeLabel, nameWithoutExtension } from "@/ui/lib/fileUtils";
+import { numberFormat } from "@/ui/lib/intl";
+import { Progress } from "@/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
+import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/ui/tabs";
 
 type CreateFileDialogProps = DialogProps & {
   /** The initiative the file is made in. */

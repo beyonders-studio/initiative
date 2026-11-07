@@ -3,7 +3,6 @@ import { MessageSquare, UserPlus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { DirectMessagePermissionRead } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
 import {
   useAcceptConnection,
   useConnections,
@@ -14,7 +13,8 @@ import {
 } from "@/hooks/useDirectMessages";
 import { toast } from "@/lib/mascotToast";
 import { getUrlHandle } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
 
 interface ConnectionActionButtonsProps {
   /** The account being acted on. A connection is addressed by handle, so both

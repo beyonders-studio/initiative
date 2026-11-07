@@ -16,10 +16,10 @@ import { useTranslation } from "react-i18next";
 
 import type { ArchivableType, ToolCan } from "@/api/generated/initiativeAPI.schemas";
 import { useToolSettings } from "@/components/tools/settings/ToolSettingsContext";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useArchiveEntity, useUnarchiveEntity } from "@/hooks/useArchive";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 /** Whether this viewer has anything to do here — what gates the card and, in
  *  the layout, the tab that holds it. */

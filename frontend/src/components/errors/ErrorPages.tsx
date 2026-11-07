@@ -3,7 +3,7 @@ import { FileQuestion, RefreshCw, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/ui/button";
 import {
   Empty,
   EmptyContent,
@@ -11,8 +11,8 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty";
-import { cn } from "@/lib/utils";
+} from "@/ui/empty";
+import { cn } from "@/ui/lib/utils";
 
 /**
  * Whether an error is a lazily loaded chunk that is no longer on the server —

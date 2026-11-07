@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { ConversationList } from "@/components/messages/ConversationList";
 import { SidebarContent, SidebarGroup, SidebarHeader } from "@/components/sidebar/sidebar";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/ui/button";
 
 /**
  * Who you are talking to, in the column the navigation was in.

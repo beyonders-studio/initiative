@@ -2,10 +2,10 @@ import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
 import { useCompleteVendorSetup } from "@/hooks/usePluginServices";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
 
 /**
  * Where a plug-in vendor's own setup sends the operator back.

@@ -12,9 +12,9 @@ import { useTranslation } from "react-i18next";
 import type { SupportTopic } from "@/api/generated/initiativeAPI.schemas";
 import { ContactDialog } from "@/components/tickets/ContactDialog";
 import { FileTicketDialog } from "@/components/tickets/FileTicketDialog";
-import { Button, type buttonVariants } from "@/components/ui/button";
 import { useTicketAvailability } from "@/hooks/useTickets";
-import { cn } from "@/lib/utils";
+import { Button, type buttonVariants } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
 
 type ButtonLook = VariantProps<typeof buttonVariants>;
 

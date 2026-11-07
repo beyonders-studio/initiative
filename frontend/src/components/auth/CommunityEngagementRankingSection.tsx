@@ -9,16 +9,16 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   useCommunityAuthSettings,
   useUpdateCommunityAuthSettings,
 } from "@/hooks/useCommunityAuthPolicy";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { Label } from "@/ui/label";
+import { Switch } from "@/ui/switch";
 
 export const CommunityEngagementRankingSection = ({ communityId }: { communityId: number }) => {
   const { t } = useTranslation("settings");

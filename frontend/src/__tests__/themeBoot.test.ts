@@ -27,7 +27,7 @@ describe("theme boot script", () => {
 
   it("mirrors the stylesheet's background for each theme", () => {
     const boot = read("public/theme-boot.css");
-    const styles = read("src/styles.css");
+    const styles = read("src/ui/styles.css");
     const tokens = [...styles.matchAll(/^ {2}--background: ([^;]+);/gm)].map((m) => m[1]);
     expect(tokens).toHaveLength(2);
     for (const token of tokens) expect(boot).toContain(token);

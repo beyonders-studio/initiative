@@ -1,6 +1,6 @@
 import { type ChangeEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 interface CounterValueInputProps {
   /** Server-side count (string). The input syncs to this when not actively edited. */

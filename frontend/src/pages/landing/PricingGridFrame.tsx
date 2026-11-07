@@ -16,11 +16,11 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { isOwnOrigin } from "@/api/client";
-import { Button } from "@/components/ui/button";
 import { portalPricingUrl, pricingEmbedUrl } from "@/hooks/useBillingCatalog";
-import { useFrameMessages } from "@/hooks/useFrameMessages";
 import { useTheme } from "@/hooks/useTheme";
 import { docsUrl } from "@/lib/links";
+import { Button } from "@/ui/button";
+import { useFrameMessages } from "@/ui/lib/useFrameMessages";
 
 export const SELF_HOST_GUIDE = docsUrl("running-a-server/installation/");
 

@@ -5,10 +5,10 @@ import { useTranslation } from "react-i18next";
 import type { FileType, Tool, ToolCan } from "@/api/generated/initiativeAPI.schemas";
 import { ExportWizard, type ExportWizardScope } from "@/components/exports/ExportWizard";
 import { selectionExportFormats } from "@/components/exports/formats";
-import { Button } from "@/components/ui/button";
 import { exportFilenameStem } from "@/lib/exportDownload";
 import { everyCan } from "@/lib/permissions";
 import { toolRouteSegment } from "@/lib/tools";
+import { Button } from "@/ui/button";
 
 type EntitiesExportButtonProps = Omit<Extract<ExportWizardScope, { kind: "entities" }>, "kind"> & {
   variant?: "outline" | "default";

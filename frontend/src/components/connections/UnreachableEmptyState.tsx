@@ -3,8 +3,8 @@ import { useTranslation } from "react-i18next";
 
 import { BirthdateField } from "@/components/auth/BirthdateField";
 import { useAgeConfirmation } from "@/components/auth/useAgeConfirmation";
-import { Button } from "@/components/ui/button";
 import { useUpdateDmSettings } from "@/hooks/useDirectMessages";
+import { Button } from "@/ui/button";
 
 /**
  * Why nothing is listed, in the order the reasons outrank one another.

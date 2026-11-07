@@ -3,7 +3,8 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
+import { type MetadataOwner, useOwnedDefinitions } from "@/hooks/useProperties";
+import { Button } from "@/ui/button";
 import {
   Command,
   CommandGroup,
@@ -11,9 +12,8 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { type MetadataOwner, useOwnedDefinitions } from "@/hooks/useProperties";
+} from "@/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 import { NewPropertyForm } from "./NewPropertyForm";
 import { iconForPropertyType } from "./propertyTypeIcons";

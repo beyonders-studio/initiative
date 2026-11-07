@@ -10,8 +10,8 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { mailtoHref, telHref } from "@/lib/contacts";
-import type { AppColumnDef } from "@/lib/table";
 import { toolDetailRoute } from "@/lib/tools";
+import type { AppColumnDef } from "@/ui/lib/table";
 
 const NONE = <span className="text-muted-foreground">—</span>;
 

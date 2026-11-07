@@ -4,7 +4,10 @@ import { useTranslation } from "react-i18next";
 
 import type { ProjectRead, TaskRead } from "@/api/generated/initiativeAPI.schemas";
 import { ProjectPickerStep } from "@/components/tasks/ProjectPickerStep";
-import { Button } from "@/components/ui/button";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useCreateTask } from "@/hooks/useTasks";
+import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -12,12 +15,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useCreateTask } from "@/hooks/useTasks";
-import type { DialogProps } from "@/types/dialog";
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 type ContactNewTaskDialogProps = DialogProps & {
   /** The contact the task is for: its name, and the initiative it goes in. */

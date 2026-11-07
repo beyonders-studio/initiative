@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { expect, it } from "vitest";
 
 import { TableNode } from "@/components/initiativeTools/dashboards/scene/TableNode";
-import { dateTimeFormat } from "@/lib/intl";
+import { dateTimeFormat } from "@/ui/lib/intl";
 
 import { normalizeQueryRows } from "../normalize";
 import { builtinWidgetSource } from "../registry";

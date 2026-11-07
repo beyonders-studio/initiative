@@ -30,18 +30,6 @@ import {
 import { useListTaskEdges } from "@/api/generated/relationships/relationships";
 import { readTask } from "@/api/generated/tasks/tasks";
 import { TaskTypeMark } from "@/components/tasks/TaskTypeOption";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { GroupBySelect } from "@/components/ui/data-table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Toggle } from "@/components/ui/toggle";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
 import { useOwnedDefinitions } from "@/hooks/useProperties";
@@ -67,13 +55,11 @@ import {
   waitingOn,
   wholesOf,
 } from "@/lib/gantt";
-import { dateTimeFormat } from "@/lib/intl";
 import { LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
 import { boardBands } from "@/lib/layouts/grouping";
 import { taskFields } from "@/lib/layouts/tasks";
 import { browserTimezone } from "@/lib/timezones";
 import { taskRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
 import {
   type AxisTick,
   addUnits,
@@ -83,6 +69,20 @@ import {
   weekendBands,
 } from "@/lib/widgets/timelineAxis";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { GroupBySelect } from "@/ui/data-table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { cn } from "@/ui/lib/utils";
+import { Toggle } from "@/ui/toggle";
+import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 const LABEL_WIDTH = 260;
 const ROW_HEIGHT = 32;

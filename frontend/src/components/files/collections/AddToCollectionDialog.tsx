@@ -15,24 +15,6 @@ import {
 } from "@/components/files/collections/RequiredMetadataDialog";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { ReadyMadeGallery } from "@/components/shared/ReadyMadeGallery";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   useAddCollectionFiles,
   useCollectionShapes,
@@ -43,10 +25,22 @@ import { detailLayoutOf, instanceTarget, useReadToolLayouts } from "@/hooks/useT
 import { COLLECTION_ICON } from "@/lib/collections";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { listFormat } from "@/lib/intl";
 import { requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
 import { toast } from "@/lib/mascotToast";
 import { collectionRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { listFormat } from "@/ui/lib/intl";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 interface AddToCollectionDialogProps {
   initiativeId: number;

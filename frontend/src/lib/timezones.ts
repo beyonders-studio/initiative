@@ -8,7 +8,7 @@
  * environments, or test runners with stripped Intl data.
  */
 
-import { dateTimeFormat } from "@/lib/intl";
+import { dateTimeFormat } from "@/ui/lib/intl";
 
 const FALLBACK_TIMEZONES = [
   "UTC",

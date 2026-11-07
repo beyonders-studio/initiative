@@ -7,7 +7,11 @@
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
+import { SlotPicker } from "@/components/user/DecorationPicker";
+import { useAuth } from "@/hooks/useAuth";
+import { useMyDecorations } from "@/hooks/useUsers";
+import { resolveDecoration } from "@/lib/profileDecorations";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -15,12 +19,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
-import { SlotPicker } from "@/components/user/DecorationPicker";
-import { useAuth } from "@/hooks/useAuth";
-import { useMyDecorations } from "@/hooks/useUsers";
-import { resolveDecoration } from "@/lib/profileDecorations";
+} from "@/ui/dialog";
+import { Skeleton } from "@/ui/skeleton";
 
 export interface HomeBannerDialogProps {
   open: boolean;

@@ -3,11 +3,11 @@ import { Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolCreateLabelKey, toolCreateTarget } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { DropdownMenuItem } from "@/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 
 /**
  * The single source of "how do I create this tool" — derived entirely from the

@@ -15,10 +15,10 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { FileTicketDialog } from "@/components/tickets/FileTicketDialog";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 export interface ReportButtonProps {
   /** A `SearchEntityType` or a `PlatformReportTarget` value. */

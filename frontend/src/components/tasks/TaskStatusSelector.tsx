@@ -3,8 +3,8 @@ import { useTranslation } from "react-i18next";
 
 import type { TaskListRead, TaskStatusRead } from "@/api/generated/initiativeAPI.schemas";
 import { statusTriggerStyle, TaskStatusOption } from "@/components/tasks/TaskStatusOption";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { toast } from "@/lib/mascotToast";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
 
 type TaskStatusSelectorProps = {
   task: TaskListRead;

@@ -3,6 +3,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { LineBand } from "@/components/files/spreadsheet/useSpreadsheetStructure";
+import { colIndexToLetter } from "@/lib/spreadsheet/coords";
+import type { SortDirection } from "@/lib/spreadsheet/sort";
+import type { LineAxis } from "@/lib/spreadsheet/transform";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -12,11 +15,8 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
   ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { colIndexToLetter } from "@/lib/spreadsheet/coords";
-import type { SortDirection } from "@/lib/spreadsheet/sort";
-import type { LineAxis } from "@/lib/spreadsheet/transform";
-import { cn } from "@/lib/utils";
+} from "@/ui/context-menu";
+import { cn } from "@/ui/lib/utils";
 
 export const ROW_HEADER_WIDTH = 56;
 export const COL_HEADER_HEIGHT = 26;

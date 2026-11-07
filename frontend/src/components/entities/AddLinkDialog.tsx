@@ -11,31 +11,10 @@ import { DEFAULT_GRANTS } from "@/components/access/grants";
 import { EntityPicker, type LinkableSuggestion } from "@/components/entities/EntityPicker";
 import { MemberSelect, type MemberSummary } from "@/components/members/MemberSearchSelect";
 import { SearchCategoryTabs } from "@/components/search/SearchCategoryTabs";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { FileDropArea } from "@/components/ui/file-drop";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useUploadFile } from "@/hooks/useFiles";
 import { type ToolRef, useRelate } from "@/hooks/useRelationships";
 import type { MemberSearchScope } from "@/hooks/useUsers";
 import { fileIcon } from "@/lib/fileIcon";
-import { formatBytes, getFileTypeLabel, nameWithoutExtension } from "@/lib/fileUtils";
 import { toast } from "@/lib/mascotToast";
 import {
   canAssert,
@@ -52,7 +31,22 @@ import {
   type SearchCategory,
 } from "@/lib/searchResults";
 import { getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { FileDropArea } from "@/ui/file-drop";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { formatBytes, getFileTypeLabel, nameWithoutExtension } from "@/ui/lib/fileUtils";
+import { cn } from "@/ui/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Tabs, TabsContent } from "@/ui/tabs";
 
 /** What a link can end at, as the search tabs name them: a thing, or a member. */
 const LINK_CATEGORIES: SearchCategory[] = ["tool", "member"];

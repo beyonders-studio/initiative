@@ -3,17 +3,6 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ListLayoutReadKind, SortField } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { tableSortFields, taskTableSorting } from "@/lib/filters/taskFilters";
 import type { ListLayout } from "@/lib/layouts/draft";
 import { type FieldDef, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
@@ -27,6 +16,17 @@ import {
   storedPreset,
 } from "@/lib/layouts/presets";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 import type { LayoutEdits } from "./LayoutEditor";
 import { TaskSortPicker } from "./TaskSortPicker";

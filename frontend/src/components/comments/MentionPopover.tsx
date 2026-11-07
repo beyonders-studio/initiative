@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { SearchSuggestion, UserSummary } from "@/api/generated/initiativeAPI.schemas";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
 import { type MemberSearchScope, useMemberSearch } from "@/hooks/useUsers";
@@ -14,7 +13,8 @@ import { MENTIONABLE_TYPES } from "@/lib/mentions";
 import { linkableToolTypes } from "@/lib/references";
 import { hitIcon } from "@/lib/searchResults";
 import { getAvatarSrc, getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { cn } from "@/ui/lib/utils";
 
 /** How many rows a mention picker offers. */
 const MENTION_LIMIT = 8;

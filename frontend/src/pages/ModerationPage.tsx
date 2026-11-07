@@ -26,11 +26,6 @@ import { RemovalDialog } from "@/components/moderation/RemovalDialog";
 import { SendToPlatformDialog } from "@/components/moderation/SendToPlatformDialog";
 import { WarnDialog } from "@/components/moderation/WarnDialog";
 import { communityEvidenceUrl, EvidenceList } from "@/components/tickets/Evidence";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { MentionText } from "@/components/user/MentionText";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { refreshAfterHolding } from "@/hooks/useHolds";
@@ -49,6 +44,11 @@ import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { searchHitPath } from "@/lib/searchResults";
 import { getUserDisplayName } from "@/lib/userDisplay";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/ui/tabs";
+import { Textarea } from "@/ui/textarea";
 
 export const ModerationPage = () => {
   const { t } = useTranslation(["moderation", "common"]);

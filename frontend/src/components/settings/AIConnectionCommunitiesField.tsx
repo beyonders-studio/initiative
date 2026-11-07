@@ -10,11 +10,11 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AIConnectionCommunity } from "@/api/generated/initiativeAPI.schemas";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { usePlatformCommunities } from "@/hooks/useSettings";
+import { AsyncCombobox } from "@/ui/async-combobox";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Label } from "@/ui/label";
 
 interface AIConnectionCommunitiesFieldProps {
   communities: AIConnectionCommunity[];

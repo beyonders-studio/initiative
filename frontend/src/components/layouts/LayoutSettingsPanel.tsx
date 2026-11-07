@@ -16,21 +16,9 @@ import {
   SCALE_DISPLAYS,
 } from "@/components/properties/propertyHelpers";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { MAX_COLUMN_LIMIT } from "@/hooks/useColumnLimits";
 import type { MetadataOwner } from "@/hooks/useProperties";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { listFormat } from "@/lib/intl";
 import { LAYOUT_REGIONS } from "@/lib/layouts/detailLayout";
 import {
   cardOf,
@@ -45,6 +33,12 @@ import { type FieldDef, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
 import type { LayoutNode } from "@/lib/layouts/tree";
 import { initiativeRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { listFormat } from "@/ui/lib/intl";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 import type { EditableDetail } from "./details";
 import type { LayoutEdits } from "./LayoutEditor";

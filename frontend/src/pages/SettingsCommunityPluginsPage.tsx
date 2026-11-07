@@ -52,16 +52,6 @@ import { PluginPlacementPanel } from "@/components/plugins/PluginPlacementPanel"
 import { PluginScopesPanel } from "@/components/plugins/PluginScopesPanel";
 import { PluginSettingsPanel } from "@/components/plugins/PluginSettingsPanel";
 import { PluginPendingUpdate, PluginUpdatesPanel } from "@/components/plugins/PluginUpdatesPanel";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityPluginDetail } from "@/hooks/useCommunityPluginDetail";
@@ -76,7 +66,17 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { formatDate } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { hasInitiativeSurfaces } from "@/lib/pluginSurfaces";
-import { cn } from "@/lib/utils";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Checkbox } from "@/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
+import { Skeleton } from "@/ui/skeleton";
 
 export function SettingsCommunityPluginsPage() {
   const { t } = useTranslation(["plugins", "common"]);

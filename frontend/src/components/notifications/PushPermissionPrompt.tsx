@@ -2,10 +2,10 @@ import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { getItem, setItem } from "@/lib/storage";
+import { Button } from "@/ui/button";
 
 const DISMISS_STORAGE_KEY = "push-prompt-dismissed";
 const SHOW_DELAY_MS = 3000;

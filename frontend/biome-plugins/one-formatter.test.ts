@@ -54,7 +54,7 @@ const flagged = (() => {
   };
   return new Set(
     report.diagnostics
-      .filter((diagnostic) => diagnostic.message.includes("src/lib/intl.ts"))
+      .filter((diagnostic) => diagnostic.message.includes("src/ui/lib/intl.ts"))
       .map((diagnostic) => path.basename(diagnostic.location.path))
   );
 })();

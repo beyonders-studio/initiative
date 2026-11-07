@@ -5,7 +5,10 @@ import { useTranslation } from "react-i18next";
 import type { TagSummary, TagTarget } from "@/api/generated/initiativeAPI.schemas";
 import { bulkEditTags } from "@/api/generated/tags/tags";
 import { TagPicker } from "@/components/tags/TagPicker";
-import { Button } from "@/components/ui/button";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import type { DialogWithSuccessProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -13,11 +16,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
-import type { DialogWithSuccessProps } from "@/types/dialog";
+} from "@/ui/dialog";
+import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/ui/tabs";
 
 /** Any entity that has an `id` and optional `tags`. */
 interface TaggableItem {

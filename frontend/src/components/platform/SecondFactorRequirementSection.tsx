@@ -19,11 +19,6 @@ import { useTranslation } from "react-i18next";
 import { AUTH_FACTOR_REQUIRED_EVENT, type FactorChallengeDetail } from "@/api/client";
 import type { SecondFactorRequirement } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   useAuthProviders,
   usePlatformAuthSettings,
@@ -32,6 +27,11 @@ import {
 } from "@/hooks/useSettings";
 import { getErrorCode, getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { Label } from "@/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 
 /** The three answers, in the order they widen. */
 const LEVELS = ["nobody", "platform_roles", "everyone"] as const;

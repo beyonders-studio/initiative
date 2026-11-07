@@ -29,8 +29,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/sidebar/sidebar";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   useAddWikiFile,
   useAddWikiPage,
@@ -43,6 +41,8 @@ import {
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { TOOL_ICONS, toolSettingsRoute, wikiFileRoute, wikiPageRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 
 // Adding a file to a wiki is named by the files tool itself, so the row
 // says which tool it reaches into rather than inventing a second mark for it.

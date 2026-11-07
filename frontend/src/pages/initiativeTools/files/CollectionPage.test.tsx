@@ -35,7 +35,7 @@ import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
-import { numberFormat } from "@/lib/intl";
+import { numberFormat } from "@/ui/lib/intl";
 
 import { CollectionPage } from "./CollectionPage";
 

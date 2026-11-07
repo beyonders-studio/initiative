@@ -2,7 +2,11 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type ApiKeyMetadata, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
+import { useCreateApiKey, useMyApiKeys } from "@/hooks/useSecurity";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import { buildApiUrl } from "@/lib/wsUrl";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -10,11 +14,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useCreateApiKey, useMyApiKeys } from "@/hooks/useSecurity";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
-import { buildApiUrl } from "@/lib/wsUrl";
+} from "@/ui/dialog";
 
 /** The longest name an API key takes. */
 const KEY_NAME_MAX = 100;

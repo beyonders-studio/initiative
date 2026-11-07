@@ -22,15 +22,10 @@ import {
   type TaskListRead,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { TableSkeleton } from "@/components/skeletons/PageSkeletons";
 import { sharedTaskColumns } from "@/components/tasks/globalTaskColumns";
 import { type ToolSortField, ToolTable } from "@/components/toolBrowser/ToolTable";
-import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/ui/data-table";
-import { RelativeTime } from "@/components/ui/relative-time";
 import { MentionText } from "@/components/user/MentionText";
 import { useCommunityToolRows } from "@/hooks/useCommunityToolRows";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInitiatives } from "@/hooks/useInitiatives";
 import { useServerTableState } from "@/hooks/useServerTableState";
 import { useTagEntities } from "@/hooks/useTags";
@@ -41,7 +36,6 @@ import { fieldColumn } from "@/lib/layouts/columns";
 import { LAYOUT_NAMESPACES, type LayoutEnv } from "@/lib/layouts/fields";
 import { taskFields } from "@/lib/layouts/tasks";
 import { hitIcon, searchHitPath } from "@/lib/searchResults";
-import type { AppColumnDef } from "@/lib/table";
 import {
   type ChildKind,
   entityRefRoute,
@@ -53,6 +47,12 @@ import {
   toolNavLabelKey,
 } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { DataTable } from "@/ui/data-table";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { TableSkeleton } from "@/ui/page-skeletons";
+import { RelativeTime } from "@/ui/relative-time";
 
 /** What a tool holds that can carry a tag, by tool: every child kind the
  *  bulk tag edit can address. Derived, so a newly taggable kind gets its

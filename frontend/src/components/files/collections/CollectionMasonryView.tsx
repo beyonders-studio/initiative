@@ -7,8 +7,8 @@ import type { CollectionCard } from "@/components/files/collections/collectionLi
 import { type MasonryEntry, MasonryWall } from "@/components/files/collections/MasonryWall";
 import { TagBadge } from "@/components/tags/TagBadge";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
-import { useWidthClass } from "@/hooks/useWidthClass";
 import { fileRatio, groupByTag } from "@/lib/collections";
+import { useWidthClass } from "@/ui/lib/useWidthClass";
 
 interface CollectionMasonryViewProps {
   files: CollectionFileSummary[];

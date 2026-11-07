@@ -27,10 +27,7 @@ import {
   type ProjectTaskCalendar,
 } from "@/components/initiativeTools/events/CalendarListPanel";
 import { ToolFilterPanel } from "@/components/initiativeTools/shared/ToolFilterPanel";
-import { CalendarGridSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
 import { TaskStatusPriorityFilters } from "@/components/tasks/TaskStatusPriorityFilters";
-import { Label } from "@/components/ui/label";
-import { MultiSelect } from "@/components/ui/multi-select";
 import { useMyCalendarEntries } from "@/hooks/useCalendarEntries";
 import { useMyCalendars } from "@/hooks/useCalendars";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -56,6 +53,9 @@ import { getProjectColor } from "@/lib/projectColor";
 import { browserTimezone } from "@/lib/timezones";
 import { entityRefRoute, toolSettingsRoute } from "@/lib/tools";
 import { useWeekStart } from "@/ui/host";
+import { Label } from "@/ui/label";
+import { MultiSelect } from "@/ui/multi-select";
+import { CalendarGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 /** Where one person's view of their calendar is kept. What an older release
  *  kept (its filters and month or week as one preference, what was switched

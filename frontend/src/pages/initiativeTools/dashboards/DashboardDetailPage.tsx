@@ -10,7 +10,6 @@ import { DashboardUpdateBadge } from "@/components/initiativeTools/dashboards/Da
 import { InitiativeViewNotice } from "@/components/initiativeTools/dashboards/InitiativeViewNotice";
 import { WidgetConfigDialog } from "@/components/initiativeTools/dashboards/WidgetConfigDialog";
 import { WidgetPicker } from "@/components/initiativeTools/dashboards/WidgetPicker";
-import { DetailHeaderSkeleton } from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { ToolChest, ToolChestSegment } from "@/components/tools/ToolChest";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
@@ -21,6 +20,7 @@ import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolListRoute, toolSettingsRoute } from "@/lib/tools";
+import { DetailHeaderSkeleton } from "@/ui/page-skeletons";
 
 export function DashboardDetailPage() {
   const { t } = useTranslation(["dashboards", "common"]);

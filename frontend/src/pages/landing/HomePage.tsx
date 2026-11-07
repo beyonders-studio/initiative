@@ -22,10 +22,10 @@ import { useTranslation } from "react-i18next";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { ToolIconTile, ToolSketch } from "@/components/initiatives/ToolSkeletons";
 import { LogoIcon } from "@/components/LogoIcon";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { DOCS_URL, docsUrl } from "@/lib/links";
 import { TOOL_ICONS, TOOLS, toolCamelPlural, toolNavLabelKey } from "@/lib/tools";
+import { Button } from "@/ui/button";
 
 import { BitsBetween } from "./BitsBetween";
 import { DarkBand } from "./DarkBand";

@@ -53,14 +53,14 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/sidebar/sidebar";
-import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { communityPluginPath, pluginHasConnections } from "@/lib/pluginSurfaces";
 import { resolveArtworkUrl } from "@/lib/uploadUrl";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
+import { cn } from "@/ui/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 
 export interface PluginsSectionProps {
   isCommunityAdmin: boolean;

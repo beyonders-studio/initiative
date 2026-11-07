@@ -20,8 +20,8 @@ import { useTranslation } from "react-i18next";
 
 import type { InitiativeDirectoryEntry } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeDirectory } from "@/components/communityHome/InitiativeDirectory";
-import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/ui/button";
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
 
 export interface CommunityHomeEmptyStateProps {
   entries: InitiativeDirectoryEntry[];

@@ -4,16 +4,16 @@ import { type ReactNode, useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useLeaveDemoLead, usePublishDemoPitch, useReadDemoPitch } from "@/api/generated/demo/demo";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCommunities } from "@/hooks/useCommunities";
 import { type DemoCopy, useDemoCopy, useIsDemoServer } from "@/hooks/useDemoCopy";
-import { useLiveClockValue, useRelativeTime } from "@/hooks/useRelativeTime";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { listFormat, numberFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { listFormat, numberFormat } from "@/ui/lib/intl";
+import { useLiveClockValue, useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 /** Publishing is queued, so the pitch is read again this often until the new
  *  version lands, and given up on after this long. */

@@ -40,20 +40,6 @@ import {
 import { CasePicker } from "@/components/platform/CasePicker";
 import { OperatorDeleteUserDialog } from "@/components/platform/OperatorDeleteUserDialog";
 import { Section, SettingRow } from "@/components/platform/SettingRow";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { useGrantCases } from "@/hooks/useAccessGrants";
 import { useAuth } from "@/hooks/useAuth";
@@ -81,6 +67,14 @@ import { toast } from "@/lib/mascotToast";
 import { Capability, hasAnyCapability } from "@/lib/permissions";
 import { getUserHandle } from "@/lib/userDisplay";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui/sheet";
+import { Switch } from "@/ui/switch";
+import { Textarea } from "@/ui/textarea";
 
 /** Platform roles ordered least → most privileged. */
 export const PLATFORM_ROLE_ORDER: UserRole[] = [

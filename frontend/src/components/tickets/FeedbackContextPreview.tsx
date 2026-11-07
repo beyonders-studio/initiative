@@ -8,7 +8,7 @@ import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { FeedbackContext } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/ui/button";
 
 /** The fields, in the order they are shown. */
 const FIELDS = ["app_version", "platform", "locale", "theme", "route", "viewport"] as const;

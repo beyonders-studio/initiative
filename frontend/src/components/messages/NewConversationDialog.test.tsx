@@ -30,7 +30,7 @@ vi.mock("@/hooks/usePeople", () => ({
 
 // The field's own debounce is not what is on trial, and waiting 250ms of fake
 // time in every case only makes them slower.
-vi.mock("@/hooks/useDebouncedValue", () => ({
+vi.mock("@/ui/lib/useDebouncedValue", () => ({
   useDebouncedValue: (value: string) => value,
 }));
 

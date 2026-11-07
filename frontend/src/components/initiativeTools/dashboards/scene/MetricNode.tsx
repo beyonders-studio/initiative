@@ -1,9 +1,9 @@
 import { TrendingDown, TrendingUp } from "lucide-react";
 
-import { cn } from "@/lib/utils";
 import { formatValue } from "@/lib/widgets/format";
 import type { SceneNode } from "@/lib/widgets/sceneSpec";
 import { toneTextClass } from "@/lib/widgets/tone";
+import { cn } from "@/ui/lib/utils";
 
 type Node = Extract<SceneNode, { kind: "metric" }>;
 

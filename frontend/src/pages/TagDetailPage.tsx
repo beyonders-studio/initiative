@@ -4,9 +4,16 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { StatusMessage } from "@/components/StatusMessage";
-import { TableSkeleton, TagDetailSkeleton } from "@/components/skeletons/PageSkeletons";
 import { TagLoadError, TagToolTab, toolTabCount } from "@/components/tags/TagToolTab";
+import { useDeleteTag, useTag, useTagCounts, useUpdateTag } from "@/hooks/useTags";
+import { toast } from "@/lib/mascotToast";
+import {
+  TOOL_ICONS,
+  TOOLS,
+  toolForRouteSegment,
+  toolNavLabelKey,
+  toolRouteSegment,
+} from "@/lib/tools";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,20 +24,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
-import { useDeleteTag, useTag, useTagCounts, useUpdateTag } from "@/hooks/useTags";
-import { toast } from "@/lib/mascotToast";
-import {
-  TOOL_ICONS,
-  TOOLS,
-  toolForRouteSegment,
-  toolNavLabelKey,
-  toolRouteSegment,
-} from "@/lib/tools";
+} from "@/ui/alert-dialog";
+import { Button } from "@/ui/button";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { Input } from "@/ui/input";
+import { TableSkeleton, TagDetailSkeleton } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
+import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/ui/tabs";
 
 export const TagDetailPage = () => {
   const { t } = useTranslation(["tags", "common", "nav"]);

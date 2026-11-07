@@ -3,7 +3,6 @@ import { Suspense, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SettingsTabsNav } from "@/components/settings/SettingsTabsNav";
-import { SettingsPaneSkeleton } from "@/components/skeletons/PageSkeletons";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Capability,
@@ -12,6 +11,7 @@ import {
   hasCapability,
 } from "@/lib/permissions";
 import { matchActiveTab } from "@/lib/tabs";
+import { SettingsPaneSkeleton } from "@/ui/page-skeletons";
 
 /**
  * App-wide *configuration* area: authentication, security, branding, email,

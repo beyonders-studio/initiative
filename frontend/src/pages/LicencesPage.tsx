@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useThirdPartyNotices } from "@/hooks/useThirdPartyNotices";
+import { Card, CardContent } from "@/ui/card";
+import { Skeleton } from "@/ui/skeleton";
 
 /**
  * The third-party licence notices the app ships with, read inside the app.

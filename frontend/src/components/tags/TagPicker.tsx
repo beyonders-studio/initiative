@@ -3,8 +3,9 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { TagRead, TagSummary } from "@/api/generated/initiativeAPI.schemas";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
+import { useCreateTag, useTags } from "@/hooks/useTags";
+import { Button, buttonVariants } from "@/ui/button";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import {
   Command,
   CommandGroup,
@@ -12,11 +13,10 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "@/components/ui/command";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useCreateTag, useTags } from "@/hooks/useTags";
-import { cn } from "@/lib/utils";
+} from "@/ui/command";
+import { Input } from "@/ui/input";
+import { cn } from "@/ui/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 import { TagBadge } from "./TagBadge";
 

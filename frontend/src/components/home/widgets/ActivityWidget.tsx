@@ -14,20 +14,14 @@ import { useTranslation } from "react-i18next";
 import { FeedView } from "@/api/generated/initiativeAPI.schemas";
 import { CommunityActivityFeed } from "@/components/communityHome/CommunityActivityFeed";
 import { HomeWidgetCard, HomeWidgetNotice } from "@/components/home/HomeWidgetCard";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { type CommunityEntry, useCommunities } from "@/hooks/useCommunities";
 import { activityLastVisitKey } from "@/lib/activityLastVisit";
 import { communityPath } from "@/lib/communityUrl";
 import { getItem } from "@/lib/storage";
+import { Button } from "@/ui/button";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 import type { HomeWidgetProps, HomeWidgetSettingsProps } from "./types";
 

@@ -4,27 +4,15 @@ import { useTranslation } from "react-i18next";
 import { FileKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { CollectionFileTile } from "@/components/files/collections/CollectionFileTile";
 import { CollectionFilterField } from "@/components/files/collections/CollectionFilterField";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useFilesFeed } from "@/hooks/useFiles";
 import { useInitiatives } from "@/hooks/useInitiatives";
 import { isToolEnabled } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** A picture taken from Files: the address of the version picked, and the
  *  file's name, which starts as its alt text. */

@@ -4,11 +4,11 @@ import { useTranslation } from "react-i18next";
 
 import { Tool, type WikiSummary } from "@/api/generated/initiativeAPI.schemas";
 import { TagBadgeList } from "@/components/tags/TagBadge";
-import { Badge } from "@/components/ui/badge";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolDetailRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/ui/badge";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { cn } from "@/ui/lib/utils";
 
 interface WikiCardProps {
   wiki: WikiSummary;

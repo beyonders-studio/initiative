@@ -38,11 +38,6 @@ import {
 } from "@/components/sidebar/sidebar";
 import { TagBrowser } from "@/components/sidebar/TagBrowser";
 import { WikiSidebarContent } from "@/components/sidebar/WikiSidebarContent";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useAutoCloseSidebar } from "@/hooks/useAutoCloseSidebar";
@@ -56,13 +51,18 @@ import { useCommunityBookmarks } from "@/hooks/usePersonalItems";
 import { useProjects } from "@/hooks/useProjects";
 import { useTags } from "@/hooks/useTags";
 import { useToolCountsByInitiative } from "@/hooks/useToolCounts";
-import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
 import { communityPath } from "@/lib/communityUrl";
 import { canAccessOperatorDashboard, canManagePlatformConfig } from "@/lib/permissions";
 import { renderRecentIcon } from "@/lib/recentIcon";
 import { getActiveRecentKey, recentRoute } from "@/lib/recentRoute";
 import { getItem, setItem } from "@/lib/storage";
 import { TOOLS, toolViewParams } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
+import { ScrollArea } from "@/ui/scroll-area";
+import { Skeleton } from "@/ui/skeleton";
+import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 
 export const AppSidebar = () => {
   const { user, logout, refreshUser } = useAuth();

@@ -4,9 +4,11 @@ import { useTranslation } from "react-i18next";
 
 import type { ChangelogEntry } from "@/api/generated/initiativeAPI.schemas";
 import { Markdown } from "@/components/Markdown";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useChangelog } from "@/hooks/useSettings";
+import { CHANGELOG_URL, RELEASES_URL } from "@/lib/links";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import {
   Dialog,
   DialogClose,
@@ -15,11 +17,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useChangelog } from "@/hooks/useSettings";
-import { CHANGELOG_URL, RELEASES_URL } from "@/lib/links";
-import { cn } from "@/lib/utils";
+} from "@/ui/dialog";
+import { cn } from "@/ui/lib/utils";
+import { ScrollArea } from "@/ui/scroll-area";
 
 /**
  * What version this is, and what has changed lately — opened from the sidebar,

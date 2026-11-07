@@ -23,7 +23,7 @@ import { FileTicketDialog } from "@/components/tickets/FileTicketDialog";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useTheme } from "@/hooks/useTheme";
 import { useTicketAvailability } from "@/hooks/useTickets";
-import { useWidthClass } from "@/hooks/useWidthClass";
+import { useWidthClass } from "@/ui/lib/useWidthClass";
 
 // Whether the sheet is open, kept outside React so a menu item and the
 // command palette can open the one drawn by the shell.

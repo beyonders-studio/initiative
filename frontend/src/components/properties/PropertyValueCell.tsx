@@ -8,14 +8,14 @@ import {
   type PropertyOption,
   type PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { fileIcon } from "@/lib/fileIcon";
 import { formatDate, formatDateTime } from "@/lib/formatDate";
-import { numberFormat } from "@/lib/intl";
 import { openExternal } from "@/lib/openExternal";
-import { sanitizeUrl } from "@/lib/safeUrl";
 import { getAvatarSrc, getInitialsForUser, getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { numberFormat } from "@/ui/lib/intl";
+import { sanitizeUrl } from "@/ui/lib/safeUrl";
+import { cn } from "@/ui/lib/utils";
 
 import {
   counterCount,

@@ -10,11 +10,11 @@ import {
 } from "@/components/access/BulkEditAccessDialog";
 import { BulkExportButton } from "@/components/exports/BulkExportButton";
 import { BulkEditTagsDialog } from "@/components/shared/BulkEditTagsDialog";
-import { Button } from "@/components/ui/button";
 import { useDeleteTools, useDuplicateTools } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { toast } from "@/lib/mascotToast";
 import { everyCan } from "@/lib/permissions";
+import { Button } from "@/ui/button";
 
 /** The slice of {@link useGridSelection} this section drives. */
 interface GridSelectionLike<T> {

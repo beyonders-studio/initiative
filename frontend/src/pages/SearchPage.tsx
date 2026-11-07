@@ -17,17 +17,10 @@ import { Search, SearchX, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { StatusMessage } from "@/components/StatusMessage";
 import { MemberResultRow } from "@/components/search/MemberResultRow";
 import { SearchCategoryTabs } from "@/components/search/SearchCategoryTabs";
 import { SearchResultList } from "@/components/search/SearchResultRow";
-import { ListSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useCommunities } from "@/hooks/useCommunities";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useCommunitySearch } from "@/hooks/useSearch";
 import { useUserSearch } from "@/hooks/useUsers";
 import {
@@ -38,6 +31,13 @@ import {
   type SearchCategory,
   TOOL_ENTITY_TYPES,
 } from "@/lib/searchResults";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
+import { Switch } from "@/ui/switch";
+import { Tabs, TabsContent } from "@/ui/tabs";
 
 /** A page of one category. */
 const PAGE_SIZE = 20;

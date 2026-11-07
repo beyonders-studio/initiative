@@ -6,15 +6,9 @@
 import { useTranslation } from "react-i18next";
 
 import { HOME_WIDGETS } from "@/components/home/widgets";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import type { HomeWidget, HomeWidgetOptions } from "@/lib/home/layout";
+import { Button } from "@/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/ui/dialog";
 
 export interface HomeWidgetSettingsDialogProps {
   widget: HomeWidget | null;

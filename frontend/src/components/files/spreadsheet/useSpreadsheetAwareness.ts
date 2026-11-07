@@ -2,7 +2,7 @@ import type { ProviderAwareness } from "@lexical/yjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { SheetId } from "@/lib/spreadsheet/sheets";
-import { getUserColorHsl } from "@/lib/userColor";
+import { getUserColorHsl } from "@/ui/lib/userColor";
 
 /**
  * Selection-presence awareness for the spreadsheet editor.

@@ -3,16 +3,10 @@ import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { type MetadataOwner, useOwnedDefinitions } from "@/hooks/useProperties";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 import { PropertyInput, type PropertyInputProps } from "./PropertyInput";
 import { iconForPropertyType } from "./propertyTypeIcons";

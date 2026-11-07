@@ -7,15 +7,6 @@ import type {
   PropertySummary,
   PropertyValueInput,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { type ItemDraft, ItemDraftContext, type ItemEdit } from "@/hooks/useFieldSave";
 import { useOwnedDefinitions } from "@/hooks/useProperties";
 import { useSetItemLinks } from "@/hooks/useRelationships";
@@ -24,8 +15,17 @@ import { AddingLinks, type DetailKind, DetailLayoutView } from "@/lib/layouts/De
 import { missingRequired, requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
 import type { PluginItem } from "@/lib/layouts/plugins";
 import type { LinkedRef } from "@/lib/relationships";
-import { cn } from "@/lib/utils";
 import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { cn } from "@/ui/lib/utils";
 
 type Item = PluginItem & { properties: PropertySummary[] };
 

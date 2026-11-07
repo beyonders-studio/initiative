@@ -35,24 +35,11 @@ import { TaskReminderField } from "@/components/tasks/TaskReminderField";
 import { statusTriggerStyle, TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { CasePanel } from "@/components/tickets/CasePanel";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { useComments, useCommentsCache, useCommentThreadState } from "@/hooks/useComments";
-import { useDateLocale } from "@/hooks/useDateLocale";
 import { ItemDraftContext, type ItemEdit } from "@/hooks/useFieldSave";
 import { useOwnedDefinitions } from "@/hooks/useProperties";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { useSmartTitle, useSmartTitlesOn } from "@/hooks/useSmartTitle";
 import {
   TASK_SAVES,
@@ -64,7 +51,6 @@ import {
 } from "@/hooks/useTasks";
 import { detailLayoutOf, instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { dateRangeBounds } from "@/lib/dateRange";
-import { fromPickerValue, toPickerValue } from "@/lib/localDateTime";
 import { toast } from "@/lib/mascotToast";
 import {
   fromStored,
@@ -77,7 +63,6 @@ import { referenceRef } from "@/lib/smartChips";
 import { type Applied, NOTHING_APPLIED, readingEdit } from "@/lib/smartTaskTitle";
 import { PRIORITY_ORDER } from "@/lib/sorting";
 import { startedFrom, startsWith } from "@/lib/taskTypeStart";
-import { dateTimePattern } from "@/lib/timeFormat";
 import { taskRoute } from "@/lib/tools";
 import {
   getAvatarSrc,
@@ -85,6 +70,15 @@ import {
   getUserDisplayName,
   isAnonymizedUser,
 } from "@/lib/userDisplay";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Label } from "@/ui/label";
+import { fromPickerValue, toPickerValue } from "@/ui/lib/localDateTime";
+import { dateTimePattern } from "@/ui/lib/timeFormat";
+import { useDateLocale } from "@/ui/lib/useDateLocale";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 import { type DetailKind, useItemContext } from "./DetailLayoutView";
 import {

@@ -4,8 +4,6 @@ import { useTranslation } from "react-i18next";
 
 import type { UserRead, UserSelfUpdate } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { SlotPicker, TrophyPicker } from "@/components/user/DecorationPicker";
 import { MyDecorationPacks } from "@/components/user/MyDecorationPacks";
 import { ProfilePreview } from "@/components/user/ProfilePreview";
@@ -13,6 +11,8 @@ import { useMyDecorations, useUpdateCurrentUser } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { currentYear, DATED_DECORATIONS } from "@/lib/gradArtwork";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { Label } from "@/ui/label";
 
 /** Mirrors ``MAX_PROFILE_TROPHIES`` on the server. */
 const MAX_TROPHIES = 6;

@@ -22,8 +22,6 @@ import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { HomeWidgetCard } from "@/components/home/HomeWidgetCard";
 import { useHomeActions } from "@/components/home/homeActions";
 import { YonderSays } from "@/components/start/YonderSays";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useHomeViews } from "@/hooks/useHomeViews";
@@ -33,7 +31,9 @@ import { communityPath } from "@/lib/communityUrl";
 import type { HomeTaskList } from "@/lib/home/firstHome";
 import type { StartPath } from "@/lib/startFlow";
 import { toolDetailRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
+import { Progress } from "@/ui/progress";
 
 import type { HomeWidgetProps } from "./types";
 

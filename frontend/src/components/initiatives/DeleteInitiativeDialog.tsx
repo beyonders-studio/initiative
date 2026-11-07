@@ -1,6 +1,6 @@
 import { Trans, useTranslation } from "react-i18next";
 
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 
 interface DeleteInitiativeDialogProps {
   open: boolean;

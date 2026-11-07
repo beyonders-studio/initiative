@@ -35,9 +35,9 @@ import {
 } from "@/lib/counter-math";
 import { fireCounterStepFeedback } from "@/lib/counterStepFeedback";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { collator } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
 import type { MutationOpts } from "@/types/mutation";
+import { collator } from "@/ui/lib/intl";
 
 // ── Optimistic update helpers ───────────────────────────────────────────────
 

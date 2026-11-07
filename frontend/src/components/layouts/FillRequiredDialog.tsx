@@ -3,7 +3,13 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { PropertySummary } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
+import { ItemDraftContext } from "@/hooks/useFieldSave";
+import { useOwnedDefinitions } from "@/hooks/useProperties";
+import { type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
+import { missingRequired, type StoredRegions } from "@/lib/layouts/detailLayout";
+import type { LayoutNode } from "@/lib/layouts/tree";
+import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -11,13 +17,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { ItemDraftContext } from "@/hooks/useFieldSave";
-import { useOwnedDefinitions } from "@/hooks/useProperties";
-import { type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
-import { missingRequired, type StoredRegions } from "@/lib/layouts/detailLayout";
-import type { LayoutNode } from "@/lib/layouts/tree";
-import type { DialogProps } from "@/types/dialog";
+} from "@/ui/dialog";
 
 import { useItemDraft, type Written } from "./AddItemDialog";
 

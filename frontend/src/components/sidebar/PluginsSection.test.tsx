@@ -22,7 +22,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { CommunityPluginRead } from "@/api/generated/initiativeAPI.schemas";
 import { SidebarProvider } from "@/components/sidebar/sidebar";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/ui/tooltip";
 
 import { PluginsSection } from "./PluginsSection";
 

@@ -15,16 +15,6 @@ import {
   type PropertyFilterCondition,
 } from "@/components/properties/PropertyFilter";
 import { TagPicker } from "@/components/tags/TagPicker";
-import { Label } from "@/components/ui/label";
-import { MultiSelect } from "@/components/ui/multi-select";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useTags } from "@/hooks/useTags";
 import type { MemberSearchScope } from "@/hooks/useUsers";
 import {
@@ -36,6 +26,10 @@ import {
 } from "@/lib/filters/taskFilters";
 import { pluginFilterFields, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { PRIORITY_ORDER } from "@/lib/sorting";
+import { Label } from "@/ui/label";
+import { MultiSelect } from "@/ui/multi-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 /**
  * Task statuses are per-project rows, so filtering by a status *id* only means

@@ -1,8 +1,8 @@
 import type { PostRead } from "@/api/generated/initiativeAPI.schemas";
 import { UserName } from "@/components/UserHandle";
-import { RelativeTime } from "@/components/ui/relative-time";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
+import { RelativeTime } from "@/ui/relative-time";
 
 /**
  * Who said it, and when. A notice is somebody saying something, and a board

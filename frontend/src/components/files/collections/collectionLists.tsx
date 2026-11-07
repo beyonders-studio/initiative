@@ -29,8 +29,8 @@ import {
 } from "@/lib/layouts/fields";
 import { cardLines, FILE_COLUMN_OF, FILE_LIST_SHAPE } from "@/lib/layouts/files";
 import { type LayoutContext, type LayoutNode, LayoutTree, namesField } from "@/lib/layouts/tree";
-import type { AppColumnDef } from "@/lib/table";
 import type { TranslateFn } from "@/types/i18n";
+import type { AppColumnDef } from "@/ui/lib/table";
 
 /** A card under each file's picture, and how tall it stands for a file: what
  *  the masonry wall, which places files without measuring them, reserves. */

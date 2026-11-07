@@ -27,7 +27,6 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getCaretCoordinates } from "@/lib/caretCoordinates";
-import { cn } from "@/lib/utils";
 import {
   applyCompletion,
   type Completion,
@@ -39,6 +38,7 @@ import {
   type WordAt,
   wordAt,
 } from "@/lib/widgets/completion";
+import { cn } from "@/ui/lib/utils";
 
 /** How many names the list offers at once. */
 const LIMIT = 8;

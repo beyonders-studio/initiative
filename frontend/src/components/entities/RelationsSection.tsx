@@ -19,25 +19,6 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { AddLinkDialog } from "@/components/entities/AddLinkDialog";
 import { EntityCard } from "@/components/entities/EntityCard";
-import { Button } from "@/components/ui/button";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
-import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { DropOverlay } from "@/components/ui/file-drop";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useFileDrop } from "@/hooks/useFileDrop";
 import { useInitiatives } from "@/hooks/useInitiatives";
 import { useRelatedStates } from "@/hooks/useRelatedStates";
 import {
@@ -57,7 +38,26 @@ import {
   type RelationGroupKey,
 } from "@/lib/relationships";
 import { getItem, setItem } from "@/lib/storage";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/ui/carousel";
+import { Collapsible, CollapsibleContent } from "@/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { DropOverlay } from "@/ui/file-drop";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hover-card";
+import { useFileDrop } from "@/ui/lib/useFileDrop";
+import { cn } from "@/ui/lib/utils";
+import { Skeleton } from "@/ui/skeleton";
 
 /**
  * The grid every group draws into. `min(…, 100%)` keeps a card from overflowing

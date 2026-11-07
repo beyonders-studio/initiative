@@ -13,14 +13,14 @@ import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { usePersonMention } from "@/components/comments/usePersonMention";
 import { SmartTitleHints } from "@/components/tasks/SmartTitleHints";
 import { SmartTitleParts } from "@/components/tasks/SmartTitleParts";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { useSmartTitle, useSmartTitlesOn } from "@/hooks/useSmartTitle";
 import { useCreateTaskInCommunity } from "@/hooks/useTasks";
 import type { HomeTaskList } from "@/lib/home/firstHome";
 import { toast } from "@/lib/mascotToast";
 import { readingCreate } from "@/lib/smartTaskTitle";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
 
 export const QuickAddTask = ({ list, name }: { list: HomeTaskList; name: string }) => {
   const { t } = useTranslation("home");

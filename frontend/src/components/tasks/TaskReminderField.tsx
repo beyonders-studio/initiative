@@ -2,10 +2,10 @@ import { BellRing } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { TaskRead } from "@/api/generated/initiativeAPI.schemas";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Label } from "@/components/ui/label";
 import { useTaskReminder } from "@/hooks/usePersonalItems";
-import { fromPickerValue, toPickerValue } from "@/lib/localDateTime";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Label } from "@/ui/label";
+import { fromPickerValue, toPickerValue } from "@/ui/lib/localDateTime";
 
 /**
  * When to remind the reader of a task: theirs alone, kept beside what else they

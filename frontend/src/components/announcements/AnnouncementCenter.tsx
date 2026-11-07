@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 
 import { AnnouncementDialog } from "@/components/announcements/AnnouncementDialog";
-import { Button } from "@/components/ui/button";
 import { useAnnouncements } from "@/hooks/useAnnouncements";
+import { Button } from "@/ui/button";
 
 /**
  * Shows the announcements queued for the signed-in reader, one at a time.

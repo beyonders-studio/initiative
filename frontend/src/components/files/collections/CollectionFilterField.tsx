@@ -3,15 +3,9 @@ import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import type { ToolListFilters } from "@/components/tools/ToolFilterFields";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useCollections } from "@/hooks/useCollections";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** "Any" is a sentinel: the underlying filter is absent, not a value. */
 const ANY_COLLECTION = "any";

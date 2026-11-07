@@ -30,8 +30,6 @@ import { type ColumnFill, KanbanColumn } from "@/components/projects/KanbanColum
 import { priorityVariant } from "@/components/projects/projectTasksConfig";
 import { resolveKanbanDropTarget } from "@/components/projects/taskOrdering";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
-import { Badge } from "@/components/ui/badge";
-import { GroupBySelect } from "@/components/ui/data-table";
 import { MentionText } from "@/components/user/MentionText";
 import { type ColumnLimits, NO_COLUMN_LIMITS } from "@/hooks/useColumnLimits";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
@@ -46,7 +44,9 @@ import { boardBands } from "@/lib/layouts/grouping";
 import { pluginFields, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { taskFields } from "@/lib/layouts/tasks";
 import { type LayoutContext, type LayoutNode, namesField } from "@/lib/layouts/tree";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/ui/badge";
+import { GroupBySelect } from "@/ui/data-table";
+import { cn } from "@/ui/lib/utils";
 
 import { TaskAssigneeList } from "./TaskAssigneeList";
 import { type BoardActions, BoardActionsContext, TaskCardActions } from "./TaskQuickActions";

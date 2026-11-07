@@ -39,7 +39,7 @@ import { activityLastVisitKey } from "@/lib/activityLastVisit";
 import { renderableBanner } from "@/lib/banner";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { readableTextShadow } from "@/lib/contrastColor";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 /** The rail's circles, in order; the first is the default. All and Yours are
  *  views of the activity feed; Comments shows the comments themselves. */

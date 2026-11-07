@@ -2,8 +2,8 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CurrencyCode } from "@/api/generated/initiativeAPI.schemas";
-import { SearchableCombobox } from "@/components/ui/searchable-combobox";
-import { collator, displayNames } from "@/lib/intl";
+import { collator, displayNames } from "@/ui/lib/intl";
+import { SearchableCombobox } from "@/ui/searchable-combobox";
 
 /** The currency a new money property starts in: the one the reader's language
  *  is most often written about. */

@@ -16,9 +16,6 @@ import { useTranslation } from "react-i18next";
 
 import { type ChosenImage, ImageChooserDialog } from "@/components/files/ImageChooser";
 import { Markdown } from "@/components/Markdown";
-import { usePhotoCapture } from "@/components/ui/image-picker";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/errorMessage";
 import {
   continueList,
@@ -29,7 +26,10 @@ import {
 } from "@/lib/markdownEditing";
 import { toast } from "@/lib/mascotToast";
 import { canCapturePhoto } from "@/lib/nativeCamera";
-import { cn } from "@/lib/utils";
+import { usePhotoCapture } from "@/ui/image-picker";
+import { cn } from "@/ui/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
+import { Textarea } from "@/ui/textarea";
 
 import {
   MARKDOWN_SHORTCUTS,

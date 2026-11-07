@@ -1,7 +1,7 @@
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
 
-import { BLOCKED_URL, sanitizeUrl } from "@/lib/safeUrl";
+import { BLOCKED_URL, sanitizeUrl } from "@/ui/lib/safeUrl";
 
 /** The phone apps open another site in the system's browser sheet. */
 const opensInBrowserSheet = (): boolean => {

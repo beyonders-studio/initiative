@@ -14,7 +14,7 @@
 import type { ReactNode } from "react";
 
 import { useFullBleed } from "@/components/PageBanner";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 /** The artwork fades to nothing over its lower part, where the widgets sit. */
 const FADE = "linear-gradient(to bottom, #000 35%, transparent 100%)";

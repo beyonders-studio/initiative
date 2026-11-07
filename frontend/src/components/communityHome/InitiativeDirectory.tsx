@@ -40,10 +40,6 @@ import type {
 import { InitiativeJoinPolicy } from "@/api/generated/initiativeAPI.schemas";
 import { RequestToJoinDialog } from "@/components/initiatives/RequestToJoinDialog";
 import { Markdown } from "@/components/Markdown";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useInitiativeAccess } from "@/hooks/useInitiativeAccess";
 import { useInitiatives, useJoinInitiative } from "@/hooks/useInitiatives";
@@ -53,7 +49,11 @@ import { hexToRgba, InitiativeColorDot, resolveInitiativeColor } from "@/lib/ini
 import { toast } from "@/lib/mascotToast";
 import { getItem, setItem } from "@/lib/storage";
 import { initiativeRoute, TOOL_ICONS, TOOLS, toolNavLabelKey } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
+import { cn } from "@/ui/lib/utils";
 
 export const DIRECTORY_SECTION_ID = "initiative-directory";
 

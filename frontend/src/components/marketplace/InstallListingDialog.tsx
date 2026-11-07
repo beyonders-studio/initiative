@@ -29,26 +29,6 @@ import {
 import { useInstallMarketplaceListing } from "@/api/generated/marketplace/marketplace";
 import { invalidate, q } from "@/api/query-keys";
 import { ListingProvenance } from "@/components/marketplace/ListingProvenance";
-import { Button } from "@/components/ui/button";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCreateDashboard } from "@/hooks/useDashboards";
 import { useToolCreateAccess } from "@/hooks/useInitiativeAccess";
@@ -59,6 +39,20 @@ import { toast } from "@/lib/mascotToast";
 import { projectEnvelopeHasDates, readProjectEnvelope } from "@/lib/projectListing";
 import { toolDetailRoute } from "@/lib/tools";
 import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 export interface InstallListingDialogProps extends DialogProps {
   listing: MarketplaceListingDetail;

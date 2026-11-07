@@ -27,21 +27,10 @@ import { getOpenCreateTaskWizard } from "@/components/tasks/CreateTaskWizard";
 import { openFeedback, useFeedbackOffered } from "@/components/tickets/FeedbackSheet";
 import { useSecurityReporting } from "@/components/tickets/ReportSecurityProblem";
 import { getOpenCreateToolWizard } from "@/components/tools/CreateToolWizard";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { Tabs } from "@/components/ui/tabs";
 import { MentionText } from "@/components/user/MentionText";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useHeldSurfaces } from "@/hooks/useCustomRoles";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useDirectMessagesEnabled } from "@/hooks/useDirectMessages";
 import { useGlobalCreateAccess } from "@/hooks/useInitiativeAccess";
 import { useRecents } from "@/hooks/usePersonalItems";
@@ -51,7 +40,6 @@ import { useHasFiledTickets } from "@/hooks/useTickets";
 import { useUserSearch } from "@/hooks/useUsers";
 import { USER_MENTION_PATTERN } from "@/lib/commentReferences";
 import { communityPath, useCommunityPath } from "@/lib/communityUrl";
-import { commandFilter } from "@/lib/fuzzyMatch";
 import { canAccessOperatorDashboard, canManagePlatformConfig } from "@/lib/permissions";
 import { renderRecentIcon } from "@/lib/recentIcon";
 import { recentRoute } from "@/lib/recentRoute";
@@ -73,6 +61,18 @@ import {
   getUrlHandle,
   getUserDisplayName,
 } from "@/lib/userDisplay";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/ui/command";
+import { commandFilter } from "@/ui/lib/fuzzyMatch";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { Tabs } from "@/ui/tabs";
 
 // Module-level callback so other components can open the command center
 let openCommandCenter: (() => void) | null = null;

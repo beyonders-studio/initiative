@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import type { TaskListRead } from "@/api/generated/initiativeAPI.schemas";
 import { type ExportParams, ExportTasksButton } from "@/components/tasks/ExportTasksButton";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/ui/button";
 
 type TaskBulkEditPanelProps = {
   selectedTasks: TaskListRead[];

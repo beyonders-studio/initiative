@@ -64,12 +64,10 @@ import {
 } from "@/components/marketplace/BrowseMarketplaceButton";
 import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
-import { PaginationBar } from "@/components/PaginationBar";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { useProjectColumns } from "@/components/projects/projectColumns";
 import { parsePropertyFilters } from "@/components/properties/PropertyFilter";
-import { CardGridSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { TagBrowseLayout } from "@/components/tags/TagBrowseLayout";
 import {
@@ -83,15 +81,9 @@ import {
   ToolIndexTable,
   toolTableStorageKey,
 } from "@/components/tools/ToolIndexTable";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { DropOverlay } from "@/components/ui/file-drop";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCreateFromSearchParam } from "@/hooks/useCreateFromSearchParam";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { useFileDrop } from "@/hooks/useFileDrop";
 import { useGridSelection } from "@/hooks/useGridSelection";
 import { useToolCreateAccess } from "@/hooks/useInitiativeAccess";
 import {
@@ -108,7 +100,6 @@ import { useTagTreeSelection } from "@/hooks/useTagTreeSelection";
 import { useToolCounts } from "@/hooks/useToolCounts";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { useCommunityPath } from "@/lib/communityUrl";
-import type { AppColumnDef } from "@/lib/table";
 import {
   isToolView,
   TOOL_ICONS,
@@ -123,6 +114,15 @@ import {
 } from "@/lib/tools";
 import type { DialogProps } from "@/types/dialog";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { DropdownMenuItem } from "@/ui/dropdown-menu";
+import { DropOverlay } from "@/ui/file-drop";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { useFileDrop } from "@/ui/lib/useFileDrop";
+import { CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { PaginationBar } from "@/ui/pagination-bar";
 
 // ---------------------------------------------------------------------------
 // What a tool contributes

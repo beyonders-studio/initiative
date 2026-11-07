@@ -16,9 +16,10 @@ import type {
   AnnouncementSection,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Markdown } from "@/components/Markdown";
-import { Lightbox } from "@/components/shared/Lightbox";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { splitIntoPages } from "@/lib/announcementPages";
+import { resolveHeaderlessApiUrl } from "@/lib/uploadUrl";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -26,9 +27,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { splitIntoPages } from "@/lib/announcementPages";
-import { resolveHeaderlessApiUrl } from "@/lib/uploadUrl";
+} from "@/ui/dialog";
+import { Lightbox } from "@/ui/lightbox";
 
 const CATEGORY_ICON: Record<AnnouncementCategory, typeof Megaphone> = {
   release: Rocket,

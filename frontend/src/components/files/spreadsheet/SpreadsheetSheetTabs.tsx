@@ -3,19 +3,19 @@ import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   MAX_SHEET_NAME_LENGTH,
   type SheetId,
   type SheetMeta,
   visibleSheets,
 } from "@/lib/spreadsheet/sheets";
-import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { cn } from "@/ui/lib/utils";
 
 interface SpreadsheetSheetTabsProps {
   sheets: SheetMeta[];

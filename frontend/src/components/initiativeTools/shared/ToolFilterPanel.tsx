@@ -2,10 +2,10 @@ import { Filter, FilterX } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { useWidthClass } from "@/hooks/useWidthClass";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { useWidthClass } from "@/ui/lib/useWidthClass";
+import { cn } from "@/ui/lib/utils";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
 
 /** How many filters are set, as a small pill; nothing while none are. */
 export const FilterCountBadge = ({ count }: { count: number }) =>

@@ -217,8 +217,20 @@
       }
     },
     {
-      // UI primitives and tests: relax rules that aren't worth fixing here
-      "includes": ["src/components/ui/**", "src/__tests__/**", "**/*.test.ts", "**/*.test.tsx"],
+      // The UI kit our plug-ins copy imports nothing of Initiative's. Its tests
+      // stay in Initiative and aren't copied.
+      "includes": ["src/ui/**", "!**/*.test.ts", "!**/*.test.tsx"],
+      "plugins": ["./biome-plugins/ui-imports-only-ui.grit"]
+    },
+    {
+      // UI primitives, the editor and tests: relax rules that aren't worth fixing here
+      "includes": [
+        "src/ui/**",
+        "src/components/editor/**",
+        "src/__tests__/**",
+        "**/*.test.ts",
+        "**/*.test.tsx"
+      ],
       "linter": {
         "rules": {
           "a11y": {

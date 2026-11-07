@@ -18,32 +18,7 @@ import {
 } from "@/components/communities/CommunityInvites";
 import { RemoveCommunityMemberDialog } from "@/components/communities/RemoveCommunityMemberDialog";
 import { EntityPicker } from "@/components/entities/EntityPicker";
-import { SkeletonRegion, TableSkeleton } from "@/components/skeletons/PageSkeletons";
 import { UserHandle } from "@/components/UserHandle";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/data-table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { MultiSelect } from "@/components/ui/multi-select";
-import { RelativeTime } from "@/components/ui/relative-time";
-import { RowActionsMenu } from "@/components/ui/row-actions-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityInvites } from "@/hooks/useCommunityInvites";
@@ -53,9 +28,28 @@ import { useServerTableState } from "@/hooks/useServerTableState";
 import { useExtendGuest, useMakeGuestAMember, useUsers } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import type { AppColumnDef } from "@/lib/table";
 import { TOOLS } from "@/lib/tools";
 import { getUrlHandle, getUserDisplayName } from "@/lib/userDisplay";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { DataTable } from "@/ui/data-table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { MultiSelect } from "@/ui/multi-select";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { RelativeTime } from "@/ui/relative-time";
+import { RowActionsMenu } from "@/ui/row-actions-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** One item a guest invite gives, and how far. */
 interface ChosenItem {

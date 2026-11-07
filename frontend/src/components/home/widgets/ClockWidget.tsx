@@ -25,17 +25,17 @@ import { useTranslation } from "react-i18next";
 
 import timerBeepUrl from "@/assets/beeps.wav";
 import { HomeWidgetCard } from "@/components/home/HomeWidgetCard";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { SearchableCombobox } from "@/components/ui/searchable-combobox";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { dateTimeFormat, numberFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
-import { hour12Option } from "@/lib/timeFormat";
 import { isKnownTimezone, TIMEZONE_OPTIONS } from "@/lib/timezones";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
 import { useTimeFormat } from "@/ui/host";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { dateTimeFormat, numberFormat } from "@/ui/lib/intl";
+import { hour12Option } from "@/ui/lib/timeFormat";
+import { cn } from "@/ui/lib/utils";
+import { SearchableCombobox } from "@/ui/searchable-combobox";
+import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 import type { HomeWidgetProps, HomeWidgetSettingsProps } from "./types";
 

@@ -17,7 +17,7 @@ import type {
   CollectionRead,
   PropertyValuesSetRequest,
 } from "@/api/generated/initiativeAPI.schemas";
-import { formatBytes } from "@/lib/fileUtils";
+import { formatBytes } from "@/ui/lib/fileUtils";
 
 import { DetailLayoutView } from "./DetailLayoutView";
 import type { StoredRegions } from "./detailLayout";

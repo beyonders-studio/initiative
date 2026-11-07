@@ -32,30 +32,6 @@ import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { SpreadsheetFormattingStore } from "@/components/files/spreadsheet/useSpreadsheetFormatting";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  OverflowMenuItem,
-  OverflowSubmenu,
-  OverflowToolbar,
-  type OverflowToolbarItem,
-} from "@/components/ui/overflow-toolbar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { HISTORY_SHORTCUT } from "@/hooks/useYjsHistory";
 import type {
   BorderLineStyle,
@@ -66,7 +42,25 @@ import type {
   NegativeStyle,
   NumberFormat,
 } from "@/lib/spreadsheet/styles";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { cn } from "@/ui/lib/utils";
+import {
+  OverflowMenuItem,
+  OverflowSubmenu,
+  OverflowToolbar,
+  type OverflowToolbarItem,
+} from "@/ui/overflow-toolbar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 export type SelectionMode = "range" | "columns" | "rows";
 

@@ -12,16 +12,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ServerChip } from "@/components/auth/ServerChoice";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { PROMPT_CALLBACK, type PromptKind, runPrompt } from "@/lib/passkeys";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
 
 /** The prompt the fragment asks for, with the id its answer goes back under,
  *  or null for a link that carries none. */

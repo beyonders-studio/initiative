@@ -12,9 +12,9 @@
  * applied by the editor inside a single collaborative transaction.
  */
 
-import { collator } from "@/lib/intl";
 import { type CellValue, keyOf, parseKey } from "@/lib/spreadsheet/coords";
 import type { CellFmt, RowFmt } from "@/lib/spreadsheet/styles";
+import { collator } from "@/ui/lib/intl";
 
 export type SortDirection = "asc" | "desc";
 

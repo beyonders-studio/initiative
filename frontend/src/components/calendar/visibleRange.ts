@@ -10,7 +10,7 @@ import {
   startOfYear,
 } from "date-fns";
 
-import { dateRangeBounds, type LocalDateRange } from "@/components/ui/date-range-field";
+import { dateRangeBounds, type LocalDateRange } from "@/ui/date-range-field";
 
 import type { CalendarViewMode } from "./CalendarView";
 

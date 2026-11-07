@@ -6,12 +6,12 @@ import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { WikiPageTree } from "@/components/initiativeTools/wikis/WikiPageTree";
 import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useAddWikiPage, useWiki, useWikiPages } from "@/hooks/useWikis";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolListRoute, wikiPageRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 /**
  * A wiki, opened.

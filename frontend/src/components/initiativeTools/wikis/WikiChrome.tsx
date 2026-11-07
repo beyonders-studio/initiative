@@ -6,12 +6,12 @@ import { Tool, type WikiRead } from "@/api/generated/initiativeAPI.schemas";
 import { BookmarkButton } from "@/components/BookmarkButton";
 import { SubscribeButton } from "@/components/SubscribeButton";
 import { ToolBreadcrumb } from "@/components/tools/ToolBreadcrumb";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { RelativeTime } from "@/components/ui/relative-time";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toolDetailRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { cn } from "@/ui/lib/utils";
+import { RelativeTime } from "@/ui/relative-time";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 
 interface WikiChromeProps {
   wiki: WikiRead;

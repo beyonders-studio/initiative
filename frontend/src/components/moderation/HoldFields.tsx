@@ -11,15 +11,9 @@ import {
   LegalBasis,
   type LegalBasis as LegalBasisValue,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Textarea } from "@/ui/textarea";
 
 /** Matches the column behind it. */
 const NOTE_MAX = 2000;

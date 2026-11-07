@@ -5,11 +5,6 @@ import {
   AIConnectionManager,
   type ConnectionMutations,
 } from "@/components/settings/AIConnectionManager";
-import { FormSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   useCreatePlatformConnection,
   useDeletePlatformConnection,
@@ -26,6 +21,11 @@ import { getProvidersForScope } from "@/lib/ai-providers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Label } from "@/ui/label";
+import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 
 const MODES: AIConfigMode[] = ["disabled", "platform", "community"];
 

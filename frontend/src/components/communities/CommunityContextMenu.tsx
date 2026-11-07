@@ -16,6 +16,12 @@ import { createCommunityInvite } from "@/api/generated/communities/communities";
 import { AdminSurface, type CommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { InitiativeMark } from "@/components/icons/InitiativeMark";
+import { useBillingPortal } from "@/hooks/useBillingPortal";
+import { useCommunities } from "@/hooks/useCommunities";
+import { useHeldSurfaces } from "@/hooks/useCustomRoles";
+import { holdsBillingSeat } from "@/lib/billingSummary";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -23,13 +29,7 @@ import {
   ContextMenuLabel,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { useBillingPortal } from "@/hooks/useBillingPortal";
-import { useCommunities } from "@/hooks/useCommunities";
-import { useHeldSurfaces } from "@/hooks/useCustomRoles";
-import { holdsBillingSeat } from "@/lib/billingSummary";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
+} from "@/ui/context-menu";
 
 import { LeaveCommunityDialog } from "./LeaveCommunityDialog";
 

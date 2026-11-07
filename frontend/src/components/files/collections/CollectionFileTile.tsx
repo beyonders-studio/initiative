@@ -2,13 +2,13 @@ import { Check } from "lucide-react";
 import { type CSSProperties, memo } from "react";
 
 import { FileKind, type FileSummary } from "@/api/generated/initiativeAPI.schemas";
-import { LazyImage } from "@/components/shared/LazyImage";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
 import { fileRatio } from "@/lib/collections";
 import { fileIcon } from "@/lib/fileIcon";
-import { filePicture } from "@/lib/fileUtils";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
-import { cn } from "@/lib/utils";
+import { LazyImage } from "@/ui/lazy-image";
+import { filePicture } from "@/ui/lib/fileUtils";
+import { cn } from "@/ui/lib/utils";
 
 interface CollectionFileTileProps {
   file: FileSummary;

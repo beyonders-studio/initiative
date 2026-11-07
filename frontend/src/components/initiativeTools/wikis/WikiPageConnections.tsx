@@ -2,9 +2,9 @@ import { useTranslation } from "react-i18next";
 
 import type { EndpointRef } from "@/api/generated/initiativeAPI.schemas";
 import { RelationsSection } from "@/components/entities/RelationsSection";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { useWidthClass } from "@/hooks/useWidthClass";
-import { cn } from "@/lib/utils";
+import { useWidthClass } from "@/ui/lib/useWidthClass";
+import { cn } from "@/ui/lib/utils";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
 
 interface WikiPageConnectionsProps {
   entity: EndpointRef;

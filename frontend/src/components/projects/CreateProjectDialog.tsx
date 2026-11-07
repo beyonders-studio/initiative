@@ -4,31 +4,19 @@ import { useTranslation } from "react-i18next";
 import type { ProjectCreate, ResourceGrantSchema } from "@/api/generated/initiativeAPI.schemas";
 import { CreateAccessSection } from "@/components/access/CreateAccessSection";
 import { DEFAULT_GRANTS } from "@/components/access/grants";
-import { EmojiPicker } from "@/components/EmojiPicker";
 import { ProjectDateFields } from "@/components/projects/ProjectDateFields";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useCreateProject, useTemplateProjects } from "@/hooks/useProjects";
 import { dateRangeBounds } from "@/lib/dateRange";
 import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { EmojiField } from "@/ui/emoji-picker";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
+import { Textarea } from "@/ui/textarea";
 
 const NO_TEMPLATE_VALUE = "template-none";
 
@@ -141,7 +129,7 @@ export const CreateProjectDialog = ({
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="project-icon">{t("createDialog.iconLabel")}</Label>
-              <EmojiPicker
+              <EmojiField
                 id="project-icon"
                 value={icon || undefined}
                 onChange={(emoji) => setIcon(emoji ?? "")}

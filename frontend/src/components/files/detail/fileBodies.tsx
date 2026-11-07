@@ -16,22 +16,22 @@ import {
   type WhiteboardSceneLoad,
 } from "@/components/files/whiteboardSceneCache";
 import { CreateReferencedThingDialog } from "@/components/references/CreateReferencedThingDialog";
-import { Button } from "@/components/ui/button";
 import type { UseCollaborationResult } from "@/hooks/useCollaboration";
 import { useCommunities, useSelfInCommunity } from "@/hooks/useCommunities";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { normalizeEditorState } from "@/lib/editorState";
 import { type EditorFileType, isStoredFileType } from "@/lib/fileTypes";
 import { supportsEntityMentions } from "@/lib/mentions";
-import { sanitizeUrl } from "@/lib/safeUrl";
 import { referenceRef } from "@/lib/smartChips";
 import type { SpreadsheetSheetContent } from "@/lib/spreadsheet/content";
 import { toolDetailRoute } from "@/lib/tools";
 import { getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { sanitizeUrl } from "@/ui/lib/safeUrl";
+import { cn } from "@/ui/lib/utils";
 
 const Editor = lazy(() =>
-  import("@/components/ui/editor/editor").then((m) => ({ default: m.Editor }))
+  import("@/components/editor/editor").then((m) => ({ default: m.Editor }))
 );
 const UploadedFileViewer = lazy(() =>
   import("@/components/files/UploadedFileViewer").then((m) => ({

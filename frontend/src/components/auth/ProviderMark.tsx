@@ -7,7 +7,7 @@
  */
 
 import { providerIcon } from "@/lib/authProviderIcons";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 export interface ProviderMarkProps {
   icon: string | null | undefined;

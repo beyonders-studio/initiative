@@ -23,20 +23,20 @@ import { AccessGrantStatusBadge } from "@/components/platform/AccessGrantStatusB
 import { CaseHolds } from "@/components/tickets/CaseHolds";
 import { communityEvidenceUrl, EvidenceList } from "@/components/tickets/Evidence";
 import { UserHandle } from "@/components/UserHandle";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { UserHoverLink } from "@/components/user/UserHoverLink";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useCreateComment } from "@/hooks/useComments";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { useUpdateTask } from "@/hooks/useTasks";
 import { refreshTaskCase, useTakeCase, useTaskCase } from "@/hooks/useTickets";
 import { minutesLeft } from "@/lib/formatDate";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { cn } from "@/ui/lib/utils";
+import { Textarea } from "@/ui/textarea";
 
 interface CasePanelProps {
   taskId: number;

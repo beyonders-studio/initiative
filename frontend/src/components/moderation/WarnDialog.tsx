@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -15,9 +15,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { Textarea } from "@/ui/textarea";
 
 /** Matches the column behind it. */
 const MESSAGE_MAX = 2000;

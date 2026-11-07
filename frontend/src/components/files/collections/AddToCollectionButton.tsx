@@ -3,9 +3,9 @@ import { useTranslation } from "react-i18next";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { AddToCollectionDialog } from "@/components/files/collections/AddToCollectionDialog";
-import { Button } from "@/components/ui/button";
 import { useToolCreateAccess } from "@/hooks/useInitiativeAccess";
 import { COLLECTION_ICON } from "@/lib/collections";
+import { Button } from "@/ui/button";
 
 interface AddToCollectionButtonProps {
   initiativeId: number;

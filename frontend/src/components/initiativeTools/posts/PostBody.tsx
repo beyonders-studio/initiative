@@ -1,14 +1,14 @@
 import { lazy, Suspense } from "react";
 
-import { Skeleton } from "@/components/ui/skeleton";
 import { normalizeEditorState } from "@/lib/editorState";
 import { hasBody } from "@/lib/posts";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
+import { Skeleton } from "@/ui/skeleton";
 
 // The editor is the largest thing in the bundle and a board is often the first
 // page someone lands on, so it arrives on demand rather than in the route chunk.
 const Editor = lazy(() =>
-  import("@/components/ui/editor/editor").then((m) => ({ default: m.Editor }))
+  import("@/components/editor/editor").then((m) => ({ default: m.Editor }))
 );
 
 interface PostBodyProps {

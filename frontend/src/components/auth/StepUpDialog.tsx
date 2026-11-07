@@ -4,7 +4,10 @@ import { useTranslation } from "react-i18next";
 
 import { AUTH_STEP_UP_EVENT, type StepUpEventDetail } from "@/api/client";
 import type { ProviderMarkProps } from "@/components/auth/ProviderMark";
-import { Button } from "@/components/ui/button";
+import { useAuthChallenge } from "@/hooks/useAuthChallenge";
+import { useCommunityLoginProviders, useLoginProviders } from "@/hooks/useCommunityAuthPolicy";
+import { providerSignInHref } from "@/lib/returnPath";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -12,10 +15,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useAuthChallenge } from "@/hooks/useAuthChallenge";
-import { useCommunityLoginProviders, useLoginProviders } from "@/hooks/useCommunityAuthPolicy";
-import { providerSignInHref } from "@/lib/returnPath";
+} from "@/ui/dialog";
 
 // The providers' marks load when the dialog first shows one, not with every
 // page. A mark is decoration: one that fails to load draws nothing.

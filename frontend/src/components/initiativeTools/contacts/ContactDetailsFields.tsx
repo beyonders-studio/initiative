@@ -2,10 +2,6 @@ import { Building2, Plus, UserRound, X } from "lucide-react";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   BLANK_DETAIL,
   CONTACT_DETAILS,
@@ -13,6 +9,10 @@ import {
   type ContactDetails,
   DETAIL_LABELS,
 } from "@/lib/contacts";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Textarea } from "@/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 /** How each detail's value is typed, so a phone's keyboard comes up for a phone. */
 const VALUE_INPUT: Record<

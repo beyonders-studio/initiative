@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 
 import { StepField } from "@/components/start/stepParts";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
 
 /** The invite code or link, and what checking it found. */
 export const InviteStep = ({

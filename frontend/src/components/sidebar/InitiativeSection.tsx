@@ -12,15 +12,6 @@ import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/sidebar/sidebar";
 import { ToolCreateButton } from "@/components/tools/ToolCreateButton";
-import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { communityPath } from "@/lib/communityUrl";
 import { initiativePluginPath } from "@/lib/pluginSurfaces";
@@ -34,7 +25,16 @@ import {
   toolNavLabelKey,
 } from "@/lib/tools";
 import { resolveArtworkUrl } from "@/lib/uploadUrl";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { cn } from "@/ui/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 
 export interface InitiativeSectionProps {
   initiative: InitiativeRead;

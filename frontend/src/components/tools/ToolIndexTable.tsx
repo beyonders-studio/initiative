@@ -14,19 +14,19 @@ import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { BookmarkButton } from "@/components/BookmarkButton";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
 import { buildPropertyColumns, propertyColumnIds } from "@/components/properties/propertyColumns";
-import { SortHeader } from "@/components/SortIcon";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import type { ToolIndexRow } from "@/components/tools/ToolIndexPage";
-import { Checkbox } from "@/components/ui/checkbox";
-import { DataTable } from "@/components/ui/data-table";
-import { RelativeTime } from "@/components/ui/relative-time";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
 import { useProperties } from "@/hooks/useProperties";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { useCommunityPath } from "@/lib/communityUrl";
-import type { AppColumnDef } from "@/lib/table";
 import { toolDetailRoute, toolRouteSegment } from "@/lib/tools";
+import { Checkbox } from "@/ui/checkbox";
+import { DataTable } from "@/ui/data-table";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { RelativeTime } from "@/ui/relative-time";
+import { SortHeader } from "@/ui/sort-icon";
 
 /** The list fields a table header sorts by, as its column ids. */
 export const TABLE_SORT_FIELDS: ReadonlySet<string> = new Set(["name", "updated_at"]);
