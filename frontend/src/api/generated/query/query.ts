@@ -29,7 +29,8 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 /**
  * Say what one statement would return, without running it.
  *
- * Costs a plan and no rows, so a builder may ask as often as it likes.
+ * Costs a plan and no rows, so a builder may ask as often as it likes: a
+ * plug-in it reads is described from its declaration, not called.
  * @summary Describe Query
  */
 export const describeQuery = (

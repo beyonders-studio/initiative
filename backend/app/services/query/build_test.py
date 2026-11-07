@@ -13,7 +13,7 @@ import pytest
 from app.core.messages import QueryMessages
 from app.schemas.query import FilterOp
 from app.services.query import QueryError
-from app.services.query.resolve import ResolvedQuery, SheetCall, resolve
+from app.services.query.resolve import PluginCall, ResolvedQuery, SheetCall, resolve
 from app.services.query.build import (
     Column,
     Condition,
@@ -663,12 +663,33 @@ def test_a_range_is_built_with_its_headers_whole():
     assert resolved.unread == (SheetCall(42, "Q3 Actuals!A1:D"),)
 
 
+def test_a_plugin_endpoint_is_built_with_its_parameters_by_name():
+    orders = PluginCall("acme.shop", "orders", (("range", "30d"), ("tags", ("a", "b"))))
+    sql, resolved = build_and_resolve(
+        QuerySpec(
+            plugin=orders,
+            columns=(Column(field="status"), Column(field="total", aggregate="sum")),
+            group_by=("status",),
+        )
+    )
+    assert sql.startswith(
+        "SELECT status, sum(total) AS total_sum FROM plugin('acme.shop', 'orders', "
+        "range => '30d', tags => ARRAY['a', 'b'])"
+    )
+    assert resolved.unread == (orders,)
+
+
 def test_a_description_reads_one_dataset_or_one_range():
     for spec in (
         QuerySpec(columns=(Column(field="*", aggregate="count"),)),
         QuerySpec(
             dataset="tasks",
             sheet=SheetCall(42),
+            columns=(Column(field="*", aggregate="count"),),
+        ),
+        QuerySpec(
+            sheet=SheetCall(42),
+            plugin=PluginCall("acme.shop", "orders"),
             columns=(Column(field="*", aggregate="count"),),
         ),
     ):

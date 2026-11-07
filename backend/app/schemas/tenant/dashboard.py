@@ -140,18 +140,18 @@ class DashboardViewModeRequest(SanitizedBaseModel):
 
 
 class DashboardWidgetData(SanitizedBaseModel):
-    """One widget's answer when its canvas is loaded: its rows, or the code it
-    was refused with. Exactly one of the two is set."""
+    """One widget's answer when its canvas is loaded: a statement's rows, a
+    plug-in widget's rows and values, or the code it was refused with.
+    Exactly one is set."""
 
     result: Optional["QueryResponse"] = None
+    plugin: Optional["PluginDataResponse"] = None
     error: Optional[str] = None
 
 
 class DashboardDataResponse(SanitizedBaseModel):
-    """Every query widget on a canvas, answered together, keyed by widget id.
-
-    Widgets bound to anything other than a statement are not here: they fetch
-    their own data."""
+    """Every widget on a canvas that reads data, answered together, keyed by
+    widget id."""
 
     #: The initiative the canvas reads, so a client knows which changes make
     #: these answers stale.
@@ -160,6 +160,7 @@ class DashboardDataResponse(SanitizedBaseModel):
 
 
 from app.schemas.sql_query import QueryResponse  # noqa: E402
+from app.schemas.tenant.plugin_data import PluginDataResponse  # noqa: E402
 
 DashboardWidgetData.model_rebuild()
 

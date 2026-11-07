@@ -639,42 +639,35 @@ def test_a_plugin_widget_binds_only_the_plugin_source():
             )
 
 
-def _builtin_over_a_plugin(**binding):
-    return _definition(
-        {
-            "id": "w1",
-            "type": "stat",
-            "binding": {
-                "source": "plugin",
-                "plugin_uid": PLUGIN_UID,
-                "endpoint_id": "plugin.acme.shop.orders",
-                **binding,
-            },
-        }
-    )
-
-
-def test_a_builtin_widget_cannot_bind_a_plugin_it_cannot_read():
-    """A plug-in's rows are its own shape — keyed by names it chose, described
-    nowhere a built-in can see — so a chart handed them has nothing to draw."""
+def test_a_builtin_widget_reads_a_plugin_through_its_statement():
+    """A built-in widget binds a statement, and the statement reads the
+    plug-in; the plug-in source is its own widgets'."""
     with pytest.raises(DashboardDefinitionError):
-        normalize_dashboard_definition(_builtin_over_a_plugin())
-
-
-def test_a_statement_is_what_lets_a_builtin_read_a_plugin():
-    """A statement names the columns it returns, over columns the endpoint
-    declared it hands back. That is the whole of what was missing."""
+        normalize_dashboard_definition(
+            _definition(
+                {
+                    "id": "w1",
+                    "type": "stat",
+                    "binding": {
+                        "source": "plugin",
+                        "plugin_uid": PLUGIN_UID,
+                        "endpoint_id": "plugin.acme.shop.orders",
+                        "sql": "SELECT shop FROM rows",
+                    },
+                }
+            )
+        )
+    statement = "SELECT o.shop FROM plugin('acme.shop', 'orders', range => '30d') AS o"
     definition = normalize_dashboard_definition(
-        _builtin_over_a_plugin(sql="SELECT shop FROM rows")
+        _definition(
+            {
+                "id": "w1",
+                "type": "stat",
+                "binding": {"source": "query", "sql": statement},
+            }
+        )
     )
-    binding = definition["widgets"][0]["binding"]
-    assert binding["source"] == "plugin"
-    assert binding["sql"] == "SELECT shop FROM rows"
-
-
-def test_a_statement_a_builtin_cannot_run_is_still_refused():
-    with pytest.raises(DashboardDefinitionError):
-        normalize_dashboard_definition(_builtin_over_a_plugin(sql="DELETE FROM rows"))
+    assert definition["widgets"][0]["binding"] == {"source": "query", "sql": statement}
 
 
 def test_the_plugin_source_is_not_in_the_builtin_vocabulary():

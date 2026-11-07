@@ -56,11 +56,7 @@ from app.db import cohorts
 from app.db.guild_standing import GuildContext
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.services.marketplace import plugin_data
-from app.services.marketplace.declarative import (
-    action_change,
-    request_refusal,
-    typed_params,
-)
+from app.services.marketplace.declarative import action_change, typed_params
 from app.services.marketplace.expressions import UNDEFINED
 from app.services.marketplace.plugin_data import PluginDataError
 from app.services.marketplace.plugin_refs import PluginNameRefused, ensure_plugin_ref
@@ -174,17 +170,11 @@ async def _actor(
     user_id: int,
 ) -> tuple[str, dict[str, str], dict[str, dict[str, Any]]]:
     """Whose credential a declarative action's call runs on, and the handles
-    and non-secret fields it runs with
-    (:func:`~app.services.marketplace.plugin_data._resolve_connections`): the
-    first of the endpoint's ``actors`` the reader's call can run as,
-    ``member`` on the reader's own connections and ``installation`` on the
-    community's: its ``requires`` met, and every connection its requests name
-    for that actor able to travel
-    (:func:`~app.services.marketplace.declarative.request_refusal`).
-    An endpoint naming no actors runs as the reader when its
-    first request carries an interactive connection, and as the installation
-    when it carries a static one. When none can, the best one's refusal is
-    the answer."""
+    and non-secret fields it runs with: the first of the endpoint's ``actors``
+    the reader's call can run as (:func:`plugin_data.first_actor`). An
+    endpoint naming no actors runs as the reader when its first request
+    carries an interactive connection, and as the installation when it
+    carries a static one."""
     actors = endpoint.get("actors")
     if not isinstance(actors, list) or not actors:
         request = (endpoint.get("steps") or [endpoint])[0]["request"]
@@ -193,25 +183,9 @@ async def _actor(
         )
         interactive = (connection or {}).get("scope") == "interactive"
         actors = ["member" if interactive else "installation"]
-    refusals: list[PluginDataError] = []
-    for actor in actors:
-        try:
-            refs, fields = await plugin_data._resolve_connections(
-                session,
-                plugin=plugin,
-                endpoint=endpoint,
-                user_id=user_id if actor == "member" else None,
-                actor=actor,
-            )
-        except PluginDataError as exc:
-            refusals.append(exc)
-            continue
-        refused = request_refusal(plugin.definition, endpoint, refs, actor)
-        if refused is not None:
-            refusals.append(refused)
-            continue
-        return actor, refs, fields
-    raise refusals[0]
+    return await plugin_data.first_actor(
+        session, plugin=plugin, endpoint=endpoint, user_id=user_id, actors=actors
+    )
 
 
 async def _act(

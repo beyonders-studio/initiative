@@ -5291,22 +5291,36 @@ export interface QueryResponse {
   relations: string[];
 }
 
+export type PluginDataResponseRowsItem = { [key: string]: unknown };
+
+export type PluginDataResponseValues = { [key: string]: unknown };
+
 /**
- * One widget's answer when its canvas is loaded: its rows, or the code it
- * was refused with. Exactly one of the two is set.
+ * One data source's answer, in the two shapes its endpoint declared.
+ */
+export interface PluginDataResponse {
+  rows?: PluginDataResponseRowsItem[];
+  values?: PluginDataResponseValues;
+  fetched_at: string;
+  cached?: boolean;
+}
+
+/**
+ * One widget's answer when its canvas is loaded: a statement's rows, a
+ * plug-in widget's rows and values, or the code it was refused with.
+ * Exactly one is set.
  */
 export interface DashboardWidgetData {
   result?: QueryResponse | null;
+  plugin?: PluginDataResponse | null;
   error?: string | null;
 }
 
 export type DashboardDataResponseWidgets = { [key: string]: DashboardWidgetData };
 
 /**
- * Every query widget on a canvas, answered together, keyed by widget id.
- *
- * Widgets bound to anything other than a statement are not here: they fetch
- * their own data.
+ * Every widget on a canvas that reads data, answered together, keyed by
+ * widget id.
  */
 export interface DashboardDataResponse {
   initiative_id: number;
@@ -9556,33 +9570,6 @@ export interface PluginDataParam {
   list?: boolean;
 }
 
-export type PluginDataResponseRowsItem = { [key: string]: unknown };
-
-export type PluginDataResponseValues = { [key: string]: unknown };
-
-/**
- * Rows a statement produced, and what they hold.
- *
- * Positional against ``columns`` rather than keyed by name, for the reason
- * every other read of this surface is: a statement may name two outputs the
- * same thing, and a mapping would keep one of the two.
- */
-export interface PluginDataTable {
-  columns?: QueryColumnDescription[];
-  rows?: unknown[][];
-}
-
-/**
- * One data source's answer, in the two shapes its endpoint declared.
- */
-export interface PluginDataResponse {
-  rows?: PluginDataResponseRowsItem[];
-  table?: PluginDataTable | null;
-  values?: PluginDataResponseValues;
-  fetched_at: string;
-  cached?: boolean;
-}
-
 export type PluginDataReturnLabel = { [key: string]: string };
 
 /**
@@ -9905,12 +9892,13 @@ export interface PluginWidgetRead {
 }
 
 /**
- * One installed plug-in's contribution to the widget palette.
+ * One installed plug-in's widgets and read endpoints.
  */
 export interface PluginWidgetCatalogEntry {
   plugin_id: number;
   /** @maxLength 14 */
   plugin_uid: string;
+  public_id?: string | null;
   name: string;
   enabled?: boolean;
   widgets?: PluginWidgetRead[];
@@ -10410,6 +10398,27 @@ export interface QuerySheetSpec {
   range?: string | null;
 }
 
+export type QueryPluginSpecParams = {
+  [key: string]: string | number | boolean | (string | number | boolean)[];
+};
+
+/**
+ * A plug-in's read endpoint a built query reads.
+ */
+export interface QueryPluginSpec {
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  plugin: string;
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  endpoint: string;
+  params?: QueryPluginSpecParams;
+}
+
 /**
  * One thing a built query returns.
  */
@@ -10474,12 +10483,13 @@ export interface QuerySortSpec {
  *
  * The builder describes; the server writes the SQL. A statement built by
  * clicking is therefore always one this surface will run, because it is built
- * in the parse tree rather than assembled as text. It reads one dataset or
- * one range of a spreadsheet.
+ * in the parse tree rather than assembled as text. It reads one dataset, one
+ * range of a spreadsheet, or one of a plug-in's read endpoints.
  */
 export interface QueryBuildRequest {
   dataset?: string | null;
   sheet?: QuerySheetSpec | null;
+  plugin?: QueryPluginSpec | null;
   /**
    * @minItems 1
    * @maxItems 20
@@ -10504,6 +10514,15 @@ export interface QuerySheetDescription {
 }
 
 /**
+ * A plug-in's endpoint a statement reads with ``plugin()``, as the
+ * install's pinned definition declares it.
+ */
+export interface QueryPluginDescription {
+  alias: string;
+  fields: FieldDescription[];
+}
+
+/**
  * The statement, and what it would return.
  */
 export interface QueryBuildResponse {
@@ -10511,6 +10530,7 @@ export interface QueryBuildResponse {
   columns: QueryColumnDescription[];
   relations: string[];
   sheets?: QuerySheetDescription[];
+  plugins?: QueryPluginDescription[];
 }
 
 /**
@@ -10532,6 +10552,7 @@ export interface QueryShapeResponse {
   columns: QueryColumnDescription[];
   relations: string[];
   sheets?: QuerySheetDescription[];
+  plugins?: QueryPluginDescription[];
 }
 
 /**
@@ -14163,17 +14184,13 @@ export type ReadPostParams = {
 
 export type ReadPluginDataParams = {
   /**
-   * The dashboard the widget sits on. Its own gates decide whether this caller may see anything here at all.
+   * The dashboard the widget sits on. Previewing a widget takes write access to it.
    */
   dashboard_id: number;
   /**
-   * The binding's parameters, as a JSON object.
+   * The parameters on the form, as a JSON object.
    */
   params?: string | null;
-  /**
-   * Which widget on that dashboard is asking. Only needed where its binding carries a statement: what runs is the one stored on the widget, never one the request supplies.
-   */
-  widget_id?: string | null;
 };
 
 export type ReadPluginParamOptionsParams = {

@@ -16,10 +16,11 @@ The cutover migration writes its statements through the same functions, so the
 SQL a stored definition was rewritten to and the SQL the builder produces are
 the same SQL.
 
-A description reads one of the registry's datasets, or a range of a
-spreadsheet (``sheet(file, range)``). A range's columns are what the file holds,
-so they are not checked here: the description of the statement that follows,
-which reads the file, refuses a column the range does not have.
+A description reads one of the registry's datasets, a range of a spreadsheet
+(``sheet(file, range)``), or one of a plug-in's read endpoints
+(``plugin(public id, endpoint, name => value, …)``). Their columns are what the
+file holds and what the endpoint declares, so they are not checked here: the
+description of the statement that follows refuses a column they do not have.
 """
 
 from __future__ import annotations
@@ -41,7 +42,14 @@ from app.schemas.query import FilterOp
 from app.services.fields import dataset
 from app.services.fields.registry import dataset_names
 from app.services.fields.spec import ControlKind
-from app.services.query.resolve import SHEET, VIEWER, QueryError, SheetCall
+from app.services.query.resolve import (
+    PLUGIN,
+    SHEET,
+    VIEWER,
+    PluginCall,
+    QueryError,
+    SheetCall,
+)
 
 #: What a column may be reduced to. Aggregates only — a window function is a
 #: different question and the validator does not admit one.
@@ -134,11 +142,12 @@ class Sort:
 
 @dataclass(frozen=True)
 class QuerySpec:
-    """What somebody clicked, before it is a statement: about one dataset, or
-    one range of a spreadsheet."""
+    """What somebody clicked, before it is a statement: about one dataset, one
+    range of a spreadsheet, or one of a plug-in's read endpoints."""
 
     dataset: Optional[str] = None
     sheet: Optional[SheetCall] = None
+    plugin: Optional[PluginCall] = None
     columns: Sequence[Column] = field(default_factory=tuple)
     where: Sequence[Node] = field(default_factory=tuple)
     #: Columns to group by, named the way the select list names them.
@@ -299,7 +308,7 @@ def _viewer_value(dataset_name: str, condition: Condition) -> bool:
 
 
 def _names_a_person(dataset_name: str, field_name: str) -> bool:
-    if dataset_name == SHEET:
+    if dataset_name in (SHEET, PLUGIN):
         return False
     relation_name, plain = _split(field_name)
     holder = dataset_name
@@ -323,7 +332,7 @@ def _predicate(
     dataset_name: str, condition: Condition, base: Optional[str] = None
 ) -> ast.Node:
     viewer = _viewer_value(dataset_name, condition)
-    left = _column_ref(condition.field, base, whole=dataset_name == SHEET)
+    left = _column_ref(condition.field, base, whole=dataset_name in (SHEET, PLUGIN))
     if condition.op is FilterOp.is_null:
         # The DSL's is_null carries whether it means null or not-null.
         return ast.NullTest(arg=left, nulltesttype=0 if condition.value else 1)
@@ -449,7 +458,7 @@ def _leaves(nodes: Sequence[Node]) -> list[Condition]:
 
 def _relations_named(spec: QuerySpec) -> list[str]:
     """The relations this description reads through, in the order first met."""
-    if spec.sheet is not None:
+    if spec.dataset is None:
         return []
     named: list[str] = []
     for name in (
@@ -480,6 +489,23 @@ def _from(spec: QuerySpec, relations: Sequence[str]) -> ast.Node:
             _literal(value)
             for value in (spec.sheet.file, spec.sheet.range)
             if value is not None
+        )
+        return reading
+    if spec.plugin is not None:
+        reading = parse_sql(f"SELECT FROM {PLUGIN}()")[0].stmt.fromClause[0]
+        reading.functions[0][0].args = (
+            _literal(spec.plugin.plugin),
+            _literal(spec.plugin.endpoint),
+            *(
+                ast.NamedArgExpr(
+                    name=name,
+                    arg=ast.A_ArrayExpr(elements=tuple(map(_literal, value)))
+                    if isinstance(value, tuple)
+                    else _literal(value),
+                    argnumber=-1,
+                )
+                for name, value in spec.plugin.params
+            ),
         )
         return reading
     declared = dataset(spec.dataset).by_relation
@@ -525,7 +551,7 @@ def build(spec: QuerySpec) -> str:
     reader sees — so what is stored is what they built, and resolution to
     physical names happens when it runs, like any other statement.
     """
-    if (spec.dataset is None) == (spec.sheet is None):
+    if sum(read is not None for read in (spec.dataset, spec.sheet, spec.plugin)) != 1:
         raise QueryError(QueryMessages.MISSING_RELATION)
     if spec.dataset is not None and spec.dataset not in dataset_names():
         raise QueryError(QueryMessages.UNKNOWN_RELATION, spec.dataset)
@@ -549,7 +575,7 @@ def build(spec: QuerySpec) -> str:
     # about one table reads better without it.
     joined = bool(_relations_named(spec))
     base = spec.dataset if joined else None
-    whole = spec.sheet is not None
+    whole = spec.dataset is None
 
     targets = tuple(
         ast.ResTarget(
@@ -567,7 +593,9 @@ def build(spec: QuerySpec) -> str:
     select = ast.SelectStmt(
         targetList=targets,
         fromClause=(_from(spec, _relations_named(spec)),),
-        whereClause=_where(spec.dataset or SHEET, spec.where, base=base),
+        whereClause=_where(
+            spec.dataset or (SHEET if spec.sheet else PLUGIN), spec.where, base=base
+        ),
         op=0,
     )
 
