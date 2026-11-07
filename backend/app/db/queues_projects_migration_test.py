@@ -22,6 +22,7 @@ from app.testing import (
     create_tag,
     create_user,
 )
+from app.testing.later_revisions import restate_kind_code
 
 _MIGRATION = (
     Path(__file__).resolve().parents[2]
@@ -49,7 +50,9 @@ async def _one(session, sql: str, **params: Any) -> Any:
 
 
 def _runner(schema: str):
-    """Revision 0581 one way or the other, on one guild's schema only."""
+    """Revision 0581 one way or the other, on one guild's schema only. Back up,
+    ``public.relationship_kind_code`` is put back as the newest revision left
+    it (``app.testing.later_revisions``)."""
     migration = _load()
 
     def run(forward: bool):
@@ -65,6 +68,8 @@ def _runner(schema: str):
 
             with Operations.context(MigrationContext.configure(bind)):
                 migration._convert(bind, forward, in_schema)
+                if forward:
+                    restate_kind_code(bind)
 
         return apply
 

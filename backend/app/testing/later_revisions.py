@@ -58,9 +58,7 @@ def _steps(bind: Any, *, forward: bool) -> list[Callable[[], None]]:
             lambda: queues._upgrade_schema(bind),
             contacts._apply_upgrade,
             pair._upgrade,
-            lambda: bind.exec_driver_sql(
-                contacts._kind_code_fn(contacts._KIND_CODES_AFTER)
-            ),
+            lambda: restate_kind_code(bind),
         ]
     return [
         pair._downgrade,
@@ -72,6 +70,13 @@ def _steps(bind: Any, *, forward: bool) -> list[Callable[[], None]]:
         data_jobs._downgrade_schema,
         lambda: batched._downgrade(bind),
     ]
+
+
+def restate_kind_code(bind: Any) -> None:
+    """Restate ``public.relationship_kind_code`` as the newest revision left
+    it, after a test has run a revision that restates it as that one left it."""
+    contacts = _load("20261105_0582_contacts.py")
+    bind.exec_driver_sql(contacts._kind_code_fn(contacts._KIND_CODES_AFTER))
 
 
 def step_later_revisions(bind: Any, schema: str, *, forward: bool) -> None:
