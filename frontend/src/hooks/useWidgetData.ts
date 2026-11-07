@@ -21,7 +21,7 @@
 
 import { useCallback, useMemo, useRef } from "react";
 
-import { type PluginDataResponse, resolvePluginBinding } from "@/api/pluginData";
+import { resolvePluginBinding } from "@/api/pluginData";
 import { usePluginData, usePluginWidgetCatalog } from "@/hooks/usePluginData";
 import { useSqlQuery, useWidgetQuery } from "@/hooks/useSqlQuery";
 import type { DataMeta, WidgetData, WidgetSource } from "@/lib/widgets/dataShapes";
@@ -173,21 +173,10 @@ export function useWidgetData(
     enabled: scoped && isPlugin && !placed,
   });
 
-  // A plug-in that stopped answering does not blank a tile that already has
-  // rows. The preview's query keeps its last good body for its key; the canvas
-  // answers each widget afresh, so a placed widget holds the last answer it had
-  // for the binding it has now.
-  const answerKey = JSON.stringify([
-    binding.plugin_uid,
-    binding.endpoint_id,
-    binding.params ?? null,
-  ]);
-  const lastAnswer = useRef<{ key: string; answer: PluginDataResponse } | null>(null);
-  if (placed && widgetQuery.plugin) {
-    lastAnswer.current = { key: answerKey, answer: widgetQuery.plugin };
-  }
-  const held = lastAnswer.current?.key === answerKey ? lastAnswer.current.answer : undefined;
-  const pluginAnswer = placed ? (widgetQuery.plugin ?? held) : pluginQuery.data;
+  // A placed widget is answered by its canvas entry, a refusal included, as a
+  // statement's tile is; the preview's query keeps its last good body for its
+  // key.
+  const pluginAnswer = placed ? widgetQuery.plugin : pluginQuery.data;
   const pluginLoading = placed ? widgetQuery.isLoading : pluginQuery.isLoading;
   const pluginFailed = placed ? widgetQuery.isError : pluginQuery.isError;
 
@@ -309,8 +298,8 @@ export function useWidgetData(
         // Installed, but its pinned version stopped offering this source —
         // the catalog answered, so this is absence rather than a failure.
         if (!pluginBinding) return absent({ isLoading: false, isError: false });
-        // The last good rows are more useful than nothing, so the error tile is
-        // for when there is genuinely nothing to draw.
+        // The preview's last good rows are more useful than nothing, so the
+        // error tile is for when there is genuinely nothing to draw.
         if (pluginFailed && !pluginAnswer) {
           return {
             data: emptyDataFor(source),

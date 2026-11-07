@@ -228,27 +228,9 @@ describe("a plug-in widget", () => {
     });
   });
 
-  it("keeps the rows it had when its plug-in stops answering", () => {
-    installed();
-    useWidgetQuery.mockReturnValue({ ...idle, plugin: answer });
-    const { result, rerender } = renderHook(() => useWidgetData(binding, 7, 11, "w1"));
-
-    useWidgetQuery.mockReturnValue({ ...idle, isError: true });
-    rerender();
-    expect(result.current.errorCode).toBeUndefined();
-    expect(result.current.data).toMatchObject({ rows: answer.rows });
-  });
-
-  it("draws the error tile when there are no rows to keep", () => {
-    installed();
-    useWidgetQuery.mockReturnValue({ ...idle, isError: true });
-    const { result } = renderHook(() => useWidgetData(binding, 7, 11, "w1"));
-    expect(result.current.errorCode).toBe(WidgetErrorCode.PLUGIN_UNAVAILABLE);
-  });
-
-  it("does not keep another binding's rows", () => {
-    // Saved with different parameters: the rows it had answered a different
-    // question.
+  it("draws the error tile when its canvas entry is refused, as a statement's tile does", () => {
+    // Saved with different parameters and refused: the rows it had answered a
+    // different question.
     installed();
     useWidgetQuery.mockReturnValue({ ...idle, plugin: answer });
     const { result, rerender } = renderHook(

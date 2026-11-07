@@ -34,6 +34,7 @@ for real.
 from datetime import datetime, timezone
 from urllib.parse import quote
 
+import asyncio
 import json
 import httpx
 import jwt
@@ -323,6 +324,8 @@ def upstream(monkeypatch):
             self.rows: list = [{"id": 1}]
             self.values: dict = {}
             self.error: Exception | None = None
+            #: Holds each call until this many are waiting together.
+            self.together: asyncio.Barrier | None = None
 
         @property
         def count(self) -> int:
@@ -332,6 +335,8 @@ def upstream(monkeypatch):
 
     async def _fake_read_answer(request, *, endpoint, transport=None):
         recorder.calls.append(request)
+        if recorder.together is not None:
+            await asyncio.wait_for(recorder.together.wait(), timeout=2)
         if recorder.error is not None:
             raise recorder.error
         return list(recorder.rows), dict(recorder.values)
@@ -1464,6 +1469,41 @@ class TestTheCanvas:
         assert widgets["chart"]["result"]["rows"] == [["mon", 7], ["tue", 5]]
         assert upstream.count == 1
         assert json.loads(upstream.calls[0].content)["params"] == {"range": "7d"}
+
+    async def test_plugins_are_called_together(
+        self, client, session, acting_user, upstream
+    ):
+        """Each widget's call is settled first, and then every plug-in is
+        called at once, so the canvas waits for the slowest of them."""
+        upstream.together = asyncio.Barrier(2)
+        a, plugin, dashboard = await _workspace(session, acting_user)
+        dashboard.definition = normalize_dashboard_definition(
+            {
+                "widgets": [
+                    {
+                        "id": f"w{days}",
+                        "type": f"plugin:{PLUGIN_UID}:summary",
+                        "binding": {
+                            "source": "plugin",
+                            "plugin_uid": PLUGIN_UID,
+                            "endpoint_id": ORDERS_SUMMARY,
+                            "params": {"range": f"{days}d"},
+                        },
+                    }
+                    for days in (7, 30)
+                ]
+            }
+        )
+        session.add(dashboard)
+        await session.commit()
+
+        response = await client.get(
+            a.g(f"/dashboards/{dashboard.id}/data"), headers=a.headers
+        )
+        widgets = response.json()["widgets"]
+        assert widgets["w7"]["plugin"]["rows"] == [{"id": 1}]
+        assert widgets["w30"]["plugin"]["rows"] == [{"id": 1}]
+        assert upstream.count == 2
 
     async def test_a_dashboard_run_as_its_initiative_calls_as_the_installation(
         self, client, session, acting_user, upstream

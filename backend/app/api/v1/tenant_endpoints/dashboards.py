@@ -13,9 +13,10 @@ Sharing a dashboard therefore shares the *view*, never the underlying data:
 a viewer who cannot read a bound counter simply sees an empty widget.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any, Awaitable, Callable, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
@@ -470,8 +471,11 @@ async def canvas_widget_data(
     context = _answered_as(session, dashboard)
     as_installation = view_as.runs_as_initiative(dashboard)
 
+    # Everything each widget needs from the session is read first, one widget
+    # after another; then every plug-in is called together.
     widgets: dict[str, DashboardWidgetData] = {}
-    statements: dict[str, query_service.ResolvedQuery] = {}
+    sources: dict[str, tuple[str, query_service.ResolvedQuery]] = {}
+    calls: dict[str, Callable[[], Awaitable[plugin_data.PluginDataResult]]] = {}
     installs: dict[str, GuildPlugin] | None = None
     for widget_id in _widget_ids(dashboard.definition):
         binding = _stored_binding(dashboard.definition, dashboard.config, widget_id)
@@ -479,9 +483,7 @@ async def canvas_widget_data(
         sql = (binding or {}).get("sql")
         try:
             if source == "query" and isinstance(sql, str) and sql.strip():
-                statements[widget_id] = await query_plugins.with_rows(
-                    session, sql, as_installation=as_installation
-                )
+                sources[widget_id] = (sql, query_service.resolve(sql))
             elif source == "plugin" and binding is not None:
                 if installs is None:
                     installs = {
@@ -497,22 +499,49 @@ async def canvas_widget_data(
                     raise plugin_data.PluginDataError(
                         PluginDataMessages.ENDPOINT_NOT_FOUND, 404
                     )
-                answer = await plugin_data.fetch_for_session(
+                calls[widget_id] = await plugin_data.prepare_for_session(
                     session,
                     plugin=install,
                     endpoint_id=str(binding.get("endpoint_id")),
                     params=binding.get("params") or {},
                     as_installation=as_installation,
                 )
-                widgets[widget_id] = DashboardWidgetData(
-                    plugin=PluginDataResponse(
-                        rows=answer.rows,
-                        values=answer.values,
-                        fetched_at=answer.fetched_at,
-                        cached=answer.cached,
-                    )
-                )
         except (query_service.QueryError, plugin_data.PluginDataError) as refused:
+            widgets[widget_id] = DashboardWidgetData(error=refused.code)
+    prepared = await query_plugins.prepare(
+        session,
+        [call for _, statement in sources.values() for call in statement.unread],
+        as_installation=as_installation,
+    )
+
+    read_rows, *answers = await asyncio.gather(
+        query_plugins.answered(prepared),
+        *(call() for call in calls.values()),
+        return_exceptions=True,
+    )
+    if isinstance(read_rows, BaseException):
+        raise read_rows
+    for widget_id, answer in zip(calls, answers):
+        if isinstance(answer, plugin_data.PluginDataError):
+            widgets[widget_id] = DashboardWidgetData(error=answer.code)
+        elif isinstance(answer, BaseException):
+            raise answer
+        else:
+            widgets[widget_id] = DashboardWidgetData(
+                plugin=PluginDataResponse(
+                    rows=answer.rows,
+                    values=answer.values,
+                    fetched_at=answer.fetched_at,
+                    cached=answer.cached,
+                )
+            )
+    statements: dict[str, query_service.ResolvedQuery] = {}
+    for widget_id, (sql, statement) in sources.items():
+        try:
+            statements[widget_id] = query_plugins.resolved_with(
+                sql, statement, read_rows
+            )
+        except query_service.QueryError as refused:
             widgets[widget_id] = DashboardWidgetData(error=refused.code)
 
     outcomes = await query_service.execute_canvas(

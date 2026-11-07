@@ -121,8 +121,9 @@ __all__ = [
     "CallingPlugin",
     "cached_call",
     "clear_plugin_data_cache",
-    "fetch_for_session",
     "fetch_plugin_source",
+    "prepare_for_session",
+    "prepare_plugin_source",
     "find_param",
     "find_read_endpoint",
     "first_actor",
@@ -1098,7 +1099,36 @@ async def fetch_plugin_source(
     as_installation: bool = False,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> PluginDataResult:
-    """Resolve one endpoint for one caller.
+    """Resolve one endpoint for one caller (:func:`prepare_plugin_source`),
+    and make the call."""
+    call = await prepare_plugin_source(
+        session,
+        plugin=plugin,
+        endpoint_id=endpoint_id,
+        raw_params=raw_params,
+        user_id=user_id,
+        is_guild_admin=is_guild_admin,
+        as_installation=as_installation,
+        transport=transport,
+    )
+    return await call()
+
+
+async def prepare_plugin_source(
+    session: AsyncSession,
+    *,
+    plugin: GuildPlugin,
+    endpoint_id: str,
+    raw_params: str | None,
+    user_id: int | None,
+    is_guild_admin: bool,
+    as_installation: bool = False,
+    transport: httpx.AsyncBaseTransport | None = None,
+) -> Callable[[], Awaitable[PluginDataResult]]:
+    """Resolve one endpoint for one caller, and hand back the call to make.
+
+    Everything the call needs from *session* is read here, so the call itself
+    reads nothing from it, and several can be made at once.
 
     The install has already been loaded under the caller's own guild session, so
     the guild boundary and a guild admin's wider reach are settled before this
@@ -1124,9 +1154,8 @@ async def fetch_plugin_source(
     if not plugin.enabled:
         raise PluginDataError(PluginDataMessages.PLUGIN_DISABLED, 409)
 
-    registration = await _load_registration(
-        None, guild_id=routed_guild_id(session), plugin=plugin
-    )
+    guild_id = routed_guild_id(session)
+    registration = await _load_registration(None, guild_id=guild_id, plugin=plugin)
     params, canonical = validate_params(endpoint, raw_params)
     declared = endpoint.get("actors")
     actors = declared if isinstance(declared, list) and declared else None
@@ -1149,7 +1178,7 @@ async def fetch_plugin_source(
         )
 
     key = _cache_key(
-        guild_id=routed_guild_id(session),
+        guild_id=guild_id,
         plugin=plugin,
         endpoint_id=endpoint_id,
         canonical_params=canonical,
@@ -1167,7 +1196,7 @@ async def fetch_plugin_source(
         rows, values = await _call_plugin(
             registration=registration,
             plugin=plugin,
-            guild_id=routed_guild_id(session),
+            guild_id=guild_id,
             endpoint_id=endpoint_id,
             params=params,
             refs=refs,
@@ -1180,23 +1209,24 @@ async def fetch_plugin_source(
             rows=rows, values=values, fetched_at=datetime.now(timezone.utc)
         )
 
-    result, cached = await cached_call(key, _effective_ttl(endpoint), call)
-    if cached:
-        return replace(result, cached=True)
-    return result
+    async def answer() -> PluginDataResult:
+        result, cached = await cached_call(key, _effective_ttl(endpoint), call)
+        return replace(result, cached=True) if cached else result
+
+    return answer
 
 
-async def fetch_for_session(
+async def prepare_for_session(
     session: AsyncSession,
     *,
     plugin: GuildPlugin,
     endpoint_id: str,
     params: Mapping[str, Any],
     as_installation: bool = False,
-) -> PluginDataResult:
-    """One of *plugin*'s read endpoints, called with *params* for the person
-    *session* was routed for (:func:`fetch_plugin_source`). A plug-in's
-    minimum age holds for its rows as for its tiles."""
+) -> Callable[[], Awaitable[PluginDataResult]]:
+    """The call to one of *plugin*'s read endpoints with *params*, for the
+    person *session* was routed for (:func:`prepare_plugin_source`). A
+    plug-in's minimum age holds for its rows as for its tiles."""
     # Imported here: the age check reads the platform's settings.
     from app.services.tenant import plugin_age
 
@@ -1206,7 +1236,7 @@ async def fetch_for_session(
     ):
         raise PluginDataError(GuildPluginMessages.AGE_RESTRICTED, 403)
     standing = guild_context(session)
-    return await fetch_plugin_source(
+    return await prepare_plugin_source(
         session,
         plugin=plugin,
         endpoint_id=endpoint_id,
