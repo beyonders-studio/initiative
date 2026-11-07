@@ -1,6 +1,7 @@
 import { Browser } from "@capacitor/browser";
 import { Device } from "@capacitor/device";
 import { Link, useRouter, useSearch } from "@tanstack/react-router";
+import { isAxiosError } from "axios";
 import { KeyRound, Mail } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -28,15 +29,14 @@ import { SecondFactorRequiredError, useAuth } from "@/hooks/useAuth";
 import { useLoginProviders } from "@/hooks/useCommunityAuthPolicy";
 import { useResumeAfterSignIn } from "@/hooks/useResumeAfterSignIn";
 import { useServer } from "@/hooks/useServer";
-import { getErrorCode } from "@/lib/errorMessage";
-import { beginNativeSignIn, redeemNativeSignIn, takePendingSignIn } from "@/lib/nativeSignIn";
-import { passkeyFailureMessage } from "@/lib/passkeyFailure";
+import { getErrorCode, getErrorMessage } from "@/lib/errorMessage";
+import { beginNativeSignIn } from "@/lib/nativeSignIn";
 import {
   appRunsPasskeys,
   browserMayHoldOtherPasskeys,
   browserOffersPasskeyAutofill,
   cancelPendingPasskeyPrompt,
-  PasskeyNeedsBrowserError,
+  describePasskeyPromptError,
   passkeysRunHere,
   signInWithPasskey,
 } from "@/lib/passkeys";
@@ -45,14 +45,11 @@ import { compactCode } from "@/lib/secondFactorAnswer";
 
 import { RegisterPage } from "./RegisterPage";
 
-/** Where an app sends a phone so a browser can run the ceremony for it. */
-const RELAY_PATH = "/login?passkey=1&mobile=true";
-
 /** What to call a phone in the sign-in record when it will not say. */
 const FALLBACK_DEVICE_NAME = "Mobile Device";
 
 /** The value of a URL flag, whatever the router made of it: `passkey=1` can
- *  arrive as a number and `mobile=true` as a boolean. */
+ *  arrive as a number. */
 const flag = (value: unknown): string => String(value ?? "");
 
 export const LoginPage = () => {
@@ -78,11 +75,8 @@ const SignInCard = () => {
     invite_code?: string;
     next?: string;
     passkey?: string | number;
-    mobile?: string | boolean;
-    device_name?: string;
-    code_challenge?: string;
   };
-  const { login, completeSecondFactor, applyPasskeySignIn, completeOidcLogin } = useAuth();
+  const { login, completeSecondFactor, applySignIn } = useAuth();
   const resumeAfterSignIn = useResumeAfterSignIn();
   const { isNativePlatform, getServerOrigin } = useServer();
   const { passwordLoginEnabled, passkeyLoginEnabled, emailOtpLoginEnabled } = useAppConfig();
@@ -112,17 +106,11 @@ const SignInCard = () => {
     return code && code.trim().length > 0 ? code.trim() : null;
   }, [searchParams]);
 
-  // This page, opened in a system browser by an app that cannot hold the
-  // conversation itself: one press, then back to where it came from.
-  const relayMode = flag(searchParams.passkey) === "1" && flag(searchParams.mobile) === "true";
-  const relayDeviceName =
-    typeof searchParams.device_name === "string" ? searchParams.device_name : "";
-  const relayChallenge =
-    typeof searchParams.code_challenge === "string" ? searchParams.code_challenge : "";
+  // This page, opened in a system browser by an app to run one passkey prompt
+  // for it: one press, then back to where it came from.
+  const relayMode = flag(searchParams.passkey) === "1";
 
-  // On a phone the button runs the ceremony in the app, or opens the phone's
-  // browser where the app cannot, so it is offered either way.
-  const passkeyOffered = passkeyLoginEnabled && (isNativePlatform || passkeysRunHere());
+  const passkeyOffered = passkeyLoginEnabled && passkeysRunHere();
   // A computer's app runs the ceremony itself, but passkeys kept inside a
   // browser are out of its reach, so the browser stays one press away.
   const browserPasskeysOffered =
@@ -177,19 +165,23 @@ const SignInCard = () => {
    *  not finish. Nothing is said for a prompt this page stood down itself. */
   const reportPasskeyFailure = useCallback(
     (err: unknown) => {
-      const message = passkeyFailureMessage(err, t);
-      if (message) setError(message);
+      if (isAxiosError(err)) {
+        setError(getErrorMessage(err, "auth:login.passkeyFailed"));
+        return;
+      }
+      const key = describePasskeyPromptError(err);
+      if (key) setError(t(key));
     },
     [t]
   );
 
   /** Adopt a session the browser's own autofill or the button produced. */
   const adoptPasskeySession = useCallback(
-    async (result: Awaited<ReturnType<typeof signInWithPasskey>>) => {
-      await applyPasskeySignIn(result);
+    async (token: Awaited<ReturnType<typeof signInWithPasskey>>) => {
+      await applySignIn(token);
       await goWhereTheySignedInFor();
     },
-    [applyPasskeySignIn, goWhereTheySignedInFor]
+    [applySignIn, goWhereTheySignedInFor]
   );
 
   // The browser can offer a passkey inside its own autofill, beside the saved
@@ -240,62 +232,17 @@ const SignInCard = () => {
   // Whatever is still waiting goes with the page.
   useEffect(() => () => cancelPendingPasskeyPrompt(), []);
 
-  /** Send a phone to a browser, which is what knows the site the passkey
-   *  belongs to. The app takes over again at the callback link. */
-  const openPasskeyRelay = async () => {
-    const origin = getServerOrigin();
-    if (!origin) return;
-    const params = new URLSearchParams({
-      device_name: await resolveDeviceName(),
-      code_challenge: await beginNativeSignIn(origin),
-    });
-    await Browser.open({ url: `${origin}${RELAY_PATH}&${params}` });
-  };
-
-  /** The app's own ceremony, finished the way the relay's is: the server
-   *  hands back a code bound to this app's challenge, and the app redeems it. */
-  const signInInApp = async (origin: string) => {
-    const result = await signInWithPasskey({
-      mobile: true,
-      deviceName: await resolveDeviceName(),
-      codeChallenge: await beginNativeSignIn(origin),
-    });
-    const code = result.redirect_to ? new URL(result.redirect_to).searchParams.get("code") : null;
-    const pending = takePendingSignIn(origin);
-    const session = code && pending ? await redeemNativeSignIn(code, pending) : null;
-    if (!session) throw new Error(t("login.passkeyFailed"));
-    await completeOidcLogin(session);
-    await goWhereTheySignedInFor();
-  };
-
-  const handlePasskeyLogin = async () => {
-    if (isNativePlatform) {
-      const origin = getServerOrigin();
-      if (origin && appRunsPasskeys()) {
-        setPasskeyBusy(true);
-        setError(null);
-        try {
-          await signInInApp(origin);
-          return;
-        } catch (err) {
-          if (!(err instanceof PasskeyNeedsBrowserError)) {
-            reportPasskeyFailure(err);
-            return;
-          }
-        } finally {
-          setPasskeyBusy(false);
-        }
-      }
-      await openPasskeyRelay();
-      return;
-    }
+  /** `inBrowser` runs an app's prompt in the system browser, for passkeys
+   *  kept there. */
+  const handlePasskeyLogin = async (inBrowser = false) => {
     setPasskeyBusy(true);
     setError(null);
     try {
       // Only one ceremony runs at a time, so the one waiting in autofill stands
       // aside for the one the person just asked for.
       cancelPendingPasskeyPrompt();
-      await adoptPasskeySession(await signInWithPasskey({ conditional: false }));
+      const deviceName = isNativePlatform ? await resolveDeviceName() : undefined;
+      await adoptPasskeySession(await signInWithPasskey({ inBrowser, deviceName }));
     } catch (err) {
       reportPasskeyFailure(err);
     } finally {
@@ -385,10 +332,7 @@ const SignInCard = () => {
   if (relayMode) {
     return (
       <SignInFrame>
-        <PasskeyRelayCard
-          deviceName={relayDeviceName || FALLBACK_DEVICE_NAME}
-          codeChallenge={relayChallenge}
-        />
+        <PasskeyRelayCard />
       </SignInFrame>
     );
   }
@@ -565,7 +509,7 @@ const SignInCard = () => {
                   variant="link"
                   className="h-auto w-full p-0"
                   disabled={passkeyBusy}
-                  onClick={() => void openPasskeyRelay()}
+                  onClick={() => void handlePasskeyLogin(true)}
                 >
                   {t("login.passkeyInBrowser")}
                 </Button>

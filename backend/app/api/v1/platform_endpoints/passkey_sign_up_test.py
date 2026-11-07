@@ -10,6 +10,8 @@ password, and the recovery set that is its way back to one.
 
 from __future__ import annotations
 
+import secrets
+
 import pytest
 from httpx import AsyncClient
 from sqlmodel import select
@@ -19,6 +21,7 @@ from app.core.login_methods import LoginMethod
 from app.core.security import decode_session_token, has_usable_password
 from app.models.platform.user import User
 from app.models.platform.user_passkey import UserPasskey
+from app.services.auth.oidc.flow_state import s256
 from app.services.platform import auth_posture
 from app.testing import create_user, registration_for, stub_registration
 
@@ -77,16 +80,24 @@ async def test_an_account_is_made_with_a_key_instead_of_a_password(
     assert body["refresh_token"] is None
 
 
-async def test_the_app_is_handed_the_refresh_token_it_keeps(
-    client: AsyncClient, ceremony
-):
-    """The app keeps its own refresh token, so the account it made stays
-    signed in past the access token and across a restart."""
-    challenge = await _begin(client)
+async def test_the_app_finishes_the_account_it_began(client: AsyncClient, ceremony):
+    """The app begins with its S256 challenge, so only the verifier behind it
+    finishes the registration, wherever the prompt ran. The app keeps its own
+    refresh token, so the account stays signed in across a restart."""
+    verifier = secrets.token_urlsafe(48)
+    challenge = await _begin(client, code_challenge=s256(verifier))
+    credential = registration_for(challenge)
+    app = {"Origin": "https://studio.beyonders.initiative"}
+
+    refused = await client.post(
+        FINISH, json={**DETAILS, "credential": credential}, headers=app
+    )
+    assert refused.status_code == 400, refused.text
+
     response = await client.post(
         FINISH,
-        json={**DETAILS, "credential": registration_for(challenge)},
-        headers={"Origin": "https://studio.beyonders.initiative"},
+        json={**DETAILS, "credential": credential, "code_verifier": verifier},
+        headers=app,
     )
     assert response.status_code == 201, response.text
     assert response.json()["refresh_token"]

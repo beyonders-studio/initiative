@@ -11,7 +11,7 @@ A passkey is a sign-in with nothing to type. Your phone, your laptop or your pas
 1. **My Settings → Security → Passkeys → Add a passkey**.
 2. Give it a name you'll recognise in a list — *Laptop*, *Phone*, *The blue key on the lanyard*.
 3. Confirm your password. No password on your account, or none on your server? Then it asks you to prove it's you with a fresh sign-in.
-4. Your browser takes over from here (in the Android app it's your phone, and in the Windows app it's Windows): it asks where to keep the key and how you'd like to prove it's you. Say yes to whatever you normally unlock with.
+4. Your browser takes over from here (in the Android app it's your phone, in the Windows app it's Windows, and the Mac, Linux and iPhone apps open your browser for it): it asks where to keep the key and how you'd like to prove it's you. Say yes to whatever you normally unlock with.
 
 That's it. It's in the list, with the date you added it.
 
@@ -45,7 +45,7 @@ Removing your last passkey from somewhere you've only just signed in [waits two 
 
 A community can require that everybody in it signed in with a passkey, the same way it can require a code from an authenticator app. Signed in with your password instead? You're asked for the passkey where you are — a small prompt, then everything fills in behind it. Nobody is signed out to satisfy a new rule.
 
-The Android and Windows apps ask for it right there in the app. On an iPhone, a Mac or Linux, the prompt sends you to a browser to present it.
+The Android and Windows apps ask for it right there in the app. On an iPhone, a Mac or Linux, your browser opens for the passkey and hands you straight back.
 
 ??? techspec "The details"
     WebAuthn, through the reference libraries on both sides. Credentials are made as discoverable, so a sign-in can start from the key rather than from a typed address, and every ceremony requires user verification: a passkey that cannot prove the person as well as the device is not one this site will register or accept.
@@ -59,3 +59,5 @@ The Android and Windows apps ask for it right there in the app. On an iPhone, a 
     The Windows app runs each ceremony in a page of its own, laid over the app and loaded at the deployment's address, so the origin the server checks is the deployment's own and Windows shows its own passkey dialog. Nothing is fetched for that page. Where Windows can't use the address, the app uses the system browser.
 
     The server answers `/.well-known/apple-app-site-association` once the iPhone app is published. Until then the iPhone app runs every ceremony in the browser, on every server.
+
+    In the browser, only the prompt leaves the app. The app begins the ceremony, opens the deployment's own page in the system browser with the options in the address's fragment, and that page runs the prompt and hands the credential back through `initiative://passkey/callback`; the app then finishes the ceremony itself, as it would with its own prompt. A sign-in or sign-up begun this way carries a PKCE challenge (RFC 7636), and its finish carries the verifier.

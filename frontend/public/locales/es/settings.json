@@ -2091,7 +2091,6 @@
     "unsupported": "Este navegador no puede crear claves de acceso. Abre esta página en un navegador actualizado.",
     "siteUnsupported": "Las claves de acceso necesitan que este sitio tenga un nombre de dominio propio y https. Quien gestiona el sitio puede solucionarlo.",
     "limitReached": "Esta cuenta tiene todas las claves de acceso que puede tener ({{limit}}). Quita una para añadir otra.",
-    "addFromBrowser": "Las claves de acceso se añaden desde un navegador con la sesión iniciada en este sitio. «Añadir una clave de acceso» abre uno.",
     "notOffered": "Este sitio no ofrece claves de acceso. Las que ya tienes se conservan.",
     "error": "No ha funcionado. Inténtalo de nuevo."
   },

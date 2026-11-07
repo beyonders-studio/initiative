@@ -2091,7 +2091,6 @@
     "unsupported": "Dieser Browser kann keine Passkeys erstellen. Öffne diese Seite in einem aktuellen Browser.",
     "siteUnsupported": "Passkeys brauchen für diese Seite einen richtigen Domainnamen und https. Wer die Seite betreibt, kann das einrichten.",
     "limitReached": "Dieses Konto hat so viele Passkeys, wie es haben kann ({{limit}}). Entferne einen, um einen neuen hinzuzufügen.",
-    "addFromBrowser": "Ein Passkey wird in einem Browser hinzugefügt, der auf dieser Seite angemeldet ist. „Passkey hinzufügen“ öffnet einen für dich.",
     "notOffered": "Diese Seite bietet keine Passkeys an. Die vorhandenen bleiben erhalten.",
     "error": "Das hat nicht geklappt. Versuche es erneut."
   },

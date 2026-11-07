@@ -1,4 +1,3 @@
-import { Browser } from "@capacitor/browser";
 import { browserSupportsWebAuthn, WebAuthnError } from "@simplewebauthn/browser";
 import { KeyRound, Pencil, Trash2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
@@ -36,11 +35,8 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { hasReservedSigil } from "@/lib/mentions";
-import { appRunsPasskeys, createCredential, PasskeyNeedsBrowserError } from "@/lib/passkeys";
+import { createCredential } from "@/lib/passkeys";
 import { queryClient } from "@/lib/queryClient";
-
-/** Where this very section lives, for the app to send a phone to a browser. */
-const SECURITY_PAGE_PATH = "/profile/security";
 
 /** The form, then the wait for the browser's own prompt. */
 type AddStep = "details" | "prompting";
@@ -82,18 +78,14 @@ const promptMessageKey = (error: unknown): PromptMessageKey => {
  * the form, so a prompt that ended in nothing can be tried again without
  * retyping it.
  *
- * On Android the app holds that conversation itself when the deployment names
- * it. Anywhere else on a phone — a passkey belongs to the deployment's domain,
- * which is the browser's idea of where it is, not the app's — the Add button
- * opens this page in the system browser instead. Renaming and removing are
- * ordinary requests and work anywhere.
+ * In an app the prompt runs wherever `lib/passkeys` can run it: the app's own
+ * plug-in, or the system browser on the deployment's page. Renaming and
+ * removing are ordinary requests and work anywhere.
  */
 export const PasskeysSection = () => {
   const { t } = useTranslation(["settings", "errors", "common"]);
   const announceHeld = useAnnounceHeld();
-  const { isNativePlatform, getServerOrigin } = useServer();
-  /** A phone whose app cannot make the credential itself. */
-  const browserOnly = isNativePlatform && !appRunsPasskeys();
+  const { isNativePlatform } = useServer();
 
   const list = useListPasskeys();
   const refresh = () => queryClient.invalidateQueries({ queryKey: getListPasskeysQueryKey() });
@@ -173,11 +165,6 @@ export const PasskeysSection = () => {
             },
           });
         } catch (err) {
-          if (err instanceof PasskeyNeedsBrowserError) {
-            closeAdd();
-            openInBrowser();
-            return;
-          }
           setError(t(promptMessageKey(err)));
           back();
         }
@@ -210,16 +197,7 @@ export const PasskeysSection = () => {
     },
   });
 
-  const openInBrowser = () => {
-    const origin = getServerOrigin();
-    if (origin) void Browser.open({ url: `${origin}${SECURITY_PAGE_PATH}` });
-  };
-
   const openAdd = () => {
-    if (browserOnly) {
-      openInBrowser();
-      return;
-    }
     reset();
     setName("");
     setPassword("");
@@ -269,9 +247,7 @@ export const PasskeysSection = () => {
         ? t("passkeys.siteUnsupported")
         : unsupported
           ? t("passkeys.unsupported")
-          : browserOnly
-            ? t("passkeys.addFromBrowser")
-            : null;
+          : null;
 
   return (
     <div className="space-y-4">

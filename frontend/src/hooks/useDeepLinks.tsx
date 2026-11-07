@@ -5,6 +5,7 @@ import { useEffect } from "react";
 
 import { useAuth } from "@/hooks/useAuth";
 import { redeemNativeSignIn, takePendingSignIn } from "@/lib/nativeSignIn";
+import { answerBrowserPrompt } from "@/lib/passkeys";
 
 import { useServer } from "./useServer";
 
@@ -13,7 +14,8 @@ const isSignInCallback = (url: URL) =>
   url.protocol === "initiative:" && url.host === "oidc" && url.pathname === "/callback";
 
 /**
- * Finish a sign-in the app began in the phone's browser.
+ * Take the links the system browser hands back to the app: a passkey prompt's
+ * answer, and a sign-in the app began there.
  *
  * Handles the link whether it wakes the running app or starts it: the phone
  * often closes the app while the browser is in front. Only a callback for a
@@ -34,7 +36,7 @@ export function useDeepLinks() {
       } catch {
         return;
       }
-      if (!isSignInCallback(url)) return;
+      if (answerBrowserPrompt(url) || !isSignInCallback(url)) return;
       const pending = takePendingSignIn(getServerOrigin());
       if (!pending) return;
       await Browser.close().catch(() => undefined);
