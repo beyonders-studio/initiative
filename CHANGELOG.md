@@ -9,8 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Passkeys inside the Windows app.** Signing in, adding a passkey, a community's passkey ask, creating an account and breaking glass go through Windows' own passkey window (Windows Hello, your phone or a security key) instead of a trip to the browser. **Use a passkey saved in your browser**, under the button, is for passkeys kept in a browser's password manager. It comes with the next Windows app update.
-- **Every passkey button works in the Mac, Linux and iPhone apps.** Signing in, creating an account, adding a passkey, a community's passkey ask, making a waiting change now, breaking glass and the billing console open your browser for the passkey and carry on in the app, with no second sign-in. The Android and Windows apps do the same for a server they can't use passkeys with directly.
 - **Dashboards read plug-ins in SQL.** `plugin('acme.shop', 'orders', range => '30d')` in a statement reads one of a plug-in's endpoints, so its rows join tasks, spreadsheets and other plug-ins. A tile's **Build** tab has **Plug-in data** beside **Spreadsheet**, the SQL box suggests plug-ins and their settings, and tiles that read a plug-in through a statement are rewritten to use it. Plug-in widgets and tiles follow **Run dashboard as**: on **Initiative** they use the community's connection.
 
 ### Changed
@@ -20,12 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Every passkey button works in the apps.** Signing in, creating an account, adding a passkey, a community's passkey ask, making a waiting change now, breaking glass and the billing console open your browser for the passkey and carry on in the app, with no second sign-in. The Android and Windows apps do the same for a server they can't use passkeys with directly.
 - **Messages fit the screen.** The conversation takes the page and scrolls on its own, on phones too, with the message box always in view, and it stays on the newest message as you type. The page title is gone, and the encryption note is a shield beside the person's name.
 - **A plug-in update that asks for more access can be answered.** Its row in **Settings › Integrations** shows **Update waiting**, the notice opens that row, and what the version asks for comes first. A newer version this server can't run says why instead of **Up to date**, and nobody is asked while whoever runs the server manages your plug-ins.
-- **The Android app creates accounts and breaks glass with a passkey in the app,** through the phone's own passkey prompt, the way it signs in.
 - **Posts from X and Reddit show where you put them.** A post in a document or on a whiteboard draws in a frame from its own site, on the web and in the apps, and a link file to one shows the post.
 - **Tabs past the edge of a narrow window can be reached with a mouse.** A row of tabs wider than the page, such as **Platform settings** on a narrow screen, shows a thin scrollbar under it to drag.
-- **Both digests arrive under one Android notification category, Digests,** so **Overdue tasks** and **Coming up** are muted or kept together. It takes the new name with the next Android app update.
 - **The arrow keys move through what `[[` offers.** They stayed on the first match; now they step through the list, as they do for `@` and `#`.
 
 ## [0.78.0] - 2026-11-06
