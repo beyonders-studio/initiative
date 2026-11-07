@@ -33,6 +33,7 @@
     "autoUpdateOff": "Updates are now applied by hand.",
     "upgradeTo": "Update to {{version}}",
     "upToDate": "Up to date",
+    "updateWaiting": "Update waiting",
     "upgraded": "Updated to {{version}}.",
     "removeManagedNeutral": "Charges for this plug-in are managed by your provider.",
     "removeManagedAction": "Manage",
@@ -45,7 +46,8 @@
     "decline": "Decline",
     "declined": "You declined version {{version}}. The plug-in stays on its current version.",
     "declinedDone": "Version {{version}} declined.",
-    "moved": "A different version is now available. Review what it asks for."
+    "moved": "A different version is now available. Review what it asks for.",
+    "refused": "Version {{version}} can't run on this server."
   },
   "install": {
     "title": "Add {{name}}",

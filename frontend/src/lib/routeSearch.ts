@@ -20,6 +20,12 @@ export function validatePage(value: unknown): number | undefined {
   return undefined;
 }
 
+/** A positive integer id from a search param, or `undefined`. */
+export function validateId(value: unknown): number | undefined {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : undefined;
+}
+
 /**
  * Search shared by the six initiative tool tabs: open the create dialog, the
  * page cursor for the tools that paginate, and which state of a list is shown

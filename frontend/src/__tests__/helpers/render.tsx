@@ -14,7 +14,6 @@ import { vi } from "vitest";
 
 import { buildCommunity } from "@/__tests__/factories/community.factory";
 import { buildUser } from "@/__tests__/factories/user.factory";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthContext } from "@/hooks/useAuth";
 import { CommunityContext } from "@/hooks/useCommunities";
 import { ServerContext } from "@/hooks/useServer";
@@ -185,10 +184,7 @@ function buildWrapper(options: ProviderOptions = {}) {
         <ServerContext.Provider value={server}>
           <ThemeContext.Provider value={theme}>
             <AuthContext.Provider value={auth}>
-              <CommunityContext.Provider value={communities}>
-                {/* A page renders inside the app shell's tooltip provider. */}
-                <TooltipProvider>{children}</TooltipProvider>
-              </CommunityContext.Provider>
+              <CommunityContext.Provider value={communities}>{children}</CommunityContext.Provider>
             </AuthContext.Provider>
           </ThemeContext.Provider>
         </ServerContext.Provider>
