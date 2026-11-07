@@ -2062,15 +2062,14 @@ def _endpoint(
         cleaned["requires"] = requires
     # A member's own connection is resolved for the caller by ``requires``, so
     # a request carrying one on every call names it there too, and is not one
-    # the installation, which has no member, can make. A write's request may
-    # name one connection per actor instead, for exactly its actors: the
-    # member's own for the member, and the community's for the installation.
+    # the installation, which has no member, can make. A read's or write's
+    # request may name one connection per actor instead, for exactly its
+    # actors: the member's own for the member, and the community's for the
+    # installation.
     required = {term for terms in (requires or {}).values() for term in terms}
     for request in _requests(cleaned):
         named = request.get("connection")
         if isinstance(named, dict):
-            if direction != "write":
-                fail(f"{what}: only a write's request names a connection per actor")
             if set(named) != set(actors):
                 fail(
                     f"{what}: its request names a connection per actor, one for "
