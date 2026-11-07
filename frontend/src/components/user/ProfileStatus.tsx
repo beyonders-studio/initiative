@@ -1,5 +1,5 @@
 import { MessageCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CustomStatusOutput, UserSelfUpdate } from "@/api/generated/initiativeAPI.schemas";
@@ -94,10 +94,12 @@ export const StatusEditor = ({
   const [emoji, setEmoji] = useState(status.emoji ?? null);
   const [text, setText] = useState(status.text ?? "");
 
-  useEffect(() => {
+  const [prevStatus, setPrevStatus] = useState(status);
+  if (prevStatus.emoji !== status.emoji || prevStatus.text !== status.text) {
+    setPrevStatus(status);
     setEmoji(status.emoji ?? null);
     setText(status.text ?? "");
-  }, [status.emoji, status.text]);
+  }
 
   const save = useUpdateCurrentUser({
     onSuccess: async () => {

@@ -122,10 +122,13 @@ export const MentionPopover = ({
     enabled: active.user && (memberScope !== undefined || inInitiative),
   });
   // `[[ ]]` reaches the tools this initiative has; `#` reaches everything.
+  // Held across renders, so the rows below are rebuilt only when what they
+  // come from changes, and moving through them doesn't start them over.
   const { data: initiative } = useInitiative(inInitiative ? initiativeId : null);
-  const types = active.canCreate
-    ? linkableToolTypes(initiative)
-    : (active.types ?? MENTIONABLE_TYPES);
+  const types = useMemo(
+    () => (active.canCreate ? linkableToolTypes(initiative) : (active.types ?? MENTIONABLE_TYPES)),
+    [active.canCreate, active.types, initiative]
+  );
   // A bare trigger names nothing yet, so the list opens on what was most
   // recently worked on instead of on nothing at all.
   const suggestions = useCommunityPickerSuggestions(active.query, {
@@ -160,9 +163,12 @@ export const MentionPopover = ({
     ? (memberScope !== undefined || inInitiative) && members.isLoading
     : inInitiative && suggestions.isLoading;
 
-  useEffect(() => {
+  // A new list starts at its top.
+  const [prevRows, setPrevRows] = useState(rows);
+  if (prevRows !== rows) {
+    setPrevRows(rows);
     setSelectedIndex(0);
-  }, [rows]);
+  }
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {

@@ -478,11 +478,9 @@ export function DataTable<TData extends RowData>({
     [groupingChoices]
   );
   const groupingSelectValue = grouping.length > 0 ? grouping[0] : GROUPING_NONE_VALUE;
-  useEffect(() => {
-    if (!groupingEnabled && internalGrouping.length > 0) {
-      setGrouping([]);
-    }
-  }, [groupingEnabled, internalGrouping]);
+  if (!groupingEnabled && internalGrouping.length > 0) {
+    setGrouping([]);
+  }
   useEffect(() => {
     if (!groupingEnabled || grouping.length > 0) {
       return;

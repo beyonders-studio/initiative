@@ -7,7 +7,7 @@
  * is no card.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useToolSettings } from "@/components/tools/settings/ToolSettingsContext";
@@ -19,9 +19,11 @@ export const ToolTemplateCard = () => {
   const { entity, template } = useToolSettings();
   const [isTemplate, setIsTemplate] = useState(Boolean(entity.is_template));
 
-  useEffect(() => {
+  const [prevIsTemplate, setPrevIsTemplate] = useState(entity.is_template);
+  if (prevIsTemplate !== entity.is_template) {
+    setPrevIsTemplate(entity.is_template);
     setIsTemplate(Boolean(entity.is_template));
-  }, [entity.is_template]);
+  }
 
   if (!template) {
     return null;

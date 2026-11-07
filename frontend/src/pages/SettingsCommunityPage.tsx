@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { updateCommunity } from "@/api/generated/communities/communities";
@@ -17,21 +17,18 @@ import { getErrorMessage } from "@/lib/errorMessage";
 export const SettingsCommunityPage = () => {
   const { activeCommunity, refreshCommunities, updateCommunityInState } = useCommunities();
   const { t } = useTranslation(["communities", "common"]);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [name, setName] = useState(activeCommunity?.name ?? "");
+  const [description, setDescription] = useState(activeCommunity?.description ?? "");
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!activeCommunity) {
-      setName("");
-      setDescription("");
-      return;
-    }
-    setName(activeCommunity.name);
-    setDescription(activeCommunity.description ?? "");
-  }, [activeCommunity]);
+  const [prevCommunity, setPrevCommunity] = useState(activeCommunity);
+  if (prevCommunity !== activeCommunity) {
+    setPrevCommunity(activeCommunity);
+    setName(activeCommunity?.name ?? "");
+    setDescription(activeCommunity?.description ?? "");
+  }
 
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

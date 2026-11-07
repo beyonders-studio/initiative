@@ -19,7 +19,7 @@
  */
 
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -100,9 +100,11 @@ export const ConnectSignInWizard = ({
   const [providerId, setProviderId] = useState<number | null>(startOn);
   // The wizard stays mounted between openings, so a provider chosen for it
   // has to land each time it opens rather than only on the first mount.
-  useEffect(() => {
+  const [prev, setPrev] = useState({ open, startOn });
+  if (prev.open !== open || prev.startOn !== startOn) {
+    setPrev({ open, startOn });
     if (open && startOn !== null) setProviderId(startOn);
-  }, [open, startOn]);
+  }
   const [claim, setClaim] = useState("");
   // Whether the claim is being typed rather than picked from the shortcuts.
   const [customClaim, setCustomClaim] = useState(false);

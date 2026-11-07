@@ -60,12 +60,14 @@ export const TaskTypeCopyDialog = ({
   const [chosen, setChosen] = useState<Set<number>>(new Set());
   const sourceTypes = useProjectTaskTypes(sourceId, { enabled: open && sourceId !== null });
 
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (open) {
       setSourceId(null);
       setChosen(new Set());
     }
-  }, [open]);
+  }
 
   const others = (projects.data?.items ?? []).filter((project) => project.id !== projectId);
   const here = useMemo(() => new Set(types.map((type) => type.name.toLocaleLowerCase())), [types]);

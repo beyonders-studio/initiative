@@ -109,12 +109,14 @@ export function CommandCenter() {
   const isSearching = effectiveSearch.length >= 2;
 
   // Reset the input whenever the dialog closes so reopening starts fresh.
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (!open) {
       setSearchQuery("");
       setScope(DEFAULT_SEARCH_CATEGORY);
     }
-  }, [open]);
+  }
 
   // Tab moves between the slices while there is something to search for, so the
   // hands stay on the query.

@@ -682,9 +682,7 @@ export const CommunitySidebar = ({ isHomeMode = false }: { isHomeMode?: boolean 
   // shrinks to one while reordering, the mode closes itself rather than
   // leaving taps inert.
   const canReorder = memberCommunities.length > 1;
-  useEffect(() => {
-    if (!canReorder) setReorderMode(false);
-  }, [canReorder]);
+  if (!canReorder && reorderMode) setReorderMode(false);
 
   // --- Expandable "Communities" flyout state machine (mirrors MobileSidebar) ---
   // `expanded` is the desired state; `render`/`atOpen` decouple mount from the

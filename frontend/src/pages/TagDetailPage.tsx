@@ -1,6 +1,6 @@
 import { Navigate, useNavigate, useParams, useRouter, useSearch } from "@tanstack/react-router";
 import { SearchX, Settings, TagIcon, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
@@ -53,11 +53,13 @@ export const TagDetailPage = () => {
   const [editColor, setEditColor] = useState("");
 
   // Reset edit state when navigating between tags
-  useEffect(() => {
+  const [prevTagId, setPrevTagId] = useState(tagId);
+  if (prevTagId !== tagId) {
+    setPrevTagId(tagId);
     setIsEditing(false);
     setEditName("");
     setEditColor("");
-  }, [parsedTagId]);
+  }
 
   if (!hasValidTagId) {
     return <Navigate to="/" replace />;

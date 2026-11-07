@@ -12,7 +12,7 @@
  * that nothing is deleted.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
@@ -51,9 +51,11 @@ export const ToolEnableDialog = ({
   const [audience, setAudience] = useState<ToolAudience>("everyone");
 
   // Each tool is its own question; don't carry the last answer into the next.
-  useEffect(() => {
+  const [prevTool, setPrevTool] = useState(tool);
+  if (prevTool !== tool) {
+    setPrevTool(tool);
     if (tool) setAudience("everyone");
-  }, [tool]);
+  }
 
   const toolName = tool ? t(`${toolCamelPlural(tool)}Feature` as never) : "";
 

@@ -8,7 +8,7 @@
  */
 
 import { Loader2 } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -45,11 +45,13 @@ export const RequestToJoinDialog = ({
   const [message, setMessage] = useState("");
 
   // Reset on close, however it was closed — reopening starts a fresh note.
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (!open) {
       setMessage("");
     }
-  }, [open]);
+  }
 
   const requestToJoin = useRequestToJoinInitiative({
     onSuccess: () => {

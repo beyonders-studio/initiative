@@ -978,9 +978,11 @@ const ColorTrigger = ({
 
   // The committed value only changes externally (other clients, clear),
   // never mid-pick — so syncing the swatch here can't fight the drag.
-  useEffect(() => {
+  const [prevValue, setPrevValue] = useState(value);
+  if (prevValue !== value) {
+    setPrevValue(value);
     setDraft(value);
-  }, [value]);
+  }
 
   useEffect(() => {
     const el = inputRef.current;

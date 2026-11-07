@@ -1,5 +1,5 @@
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -70,12 +70,15 @@ const CustomRoleDialog = ({ role, open, onOpenChange }: CustomRoleDialogProps) =
   const [rung, setRung] = useState<Rung>("member");
   const [surfaces, setSurfaces] = useState<AdminSurface[]>([]);
 
-  useEffect(() => {
-    if (!open) return;
-    setName(role?.name ?? "");
-    setRung(role?.base_rung === "admin" ? "admin" : "member");
-    setSurfaces(role?.surfaces ?? []);
-  }, [open, role]);
+  const [prev, setPrev] = useState({ open, role });
+  if (prev.open !== open || prev.role !== role) {
+    setPrev({ open, role });
+    if (open) {
+      setName(role?.name ?? "");
+      setRung(role?.base_rung === "admin" ? "admin" : "member");
+      setSurfaces(role?.surfaces ?? []);
+    }
+  }
 
   const offered = offeredSurfaces(rung);
   const pending = createRole.isPending || updateRole.isPending;

@@ -30,7 +30,7 @@
 
 import { Link } from "@tanstack/react-router";
 import { Check, ChevronRight, Clock, Loader2, Plus, Users } from "lucide-react";
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -118,9 +118,11 @@ export const InitiativeDirectory = ({ entries, onCreate }: InitiativeDirectoryPr
 
   const [open, setOpen] = useState(() => getItem(collapsedStorageKey(communityId)) !== "true");
   // Switching communities keeps this mounted, so re-read the community whose list it now is.
-  useEffect(() => {
+  const [prevCommunityId, setPrevCommunityId] = useState(communityId);
+  if (prevCommunityId !== communityId) {
+    setPrevCommunityId(communityId);
     setOpen(getItem(collapsedStorageKey(communityId)) !== "true");
-  }, [communityId]);
+  }
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next);

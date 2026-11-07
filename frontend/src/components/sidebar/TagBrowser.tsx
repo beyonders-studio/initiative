@@ -83,11 +83,9 @@ export const TagBrowser = ({
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
 
   // Leaving edit mode discards the selection.
-  useEffect(() => {
-    if (!editMode) {
-      setSelectedIds(new Set());
-    }
-  }, [editMode]);
+  if (!editMode && selectedIds.size > 0) {
+    setSelectedIds(new Set());
+  }
 
   // Rename + recolor dialog state.
   const [renameTag, setRenameTag] = useState<TagSummary | null>(null);

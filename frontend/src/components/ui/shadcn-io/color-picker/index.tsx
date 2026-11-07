@@ -107,12 +107,13 @@ export const ColorPicker = ({
   }, []);
 
   // Update color when controlled value changes
-  useEffect(() => {
-    if (!value) {
-      return;
+  const [prevValue, setPrevValue] = useState(value);
+  if (prevValue !== value) {
+    setPrevValue(value);
+    if (value) {
+      setColorValue(value as string);
     }
-    setColorValue(value as string);
-  }, [setColorValue, value]);
+  }
 
   // Notify parent of changes
   useEffect(() => {
@@ -367,10 +368,11 @@ export const ColorPickerFormat = ({ className, ...props }: ColorPickerFormatProp
   const color = Color.hsl(hue, saturation, lightness, alpha / 100);
   const hexValue = color.hex();
   const [hexInput, setHexInput] = useState(hexValue);
-
-  useEffect(() => {
+  const [prevHexValue, setPrevHexValue] = useState(hexValue);
+  if (prevHexValue !== hexValue) {
+    setPrevHexValue(hexValue);
     setHexInput(hexValue);
-  }, [hexValue]);
+  }
 
   if (mode === "hex") {
     return (

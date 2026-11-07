@@ -1,7 +1,7 @@
 import { useBlocker } from "@tanstack/react-router";
 import type { SerializedEditorState } from "lexical";
 import { Loader2, Vote } from "lucide-react";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -87,7 +87,9 @@ export const CreatePostDialog = ({
   const [values, setValues] = useState(EMPTY_REQUIRED);
   const missing = missingIn(required.keys, values, definitions);
 
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (!open) {
       setName("");
       setBody(null);
@@ -96,7 +98,7 @@ export const CreatePostDialog = ({
       setPoll(null);
       setValues(EMPTY_REQUIRED);
     }
-  }, [open]);
+  }
 
   const create = useCreatePost({
     onSuccess: (post) => {

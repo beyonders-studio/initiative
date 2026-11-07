@@ -16,7 +16,7 @@
  */
 
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -100,14 +100,11 @@ export const SuggestCombobox = ({
     setOpen(false);
   };
 
-  useEffect(() => {
-    if (!open) setSearch("");
-  }, [open]);
-
   const handleOpenChange = (nextOpen: boolean) => {
     if (disabled) return;
     setOpen(nextOpen);
     if (nextOpen) onOpen?.();
+    else setSearch("");
   };
 
   return (

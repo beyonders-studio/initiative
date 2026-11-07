@@ -23,7 +23,7 @@
  * dialog is what answers it, at the moment it starts to matter.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { updateCommunity } from "@/api/generated/communities/communities";
@@ -58,10 +58,12 @@ export const CommunityDiscoveryPanel = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const [prevCommunity, setPrevCommunity] = useState(activeCommunity);
+  if (prevCommunity !== activeCommunity) {
+    setPrevCommunity(activeCommunity);
     setMessage(null);
     setError(null);
-  }, [activeCommunity]);
+  }
 
   if (!communityDirectoryEnabled || !activeCommunity?.can.administer) {
     return null;

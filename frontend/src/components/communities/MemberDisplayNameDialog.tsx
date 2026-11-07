@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -49,9 +49,11 @@ export const MemberDisplayNameDialog = ({
     onError: (error) => toast.error(getErrorMessage(error, "communities:displayName.saveFailed")),
   });
 
-  useEffect(() => {
+  const [prev, setPrev] = useState({ open, current });
+  if (prev.open !== open || prev.current !== current) {
+    setPrev({ open, current });
     if (open) setValue(current ?? "");
-  }, [open, current]);
+  }
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

@@ -225,11 +225,13 @@ export const ProjectTasksSection = ({
   const [isComposerOpen, setIsComposerOpen] = useState(initialComposerOpen ?? false);
   // An archived project takes no new tasks until it is unarchived.
   const canAddTasks = canEditTaskDetails && !projectIsArchived;
-  useEffect(() => {
+  const [prevInitialComposerOpen, setPrevInitialComposerOpen] = useState(initialComposerOpen);
+  if (prevInitialComposerOpen !== initialComposerOpen) {
+    setPrevInitialComposerOpen(initialComposerOpen);
     if (initialComposerOpen) {
       setIsComposerOpen(true);
     }
-  }, [initialComposerOpen]);
+  }
   useEffect(() => {
     onComposerOpenChange?.(isComposerOpen);
   }, [isComposerOpen, onComposerOpenChange]);
@@ -327,9 +329,13 @@ export const ProjectTasksSection = ({
     return explicit?.id ?? sortedTaskStatuses[0]?.id ?? null;
   }, [sortedTaskStatuses]);
 
-  useEffect(() => {
+  // Rows changed here stand in for the server's until its next answer, which
+  // replaces them.
+  const [prevProjectTasks, setPrevProjectTasks] = useState(projectTasks);
+  if (prevProjectTasks !== projectTasks) {
+    setPrevProjectTasks(projectTasks);
     setLocalOverride(null);
-  }, [projectTasks]);
+  }
 
   useEffect(() => {
     if (!collapsedStorageKey) {

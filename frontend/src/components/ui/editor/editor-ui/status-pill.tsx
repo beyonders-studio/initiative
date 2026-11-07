@@ -2,7 +2,7 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 import { useLexicalEditable } from "@lexical/react/useLexicalEditable";
 import { $getNodeByKey, type NodeKey } from "lexical";
 import { Check, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -55,12 +55,11 @@ export function StatusPill({ nodeKey, text, color }: StatusPillProps) {
   // status with no word is removed, so the colour waits for one.
   const [draftColor, setDraftColor] = useState(color);
 
-  useEffect(() => {
-    if (!open) {
-      setDraft(text);
-      setDraftColor(color);
-    }
-  }, [open, text, color]);
+  // Closed, the draft is what the node holds.
+  if (!open && (draft !== text || draftColor !== color)) {
+    setDraft(text);
+    setDraftColor(color);
+  }
 
   const update = (nextText: string, nextColor: StatusColor) => {
     editor.update(() => {
