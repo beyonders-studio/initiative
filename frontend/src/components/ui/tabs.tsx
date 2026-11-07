@@ -22,10 +22,12 @@ TabsList.displayName = TabsPrimitive.List.displayName;
 
 /**
  * The page-level tab bar: spans the width of its container, keeps its triggers
- * at their label width and left-aligned, and scrolls horizontally (scrollbar
- * hidden) once they stop fitting. Use this for every navigation-style tab bar;
- * inline segmented controls (a view picker sitting in a toolbar) keep a bare
- * `TabsList` so they stay sized to their content.
+ * at their label width and left-aligned, and scrolls horizontally once they
+ * stop fitting. A mouse wheel only scrolls up and down, so a fine pointer gets a
+ * thin scrollbar to drag; a touch screen swipes and shows none. Use this for
+ * every navigation-style tab bar; inline segmented controls (a view picker
+ * sitting in a toolbar) keep a bare `TabsList` so they stay sized to their
+ * content.
  */
 const TabsBar = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
@@ -36,7 +38,7 @@ const TabsBar = React.forwardRef<
 >(({ className, containerClassName, ...props }, ref) => (
   <div
     className={cn(
-      "-mx-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+      "scrollbar-thin -mx-1 overflow-x-auto px-1 pointer-coarse:[scrollbar-width:none] pointer-coarse:[&::-webkit-scrollbar]:hidden",
       containerClassName
     )}
   >
