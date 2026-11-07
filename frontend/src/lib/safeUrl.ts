@@ -25,7 +25,8 @@ function stripControlChars(value: string): string {
 /**
  * The address a link, image or tab from content uses. A relative address, a
  * bare host (the caller adds its scheme) and an allowed protocol keep their
- * value; anything else, and anything unreadable, becomes {@link BLOCKED_URL}.
+ * value; anything else becomes {@link BLOCKED_URL}. It reads the scheme itself
+ * rather than with `URL`, so it runs in the server's embedded V8, which has none.
  */
 export function sanitizeUrl(url: string): string {
   const trimmed = url.trim();
@@ -34,24 +35,14 @@ export function sanitizeUrl(url: string): string {
     return BLOCKED_URL;
   }
 
-  // The editor's new-link placeholder keeps its value.
-  if (trimmed === "https://") {
-    return trimmed;
-  }
-
   if (RELATIVE_REFERENCE_RE.test(trimmed)) {
     return trimmed;
   }
 
   // Schemes are read without whitespace and control characters.
-  const stripped = stripControlChars(trimmed);
-  if (!SCHEME_RE.test(stripped)) {
+  const scheme = SCHEME_RE.exec(stripControlChars(trimmed));
+  if (!scheme) {
     return trimmed;
   }
-
-  try {
-    return ALLOWED_PROTOCOLS.has(new URL(stripped).protocol) ? trimmed : BLOCKED_URL;
-  } catch {
-    return BLOCKED_URL;
-  }
+  return ALLOWED_PROTOCOLS.has(scheme[0].toLowerCase()) ? trimmed : BLOCKED_URL;
 }

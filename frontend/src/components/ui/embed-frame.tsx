@@ -1,6 +1,7 @@
 import type React from "react";
 import { useRef, useState } from "react";
 
+import { isOwnOrigin } from "@/api/client";
 import { useFrameMessages } from "@/hooks/useFrameMessages";
 
 /** The tallest a frame grows to fit what it reports. */
@@ -23,7 +24,10 @@ export interface EmbedFrameProps {
   className?: string;
 }
 
-/** Another site's page, framed and sandboxed. It takes the height its page reports. */
+/**
+ * Another site's page, framed and sandboxed. It takes the height its page
+ * reports, and shows nothing for an address on the app's or the server's origin.
+ */
 export function EmbedFrame({
   src,
   title,
@@ -39,6 +43,8 @@ export function EmbedFrame({
     const reported = heightOf?.(data) ?? null;
     if (reported !== null && reported > 0) setHeight(Math.min(reported, MAX_HEIGHT));
   });
+
+  if (isOwnOrigin(src)) return null;
 
   return (
     <iframe

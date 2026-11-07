@@ -25,6 +25,7 @@ import { Loader2 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { isOwnOrigin } from "@/api/client";
 import type { CommunityPluginHandoff } from "@/api/generated/initiativeAPI.schemas";
 import {
   createCommunityPluginHandoff,
@@ -156,14 +157,13 @@ export function CommunityPluginPage({ pluginId, initiativeId }: CommunityPluginP
   // A plug-in's page has an origin of its own: one shared with the app or the
   // server is not framed.
   const origin = useMemo(() => {
-    if (!handoff?.page_url) return null;
+    if (!handoff?.page_url || isOwnOrigin(handoff.page_url)) return null;
     try {
-      const page = new URL(handoff.page_url).origin;
-      return page === window.location.origin || page === getServerOrigin() ? null : page;
+      return new URL(handoff.page_url).origin;
     } catch {
       return null;
     }
-  }, [handoff?.page_url, getServerOrigin]);
+  }, [handoff?.page_url]);
 
   const allowed = useMemo(
     () => new Set(handoff?.allowed_origins ?? []),

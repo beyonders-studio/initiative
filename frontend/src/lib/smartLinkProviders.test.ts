@@ -32,6 +32,7 @@ describe("matchSmartLinkProvider", () => {
   it("gives the id an editor embed stores", () => {
     expect(matchSmartLinkProvider("https://x.com/jack/status/20").ref).toBe("20");
     expect(matchSmartLinkProvider("https://youtu.be/jNQXAC9IVRw").ref).toBe("jNQXAC9IVRw");
+    expect(matchSmartLinkProvider("https://www.youtube.com/v/jNQXAC9IVRw").ref).toBe("jNQXAC9IVRw");
     expect(matchSmartLinkProvider("https://www.youtube.com/playlist?list=PL1").ref).toBeUndefined();
   });
 

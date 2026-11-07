@@ -70,6 +70,22 @@ export const setApiBaseUrl = (url: string) => {
   apiClient.defaults.baseURL = url;
 };
 
+/**
+ * Whether an address is on the app's own origin or the server's. A frame that
+ * lets its page run scripts with its own origin shows neither.
+ */
+export const isOwnOrigin = (url: string): boolean => {
+  try {
+    const origin = new URL(url, window.location.href).origin;
+    return (
+      origin === window.location.origin ||
+      origin === new URL(API_BASE_URL, window.location.href).origin
+    );
+  } catch {
+    return false;
+  }
+};
+
 export const AUTH_UNAUTHORIZED_EVENT = "initiative:auth:unauthorized";
 export const AUTH_STEP_UP_EVENT = "initiative:auth:step-up";
 /** A community wants a factor of the account's own on this session. */

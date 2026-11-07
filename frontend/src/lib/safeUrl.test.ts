@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { sanitizeUrl } from "./safeUrl";
 
@@ -39,6 +39,16 @@ describe("sanitizeUrl", () => {
 
   it("leaves bare protocol-less domains for the caller to format", () => {
     expect(sanitizeUrl("example.com/foo")).toBe("example.com/foo");
+  });
+
+  it("gives the same answers with no URL global, as in the server's editor", () => {
+    vi.stubGlobal("URL", undefined);
+    try {
+      expect(sanitizeUrl("https://example.com")).toBe("https://example.com");
+      expect(sanitizeUrl("javascript:alert(1)")).toBe("about:blank");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("neutralizes empty input", () => {

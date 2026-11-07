@@ -64,7 +64,7 @@ const GENERIC: SmartLinkProviderMatch = {
 };
 
 // youtu.be/<id>, youtube.com/watch?v=<id>, youtube.com/shorts/<id>,
-// youtube.com/embed/<id>, youtube.com/playlist?list=<id>
+// youtube.com/embed/<id>, youtube.com/v/<id>, youtube.com/playlist?list=<id>
 function parseYouTubeId(url: URL): { kind: "video" | "playlist"; value: string } | null {
   // A video's id is eleven letters, digits, `-` or `_`.
   const video = (id: string | undefined) =>
@@ -77,10 +77,8 @@ function parseYouTubeId(url: URL): { kind: "video" | "playlist"; value: string }
   if (v) return video(v);
   const list = url.searchParams.get("list");
   if (url.pathname === "/playlist" && list) return { kind: "playlist", value: list };
-  const shorts = /^\/shorts\/([^/?#]+)/.exec(url.pathname);
-  if (shorts) return video(shorts[1]);
-  const embed = /^\/embed\/([^/?#]+)/.exec(url.pathname);
-  if (embed) return video(embed[1]);
+  const path = /^\/(?:shorts|embed|v)\/([^/?#]+)/.exec(url.pathname);
+  if (path) return video(path[1]);
   return null;
 }
 

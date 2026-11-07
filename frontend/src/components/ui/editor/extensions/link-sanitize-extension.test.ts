@@ -83,31 +83,12 @@ function buildLinkDocument(url: string, type: "link" | "autolink" = "link") {
   };
 }
 
-/** Imports a serialized document and flushes node transforms, then returns the link URL. */
+/** Loads a serialized document the way a stored one is loaded, then returns the link URL. */
 async function importAndReadLinkUrl(
   editor: LexicalEditor,
   serialized: object
 ): Promise<{ storedUrl: string | null; renderedHref: string | null }> {
-  const state = editor.parseEditorState(JSON.stringify(serialized));
-  editor.setEditorState(state);
-
-  // setEditorState does not run transforms; an explicit update marking the node
-  // dirty flushes the registered transforms (this is also what the editor does
-  // on the first user edit after load).
-  await new Promise<void>((resolve) => {
-    editor.update(
-      () => {
-        const link = $getRoot()
-          .getAllTextNodes()
-          .map((n) => n.getParent())
-          .find((p) => $isLinkNode(p) || $isAutoLinkNode(p));
-        if (link && ($isLinkNode(link) || $isAutoLinkNode(link))) {
-          link.markDirty();
-        }
-      },
-      { onUpdate: resolve }
-    );
-  });
+  editor.setEditorState(editor.parseEditorState(JSON.stringify(serialized)));
 
   let storedUrl: string | null = null;
   let renderedHref: string | null = null;
