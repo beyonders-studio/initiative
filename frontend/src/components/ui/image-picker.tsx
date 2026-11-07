@@ -53,7 +53,7 @@ export const acceptsNonImages = (accept: string): boolean =>
  * dialog. Only meaningful where the host has a camera.
  */
 export function usePhotoCapture(onSelect: (file: File) => void | Promise<void>) {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   const [capturing, setCapturing] = useState(false);
   // Read at the moment a picture arrives, so a caller passing a fresh function
   // each render does not make `capture` a new function each render too.
@@ -115,7 +115,7 @@ export const ImagePicker = ({
   buttonSize,
   "data-test-id": dataTestId,
 }: ImagePickerProps) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   const inputRef = useRef<HTMLInputElement>(null);
   const { capturing, capture } = usePhotoCapture(onSelect);
 

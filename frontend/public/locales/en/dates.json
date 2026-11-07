@@ -2,12 +2,7 @@
   "invalidRange": "The end date can't be before the start date.",
   "picker": {
     "invalidEventRange": "The event must end after it starts.",
-    "invalidDate": "Enter a valid calendar date.",
-    "invalidLocalDateTime": "Choose a valid date and time. Times skipped or repeated when the clocks change need a time outside that interval.",
-    "pickDate": "Pick a date",
-    "pickDateTime": "Pick a date and time",
-    "typeDate": "Type or pick a date",
-    "time": "Time"
+    "invalidLocalDateTime": "Choose a valid date and time. Times skipped or repeated when the clocks change need a time outside that interval."
   },
   "status": {
     "overdue": "Overdue",

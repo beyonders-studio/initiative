@@ -49,7 +49,7 @@ export interface SkeletonRegionProps {
 
 /** The accessible wrapper every placeholder below renders into. */
 export const SkeletonRegion = ({ label, className, children }: SkeletonRegionProps) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   return (
     <div role="status" aria-busy="true" data-testid="skeleton-region">
       {/* The bars are decoration: a reader hears the label, not an empty table. */}

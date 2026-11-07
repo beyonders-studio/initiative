@@ -39,7 +39,7 @@ const dayFormat = () => dateTimeFormat(undefined, { dateStyle: "medium" });
 /** Reads a range out loud: "Jul 1 – Sep 30, 2026", "From Jul 1, 2026", or
  *  "" when neither end is set. */
 export const useFormatDateRange = (): ((range: LocalDateRange) => string) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   return useCallback(
     ({ from, until }: LocalDateRange) => {
       const days = dayFormat();
@@ -82,7 +82,7 @@ interface DateRangeFieldProps {
 /** Picks a span of days: a quick pick, or a start and an end on the calendar,
  *  where either end may be left open. */
 export function DateRangeField({ id, value, onChange }: DateRangeFieldProps) {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   const formatRange = useFormatDateRange();
   const [open, setOpen] = useState(false);
   const set = isDateRangeSet(value);

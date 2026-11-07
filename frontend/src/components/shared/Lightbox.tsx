@@ -90,7 +90,7 @@ export const Lightbox = ({
   onNearEnd,
   panel,
 }: LightboxProps) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   const count = items.length;
   const current = items[index];
   const hasPrev = index > 0;
@@ -388,7 +388,7 @@ export const Lightbox = ({
               variant="ghost"
               size="icon"
               className="text-white hover:bg-white/10 hover:text-white"
-              aria-label={t("close")}
+              aria-label={t("lightbox.close")}
               onClick={() => onOpenChange(false)}
             >
               <X className="size-5" />

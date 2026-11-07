@@ -219,7 +219,7 @@ export function DataTable<TData extends RowData>({
   virtualOverscan = 5,
   virtualContainerHeight = "h-[60vh]",
 }: DataTableProps<TData>) {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   const initialStateRef = useRef<Partial<TableState> | undefined>(initialState);
   const initialSortingRef = useRef<SortingState>(initialSorting ? [...initialSorting] : []);
   const groupingEnabled = Boolean(groupingOptions && groupingOptions.length > 0);
@@ -340,7 +340,7 @@ export function DataTable<TData extends RowData>({
             shiftKeyRef.current = e.shiftKey;
           }}
           onCheckedChange={(value) => rowCheckboxHandlerRef.current(row.id, !!value)}
-          aria-label={t("selectRow")}
+          aria-label={t("table.selectRow")}
         />
       ),
       enableSorting: false,
@@ -714,8 +714,8 @@ export function DataTable<TData extends RowData>({
           return (
             <div className="text-muted-foreground text-sm">
               {showFilteredVariant
-                ? t("rowsSelectedFiltered", { selected, total: filteredTotal })
-                : t("rowsSelected", { selected, total: filteredTotal })}
+                ? t("table.rowsSelectedFiltered", { selected, total: filteredTotal })
+                : t("table.rowsSelected", { selected, total: filteredTotal })}
             </div>
           );
         })()}
@@ -743,7 +743,7 @@ export function DataTable<TData extends RowData>({
                   }}
                   className="shrink-0"
                 >
-                  {selectionModeActive ? t("exitSelection") : t("select")}
+                  {selectionModeActive ? t("table.exitSelection") : t("table.select")}
                 </Button>
               )}
               {enableFilterInput && (
@@ -768,7 +768,7 @@ export function DataTable<TData extends RowData>({
               <div className="canvas-sm:flex hidden flex-wrap items-center justify-end gap-2">
                 {enableClearSorting && (
                   <Button variant="ghost" onClick={() => table.resetSorting()}>
-                    <span className="text-muted-foreground">{t("resetSorting")}</span>
+                    <span className="text-muted-foreground">{t("table.resetSorting")}</span>
                   </Button>
                 )}
                 {groupingEnabled && hasGroupingOptions ? (
@@ -782,7 +782,7 @@ export function DataTable<TData extends RowData>({
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" className="ml-auto">
-                        {t("columns")} <ChevronDown />
+                        {t("table.columns")} <ChevronDown />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
@@ -815,11 +815,11 @@ export function DataTable<TData extends RowData>({
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon" className="canvas-sm:hidden">
                     <MoreVertical className="h-4 w-4" />
-                    <span className="sr-only">{t("tableOptions")}</span>
+                    <span className="sr-only">{t("table.options")}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>{t("tableOptions")}</DropdownMenuLabel>
+                  <DropdownMenuLabel>{t("table.options")}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
 
                   {enableRowSelection && (
@@ -834,7 +834,9 @@ export function DataTable<TData extends RowData>({
                         }}
                         className="cursor-pointer"
                       >
-                        {selectionModeActive ? t("exitSelectionMode") : t("enableSelectionMode")}
+                        {selectionModeActive
+                          ? t("table.exitSelectionMode")
+                          : t("table.enableSelectionMode")}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                     </>
@@ -846,7 +848,7 @@ export function DataTable<TData extends RowData>({
                         onSelect={() => table.resetSorting()}
                         className="cursor-pointer"
                       >
-                        {t("resetSorting")}
+                        {t("table.resetSorting")}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                     </>
@@ -855,13 +857,13 @@ export function DataTable<TData extends RowData>({
                   {groupingEnabled && hasGroupingOptions && (
                     <>
                       <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>{t("groupBy")}</DropdownMenuSubTrigger>
+                        <DropdownMenuSubTrigger>{t("table.groupBy")}</DropdownMenuSubTrigger>
                         <DropdownMenuSubContent>
                           <DropdownMenuCheckboxItem
                             checked={groupingSelectValue === GROUPING_NONE_VALUE}
                             onCheckedChange={() => handleGroupingChange([])}
                           >
-                            {t("none")}
+                            {t("table.none")}
                           </DropdownMenuCheckboxItem>
                           {groupingChoices.map((option) => (
                             <DropdownMenuCheckboxItem
@@ -887,7 +889,7 @@ export function DataTable<TData extends RowData>({
                         off the left edge of the viewport. A single scrollable
                         region inside the main menu keeps everything on-screen.
                       */}
-                      <DropdownMenuLabel>{t("columns")}</DropdownMenuLabel>
+                      <DropdownMenuLabel>{t("table.columns")}</DropdownMenuLabel>
                       <div className="max-h-[min(50vh,20rem)] overflow-y-auto">
                         {table
                           .getAllColumns()
@@ -1026,7 +1028,7 @@ export function DataTable<TData extends RowData>({
             ) : (
               <TableRow>
                 <TableCell colSpan={visibleColCount} className="h-24 text-center">
-                  {t("noResultsDot")}
+                  {t("table.noResults")}
                 </TableCell>
               </TableRow>
             )}
@@ -1035,7 +1037,7 @@ export function DataTable<TData extends RowData>({
         {showPagination && (
           <div className="pp4 flex flex-wrap items-center justify-between gap-3 p-4">
             <div className="flex items-center gap-2">
-              <span className="text-muted-foreground text-sm">{t("rowsPerPage")}</span>
+              <span className="text-muted-foreground text-sm">{t("table.rowsPerPage")}</span>
               <Select
                 value={String(pageSize)}
                 onValueChange={(value) => {
@@ -1045,7 +1047,7 @@ export function DataTable<TData extends RowData>({
                   }
                 }}
               >
-                <SelectTrigger className="w-24" aria-label={t("rowsPerPage")}>
+                <SelectTrigger className="w-24" aria-label={t("table.rowsPerPage")}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent align="end">
@@ -1060,7 +1062,7 @@ export function DataTable<TData extends RowData>({
             <div className="ml-auto flex items-center gap-2">
               {manualPagination && externalPageCount !== undefined && (
                 <span className="text-muted-foreground text-sm">
-                  {t("pageOf", {
+                  {t("table.pageOf", {
                     current: table.state.pagination.pageIndex + 1,
                     total: Math.max(externalPageCount, 1),
                   })}
@@ -1109,22 +1111,22 @@ export function GroupBySelect({
   value: string | null;
   onChange: (id: string | null) => void;
 }) {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   const id = useId();
   return (
     <div className="flex items-center gap-2">
       <Label htmlFor={id} className="font-medium text-muted-foreground text-sm">
-        {t("groupBy")}
+        {t("table.groupBy")}
       </Label>
       <Select
         value={value ?? GROUPING_NONE_VALUE}
         onValueChange={(next) => onChange(next === GROUPING_NONE_VALUE ? null : next)}
       >
         <SelectTrigger id={id} className="w-40">
-          <SelectValue placeholder={t("chooseGrouping")} />
+          <SelectValue placeholder={t("table.chooseGrouping")} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={GROUPING_NONE_VALUE}>{t("none")}</SelectItem>
+          <SelectItem value={GROUPING_NONE_VALUE}>{t("table.none")}</SelectItem>
           {options.map((option) => (
             <SelectItem key={option.id} value={option.id}>
               {option.label}

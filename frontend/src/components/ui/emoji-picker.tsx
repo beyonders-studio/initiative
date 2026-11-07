@@ -56,7 +56,7 @@ function EmojiPickerSearch({
   placeholder,
   ...props
 }: React.ComponentProps<typeof EmojiPickerPrimitive.Search>) {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   return (
     <div
       className={cn("flex h-9 shrink-0 items-center gap-2 border-b px-3", className)}
@@ -112,7 +112,7 @@ function EmojiPickerContent({
   className,
   ...props
 }: React.ComponentProps<typeof EmojiPickerPrimitive.Viewport>) {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   return (
     <EmojiPickerPrimitive.Viewport
       className={cn("relative min-h-0 flex-1 outline-hidden", className)}
@@ -145,7 +145,7 @@ function EmojiPickerContent({
 }
 
 function EmojiPickerFooter({ className, ...props }: React.ComponentProps<"div">) {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   return (
     <div
       className={cn(

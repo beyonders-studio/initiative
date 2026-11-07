@@ -96,7 +96,7 @@ export const DateTimePicker = ({
   calendarProps,
   includeTime = true,
 }: DateTimePickerProps) => {
-  const { t } = useTranslation(["dates", "common"]);
+  const { t } = useTranslation("ui");
   // Read so the typed and trigger labels re-render on a clock change.
   useTimeFormat();
   const parsedValue = value
@@ -108,7 +108,7 @@ export const DateTimePicker = ({
   const [invalid, setInvalid] = React.useState(false);
   const errorId = React.useId();
   const timeValue = selectedDate ? format(selectedDate, "HH:mm") : "";
-  const defaultPlaceholder = includeTime ? t("picker.pickDateTime") : t("picker.pickDate");
+  const defaultPlaceholder = includeTime ? t("datePicker.pickDateTime") : t("datePicker.pickDate");
 
   // Human-friendly representation of the current value for the manual-entry field.
   const displayValue = selectedDate
@@ -268,8 +268,8 @@ export const DateTimePicker = ({
             id={id ? `${id}-input` : undefined}
             type="text"
             value={inputValue}
-            placeholder={t("picker.typeDate")}
-            aria-label={t("picker.typeDate")}
+            placeholder={t("datePicker.typeDate")}
+            aria-label={t("datePicker.typeDate")}
             disabled={disabled}
             aria-invalid={invalid || undefined}
             aria-describedby={invalid ? errorId : undefined}
@@ -288,7 +288,7 @@ export const DateTimePicker = ({
         </div>
         {invalid ? (
           <p id={errorId} role="alert" className="px-3 py-2 text-destructive text-sm">
-            {t(includeTime ? "picker.invalidLocalDateTime" : "picker.invalidDate")}
+            {t(includeTime ? "datePicker.invalidLocalDateTime" : "datePicker.invalidDate")}
           </p>
         ) : null}
         <Calendar
@@ -307,7 +307,7 @@ export const DateTimePicker = ({
                 htmlFor={`${id ?? "datetime"}-time`}
                 className="font-medium text-muted-foreground text-xs"
               >
-                {t("picker.time")}
+                {t("datePicker.time")}
               </label>
               <Input
                 id={`${id ?? "datetime"}-time`}
@@ -329,7 +329,7 @@ export const DateTimePicker = ({
             onClick={handleClear}
             disabled={!selectedDate || disabled}
           >
-            {clearLabel ?? t("common:clear")}
+            {clearLabel ?? t("clear")}
           </Button>
         </div>
       </PopoverContent>

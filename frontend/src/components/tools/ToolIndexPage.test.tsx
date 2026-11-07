@@ -257,9 +257,7 @@ describe("the tool index page", () => {
     expect(requests.at(-1)?.get("page")).toBe("1");
     expect(requests.at(-1)?.get("page_size")).toBe("20");
     expect(
-      screen.getByText(
-        translate("pagination.rangeOf", { ns: "common", start: 1, end: 1, total: 1 })
-      )
+      screen.getByText(translate("pagination.rangeOf", { ns: "ui", start: 1, end: 1, total: 1 }))
     ).toBeInTheDocument();
   });
 

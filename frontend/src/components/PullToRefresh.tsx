@@ -29,7 +29,7 @@ export function PullToRefresh({
   enabled = true,
   className,
 }: PullToRefreshProps) {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   const { pullDistance, isRefreshing, containerProps } = usePullToRefresh({
     threshold,
     maxPull,
