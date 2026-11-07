@@ -15,7 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **The desktop app on Windows and Linux hides its menu bar.** The File, Edit, View and Window row no longer takes space under the title bar; press Alt to show it. Zoom, reload and full screen keep their shortcuts.
-- **A community's trash retention sits on top of its trash.** **Community settings › Trash** is one card: a switch and a number of days, then what's in the trash.
 
 ### Fixed
 
