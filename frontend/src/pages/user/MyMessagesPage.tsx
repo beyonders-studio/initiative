@@ -1,5 +1,5 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual";
 import {
   Check,
   CheckCheck,
@@ -525,6 +525,9 @@ function Thread({
   const composer = useRef<HTMLTextAreaElement | null>(null);
   /** Every message mounted, so a tap outside the open one can close it. */
   const rows = useRef(new Map<string, HTMLDivElement>());
+  /** The message holding the focus, kept mounted wherever the log scrolls so
+   *  the next Tab goes on from it. */
+  const focusedId = useRef<string | null>(null);
   /** Where a quote just took the reader, marked long enough to be noticed. */
   const [landedOn, setLandedOn] = useState<string | null>(null);
 
@@ -589,7 +592,8 @@ function Thread({
    * Only the messages near the view are mounted, measured as they mount.
    *
    * Anchored to the end, as a thread is read: a message that grows or arrives
-   * while the reader is at the newest one keeps them there. The padding at the
+   * while the reader is at the newest one keeps them there. The one holding the
+   * focus stays mounted when it scrolls out of the window. The padding at the
    * top is headroom for the actions of the first message, which are drawn above
    * it -- the height of that bar, a row of `size-7` buttons with its own padding
    * and border and the gap under it, rounded up to the next step.
@@ -604,6 +608,13 @@ function Thread({
     paddingEnd: 12,
     overscan: 8,
     anchorTo: "end",
+    rangeExtractor: (range) => {
+      const indexes = defaultRangeExtractor(range);
+      const kept = focusedId.current === null ? undefined : indexOf.get(focusedId.current);
+      return kept === undefined || indexes.includes(kept)
+        ? indexes
+        : [...indexes, kept].sort((a, b) => a - b);
+    },
   });
 
   /**
@@ -819,12 +830,21 @@ function Thread({
               const opensDay =
                 index === 0 || localDayKey(messages[index - 1].at) !== localDayKey(message.at);
               return (
+                // biome-ignore lint/a11y/noStaticElementInteractions: it only notes which message holds the focus; the controls inside take the input
                 <div
                   key={key}
                   data-index={index}
                   ref={virtualizer.measureElement}
                   className="absolute inset-x-0 top-0"
                   style={{ transform: `translateY(${start}px)` }}
+                  onFocus={() => {
+                    focusedId.current = message.id;
+                  }}
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) {
+                      focusedId.current = null;
+                    }
+                  }}
                 >
                   {changesBetween(
                     index === 0 ? Number.NEGATIVE_INFINITY : Date.parse(messages[index - 1].at),

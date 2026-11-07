@@ -10,14 +10,17 @@ import { describe, expect, it, vi } from "vitest";
 
 import { buildDefaultTaskStatuses, buildTask } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
+import { layOutVirtualList } from "@/__tests__/helpers/layOutVirtualList";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
-import { sizeScroller } from "@/__tests__/helpers/sizeScroller";
 import type { LinkedTaskRead, TaskEdgeRead } from "@/api/generated/initiativeAPI.schemas";
 import { ProjectTasksGanttView } from "@/components/projects/ProjectTasksGanttView";
 import { DAY, PX_PER_DAY } from "@/lib/gantt";
 
-sizeScroller((element) => element.dataset.testid === "gantt", 600);
+layOutVirtualList((element) => element.dataset.testid === "gantt", {
+  height: 600,
+  rowHeight: 32,
+});
 
 const at = (iso: string) => new Date(`${iso}T09:00:00`).toISOString();
 
