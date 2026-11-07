@@ -964,10 +964,11 @@ function EntitiesExportWizard({
   });
   // The view loads after the wizard mounts, and can change while it is
   // closed, so each opening starts from it as it is then.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs on opening only; the seed is read at that moment
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (open && !exportJob.busy) setContent(startContent(only?.format === "json"));
-  }, [open]);
+  }
 
   // Only the content filter travels for named entities: the ids already say
   // which things.

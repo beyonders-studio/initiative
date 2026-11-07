@@ -118,10 +118,12 @@ export const DateTimePicker = ({
     : "";
   const [inputValue, setInputValue] = React.useState(displayValue);
   // Keep the text field in sync whenever the committed value changes.
-  React.useEffect(() => {
+  const [prevDisplayValue, setPrevDisplayValue] = React.useState(displayValue);
+  if (prevDisplayValue !== displayValue) {
+    setPrevDisplayValue(displayValue);
     setInputValue(displayValue);
     setInvalid(false);
-  }, [displayValue]);
+  }
 
   const [open, setOpen] = React.useState(false);
 
@@ -131,12 +133,15 @@ export const DateTimePicker = ({
   const selectedMonthKey = selectedDate
     ? `${selectedDate.getFullYear()}-${selectedDate.getMonth()}`
     : null;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on selectedMonthKey so we only jump when the selected month changes, not on every render (selectedDate is a fresh object each render).
-  React.useEffect(() => {
+  // Keyed on the month rather than the date, which is a fresh object each
+  // render, so the calendar only jumps when the selected month changes.
+  const [prevMonthKey, setPrevMonthKey] = React.useState(selectedMonthKey);
+  if (prevMonthKey !== selectedMonthKey) {
+    setPrevMonthKey(selectedMonthKey);
     if (selectedDate) {
       setVisibleMonth(selectedDate);
     }
-  }, [selectedMonthKey]);
+  }
 
   const resolvedWeekStartsOn = (calendarProps?.weekStartsOn ?? user?.week_starts_on ?? 0) as
     | 0

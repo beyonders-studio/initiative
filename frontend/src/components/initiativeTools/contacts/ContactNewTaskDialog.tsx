@@ -44,11 +44,14 @@ export const ContactNewTaskDialog = ({
 
   const titleRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (open) return;
-    setTitle("");
-    setProject(null);
-  }, [open]);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (!open) {
+      setTitle("");
+      setProject(null);
+    }
+  }
 
   // The project comes first, as it does everywhere a task is added; once it is
   // picked, the title is what is asked for next.

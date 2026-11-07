@@ -4,7 +4,7 @@
  * What is typed here is sent to them as it is. It never says who reported
  * the thing, or how many people did.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -33,9 +33,11 @@ export const WarnDialog = ({ open, onOpenChange, pending = false, onConfirm }: W
   const { t } = useTranslation(["moderation", "common"]);
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (open) setMessage("");
-  }, [open]);
+  }
 
   const said = message.trim();
 

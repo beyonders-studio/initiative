@@ -519,9 +519,11 @@ const PromoteDialog = ({
   const promote = usePromoteProperties();
   const [name, setName] = useState("");
   const first = sources[0];
-  useEffect(() => {
+  const [prev, setPrev] = useState({ open, first });
+  if (prev.open !== open || prev.first !== first) {
+    setPrev({ open, first });
     if (open) setName(first?.name ?? "");
-  }, [open, first]);
+  }
   const trimmed = name.trim();
   const same = metadata.find(
     (definition) => definition.name.toLocaleLowerCase() === trimmed.toLocaleLowerCase()

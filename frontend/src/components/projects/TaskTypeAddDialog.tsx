@@ -5,7 +5,7 @@
  */
 
 import { Loader2 } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { TaskTypeCreate, TaskTypeRead } from "@/api/generated/initiativeAPI.schemas";
@@ -58,12 +58,14 @@ export const TaskTypeAddDialog = ({
   const [name, setName] = useState("");
 
   // Opened afresh each time.
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (open) {
       setStart({ kind: "blank" });
       setName("");
     }
-  }, [open]);
+  }
 
   // Names are unique within a project, whatever their case; the server says
   // so too, but the dialog can say it before the reader presses Add.

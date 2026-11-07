@@ -29,7 +29,7 @@
  * shown and can still be removed.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -95,9 +95,11 @@ export const CommunityArtworkPanel = ({ community }: { community: CommunityRead 
   const entitlements = useReadCommunityEntitlements(community.id);
   const mayUploadBanner = entitlements.data?.banner_image_enabled ?? true;
 
-  useEffect(() => {
+  const [prevBanner, setPrevBanner] = useState(community.banner);
+  if (prevBanner !== community.banner) {
+    setPrevBanner(community.banner);
     setDraft(community.banner);
-  }, [community.banner]);
+  }
 
   /** Show a change, without writing it — for a picker still being dragged. */
   const draftLook = (change: Partial<CommunityBannerWrite>) =>

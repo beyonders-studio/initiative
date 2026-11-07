@@ -74,9 +74,11 @@ export const LazyImage = ({
   }, [near]);
 
   // A new picture in the same box starts over.
-  useEffect(() => {
+  const [prevSrc, setPrevSrc] = useState(src);
+  if (prevSrc !== src) {
+    setPrevSrc(src);
     setLoaded(false);
-  }, [src]);
+  }
 
   // A span, so the picture can sit in a paragraph of rendered prose.
   return (

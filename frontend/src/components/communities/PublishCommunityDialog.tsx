@@ -12,7 +12,7 @@
  * with the checkbox rather than in a policy page nobody opens.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CommunityCategory } from "@/api/generated/initiativeAPI.schemas";
@@ -59,12 +59,14 @@ export const PublishCommunityDialog = ({
 
   // Every opening starts from the community's current shelves and an un-ticked
   // certification: it is an assertion made now, not one a previous visit made.
-  useEffect(() => {
+  const [prev, setPrev] = useState({ open, initialCategories });
+  if (prev.open !== open || prev.initialCategories !== initialCategories) {
+    setPrev({ open, initialCategories });
     if (open) {
       setCategories(initialCategories);
       setCertified(false);
     }
-  }, [open, initialCategories]);
+  }
 
   const toggleCategory = (category: CommunityCategory) => {
     setCategories((current) =>

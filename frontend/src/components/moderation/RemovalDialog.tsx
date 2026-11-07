@@ -6,7 +6,7 @@
  * thing's own moderation menu and from a report card, which pre-fills the
  * reason it was reported for.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -82,12 +82,18 @@ export const RemovalDialog = ({
   const [note, setNote] = useState(initialNote);
 
   // Each opening starts from what the caller knows, not from last time.
-  useEffect(() => {
+  const [prev, setPrev] = useState({ open, initialReason, initialNote });
+  if (
+    prev.open !== open ||
+    prev.initialReason !== initialReason ||
+    prev.initialNote !== initialNote
+  ) {
+    setPrev({ open, initialReason, initialNote });
     if (open) {
       setReason(initialReason ?? "");
       setNote(initialNote);
     }
-  }, [open, initialReason, initialNote]);
+  }
 
   const comment = targetType === "comment";
 

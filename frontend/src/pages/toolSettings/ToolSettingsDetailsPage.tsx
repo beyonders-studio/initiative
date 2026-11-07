@@ -6,7 +6,7 @@
  * itself rather than at a `/settings/details` alias.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { TagSummary } from "@/api/generated/initiativeAPI.schemas";
@@ -48,10 +48,12 @@ export const ToolSettingsDetailsPage = () => {
   const [tags, setTags] = useState<TagSummary[]>(entity.tags ?? []);
   const [commentsEnabled, setCommentsEnabled] = useState(entity.comments_enabled);
 
-  useEffect(() => {
+  const [prevEntity, setPrevEntity] = useState(entity);
+  if (prevEntity !== entity) {
+    setPrevEntity(entity);
     setTags(entity.tags ?? []);
     setCommentsEnabled(entity.comments_enabled);
-  }, [entity]);
+  }
 
   const setToolTags = useSetToolTags(tool);
   const setToolComments = useSetToolComments(tool);

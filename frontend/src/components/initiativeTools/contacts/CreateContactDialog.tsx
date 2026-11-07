@@ -1,5 +1,5 @@
 import { Loader2 } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -116,14 +116,17 @@ export const CreateContactDialog = ({
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [grants, setGrants] = useState<ResourceGrantSchema[]>([...DEFAULT_GRANTS]);
 
-  useEffect(() => {
-    if (open) return;
-    setName("");
-    setIsOrganization(false);
-    setDetails(NO_DETAILS);
-    setOrganization(null);
-    setGrants([...DEFAULT_GRANTS]);
-  }, [open]);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (!open) {
+      setName("");
+      setIsOrganization(false);
+      setDetails(NO_DETAILS);
+      setOrganization(null);
+      setGrants([...DEFAULT_GRANTS]);
+    }
+  }
 
   const partOf = fixedOrganization ?? (isOrganization ? null : organization);
   const relate = useRelate();

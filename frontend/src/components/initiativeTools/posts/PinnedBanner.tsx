@@ -1,5 +1,5 @@
 import { Pin } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { PostRead } from "@/api/generated/initiativeAPI.schemas";
@@ -44,9 +44,11 @@ export const PinnedBanner = ({ post, canPin = false, className }: PinnedBannerPr
 
   // Opening the dialog starts from what the pin actually says now, so a change
   // is an edit rather than a fresh answer.
-  useEffect(() => {
+  const [prev, setPrev] = useState({ open, expiresAt: post.pin_expires_at });
+  if (prev.open !== open || prev.expiresAt !== post.pin_expires_at) {
+    setPrev({ open, expiresAt: post.pin_expires_at });
     if (open) setExpiresAt(toLocalDateTimeInput(post.pin_expires_at));
-  }, [open, post.pin_expires_at]);
+  }
 
   const setPin = useSetPostPin(post.id, {
     onSuccess: () => {

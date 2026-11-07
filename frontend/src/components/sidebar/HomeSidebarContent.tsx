@@ -7,7 +7,7 @@ import {
   LifeBuoy,
   MessageSquare,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { MessagesSidebarContent } from "@/components/sidebar/MessagesSidebarContent";
@@ -36,9 +36,11 @@ export const HomeSidebarContent = () => {
   // here, and arriving at the route again drills back in.
   const onMessages = pathname.startsWith("/messages");
   const [climbedOut, setClimbedOut] = useState(false);
-  useEffect(() => {
+  const [wasOnMessages, setWasOnMessages] = useState(onMessages);
+  if (wasOnMessages !== onMessages) {
+    setWasOnMessages(onMessages);
     setClimbedOut(false);
-  }, [onMessages]);
+  }
 
   // Somebody asking to message you, or a message you have not read: the same
   // thing to whoever sees the mark, and counted in one place because the logo

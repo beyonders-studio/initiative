@@ -8,7 +8,7 @@ import {
   TriangleAlert,
   Wrench,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -86,10 +86,12 @@ export const AnnouncementDialog = ({
   // A dialog opening is a fresh read, and so is a different announcement
   // arriving in the same dialog — both start at page one. The title stands in
   // for "which announcement": the pages themselves are a fresh array each
-  // render, so they cannot be the dependency.
-  useEffect(() => {
+  // render, so they cannot be what is compared.
+  const [prev, setPrev] = useState({ open, title });
+  if (prev.open !== open || prev.title !== title) {
+    setPrev({ open, title });
     setPageIndex(0);
-  }, [open, title]);
+  }
 
   const safeIndex = Math.min(pageIndex, Math.max(pages.length - 1, 0));
   const isLastPage = safeIndex >= pages.length - 1;

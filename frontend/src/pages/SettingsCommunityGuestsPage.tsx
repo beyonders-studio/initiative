@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { CalendarPlus, RefreshCcw, UserCheck, UserMinus, X } from "lucide-react";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -84,9 +84,11 @@ const ExtendGuestDialog = ({
     onError: (error) => toast.error(getErrorMessage(error, "communities:guests.extendError")),
   });
 
-  useEffect(() => {
+  const [prevGuest, setPrevGuest] = useState(guest);
+  if (prevGuest !== guest) {
+    setPrevGuest(guest);
     if (guest) setDays(7);
-  }, [guest]);
+  }
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

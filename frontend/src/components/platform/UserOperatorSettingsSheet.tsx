@@ -29,7 +29,7 @@ import {
   Trash2,
   UserCheck,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -209,9 +209,11 @@ export const UserOperatorSettingsSheet = ({
   const grantCases = useGrantCases({ enabled: open && mayNameCase });
   const [caseTaskId, setCaseTaskId] = useState<number | null>(null);
   // A new account starts with no case.
-  useEffect(() => {
+  const [prevUserId, setPrevUserId] = useState(user?.id);
+  if (prevUserId !== user?.id) {
+    setPrevUserId(user?.id);
     setCaseTaskId(null);
-  }, [user?.id]);
+  }
 
   const setUsername = useOperatorSetUsername(
     {

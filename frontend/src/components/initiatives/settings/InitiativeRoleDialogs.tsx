@@ -5,7 +5,7 @@
  */
 
 import { Loader2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { InitiativeRoleRead } from "@/api/generated/initiativeAPI.schemas";
@@ -60,14 +60,16 @@ export const InitiativeRoleDialogs = ({
   const roleNameTouchedRef = useRef(false);
 
   // Rename role dialog state
-  const [renameDisplayName, setRenameDisplayName] = useState("");
+  const [renameDisplayName, setRenameDisplayName] = useState(roleToRename?.display_name ?? "");
 
   // Sync renameDisplayName when roleToRename changes
-  useEffect(() => {
+  const [prevRoleToRename, setPrevRoleToRename] = useState(roleToRename);
+  if (prevRoleToRename !== roleToRename) {
+    setPrevRoleToRename(roleToRename);
     if (roleToRename) {
       setRenameDisplayName(roleToRename.display_name);
     }
-  }, [roleToRename]);
+  }
 
   const createRoleMutation = useCreateRole(initiativeId);
   const updateRoleMutation = useUpdateRole(initiativeId);

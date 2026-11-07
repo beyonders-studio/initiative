@@ -6,7 +6,7 @@
  * the people browsing for one.
  */
 
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { updateCommunity } from "@/api/generated/communities/communities";
@@ -48,11 +48,12 @@ export const CommunityLocationPanel = () => {
   // Compared by value: the community list is refetched on focus, and a fresh copy
   // of the same location must not throw away what is being typed.
   const storedKey = JSON.stringify(stored ?? null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: storedKey is stored, by value
-  useEffect(() => {
+  const [prevStoredKey, setPrevStoredKey] = useState(storedKey);
+  if (prevStoredKey !== storedKey) {
+    setPrevStoredKey(storedKey);
     setDraft(placeFrom(stored));
     setLabel(stored?.label ?? "");
-  }, [storedKey]);
+  }
 
   if (!activeCommunity) return null;
 

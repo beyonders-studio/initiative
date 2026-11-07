@@ -1,5 +1,5 @@
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CollectionRead, PropertyValueInput } from "@/api/generated/initiativeAPI.schemas";
@@ -48,9 +48,11 @@ export const RequiredMetadataDialog = ({
 }) => {
   const { t } = useTranslation(["files", "common"]);
   const [draft, setDraft] = useState(EMPTY_REQUIRED);
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (!open) setDraft(EMPTY_REQUIRED);
-  }, [open]);
+  }
   const missing = missingIn(keys, draft, collection.metadata);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

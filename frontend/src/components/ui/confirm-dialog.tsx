@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 
 import {
   AlertDialog,
@@ -59,17 +59,14 @@ export const ConfirmDialog = ({
 
   const requiresConfirmation = Boolean(confirmationText);
 
-  // Reset the typed confirmation whenever the dialog closes so a
-  // reopened dialog starts blank.
-  useEffect(() => {
-    if (!open) setConfirmationInput("");
-  }, [open]);
-
-  // Reset when the expected phrase changes (e.g. a reused dialog now
-  // guards a differently named resource).
-  useEffect(() => {
-    setConfirmationInput("");
-  }, [confirmationText]);
+  // Reset the typed confirmation whenever the dialog closes, so a reopened
+  // dialog starts blank, and when the expected phrase changes (e.g. a reused
+  // dialog now guards a differently named resource).
+  const [prev, setPrev] = useState({ open, confirmationText });
+  if (prev.open !== open || prev.confirmationText !== confirmationText) {
+    setPrev({ open, confirmationText });
+    if (!open || prev.confirmationText !== confirmationText) setConfirmationInput("");
+  }
 
   const confirmationSatisfied = !requiresConfirmation || confirmationInput === confirmationText;
 

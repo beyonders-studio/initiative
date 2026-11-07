@@ -10,7 +10,7 @@
  */
 
 import { LifeBuoy } from "lucide-react";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SupportTopic } from "@/api/generated/initiativeAPI.schemas";
@@ -30,9 +30,11 @@ export const AskForHelpButton = () => {
   // in one could be sent to the next. Changing community closes it: a help
   // request is about where you were, and carrying the words across would send
   // them to people the writer never meant.
-  useEffect(() => {
+  const [prevCommunityId, setPrevCommunityId] = useState(communityId);
+  if (prevCommunityId !== communityId) {
+    setPrevCommunityId(communityId);
     setOpen(false);
-  }, [communityId]);
+  }
 
   const support = data?.support;
   const canAsk = support?.mode === "form";

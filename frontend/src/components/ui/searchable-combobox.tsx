@@ -1,5 +1,5 @@
 import { Check, ChevronsUpDown, type LucideIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -55,13 +55,7 @@ export const SearchableCombobox = ({
   const [open, setOpen] = useState(false);
   const [internalValue, setInternalValue] = useState(value ?? "");
 
-  useEffect(() => {
-    if (value !== undefined && value !== internalValue) {
-      setInternalValue(value ?? "");
-    }
-  }, [value, internalValue]);
-
-  const selectedValue = value ?? internalValue;
+  const selectedValue = value === undefined ? internalValue : (value ?? "");
   const selectedItem = items.find(
     (item) => item.value.toLowerCase() === selectedValue.toLowerCase()
   );
