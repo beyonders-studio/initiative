@@ -1,4 +1,5 @@
 import { defineConfig } from "@capawesome/capacitor-electron/config";
+import { BrowserWindow } from "electron";
 
 // The person connects the app to their own server, so what it may reach is
 // whatever that server is, over https or plain http on a home network. The
@@ -36,5 +37,10 @@ export default defineConfig({
   splashScreen: {
     width: 320,
     height: 320,
+  },
+  hooks: {
+    // The window keeps its title bar but hides the menu bar under it until
+    // Alt is pressed; its shortcuts (zoom, reload, full screen) still work.
+    windowFactory: (options) => new BrowserWindow({ ...options, autoHideMenuBar: true }),
   },
 });
