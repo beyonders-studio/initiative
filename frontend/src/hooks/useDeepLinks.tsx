@@ -5,7 +5,7 @@ import { useEffect } from "react";
 
 import { useAuth } from "@/hooks/useAuth";
 import { redeemNativeSignIn, takePendingSignIn } from "@/lib/nativeSignIn";
-import { answerBrowserPrompt } from "@/lib/passkeys";
+import { takeBrowserAnswer } from "@/lib/passkeys";
 
 import { useServer } from "./useServer";
 
@@ -24,7 +24,7 @@ const isSignInCallback = (url: URL) =>
 export function useDeepLinks() {
   const router = useRouter();
   const { isNativePlatform, getServerOrigin } = useServer();
-  const { completeOidcLogin } = useAuth();
+  const { completeOidcLogin, applySignIn } = useAuth();
 
   useEffect(() => {
     if (!isNativePlatform) return;
@@ -36,7 +36,15 @@ export function useDeepLinks() {
       } catch {
         return;
       }
-      if (answerBrowserPrompt(url) || !isSignInCallback(url)) return;
+      // A passkey sign-in the answer started the app for is finished here; a
+      // refused one leaves the sign-in page up, to press again.
+      const signedIn = await takeBrowserAnswer(url).catch(() => null);
+      if (signedIn) {
+        await applySignIn(signedIn);
+        await router.navigate({ to: "/", replace: true });
+        return;
+      }
+      if (!isSignInCallback(url)) return;
       const pending = takePendingSignIn(getServerOrigin());
       if (!pending) return;
       await Browser.close().catch(() => undefined);
@@ -70,5 +78,5 @@ export function useDeepLinks() {
     return () => {
       void listener.then((l) => l.remove());
     };
-  }, [isNativePlatform, getServerOrigin, completeOidcLogin, router]);
+  }, [isNativePlatform, getServerOrigin, completeOidcLogin, applySignIn, router]);
 }

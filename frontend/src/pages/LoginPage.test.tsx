@@ -601,7 +601,7 @@ describe("LoginPage passkey relay", () => {
   });
 
   it("asks for one press and nothing else", async () => {
-    openedWith(`#get=${encodeURIComponent(JSON.stringify(options))}`);
+    openedWith(`#get=${encodeURIComponent(JSON.stringify(options))}&prompt=p1`);
 
     expect(
       await screen.findByRole("button", { name: /continue with a passkey/i })
@@ -615,12 +615,13 @@ describe("LoginPage passkey relay", () => {
   it("hands the app the credential", async () => {
     const user = userEvent.setup();
     mocks.runPrompt.mockResolvedValue({ id: "cred" });
-    openedWith(`#create=${encodeURIComponent(JSON.stringify(options))}`);
+    openedWith(`#create=${encodeURIComponent(JSON.stringify(options))}&prompt=p1`);
 
     await user.click(await screen.findByRole("button", { name: /continue with a passkey/i }));
 
     expect(mocks.runPrompt).toHaveBeenCalledWith("create", options);
     const back = `initiative://passkey/callback?${new URLSearchParams({
+      prompt: "p1",
       credential: JSON.stringify({ id: "cred" }),
     })}`;
     await waitFor(() => expect(assign).toHaveBeenCalledWith(back));
@@ -631,12 +632,14 @@ describe("LoginPage passkey relay", () => {
   it("hands the app how the prompt ended", async () => {
     const user = userEvent.setup();
     mocks.runPrompt.mockRejectedValue(refusedPrompt());
-    openedWith(`#get=${encodeURIComponent(JSON.stringify(options))}`);
+    openedWith(`#get=${encodeURIComponent(JSON.stringify(options))}&prompt=p1`);
 
     await user.click(await screen.findByRole("button", { name: /continue with a passkey/i }));
 
     await waitFor(() =>
-      expect(assign).toHaveBeenCalledWith("initiative://passkey/callback?error=NotAllowedError")
+      expect(assign).toHaveBeenCalledWith(
+        "initiative://passkey/callback?prompt=p1&error=NotAllowedError"
+      )
     );
   });
 

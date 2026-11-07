@@ -53,7 +53,7 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { pkcePair } from "@/lib/nativeSignIn";
 import { getStoredServerUrl } from "@/lib/serverStorage";
-import { getItem, setItem } from "@/lib/storage";
+import { getItem, removeItem, setItem } from "@/lib/storage";
 
 /** Set when the app could not act for a server, which then goes straight to
  *  the browser until it lapses: long enough not to fail first on every press,
@@ -160,41 +160,62 @@ const viaApp = async (kind: PromptKind, options: unknown): Promise<unknown> => {
   }
 };
 
-/** The browser prompt waiting for its answer, if one is. */
-let waiting: ((answer: URL | Error) => void) | null = null;
+/** What finishes a sign-in: the verifier its begin was bound to, and the name
+ *  the session is given. */
+interface SignInToFinish {
+  verifier: string;
+  deviceName: string;
+}
+
+/** A sign-in whose prompt is in the browser, with the prompt's id. Kept while
+ *  the browser is in front, because the phone can close the app meanwhile and
+ *  the answer then starts it afresh. */
+const SIGN_IN_IN_BROWSER_KEY = "initiative-passkey-sign-in";
+
+/** The browser prompt waiting for its answer, if one is, by the id its page
+ *  hands back with the answer. */
+let waiting: { prompt: string; settle: (answer: URL | Error) => void } | null = null;
 
 /**
  * Run a prompt in the system browser, on the server's own page, and wait for
  * the answer it hands back. A newer prompt puts an older one down, and one
- * nobody answers ends the way a browser's own prompt does.
+ * nobody answers ends the way a browser's own prompt does. `signIn` is kept
+ * for a launch the answer starts afresh.
  */
-const viaBrowser = async (kind: PromptKind, options: unknown): Promise<unknown> => {
+const viaBrowser = async (
+  kind: PromptKind,
+  options: unknown,
+  signIn?: SignInToFinish
+): Promise<unknown> => {
   const origin = serverOrigin();
   if (!origin) throw promptEnded("NotSupportedError");
-  waiting?.(promptEnded("AbortError"));
+  waiting?.settle(promptEnded("AbortError"));
+  const prompt = crypto.randomUUID();
 
   const answered = new Promise<URL>((resolve, reject) => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let closed: Promise<PluginListenerHandle> | undefined;
     const settle = (answer: URL | Error) => {
-      if (waiting !== settle) return;
+      if (waiting?.settle !== settle) return;
       waiting = null;
+      void removeItem(SIGN_IN_IN_BROWSER_KEY);
       clearTimeout(timer);
       void closed?.then((handle) => handle.remove());
       if (answer instanceof Error) reject(answer);
       else resolve(answer);
     };
-    waiting = settle;
+    waiting = { prompt, settle };
     timer = setTimeout(() => settle(promptEnded("NotAllowedError")), BROWSER_WAIT_MS);
     // A phone's in-app browser closed before an answer ends the prompt.
     closed = Browser.addListener("browserFinished", () => settle(promptEnded("NotAllowedError")));
   });
 
-  const fragment = new URLSearchParams({ [kind]: JSON.stringify(options) });
+  if (signIn) await setItem(SIGN_IN_IN_BROWSER_KEY, JSON.stringify({ ...signIn, prompt }));
+  const fragment = new URLSearchParams({ [kind]: JSON.stringify(options), prompt });
   try {
     await Browser.open({ url: `${origin}${PROMPT_PATH}#${fragment}` });
   } catch {
-    waiting?.(promptEnded("NotSupportedError"));
+    waiting?.settle(promptEnded("NotSupportedError"));
   }
   const answer = await answered;
   const credential = answer.searchParams.get("credential");
@@ -202,25 +223,51 @@ const viaBrowser = async (kind: PromptKind, options: unknown): Promise<unknown> 
   return JSON.parse(credential) as unknown;
 };
 
+/** Finish a sign-in with the credential its prompt produced. */
+const finishSignIn = (credential: unknown, { verifier, deviceName }: SignInToFinish) =>
+  finishPasskeySignIn({
+    credential: credential as PasskeySignInFinishCredential,
+    device_name: deviceName,
+    code_verifier: verifier,
+  });
+
 /**
- * Hand a link the app was opened with to the browser prompt waiting for it.
- * Returns whether the link was a prompt's answer.
+ * Take a link the app was opened with, when it is a browser prompt's answer.
+ *
+ * The answer goes to the prompt waiting for it, and one from any other prompt
+ * is dropped. Where nothing is waiting, the answer started the app afresh: a
+ * sign-in it answers is finished here, and its session is what this resolves
+ * to. Null for anything else.
  */
-export const answerBrowserPrompt = (url: URL): boolean => {
+export const takeBrowserAnswer = async (url: URL): Promise<Token | null> => {
   if (url.protocol !== "initiative:" || url.host !== "passkey" || url.pathname !== "/callback") {
-    return false;
+    return null;
   }
   void Browser.close().catch(() => undefined);
-  waiting?.(url);
-  return true;
+  const prompt = url.searchParams.get("prompt");
+  if (waiting) {
+    if (waiting.prompt === prompt) waiting.settle(url);
+    return null;
+  }
+  const kept = getItem(SIGN_IN_IN_BROWSER_KEY);
+  void removeItem(SIGN_IN_IN_BROWSER_KEY);
+  const credential = url.searchParams.get("credential");
+  if (!kept || !credential) return null;
+  const signIn = JSON.parse(kept) as SignInToFinish & { prompt: string };
+  return signIn.prompt === prompt ? finishSignIn(JSON.parse(credential), signIn) : null;
 };
 
 /** Run a prompt wherever it can run here. `inBrowser` sends an app's prompt to
- *  the browser even where its plug-in could run it. */
+ *  the browser even where its plug-in could run it; `signIn` is the sign-in
+ *  the prompt is for, if it is for one. */
 export const runPrompt = async (
   kind: PromptKind,
   options: unknown,
-  { conditional = false, inBrowser = false } = {}
+  {
+    conditional = false,
+    inBrowser = false,
+    signIn,
+  }: { conditional?: boolean; inBrowser?: boolean; signIn?: SignInToFinish } = {}
 ): Promise<unknown> => {
   if (!inBrowser && appRunsPasskeys()) {
     try {
@@ -229,7 +276,7 @@ export const runPrompt = async (
       if (!(err instanceof NeedsBrowser)) throw err;
     }
   }
-  if (Capacitor.isNativePlatform()) return viaBrowser(kind, options);
+  if (Capacitor.isNativePlatform()) return viaBrowser(kind, options, signIn);
   return kind === "get"
     ? startAuthentication({
         optionsJSON: options as PublicKeyCredentialRequestOptionsJSON,
@@ -280,12 +327,9 @@ export const signInWithPasskey = async ({
 }: PasskeySignInOptions = {}): Promise<Token> => {
   const pair = await pkcePair();
   const begun = await beginPasskeySignIn({ code_challenge: pair.challenge });
-  const credential = await runPrompt("get", begun.options, { conditional, inBrowser });
-  return finishPasskeySignIn({
-    credential: credential as PasskeySignInFinishCredential,
-    device_name: deviceName ?? "",
-    code_verifier: pair.verifier,
-  });
+  const signIn = { verifier: pair.verifier, deviceName: deviceName ?? "" };
+  const credential = await runPrompt("get", begun.options, { conditional, inBrowser, signIn });
+  return finishSignIn(credential, signIn);
 };
 
 /**

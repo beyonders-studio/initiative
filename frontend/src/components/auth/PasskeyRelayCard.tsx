@@ -23,14 +23,17 @@ import {
 } from "@/components/ui/card";
 import { PROMPT_CALLBACK, type PromptKind, runPrompt } from "@/lib/passkeys";
 
-/** The prompt the fragment asks for, or null for a link that carries none. */
-const askedFor = (hash: string): { kind: PromptKind; options: unknown } | null => {
+/** The prompt the fragment asks for, with the id its answer goes back under,
+ *  or null for a link that carries none. */
+const askedFor = (hash: string): { kind: PromptKind; options: unknown; prompt: string } | null => {
   const params = new URLSearchParams(hash.replace(/^#/, ""));
+  const prompt = params.get("prompt");
+  if (!prompt) return null;
   for (const kind of ["get", "create"] as const) {
     const options = params.get(kind);
     if (options === null) continue;
     try {
-      return { kind, options: JSON.parse(options) as unknown };
+      return { kind, options: JSON.parse(options) as unknown, prompt };
     } catch {
       return null;
     }
@@ -50,16 +53,15 @@ export const PasskeyRelayCard = () => {
   const run = async () => {
     if (!asked) return;
     setBusy(true);
-    let back: string;
+    let ended: Record<string, string>;
     try {
-      const credential = await runPrompt(asked.kind, asked.options);
-      back = `${PROMPT_CALLBACK}?${new URLSearchParams({ credential: JSON.stringify(credential) })}`;
+      ended = { credential: JSON.stringify(await runPrompt(asked.kind, asked.options)) };
     } catch (err) {
-      const name = err instanceof Error ? err.name : "UnknownError";
-      back = `${PROMPT_CALLBACK}?${new URLSearchParams({ error: name })}`;
+      ended = { error: err instanceof Error ? err.name : "UnknownError" };
     } finally {
       setBusy(false);
     }
+    const back = `${PROMPT_CALLBACK}?${new URLSearchParams({ prompt: asked.prompt, ...ended })}`;
     setAnswer(back);
     window.location.assign(back);
   };

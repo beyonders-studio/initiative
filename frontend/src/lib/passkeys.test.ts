@@ -15,6 +15,21 @@ const mocks = vi.hoisted(() => ({
   finishPasskeyStepUp: vi.fn(),
   beginPasskeySignUp: vi.fn(),
   finishPasskeySignUp: vi.fn(),
+  finishPasskeySignIn: vi.fn(),
+}));
+
+/** The app's storage, kept apart from the module so it outlives a restart. */
+const store = vi.hoisted(() => new Map<string, string>());
+
+vi.mock("@/lib/storage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/storage")>()),
+  getItem: (key: string) => store.get(key) ?? null,
+  setItem: async (key: string, value: string) => {
+    store.set(key, value);
+  },
+  removeItem: async (key: string) => {
+    store.delete(key);
+  },
 }));
 
 vi.mock("@capacitor/core", () => ({
@@ -38,6 +53,8 @@ vi.mock("@/api/generated/auth/auth", async (importOriginal) => ({
   finishPasskeyStepUp: (body: unknown) => mocks.finishPasskeyStepUp(body),
   beginPasskeySignUp: (body: unknown) => mocks.beginPasskeySignUp(body),
   finishPasskeySignUp: (body: unknown) => mocks.finishPasskeySignUp(body),
+  beginPasskeySignIn: () => Promise.resolve({ options: { challenge: "i", rpId: "example.com" } }),
+  finishPasskeySignIn: (body: unknown) => mocks.finishPasskeySignIn(body),
 }));
 
 // A browser that would run a ceremony, so an app is seen refusing one anyway.
@@ -52,26 +69,33 @@ vi.mock("@/api/generated/access-grants/access-grants", () => ({
 }));
 
 import { setStoredServerUrl } from "@/lib/serverStorage";
-import { listKeys, removeItem } from "@/lib/storage";
 
 import {
-  answerBrowserPrompt,
   appRunsPasskeys,
   assertForBreakGlass,
   describePasskeyPromptError,
   passkeysRunHere,
+  signInWithPasskey,
   signUpWithPasskey,
   stepUpWithPasskey,
+  takeBrowserAnswer,
 } from "./passkeys";
 
 const STEP_UP_OPTIONS = { challenge: "c", rpId: "example.com" };
 
-/** What the system browser hands back, as the app is opened with it. */
-const answer = (params: Record<string, string>) =>
-  answerBrowserPrompt(new URL(`initiative://passkey/callback?${new URLSearchParams(params)}`));
-
 /** The address the app last opened the system browser at. */
 const opened = () => new URL(vi.mocked(Browser.open).mock.calls.at(-1)?.[0].url ?? "");
+
+/** The id of the prompt the app last sent the browser. */
+const lastPrompt = () => new URLSearchParams(opened().hash.slice(1)).get("prompt") ?? "";
+
+/** A link the browser's page hands back. */
+const callback = (params: Record<string, string>) =>
+  new URL(`initiative://passkey/callback?${new URLSearchParams(params)}`);
+
+/** What the browser's page hands back for the prompt it was sent. */
+const answer = (params: Record<string, string>) =>
+  takeBrowserAnswer(callback({ prompt: lastPrompt(), ...params }));
 
 beforeEach(() => {
   mocks.platform = "android";
@@ -80,8 +104,7 @@ beforeEach(() => {
   mocks.beginPasskeySignUp.mockResolvedValue({
     options: { challenge: "s", rp: { id: "example.com" } },
   });
-  // An app keeps its storage in memory, which the shared setup leaves alone.
-  for (const key of listKeys()) void removeItem(key);
+  store.clear();
   setStoredServerUrl("https://one.example.com/api/v1");
 });
 
@@ -164,7 +187,7 @@ describe("a ceremony in the app", () => {
     // The same press goes on in the browser.
     const done = stepUpWithPasskey();
     await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(1));
-    answer({ credential: JSON.stringify({ id: "cred" }) });
+    await answer({ credential: JSON.stringify({ id: "cred" }) });
     await done;
     expect(appRunsPasskeys()).toBe(false);
 
@@ -174,7 +197,7 @@ describe("a ceremony in the app", () => {
     // A second refusal keeps the first.
     const again = stepUpWithPasskey();
     await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(2));
-    answer({ credential: JSON.stringify({ id: "cred" }) });
+    await answer({ credential: JSON.stringify({ id: "cred" }) });
     await again;
     setStoredServerUrl("https://one.example.com/api/v1");
     expect(appRunsPasskeys()).toBe(false);
@@ -195,7 +218,7 @@ describe("a ceremony in the app", () => {
     mocks.getPasskey.mockRejectedValue({ code: "SecurityError" });
     const refused = stepUpWithPasskey();
     await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(1));
-    answer({ error: "NotAllowedError" });
+    await answer({ error: "NotAllowedError" });
     await expect(refused).rejects.toMatchObject({ name: "NotAllowedError" });
   });
 });
@@ -217,7 +240,7 @@ describe("a prompt in the system browser", () => {
       STEP_UP_OPTIONS
     );
 
-    expect(answer({ credential: JSON.stringify({ id: "cred" }) })).toBe(true);
+    await answer({ credential: JSON.stringify({ id: "cred" }) });
     await done;
     expect(mocks.finishPasskeyStepUp).toHaveBeenCalledWith({ credential: { id: "cred" } });
     expect(Browser.close).toHaveBeenCalled();
@@ -226,7 +249,7 @@ describe("a prompt in the system browser", () => {
   it("ends the way the browser's prompt ended", async () => {
     const done = stepUpWithPasskey();
     await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(1));
-    answer({ error: "NotAllowedError" });
+    await answer({ error: "NotAllowedError" });
 
     const ended = await done.catch((err: unknown) => err);
     expect(describePasskeyPromptError(ended)).toBe("auth:login.passkeyCancelled");
@@ -253,11 +276,46 @@ describe("a prompt in the system browser", () => {
 
     await expect(first).rejects.toMatchObject({ name: "AbortError" });
     await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(2));
-    answer({ credential: JSON.stringify({ id: "cred" }) });
+    await answer({ credential: JSON.stringify({ id: "cred" }) });
     await second;
   });
 
-  it("leaves other links to whoever takes them", () => {
-    expect(answerBrowserPrompt(new URL("initiative://oidc/callback?code=x"))).toBe(false);
+  it("drops an answer from another prompt's page", async () => {
+    const done = stepUpWithPasskey();
+    await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(1));
+
+    await takeBrowserAnswer(callback({ prompt: "an-older-one", credential: "{}" }));
+    await answer({ credential: JSON.stringify({ id: "cred" }) });
+    await done;
+    expect(mocks.finishPasskeyStepUp).toHaveBeenCalledWith({ credential: { id: "cred" } });
+  });
+
+  it("finishes a sign-in whose answer starts the app afresh", async () => {
+    // The phone closed the app while the browser was in front.
+    void signInWithPasskey({ deviceName: "iPhone" }).catch(() => undefined);
+    await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(1));
+    const prompt = lastPrompt();
+    vi.resetModules();
+    const restarted = await import("./passkeys");
+    mocks.finishPasskeySignIn.mockResolvedValue({ access_token: "t" });
+
+    await expect(
+      restarted.takeBrowserAnswer(callback({ prompt, credential: JSON.stringify({ id: "cred" }) }))
+    ).resolves.toEqual({ access_token: "t" });
+    expect(mocks.finishPasskeySignIn).toHaveBeenCalledWith({
+      credential: { id: "cred" },
+      device_name: "iPhone",
+      code_verifier: expect.any(String),
+    });
+    // Once.
+    await expect(
+      restarted.takeBrowserAnswer(callback({ prompt, credential: JSON.stringify({ id: "cred" }) }))
+    ).resolves.toBeNull();
+  });
+
+  it("leaves other links to whoever takes them", async () => {
+    await expect(
+      takeBrowserAnswer(new URL("initiative://oidc/callback?code=x"))
+    ).resolves.toBeNull();
   });
 });
