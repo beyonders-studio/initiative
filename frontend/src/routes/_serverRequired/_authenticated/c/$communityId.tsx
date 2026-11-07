@@ -80,7 +80,7 @@ function ToolPageTitle() {
 }
 
 function CommunityLoading({ communityId }: { communityId: number }) {
-  const { pathname } = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
   const atHome = pathname === `/c/${communityId}` || pathname === `/c/${communityId}/`;
   return atHome ? <CommunityHomeSkeleton /> : <PageSkeleton />;
 }

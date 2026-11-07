@@ -27,14 +27,14 @@ import { useHasFiledTickets } from "@/hooks/useTickets";
 
 export const HomeSidebarContent = () => {
   const { t } = useTranslation("nav");
-  const location = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
 
   // My Messages is a list of people and then one of them, so it drills rather
   // than sharing the column: opening it puts the conversations here and the
   // arrow in that header climbs back out to this list. Climbing out is a look
   // rather than a move -- the thread stays open beside it -- so it is state
   // here, and arriving at the route again drills back in.
-  const onMessages = location.pathname.startsWith("/messages");
+  const onMessages = pathname.startsWith("/messages");
   const [climbedOut, setClimbedOut] = useState(false);
   useEffect(() => {
     setClimbedOut(false);
@@ -101,9 +101,7 @@ export const HomeSidebarContent = () => {
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => {
-                const isActive = item.exact
-                  ? location.pathname === item.to
-                  : location.pathname.startsWith(item.to);
+                const isActive = item.exact ? pathname === item.to : pathname.startsWith(item.to);
                 return (
                   <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton asChild isActive={isActive}>

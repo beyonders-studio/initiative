@@ -102,7 +102,7 @@ export const ToolSettingsLayout = ({
   const { t } = useTranslation(["common", "nav", "access", "layouts"]);
   const router = useRouter();
   const gp = useCommunityPath();
-  const location = useLocation();
+  const currentPath = useLocation({ select: (location) => location.pathname });
   // A tool that lays out its own items offers its layouts to whoever may
   // change them; the server says who on the set.
   const layouts = useInstanceLayouts(
@@ -167,7 +167,6 @@ export const ToolSettingsLayout = ({
 
   // The tab paths are community-prefixed; matching happens on the sub-path, so a
   // community id in the address never decides which tab is lit.
-  const currentPath = location.pathname;
   const normalizedPath = isCommunityScopedPath(currentPath)
     ? extractSubPath(currentPath).replace(/\/+$/, "") || "/"
     : currentPath.replace(/\/+$/, "") || "/";

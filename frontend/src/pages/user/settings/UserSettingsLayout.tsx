@@ -22,7 +22,7 @@ const userSettingsTabs = [
 export const UserSettingsLayout = () => {
   const { t } = useTranslation("settings");
   const { user } = useAuth();
-  const location = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
   const router = useRouter();
   // Privacy is offered while any of its sections has something to set here.
   const privacy = usePrivacySections();
@@ -45,7 +45,7 @@ export const UserSettingsLayout = () => {
       label: t(tab.labelKey),
       path: tab.path,
     }));
-  const normalizedPath = location.pathname.replace(/\/+$/, "") || "/";
+  const normalizedPath = pathname.replace(/\/+$/, "") || "/";
   const activeTab = matchActiveTab(tabs, normalizedPath, "registration");
 
   return (
