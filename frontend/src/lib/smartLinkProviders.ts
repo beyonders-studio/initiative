@@ -4,7 +4,9 @@ import {
   SiGoogledocs,
   SiLoom,
   SiMiro,
+  SiReddit,
   SiVimeo,
+  SiX,
   SiYoutube,
 } from "@icons-pack/react-simple-icons";
 import { FileText, Link as LinkIcon } from "lucide-react";
@@ -19,6 +21,8 @@ export type SmartLinkProviderId =
   | "miro"
   | "airtable"
   | "microsoft_office"
+  | "x"
+  | "reddit"
   | "generic";
 
 type IconComponent = ComponentType<{ className?: string; size?: number }>;
@@ -32,7 +36,10 @@ export interface SmartLinkProviderMatch {
   iframeAttrs: {
     allow?: string;
     referrerPolicy?: React.HTMLAttributeReferrerPolicy;
+    sandbox?: string;
   };
+  /** Reads the height a framed post reports in a message, for pages that report one. */
+  heightOf?: (data: unknown) => number | null;
   /**
    * i18n key (in the `files` namespace) for provider-specific
    * instructions shown when we recognize the provider but the URL isn't
@@ -72,6 +79,32 @@ function parseYouTubeId(url: URL): { kind: "video" | "playlist"; value: string }
   const embed = /^\/embed\/([^/?#]+)/.exec(url.pathname);
   if (embed) return { kind: "video", value: embed[1] };
   return null;
+}
+
+/** A framed post runs its page and opens its links as ordinary tabs. */
+const POST_FRAME_SANDBOX =
+  "allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox";
+
+/** X's post frame reports its height as `twttr.private.resize`. */
+function xPostHeight(data: unknown): number | null {
+  const call = (data as { "twttr.embed"?: { method?: unknown; params?: unknown } } | null)?.[
+    "twttr.embed"
+  ];
+  if (call?.method !== "twttr.private.resize" || !Array.isArray(call.params)) return null;
+  const height = (call.params[0] as { height?: unknown } | undefined)?.height;
+  return typeof height === "number" ? height : null;
+}
+
+/** Reddit's post frame reports its height as a `resize.embed` message, in JSON. */
+function redditPostHeight(data: unknown): number | null {
+  if (typeof data !== "string") return null;
+  try {
+    const message = JSON.parse(data) as { type?: unknown; data?: unknown };
+    const height = Number(message.data);
+    return message.type === "resize.embed" && Number.isFinite(height) ? height : null;
+  } catch {
+    return null;
+  }
 }
 
 const PROVIDERS: Array<{
@@ -285,6 +318,49 @@ const PROVIDERS: Array<{
       return null;
     },
   },
+  {
+    id: "x",
+    match: (url) => {
+      if (!/(^|\.)(x|twitter)\.com$/.test(url.hostname)) return null;
+      // x.com/<handle>/status/<id>, x.com/i/web/status/<id>, twitter.com/…
+      const m = /^\/(?:i\/web|[^/]+)\/status(?:es)?\/(\d+)/.exec(url.pathname);
+      if (!m) return null;
+      return {
+        id: "x",
+        label: "X",
+        canEmbed: true,
+        icon: SiX,
+        embedSrc: `https://platform.twitter.com/embed/Tweet.html?id=${m[1]}&dnt=true`,
+        iframeAttrs: {
+          sandbox: POST_FRAME_SANDBOX,
+          referrerPolicy: "strict-origin-when-cross-origin",
+        },
+        heightOf: xPostHeight,
+      };
+    },
+  },
+  {
+    id: "reddit",
+    match: (url) => {
+      if (!/(^|\.)reddit\.com$/.test(url.hostname)) return null;
+      // reddit.com/r/<subreddit>/comments/<id>/<slug>/
+      const m = /^\/r\/(\w+)\/comments\/([a-z0-9]+)(?:\/([\w%-]+))?/.exec(url.pathname);
+      if (!m) return null;
+      const [, subreddit, id, slug] = m;
+      return {
+        id: "reddit",
+        label: "Reddit",
+        canEmbed: true,
+        icon: SiReddit,
+        embedSrc: `https://embed.reddit.com/r/${subreddit}/comments/${id}/${slug ? `${slug}/` : ""}`,
+        iframeAttrs: {
+          sandbox: POST_FRAME_SANDBOX,
+          referrerPolicy: "strict-origin-when-cross-origin",
+        },
+        heightOf: redditPostHeight,
+      };
+    },
+  },
 ];
 
 /**
@@ -307,6 +383,8 @@ export const SUPPORTED_PROVIDER_BADGES: readonly SupportedProviderBadge[] = [
   { id: "miro", label: "Miro", icon: SiMiro },
   { id: "airtable", label: "Airtable", icon: SiAirtable },
   { id: "microsoft_office", label: "Office", icon: FileText },
+  { id: "x", label: "X", icon: SiX },
+  { id: "reddit", label: "Reddit", icon: SiReddit },
 ];
 
 export function matchSmartLinkProvider(url: string): SmartLinkProviderMatch {

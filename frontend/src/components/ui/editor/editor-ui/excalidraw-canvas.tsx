@@ -11,6 +11,7 @@ import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import { renderEmbeddable, validateEmbeddable } from "@/lib/whiteboardEmbeds";
 
 export interface DrawingScene {
   elements: readonly ExcalidrawElement[];
@@ -73,6 +74,8 @@ export default function DrawingCanvas({
           }}
           initialData={initialData}
           theme={theme}
+          validateEmbeddable={validateEmbeddable}
+          renderEmbeddable={renderEmbeddable}
         />
       </div>
       <div className="flex justify-end gap-2 border-t p-2">
