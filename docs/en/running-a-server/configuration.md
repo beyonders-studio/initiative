@@ -178,7 +178,7 @@ A phone lets an app use a site's passkeys only when the site says, in a file at 
 
 They're served as JSON, at exactly those paths, with no redirect, and only when your address can carry a passkey at all (`https`, a host name rather than an IP address). Anything else under `/.well-known/` answers 404, never the app's page, because Apple and Google read an HTML page there as a broken file.
 
-**If you self-host**, there's nothing to set. Android checks the file on whatever server the app points at, so the Android app signs in with passkeys on yours by itself. An iPhone only reads the file for addresses built into the app (the hosted service's `initiativetasks.com` and `demo.initiativetasks.com`), so on your server the iPhone app sends people to the browser for passkeys, which works for every server.
+**If you self-host**, there's nothing to set. Android checks the file on whatever server the app points at, so the Android app signs in with passkeys on yours by itself. An iPhone only reads the file for addresses built into the app (the hosted service's `initiativetasks.com` and `demo.initiativetasks.com`), so on your server the iPhone app sends people to the browser for passkeys, which works for every server. The Windows app reads neither file and signs in with passkeys on any `https` address.
 
 If your proxy answers anything under `/.well-known/` itself, as some do for certificates, pass `/.well-known/assetlinks.json` through to Initiative. Without it the Android app sends people to the browser for passkeys instead.
 
