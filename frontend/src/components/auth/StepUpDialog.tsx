@@ -1,8 +1,9 @@
 import { Capacitor } from "@capacitor/core";
-import { lazy, Suspense } from "react";
+import { type ComponentType, lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AUTH_STEP_UP_EVENT, type StepUpEventDetail } from "@/api/client";
+import type { ProviderMarkProps } from "@/components/auth/ProviderMark";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,9 +17,12 @@ import { useAuthChallenge } from "@/hooks/useAuthChallenge";
 import { useCommunityLoginProviders, useLoginProviders } from "@/hooks/useCommunityAuthPolicy";
 import { providerSignInHref } from "@/lib/returnPath";
 
-// The providers' marks load when the dialog first shows one, not with every page.
-const ProviderMark = lazy(() =>
-  import("@/components/auth/ProviderMark").then((m) => ({ default: m.ProviderMark }))
+// The providers' marks load when the dialog first shows one, not with every
+// page. A mark is decoration: one that fails to load draws nothing.
+const ProviderMark = lazy<ComponentType<ProviderMarkProps>>(() =>
+  import("@/components/auth/ProviderMark")
+    .then((m) => ({ default: m.ProviderMark }))
+    .catch(() => ({ default: () => null }))
 );
 
 /** The path the sign-in should return to: where the challenge happened. */
