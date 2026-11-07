@@ -126,11 +126,7 @@ export const SettingsAIPage = () => {
 
       {savedMode === "platform" && (
         <Card>
-          <CardHeader>
-            <CardTitle>{t("platformAI.connectionsTitle")}</CardTitle>
-            <CardDescription>{t("platformAI.connectionsDescription")}</CardDescription>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <AIConnectionManager
               scope="platform"
               connections={connectionsQuery.data ?? []}

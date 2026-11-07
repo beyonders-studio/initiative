@@ -328,6 +328,18 @@ async def record_health(
         await system.exec(stmt)
 
 
+async def turn_off_guild_connections(guild_id: int) -> None:
+    """Turn every one of a community's own connections off, on the system
+    engine: the community has just switched its AI off."""
+    async with cohorts.system_session(guild_id) as system, system.begin():
+        await set_rls_context(system, SystemGuild(guild_id))
+        await system.exec(
+            update(GuildAIConnection)
+            .where(col(GuildAIConnection.enabled))
+            .values(enabled=False)
+        )
+
+
 # ---------------------------------------------------------------------------
 # Resolution
 # ---------------------------------------------------------------------------
@@ -725,7 +737,9 @@ async def create_guild_connection(
         provider=payload.provider.value,
         base_url=base_url,
         model=_normalize_optional_string(payload.model),
-        enabled=payload.enabled,
+        # While the community's AI is off, a new connection starts off too.
+        enabled=payload.enabled
+        and await rules.community_value(session, guild_id, "allow_ai"),
         is_default=payload.is_default,
     )
     key = (
@@ -799,6 +813,14 @@ async def update_guild_connection(
         # A key goes only where it was given for.
         key = None
     if "enabled" in data and payload.enabled is not None:
+        if (
+            payload.enabled
+            and not row.enabled
+            and not await rules.community_value(
+                session, routed_guild_id(session), "allow_ai"
+            )
+        ):
+            raise HTTPException(status_code=409, detail=AIMessages.NOT_ENABLED)
         row.enabled = payload.enabled
     if "is_default" in data and payload.is_default is not None:
         if payload.is_default:

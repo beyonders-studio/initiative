@@ -11,6 +11,7 @@ import type {
   CommunityAuthPolicyUpdate,
   CommunityAuthSettingsRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { CommunityAISwitchSection } from "@/components/auth/CommunityAISwitchSection";
 import { CommunityAuthProvidersSection } from "@/components/auth/CommunityAuthProvidersSection";
 import { CommunityClaimRulesSection } from "@/components/auth/CommunityClaimRulesSection";
 import { CommunityEngagementRankingSection } from "@/components/auth/CommunityEngagementRankingSection";
@@ -793,6 +794,8 @@ export const SettingsCommunitySecurityPage = () => {
           <CommunityNotificationPolicySection communityId={communityId} />
 
           <CommunityEngagementRankingSection communityId={communityId} />
+
+          <CommunityAISwitchSection communityId={communityId} />
 
           {takesGuests ? (
             <GuestStayCard communityId={communityId} authSettings={authSettings} />

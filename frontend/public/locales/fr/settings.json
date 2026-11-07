@@ -195,8 +195,6 @@
   "ai": {
     "loading": "Chargement des paramètres d'IA…",
     "loadError": "Impossible de charger les paramètres d'IA.",
-    "enabled": "Actif",
-    "disabled": "Désactivé",
     "providerFieldLabel": "Fournisseur",
     "providerPlaceholder": "Sélectionnez un fournisseur",
     "modelLabel": "Modèle",
@@ -211,14 +209,12 @@
   "communityAI": {
     "title": "IA de la communauté",
     "adminOnly": "Seuls les administrateurs de la communauté peuvent gérer les connexions d'IA.",
-    "connectionsTitle": "Connexions de la communauté",
-    "connectionsDescription": "Définissez les connexions d'IA que les membres de cette communauté peuvent utiliser.",
     "disabledDescription": "Les fonctionnalités d'IA sont désactivées pour la plateforme.",
     "managedByPlatform": "Les connexions d'IA sont gérées au niveau de la plateforme. Les membres définissent leur propre clé dans les paramètres de leur profil.",
     "managedByServer": "La personne qui gère ce serveur s'occupe de l'IA de cette communauté.",
-    "switchTitle": "L'IA dans cette communauté",
+    "switchTitle": "IA",
     "switchLabel": "Autoriser les fonctions d'IA",
-    "switchHelp": "Désactivée, rien de cette communauté n'est envoyé à un fournisseur d'IA, quelle que soit la connexion configurée par le serveur ou la communauté.",
+    "switchHelp": "Permet aux membres d'utiliser les fonctions d'IA dans cette communauté. Désactivée, rien d'ici n'est envoyé à un fournisseur d'IA.",
     "switchSaved": "Paramètre d'IA enregistré",
     "switchError": "Impossible d'enregistrer le paramètre d'IA."
   },
@@ -236,9 +232,7 @@
     "saveMode": "Enregistrer",
     "savingMode": "Enregistrement…",
     "modeSaved": "Paramètres d'IA mis à jour",
-    "modeSaveError": "Impossible de mettre à jour les paramètres d'IA",
-    "connectionsTitle": "Connexions de la plateforme",
-    "connectionsDescription": "Définissez les connexions d'IA utilisées par chaque communauté."
+    "modeSaveError": "Impossible de mettre à jour les paramètres d'IA"
   },
   "marketplaceRegistry": {
     "title": "Registre du catalogue",
@@ -1778,8 +1772,11 @@
   },
   "aiConnections": {
     "title": "Connexions",
-    "subtitle": "Chaque connexion est une destination : un fournisseur, un modèle et une clé partagée facultative.",
+    "subtitle_community": "Les fournisseurs et modèles d'IA que les membres de cette communauté peuvent utiliser.",
+    "subtitle_platform": "Les fournisseurs et modèles d'IA que les communautés de ce serveur peuvent utiliser.",
+    "locked": "Activez l'IA dans Sécurité pour utiliser ces connexions.",
     "add": "Ajouter une connexion",
+    "toggleLabel": "Utiliser {{label}}",
     "empty": "Aucune connexion pour le moment. Ajoutez-en une pour activer les fonctionnalités d'IA.",
     "loading": "Chargement des connexions…",
     "loadError": "Impossible de charger les connexions.",
@@ -1814,8 +1811,6 @@
     "modelHintPick": "Choisissez un modèle pour finir de configurer cette connexion.",
     "needsModel": "Modèle à choisir",
     "customHint": "Tout serveur qui parle l'API d'OpenAI : vLLM, llama.cpp, LM Studio, LocalAI, ou une passerelle comme LiteLLM. Indiquez l'adresse jusqu'à /v1.",
-    "enabledLabel": "Activée",
-    "enabledDescription": "Autoriser les membres à utiliser cette connexion.",
     "defaultLabel": "Connexion par défaut",
     "defaultDescription": "Les membres utilisent cette connexion à moins d'en choisir une autre.",
     "save": "Enregistrer la connexion",
