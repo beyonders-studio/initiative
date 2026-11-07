@@ -354,6 +354,9 @@ async def apply_community_sync(
     )
     for key, value in synced.items():
         await rules.put(session, key, value, guild_id=guild_id, set_by=SetBy.deployment)
+    from app.services import ai_settings
+
+    ai_settings.turn_off_guild_connections_once_committed(session, guild_id)
     # Stamp the guild whichever row moved: "when did this guild last change"
     # stays a fact about the guild.
     await session.exec(update(Guild).where(Guild.id == guild_id).values(**guild_values))
