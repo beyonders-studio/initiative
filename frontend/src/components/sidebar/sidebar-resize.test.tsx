@@ -9,7 +9,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { Sidebar, SidebarProvider } from "@/components/ui/sidebar";
+import { Sidebar, SidebarProvider } from "@/components/sidebar/sidebar";
 import { getItem, removeItem } from "@/lib/storage";
 
 const FLOOR = 320; // the 20rem the app shell asks for

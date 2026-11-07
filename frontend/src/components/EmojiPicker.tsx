@@ -34,7 +34,7 @@ export const EmojiPicker = ({
   disabled = false,
   placeholder,
 }: EmojiPickerProps) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   const [open, setOpen] = useState(false);
 
   return (
@@ -51,7 +51,7 @@ export const EmojiPicker = ({
             {value ? (
               <span className="text-xl leading-none">{value}</span>
             ) : (
-              <span className="text-sm">{placeholder ?? t("pickEmoji")}</span>
+              <span className="text-sm">{placeholder ?? t("emojiPicker.pick")}</span>
             )}
           </Button>
         </PopoverTrigger>

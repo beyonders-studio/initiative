@@ -1,5 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 
+import { PhotoCaptureError, type PhotoCaptureFailure, type PhotoSource } from "@/ui/host";
+
 /**
  * Taking a picture, on the devices that have a camera.
  *
@@ -7,19 +9,6 @@ import { Capacitor } from "@capacitor/core";
  * offer a file field. Everything here answers "no" off-native so a caller can
  * ask once and render the control it can actually deliver.
  */
-
-/** Where a picture comes from: the camera, or the pictures already on the device. */
-export type PhotoSource = "camera" | "library";
-
-/** Why a capture produced no file. A cancelled one is not an error — it is `null`. */
-export type PhotoCaptureFailure = "permission" | "unavailable" | "failed";
-
-export class PhotoCaptureError extends Error {
-  constructor(readonly reason: PhotoCaptureFailure) {
-    super(`Photo capture failed: ${reason}`);
-    this.name = "PhotoCaptureError";
-  }
-}
 
 /** Whether this device can hand back a picture without going through a file field. */
 export const canCapturePhoto = (): boolean => Capacitor.isNativePlatform();

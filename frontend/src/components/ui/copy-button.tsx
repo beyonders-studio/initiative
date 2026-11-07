@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
-import { toast } from "@/lib/mascotToast";
+import { host } from "@/ui/host";
 
 /** Long enough to read the tick, short enough not to look stuck. */
 const CONFIRM_MS = 2000;
@@ -36,7 +36,7 @@ export const CopyButton = ({
   size = "sm",
   ...props
 }: CopyButtonProps) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -49,18 +49,18 @@ export const CopyButton = ({
 
   const copy = () => {
     if (!navigator?.clipboard) {
-      toast.error(t("copyUnavailable"));
+      host.toast.error(t("copy.unavailable"));
       return;
     }
     void navigator.clipboard
       .writeText(value)
       .then(() => {
-        toast.success(copiedMessage ?? t("copied"));
+        host.toast.success(copiedMessage ?? t("copy.copied"));
         setCopied(true);
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => setCopied(false), CONFIRM_MS);
       })
-      .catch(() => toast.error(t("copyUnavailable")));
+      .catch(() => host.toast.error(t("copy.unavailable")));
   };
 
   const Icon = copied ? Check : Copy;
@@ -70,7 +70,7 @@ export const CopyButton = ({
       variant={variant}
       size={size}
       onClick={copy}
-      aria-label={label ? undefined : t("copy")}
+      aria-label={label ? undefined : t("copy.label")}
       {...props}
     >
       <Icon className="h-4 w-4" />

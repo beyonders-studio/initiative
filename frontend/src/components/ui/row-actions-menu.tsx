@@ -42,7 +42,7 @@ export const RowActionsMenu = ({
   className,
   onOpenChange,
 }: RowActionsMenuProps) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
 
   // `Children.count` would count a `{false && …}` guard as an item; an array
   // of all-falsy children is the normal shape here, so test the rendered
@@ -58,7 +58,7 @@ export const RowActionsMenu = ({
             type="button"
             variant="ghost"
             size="icon"
-            aria-label={subject ? t("rowActionsFor", { subject }) : t("actions")}
+            aria-label={subject ? t("rowActions.labelFor", { subject }) : t("rowActions.label")}
           >
             <MoreHorizontal className="size-4" />
           </Button>

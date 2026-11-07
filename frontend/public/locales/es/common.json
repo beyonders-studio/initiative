@@ -18,32 +18,12 @@
   "submit": "Enviar",
   "reset": "Restablecer",
   "done": "Listo",
-  "pullToRefresh": {
-    "pull": "Desliza para actualizar",
-    "release": "Suelta para actualizar",
-    "refreshing": "Actualizando…"
-  },
   "toolViewFilter": {
     "label": "Mostrar",
     "all": "Todos",
     "active": "Activos",
     "templates": "Plantillas",
     "archived": "Archivados"
-  },
-  "dateRange": {
-    "any": "Cualquier fecha",
-    "fromOnly": "Desde el {{date}}",
-    "untilOnly": "Hasta el {{date}}",
-    "thisMonth": "Este mes",
-    "lastMonth": "El mes pasado",
-    "thisQuarter": "Este trimestre",
-    "thisYear": "Este año",
-    "fromLabel": "Desde",
-    "untilLabel": "Hasta",
-    "open": "Abierto",
-    "fromRemove": "Quitar la fecha de inicio",
-    "untilRemove": "Quitar la fecha de fin",
-    "clear": "Borrar fechas"
   },
   "yes": "Sí",
   "no": "No",
@@ -52,7 +32,6 @@
   "success": "Éxito",
   "warning": "Advertencia",
   "info": "Información",
-  "none": "Ninguno",
   "all": "Todos",
   "name": "Nombre",
   "description": "Descripción",
@@ -62,7 +41,6 @@
   "optional": "Opcional",
   "actions": "Acciones",
   "adding": "Añadiendo…",
-  "rowActionsFor": "Acciones para {{subject}}",
   "more": "Más",
   "moreOptions": "Más opciones",
   "less": "Menos",
@@ -71,38 +49,19 @@
   "learnMore": "Más información",
   "viewAll": "Ver todo",
   "copyToClipboard": "Copiar al portapapeles",
-  "copied": "¡Copiado!",
   "copy": "Copiar",
-  "copyUnavailable": "No se pudo copiar: cópialo a mano",
   "untitled": "Sin título",
   "appName": "initiative",
   "pageTitle": "{{name}} - Initiative",
   "send": "Enviar",
   "submitting": "Enviando…",
   "clear": "Limpiar",
-  "pickEmoji": "Elegir un emoji",
   "previous": "Anterior",
-  "rowsPerPage": "Filas por página:",
   "pageOf": "Página {{current}} de {{total}}",
-  "stepOf": "Paso {{current}} de {{total}}",
-  "select": "Seleccionar",
-  "exitSelection": "Salir de selección",
-  "enableSelectionMode": "Activar modo de selección",
-  "exitSelectionMode": "Salir del modo de selección",
-  "resetSorting": "Restablecer orden",
-  "groupBy": "Agrupar por",
-  "chooseGrouping": "Elegir agrupación",
-  "columns": "Columnas",
-  "tableOptions": "Opciones de tabla",
-  "rowsSelected": "{{selected}} de {{total}} fila(s) seleccionada(s)",
-  "rowsSelectedFiltered": "{{selected}} seleccionada(s) ({{total}} coinciden con el filtro)",
   "selectAll": "Seleccionar todo",
   "selectRow": "Seleccionar fila",
   "noResultsDot": "Sin resultados.",
-  "allSelected": "Todos seleccionados",
   "countSelected": "{{count}} seleccionados",
-  "selectEllipsis": "Seleccionar...",
-  "noOptionsAvailable": "No hay opciones disponibles",
   "clearAll": "Limpiar todo",
   "calendar": {
     "today": "Hoy",
@@ -243,11 +202,6 @@
     "viewTags": "Etiquetas",
     "details": "Detalles"
   },
-  "emojiPicker": {
-    "searchPlaceholder": "Buscar emoji…",
-    "empty": "No se encontraron emojis.",
-    "prompt": "Selecciona un emoji…"
-  },
   "reactions": {
     "add": "Añadir una reacción",
     "quick": "Reaccionar con {{emoji}}",
@@ -259,16 +213,7 @@
     "namesAndMore_other": "{{names}} y {{count}} personas más",
     "error": "No se pudo guardar tu reacción."
   },
-  "pagination": {
-    "perPage": "Por página:",
-    "rangeOf": "{{start}}–{{end}} de {{total}}"
-  },
   "lightbox": {
-    "title": "Imagen",
-    "description": "Usa las flechas o desliza para pasar de una imagen a otra.",
-    "position": "{{current}} / {{total}}",
-    "zoomIn": "Acercar",
-    "zoomOut": "Alejar",
     "open": "Ver esta imagen a tamaño completo",
     "openNamed": "Ver {{name}} a tamaño completo"
   },
@@ -282,17 +227,8 @@
     "lastUpdated": "Última actualización {{when}}"
   },
   "imagePicker": {
-    "chooseImage": "Elegir una imagen",
     "takePhoto": "Hacer una foto",
-    "chooseFromLibrary": "Elegir de la galería",
-    "chooseFile": "Elegir un archivo",
-    "permission": "Initiative necesita permiso para usar la cámara y las fotos. Actívalo en los ajustes del dispositivo e inténtalo de nuevo.",
-    "unavailable": "Este dispositivo no tiene cámara para hacer una foto.",
-    "failed": "No se pudo leer esa foto. Inténtalo de nuevo."
-  },
-  "fileDrop": {
-    "release": "Suéltalo aquí",
-    "unsupported": "Ese tipo de archivo no se puede subir aquí."
+    "chooseFromLibrary": "Elegir de la galería"
   },
   "archiveError": "No se pudo archivar. Inténtalo de nuevo.",
   "unarchiveError": "No se pudo desarchivar. Inténtalo de nuevo.",

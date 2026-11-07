@@ -19,32 +19,12 @@
   "submit": "Submit",
   "reset": "Reset",
   "done": "Done",
-  "pullToRefresh": {
-    "pull": "Pull to refresh",
-    "release": "Release to refresh",
-    "refreshing": "Refreshing…"
-  },
   "toolViewFilter": {
     "label": "Show",
     "all": "All",
     "active": "Active",
     "templates": "Templates",
     "archived": "Archived"
-  },
-  "dateRange": {
-    "any": "Any date",
-    "fromOnly": "From {{date}}",
-    "untilOnly": "Until {{date}}",
-    "thisMonth": "This month",
-    "lastMonth": "Last month",
-    "thisQuarter": "This quarter",
-    "thisYear": "This year",
-    "fromLabel": "From",
-    "untilLabel": "Until",
-    "open": "Open",
-    "fromRemove": "Remove the start date",
-    "untilRemove": "Remove the end date",
-    "clear": "Clear dates"
   },
   "yes": "Yes",
   "no": "No",
@@ -53,7 +33,6 @@
   "success": "Success",
   "warning": "Warning",
   "info": "Info",
-  "none": "None",
   "all": "All",
   "name": "Name",
   "description": "Description",
@@ -63,7 +42,6 @@
   "optional": "Optional",
   "actions": "Actions",
   "adding": "Adding…",
-  "rowActionsFor": "Actions for {{subject}}",
   "more": "More",
   "moreOptions": "More options",
   "less": "Less",
@@ -72,38 +50,19 @@
   "learnMore": "Learn more",
   "viewAll": "View all",
   "copyToClipboard": "Copy to clipboard",
-  "copied": "Copied!",
   "copy": "Copy",
-  "copyUnavailable": "Could not copy — copy it by hand",
   "untitled": "Untitled",
   "appName": "initiative",
   "pageTitle": "{{name}} - Initiative",
   "send": "Send",
   "submitting": "Sending…",
   "clear": "Clear",
-  "pickEmoji": "Pick an emoji",
   "previous": "Previous",
-  "rowsPerPage": "Rows per page:",
   "pageOf": "Page {{current}} of {{total}}",
-  "stepOf": "Step {{current}} of {{total}}",
-  "select": "Select",
-  "exitSelection": "Exit Selection",
-  "enableSelectionMode": "Enable Selection Mode",
-  "exitSelectionMode": "Exit Selection Mode",
-  "resetSorting": "Reset Sorting",
-  "groupBy": "Group by",
-  "chooseGrouping": "Choose grouping",
-  "columns": "Columns",
-  "tableOptions": "Table Options",
-  "rowsSelected": "{{selected}} of {{total}} row(s) selected",
-  "rowsSelectedFiltered": "{{selected}} selected ({{total}} match filter)",
   "selectAll": "Select all",
   "selectRow": "Select row",
   "noResultsDot": "No results.",
-  "allSelected": "All selected",
   "countSelected": "{{count}} selected",
-  "selectEllipsis": "Select...",
-  "noOptionsAvailable": "No options available",
   "clearAll": "Clear all",
   "calendar": {
     "today": "Today",
@@ -243,11 +202,6 @@
     "viewTags": "Tags",
     "details": "Details"
   },
-  "emojiPicker": {
-    "searchPlaceholder": "Search emoji…",
-    "empty": "No emoji found.",
-    "prompt": "Select an emoji…"
-  },
   "reactions": {
     "add": "Add a reaction",
     "quick": "React with {{emoji}}",
@@ -259,16 +213,7 @@
     "namesAndMore_other": "{{names}} and {{count}} others",
     "error": "Could not save your reaction."
   },
-  "pagination": {
-    "perPage": "Per page:",
-    "rangeOf": "{{start}}–{{end}} of {{total}}"
-  },
   "lightbox": {
-    "title": "Picture",
-    "description": "Use the arrow keys or swipe to move between pictures. Pinch, double-tap or scroll with Ctrl to zoom.",
-    "position": "{{current}} / {{total}}",
-    "zoomIn": "Zoom in",
-    "zoomOut": "Zoom out",
     "open": "View this picture full size",
     "openNamed": "View {{name}} full size"
   },
@@ -282,17 +227,8 @@
     "lastUpdated": "Last updated {{when}}"
   },
   "imagePicker": {
-    "chooseImage": "Choose an image",
     "takePhoto": "Take a photo",
-    "chooseFromLibrary": "Choose from library",
-    "chooseFile": "Choose a file",
-    "permission": "Initiative needs permission to use your camera and photos. Allow it in your device settings, then try again.",
-    "unavailable": "This device has no camera to take a photo with.",
-    "failed": "That photo could not be read. Try again."
-  },
-  "fileDrop": {
-    "release": "Drop it here",
-    "unsupported": "That kind of file can't be uploaded here."
+    "chooseFromLibrary": "Choose from library"
   },
   "archiveError": "Couldn't archive that. Please try again.",
   "unarchiveError": "Couldn't unarchive that. Please try again.",

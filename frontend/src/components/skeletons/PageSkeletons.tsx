@@ -11,7 +11,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TOOLS } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 
 /**
@@ -50,7 +49,7 @@ export interface SkeletonRegionProps {
 
 /** The accessible wrapper every placeholder below renders into. */
 export const SkeletonRegion = ({ label, className, children }: SkeletonRegionProps) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   return (
     <div role="status" aria-busy="true" data-testid="skeleton-region">
       {/* The bars are decoration: a reader hears the label, not an empty table. */}
@@ -481,14 +480,6 @@ interface LabelledSkeletonProps {
   /** Announced to assistive tech. Defaults to the shared "Loading…". */
   label?: string;
 }
-
-/** The initiative page: its header, the tool tabs, and the first tab's list. */
-export const InitiativePageSkeleton = ({ label }: LabelledSkeletonProps) => (
-  <SkeletonRegion label={label} className="space-y-4 sm:space-y-6">
-    <PageHeaderSkeleton dot description meta action tabs={TOOLS.length} />
-    <ToolListSkeleton className="pt-2" />
-  </SkeletonRegion>
-);
 
 /** A calendar's page: breadcrumb, controls, and the month grid. */
 export const CalendarPageSkeleton = ({ label }: LabelledSkeletonProps) => (

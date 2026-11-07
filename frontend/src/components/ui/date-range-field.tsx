@@ -3,7 +3,6 @@ import {
   endOfMonth,
   endOfQuarter,
   endOfYear,
-  format,
   startOfDay,
   startOfMonth,
   startOfQuarter,
@@ -17,7 +16,6 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useAuth } from "@/hooks/useAuth";
 import { dateTimeFormat } from "@/lib/intl";
 
 /** A span of calendar days in the viewer's zone. Either end may be open. */
@@ -36,26 +34,12 @@ export const dateRangeBounds = ({ from, until }: LocalDateRange): { start?: Date
   end: until ? endOfDay(until) : undefined,
 });
 
-const isoWithOffset = (date: Date): string => format(date, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
-
-/** The range as the calendar lists take it: `start_after` / `start_before`,
- *  ISO with the viewer's offset. Nothing for an open end. */
-export const dateRangeParams = (
-  range: LocalDateRange
-): { start_after?: string; start_before?: string } => {
-  const { start, end } = dateRangeBounds(range);
-  return {
-    ...(start ? { start_after: isoWithOffset(start) } : {}),
-    ...(end ? { start_before: isoWithOffset(end) } : {}),
-  };
-};
-
 const dayFormat = () => dateTimeFormat(undefined, { dateStyle: "medium" });
 
 /** Reads a range out loud: "Jul 1 – Sep 30, 2026", "From Jul 1, 2026", or
  *  "" when neither end is set. */
 export const useFormatDateRange = (): ((range: LocalDateRange) => string) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   return useCallback(
     ({ from, until }: LocalDateRange) => {
       const days = dayFormat();
@@ -98,9 +82,7 @@ interface DateRangeFieldProps {
 /** Picks a span of days: a quick pick, or a start and an end on the calendar,
  *  where either end may be left open. */
 export function DateRangeField({ id, value, onChange }: DateRangeFieldProps) {
-  const { t } = useTranslation("common");
-  const { user } = useAuth();
-  const weekStartsOn = (user?.week_starts_on ?? 0) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  const { t } = useTranslation("ui");
   const formatRange = useFormatDateRange();
   const [open, setOpen] = useState(false);
   const set = isDateRangeSet(value);
@@ -142,7 +124,6 @@ export function DateRangeField({ id, value, onChange }: DateRangeFieldProps) {
             selected={{ from: value.from, to: value.until }}
             onSelect={(_range, day) => onChange(withDay(value, day))}
             defaultMonth={value.from ?? value.until}
-            weekStartsOn={weekStartsOn}
           />
           <div className="space-y-1 border-t p-2 text-sm">
             {(["from", "until"] as const).map((end) => {

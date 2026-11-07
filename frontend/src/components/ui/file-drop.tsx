@@ -72,7 +72,7 @@ export const FileDropArea = ({
   disabled = false,
   className,
 }: FileDropAreaProps) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   const drop = useFileDrop(
     !disabled,
     (files) => {

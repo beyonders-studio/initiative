@@ -27,6 +27,7 @@ import { CreateActionProvider } from "@/components/navigation/CreateActionContex
 import { PushPermissionPrompt } from "@/components/notifications/PushPermissionPrompt";
 import { OfflineBanner } from "@/components/offline/OfflineBanner";
 import { RecentTabsBar } from "@/components/recents/RecentTabsBar";
+import { SidebarProvider } from "@/components/sidebar/sidebar";
 import { PageSkeleton } from "@/components/skeletons/PageSkeletons";
 import { StartFlow } from "@/components/start/StartFlow";
 import { CreateTaskWizard } from "@/components/tasks/CreateTaskWizard";
@@ -44,7 +45,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { SidebarProvider } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { useBackButton } from "@/hooks/useBackButton";
 import { useCommunities } from "@/hooks/useCommunities";

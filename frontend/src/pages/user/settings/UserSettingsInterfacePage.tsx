@@ -30,10 +30,10 @@ import {
 } from "@/lib/taskCompletionFeedback";
 import type { ThemeColors } from "@/lib/themes";
 import { getThemeList } from "@/lib/themes";
-import { parseTimeFormat, TIME_FORMAT_PREFERENCES } from "@/lib/timeFormat";
 import { TIMEZONE_OPTIONS } from "@/lib/timezones";
 import { cn } from "@/lib/utils";
 import Desktop from "@/plugins/desktop";
+import { parseTimeFormat, TIME_FORMAT_PREFERENCES } from "@/ui/host";
 
 const WEEK_START_OPTIONS = [
   { labelKey: "dates:weekdays.sunday", value: 0 },

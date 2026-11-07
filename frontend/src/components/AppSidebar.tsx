@@ -24,10 +24,6 @@ import { InitiativeSection } from "@/components/sidebar/InitiativeSection";
 import { PluginsSection } from "@/components/sidebar/PluginsSection";
 import { SidebarSearchButton } from "@/components/sidebar/SidebarSearchButton";
 import { SidebarUserFooter } from "@/components/sidebar/SidebarUserFooter";
-import { TagBrowser } from "@/components/sidebar/TagBrowser";
-import { WikiSidebarContent } from "@/components/sidebar/WikiSidebarContent";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Sidebar,
   SidebarContent,
@@ -39,7 +35,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
-} from "@/components/ui/sidebar";
+} from "@/components/sidebar/sidebar";
+import { TagBrowser } from "@/components/sidebar/TagBrowser";
+import { WikiSidebarContent } from "@/components/sidebar/WikiSidebarContent";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";

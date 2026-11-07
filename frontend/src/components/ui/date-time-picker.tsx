@@ -7,11 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useAuth } from "@/hooks/useAuth";
-import { useTimeFormat } from "@/hooks/useTimeFormat";
 import { parseLocalCalendarDate, resolveLocalDateTime } from "@/lib/localDateTime";
 import { dateTimePattern } from "@/lib/timeFormat";
 import { cn } from "@/lib/utils";
+import { useTimeFormat } from "@/ui/host";
 
 interface DateTimePickerProps {
   id?: string;
@@ -97,8 +96,7 @@ export const DateTimePicker = ({
   calendarProps,
   includeTime = true,
 }: DateTimePickerProps) => {
-  const { t } = useTranslation(["dates", "common"]);
-  const { user } = useAuth();
+  const { t } = useTranslation("ui");
   // Read so the typed and trigger labels re-render on a clock change.
   useTimeFormat();
   const parsedValue = value
@@ -110,7 +108,7 @@ export const DateTimePicker = ({
   const [invalid, setInvalid] = React.useState(false);
   const errorId = React.useId();
   const timeValue = selectedDate ? format(selectedDate, "HH:mm") : "";
-  const defaultPlaceholder = includeTime ? t("picker.pickDateTime") : t("picker.pickDate");
+  const defaultPlaceholder = includeTime ? t("datePicker.pickDateTime") : t("datePicker.pickDate");
 
   // Human-friendly representation of the current value for the manual-entry field.
   const displayValue = selectedDate
@@ -143,14 +141,6 @@ export const DateTimePicker = ({
     }
   }
 
-  const resolvedWeekStartsOn = (calendarProps?.weekStartsOn ?? user?.week_starts_on ?? 0) as
-    | 0
-    | 1
-    | 2
-    | 3
-    | 4
-    | 5
-    | 6;
   const mergedCalendarProps = React.useMemo(() => {
     const currentYear = new Date().getFullYear();
     return {
@@ -158,9 +148,8 @@ export const DateTimePicker = ({
       startMonth: new Date(currentYear - 120, 0),
       endMonth: new Date(currentYear + 10, 11),
       ...(calendarProps ?? {}),
-      weekStartsOn: resolvedWeekStartsOn,
     };
-  }, [calendarProps, resolvedWeekStartsOn]);
+  }, [calendarProps]);
 
   const handleSelectDate = (date: Date | undefined) => {
     if (!date) {
@@ -279,8 +268,8 @@ export const DateTimePicker = ({
             id={id ? `${id}-input` : undefined}
             type="text"
             value={inputValue}
-            placeholder={t("picker.typeDate")}
-            aria-label={t("picker.typeDate")}
+            placeholder={t("datePicker.typeDate")}
+            aria-label={t("datePicker.typeDate")}
             disabled={disabled}
             aria-invalid={invalid || undefined}
             aria-describedby={invalid ? errorId : undefined}
@@ -299,7 +288,7 @@ export const DateTimePicker = ({
         </div>
         {invalid ? (
           <p id={errorId} role="alert" className="px-3 py-2 text-destructive text-sm">
-            {t(includeTime ? "picker.invalidLocalDateTime" : "picker.invalidDate")}
+            {t(includeTime ? "datePicker.invalidLocalDateTime" : "datePicker.invalidDate")}
           </p>
         ) : null}
         <Calendar
@@ -318,7 +307,7 @@ export const DateTimePicker = ({
                 htmlFor={`${id ?? "datetime"}-time`}
                 className="font-medium text-muted-foreground text-xs"
               >
-                {t("picker.time")}
+                {t("datePicker.time")}
               </label>
               <Input
                 id={`${id ?? "datetime"}-time`}
@@ -340,7 +329,7 @@ export const DateTimePicker = ({
             onClick={handleClear}
             disabled={!selectedDate || disabled}
           >
-            {clearLabel ?? t("common:clear")}
+            {clearLabel ?? t("clear")}
           </Button>
         </div>
       </PopoverContent>

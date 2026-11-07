@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { getOpenCommandCenter } from "@/components/CommandCenter";
 import { usePrimaryCreateAction } from "@/components/navigation/CreateActionContext";
+import { useSidebar } from "@/components/sidebar/sidebar";
 import { getOpenCreateTaskWizard } from "@/components/tasks/CreateTaskWizard";
 import { getOpenCreateToolWizard } from "@/components/tools/CreateToolWizard";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useSidebar } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { useDirectMessagesEnabled } from "@/hooks/useDirectMessages";
 import { useGlobalCreateAccess } from "@/hooks/useInitiativeAccess";

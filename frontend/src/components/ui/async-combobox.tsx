@@ -66,7 +66,7 @@ export const AsyncCombobox = ({
   disabled = false,
   "aria-label": ariaLabel,
 }: AsyncComboboxProps) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, debounceMs);
@@ -96,7 +96,8 @@ export const AsyncCombobox = ({
   };
 
   const selectedItem = items.find((item) => item.value === value);
-  const triggerLabel = selectedLabel ?? selectedItem?.label ?? placeholder ?? t("selectAnOption");
+  const triggerLabel =
+    selectedLabel ?? selectedItem?.label ?? placeholder ?? t("combobox.placeholder");
 
   return (
     <div className={cn("w-full", className)}>
@@ -119,7 +120,7 @@ export const AsyncCombobox = ({
               results that matched on something other than the label. */}
           <Command shouldFilter={false}>
             <CommandInput
-              placeholder={searchPlaceholder ?? t("search")}
+              placeholder={searchPlaceholder ?? t("combobox.search")}
               value={query}
               onValueChange={setQuery}
             />
@@ -130,7 +131,7 @@ export const AsyncCombobox = ({
               </div>
             ) : (
               <>
-                <CommandEmpty>{emptyMessage ?? t("noResults")}</CommandEmpty>
+                <CommandEmpty>{emptyMessage ?? t("combobox.noResults")}</CommandEmpty>
                 <CommandGroup className="max-h-64 overflow-y-auto">
                   {items.map((item) => (
                     <CommandItem

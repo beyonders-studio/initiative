@@ -1,0 +1,108 @@
+{
+  "loading": "Loading…",
+  "clear": "Clear",
+  "next": "Next",
+  "previous": "Previous",
+  "selectAll": "Select all",
+  "combobox": {
+    "placeholder": "Select an option",
+    "search": "Search",
+    "noResults": "No results found"
+  },
+  "copy": {
+    "label": "Copy",
+    "copied": "Copied!",
+    "unavailable": "Could not copy — copy it by hand"
+  },
+  "dateRange": {
+    "any": "Any date",
+    "fromOnly": "From {{date}}",
+    "untilOnly": "Until {{date}}",
+    "thisMonth": "This month",
+    "lastMonth": "Last month",
+    "thisQuarter": "This quarter",
+    "thisYear": "This year",
+    "fromLabel": "From",
+    "untilLabel": "Until",
+    "open": "Open",
+    "fromRemove": "Remove the start date",
+    "untilRemove": "Remove the end date",
+    "clear": "Clear dates"
+  },
+  "datePicker": {
+    "pickDate": "Pick a date",
+    "pickDateTime": "Pick a date and time",
+    "typeDate": "Type or pick a date",
+    "time": "Time",
+    "invalidDate": "Enter a valid calendar date.",
+    "invalidLocalDateTime": "Choose a valid date and time. Times skipped or repeated when the clocks change need a time outside that interval."
+  },
+  "emojiPicker": {
+    "pick": "Pick an emoji",
+    "searchPlaceholder": "Search emoji…",
+    "empty": "No emoji found.",
+    "prompt": "Select an emoji…"
+  },
+  "fileDrop": {
+    "release": "Drop it here",
+    "unsupported": "That kind of file can't be uploaded here."
+  },
+  "imagePicker": {
+    "chooseImage": "Choose an image",
+    "takePhoto": "Take a photo",
+    "chooseFromLibrary": "Choose from library",
+    "chooseFile": "Choose a file",
+    "permission": "Initiative needs permission to use your camera and photos. Allow it in your device settings, then try again.",
+    "unavailable": "This device has no camera to take a photo with.",
+    "failed": "That photo could not be read. Try again."
+  },
+  "lightbox": {
+    "title": "Picture",
+    "description": "Use the arrow keys or swipe to move between pictures. Pinch, double-tap or scroll with Ctrl to zoom.",
+    "position": "{{current}} / {{total}}",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "close": "Close"
+  },
+  "multiSelect": {
+    "placeholder": "Select...",
+    "empty": "No options available",
+    "allSelected": "All selected",
+    "countSelected": "{{count}} selected",
+    "clearAll": "Clear all"
+  },
+  "pagination": {
+    "perPage": "Per page:",
+    "rangeOf": "{{start}}–{{end}} of {{total}}"
+  },
+  "pullToRefresh": {
+    "pull": "Pull to refresh",
+    "release": "Release to refresh",
+    "refreshing": "Refreshing…"
+  },
+  "rowActions": {
+    "label": "Actions",
+    "labelFor": "Actions for {{subject}}"
+  },
+  "table": {
+    "select": "Select",
+    "exitSelection": "Exit Selection",
+    "enableSelectionMode": "Enable Selection Mode",
+    "exitSelectionMode": "Exit Selection Mode",
+    "resetSorting": "Reset Sorting",
+    "groupBy": "Group by",
+    "chooseGrouping": "Choose grouping",
+    "none": "None",
+    "columns": "Columns",
+    "options": "Table Options",
+    "selectRow": "Select row",
+    "rowsSelected": "{{selected}} of {{total}} row(s) selected",
+    "rowsSelectedFiltered": "{{selected}} selected ({{total}} match filter)",
+    "noResults": "No results.",
+    "rowsPerPage": "Rows per page:",
+    "pageOf": "Page {{current}} of {{total}}"
+  },
+  "wizard": {
+    "stepOf": "Step {{current}} of {{total}}"
+  }
+}

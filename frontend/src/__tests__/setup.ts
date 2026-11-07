@@ -11,6 +11,7 @@ import path from "node:path";
 import { cleanup, configure } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from "vitest";
 
+import { connectKit } from "@/lib/kitHost";
 import { resetStoreSelling } from "@/lib/storeSelling";
 
 import { resetFactories } from "./factories";
@@ -268,6 +269,12 @@ if (typeof Blob.prototype.stream !== "function") {
     });
   };
 }
+
+// ---------------------------------------------------------------------------
+// The UI kit's host, filled as the app fills it at boot
+// ---------------------------------------------------------------------------
+
+connectKit();
 
 // ---------------------------------------------------------------------------
 // MSW lifecycle

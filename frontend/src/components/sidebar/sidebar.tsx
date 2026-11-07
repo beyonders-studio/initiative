@@ -22,8 +22,6 @@ import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
 import { getItem, setItem } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
-const SIDEBAR_COOKIE_NAME = "sidebar_state";
-const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 //: The narrowest the column goes when the app has not said otherwise — the
 //: 16rem this component has always defaulted to. Widening it is for a wiki
 //: with pages filed three deep; nobody needs it narrower than the navigation
@@ -222,10 +220,6 @@ const SidebarProvider = React.forwardRef<
         } else {
           _setOpen(openState);
         }
-
-        // This sets the cookie to keep the sidebar state.
-        // biome-ignore lint/suspicious/noDocumentCookie: shadcn pattern; Cookie Store API isn't available in Firefox/Safari
-        document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
       },
       [setOpenProp, open]
     );

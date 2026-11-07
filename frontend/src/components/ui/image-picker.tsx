@@ -10,13 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { toast } from "@/lib/mascotToast";
-import {
-  canCapturePhoto,
-  capturePhoto,
-  PhotoCaptureError,
-  type PhotoSource,
-} from "@/lib/nativeCamera";
+import { host, PhotoCaptureError, type PhotoSource } from "@/ui/host";
 
 /**
  * One way to hand the app a picture, wherever the app runs.
@@ -56,10 +50,10 @@ export const acceptsNonImages = (accept: string): boolean =>
 /**
  * Taking a picture with the camera, or choosing one from the photo library, on
  * the native app — what every picture control there offers before a file
- * dialog. Only meaningful where `canCapturePhoto()` says so.
+ * dialog. Only meaningful where the host has a camera.
  */
 export function usePhotoCapture(onSelect: (file: File) => void | Promise<void>) {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   const [capturing, setCapturing] = useState(false);
   // Read at the moment a picture arrives, so a caller passing a fresh function
   // each render does not make `capture` a new function each render too.
@@ -70,13 +64,14 @@ export function usePhotoCapture(onSelect: (file: File) => void | Promise<void>) 
     async (source: PhotoSource) => {
       setCapturing(true);
       try {
-        const file = await capturePhoto(source);
+        if (!host.camera) throw new PhotoCaptureError("unavailable");
+        const file = await host.camera.capture(source);
         // No file means the person backed out, which needs no announcement.
         if (file) await latestOnSelect.current(file);
       } catch (error) {
         console.error(error);
         const reason = error instanceof PhotoCaptureError ? error.reason : "failed";
-        toast.error(t(`imagePicker.${reason}`));
+        host.toast.error(t(`imagePicker.${reason}`));
       } finally {
         setCapturing(false);
       }
@@ -120,7 +115,7 @@ export const ImagePicker = ({
   buttonSize,
   "data-test-id": dataTestId,
 }: ImagePickerProps) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   const inputRef = useRef<HTMLInputElement>(null);
   const { capturing, capture } = usePhotoCapture(onSelect);
 
@@ -139,11 +134,11 @@ export const ImagePicker = ({
       accept={accept}
       disabled={disabled}
       onChange={handleInput}
-      className={variant === "button" || canCapturePhoto() ? "hidden" : className}
+      className={variant === "button" || host.camera ? "hidden" : className}
       data-test-id={dataTestId}
       // A control the person never sees should not be a tab stop of its own.
-      tabIndex={variant === "button" || canCapturePhoto() ? -1 : undefined}
-      aria-hidden={variant === "button" || canCapturePhoto() ? true : undefined}
+      tabIndex={variant === "button" || host.camera ? -1 : undefined}
+      aria-hidden={variant === "button" || host.camera ? true : undefined}
     />
   );
 
@@ -154,7 +149,7 @@ export const ImagePicker = ({
     </>
   );
 
-  if (!canCapturePhoto()) {
+  if (!host.camera) {
     if (variant === "input") return fileInput;
     return (
       <>

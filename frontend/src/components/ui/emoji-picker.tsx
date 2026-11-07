@@ -3,9 +3,9 @@
  *
  * Two things differ from the upstream registry component:
  *
- * - **The dataset is served by this app**, never a public CDN — a self-hosted
- *   install may have no internet at all. `__EMOJIBASE_URL__` points at the
- *   files the Vite plugin emits (see `vite.config.ts`).
+ * - **The dataset comes from where the host says** (`emojibaseUrl`). Initiative
+ *   serves its own, never a public CDN — a self-hosted install may have no
+ *   internet at all.
  * - **Its strings and locale come from i18next**, so the picker searches and
  *   labels in the language the rest of the app is in.
  */
@@ -21,6 +21,7 @@ import type * as React from "react";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
+import { host } from "@/ui/host";
 
 /** Locales the emoji dataset is shipped for; anything else falls back to English. */
 const SUPPORTED_LOCALES = ["en", "de", "es", "fr"] as const;
@@ -39,7 +40,7 @@ function EmojiPicker({
   return (
     <EmojiPickerPrimitive.Root
       locale={emojiLocale(i18n.language)}
-      emojibaseUrl={__EMOJIBASE_URL__}
+      emojibaseUrl={host.emojibaseUrl}
       className={cn(
         "isolate flex h-full min-h-0 w-fit flex-col overflow-hidden rounded-md bg-popover text-popover-foreground",
         className
@@ -55,7 +56,7 @@ function EmojiPickerSearch({
   placeholder,
   ...props
 }: React.ComponentProps<typeof EmojiPickerPrimitive.Search>) {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   return (
     <div
       className={cn("flex h-9 shrink-0 items-center gap-2 border-b px-3", className)}
@@ -111,7 +112,7 @@ function EmojiPickerContent({
   className,
   ...props
 }: React.ComponentProps<typeof EmojiPickerPrimitive.Viewport>) {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   return (
     <EmojiPickerPrimitive.Viewport
       className={cn("relative min-h-0 flex-1 outline-hidden", className)}
@@ -144,7 +145,7 @@ function EmojiPickerContent({
 }
 
 function EmojiPickerFooter({ className, ...props }: React.ComponentProps<"div">) {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   return (
     <div
       className={cn(

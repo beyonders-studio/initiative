@@ -18,6 +18,7 @@ import {
   titleWords,
   WORD_KEYS,
 } from "@/lib/smartTitle";
+import { useWeekStart } from "@/ui/host";
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
 
@@ -73,6 +74,7 @@ export const useSmartTitle = ({
   enabled: boolean;
 }): SmartTitle => {
   const { user } = useAuth();
+  const weekStartsOn = useWeekStart();
   const words = useTitleWords();
   const [kept, setKept] = useState<ReadonlySet<string>>(() => new Set());
   const [chosen, setChosen] = useState<TitlePerson[]>([]);
@@ -141,14 +143,14 @@ export const useSmartTitle = ({
   const context = useMemo<Omit<TitleContext, "now">>(
     () => ({
       words,
-      weekStartsOn: user?.week_starts_on ?? 0,
+      weekStartsOn,
       tags: tags.data ?? [],
       types: types.data ?? [],
       people,
       me,
       kept,
     }),
-    [words, user?.week_starts_on, tags.data, types.data, people, me, kept]
+    [words, weekStartsOn, tags.data, types.data, people, me, kept]
   );
   const read = useCallback(
     (typed: string) => readTitle(typed, { ...context, now: new Date() }),

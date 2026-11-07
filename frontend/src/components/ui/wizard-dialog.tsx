@@ -59,7 +59,7 @@ export interface WizardProgress {
  * description as you move otherwise tells you nothing about having moved.
  */
 const WizardProgressDots = ({ current, total }: WizardProgress) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   return (
     <div className="flex items-center gap-2">
       <div className="flex items-center gap-1.5" aria-hidden="true">
@@ -74,7 +74,7 @@ const WizardProgressDots = ({ current, total }: WizardProgress) => {
         ))}
       </div>
       <span aria-live="polite" className="sr-only">
-        {t("stepOf", { current, total })}
+        {t("wizard.stepOf", { current, total })}
       </span>
     </div>
   );

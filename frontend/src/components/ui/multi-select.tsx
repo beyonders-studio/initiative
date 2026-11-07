@@ -44,9 +44,9 @@ export const MultiSelect = ({
   disabled = false,
   className,
 }: MultiSelectProps) => {
-  const { t } = useTranslation("common");
-  const resolvedPlaceholder = placeholder ?? t("selectEllipsis");
-  const resolvedEmptyMessage = emptyMessage ?? t("noOptionsAvailable");
+  const { t } = useTranslation("ui");
+  const resolvedPlaceholder = placeholder ?? t("multiSelect.placeholder");
+  const resolvedEmptyMessage = emptyMessage ?? t("multiSelect.empty");
   const toggleValue = (value: string) => {
     if (selectedValues.includes(value)) {
       onChange(selectedValues.filter((v) => v !== value));
@@ -68,13 +68,13 @@ export const MultiSelect = ({
       return resolvedPlaceholder;
     }
     if (selectedValues.length === options.length) {
-      return t("allSelected");
+      return t("multiSelect.allSelected");
     }
     if (selectedValues.length === 1) {
       const option = options.find((o) => o.value === selectedValues[0]);
       return option?.label ?? resolvedPlaceholder;
     }
-    return t("countSelected", { count: selectedValues.length });
+    return t("multiSelect.countSelected", { count: selectedValues.length });
   }, [selectedValues, options, resolvedPlaceholder, t]);
 
   // Ungrouped first, then each group in the order it first appears — the
@@ -151,7 +151,7 @@ export const MultiSelect = ({
             disabled={selectedValues.length === 0}
             className="h-8 w-full justify-start px-2 font-normal"
           >
-            {t("clearAll")}
+            {t("multiSelect.clearAll")}
           </Button>
         </div>
         {ungrouped.map(renderOption)}

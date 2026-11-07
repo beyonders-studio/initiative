@@ -11,7 +11,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { MessagesSidebarContent } from "@/components/sidebar/MessagesSidebarContent";
-import { Badge } from "@/components/ui/badge";
 import {
   SidebarContent,
   SidebarGroup,
@@ -20,7 +19,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@/components/sidebar/sidebar";
+import { Badge } from "@/components/ui/badge";
 import { useDirectMessagesEnabled } from "@/hooks/useDirectMessages";
 import { useMessagesWaiting } from "@/hooks/useMyMessages";
 import { useHasFiledTickets } from "@/hooks/useTickets";

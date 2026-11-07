@@ -2,7 +2,7 @@ import { type DragEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { matchesAccept } from "@/lib/fileUtils";
-import { toast } from "@/lib/mascotToast";
+import { host } from "@/ui/host";
 
 interface FileDropOptions {
   /**
@@ -30,7 +30,7 @@ export const useFileDrop = (
   onFiles: (files: File[]) => void,
   { accept }: FileDropOptions = {}
 ) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   const depth = useRef(0);
   const internalDrag = useRef(false);
   const [dragging, setDragging] = useState(false);
@@ -72,7 +72,7 @@ export const useFileDrop = (
       const dropped = Array.from(event.dataTransfer.files);
       const files = accept ? dropped.filter((file) => matchesAccept(file.name, accept)) : dropped;
       if (files.length > 0) onFiles(files);
-      else if (dropped.length > 0) toast.error(t("fileDrop.unsupported"));
+      else if (dropped.length > 0) host.toast.error(t("fileDrop.unsupported"));
     },
   };
 

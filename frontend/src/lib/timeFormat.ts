@@ -1,89 +1,19 @@
 /**
- * Whether clock times read as "1:30 PM" or "13:30".
+ * A time of day on the reader's clock: "1:30 PM" or "13:30".
  *
- * The formatters that need this are mostly plain functions — `formatDateTime`,
+ * The formatters that need it are mostly plain functions — `formatDateTime`,
  * a calendar's hour gutter, the clock beside a message — called from deep
  * inside render trees that have no business threading a preference down. So
- * the answer lives here as one module-level value, written once from the
- * signed-in account (see `useTimeFormatSync`) and read wherever a time is
- * rendered.
- *
- * React components that must re-render when it changes subscribe through
- * `useTimeFormat`; everything else just reads it at format time.
+ * they read the host's clock (`getClock`), which the app writes from the
+ * signed-in account (see `useClockSync`). React components that must
+ * re-render when it changes subscribe through `useTimeFormat`; everything else
+ * just reads it at format time.
  */
 
 import { dateTimeFormat } from "@/lib/intl";
-import { getItem, setItem } from "@/lib/storage";
+import { getClock } from "@/ui/host";
 
-export type TimeFormatPreference = "system" | "12" | "24";
-
-export const TIME_FORMAT_PREFERENCES: readonly TimeFormatPreference[] = ["system", "12", "24"];
-
-export const DEFAULT_TIME_FORMAT: TimeFormatPreference = "system";
-
-/** Narrow an API value (or anything else) to a preference we know. */
-export const parseTimeFormat = (value: unknown): TimeFormatPreference =>
-  TIME_FORMAT_PREFERENCES.includes(value as TimeFormatPreference)
-    ? (value as TimeFormatPreference)
-    : DEFAULT_TIME_FORMAT;
-
-/**
- * The last answer this browser saw, so the first paint of a returning reader
- * is already on the right clock. The account is the authority and overwrites
- * it as soon as `/me` lands; this only covers the gap before that.
- */
-const STORAGE_KEY = "initiative.timeFormat";
-
-// `null` until something asks, because this module is imported before
-// `initStorage()` has hydrated the cache on native.
-let preference: TimeFormatPreference | null = null;
-const listeners = new Set<() => void>();
-
-const current = (): TimeFormatPreference => {
-  if (preference === null) {
-    preference = parseTimeFormat(getItem(STORAGE_KEY));
-  }
-  return preference;
-};
-
-export const getTimeFormat = (): TimeFormatPreference => current();
-
-/**
- * Record the answer without telling anybody. `useTimeFormatSync` calls this
- * while the root renders, so every timestamp below it is formatted on the new
- * clock in that same pass — a formatter that reads this module but does not
- * subscribe to it would otherwise keep the old one until something unrelated
- * re-rendered it.
- */
-export const writeTimeFormat = (next: TimeFormatPreference): boolean => {
-  if (next === current()) return false;
-  preference = next;
-  try {
-    setItem(STORAGE_KEY, next);
-  } catch {
-    // A browser that refuses storage still gets the right clock this session.
-  }
-  return true;
-};
-
-/** Tell every subscriber to look again. Safe to call when nothing changed. */
-export const notifyTimeFormat = (): void => {
-  for (const listener of listeners) listener();
-};
-
-export const setTimeFormat = (next: TimeFormatPreference): void => {
-  if (writeTimeFormat(next)) notifyTimeFormat();
-};
-
-export const subscribeTimeFormat = (listener: () => void): (() => void) => {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-};
-
-/** Test helper: forget the account's answer and go back to the default. */
-export const resetTimeFormat = (): void => setTimeFormat(DEFAULT_TIME_FORMAT);
+const current = () => getClock().timeFormat;
 
 /**
  * The `hour12` to hand `Intl.DateTimeFormat`. `undefined` on `system` is the

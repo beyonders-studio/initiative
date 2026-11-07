@@ -12,7 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { renderPage } from "@/__tests__/helpers/render";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/sidebar/sidebar";
 
 import { CommunityDirectorySidebar } from "./CommunityDirectorySidebar";
 

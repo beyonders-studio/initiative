@@ -1,13 +1,8 @@
 {
   "invalidRange": "La date de fin ne peut pas précéder la date de début.",
   "picker": {
-    "invalidDate": "Saisissez une date valide.",
     "invalidEventRange": "L’événement doit se terminer après son début.",
-    "invalidLocalDateTime": "Saisissez une date et une heure valides. Lors du changement d’heure, choisissez une heure en dehors de l’intervalle sauté ou répété.",
-    "pickDate": "Choisir une date",
-    "pickDateTime": "Choisir une date et une heure",
-    "typeDate": "Saisir ou choisir une date",
-    "time": "Heure"
+    "invalidLocalDateTime": "Saisissez une date et une heure valides. Lors du changement d’heure, choisissez une heure en dehors de l’intervalle sauté ou répété."
   },
   "status": {
     "overdue": "En retard",

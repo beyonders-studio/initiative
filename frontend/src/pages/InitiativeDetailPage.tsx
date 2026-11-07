@@ -8,7 +8,7 @@ import { InitiativeMembersPeek } from "@/components/initiatives/InitiativeMember
 import { Markdown } from "@/components/Markdown";
 import { StatusMessage } from "@/components/StatusMessage";
 import {
-  InitiativePageSkeleton,
+  PageHeaderSkeleton,
   SkeletonRegion,
   ToolListSkeleton,
 } from "@/components/skeletons/PageSkeletons";
@@ -112,7 +112,13 @@ export const InitiativeDetailPage = ({ tool }: InitiativeDetailPageProps = {}) =
   }
 
   if (initiativeQuery.isLoading) {
-    return <InitiativePageSkeleton label={t("detail.loadingInitiative")} />;
+    // Its header, the tool tabs, and the first tab's list.
+    return (
+      <SkeletonRegion label={t("detail.loadingInitiative")} className="space-y-4 sm:space-y-6">
+        <PageHeaderSkeleton dot description meta action tabs={TOOLS.length} />
+        <ToolListSkeleton className="pt-2" />
+      </SkeletonRegion>
+    );
   }
 
   if (!initiative) {

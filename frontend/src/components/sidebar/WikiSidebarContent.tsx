@@ -19,7 +19,6 @@ import {
   WikiPageTree,
 } from "@/components/initiativeTools/wikis/WikiPageTree";
 import { SubscribeButton } from "@/components/SubscribeButton";
-import { Button } from "@/components/ui/button";
 import {
   SidebarContent,
   SidebarGroup,
@@ -29,7 +28,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@/components/sidebar/sidebar";
+import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   useAddWikiFile,

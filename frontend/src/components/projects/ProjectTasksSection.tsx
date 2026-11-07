@@ -99,6 +99,7 @@ import { getProjectColor } from "@/lib/projectColor";
 import { getItem, setItem } from "@/lib/storage";
 import { taskReadToListRow } from "@/lib/taskUtils";
 import { browserTimezone } from "@/lib/timezones";
+import { useWeekStart } from "@/ui/host";
 
 /** A status change on screen whose request has not answered yet. */
 type PendingStatus = { vars: UpdateTaskVariables; status: TaskStatusRead };
@@ -287,7 +288,7 @@ export const ProjectTasksSection = ({
   const lastKanbanOverRef = useRef<DragOverEvent["over"] | null>(null);
 
   const { user } = useAuth();
-  const weekStartsOn = (user?.week_starts_on ?? 0) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  const weekStartsOn = useWeekStart();
   // How much of the calendar the Gantt or the calendar shows is one choice in
   // this person's view of the project.
   const ganttScale = isGanttScale(mode) ? mode : "week";
