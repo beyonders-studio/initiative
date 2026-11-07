@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
   login: vi.fn(),
   applyPasskeySignIn: vi.fn(),
   signUpWithPasskey: vi.fn(),
-  browserOffersPasskeys: vi.fn(() => true),
+  passkeysRunHere: vi.fn(() => true),
   /** Read on every render, so a test can say what the deployment offers. */
   config: {
     captcha: null,
@@ -45,7 +45,7 @@ vi.mock("@/hooks/useAppConfig", async (importOriginal) => ({
 }));
 
 vi.mock("@/lib/passkeys", () => ({
-  browserOffersPasskeys: () => mocks.browserOffersPasskeys(),
+  passkeysRunHere: () => mocks.passkeysRunHere(),
   signUpWithPasskey: (details: unknown) => mocks.signUpWithPasskey(details),
   describePasskeyPromptError: () => null,
 }));
@@ -56,7 +56,7 @@ const PASSKEY_BUTTON = /create account with a passkey/i;
 
 beforeEach(() => {
   mocks.config = { captcha: null, passwordLoginEnabled: true, passkeyLoginEnabled: true };
-  mocks.browserOffersPasskeys.mockReturnValue(true);
+  mocks.passkeysRunHere.mockReturnValue(true);
   mocks.signUpWithPasskey.mockReset();
   mocks.applyPasskeySignIn.mockReset();
   mocks.register.mockReset();
@@ -87,7 +87,7 @@ it("asks for no password where the deployment does not take one", async () => {
 });
 
 it("keeps the key door shut where the browser cannot open one", async () => {
-  mocks.browserOffersPasskeys.mockReturnValue(false);
+  mocks.passkeysRunHere.mockReturnValue(false);
   renderPage(RegisterPage, { initialRoute: "/login" });
 
   await screen.findByLabelText(/^password/i);

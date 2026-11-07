@@ -33,10 +33,11 @@ import { beginNativeSignIn, redeemNativeSignIn, takePendingSignIn } from "@/lib/
 import { passkeyFailureMessage } from "@/lib/passkeyFailure";
 import {
   appRunsPasskeys,
+  browserMayHoldOtherPasskeys,
   browserOffersPasskeyAutofill,
-  browserOffersPasskeys,
   cancelPendingPasskeyPrompt,
   PasskeyNeedsBrowserError,
+  passkeysRunHere,
   signInWithPasskey,
 } from "@/lib/passkeys";
 import { providerSignInHref } from "@/lib/returnPath";
@@ -121,7 +122,11 @@ const SignInCard = () => {
 
   // On a phone the button runs the ceremony in the app, or opens the phone's
   // browser where the app cannot, so it is offered either way.
-  const passkeyOffered = passkeyLoginEnabled && (isNativePlatform || browserOffersPasskeys());
+  const passkeyOffered = passkeyLoginEnabled && (isNativePlatform || passkeysRunHere());
+  // A computer's app runs the ceremony itself, but passkeys kept inside a
+  // browser are out of its reach, so the browser stays one press away.
+  const browserPasskeysOffered =
+    passkeyOffered && appRunsPasskeys() && browserMayHoldOtherPasskeys();
 
   const resolveDeviceName = async (): Promise<string> => {
     try {
@@ -552,6 +557,17 @@ const SignInCard = () => {
                 >
                   <KeyRound className="h-4 w-4" />
                   {passkeyBusy ? t("login.passkeyWorking") : t("login.passkey")}
+                </Button>
+              ) : null}
+              {browserPasskeysOffered ? (
+                <Button
+                  type="button"
+                  variant="link"
+                  className="h-auto w-full p-0"
+                  disabled={passkeyBusy}
+                  onClick={() => void openPasskeyRelay()}
+                >
+                  {t("login.passkeyInBrowser")}
                 </Button>
               ) : null}
               {emailOtpLoginEnabled ? (

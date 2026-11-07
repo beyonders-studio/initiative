@@ -10,7 +10,7 @@ import { useApplyHeldChange, useCancelHeldChange, useHeldChange } from "@/hooks/
 import { getErrorMessage } from "@/lib/errorMessage";
 import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
-import { browserOffersPasskeys, describePasskeyPromptError } from "@/lib/passkeys";
+import { describePasskeyPromptError, passkeysRunHere } from "@/lib/passkeys";
 
 /** What each waiting change will do, by the kind the server names. */
 const CHANGE_KEYS = {
@@ -57,7 +57,7 @@ export const HeldChangeNotice = () => {
     apply.mutate(held.id);
   };
 
-  const canMakeNow = browserOffersPasskeys() && (passkeys.data?.passkeys?.length ?? 0) > 0;
+  const canMakeNow = passkeysRunHere() && (passkeys.data?.passkeys?.length ?? 0) > 0;
   const busy = steppingUp || cancel.isPending || apply.isPending;
 
   return (
