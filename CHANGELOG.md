@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The desktop app on Windows and Linux hides its menu bar.** The File, Edit, View and Window row no longer takes space under the title bar; press Alt to show it. Zoom, reload and full screen keep their shortcuts.
 - **The Android app creates accounts and breaks glass with a passkey in the app,** through the phone's own passkey prompt, the way it signs in.
+- **Both digests arrive under one Android notification category, Digests,** so **Overdue tasks** and **Coming up** are muted or kept together. It takes the new name with the next Android app update.
 
 ### Fixed
 
