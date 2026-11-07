@@ -155,16 +155,23 @@ describe("useNotificationStream", () => {
 
   it("re-reads the account when the server says its standing changed", () => {
     const refreshUser = vi.fn();
-    renderWithProviders(<Probe />, { auth: { refreshUser } });
+    const refreshCommunities = vi.fn().mockResolvedValue([]);
+    renderWithProviders(<Probe />, { auth: { refreshUser }, communities: { refreshCommunities } });
     const socket = latestSocket();
     socket.open();
     // The catch-up on connect pokes every channel; this test is about the frame.
     refreshUser.mockClear();
+    refreshCommunities.mockClear();
     invalidations.mockClear();
 
     socket.receive({ resource: "account", action: "membership", ids: {} });
+    // A community's plan moved: its members' lists carry it.
+    socket.receive({ resource: "account", action: "community", ids: {} });
+    // A change to the account alone leaves the community list as it is.
+    socket.receive({ resource: "account", action: "profile", ids: {} });
 
-    expect(refreshUser).toHaveBeenCalledTimes(1);
+    expect(refreshUser).toHaveBeenCalledTimes(3);
+    expect(refreshCommunities).toHaveBeenCalledTimes(2);
     // Three channels over one socket: none answers for the others.
     expect(timesNamed(q.notifications())).toBe(0);
     expect(timesNamed(q.contactGrants())).toBe(0);
@@ -227,13 +234,15 @@ describe("useNotificationStream", () => {
 
   it("catches up on both channels after the socket was down", () => {
     const refreshUser = vi.fn();
-    renderWithProviders(<Probe />, { auth: { refreshUser } });
+    const refreshCommunities = vi.fn().mockResolvedValue([]);
+    renderWithProviders(<Probe />, { auth: { refreshUser }, communities: { refreshCommunities } });
 
     latestSocket().open();
 
     // Anything that happened while it was down was never signalled, and that
-    // includes being added to a community.
+    // includes being added to a community or its plan changing.
     expect(refreshUser).toHaveBeenCalledTimes(1);
+    expect(refreshCommunities).toHaveBeenCalledTimes(1);
     expect(timesNamed(q.notifications())).toBe(1);
     expect(timesNamed(q.contactGrants())).toBe(1);
   });
