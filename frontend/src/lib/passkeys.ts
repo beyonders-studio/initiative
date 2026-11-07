@@ -8,10 +8,11 @@
  * waits inside the browser's own autofill — because the only thing that
  * separates them is a flag the credential API reads.
  *
- * On Android the app runs sign-in, enrolment and step-up itself, through the
- * platform's credential manager, when the server names the app in its asset
- * links. Where it does not, the app goes to the phone's browser. Sign-up and
- * break-glass are the browser's on every platform.
+ * The Android app and the Windows desktop app run every ceremony themselves,
+ * through their Passkeys plug-in: Android through its credential manager when
+ * the server names the app in its asset links, Windows through its own passkey
+ * dialog. Where an app cannot, sign-in, adding a passkey and step-up go to the
+ * system browser.
  */
 import { Capacitor } from "@capacitor/core";
 import {
@@ -51,14 +52,13 @@ import type {
 import { getStoredServerUrl } from "@/lib/serverStorage";
 import { getItem, setItem } from "@/lib/storage";
 
-/** Set when the phone would not let the app act for a server, which then
- *  goes straight to the browser until it lapses: long enough not to fail
- *  first on every press, short enough that a server put right is tried again. */
+/** Set when the app could not act for a server, which then goes straight to
+ *  the browser until it lapses: long enough not to fail first on every press,
+ *  short enough that a server put right is tried again. */
 const APP_REFUSED_KEY = "initiative-passkey-app-refused";
 const APP_REFUSED_TTL_MS = 24 * 60 * 60 * 1000;
 
-/** The phone would not let the app run this ceremony for this server; the
- *  browser can. */
+/** The app could not run this ceremony for this server; the browser can. */
 export class PasskeyNeedsBrowserError extends Error {
   constructor() {
     super("PASSKEY_NEEDS_BROWSER");
@@ -66,16 +66,18 @@ export class PasskeyNeedsBrowserError extends Error {
   }
 }
 
+/** The apps whose Passkeys plug-in runs ceremonies. An iOS app can act only
+ *  for domains its build names, and the desktop app registers the plug-in on
+ *  Windows alone. */
+const PLUGIN_PLATFORMS = new Set(["android", "electron"]);
+
 const appHasPlugin = (): boolean =>
-  Capacitor.getPlatform() === "android" && Capacitor.isPluginAvailable("Passkeys");
+  PLUGIN_PLATFORMS.has(Capacitor.getPlatform()) && Capacitor.isPluginAvailable("Passkeys");
 
 /**
- * Whether this app runs a passkey ceremony itself, rather than in the phone's
- * browser.
- *
- * Android only: an iOS app can act only for domains its build names. An older
- * app without the plugin, and a server the phone refused lately, use the
- * browser.
+ * Whether this app runs a passkey ceremony itself, rather than in the system
+ * browser. An older app without the plug-in, and a server the app could not
+ * act for lately, use the browser.
  */
 export const appRunsPasskeys = (): boolean => {
   if (!appHasPlugin()) return false;
@@ -83,7 +85,7 @@ export const appRunsPasskeys = (): boolean => {
   return Date.now() - refusedAt >= APP_REFUSED_TTL_MS;
 };
 
-/** When the phone last refused each server, by its address. */
+/** When the app last could not act for each server, by its address. */
 const refusals = (): Record<string, number> => {
   try {
     return JSON.parse(getItem(APP_REFUSED_KEY) ?? "{}") as Record<string, number>;
@@ -92,14 +94,30 @@ const refusals = (): Record<string, number> => {
   }
 };
 
-/** Ask the app's plugin, giving its refusals the browser's names so one
- *  message table reads both. */
+/** Refusals that mean this server's ceremonies belong in the browser. The
+ *  Android plug-in reports its own codes; the desktop plug-in passes on the
+ *  browser's names for how a prompt ended. */
+const NEEDS_BROWSER = new Set([
+  "DOMAIN_NOT_ASSOCIATED",
+  "NOT_SUPPORTED",
+  "SecurityError",
+  "NotSupportedError",
+]);
+
+/** The browser's names for the Android plug-in's codes, so one message table
+ *  reads every refusal. A browser name passes through as it is. */
+const BROWSER_NAMES: Record<string, string> = {
+  CANCELED: "NotAllowedError",
+  NO_CREDENTIAL: "NotAllowedError",
+};
+
+/** Ask the app's plug-in, giving its refusals the browser's names. */
 const viaApp = async <T>(call: () => Promise<T>): Promise<T> => {
   try {
     return await call();
   } catch (err) {
     const code = (err as { code?: string }).code ?? "";
-    if (code === "DOMAIN_NOT_ASSOCIATED" || code === "NOT_SUPPORTED") {
+    if (NEEDS_BROWSER.has(code)) {
       const now = Date.now();
       const fresh = Object.entries(refusals()).filter(([, at]) => now - at < APP_REFUSED_TTL_MS);
       fresh.push([getStoredServerUrl() ?? "", now]);
@@ -107,9 +125,18 @@ const viaApp = async <T>(call: () => Promise<T>): Promise<T> => {
       throw new PasskeyNeedsBrowserError();
     }
     const error = new Error(code || "PASSKEY_FAILED");
-    if (code === "CANCELED" || code === "NO_CREDENTIAL") error.name = "NotAllowedError";
+    if (code) error.name = BROWSER_NAMES[code] ?? code;
     throw error;
   }
+};
+
+/** What the plug-in is handed: the server's options, and on the desktop the
+ *  server's own address, which its plug-in opens to run the ceremony at. A
+ *  phone's credential manager takes the options alone. */
+const forPlugin = (options: unknown) => {
+  if (Capacitor.getPlatform() !== "electron") return options;
+  const server = getStoredServerUrl();
+  return { ...(options as object), origin: server ? new URL(server).origin : "" };
 };
 
 /** Present a credential, from the app or the browser. The server renders the
@@ -117,7 +144,7 @@ const viaApp = async <T>(call: () => Promise<T>): Promise<T> => {
  *  objects. */
 const presentCredential = (options: unknown, conditional = false) =>
   appHasPlugin()
-    ? viaApp(() => Passkeys.getPasskey(options as GetPasskeyOptions))
+    ? viaApp(() => Passkeys.getPasskey(forPlugin(options) as GetPasskeyOptions))
     : startAuthentication({
         optionsJSON: options as PublicKeyCredentialRequestOptionsJSON,
         useBrowserAutofill: conditional,
@@ -126,11 +153,19 @@ const presentCredential = (options: unknown, conditional = false) =>
 /** Make a credential, from the app or the browser. */
 export const createCredential = (options: unknown) =>
   appHasPlugin()
-    ? viaApp(() => Passkeys.createPasskey(options as CreatePasskeyOptions))
+    ? viaApp(() => Passkeys.createPasskey(forPlugin(options) as CreatePasskeyOptions))
     : startRegistration({ optionsJSON: options as PublicKeyCredentialCreationOptionsJSON });
 
-/** Whether this browser can present a passkey at all. */
-export const browserOffersPasskeys = (): boolean => browserSupportsWebAuthn();
+/** Whether a ceremony can run here at all: through the app's plug-in, or in a
+ *  browser on the server's own page. An app's page is never that page, so an
+ *  app without the plug-in has no ceremony to run. */
+export const passkeysRunHere = (): boolean =>
+  appRunsPasskeys() || (!Capacitor.isNativePlatform() && browserSupportsWebAuthn());
+
+/** Whether a browser on this device may hold passkeys the app can't reach. A
+ *  computer's browsers keep their own, in a password manager or an extension;
+ *  a phone's browser uses the same credential manager the app does. */
+export const browserMayHoldOtherPasskeys = (): boolean => Capacitor.getPlatform() === "electron";
 
 /** Whether this browser can offer one from its own autofill, beside the saved
  *  passwords. Asked before the quiet prompt is started, so a browser without it
@@ -207,9 +242,7 @@ export const signUpWithPasskey = async (
 ): Promise<PasskeySignUpResult> => {
   const params = inviteCode ? { invite_code: inviteCode } : undefined;
   const begun = await beginPasskeySignUp(details, params);
-  const credential = await startRegistration({
-    optionsJSON: begun.options as unknown as PublicKeyCredentialCreationOptionsJSON,
-  });
+  const credential = await createCredential(begun.options);
   return finishPasskeySignUp(
     { ...details, credential: credential as unknown as PasskeySignUpFinishCredential },
     params
@@ -226,9 +259,7 @@ export const signUpWithPasskey = async (
  */
 export const assertForBreakGlass = async (): Promise<Record<string, unknown>> => {
   const begun = await beginBreakGlassPasskey();
-  const credential = await startAuthentication({
-    optionsJSON: begun.options as unknown as PublicKeyCredentialRequestOptionsJSON,
-  });
+  const credential = await presentCredential(begun.options);
   return credential as unknown as Record<string, unknown>;
 };
 
@@ -238,7 +269,10 @@ export const cancelPendingPasskeyPrompt = (): void => WebAuthnAbortService.cance
 
 /** The line to show for a prompt that ended without a credential, or null when
  *  there is nothing to say. */
-export type PasskeyPromptMessageKey = "auth:login.passkeyCancelled" | "auth:login.passkeyFailed";
+export type PasskeyPromptMessageKey =
+  | "auth:login.passkeyCancelled"
+  | "auth:login.passkeyFailed"
+  | "auth:login.passkeyNotInApp";
 
 /**
  * Which line a prompt that produced nothing deserves.
@@ -247,12 +281,14 @@ export type PasskeyPromptMessageKey = "auth:login.passkeyCancelled" | "auth:logi
  * browser's own exception, and anything else landing in the same catch keeps
  * whatever name it had. A ceremony we put down ourselves — the quiet one,
  * stood aside for a button or gone with the page — is not a failure anybody
- * needs telling about, so it gets no line at all.
+ * needs telling about, so it gets no line at all. One the app's plug-in could
+ * not run says so; sign-in and adding a passkey open the browser instead and
+ * never ask.
  */
 export const describePasskeyPromptError = (error: unknown): PasskeyPromptMessageKey | null => {
   const name = error instanceof WebAuthnError || error instanceof Error ? error.name : "";
-  // The page offers the browser instead, which says more than a line would.
-  if (name === "AbortError" || error instanceof PasskeyNeedsBrowserError) return null;
+  if (name === "AbortError") return null;
+  if (error instanceof PasskeyNeedsBrowserError) return "auth:login.passkeyNotInApp";
   if (name === "NotAllowedError") return "auth:login.passkeyCancelled";
   return "auth:login.passkeyFailed";
 };

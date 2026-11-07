@@ -80,7 +80,7 @@ import { SmartChipInsertDialog } from "@/components/ui/editor/plugins/smart-chip
 import { InsertTableDialog } from "@/components/ui/editor/plugins/table-plugin";
 import { useBlockTypeToBlockName } from "@/components/ui/editor/plugins/toolbar/block-format/block-format-data";
 import { getSelectedNode } from "@/components/ui/editor/utils/get-selected-node";
-import { sanitizeUrl } from "@/components/ui/editor/utils/url";
+import { sanitizeUrl } from "@/lib/safeUrl";
 
 /**
  * One thing the toolbar can do, as data rather than as a rendered control.

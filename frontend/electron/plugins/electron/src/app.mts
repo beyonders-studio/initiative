@@ -8,6 +8,7 @@ export {
   nativeImage,
   nativeTheme,
   net,
+  session,
   Tray,
   WebContentsView,
 } from "electron";

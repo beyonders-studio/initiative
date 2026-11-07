@@ -39,8 +39,9 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   signInWithPasskey: vi.fn(),
   cancelPendingPasskeyPrompt: vi.fn(),
-  browserOffersPasskeys: vi.fn(() => true),
+  passkeysRunHere: vi.fn(() => true),
   appRunsPasskeys: vi.fn(() => false),
+  browserMayHoldOtherPasskeys: vi.fn(() => false),
   browserOffersPasskeyAutofill: vi.fn(() => Promise.resolve(false)),
   /** The real mapping, so the card is asserted on the copy it would show. */
   describePasskeyPromptError: vi.fn((error: unknown) => {
@@ -96,7 +97,8 @@ vi.mock("@/hooks/useAppConfig", async (importOriginal) => ({
 vi.mock("@/lib/passkeys", () => ({
   appRunsPasskeys: () => mocks.appRunsPasskeys(),
   PasskeyNeedsBrowserError: class PasskeyNeedsBrowserError extends Error {},
-  browserOffersPasskeys: () => mocks.browserOffersPasskeys(),
+  passkeysRunHere: () => mocks.passkeysRunHere(),
+  browserMayHoldOtherPasskeys: () => mocks.browserMayHoldOtherPasskeys(),
   browserOffersPasskeyAutofill: () => mocks.browserOffersPasskeyAutofill(),
   signInWithPasskey: (options?: unknown) => mocks.signInWithPasskey(options),
   cancelPendingPasskeyPrompt: () => mocks.cancelPendingPasskeyPrompt(),
@@ -192,7 +194,8 @@ const resetLoginMocks = () => {
   mocks.appRunsPasskeys.mockReset().mockReturnValue(false);
   mocks.signInWithPasskey.mockReset();
   mocks.cancelPendingPasskeyPrompt.mockReset();
-  mocks.browserOffersPasskeys.mockReset().mockReturnValue(true);
+  mocks.passkeysRunHere.mockReset().mockReturnValue(true);
+  mocks.browserMayHoldOtherPasskeys.mockReset().mockReturnValue(false);
   mocks.browserOffersPasskeyAutofill.mockReset().mockResolvedValue(false);
   mocks.config = { passwordLoginEnabled: true, passkeyLoginEnabled: true };
   mocks.server = { isNativePlatform: false };
@@ -422,7 +425,7 @@ describe("LoginPage passkey", () => {
   });
 
   it("offers none where this browser cannot present one", async () => {
-    mocks.browserOffersPasskeys.mockReturnValue(false);
+    mocks.passkeysRunHere.mockReturnValue(false);
     renderLogin();
 
     await screen.findByLabelText(/email/i);
@@ -604,6 +607,8 @@ describe("LoginPage passkey", () => {
       expect.objectContaining({ code: "one-time" })
     );
     expect(Browser.open).not.toHaveBeenCalled();
+    // A phone's browser holds nothing the app can't reach.
+    expect(screen.queryByRole("button", { name: /saved in your browser/i })).toBeNull();
   });
 
   it("goes to the browser when the phone will not let the app act for the server", async () => {
@@ -618,6 +623,21 @@ describe("LoginPage passkey", () => {
     await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(1));
     expect(new URL(vi.mocked(Browser.open).mock.calls[0][0].url).pathname).toBe("/login");
     expect(mocks.describePasskeyPromptError).not.toHaveBeenCalled();
+  });
+
+  it("keeps the browser one press away on a computer", async () => {
+    // A computer's browsers keep passkeys of their own, out of the app's reach.
+    const user = userEvent.setup();
+    mocks.server = { isNativePlatform: true };
+    mocks.appRunsPasskeys.mockReturnValue(true);
+    mocks.browserMayHoldOtherPasskeys.mockReturnValue(true);
+    renderLogin();
+
+    await user.click(await screen.findByRole("button", { name: /saved in your browser/i }));
+
+    await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(1));
+    expect(new URL(vi.mocked(Browser.open).mock.calls[0][0].url).pathname).toBe("/login");
+    expect(mocks.signInWithPasskey).not.toHaveBeenCalled();
   });
 });
 

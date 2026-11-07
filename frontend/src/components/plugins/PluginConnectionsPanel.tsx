@@ -50,6 +50,7 @@ import {
 } from "@/hooks/useCommunityPluginDetail";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { openExternal } from "@/lib/openExternal";
 import { localized } from "@/lib/widgets/widgetMeta";
 
 /** One typed input in a connection's form, as the pinned definition declares
@@ -196,11 +197,10 @@ function CommunityConnection({
     connect.mutate(connection.id, {
       onSuccess: (started) => {
         // A new tab rather than a redirect, so the admin comes back to where
-        // they were; `noopener` keeps the vendor's page from reaching into
-        // this one. The address is the server's to build — see
+        // they were. The address is the server's to build — see
         // PersonalConnection.
         if (started.connect_url) {
-          window.open(started.connect_url, "_blank", "noopener,noreferrer");
+          openExternal(started.connect_url);
           toast.success(t("plugins:connections.connectOpened"));
           return;
         }
@@ -411,10 +411,9 @@ function PersonalConnection({
       onSuccess: (started) => {
         // The server builds the vendor's address; the client never does. A
         // new tab rather than a redirect, so the member comes back to where
-        // they were, and `noopener` keeps the vendor's page from reaching into
-        // this one.
+        // they were.
         if (started.connect_url) {
-          window.open(started.connect_url, "_blank", "noopener,noreferrer");
+          openExternal(started.connect_url);
           toast.success(t("plugins:connections.connectOpened"));
           return;
         }

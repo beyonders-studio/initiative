@@ -20,6 +20,7 @@ import { INSERT_TWEET_COMMAND } from "@/components/ui/editor/plugins/embeds/twit
 import { INSERT_YOUTUBE_COMMAND } from "@/components/ui/editor/plugins/embeds/youtube-plugin";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { matchSmartLinkProvider } from "@/lib/smartLinkProviders";
 
 export interface CustomEmbedConfig extends EmbedConfig {
   // Human readable name of the embeded content e.g. Tweet or Google Map.
@@ -57,19 +58,9 @@ export const YoutubeEmbedConfig: CustomEmbedConfig = {
   keywords: ["youtube", "video"],
 
   // Determine if a given URL is a match and return url data.
-  parseUrl: async (url: string) => {
-    const match = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/.exec(url);
-
-    const id = match ? (match?.[2].length === 11 ? match[2] : null) : null;
-
-    if (id != null) {
-      return {
-        id,
-        url,
-      };
-    }
-
-    return null;
+  parseUrl: (url: string) => {
+    const embed = matchSmartLinkProvider(url);
+    return embed.id === "youtube" && embed.ref ? { id: embed.ref, url } : null;
   },
 
   type: "youtube-video",
@@ -95,16 +86,8 @@ export const TwitterEmbedConfig: CustomEmbedConfig = {
 
   // Determine if a given URL is a match and return url data.
   parseUrl: (text: string) => {
-    const match = /^https:\/\/(twitter|x)\.com\/(#!\/)?(\w+)\/status(es)*\/(\d+)/.exec(text);
-
-    if (match != null) {
-      return {
-        id: match[5],
-        url: match[1],
-      };
-    }
-
-    return null;
+    const embed = matchSmartLinkProvider(text);
+    return embed.id === "x" && embed.ref ? { id: embed.ref, url: text } : null;
   },
 
   type: "tweet",

@@ -616,6 +616,7 @@ export const UploadedFileViewer = ({
             className="w-full bg-muted"
             style={{ height: "70vh", minHeight: 500 }}
             title={originalFilename || t("viewer.textDocument")}
+            sandbox=""
             referrerPolicy="no-referrer"
           />
         ) : isHtml ? (

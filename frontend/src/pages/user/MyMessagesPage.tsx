@@ -288,18 +288,10 @@ export function MyMessagesPage() {
   }
 
   return (
-    // Fills the shell: `main` has a real height now, so the thread can be what
-    // is left of it after the header, and its log is the only thing that
-    // scrolls.
+    // Fills the shell, and its log is the only thing that scrolls. No page
+    // title: the sidebar beside it already says where this is, and every line
+    // a heading took was a line of conversation off the screen.
     <div className="flex h-full min-h-0 flex-col gap-4">
-      <header className="space-y-1">
-        <h1 className="font-semibold text-3xl tracking-tight">{t("title")}</h1>
-        <p className="flex items-center gap-1.5 text-muted-foreground text-sm">
-          <ShieldCheck className="size-3.5 shrink-0" aria-hidden />
-          {t("encryptedNotice")}
-        </p>
-      </header>
-
       {/* Above the thread, because it is about the account rather than about
           whoever is on screen — and because a device waiting on an answer is
           waiting on a person who has to see it to give one. */}
@@ -525,7 +517,10 @@ function Thread({
    * the toolbar is about the message under it.
    */
   const [tapped, setTapped] = useState<string | null>(null);
+  const [encryptionShown, setEncryptionShown] = useState(false);
   const log = useRef<HTMLDivElement | null>(null);
+  /** Whether the log was at its newest message when it last scrolled. */
+  const atLatest = useRef(true);
   const composer = useRef<HTMLTextAreaElement | null>(null);
   /** Every message on screen, so a quote can go back to the one it names. */
   const rows = useRef(new Map<string, HTMLDivElement>());
@@ -638,7 +633,22 @@ function Thread({
     // that should move here is this one.
     const element = log.current;
     if (element) element.scrollTop = element.scrollHeight;
+    atLatest.current = true;
   }, [messages.length]);
+  // The log gets shorter whenever something under it takes room -- the
+  // composer growing a line, a reply bar, a phone's keyboard. Its scrollTop
+  // stays put when that happens, so the newest messages would slide out of
+  // view under the composer. A reader who was at the newest message stays
+  // there; one who scrolled back to read is left where they are.
+  useEffect(() => {
+    const element = log.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => {
+      if (atLatest.current) element.scrollTop = element.scrollHeight;
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   const focusComposer = () => composer.current?.focus();
 
@@ -720,8 +730,31 @@ function Thread({
       {/* The handle, with its number in the lighter weight it wears
           everywhere else. `name` is the plain-text fallback for a person this
           device cannot resolve, and is what the failure notice below reads. */}
-      <div className="shrink-0 border-b px-3 py-2 font-medium text-sm">
-        {sole ? <UserHandle user={sole} /> : name}
+      <div className="flex shrink-0 items-center gap-1.5 border-b px-3 py-2 font-medium text-sm">
+        <span className="min-w-0 truncate">{sole ? <UserHandle user={sole} /> : name}</span>
+        {/* What the shield means opens on hover or focus, and on a tap: a
+            touch screen has no hover, and a tooltip's own trigger closes it
+            on click, so the click is taken here instead. Anywhere else closes
+            it again. */}
+        <Tooltip open={encryptionShown} onOpenChange={setEncryptionShown}>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6 shrink-0 text-muted-foreground"
+              aria-label={t("encryptedNotice")}
+              onClick={(event) => {
+                event.preventDefault();
+                setEncryptionShown(true);
+              }}
+            >
+              <ShieldCheck className="size-3.5" aria-hidden />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-64">
+            {t("encryptedNotice")}
+          </TooltipContent>
+        </Tooltip>
       </div>
       <div
         ref={log}
@@ -733,7 +766,18 @@ function Thread({
         // one you cannot reach. It is the height of that bar -- a row of
         // `size-7` buttons, its own padding and border, and the gap under it --
         // rounded up to the next step.
-        className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pt-10 pb-3"
+        //
+        // `contain-size`, so the messages never size the page. The shell's
+        // content row grows to fit whatever a page holds, and without it the
+        // log counted as every message tall: the page outgrew the screen, the
+        // shell scrolled instead of the log, the composer sat below the fold,
+        // and on a phone a drag over the thread moved nothing at all. Held to
+        // nothing, the log takes what is left of the screen and scrolls.
+        className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pt-10 pb-3 contain-size"
+        onScroll={(event) => {
+          const box = event.currentTarget;
+          atLatest.current = box.scrollHeight - box.scrollTop - box.clientHeight < 2;
+        }}
       >
         {messages.length === 0 ? (
           <>

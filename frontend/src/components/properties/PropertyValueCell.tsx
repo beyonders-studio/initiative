@@ -12,6 +12,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { fileIcon } from "@/lib/fileIcon";
 import { formatDate, formatDateTime } from "@/lib/formatDate";
 import { numberFormat } from "@/lib/intl";
+import { openExternal } from "@/lib/openExternal";
+import { sanitizeUrl } from "@/lib/safeUrl";
 import { getAvatarSrc, getInitialsForUser, getUserDisplayName } from "@/lib/userDisplay";
 import { cn } from "@/lib/utils";
 
@@ -439,13 +441,13 @@ export const PropertyValueCell = ({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            if (href) window.open(href, "_blank", "noopener,noreferrer");
+            if (href) openExternal(href);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
               e.stopPropagation();
-              if (href) window.open(href, "_blank", "noopener,noreferrer");
+              if (href) openExternal(href);
             }
           }}
         >
@@ -453,7 +455,7 @@ export const PropertyValueCell = ({
         </span>
       ) : (
         <a
-          href={href}
+          href={sanitizeUrl(href)}
           target="_blank"
           rel="noopener noreferrer"
           className={urlClassName}

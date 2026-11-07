@@ -48,6 +48,8 @@ import { Section } from "./section";
  *  a plug-in's among them by its install and key. */
 export type PluginItem = { id: number; properties?: PropertySummary[] };
 
+import { sanitizeUrl } from "@/lib/safeUrl";
+
 import type { LayoutNode } from "./tree";
 
 // What an install's pinned definition declares for items, as the SDK's
@@ -530,7 +532,7 @@ const PluginScalar = ({
         const link = value as { url: string; text?: unknown };
         return (
           <a
-            href={link.url}
+            href={sanitizeUrl(link.url)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex min-w-0 items-center gap-1 text-primary underline-offset-4 hover:underline"

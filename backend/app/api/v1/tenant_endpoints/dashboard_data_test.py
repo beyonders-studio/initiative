@@ -241,8 +241,16 @@ async def test_a_widget_that_fails_does_not_blank_the_canvas(
     canvas = await _data(client, author, dashboard_id)
 
     assert canvas["w1"]["result"]["rows"] == [[3]]
-    assert canvas["w2"] == {"result": None, "error": QueryMessages.EXECUTION_FAILED}
-    assert canvas["w3"] == {"result": None, "error": QueryMessages.SHEET_NOT_FOUND}
+    assert canvas["w2"] == {
+        "result": None,
+        "plugin": None,
+        "error": QueryMessages.EXECUTION_FAILED,
+    }
+    assert canvas["w3"] == {
+        "result": None,
+        "plugin": None,
+        "error": QueryMessages.SHEET_NOT_FOUND,
+    }
 
 
 async def test_a_guild_with_no_free_slot_refuses_the_canvas(

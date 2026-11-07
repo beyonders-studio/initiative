@@ -26,10 +26,11 @@ import { setFloatingElemPositionForLinkEditor } from "@/components/ui/editor/uti
 import {
   DEFAULT_LINK_URL,
   pasteOverDefaultLinkUrl,
-  sanitizeUrl,
   withoutDefaultScheme,
 } from "@/components/ui/editor/utils/url";
 import { Input } from "@/components/ui/input";
+import { openExternal } from "@/lib/openExternal";
+import { sanitizeUrl } from "@/lib/safeUrl";
 
 function FloatingLinkEditor({
   editor,
@@ -357,9 +358,7 @@ function useFloatingLinkEditorToolbar(
             const node = getSelectedNode(selection);
             const linkNode = $findMatchingParent(node, $isLinkNode);
             if ($isLinkNode(linkNode) && (payload.metaKey || payload.ctrlKey)) {
-              // Stored link URLs are cross-user content; sanitize before
-              // navigating so a `javascript:`/`data:` URL opens about:blank.
-              window.open(sanitizeUrl(linkNode.getURL()), "_blank");
+              openExternal(linkNode.getURL());
               return true;
             }
           }

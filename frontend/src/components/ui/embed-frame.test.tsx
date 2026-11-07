@@ -25,4 +25,9 @@ describe("EmbedFrame", () => {
     post(99999, "https://embed.example.com", frame.contentWindow);
     expect(frame.style.height).toBe("2000px");
   });
+
+  it("frames nothing on the app's own origin", () => {
+    render(<EmbedFrame src={`${window.location.origin}/page`} title="Own" />);
+    expect(screen.queryByTitle("Own")).toBeNull();
+  });
 });
