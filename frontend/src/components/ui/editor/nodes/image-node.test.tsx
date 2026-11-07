@@ -244,15 +244,17 @@ describe("an image", () => {
   });
 
   it("offers full size once it is selected while the page is written", async () => {
+    // Uncaptioned: a caption takes the focus as it mounts, which takes the
+    // selection back from a picture selected before it has.
     const { container } = renderPage(() => (
       <Editor
         showToolbar={false}
-        editorSerializedState={imageWithCaption("x") as unknown as SerializedEditorState}
+        editorSerializedState={pictures("picture") as unknown as SerializedEditorState}
       />
     ));
     const document = await waitFor(() => {
       const editable = container.querySelector<Editable>('[data-lexical-editor="true"]');
-      expect(container.querySelector('img[alt="a picture"]')).not.toBeNull();
+      expect(container.querySelector('img[alt="picture"]')).not.toBeNull();
       return editable as Editable;
     });
 
@@ -263,7 +265,7 @@ describe("an image", () => {
       $setSelection(selection);
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: /a picture/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /picture/ }));
 
     const dialog = await screen.findByRole("dialog");
     expect(dialog.querySelector('img[src="/uploads/picture.png"]')).not.toBeNull();
