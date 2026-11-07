@@ -1,7 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { AccountNotMePage } from "@/pages/AccountNotMePage";
 
 export const Route = createFileRoute("/_serverRequired/account/not-me")({
-  component: lazyRouteComponent(() =>
-    import("@/pages/AccountNotMePage").then((m) => ({ default: m.AccountNotMePage }))
-  ),
+  component: AccountNotMePage,
 });

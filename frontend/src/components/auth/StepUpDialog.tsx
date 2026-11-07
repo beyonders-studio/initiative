@@ -1,8 +1,8 @@
 import { Capacitor } from "@capacitor/core";
+import { lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AUTH_STEP_UP_EVENT, type StepUpEventDetail } from "@/api/client";
-import { ProviderMark } from "@/components/auth/ProviderMark";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,6 +15,11 @@ import {
 import { useAuthChallenge } from "@/hooks/useAuthChallenge";
 import { useCommunityLoginProviders, useLoginProviders } from "@/hooks/useCommunityAuthPolicy";
 import { providerSignInHref } from "@/lib/returnPath";
+
+// The providers' marks load when the dialog first shows one, not with every page.
+const ProviderMark = lazy(() =>
+  import("@/components/auth/ProviderMark").then((m) => ({ default: m.ProviderMark }))
+);
 
 /** The path the sign-in should return to: where the challenge happened. */
 const currentSpaPath = (): string => `${window.location.pathname}${window.location.search}`;
@@ -72,7 +77,9 @@ export const StepUpDialog = () => {
             {t("stepUp.dismiss")}
           </Button>
           <Button onClick={beginStepUp}>
-            <ProviderMark icon={provider?.icon} className="h-4 w-4" />
+            <Suspense fallback={null}>
+              <ProviderMark icon={provider?.icon} className="h-4 w-4" />
+            </Suspense>
             {t("stepUp.continue", { providerName })}
           </Button>
         </DialogFooter>

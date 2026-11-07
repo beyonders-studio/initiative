@@ -85,7 +85,7 @@ function CommunityLoading({ communityId }: { communityId: number }) {
   return atHome ? <CommunityHomeSkeleton /> : <PageSkeleton />;
 }
 
-export function CommunityLayout() {
+function CommunityLayout() {
   const { t } = useTranslation("communities");
   const params = useParams({ from: "/_serverRequired/_authenticated/c/$communityId" });
   const communityId = Number(params.communityId);

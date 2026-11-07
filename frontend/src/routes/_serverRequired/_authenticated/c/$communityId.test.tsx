@@ -1,11 +1,19 @@
 import { screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { buildCommunity, communityCan } from "@/__tests__/factories";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { CommunityEntry } from "@/hooks/useCommunities";
 
-import { CommunityLayout } from "./$communityId";
+import { Route } from "./$communityId";
+
+// The route's own component, loaded the way the route loads it.
+const CommunityLayout = Route.options.component as React.ComponentType & {
+  preload?: () => Promise<unknown>;
+};
+beforeAll(async () => {
+  await CommunityLayout.preload?.();
+});
 
 // The layout is mounted directly rather than through the shipped tree: what is
 // under test is what it renders for a given community state, and reaching it in the

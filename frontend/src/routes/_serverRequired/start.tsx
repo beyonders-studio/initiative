@@ -1,4 +1,6 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { StartPage } from "@/pages/StartPage";
 
 export interface StartSearch {
   invite_code?: string;
@@ -11,7 +13,5 @@ export const validateStartSearch = (search: Record<string, unknown>): StartSearc
 
 export const Route = createFileRoute("/_serverRequired/start")({
   validateSearch: validateStartSearch,
-  component: lazyRouteComponent(() =>
-    import("@/pages/StartPage").then((m) => ({ default: m.StartPage }))
-  ),
+  component: StartPage,
 });

@@ -1,7 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
 
 export const Route = createFileRoute("/_serverRequired/forgot-password")({
-  component: lazyRouteComponent(() =>
-    import("@/pages/ForgotPasswordPage").then((m) => ({ default: m.ForgotPasswordPage }))
-  ),
+  component: ForgotPasswordPage,
 });

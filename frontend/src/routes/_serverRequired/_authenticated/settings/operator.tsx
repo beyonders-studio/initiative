@@ -1,7 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { OperatorDashboardLayout } from "@/pages/OperatorDashboardLayout";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/settings/operator")({
-  component: lazyRouteComponent(() =>
-    import("@/pages/OperatorDashboardLayout").then((m) => ({ default: m.OperatorDashboardLayout }))
-  ),
+  component: OperatorDashboardLayout,
 });

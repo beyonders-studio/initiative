@@ -1,6 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 import { getReadCollectionQueryKey, readCollection } from "@/api/generated/files/files";
+import { CollectionPage } from "@/pages/initiativeTools/files/CollectionPage";
 
 /**
  * A collection: in the initiative's Files, beside the files rather than inside
@@ -22,9 +23,5 @@ export const Route = createFileRoute(
       })
       .catch(() => {});
   },
-  component: lazyRouteComponent(() =>
-    import("@/pages/initiativeTools/files/CollectionPage").then((m) => ({
-      default: m.CollectionPage,
-    }))
-  ),
+  component: CollectionPage,
 });
