@@ -19,7 +19,7 @@ import { renderPage } from "@/__tests__/helpers/render";
 const mocks = vi.hoisted(() => ({
   register: vi.fn(),
   login: vi.fn(),
-  applyPasskeySignIn: vi.fn(),
+  applySignIn: vi.fn(),
   signUpWithPasskey: vi.fn(),
   passkeysRunHere: vi.fn(() => true),
   /** Read on every render, so a test can say what the deployment offers. */
@@ -35,7 +35,7 @@ vi.mock("@/hooks/useAuth", async (importOriginal) => ({
   useAuth: () => ({
     register: mocks.register,
     login: mocks.login,
-    applyPasskeySignIn: mocks.applyPasskeySignIn,
+    applySignIn: mocks.applySignIn,
   }),
 }));
 
@@ -58,7 +58,7 @@ beforeEach(() => {
   mocks.config = { captcha: null, passwordLoginEnabled: true, passkeyLoginEnabled: true };
   mocks.passkeysRunHere.mockReturnValue(true);
   mocks.signUpWithPasskey.mockReset();
-  mocks.applyPasskeySignIn.mockReset();
+  mocks.applySignIn.mockReset();
   mocks.register.mockReset();
 });
 
@@ -98,6 +98,7 @@ it("shows the recovery codes a key registration comes back with", async () => {
   const user = userEvent.setup();
   mocks.signUpWithPasskey.mockResolvedValue({
     access_token: "a-session",
+    refresh_token: "kept-by-the-app",
     codes: ["aaaa-1111", "bbbb-2222"],
   });
   renderPage(RegisterPage, { initialRoute: "/login" });
@@ -111,7 +112,9 @@ it("shows the recovery codes a key registration comes back with", async () => {
   );
   // Signed in by the ceremony that made it, and the codes on screen: they are
   // shown once, and they are the account's only way back to a password.
-  expect(mocks.applyPasskeySignIn).toHaveBeenCalledWith({ access_token: "a-session" });
+  expect(mocks.applySignIn).toHaveBeenCalledWith(
+    expect.objectContaining({ access_token: "a-session", refresh_token: "kept-by-the-app" })
+  );
   expect(await screen.findByText("aaaa-1111")).toBeInTheDocument();
   expect(screen.getByText("bbbb-2222")).toBeInTheDocument();
 });
