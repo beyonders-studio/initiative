@@ -12,6 +12,7 @@ import type { NotificationListResponse, UserRead } from "@/api/generated/initiat
 import { getListNotificationsQueryKey } from "@/api/generated/notifications/notifications";
 import { q } from "@/api/query-keys";
 import { AuthContext } from "@/hooks/useAuth";
+import { CommunityContext } from "@/hooks/useCommunities";
 import { setAlertHandler } from "@/lib/desktopAlerts";
 import { queryClient } from "@/lib/queryClient";
 
@@ -377,9 +378,14 @@ describe("useNotificationStream", () => {
         loading: false,
         refreshUser: vi.fn(),
       }) as unknown as React.ComponentProps<typeof AuthContext.Provider>["value"];
+    const communities = { refreshCommunities: vi.fn() } as unknown as React.ComponentProps<
+      typeof CommunityContext.Provider
+    >["value"];
     const tree = (user: UserRead) => (
       <AuthContext.Provider value={authValue(user)}>
-        <Probe />
+        <CommunityContext.Provider value={communities}>
+          <Probe />
+        </CommunityContext.Provider>
       </AuthContext.Provider>
     );
 
