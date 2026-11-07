@@ -22,7 +22,9 @@
  *
  * That is also where a plug-in's update cadence lives. An install takes new
  * versions on its own unless a community admin turns that off here, after which the
- * Update button beside it is how they land.
+ * Update button beside it is how they land. A version that asks for more access
+ * waits for the seat: its row says so, and its settings open on the question.
+ * The notice about it links here with `?plugin=`, which opens that row.
  *
  * Whoever runs the server can take plug-ins over for a community. The installed
  * ones keep running and stay listed, members still answer for themselves and the
@@ -30,9 +32,17 @@
  * one.
  */
 
-import { Link } from "@tanstack/react-router";
-import { Blocks, ChevronDown, Loader2, ShieldCheck, Store, TriangleAlert } from "lucide-react";
-import { useState } from "react";
+import { Link, useSearch } from "@tanstack/react-router";
+import {
+  ArrowUpCircle,
+  Blocks,
+  ChevronDown,
+  Loader2,
+  ShieldCheck,
+  Store,
+  TriangleAlert,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ListingKind } from "@/api/generated/initiativeAPI.schemas";
@@ -41,7 +51,7 @@ import { PluginMembersPanel } from "@/components/plugins/PluginMembersPanel";
 import { PluginPlacementPanel } from "@/components/plugins/PluginPlacementPanel";
 import { PluginScopesPanel } from "@/components/plugins/PluginScopesPanel";
 import { PluginSettingsPanel } from "@/components/plugins/PluginSettingsPanel";
-import { PluginUpdatesPanel } from "@/components/plugins/PluginUpdatesPanel";
+import { PluginPendingUpdate, PluginUpdatesPanel } from "@/components/plugins/PluginUpdatesPanel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,6 +90,7 @@ export function SettingsCommunityPluginsPage() {
   // Erasing a plug-in's data with it is for the community's own admins.
   const administers = Boolean(activeCommunity?.can.administer_content);
   const closed = Boolean(activeCommunity?.closed_surfaces?.includes("plugins"));
+  const { plugin: openId } = useSearch({ strict: false }) as { plugin?: number };
 
   const plugins = pluginsQuery.data?.items ?? [];
 
@@ -105,6 +116,7 @@ export function SettingsCommunityPluginsPage() {
               canManage={Boolean(holdsTheSeat)}
               canErase={holdsTheSeat && administers}
               closed={closed}
+              initiallyOpen={plugin.id === openId}
             />
           ))
         ) : (
@@ -144,6 +156,8 @@ export interface PluginListItem {
   mandatory?: boolean;
   /** False when the plug-in's service is not set up on this server. */
   available?: boolean;
+  /** A version asking for more access, waiting for the seat's answer. */
+  pending_version?: string | null;
 }
 
 function PluginRow({
@@ -151,18 +165,25 @@ function PluginRow({
   canManage,
   canErase,
   closed,
+  initiallyOpen,
 }: {
   plugin: PluginListItem;
   canManage: boolean;
   canErase: boolean;
   /** Plug-ins are managed by whoever runs the server, not here. */
   closed: boolean;
+  /** Opened and scrolled to on arrival: the row a link named. */
+  initiallyOpen: boolean;
 }) {
   const { t, i18n } = useTranslation(["plugins", "common"]);
   const [name, setName] = useState(plugin.name);
   const [confirming, setConfirming] = useState(false);
   const [erase, setErase] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
+  const row = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (initiallyOpen) row.current?.scrollIntoView?.({ block: "start" });
+  }, [initiallyOpen]);
   const update = useUpdateCommunityPlugin(plugin.id);
   const uninstall = useUninstallCommunityPlugin();
   const canChange = canManage && !closed;
@@ -191,7 +212,7 @@ function PluginRow({
   };
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="rounded-lg border">
+    <Collapsible ref={row} open={open} onOpenChange={setOpen} className="rounded-lg border">
       <div className="flex flex-wrap items-center gap-3 p-3">
         <Blocks className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
         <div className="min-w-0 flex-1 space-y-1">
@@ -213,8 +234,15 @@ function PluginRow({
           </p>
         </div>
 
-        {/* Unfinished configuration is the one thing worth surfacing on the
-            collapsed row: it is why a plug-in looks installed and does nothing. */}
+        {/* What the collapsed row surfaces: a version waiting for the seat's
+            answer, and unfinished configuration, which is why a plug-in looks
+            installed and does nothing. */}
+        {canChange && plugin.pending_version && (
+          <Badge className="gap-1">
+            <ArrowUpCircle className="h-3 w-3" aria-hidden />
+            {t("plugins:manage.updateWaiting")}
+          </Badge>
+        )}
         {plugin.needs_config && (
           <Badge variant="outline" className="gap-1">
             <TriangleAlert className="h-3 w-3" aria-hidden />
@@ -346,9 +374,9 @@ function RemovalNotice({ pluginId, locale }: { pluginId: number; locale: string 
 }
 
 /**
- * The plug-in's connections, and — for the seat — its settings, where it appears
- * and who opens it there, what it can reach, who has connected to it and how it
- * takes new versions.
+ * The plug-in's connections, and — for the seat — a version waiting for its
+ * answer first, then its settings, where it appears and who opens it there,
+ * what it can reach, who has connected to it and how it takes new versions.
  */
 function PluginDetailPanels({
   pluginId,
@@ -365,8 +393,18 @@ function PluginDetailPanels({
   if (detail.isLoading) return <Skeleton className="m-3 h-24" />;
   if (!detail.data) return null;
 
+  const asks = detail.data.pending_update;
+
   return (
     <div className="space-y-6 border-t p-4">
+      {canManage && !closed && asks && (
+        <PluginPendingUpdate
+          pluginId={pluginId}
+          asks={asks}
+          pluginNames={detail.data.plugin_names}
+        />
+      )}
+
       <PluginConnectionsPanel
         pluginId={pluginId}
         connections={detail.data.connections}

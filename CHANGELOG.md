@@ -14,9 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **The desktop app on Windows and Linux hides its menu bar.** The File, Edit, View and Window row no longer takes space under the title bar; press Alt to show it. Zoom, reload and full screen keep their shortcuts.
-- 
+
 ### Fixed
 
+- **A plug-in update that asks for more access can be answered.** Its row in **Settings › Integrations** shows **Update waiting**, the notice opens that row, and what the version asks for comes first. A newer version this server can't run says why instead of **Up to date**, and nobody is asked while whoever runs the server manages your plug-ins.
 - **Posts from X and Reddit show where you put them.** A post in a document or on a whiteboard draws in a frame from its own site, on the web and in the apps, and a link file to one shows the post.
 
 ## [0.78.0] - 2026-11-06

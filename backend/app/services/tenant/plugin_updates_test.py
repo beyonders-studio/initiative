@@ -15,17 +15,22 @@ from datetime import datetime
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.messages import MarketplaceMessages
+from app.core.rules import SURFACE_PLUGINS, SetBy
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification, NotificationType
 from app.models.tenant.plugin_schedule_run import PluginScheduleRun
 from app.models.tenant.guild_plugin import GuildPlugin
+from app.services.platform import rules
 from app.services.tenant import plugin_updates
 from app.services.tenant.plugin_updates import (
     AskedUpdate,
+    RefusedUpdate,
+    UpdateOffer,
     _update_guild,
     decline_version,
     notify_pending_updates,
-    update_version,
+    update_offer,
 )
 from app.testing import (
     create_plugin_service_registration,
@@ -223,7 +228,7 @@ class TestTheSweep:
                 await admin.commit()
 
         saved = None
-        real_resolve = plugin_updates._resolve_pending
+        real_resolve = plugin_updates.update_offer
 
         async def resolve_while_the_admin_writes(inner_session, install):
             nonlocal saved
@@ -235,7 +240,7 @@ class TestTheSweep:
             return await real_resolve(inner_session, install)
 
         monkeypatch.setattr(
-            plugin_updates, "_resolve_pending", resolve_while_the_admin_writes
+            plugin_updates, "update_offer", resolve_while_the_admin_writes
         )
 
         await route_session_to_guild(session, guild_id)
@@ -356,7 +361,7 @@ class TestTheSweep:
         assert (await _reread(session, guild.id, plugin.id)).listing_version == "1.0.0"
 
 
-class TestUpdateVersion:
+class TestUpdateOffer:
     """What the settings page is told there is to move to."""
 
     async def test_it_names_the_version_an_update_would_apply(
@@ -368,7 +373,30 @@ class TestUpdateVersion:
         await _publish(session, uid, "1.2.0", definition=_definition("Cal v2"))
 
         await route_session_to_guild(session, guild.id)
-        assert await update_version(session, plugin) == "1.2.0"
+        offer = await update_offer(session, plugin)
+        assert isinstance(offer, UpdateOffer) and offer.version == "1.2.0"
+
+    async def test_a_newer_version_this_server_cannot_run_is_named_with_why(
+        self, session: AsyncSession
+    ):
+        uid = marketplace_uid("autorefused")
+        await _publish(session, uid, "1.0.0")
+        guild, plugin = await _installed(session, uid)
+        await _publish(
+            session,
+            uid,
+            "1.2.0",
+            definition=_definition("Cal v2"),
+            min_plugin_api="99.0",
+        )
+
+        await route_session_to_guild(session, guild.id)
+        assert await update_offer(session, plugin) == RefusedUpdate(
+            version="1.2.0", reason=MarketplaceMessages.LISTING_PLUGIN_API_INCOMPATIBLE
+        )
+        # Pinned at that version already, there is nothing newer to name.
+        plugin.listing_version = "1.2.0"
+        assert await update_offer(session, plugin) is None
 
     async def test_an_install_on_the_newest_is_offered_nothing(
         self, session: AsyncSession
@@ -378,7 +406,7 @@ class TestUpdateVersion:
         guild, plugin = await _installed(session, uid)
 
         await route_session_to_guild(session, guild.id)
-        assert await update_version(session, plugin) is None
+        assert await update_offer(session, plugin) is None
 
     async def test_a_service_the_deployment_stopped_running_still_updates(
         self, session: AsyncSession
@@ -400,7 +428,8 @@ class TestUpdateVersion:
         )
 
         await route_session_to_guild(session, guild.id)
-        assert await update_version(session, plugin) == "1.3.0"
+        offer = await update_offer(session, plugin)
+        assert isinstance(offer, UpdateOffer) and offer.version == "1.3.0"
 
 
 # --- versions that ask for more ----------------------------------------------
@@ -554,6 +583,9 @@ class TestVersionsThatAskForMore:
         assert [notice.data["version"] for notice in notices] == ["1.1.0"]
         assert notices[0].guild_id == guild.id
         assert notices[0].data["plugin_id"] == plugin.id
+        assert notices[0].data["target_path"] == (
+            f"/settings/integrations?plugin={plugin.id}"
+        )
 
         # Already waiting: the next pass neither applies it nor asks again.
         moved, asked = await _sweep(session, guild.id)
@@ -624,10 +656,8 @@ class TestVersionsThatAskForMore:
 
         assert moved == 0
         assert [one.version for one in asked] == ["1.1.0"]
-        offer = await plugin_updates.update_offer(
-            session, await _reread(session, guild.id, plugin.id)
-        )
-        assert offer is not None
+        offer = await update_offer(session, await _reread(session, guild.id, plugin.id))
+        assert isinstance(offer, UpdateOffer)
         assert offer.asks.added_scopes == ()
         assert [surface["id"] for surface in offer.asks.added_surfaces] == ["planner"]
 
@@ -658,6 +688,37 @@ class TestVersionsThatAskForMore:
         assert [one.version for one in asked] == ["1.2.0"]
         assert (await _reread(session, guild.id, plugin.id)).pending_version == "1.2.0"
 
+    async def test_a_version_waits_only_while_the_seat_can_take_it(
+        self, session: AsyncSession
+    ):
+        """Not while the deployment manages the community's plug-ins, and not
+        once the catalog has moved on to a version this server cannot run."""
+        uid = marketplace_uid("asksstale")
+        _, guild, plugin = await _asking_install(session, uid)
+        wider = _asking_definition(scopes=("projects:read", "projects:write"))
+        await _publish(session, uid, "1.1.0", definition=wider)
+        await _sweep(session, guild.id)
+        assert (await _reread(session, guild.id, plugin.id)).pending_version == "1.1.0"
+
+        await rules.put(
+            session, SURFACE_PLUGINS, False, guild_id=guild.id, set_by=SetBy.deployment
+        )
+        await session.commit()
+        assert await _sweep(session, guild.id) == (0, [])
+        assert (await _reread(session, guild.id, plugin.id)).pending_version is None
+
+        # Handed back to the seat, it is asked again.
+        await rules.put(
+            session, SURFACE_PLUGINS, True, guild_id=guild.id, set_by=SetBy.deployment
+        )
+        await session.commit()
+        _, asked = await _sweep(session, guild.id)
+        assert [one.version for one in asked] == ["1.1.0"]
+
+        await _publish(session, uid, "1.2.0", definition=wider, min_plugin_api="99.0")
+        assert await _sweep(session, guild.id) == (0, [])
+        assert (await _reread(session, guild.id, plugin.id)).pending_version is None
+
     async def test_accepting_applies_and_grants(self, session: AsyncSession):
         uid = marketplace_uid("asksaccept")
         _, guild, plugin = await _asking_install(session, uid)
@@ -670,8 +731,8 @@ class TestVersionsThatAskForMore:
         await _sweep(session, guild.id)
 
         waiting = await _reread(session, guild.id, plugin.id)
-        offer = await plugin_updates.update_offer(session, waiting)
-        assert offer is not None
+        offer = await update_offer(session, waiting)
+        assert isinstance(offer, UpdateOffer)
         await plugin_updates.apply_version(
             session,
             waiting,

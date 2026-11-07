@@ -19,6 +19,7 @@ import { SettingsCommunityPluginsPage } from "./SettingsCommunityPluginsPage";
 
 let notice: CommunityPluginUninstallNotice | undefined;
 let closedSurfaces: string[] | null = null;
+let pendingVersion: string | null = null;
 const openAddress = vi.fn();
 const uninstall = vi.hoisted(() => vi.fn());
 
@@ -46,16 +47,29 @@ vi.mock("@/hooks/useCommunityPlugins", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/hooks/useCommunityPlugins")>()),
   useCommunityPlugins: () => ({
     data: {
-      items: [{ id: 4, name: "PaidCo", enabled: true, created_at: "2026-10-01T00:00:00Z" }],
+      items: [
+        {
+          id: 4,
+          name: "PaidCo",
+          enabled: true,
+          created_at: "2026-10-01T00:00:00Z",
+          pending_version: pendingVersion,
+        },
+      ],
     },
     isLoading: false,
   }),
   useUninstallNotice: () => ({ data: notice }),
 }));
+vi.mock("@/hooks/useCommunityPluginDetail", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/useCommunityPluginDetail")>()),
+  useCommunityPluginDetail: () => ({ isLoading: true }),
+}));
 
 beforeEach(() => {
   notice = undefined;
   closedSurfaces = null;
+  pendingVersion = null;
   openAddress.mockReset();
   uninstall.mockReset();
   uninstall.mockResolvedValue(undefined);
@@ -119,6 +133,7 @@ describe("erasing its data", () => {
 describe("when whoever runs the server manages plug-ins", () => {
   it("lists what is installed, says so, and offers nothing to change", async () => {
     closedSurfaces = ["plugins"];
+    pendingVersion = "1.1.0";
     renderPage(SettingsCommunityPluginsPage);
 
     expect(
@@ -128,5 +143,19 @@ describe("when whoever runs the server manages plug-ins", () => {
     expect(screen.queryByRole("textbox", { name: "Rename" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Turn off" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+    expect(screen.queryByText("Update waiting")).toBeNull();
+  });
+});
+
+describe("a version waiting for the seat", () => {
+  it("marks its row, and the notice's link opens that row", async () => {
+    pendingVersion = "1.1.0";
+    renderPage(SettingsCommunityPluginsPage, { routerSearch: { plugin: 4 } });
+
+    expect(await screen.findByText("Update waiting")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open settings" })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
   });
 });

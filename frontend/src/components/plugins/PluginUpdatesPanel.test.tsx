@@ -7,16 +7,20 @@
  * *off* — a panel that sent `auto_update: true` there would silently confirm
  * the state it was meant to leave. And the Update button is drawn from the
  * server's `update_version` rather than from a comparison invented here, so an
- * install on the newest version must not offer one.
+ * install on the newest version must not offer one, and one whose newer version
+ * cannot run here says so rather than "Up to date".
  */
 
 import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderPage } from "@/__tests__/helpers/render";
-import type { CommunityPluginDetail } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  CommunityPluginDetail,
+  CommunityPluginUpgradeAsks,
+} from "@/api/generated/initiativeAPI.schemas";
 
-import { PluginUpdatesPanel } from "./PluginUpdatesPanel";
+import { PluginPendingUpdate, PluginUpdatesPanel } from "./PluginUpdatesPanel";
 
 const patched: unknown[] = [];
 const upgraded = vi.fn();
@@ -43,6 +47,14 @@ const plugin = (overrides: Partial<CommunityPluginDetail>) =>
     auto_update: true,
     ...overrides,
   }) as unknown as CommunityPluginDetail;
+
+const asks = (overrides: Partial<CommunityPluginUpgradeAsks>): CommunityPluginUpgradeAsks => ({
+  version: "1.2.0",
+  added_scopes: ["files:read"],
+  added_surfaces: [],
+  declined: false,
+  ...overrides,
+});
 
 beforeEach(() => {
   patched.length = 0;
@@ -86,19 +98,35 @@ describe("PluginUpdatesPanel", () => {
     expect(screen.queryByRole("button", { name: /Update to/ })).not.toBeInTheDocument();
   });
 
-  it("says what a version asking for more wants, and accepts it with its scopes", async () => {
+  it("names a newer version this server cannot run, and why", async () => {
     renderPage(() => (
       <PluginUpdatesPanel
         plugin={plugin({
-          update_version: "1.2.0",
-          pending_update: {
-            version: "1.2.0",
-            added_scopes: ["files:write"],
-            added_surfaces: [{ id: "planner", name: { en: "Planner" } }],
-            declined: false,
+          update_version: null,
+          update_refused: {
+            version: "1.3.0",
+            reason: "MARKETPLACE_LISTING_PLUGIN_API_INCOMPATIBLE",
           },
         })}
       />
+    ));
+
+    expect(await screen.findByText(/Version 1\.3\.0 can't run on this server\./)).toHaveTextContent(
+      "built for a plug-in API this server doesn't provide"
+    );
+    expect(screen.queryByText("Up to date")).not.toBeInTheDocument();
+  });
+
+  it("says what a version asking for more wants, and accepts it with its scopes", async () => {
+    const wanted = asks({
+      added_scopes: ["files:write"],
+      added_surfaces: [{ id: "planner", name: { en: "Planner" } }],
+    });
+    renderPage(() => (
+      <>
+        <PluginUpdatesPanel plugin={plugin({ update_version: "1.2.0", pending_update: wanted })} />
+        <PluginPendingUpdate pluginId={7} asks={wanted} />
+      </>
     ));
 
     expect(await screen.findByText("Version 1.2.0 wants to:")).toBeInTheDocument();
@@ -116,17 +144,10 @@ describe("PluginUpdatesPanel", () => {
 
   it("says a version asking to use another plug-in names that plug-in", async () => {
     renderPage(() => (
-      <PluginUpdatesPanel
-        plugin={plugin({
-          update_version: "1.3.0",
-          plugin_names: { "acme.github": "GitHub" },
-          pending_update: {
-            version: "1.3.0",
-            added_scopes: ["plugins:acme.github"],
-            added_surfaces: [],
-            declined: false,
-          },
-        })}
+      <PluginPendingUpdate
+        pluginId={7}
+        asks={asks({ version: "1.3.0", added_scopes: ["plugins:acme.github"] })}
+        pluginNames={{ "acme.github": "GitHub" }}
       />
     ));
 
@@ -134,38 +155,14 @@ describe("PluginUpdatesPanel", () => {
   });
 
   it("declines the version it was shown", async () => {
-    renderPage(() => (
-      <PluginUpdatesPanel
-        plugin={plugin({
-          update_version: "1.2.0",
-          pending_update: {
-            version: "1.2.0",
-            added_scopes: ["files:read"],
-            added_surfaces: [],
-            declined: false,
-          },
-        })}
-      />
-    ));
+    renderPage(() => <PluginPendingUpdate pluginId={7} asks={asks({})} />);
 
     (await screen.findByRole("button", { name: "Decline" })).click();
     expect(declined).toHaveBeenCalledWith("1.2.0", expect.anything());
   });
 
   it("says a declined version was declined, and offers only to accept it", async () => {
-    renderPage(() => (
-      <PluginUpdatesPanel
-        plugin={plugin({
-          update_version: "1.2.0",
-          pending_update: {
-            version: "1.2.0",
-            added_scopes: ["files:read"],
-            added_surfaces: [],
-            declined: true,
-          },
-        })}
-      />
-    ));
+    renderPage(() => <PluginPendingUpdate pluginId={7} asks={asks({ declined: true })} />);
 
     expect(
       await screen.findByText(
