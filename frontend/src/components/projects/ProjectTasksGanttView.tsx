@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { GroupingState } from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronRight } from "lucide-react";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -446,22 +447,18 @@ export const ProjectTasksGanttView = ({
     });
 
   // Which rows are in view, from where the chart is scrolled to: only those,
-  // and the one in the tab order, are drawn.
-  const [view, setView] = useState({ top: 0, height: 0 });
-  const measure = useCallback(() => {
-    const element = scroller.current;
-    if (element) setView({ top: element.scrollTop, height: element.clientHeight });
-  }, []);
-  useLayoutEffect(() => {
-    measure();
-    const element = scroller.current;
-    if (!element || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [measure]);
-  const first = Math.max(0, Math.floor((view.top - HEADER_HEIGHT) / ROW_HEIGHT) - OVERSCAN);
-  const last = Math.min(rows.length, Math.ceil((view.top + view.height) / ROW_HEIGHT) + OVERSCAN);
+  // and the one in the tab order, are drawn. The axis sits above them in the
+  // same scroller, so the rows start that far down it.
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scroller.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: OVERSCAN,
+    scrollMargin: HEADER_HEIGHT,
+  });
+  const inView = virtualizer.getVirtualItems();
+  const first = inView[0]?.index ?? 0;
+  const last = (inView.at(-1)?.index ?? -1) + 1;
 
   // One row is in the tab order, and the arrow keys move it.
   const body = useRef<HTMLDivElement>(null);
@@ -726,7 +723,6 @@ export const ProjectTasksGanttView = ({
 
       <div
         ref={scroller}
-        onScroll={measure}
         className="scrollbar-thin max-h-[75vh] overflow-auto rounded-md border text-sm"
         data-testid="gantt"
       >

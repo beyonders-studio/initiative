@@ -23,6 +23,7 @@ import { toast } from "@/lib/mascotToast";
 import { routeTree } from "@/routeTree.gen";
 
 import { buildRouterContext, renderPage } from "./helpers/render";
+import { sizeScroller } from "./helpers/sizeScroller";
 
 const MESSAGES_ROUTE_ID = "/_serverRequired/_authenticated/messages";
 
@@ -150,6 +151,8 @@ beforeAll(() => {
 afterAll(() => {
   if (noWorker) Reflect.deleteProperty(globalThis, "Worker");
 });
+// The thread's log, a phone's height.
+sizeScroller((element) => element.classList.contains("overscroll-contain"), 800);
 
 const grant = (userId: number, username: string) => ({
   user_id: userId,
@@ -422,10 +425,11 @@ describe("My Messages", () => {
     const quote = screen.getByRole("button", { name: /are you coming monday/ });
     expect(quote).toHaveTextContent("alex#1234");
 
-    // Its own scrollTop, never `scrollIntoView`: that would scroll every box
-    // the message sits in, including ones with no way back.
+    // The log alone, never `scrollIntoView`: that would scroll every box the
+    // message sits in, including ones with no way back.
     const log = document.querySelector("[class*='overscroll-contain']") as HTMLElement;
-    const scrolled = vi.spyOn(log, "scrollTop", "set");
+    const scrolled = vi.fn();
+    log.scrollTo = scrolled;
     await userEvent.click(quote);
 
     expect(scrolled).toHaveBeenCalled();
