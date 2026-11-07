@@ -31,6 +31,7 @@ import type * as Y from "yjs";
 import { useTheme } from "@/hooks/useTheme";
 import { useWhiteboardCursors } from "@/hooks/useWhiteboardCursors";
 import { cn } from "@/lib/utils";
+import { renderEmbeddable, validateEmbeddable } from "@/lib/whiteboardEmbeds";
 
 export interface WhiteboardScene {
   elements: readonly ExcalidrawElement[];
@@ -469,6 +470,8 @@ export function WhiteboardFileEditor({
         viewModeEnabled={readOnly}
         isCollaborating={collaborative}
         theme={resolvedTheme}
+        validateEmbeddable={validateEmbeddable}
+        renderEmbeddable={renderEmbeddable}
       />
     </div>
   );

@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import { defineConfig, loadEnv } from "vite";
 
+import { contentPolicy } from "./electron/content-policy";
 import { buildNotices } from "./scripts/third-party-notices.mjs";
 
 // Load VITE_* vars from .env files (checks backend/.env and frontend/)
@@ -236,6 +237,18 @@ export default defineConfig({
     emojibasePlugin(),
     pdfjsPlugin(),
     thirdPartyNoticesPlugin(),
+    // The device apps load index.html from the bundle, so it carries their
+    // content policy, ahead of everything the page loads.
+    isCapacitorBuild && {
+      name: "device-content-policy",
+      transformIndexHtml: () => [
+        {
+          tag: "meta",
+          attrs: { "http-equiv": "Content-Security-Policy", content: contentPolicy },
+          injectTo: "head-prepend" as const,
+        },
+      ],
+    },
   ],
   resolve: {
     alias: [
