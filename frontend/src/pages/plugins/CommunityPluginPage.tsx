@@ -153,14 +153,17 @@ export function CommunityPluginPage({ pluginId, initiativeId }: CommunityPluginP
     };
   }, [activeId, held, termFull, mint, t]);
 
+  // A plug-in's page has an origin of its own: one shared with the app or the
+  // server is not framed.
   const origin = useMemo(() => {
     if (!handoff?.page_url) return null;
     try {
-      return new URL(handoff.page_url).origin;
+      const page = new URL(handoff.page_url).origin;
+      return page === window.location.origin || page === getServerOrigin() ? null : page;
     } catch {
       return null;
     }
-  }, [handoff?.page_url]);
+  }, [handoff?.page_url, getServerOrigin]);
 
   const allowed = useMemo(
     () => new Set(handoff?.allowed_origins ?? []),
@@ -351,6 +354,7 @@ export function CommunityPluginPage({ pluginId, initiativeId }: CommunityPluginP
       <PluginProviderNotice name={plugin.name} listing={plugin.listing} onContinue={acknowledge} />
     );
   if (error) return <Notice title={t("plugins:page.failed")} description={error} />;
+  if (handoff?.page_url && !origin) return <Notice title={t("plugins:page.failed")} />;
 
   return (
     <div className="flex h-full flex-col">
@@ -381,7 +385,7 @@ export function CommunityPluginPage({ pluginId, initiativeId }: CommunityPluginP
           )}
         </div>
       )}
-      {handoff?.page_url ? (
+      {handoff && origin ? (
         <iframe
           // Keyed by surface so switching tabs mounts a fresh frame rather
           // than reusing one that already spent its token.

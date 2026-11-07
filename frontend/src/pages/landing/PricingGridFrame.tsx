@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { portalPricingUrl, pricingEmbedUrl } from "@/hooks/useBillingCatalog";
+import { useFrameMessages } from "@/hooks/useFrameMessages";
 import { useTheme } from "@/hooks/useTheme";
 import { docsUrl } from "@/lib/links";
 
@@ -73,37 +74,30 @@ export const PricingGridFrame = ({
   const theme = resolvedTheme === "dark" ? "dark" : "light";
   const portalOrigin = originOf(portalUrl);
 
-  useEffect(() => {
-    const onMessage = (event: MessageEvent) => {
-      if (!portalOrigin || event.origin !== portalOrigin) return;
-      if (event.source !== frame.current?.contentWindow) return;
-      const data: unknown = event.data;
-      if (typeof data !== "object" || data === null) return;
-      const message = data as { type?: unknown; height?: unknown; kind?: unknown };
-      if (message.type === EMBED_HEIGHT && typeof message.height === "number") {
-        if (Number.isFinite(message.height) && message.height > 0) {
-          setHeight(Math.min(Math.ceil(message.height), MAX_HEIGHT));
-          setArrived(true);
-        }
-        return;
+  useFrameMessages(frame, portalOrigin, (data) => {
+    if (typeof data !== "object" || data === null) return;
+    const message = data as { type?: unknown; height?: unknown; kind?: unknown };
+    if (message.type === EMBED_HEIGHT && typeof message.height === "number") {
+      if (Number.isFinite(message.height) && message.height > 0) {
+        setHeight(Math.min(Math.ceil(message.height), MAX_HEIGHT));
+        setArrived(true);
       }
-      if (message.type !== EMBED_CTA) return;
-      switch (message.kind) {
-        case "signup":
-          void navigate({ to: registrationOpen ? "/start" : "/login" });
-          break;
-        case "external":
-          openOut(SELF_HOST_GUIDE);
-          break;
-        case "checkout":
-        case "contact":
-          openOut(portalPricingUrl(portalUrl));
-          break;
-      }
-    };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [navigate, portalOrigin, portalUrl, registrationOpen]);
+      return;
+    }
+    if (message.type !== EMBED_CTA) return;
+    switch (message.kind) {
+      case "signup":
+        void navigate({ to: registrationOpen ? "/start" : "/login" });
+        break;
+      case "external":
+        openOut(SELF_HOST_GUIDE);
+        break;
+      case "checkout":
+      case "contact":
+        openOut(portalPricingUrl(portalUrl));
+        break;
+    }
+  });
 
   useEffect(() => {
     if (arrived) return;

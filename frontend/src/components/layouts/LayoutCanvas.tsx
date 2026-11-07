@@ -58,9 +58,6 @@ const MAX_WIDTH: Record<PreviewWidth, string | undefined> = {
 const noop = () => {};
 const NO_COLLAPSED = new Set<number>();
 
-/** An attribute selector's quoted value. */
-const quoted = (value: string) => `"${value.replace(/["\\]/g, "\\$&")}"`;
-
 /** The part an element is in: the nearest marked one. A table marks its
  *  columns by field, and a tree its parts by path. */
 const partAt = (target: EventTarget): Selection | null => {
@@ -75,7 +72,7 @@ const partAt = (target: EventTarget): Selection | null => {
 const rule = (of: Selection | null) => {
   if (!of || of.kind === "layout") return null;
   const value = of.kind === "column" ? `column:${of.field}` : pathKey(of.path);
-  return `[data-layout-node=${quoted(value)}] > *`;
+  return `[data-layout-node="${CSS.escape(value)}"] > *`;
 };
 
 /** Nothing on the canvas is used: a key, a paste or a drop goes nowhere. */
@@ -303,7 +300,7 @@ export const CanvasFrame = ({
     const element =
       held?.isConnected && held.getAttribute("data-layout-node") === key
         ? held
-        : content.current?.querySelector(`[data-layout-node=${quoted(key)}]`);
+        : content.current?.querySelector(`[data-layout-node="${CSS.escape(key)}"]`);
     return element ? boxOf(element, frame.current) : null;
   };
   // Every draw, with no list: what is drawn may have moved.

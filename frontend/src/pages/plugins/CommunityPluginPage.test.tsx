@@ -219,6 +219,17 @@ describe("CommunityPluginPage", () => {
     expect(handoffSent()?.sells).toBe(true);
   });
 
+  it("frames no page served from the app's own origin", async () => {
+    mint.mockImplementation((surfaceId: string) =>
+      Promise.resolve({ ...handoff(surfaceId), page_url: `${window.location.origin}/page` })
+    );
+    const { CommunityPluginPage } = await import("./CommunityPluginPage");
+    renderPage(() => <CommunityPluginPage pluginId={1} />);
+
+    expect(await screen.findByText("This plug-in could not be opened")).toBeInTheDocument();
+    expect(screen.queryByTitle("Automations")).toBeNull();
+  });
+
   it("ignores an announcement from a window it did not mount", async () => {
     // A plug-in may hold more than one window at its own address, so the page
     // matches an announcement to the frame it mounted rather than to the

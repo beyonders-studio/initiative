@@ -16,6 +16,7 @@ import { ImageLightboxScope, InLink, ProseImage } from "@/components/markdown/Pr
 import { ThemeContext } from "@/hooks/useTheme";
 import { releaseImageUrl } from "@/lib/releaseImages";
 import { isStoredUpload, remarkImageLinks, remarkLineBreaks } from "@/lib/remarkProse";
+import { sanitizeUrl } from "@/lib/safeUrl";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
 import { cn } from "@/lib/utils";
 
@@ -341,6 +342,7 @@ export const Markdown = ({
           remarkPlugins={remarkPlugins}
           rehypePlugins={preset.headingIds ? HEADING_ID_PLUGINS : undefined}
           components={components}
+          urlTransform={sanitizeUrl}
         >
           {content}
         </ReactMarkdown>

@@ -16,6 +16,9 @@ import type {
 } from "lexical";
 import type { JSX } from "react";
 
+import { EmbedFrame } from "@/components/ui/embed-frame";
+import { matchSmartLinkProvider } from "@/lib/smartLinkProviders";
+
 type YouTubeComponentProps = Readonly<{
   className: Readonly<{
     base: string;
@@ -23,21 +26,22 @@ type YouTubeComponentProps = Readonly<{
   }>;
   format: ElementFormatType | null;
   nodeKey: NodeKey;
-  videoID: string;
+  videoUrl: string;
 }>;
 
-function YouTubeComponent({ className, format, nodeKey, videoID }: YouTubeComponentProps) {
+/** The video, in a frame from YouTube. */
+function YouTubeComponent({ className, format, nodeKey, videoUrl }: YouTubeComponentProps) {
+  const embed = matchSmartLinkProvider(videoUrl);
   return (
     <BlockWithAlignableContents className={className} format={format} nodeKey={nodeKey}>
-      <iframe
-        width="560"
-        height="315"
-        src={`https://www.youtube-nocookie.com/embed/${videoID}`}
-        frameBorder="0"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        allowFullScreen={true}
-        title="YouTube video"
-      />
+      {embed.embedSrc ? (
+        <EmbedFrame
+          src={embed.embedSrc}
+          title={embed.label}
+          {...embed.iframeAttrs}
+          className="aspect-video w-[560px] max-w-full border-0"
+        />
+      ) : null}
     </BlockWithAlignableContents>
   );
 }
@@ -94,7 +98,8 @@ export class YouTubeNode extends DecoratorBlockNode {
     element.setAttribute("data-lexical-youtube", this.__id);
     element.setAttribute("width", "560");
     element.setAttribute("height", "315");
-    element.setAttribute("src", `https://www.youtube-nocookie.com/embed/${this.__id}`);
+    const embed = matchSmartLinkProvider(this.getTextContent());
+    if (embed.embedSrc) element.setAttribute("src", embed.embedSrc);
     element.setAttribute("frameborder", "0");
     element.setAttribute(
       "allow",
@@ -145,7 +150,7 @@ export class YouTubeNode extends DecoratorBlockNode {
         className={className}
         format={this.__format}
         nodeKey={this.getKey()}
-        videoID={this.__id}
+        videoUrl={this.getTextContent()}
       />
     );
   }

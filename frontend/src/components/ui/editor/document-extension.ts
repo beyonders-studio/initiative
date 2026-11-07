@@ -27,6 +27,7 @@ import { HeadingAnchorExtension } from "@/components/ui/editor/extensions/headin
 import { ImagesExtension } from "@/components/ui/editor/extensions/images-extension";
 import { KeywordsExtension } from "@/components/ui/editor/extensions/keywords-extension";
 import { LayoutExtension } from "@/components/ui/editor/extensions/layout-extension";
+import { LinkSanitizeExtension } from "@/components/ui/editor/extensions/link-sanitize-extension";
 import { ListMaxIndentLevelExtension } from "@/components/ui/editor/extensions/list-max-indent-level-extension";
 import { MarkdownShortcutsExtension } from "@/components/ui/editor/extensions/markdown-shortcuts-extension";
 import { StatusExtension } from "@/components/ui/editor/extensions/status-extension";
@@ -109,6 +110,7 @@ export function documentExtension({
         attributes: { rel: "noopener noreferrer", target: "_blank" },
       }),
       configExtension(AutoLinkExtension, { matchers: AUTO_LINK_MATCHERS }),
+      LinkSanitizeExtension,
       ClickableLinkExtension,
       ListExtension,
       CheckListExtension,

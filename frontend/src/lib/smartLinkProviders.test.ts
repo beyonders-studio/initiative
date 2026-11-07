@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { matchSmartLinkProvider } from "./smartLinkProviders";
 
-describe("matchSmartLinkProvider: posts", () => {
+describe("matchSmartLinkProvider", () => {
   it.each([
     [
       "https://x.com/jack/status/20",
@@ -27,10 +27,16 @@ describe("matchSmartLinkProvider: posts", () => {
   ])("frames %s from the post's own site", (url, embedSrc) => {
     const match = matchSmartLinkProvider(url);
     expect(match.embedSrc).toBe(embedSrc);
-    expect(match.iframeAttrs.sandbox).toContain("allow-scripts");
+  });
+
+  it("gives the id an editor embed stores", () => {
+    expect(matchSmartLinkProvider("https://x.com/jack/status/20").ref).toBe("20");
+    expect(matchSmartLinkProvider("https://youtu.be/jNQXAC9IVRw").ref).toBe("jNQXAC9IVRw");
+    expect(matchSmartLinkProvider("https://www.youtube.com/playlist?list=PL1").ref).toBeUndefined();
   });
 
   it.each([
+    "https://www.youtube.com/watch?v=too-short",
     "https://x.com/home",
     "https://x.com/jack/status/not-a-number",
     "https://www.reddit.com/r/reddit/",

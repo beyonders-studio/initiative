@@ -36,8 +36,9 @@ export interface SmartLinkProviderMatch {
   iframeAttrs: {
     allow?: string;
     referrerPolicy?: React.HTMLAttributeReferrerPolicy;
-    sandbox?: string;
   };
+  /** The thing's id on its own site, which an editor embed stores: a YouTube video's or an X post's. */
+  ref?: string;
   /** Reads the height a framed post reports in a message, for pages that report one. */
   heightOf?: (data: unknown) => number | null;
   /**
@@ -65,25 +66,23 @@ const GENERIC: SmartLinkProviderMatch = {
 // youtu.be/<id>, youtube.com/watch?v=<id>, youtube.com/shorts/<id>,
 // youtube.com/embed/<id>, youtube.com/playlist?list=<id>
 function parseYouTubeId(url: URL): { kind: "video" | "playlist"; value: string } | null {
+  // A video's id is eleven letters, digits, `-` or `_`.
+  const video = (id: string | undefined) =>
+    id && /^[\w-]{11}$/.test(id) ? { kind: "video" as const, value: id } : null;
   if (url.hostname === "youtu.be") {
-    const id = url.pathname.slice(1).split("/")[0];
-    return id ? { kind: "video", value: id } : null;
+    return video(url.pathname.slice(1).split("/")[0]);
   }
   if (!/(^|\.)youtube\.com$/.test(url.hostname)) return null;
   const v = url.searchParams.get("v");
-  if (v) return { kind: "video", value: v };
+  if (v) return video(v);
   const list = url.searchParams.get("list");
   if (url.pathname === "/playlist" && list) return { kind: "playlist", value: list };
   const shorts = /^\/shorts\/([^/?#]+)/.exec(url.pathname);
-  if (shorts) return { kind: "video", value: shorts[1] };
+  if (shorts) return video(shorts[1]);
   const embed = /^\/embed\/([^/?#]+)/.exec(url.pathname);
-  if (embed) return { kind: "video", value: embed[1] };
+  if (embed) return video(embed[1]);
   return null;
 }
-
-/** A framed post runs its page and opens its links as ordinary tabs. */
-const POST_FRAME_SANDBOX =
-  "allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox";
 
 /** X's post frame reports its height as `twttr.private.resize`. */
 function xPostHeight(data: unknown): number | null {
@@ -125,6 +124,7 @@ const PROVIDERS: Array<{
           id.kind === "video"
             ? `https://www.youtube-nocookie.com/embed/${id.value}`
             : `https://www.youtube-nocookie.com/embed/videoseries?list=${id.value}`,
+        ref: id.kind === "video" ? id.value : undefined,
         iframeAttrs: {
           allow:
             "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
@@ -331,10 +331,8 @@ const PROVIDERS: Array<{
         canEmbed: true,
         icon: SiX,
         embedSrc: `https://platform.twitter.com/embed/Tweet.html?id=${m[1]}&dnt=true`,
-        iframeAttrs: {
-          sandbox: POST_FRAME_SANDBOX,
-          referrerPolicy: "strict-origin-when-cross-origin",
-        },
+        ref: m[1],
+        iframeAttrs: { referrerPolicy: "strict-origin-when-cross-origin" },
         heightOf: xPostHeight,
       };
     },
@@ -353,10 +351,7 @@ const PROVIDERS: Array<{
         canEmbed: true,
         icon: SiReddit,
         embedSrc: `https://embed.reddit.com/r/${subreddit}/comments/${id}/${slug ? `${slug}/` : ""}`,
-        iframeAttrs: {
-          sandbox: POST_FRAME_SANDBOX,
-          referrerPolicy: "strict-origin-when-cross-origin",
-        },
+        iframeAttrs: { referrerPolicy: "strict-origin-when-cross-origin" },
         heightOf: redditPostHeight,
       };
     },
