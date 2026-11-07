@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Messages fit the screen.** The conversation scrolls on its own, on phones too, with the message box always in view, and it stays on the newest message as you type.
+- **Messages fit the screen.** The conversation takes the page and scrolls on its own, on phones too, with the message box always in view, and it stays on the newest message as you type. The page title is gone, and the encryption note is a shield beside the person's name.
 - **The Mac and Linux apps stop offering passkeys they can't use** when creating an account, breaking glass, opening the billing console or making a waiting change now.
 - **Posts from X and Reddit show where you put them.** A post in a document or on a whiteboard draws in a frame from its own site, on the web and in the apps, and a link file to one shows the post.
 

@@ -288,18 +288,10 @@ export function MyMessagesPage() {
   }
 
   return (
-    // Fills the shell: `main` has a real height now, so the thread can be what
-    // is left of it after the header, and its log is the only thing that
-    // scrolls.
+    // Fills the shell, and its log is the only thing that scrolls. No page
+    // title: the sidebar beside it already says where this is, and every line
+    // a heading took was a line of conversation off the screen.
     <div className="flex h-full min-h-0 flex-col gap-4">
-      <header className="space-y-1">
-        <h1 className="font-semibold text-3xl tracking-tight">{t("title")}</h1>
-        <p className="flex items-center gap-1.5 text-muted-foreground text-sm">
-          <ShieldCheck className="size-3.5 shrink-0" aria-hidden />
-          {t("encryptedNotice")}
-        </p>
-      </header>
-
       {/* Above the thread, because it is about the account rather than about
           whoever is on screen — and because a device waiting on an answer is
           waiting on a person who has to see it to give one. */}
@@ -525,6 +517,7 @@ function Thread({
    * the toolbar is about the message under it.
    */
   const [tapped, setTapped] = useState<string | null>(null);
+  const [encryptionShown, setEncryptionShown] = useState(false);
   const log = useRef<HTMLDivElement | null>(null);
   /** Whether the log was at its newest message when it last scrolled. */
   const atLatest = useRef(true);
@@ -737,8 +730,31 @@ function Thread({
       {/* The handle, with its number in the lighter weight it wears
           everywhere else. `name` is the plain-text fallback for a person this
           device cannot resolve, and is what the failure notice below reads. */}
-      <div className="shrink-0 border-b px-3 py-2 font-medium text-sm">
-        {sole ? <UserHandle user={sole} /> : name}
+      <div className="flex shrink-0 items-center gap-1.5 border-b px-3 py-2 font-medium text-sm">
+        <span className="min-w-0 truncate">{sole ? <UserHandle user={sole} /> : name}</span>
+        {/* What the shield means opens on hover or focus, and on a tap: a
+            touch screen has no hover, and a tooltip's own trigger closes it
+            on click, so the click is taken here instead. Anywhere else closes
+            it again. */}
+        <Tooltip open={encryptionShown} onOpenChange={setEncryptionShown}>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6 shrink-0 text-muted-foreground"
+              aria-label={t("encryptedNotice")}
+              onClick={(event) => {
+                event.preventDefault();
+                setEncryptionShown(true);
+              }}
+            >
+              <ShieldCheck className="size-3.5" aria-hidden />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-64">
+            {t("encryptedNotice")}
+          </TooltipContent>
+        </Tooltip>
       </div>
       <div
         ref={log}
