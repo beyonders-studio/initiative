@@ -3981,6 +3981,15 @@ export interface CommunityPluginSettingRead {
   aliases: string[];
 }
 
+/**
+ * A newer version than the install's that this server cannot run.
+ * ``reason`` is the ``messages.py`` code of the refusal.
+ */
+export interface CommunityPluginUpdateRefused {
+  version: string;
+  reason: string;
+}
+
 export type PluginSurfaceSummaryName = { [key: string]: string };
 
 /**
@@ -4056,6 +4065,7 @@ export interface CommunityPluginDetail {
   name: string;
   enabled: boolean;
   auto_update: boolean;
+  pending_version: string | null;
   artifacts: CommunityPluginArtifact[];
   needs_config: boolean;
   config_state: string;
@@ -4081,6 +4091,7 @@ export interface CommunityPluginDetail {
   settings: CommunityPluginSettingRead[];
   consents: CommunityPluginConsentRead[];
   update_version: string | null;
+  update_refused: CommunityPluginUpdateRefused | null;
   requested_scopes: string[];
   grantable_scopes: string[];
   pending_update: CommunityPluginUpgradeAsks | null;
@@ -4139,6 +4150,7 @@ export interface CommunityPluginRead {
   name: string;
   enabled: boolean;
   auto_update: boolean;
+  pending_version: string | null;
   artifacts: CommunityPluginArtifact[];
   needs_config: boolean;
   config_state: string;

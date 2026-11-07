@@ -245,7 +245,7 @@ async def _plugin_names(
     """The names of the plug-ins the install's ``plugins:`` scopes name, and those a
     pending version's new ones name."""
     scopes = list(guild_plugins_service.requested_scopes(plugin.definition))
-    if offer is not None:
+    if isinstance(offer, plugin_updates_service.UpdateOffer):
         scopes.extend(offer.asks.added_scopes)
     return await guild_plugins_service.plugin_scope_names(session, scopes)
 
@@ -407,7 +407,9 @@ async def _detail(
     user_id: int,
     viewer: AgeViewer,
     *,
-    offer: Optional[plugin_updates_service.UpdateOffer] = None,
+    offer: (
+        plugin_updates_service.UpdateOffer | plugin_updates_service.RefusedUpdate | None
+    ) = None,
 ) -> CommunityPluginDetail:
     """One install with its connections and consents, as ``user_id`` sees it.
 
@@ -425,7 +427,12 @@ async def _detail(
             guild_id=context.guild_id,
             listing_uid=plugin.listing_uid,
         ),
-        update_offer=offer,
+        update_offer=(
+            offer if isinstance(offer, plugin_updates_service.UpdateOffer) else None
+        ),
+        update_refused=(
+            offer if isinstance(offer, plugin_updates_service.RefusedUpdate) else None
+        ),
         installed=await guild_plugins_service.installed_plugin_ids(session),
         plugin_names=await _plugin_names(session, plugin, offer),
         context=context,
@@ -807,7 +814,7 @@ async def decline_community_plugin_upgrade(
     """
     plugin = await _load(session, plugin_id, for_update=True)
     offer = await plugin_updates_service.update_offer(session, plugin)
-    if offer is None:
+    if not isinstance(offer, plugin_updates_service.UpdateOffer):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=MarketplaceMessages.ALREADY_LATEST_VERSION,
