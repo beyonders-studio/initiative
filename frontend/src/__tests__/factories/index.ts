@@ -41,6 +41,7 @@ export {
   buildMarketplaceListing,
   buildMarketplaceListingDetail,
   buildMarketplaceVersion,
+  buildPluginCatalogEntry,
   buildProjectListingEnvelope,
   resetCounter as resetMarketplaceCounter,
 } from "./marketplace.factory";

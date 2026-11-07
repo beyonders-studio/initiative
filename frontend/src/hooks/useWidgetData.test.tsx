@@ -10,15 +10,20 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { buildPluginCatalogEntry } from "@/__tests__/factories";
 import { useWidgetData, type WidgetBinding } from "@/hooks/useWidgetData";
+import { WidgetErrorCode } from "@/lib/widgets/errors";
 
-/** The slice of a query result the hook under test reads. */
-type QueryState = { data: unknown; isLoading: boolean; isError: boolean };
+/** The slice of a query result the hook under test reads. `plugin` is a canvas
+ *  entry's answer for a plug-in widget. */
+type QueryState = { data: unknown; plugin?: unknown; isLoading: boolean; isError: boolean };
 type QueryHook = (...args: unknown[]) => QueryState;
 
 const idle: QueryState = { data: undefined, isLoading: false, isError: false };
 const useSqlQuery = vi.fn<QueryHook>(() => idle);
 const useWidgetQuery = vi.fn<QueryHook>(() => idle);
+const usePluginData = vi.fn<QueryHook>(() => idle);
+const usePluginWidgetCatalog = vi.fn<QueryHook>(() => idle);
 
 vi.mock("@/hooks/useSqlQuery", () => ({
   useSqlQuery: (...args: unknown[]) => useSqlQuery(...args),
@@ -28,8 +33,8 @@ vi.mock("@/hooks/useSqlQuery", () => ({
 // request, and the app hooks reach for community context a bare renderHook has no
 // provider for.
 vi.mock("@/hooks/usePluginData", () => ({
-  usePluginData: () => idle,
-  usePluginWidgetCatalog: () => idle,
+  usePluginData: (...args: unknown[]) => usePluginData(...args),
+  usePluginWidgetCatalog: (...args: unknown[]) => usePluginWidgetCatalog(...args),
 }));
 
 /** The statement the query hook was actually asked for. */
@@ -44,6 +49,12 @@ const run = (binding: WidgetBinding, initiativeId: number | undefined) =>
 
 beforeEach(() => {
   useSqlQuery.mockClear();
+  useWidgetQuery.mockReset();
+  useWidgetQuery.mockReturnValue(idle);
+  usePluginData.mockReset();
+  usePluginData.mockReturnValue(idle);
+  usePluginWidgetCatalog.mockReset();
+  usePluginWidgetCatalog.mockReturnValue(idle);
 });
 
 describe("a query binding", () => {
@@ -164,5 +175,97 @@ describe("a widget already on a dashboard", () => {
     expect(
       Boolean((useSqlQuery.mock.calls.at(-1)?.[2] as { enabled?: boolean } | undefined)?.enabled)
     ).toBe(true);
+  });
+});
+
+describe("a plug-in widget", () => {
+  const entry = buildPluginCatalogEntry();
+  const binding: WidgetBinding = {
+    source: "plugin",
+    plugin_uid: entry.plugin_uid,
+    endpoint_id: "plugin.acme.shop.orders",
+    params: { range: "30d" },
+  };
+  const answer = {
+    rows: [{ status: "open", total: 3 }],
+    values: { count: 1 },
+    fetched_at: "2026-11-07T00:00:00Z",
+  };
+  const installed = () =>
+    usePluginWidgetCatalog.mockReturnValue({ ...idle, data: { items: [entry] } });
+  const previewEnabled = (): boolean =>
+    Boolean((usePluginData.mock.calls.at(-1)?.[0] as { enabled?: boolean } | undefined)?.enabled);
+
+  it("reads its canvas entry once it is placed", () => {
+    // The server reads the endpoint with the parameters the widget stores, so
+    // nothing about the request says what to read.
+    installed();
+    useWidgetQuery.mockReturnValue({ ...idle, plugin: answer });
+    const { result } = renderHook(() => useWidgetData(binding, 7, 11, "w1"));
+
+    expect(useWidgetQuery.mock.calls.at(-1)?.slice(0, 2)).toEqual([11, "w1"]);
+    expect(previewEnabled()).toBe(false);
+    expect(result.current.data).toEqual({
+      source: "plugin",
+      rows: answer.rows,
+      values: answer.values,
+      meta: { total: 1 },
+    });
+  });
+
+  it("reads its endpoint itself while it is being configured", () => {
+    // No widget id: the config dialog's preview, with the form's parameters.
+    installed();
+    renderHook(() => useWidgetData(binding, 7, 11));
+
+    expect(useWidgetQuery.mock.calls.at(-1)?.slice(0, 2)).toEqual([null, null]);
+    expect(previewEnabled()).toBe(true);
+    expect(usePluginData.mock.calls.at(-1)?.[0]).toMatchObject({
+      pluginId: entry.plugin_id,
+      endpointId: "plugin.acme.shop.orders",
+      dashboardId: 11,
+      params: { range: "30d" },
+    });
+  });
+
+  it("keeps the rows it had when its plug-in stops answering", () => {
+    installed();
+    useWidgetQuery.mockReturnValue({ ...idle, plugin: answer });
+    const { result, rerender } = renderHook(() => useWidgetData(binding, 7, 11, "w1"));
+
+    useWidgetQuery.mockReturnValue({ ...idle, isError: true });
+    rerender();
+    expect(result.current.errorCode).toBeUndefined();
+    expect(result.current.data).toMatchObject({ rows: answer.rows });
+  });
+
+  it("draws the error tile when there are no rows to keep", () => {
+    installed();
+    useWidgetQuery.mockReturnValue({ ...idle, isError: true });
+    const { result } = renderHook(() => useWidgetData(binding, 7, 11, "w1"));
+    expect(result.current.errorCode).toBe(WidgetErrorCode.PLUGIN_UNAVAILABLE);
+  });
+
+  it("does not keep another binding's rows", () => {
+    // Saved with different parameters: the rows it had answered a different
+    // question.
+    installed();
+    useWidgetQuery.mockReturnValue({ ...idle, plugin: answer });
+    const { result, rerender } = renderHook(
+      ({ params }: { params: Record<string, unknown> }) =>
+        useWidgetData({ ...binding, params }, 7, 11, "w1"),
+      { initialProps: { params: { range: "30d" } } }
+    );
+
+    useWidgetQuery.mockReturnValue({ ...idle, isError: true });
+    rerender({ params: { range: "7d" } });
+    expect(result.current.errorCode).toBe(WidgetErrorCode.PLUGIN_UNAVAILABLE);
+  });
+
+  it("asks for the plug-in to be reconnected when the catalog no longer lists it", () => {
+    usePluginWidgetCatalog.mockReturnValue({ ...idle, data: { items: [] } });
+    useWidgetQuery.mockReturnValue({ ...idle, isError: true });
+    const { result } = renderHook(() => useWidgetData(binding, 7, 11, "w1"));
+    expect(result.current.errorCode).toBe(WidgetErrorCode.PLUGIN_NOT_INSTALLED);
   });
 });

@@ -5,6 +5,7 @@ import {
   completionsFor,
   type DatasetFields,
   datasetsNamed,
+  type PluginReads,
   wordAt,
 } from "@/lib/widgets/completion";
 
@@ -261,11 +262,11 @@ describe("reading a spreadsheet", () => {
   it("offers the spreadsheets by name inside the quote that opens one", () => {
     const text = "SELECT x FROM sheet('Bu";
     const found = wordAt(text, text.length);
-    expect(found).toEqual({ word: "Bu", start: text.length - 2, quoted: true });
+    expect(found).toEqual({ word: "Bu", start: text.length - 2, quoted: "spreadsheet" });
     const offered = completionsFor(found?.word ?? "", {
       ...vocabulary,
       spreadsheets: ["Budget", "Q3 Budget", "Roster"],
-      quoted: true,
+      quoted: "spreadsheet",
     });
     expect(offered.map((entry) => entry.name)).toEqual(["Budget", "Q3 Budget"]);
     expect(applyCompletion(text, found?.start ?? 0, text.length, offered[1]).text).toBe(
@@ -289,5 +290,94 @@ describe("reading a spreadsheet", () => {
         (entry) => entry.name
       )
     ).toEqual(["Region", "Amount"]);
+  });
+});
+
+describe("reading a plug-in", () => {
+  const PLUGINS: PluginReads[] = [
+    {
+      publicId: "acme.shop",
+      endpoints: [
+        { name: "orders", params: [{ key: "range" }, { key: "tags" }] },
+        { name: "refunds" },
+      ],
+    },
+    { publicId: "acme.crm", endpoints: [{ name: "leads" }] },
+  ];
+
+  /** What is offered with the caret at the end of *text*, and *text* with the
+   *  first of them chosen. */
+  const offer = (text: string) => {
+    const found = wordAt(text, text.length);
+    const offered = completionsFor(found?.word ?? "", {
+      ...vocabulary,
+      plugins: PLUGINS,
+      quoted: found?.quoted,
+      call: found?.call,
+    });
+    return {
+      found,
+      names: offered.map((entry) => entry.name),
+      chosen: offered[0]
+        ? applyCompletion(text, found?.start ?? 0, text.length, offered[0]).text
+        : undefined,
+    };
+  };
+
+  it("offers plugin( where a relation goes", () => {
+    const found = completionsFor("plu", { ...vocabulary, functions: [...FUNCTIONS, "plugin"] });
+    expect(found).toContainEqual({ name: "plugin", kind: "function" });
+    expect(applyCompletion("FROM plu", 5, 8, found[0]).text).toBe("FROM plugin(");
+  });
+
+  it("offers the installed plug-ins by id inside the first quote", () => {
+    const text = "SELECT * FROM plugin('acme.";
+    const { found, names, chosen } = offer(text);
+    expect(found).toEqual({ word: "acme.", start: text.length - 5, quoted: "plugin" });
+    expect(names).toEqual(["acme.shop", "acme.crm"]);
+    expect(chosen).toBe("SELECT * FROM plugin('acme.shop'");
+  });
+
+  it("offers that plug-in's endpoints by name inside the second", () => {
+    const { names, chosen } = offer("FROM plugin('acme.shop', '");
+    expect(names).toEqual(["orders", "refunds"]);
+    expect(chosen).toBe("FROM plugin('acme.shop', 'orders'");
+    expect(offer("FROM plugin('acme.crm', 'l").names).toEqual(["leads"]);
+  });
+
+  it("offers the endpoint's parameters by name after both", () => {
+    const { names, chosen } = offer("FROM plugin('acme.shop', 'orders', ");
+    expect(names).toEqual(["range", "tags"]);
+    expect(chosen).toBe("FROM plugin('acme.shop', 'orders', range => ");
+    expect(offer("FROM plugin('acme.shop', 'orders', range => '30d', ta").names).toEqual(["tags"]);
+  });
+
+  it("offers no parameter inside a value, or once the call is closed", () => {
+    expect(offer("FROM plugin('acme.shop', 'orders', tags => ARRAY['a', ").found).toBeNull();
+    expect(offer("FROM plugin('acme.shop', 'orders', range => ").found).toBeNull();
+    expect(offer("FROM plugin('acme.shop', 'orders') AS o, ta").found).toEqual({
+      word: "ta",
+      start: 41,
+    });
+  });
+
+  it("offers nothing for a plug-in or an endpoint it does not know", () => {
+    expect(offer("FROM plugin('acme.nope', '").names).toEqual([]);
+    expect(offer("FROM plugin('acme.shop', 'nope', ").names).toEqual([]);
+  });
+
+  it("offers an endpoint's columns under the name it is read under", () => {
+    const read: DatasetFields = {
+      dataset: "o",
+      fields: [
+        { name: "status", type: "text" },
+        { name: "total", type: "number" },
+      ],
+    };
+    expect(
+      completionsFor("", { ...vocabulary, qualifier: "o", ranges: [read] }).map(
+        (entry) => entry.name
+      )
+    ).toEqual(["status", "total"]);
   });
 });

@@ -2,10 +2,11 @@
  * What each binding source *is* — the one description of a data view.
  *
  * Two, and they are not variations on a theme. A **query** is a statement over
- * this community's datasets and its spreadsheets' ranges. A **plug-in** is an
- * installed listing's own endpoint, whose parameters are declared in its
- * manifest and checked at fetch time — the two slots here are the ones a
- * *definition* fills: which plug-in, and which of its sources.
+ * this community's datasets, its spreadsheets' ranges and its plug-ins' read
+ * endpoints, and is what every built-in widget binds. A **plug-in** is what an
+ * installed listing's own widget binds: one of its endpoints, whose parameters
+ * are declared in its manifest and checked at fetch time — the two slots here
+ * are the ones a *definition* fills: which plug-in, and which of its sources.
  *
  * The backend deliberately does not declare binding parameters: they belong to
  * the fetcher that consumes them, and mirroring them server-side would mean

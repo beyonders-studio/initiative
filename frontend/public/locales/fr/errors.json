@@ -255,6 +255,7 @@
   "QUERY_SHEET_RANGE_INVALID": "Cette plage ne peut pas être lue. Écrivez-la comme Sheet1!A1:D, A:C ou 2:10.",
   "QUERY_SHEET_RANGE_TOO_LARGE": "Cette plage couvre trop de cellules. Réduisez-la à moins de lignes ou de colonnes.",
   "QUERY_SHEET_UNREADABLE": "Cette feuille de calcul n'a pas pu être lue pour le moment. Réessayez.",
+  "QUERY_PLUGIN_ARGUMENTS": "plugin() prend l'identifiant d'un plug-in et le nom de ce qu'il lit, puis ses paramètres par nom, chacun une valeur ou un ARRAY de valeurs, comme plugin('acme.shop', 'orders', range => '30d').",
   "SHARING_PLUGIN_INSTALL_GRANT_NOT_SET_HERE": "L'accès d'un plug-in s'accorde dans ses paramètres, pas ici.",
   "QUERY_TOO_EXPENSIVE": "Cette requête demande plus de travail qu'une requête ne peut en faire. Restreignez-la : moins de tables, ou un filtre qui réduit les lignes.",
   "QUERY_TIMED_OUT": "Cette requête a pris trop de temps et a été arrêtée.",
