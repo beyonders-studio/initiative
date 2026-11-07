@@ -16,7 +16,7 @@ import type {
 } from "lexical";
 import type { JSX } from "react";
 
-import { EmbedFrame } from "@/components/ui/embed-frame";
+import { EmbedFrame, POST_FRAME_CLASS } from "@/components/ui/embed-frame";
 import { matchSmartLinkProvider } from "@/lib/smartLinkProviders";
 
 type TweetComponentProps = Readonly<{
@@ -49,7 +49,7 @@ function TweetComponent({ className, format, nodeKey, postUrl }: TweetComponentP
           title={embed.label}
           {...embed.iframeAttrs}
           heightOf={embed.heightOf}
-          className="h-60 w-[550px] max-w-full border-0"
+          className={POST_FRAME_CLASS}
         />
       ) : null}
     </BlockWithAlignableContents>

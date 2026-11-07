@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 /** The tallest a frame grows to fit what it reports. */
 const MAX_HEIGHT = 2000;
 
+/** Where a frame that reports its height starts, before its page reports one. */
+export const POST_FRAME_CLASS = "h-60 w-[550px] max-w-full border-0";
+
 export interface EmbedFrameProps {
   src: string;
   title: string;
