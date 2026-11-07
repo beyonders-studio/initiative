@@ -22,6 +22,7 @@ import { DeviceGoneError, RecipientHasNoDeviceError } from "@/crypto/messaging";
 import { toast } from "@/lib/mascotToast";
 import { routeTree } from "@/routeTree.gen";
 
+import { layOutVirtualList } from "./helpers/layOutVirtualList";
 import { buildRouterContext, renderPage } from "./helpers/render";
 
 const MESSAGES_ROUTE_ID = "/_serverRequired/_authenticated/messages";
@@ -149,6 +150,11 @@ beforeAll(() => {
 });
 afterAll(() => {
   if (noWorker) Reflect.deleteProperty(globalThis, "Worker");
+});
+// The thread's log, a phone's height.
+layOutVirtualList((element) => element.classList.contains("overscroll-contain"), {
+  height: 800,
+  rowHeight: 48,
 });
 
 const grant = (userId: number, username: string) => ({
@@ -405,8 +411,16 @@ describe("My Messages", () => {
     mocks.messageRequests.mockReturnValue({
       data: { accepted: [grant(7, "alex")], incoming: [], outgoing: [] },
     });
+    // Far enough back that the message answered is out of the window.
+    const between = Array.from({ length: 30 }, (_, index) => ({
+      id: `between-${index}`,
+      body: `between ${index}`,
+      at: `2026-09-01T00:${String(index + 1).padStart(2, "0")}:00Z`,
+      mine: false,
+    }));
     mocks.logGet.mockResolvedValue([
       { id: "m1", body: "are you coming monday", at: "2026-09-01T00:00:00Z", mine: false },
+      ...between,
       {
         id: "m2",
         body: "yes",
@@ -417,18 +431,18 @@ describe("My Messages", () => {
     ]);
     await renderMessagesWith(7, "alex");
     await screen.findByText("yes");
+    expect(screen.queryByText("between 0")).not.toBeInTheDocument();
 
     // The quote names its speaker, so a thread reads without opening it.
     const quote = screen.getByRole("button", { name: /are you coming monday/ });
     expect(quote).toHaveTextContent("alex#1234");
 
-    // Its own scrollTop, never `scrollIntoView`: that would scroll every box
-    // the message sits in, including ones with no way back.
-    const log = document.querySelector("[class*='overscroll-contain']") as HTMLElement;
-    const scrolled = vi.spyOn(log, "scrollTop", "set");
     await userEvent.click(quote);
 
-    expect(scrolled).toHaveBeenCalled();
+    expect(await screen.findByText("between 0")).toBeInTheDocument();
+    // The answer is out of the window now, and still holds the focus, so the
+    // next Tab goes on from it.
+    expect(quote).toHaveFocus();
   });
 
   it("keeps the actions in the focus order at every width", async () => {

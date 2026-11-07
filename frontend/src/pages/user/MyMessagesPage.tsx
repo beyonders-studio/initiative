@@ -1,4 +1,5 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
+import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual";
 import {
   Check,
   CheckCheck,
@@ -10,7 +11,7 @@ import {
   UserX,
   X,
 } from "lucide-react";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ProfileDecorationsOutput } from "@/api/generated/initiativeAPI.schemas";
@@ -522,29 +523,13 @@ function Thread({
   /** Whether the log was at its newest message when it last scrolled. */
   const atLatest = useRef(true);
   const composer = useRef<HTMLTextAreaElement | null>(null);
-  /** Every message on screen, so a quote can go back to the one it names. */
+  /** Every message mounted, so a tap outside the open one can close it. */
   const rows = useRef(new Map<string, HTMLDivElement>());
+  /** The message holding the focus, kept mounted wherever the log scrolls so
+   *  the next Tab goes on from it. */
+  const focusedId = useRef<string | null>(null);
   /** Where a quote just took the reader, marked long enough to be noticed. */
   const [landedOn, setLandedOn] = useState<string | null>(null);
-
-  /**
-   * Bring the message a quote names back into view.
-   *
-   * The log's own `scrollTop`, moved by the difference between the two boxes --
-   * not `scrollIntoView`, which asks the browser to scroll *every* scrollport
-   * the element sits in, including ones with `overflow: hidden` that offer the
-   * reader no way back.
-   */
-  const goToMessage = (id: string) => {
-    const target = rows.current.get(id);
-    const box = log.current;
-    if (!target || !box) return;
-    const gap = target.getBoundingClientRect().top - box.getBoundingClientRect().top;
-    // A third of the way down rather than hard against the top edge: what was
-    // said before it is usually why it was said.
-    box.scrollTop += gap - box.clientHeight / 3;
-    setLandedOn(id);
-  };
 
   /**
    * Anywhere else closes it.
@@ -598,6 +583,56 @@ function Thread({
   }, [draft]);
 
   const messages = thread.data ?? [];
+  /** Where each message sits in the thread, for the quotes that name one. */
+  const indexOf = useMemo(
+    () => new Map(messages.map((message, index) => [message.id, index])),
+    [messages]
+  );
+  /**
+   * Only the messages near the view are mounted, measured as they mount.
+   *
+   * Anchored to the end, as a thread is read: a message that grows or arrives
+   * while the reader is at the newest one keeps them there. The one holding the
+   * focus stays mounted when it scrolls out of the window. The padding at the
+   * top is headroom for the actions of the first message, which are drawn above
+   * it -- the height of that bar, a row of `size-7` buttons with its own padding
+   * and border and the gap under it, rounded up to the next step.
+   */
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => log.current,
+    estimateSize: () => 48,
+    getItemKey: (index) => messages[index].id,
+    gap: 4,
+    paddingStart: 40,
+    paddingEnd: 12,
+    overscan: 8,
+    anchorTo: "end",
+    rangeExtractor: (range) => {
+      const indexes = defaultRangeExtractor(range);
+      const kept = focusedId.current === null ? undefined : indexOf.get(focusedId.current);
+      return kept === undefined || indexes.includes(kept)
+        ? indexes
+        : [...indexes, kept].sort((a, b) => a - b);
+    },
+  });
+
+  /**
+   * Bring the message a quote names back into view, mounting it first when it
+   * is out of the window.
+   *
+   * The virtualizer moves the log alone -- never `scrollIntoView`, which asks
+   * the browser to scroll *every* scrollport the element sits in, including
+   * ones with `overflow: hidden` that offer the reader no way back. In the
+   * middle rather than hard against the top edge: what was said before it is
+   * usually why it was said.
+   */
+  const goToMessage = (id: string) => {
+    const index = indexOf.get(id);
+    if (index === undefined) return;
+    virtualizer.scrollToIndex(index, { align: "center" });
+    setLandedOn(id);
+  };
   const noted = usePeerDeviceChanges().data;
   /**
    * When somebody on this conversation changed their devices, as this device
@@ -626,15 +661,11 @@ function Thread({
   // open, which is why the count is what re-runs it.
   useMarkThreadRead(conversationId, messages.length, memberIds);
   useEffect(() => {
-    // The log's own scrollTop, not `scrollIntoView`. That asks the browser to
-    // bring an element into view by scrolling *every* scrollport it sits in --
-    // including ones with `overflow: hidden`, which are still scrollable to a
-    // script even though nothing offers the reader a way back. The only box
-    // that should move here is this one.
-    const element = log.current;
-    if (element) element.scrollTop = element.scrollHeight;
+    // The log alone, as for a quote: a new message or a thread just opened
+    // shows the newest one.
+    if (messages.length > 0) virtualizer.scrollToEnd();
     atLatest.current = true;
-  }, [messages.length]);
+  }, [messages.length, virtualizer]);
   // The log gets shorter whenever something under it takes room -- the
   // composer growing a line, a reply bar, a phone's keyboard. Its scrollTop
   // stays put when that happens, so the newest messages would slide out of
@@ -762,12 +793,6 @@ function Thread({
         ref={log}
         // Reaching the end of the thread stops there rather than handing the
         // rest of the gesture to whatever is behind it.
-        // The top padding is headroom for the actions of the first message,
-        // which are drawn above it: a scrollport clips what is outside it, and
-        // with only the ordinary padding there the first message's bar is the
-        // one you cannot reach. It is the height of that bar -- a row of
-        // `size-7` buttons, its own padding and border, and the gap under it --
-        // rounded up to the next step.
         //
         // `contain-size`, so the messages never size the page. The shell's
         // content row grows to fit whatever a page holds, and without it the
@@ -775,20 +800,21 @@ function Thread({
         // shell scrolled instead of the log, the composer sat below the fold,
         // and on a phone a drag over the thread moved nothing at all. Held to
         // nothing, the log takes what is left of the screen and scrolls.
-        className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pt-10 pb-3 contain-size"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 contain-size"
         onScroll={(event) => {
           const box = event.currentTarget;
           atLatest.current = box.scrollHeight - box.scrollTop - box.clientHeight < 2;
         }}
       >
         {messages.length === 0 ? (
-          <>
+          <div className="pt-10 pb-3">
             <p className="text-muted-foreground text-sm">{t("noHistoryHere")}</p>
             {changesBetween(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY)}
-          </>
+          </div>
         ) : (
-          <>
-            {messages.map((message, index) => {
+          <div className="relative" style={{ height: virtualizer.getTotalSize() }}>
+            {virtualizer.getVirtualItems().map(({ index, key, start }) => {
+              const message = messages[index];
               // One picture per run rather than per message: a picture beside
               // every line of somebody talking is the same fact six times, and
               // the run is what the eye reads as one person speaking.
@@ -797,15 +823,29 @@ function Thread({
               // is when they finished saying it.
               const endsRun =
                 index === messages.length - 1 || !continuesRun(message, messages[index + 1]);
-              const answered = message.replyTo
-                ? (messages.find((entry) => entry.id === message.replyTo) ?? null)
-                : null;
+              const answeredAt = message.replyTo ? indexOf.get(message.replyTo) : undefined;
+              const answered = answeredAt === undefined ? null : messages[answeredAt];
               const reactions = Object.entries(message.reactions ?? {});
               // A new day, or the first thing this device holds.
               const opensDay =
                 index === 0 || localDayKey(messages[index - 1].at) !== localDayKey(message.at);
               return (
-                <Fragment key={message.id}>
+                // biome-ignore lint/a11y/noStaticElementInteractions: it only notes which message holds the focus; the controls inside take the input
+                <div
+                  key={key}
+                  data-index={index}
+                  ref={virtualizer.measureElement}
+                  className="absolute inset-x-0 top-0"
+                  style={{ transform: `translateY(${start}px)` }}
+                  onFocus={() => {
+                    focusedId.current = message.id;
+                  }}
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) {
+                      focusedId.current = null;
+                    }
+                  }}
+                >
                   {changesBetween(
                     index === 0 ? Number.NEGATIVE_INFINITY : Date.parse(messages[index - 1].at),
                     Date.parse(message.at)
@@ -1128,11 +1168,13 @@ function Thread({
                       ) : null}
                     </div>
                   </div>
-                </Fragment>
+                  {index === messages.length - 1
+                    ? changesBetween(Date.parse(message.at), Number.POSITIVE_INFINITY)
+                    : null}
+                </div>
               );
             })}
-            {changesBetween(Date.parse(messages[messages.length - 1].at), Number.POSITIVE_INFINITY)}
-          </>
+          </div>
         )}
       </div>
       {/* What the composer is about, when it is about something. Above the
