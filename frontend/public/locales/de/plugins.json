@@ -33,6 +33,7 @@
     "autoUpdateOff": "Updates werden jetzt manuell übernommen.",
     "upgradeTo": "Auf {{version}} aktualisieren",
     "upToDate": "Aktuell",
+    "updateWaiting": "Update wartet",
     "upgraded": "Auf {{version}} aktualisiert.",
     "removeManagedNeutral": "Die Kosten für dieses Plug-in verwaltet euer Anbieter.",
     "removeManagedAction": "Verwalten",
@@ -45,7 +46,8 @@
     "decline": "Ablehnen",
     "declined": "Du hast Version {{version}} abgelehnt. Das Plug-in bleibt auf seiner aktuellen Version.",
     "declinedDone": "Version {{version}} abgelehnt.",
-    "moved": "Inzwischen gibt es eine andere Version. Prüfe, was sie möchte."
+    "moved": "Inzwischen gibt es eine andere Version. Prüfe, was sie möchte.",
+    "refused": "Version {{version}} kann auf diesem Server nicht laufen."
   },
   "install": {
     "title": "{{name}} hinzufügen",
