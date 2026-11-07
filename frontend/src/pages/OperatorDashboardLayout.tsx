@@ -23,7 +23,7 @@ export const OperatorDashboardLayout = () => {
   const { t } = useTranslation("settings");
   const { user } = useAuth();
   const { billing } = useAppConfig();
-  const location = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
   const router = useRouter();
 
   const tabs = useMemo(() => {
@@ -83,7 +83,7 @@ export const OperatorDashboardLayout = () => {
     return <Navigate to={canManagePlatformConfig(user) ? "/settings/platform" : "/"} replace />;
   }
 
-  const normalizedPath = location.pathname.replace(/\/+$/, "") || "/";
+  const normalizedPath = pathname.replace(/\/+$/, "") || "/";
   const activeTab = matchActiveTab(tabs, normalizedPath, tabs[0]?.value ?? "users");
 
   return (

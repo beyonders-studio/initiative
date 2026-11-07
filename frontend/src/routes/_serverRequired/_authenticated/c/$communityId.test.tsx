@@ -22,7 +22,8 @@ const routeParams = { communityId: "7" };
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-router")>()),
   useParams: () => routeParams,
-  useLocation: () => ({ pathname: `/c/${routeParams.communityId}` }),
+  useLocation: ({ select }: { select: (location: { pathname: string }) => string }) =>
+    select({ pathname: `/c/${routeParams.communityId}` }),
   Outlet: () => <div data-testid="community-outlet" />,
 }));
 

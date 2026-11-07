@@ -22,7 +22,7 @@ import { matchActiveTab } from "@/lib/tabs";
 export const PlatformSettingsLayout = () => {
   const { t } = useTranslation("settings");
   const { user } = useAuth();
-  const location = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
   const router = useRouter();
 
   const tabs = useMemo(() => {
@@ -98,7 +98,7 @@ export const PlatformSettingsLayout = () => {
     return <Navigate to={canAccessOperatorDashboard(user) ? "/settings/operator" : "/"} replace />;
   }
 
-  const normalizedPath = location.pathname.replace(/\/+$/, "") || "/";
+  const normalizedPath = pathname.replace(/\/+$/, "") || "/";
   // Fall back to whichever tab this user actually has, not always `auth`.
   const activeTab = matchActiveTab(tabs, normalizedPath, tabs[0]?.value ?? "auth");
 

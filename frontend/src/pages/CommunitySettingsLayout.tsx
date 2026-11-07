@@ -21,7 +21,7 @@ export const CommunitySettingsLayout = () => {
   // Whether what the reader holds may also be changed. Without it every
   // control on these pages is shown disabled.
   const changesSettings = useHeldSurfaces().writes;
-  const location = useLocation();
+  const currentPath = useLocation({ select: (location) => location.pathname });
   const router = useRouter();
   const { tabs, isLoading } = useCommunitySettingsTabs();
 
@@ -74,7 +74,6 @@ export const CommunitySettingsLayout = () => {
   }
 
   // Normalize path for tab matching
-  const currentPath = location.pathname;
   const normalizedPath = isCommunityScopedPath(currentPath)
     ? extractSubPath(currentPath).replace(/\/+$/, "") || "/"
     : currentPath.replace(/\/+$/, "") || "/";
