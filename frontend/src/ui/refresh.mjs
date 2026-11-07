@@ -45,29 +45,34 @@ const walk = (root, dir = root) =>
     return entry.isDirectory() ? walk(root, full) : [path.relative(root, full)];
   });
 
+/** The kit's words in each language a frontend folder has. */
+const wordsOf = (frontend) =>
+  (existsSync(path.join(frontend, LOCALES)) ? readdirSync(path.join(frontend, LOCALES)) : [])
+    .map((language) => `${LOCALES}/${language}/ui.json`)
+    .filter((name) => existsSync(path.join(frontend, name)));
+
 /** The files that make up the kit, keyed by their path in a frontend folder. */
 const kitOf = (frontend) => {
+  if (!existsSync(path.join(frontend, KIT))) throw new Error(`${frontend} has no ${KIT}`);
   const files = new Map();
   for (const file of walk(path.join(frontend, KIT))) {
     const name = path.posix.join(KIT, file.split(path.sep).join("/"));
     if (!isTest(file) && name !== STAMP) files.set(name, readFileSync(path.join(frontend, name)));
   }
-  const languages = existsSync(path.join(frontend, LOCALES))
-    ? readdirSync(path.join(frontend, LOCALES))
-    : [];
-  for (const name of [SCHEMAS, ...languages.map((language) => `${LOCALES}/${language}/ui.json`)]) {
+  for (const name of [SCHEMAS, ...wordsOf(frontend)]) {
     if (existsSync(path.join(frontend, name)))
       files.set(name, readFileSync(path.join(frontend, name)));
   }
   return files;
 };
 
-/** The npm packages the kit imports, by name. */
+/** The npm packages the kit imports, its stylesheet's included, by name. */
 const packagesOf = (files) => {
   const names = new Set();
   for (const [name, body] of files) {
-    if (!/\.[cm]?[jt]sx?$/.test(name)) continue;
-    for (const [, spec] of body.toString().matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)) {
+    if (!/\.(?:[cm]?[jt]sx?|css)$/.test(name)) continue;
+    const specs = body.toString().matchAll(/(?:from|import|@plugin)\s*\(?\s*["']([^"']+)["']/g);
+    for (const [, spec] of specs) {
       if (spec.startsWith(".") || spec.startsWith("@/") || spec.startsWith("node:")) continue;
       const parts = spec.split("/");
       names.add(spec.startsWith("@") ? `${parts[0]}/${parts[1]}` : parts[0]);
@@ -142,9 +147,12 @@ const check = (from) => {
   return problems;
 };
 
+/** Replace the copy, reading the new one in full before anything is removed. */
 const copy = (from) => {
+  const files = kitOf(from.frontend);
   rmSync(KIT, { recursive: true, force: true });
-  for (const [name, body] of kitOf(from.frontend)) {
+  for (const name of wordsOf(".")) rmSync(name);
+  for (const [name, body] of files) {
     mkdirSync(path.dirname(name), { recursive: true });
     writeFileSync(name, body);
   }

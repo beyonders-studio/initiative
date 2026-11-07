@@ -15,10 +15,13 @@ const refused = {
   "a re-export of Initiative's code": 'export { other } from "@/lib/other";',
   "another generated module": 'export type { Other } from "@/api/generated/other";',
   "a page loaded later": 'export const page = () => import("@/pages/Home");',
+  "a kit path that climbs back out": 'import { useAuth } from "@/ui/../hooks/useAuth";',
+  "a sibling path that climbs out": 'import { useAuth } from "./../hooks/useAuth";',
 };
 const allowed = {
   "the kit's own files": 'import { cn } from "@/ui/lib/utils";',
   "a file beside it": 'import { thing } from "./sibling";',
+  "a file in a folder beside it": 'import { thing } from "./lib/thing";',
   "an npm package": 'import { useState } from "react";',
   "the generated API's types":
     'import type { UserRead } from "@/api/generated/initiativeAPI.schemas";',
