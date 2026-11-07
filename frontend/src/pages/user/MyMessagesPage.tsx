@@ -526,6 +526,8 @@ function Thread({
    */
   const [tapped, setTapped] = useState<string | null>(null);
   const log = useRef<HTMLDivElement | null>(null);
+  /** Whether the log was at its newest message when it last scrolled. */
+  const atLatest = useRef(true);
   const composer = useRef<HTMLTextAreaElement | null>(null);
   /** Every message on screen, so a quote can go back to the one it names. */
   const rows = useRef(new Map<string, HTMLDivElement>());
@@ -638,7 +640,22 @@ function Thread({
     // that should move here is this one.
     const element = log.current;
     if (element) element.scrollTop = element.scrollHeight;
+    atLatest.current = true;
   }, [messages.length]);
+  // The log gets shorter whenever something under it takes room -- the
+  // composer growing a line, a reply bar, a phone's keyboard. Its scrollTop
+  // stays put when that happens, so the newest messages would slide out of
+  // view under the composer. A reader who was at the newest message stays
+  // there; one who scrolled back to read is left where they are.
+  useEffect(() => {
+    const element = log.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => {
+      if (atLatest.current) element.scrollTop = element.scrollHeight;
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   const focusComposer = () => composer.current?.focus();
 
@@ -733,7 +750,18 @@ function Thread({
         // one you cannot reach. It is the height of that bar -- a row of
         // `size-7` buttons, its own padding and border, and the gap under it --
         // rounded up to the next step.
-        className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pt-10 pb-3"
+        //
+        // `contain-size`, so the messages never size the page. The shell's
+        // content row grows to fit whatever a page holds, and without it the
+        // log counted as every message tall: the page outgrew the screen, the
+        // shell scrolled instead of the log, the composer sat below the fold,
+        // and on a phone a drag over the thread moved nothing at all. Held to
+        // nothing, the log takes what is left of the screen and scrolls.
+        className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pt-10 pb-3 contain-size"
+        onScroll={(event) => {
+          const box = event.currentTarget;
+          atLatest.current = box.scrollHeight - box.scrollTop - box.clientHeight < 2;
+        }}
       >
         {messages.length === 0 ? (
           <>
