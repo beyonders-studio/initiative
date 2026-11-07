@@ -45,9 +45,10 @@ vi.mock("@/lib/offlineSession", () => ({
 }));
 
 const user = buildUser();
+const refreshUser = vi.fn();
 
 vi.mock("@/hooks/useAuth", () => ({
-  useAuth: () => ({ user, refreshUser: vi.fn() }),
+  useAuth: () => ({ user, refreshUser }),
 }));
 
 vi.mock("@/hooks/useNetworkStatus", () => ({
@@ -65,17 +66,12 @@ const Probe = () => {
   );
 };
 
-const renderProvider = () => {
+const renderProvider = (child: ReactNode = <Probe />) => {
   const client = createTestQueryClient();
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
-  render(
-    <CommunityProvider>
-      <Probe />
-    </CommunityProvider>,
-    { wrapper }
-  );
+  return render(<CommunityProvider>{child}</CommunityProvider>, { wrapper });
 };
 
 const serverError = (status: number) =>
@@ -131,5 +127,29 @@ describe("the first read of the community list", () => {
     await act(() => vi.advanceTimersByTimeAsync(30_000));
     expect(screen.getByTestId("state")).toHaveTextContent("error");
     expect(communityCalls()).toBe(1);
+  });
+});
+
+describe("the community provider", () => {
+  it("hands its readers the same value when nothing they read changed", async () => {
+    get.mockImplementation((path: string) =>
+      Promise.resolve({
+        data: path === "/access-grants/" ? buildPage([]) : [buildCommunity({ id: 7 })],
+      })
+    );
+    let renders = 0;
+    const Reader = () => {
+      useCommunities();
+      renders += 1;
+      return null;
+    };
+    const reader = <Reader />;
+    const { rerender } = renderProvider(reader);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    const settled = renders;
+
+    rerender(<CommunityProvider>{reader}</CommunityProvider>);
+
+    expect(renders).toBe(settled);
   });
 });
