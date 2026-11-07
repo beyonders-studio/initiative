@@ -1,6 +1,6 @@
 /**
- * Community → AI: whether AI features may send this community's content to a
- * provider at all.
+ * Community → Security: whether AI features may send this community's content
+ * to a provider at all.
  *
  * The seat's answer narrows what the server offers and never widens it: with
  * it off, no connection is used here, whoever set one up.

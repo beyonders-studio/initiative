@@ -195,8 +195,6 @@
   "ai": {
     "loading": "Cargando la configuración de IA…",
     "loadError": "No se pudo cargar la configuración de IA.",
-    "enabled": "Activado",
-    "disabled": "Desactivado",
     "providerFieldLabel": "Proveedor",
     "providerPlaceholder": "Selecciona un proveedor",
     "modelLabel": "Modelo",
@@ -211,14 +209,12 @@
   "communityAI": {
     "title": "IA de la comunidad",
     "adminOnly": "Solo los administradores de la comunidad pueden gestionar las conexiones de IA.",
-    "connectionsTitle": "Conexiones de la comunidad",
-    "connectionsDescription": "Define las conexiones de IA que pueden usar los miembros de esta comunidad.",
     "disabledDescription": "Las funciones de IA están desactivadas para la plataforma.",
     "managedByPlatform": "Las conexiones de IA se gestionan a nivel de plataforma. Los miembros configuran su propia clave en la configuración de su perfil.",
     "managedByServer": "Quien gestiona este servidor administra la IA de esta comunidad.",
-    "switchTitle": "IA en esta comunidad",
+    "switchTitle": "IA",
     "switchLabel": "Permitir funciones de IA",
-    "switchHelp": "Desactivada, nada de esta comunidad se envía a un proveedor de IA, sea cual sea la conexión que configuren el servidor o la comunidad.",
+    "switchHelp": "Permite a los miembros usar funciones de IA en esta comunidad. Desactivada, nada de aquí se envía a un proveedor de IA.",
     "switchSaved": "Ajuste de IA guardado",
     "switchError": "No se pudo guardar el ajuste de IA."
   },
@@ -236,9 +232,7 @@
     "saveMode": "Guardar",
     "savingMode": "Guardando…",
     "modeSaved": "Configuración de IA actualizada",
-    "modeSaveError": "No se pudo actualizar la configuración de IA",
-    "connectionsTitle": "Conexiones de la plataforma",
-    "connectionsDescription": "Define las conexiones de IA que usa cada comunidad."
+    "modeSaveError": "No se pudo actualizar la configuración de IA"
   },
   "marketplaceRegistry": {
     "title": "Registro del catálogo",
@@ -1778,8 +1772,10 @@
   },
   "aiConnections": {
     "title": "Conexiones",
-    "subtitle": "Cada conexión es un destino: un proveedor, un modelo y una clave compartida opcional.",
+    "subtitle_community": "Los proveedores y modelos de IA que pueden usar los miembros de esta comunidad.",
+    "subtitle_platform": "Los proveedores y modelos de IA que pueden usar las comunidades de este servidor.",
     "add": "Añadir conexión",
+    "toggleLabel": "Usar {{label}}",
     "empty": "Aún no hay conexiones. Añade una para activar las funciones de IA.",
     "loading": "Cargando conexiones…",
     "loadError": "No se pudieron cargar las conexiones.",
@@ -1814,8 +1810,6 @@
     "modelHintPick": "Elige un modelo para terminar de configurar esta conexión.",
     "needsModel": "Falta el modelo",
     "customHint": "Cualquier servidor que hable la API de OpenAI: vLLM, llama.cpp, LM Studio, LocalAI o una pasarela como LiteLLM. Indica la dirección hasta /v1.",
-    "enabledLabel": "Activada",
-    "enabledDescription": "Permitir que los miembros usen esta conexión.",
     "defaultLabel": "Conexión predeterminada",
     "defaultDescription": "Los miembros usan esta conexión salvo que elijan otra.",
     "save": "Guardar conexión",

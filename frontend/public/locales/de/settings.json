@@ -195,8 +195,6 @@
   "ai": {
     "loading": "KI-Einstellungen werden geladen…",
     "loadError": "KI-Einstellungen konnten nicht geladen werden.",
-    "enabled": "Aktiviert",
-    "disabled": "Deaktiviert",
     "providerFieldLabel": "Anbieter",
     "providerPlaceholder": "Anbieter auswählen",
     "modelLabel": "Modell",
@@ -211,14 +209,12 @@
   "communityAI": {
     "title": "Community-KI",
     "adminOnly": "Nur Community-Admins können KI-Verbindungen verwalten.",
-    "connectionsTitle": "Community-Verbindungen",
-    "connectionsDescription": "Definiere die KI-Verbindungen, die Mitglieder dieser Community verwenden können.",
     "disabledDescription": "KI-Funktionen sind für die Plattform deaktiviert.",
     "managedByPlatform": "KI-Verbindungen werden auf Plattformebene verwaltet. Mitglieder legen ihren eigenen Schlüssel in ihren Profileinstellungen fest.",
     "managedByServer": "Die Betreiber dieses Servers verwalten die KI für diese Community.",
-    "switchTitle": "KI in dieser Community",
+    "switchTitle": "KI",
     "switchLabel": "KI-Funktionen erlauben",
-    "switchHelp": "Ausgeschaltet wird nichts aus dieser Community an einen KI-Anbieter gesendet, egal welche Verbindung der Server oder die Community einrichtet.",
+    "switchHelp": "Lässt Mitglieder KI-Funktionen in dieser Community nutzen. Ausgeschaltet wird nichts von hier an einen KI-Anbieter gesendet.",
     "switchSaved": "KI-Einstellung gespeichert",
     "switchError": "Die KI-Einstellung konnte nicht gespeichert werden."
   },
@@ -236,9 +232,7 @@
     "saveMode": "Speichern",
     "savingMode": "Wird gespeichert…",
     "modeSaved": "KI-Einstellungen aktualisiert",
-    "modeSaveError": "KI-Einstellungen konnten nicht aktualisiert werden",
-    "connectionsTitle": "Plattform-Verbindungen",
-    "connectionsDescription": "Definiere die KI-Verbindungen, die jede Community verwendet."
+    "modeSaveError": "KI-Einstellungen konnten nicht aktualisiert werden"
   },
   "marketplaceRegistry": {
     "title": "Marketplace-Registry",
@@ -1778,8 +1772,10 @@
   },
   "aiConnections": {
     "title": "Verbindungen",
-    "subtitle": "Jede Verbindung ist ein Ziel – ein Anbieter, ein Modell und ein optionaler gemeinsamer Schlüssel.",
+    "subtitle_community": "Die KI-Anbieter und -Modelle, die Mitglieder dieser Community nutzen können.",
+    "subtitle_platform": "Die KI-Anbieter und -Modelle, die Communities auf diesem Server nutzen können.",
     "add": "Verbindung hinzufügen",
+    "toggleLabel": "{{label}} verwenden",
     "empty": "Noch keine Verbindungen. Füge eine hinzu, um KI-Funktionen zu aktivieren.",
     "loading": "Verbindungen werden geladen…",
     "loadError": "Verbindungen konnten nicht geladen werden.",
@@ -1814,8 +1810,6 @@
     "modelHintPick": "Wähle ein Modell, um diese Verbindung fertig einzurichten.",
     "needsModel": "Braucht ein Modell",
     "customHint": "Jeder Server, der die OpenAI-API spricht: vLLM, llama.cpp, LM Studio, LocalAI oder ein Gateway wie LiteLLM. Gib die Adresse bis einschließlich /v1 an.",
-    "enabledLabel": "Aktiviert",
-    "enabledDescription": "Mitgliedern erlauben, diese Verbindung zu verwenden.",
     "defaultLabel": "Standardverbindung",
     "defaultDescription": "Mitglieder verwenden diese Verbindung, sofern sie keine andere wählen.",
     "save": "Verbindung speichern",

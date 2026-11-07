@@ -81,6 +81,18 @@ describe("AIConnectionManager", () => {
     expect(screen.queryByText(/Failing since/)).not.toBeInTheDocument();
   });
 
+  it("turns a connection off from its row and nothing else about it", async () => {
+    const given = mutations();
+    render([connection({ model: "claude-haiku-5-5" })], given);
+
+    await userEvent.click(screen.getByRole("switch", { name: "Use Team" }));
+
+    expect(given.update.mutate).toHaveBeenCalledWith(
+      { connectionId: 1, data: { enabled: false } },
+      expect.anything()
+    );
+  });
+
   it("says who a connection serves and how its last request went", () => {
     render([
       connection({

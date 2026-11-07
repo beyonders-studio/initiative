@@ -195,8 +195,6 @@
   "ai": {
     "loading": "Loading AI settings…",
     "loadError": "Unable to load AI settings.",
-    "enabled": "Enabled",
-    "disabled": "Disabled",
     "providerFieldLabel": "Provider",
     "providerPlaceholder": "Select a provider",
     "modelLabel": "Model",
@@ -211,14 +209,12 @@
   "communityAI": {
     "title": "Community AI",
     "adminOnly": "Only community admins can manage AI connections.",
-    "connectionsTitle": "Community connections",
-    "connectionsDescription": "Define the AI connections members of this community can use.",
     "disabledDescription": "AI features are turned off for the platform.",
     "managedByPlatform": "AI connections are managed at the platform level. Members set their own key in their profile settings.",
     "managedByServer": "Whoever runs this server manages AI for this community.",
-    "switchTitle": "AI in this community",
+    "switchTitle": "AI",
     "switchLabel": "Allow AI features",
-    "switchHelp": "Off, nothing in this community is sent to an AI provider, whichever connection the server or the community sets up.",
+    "switchHelp": "Lets members use AI features in this community. Turned off, nothing here is sent to an AI provider.",
     "switchSaved": "AI setting saved",
     "switchError": "Couldn't save the AI setting."
   },
@@ -236,9 +232,7 @@
     "saveMode": "Save",
     "savingMode": "Saving…",
     "modeSaved": "AI settings updated",
-    "modeSaveError": "Unable to update AI settings",
-    "connectionsTitle": "Platform connections",
-    "connectionsDescription": "Define the AI connections every community uses."
+    "modeSaveError": "Unable to update AI settings"
   },
   "marketplaceRegistry": {
     "title": "Marketplace registry",
@@ -1778,8 +1772,10 @@
   },
   "aiConnections": {
     "title": "Connections",
-    "subtitle": "Each connection is a destination — a provider, model, and optional shared key.",
+    "subtitle_community": "The AI providers and models members of this community can use.",
+    "subtitle_platform": "The AI providers and models communities on this server can use.",
     "add": "Add connection",
+    "toggleLabel": "Use {{label}}",
     "empty": "No connections yet. Add one to enable AI features.",
     "loading": "Loading connections…",
     "loadError": "Unable to load connections.",
@@ -1814,8 +1810,6 @@
     "modelHintPick": "Pick a model to finish setting up this connection.",
     "needsModel": "Needs a model",
     "customHint": "Any server that speaks the OpenAI API: vLLM, llama.cpp, LM Studio, LocalAI, or a gateway such as LiteLLM. Give the address up to /v1.",
-    "enabledLabel": "Enabled",
-    "enabledDescription": "Allow members to use this connection.",
     "defaultLabel": "Default connection",
     "defaultDescription": "Members use this connection unless they pick another.",
     "save": "Save connection",
