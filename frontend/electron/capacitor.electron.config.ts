@@ -1,4 +1,5 @@
 import { defineConfig } from "@capawesome/capacitor-electron/config";
+import { BrowserWindow } from "electron";
 
 import { contentPolicy } from "./content-policy";
 
@@ -20,5 +21,10 @@ export default defineConfig({
   splashScreen: {
     width: 320,
     height: 320,
+  },
+  hooks: {
+    // The window keeps its title bar but hides the menu bar under it until
+    // Alt is pressed; its shortcuts (zoom, reload, full screen) still work.
+    windowFactory: (options) => new BrowserWindow({ ...options, autoHideMenuBar: true }),
   },
 });

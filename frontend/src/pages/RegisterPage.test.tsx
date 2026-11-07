@@ -19,9 +19,9 @@ import { renderPage } from "@/__tests__/helpers/render";
 const mocks = vi.hoisted(() => ({
   register: vi.fn(),
   login: vi.fn(),
-  applyPasskeySignIn: vi.fn(),
+  applySignIn: vi.fn(),
   signUpWithPasskey: vi.fn(),
-  browserOffersPasskeys: vi.fn(() => true),
+  passkeysRunHere: vi.fn(() => true),
   /** Read on every render, so a test can say what the deployment offers. */
   config: {
     captcha: null,
@@ -35,7 +35,7 @@ vi.mock("@/hooks/useAuth", async (importOriginal) => ({
   useAuth: () => ({
     register: mocks.register,
     login: mocks.login,
-    applyPasskeySignIn: mocks.applyPasskeySignIn,
+    applySignIn: mocks.applySignIn,
   }),
 }));
 
@@ -45,7 +45,7 @@ vi.mock("@/hooks/useAppConfig", async (importOriginal) => ({
 }));
 
 vi.mock("@/lib/passkeys", () => ({
-  browserOffersPasskeys: () => mocks.browserOffersPasskeys(),
+  passkeysRunHere: () => mocks.passkeysRunHere(),
   signUpWithPasskey: (details: unknown) => mocks.signUpWithPasskey(details),
   describePasskeyPromptError: () => null,
 }));
@@ -56,9 +56,9 @@ const PASSKEY_BUTTON = /create account with a passkey/i;
 
 beforeEach(() => {
   mocks.config = { captcha: null, passwordLoginEnabled: true, passkeyLoginEnabled: true };
-  mocks.browserOffersPasskeys.mockReturnValue(true);
+  mocks.passkeysRunHere.mockReturnValue(true);
   mocks.signUpWithPasskey.mockReset();
-  mocks.applyPasskeySignIn.mockReset();
+  mocks.applySignIn.mockReset();
   mocks.register.mockReset();
 });
 
@@ -87,7 +87,7 @@ it("asks for no password where the deployment does not take one", async () => {
 });
 
 it("keeps the key door shut where the browser cannot open one", async () => {
-  mocks.browserOffersPasskeys.mockReturnValue(false);
+  mocks.passkeysRunHere.mockReturnValue(false);
   renderPage(RegisterPage, { initialRoute: "/login" });
 
   await screen.findByLabelText(/^password/i);
@@ -98,6 +98,7 @@ it("shows the recovery codes a key registration comes back with", async () => {
   const user = userEvent.setup();
   mocks.signUpWithPasskey.mockResolvedValue({
     access_token: "a-session",
+    refresh_token: "kept-by-the-app",
     codes: ["aaaa-1111", "bbbb-2222"],
   });
   renderPage(RegisterPage, { initialRoute: "/login" });
@@ -111,7 +112,9 @@ it("shows the recovery codes a key registration comes back with", async () => {
   );
   // Signed in by the ceremony that made it, and the codes on screen: they are
   // shown once, and they are the account's only way back to a password.
-  expect(mocks.applyPasskeySignIn).toHaveBeenCalledWith({ access_token: "a-session" });
+  expect(mocks.applySignIn).toHaveBeenCalledWith(
+    expect.objectContaining({ access_token: "a-session", refresh_token: "kept-by-the-app" })
+  );
   expect(await screen.findByText("aaaa-1111")).toBeInTheDocument();
   expect(screen.getByText("bbbb-2222")).toBeInTheDocument();
 });

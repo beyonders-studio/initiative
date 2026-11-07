@@ -141,6 +141,9 @@ class PasskeySignUpResult(SanitizedBaseModel):
 
     access_token: str
     token_type: str = "bearer"
+    #: For the app, which keeps its own refresh token. A browser gets it as a
+    #: cookie, and this stays absent.
+    refresh_token: Optional[str] = None
     codes: list[str] = Field(default_factory=list)
 
 

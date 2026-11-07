@@ -9,10 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Passkeys inside the Windows app.** Signing in, adding a passkey, a community's passkey ask, creating an account and breaking glass go through Windows' own passkey window (Windows Hello, your phone or a security key) instead of a trip to the browser. **Use a passkey saved in your browser**, under the button, is for passkeys kept in a browser's password manager. It comes with the next Windows app update; the Mac and Linux apps keep using the browser.
 - **Dashboards read plug-ins in SQL.** `plugin('acme.shop', 'orders', range => '30d')` in a statement reads one of a plug-in's endpoints, so its rows join tasks, spreadsheets and other plug-ins. A tile's **Build** tab has **Plug-in data** beside **Spreadsheet**, the SQL box suggests plug-ins and their settings, and tiles that read a plug-in through a statement are rewritten to use it. Plug-in widgets and tiles follow **Run dashboard as**: on **Initiative** they use the community's connection.
+
+### Changed
+
+- **The desktop app on Windows and Linux hides its menu bar.** The File, Edit, View and Window row no longer takes space under the title bar; press Alt to show it. Zoom, reload and full screen keep their shortcuts.
+- **The Android app creates accounts and breaks glass with a passkey in the app,** through the phone's own passkey prompt, the way it signs in.
 
 ### Fixed
 
+- **The Mac and Linux apps stop offering passkeys they can't use** when creating an account, breaking glass, opening the billing console or making a waiting change now.
 - **Posts from X and Reddit show where you put them.** A post in a document or on a whiteboard draws in a frame from its own site, on the web and in the apps, and a link file to one shows the post.
 
 ## [0.78.0] - 2026-11-06

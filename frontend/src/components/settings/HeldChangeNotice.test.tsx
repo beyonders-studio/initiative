@@ -16,7 +16,7 @@ import { HeldChangeNotice } from "./HeldChangeNotice";
 
 vi.mock("@/lib/passkeys", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/passkeys")>()),
-  browserOffersPasskeys: () => true,
+  passkeysRunHere: () => true,
 }));
 
 const HELD = {

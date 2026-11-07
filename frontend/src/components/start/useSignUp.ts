@@ -14,7 +14,7 @@ import { describePasskeyPromptError, signUpWithPasskey } from "@/lib/passkeys";
 export const useSignUp = () => {
   // ``errors`` so a server code is localized without a mid-submit load.
   const { t } = useTranslation(["auth", "errors"]);
-  const { register, login, applyPasskeySignIn } = useAuth();
+  const { register, login, applySignIn } = useAuth();
 
   /**
    * Registers, then signs in at once where the account is active with its
@@ -34,9 +34,9 @@ export const useSignUp = () => {
 
   /**
    * Registers with a key. The ceremony that made the account signed it in, so
-   * it is adopted the way any passkey sign-in is. Its recovery codes go to
-   * `onCodes` before anything else is awaited: they are shown once, and an
-   * account with no password gets back in with them.
+   * its session is adopted whole: in an app, with the refresh token it keeps.
+   * Its recovery codes go to `onCodes` before anything else is awaited: they
+   * are shown once, and an account with no password gets back in with them.
    */
   const withPasskey = async (
     details: PasskeySignUpStart,
@@ -45,7 +45,7 @@ export const useSignUp = () => {
   ): Promise<void> => {
     const made = await signUpWithPasskey(details, inviteCode);
     onCodes(made.codes ?? []);
-    await applyPasskeySignIn({ access_token: made.access_token });
+    await applySignIn(made);
   };
 
   /** What to show for a failed attempt; `passkey` for the key door. */

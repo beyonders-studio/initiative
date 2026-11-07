@@ -73,6 +73,23 @@ async def test_an_account_is_made_with_a_key_instead_of_a_password(
 
     # And a way back to a password, since there is no reset to send.
     assert len(body["codes"]) > 0
+    # A browser keeps its refresh token in a cookie it never reads.
+    assert body["refresh_token"] is None
+
+
+async def test_the_app_is_handed_the_refresh_token_it_keeps(
+    client: AsyncClient, ceremony
+):
+    """The app keeps its own refresh token, so the account it made stays
+    signed in past the access token and across a restart."""
+    challenge = await _begin(client)
+    response = await client.post(
+        FINISH,
+        json={**DETAILS, "credential": registration_for(challenge)},
+        headers={"Origin": "https://studio.beyonders.initiative"},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["refresh_token"]
 
 
 async def test_the_address_is_checked_before_the_browser_is_sent_anywhere(
