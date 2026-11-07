@@ -32,7 +32,6 @@ import { EntityMentionsPlugin } from "@/components/ui/editor/plugins/entity-ment
 import { FloatingLinkEditorPlugin } from "@/components/ui/editor/plugins/floating-link-editor-plugin";
 import { FloatingTextFormatToolbarPlugin } from "@/components/ui/editor/plugins/floating-text-format-plugin";
 import { LegacyNodesPlugin } from "@/components/ui/editor/plugins/legacy-nodes-plugin";
-import { LinkSanitizePlugin } from "@/components/ui/editor/plugins/link-sanitize-plugin";
 import { MentionsPlugin } from "@/components/ui/editor/plugins/mentions-plugin";
 import { MermaidPreviewPlugin } from "@/components/ui/editor/plugins/mermaid-preview-plugin";
 import { AlignmentPickerPlugin } from "@/components/ui/editor/plugins/picker/alignment-picker-plugin";
@@ -440,7 +439,6 @@ export function Plugins({
         {!readOnly && <DragDropPastePlugin />}
         {!readOnly && <EmojiPickerPlugin />}
 
-        <LinkSanitizePlugin />
         <FloatingLinkEditorPlugin
           anchorElem={floatingAnchorElem}
           isLinkEditMode={isLinkEditMode}

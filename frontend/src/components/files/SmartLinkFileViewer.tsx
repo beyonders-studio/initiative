@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { EmbedFrame, POST_FRAME_CLASS } from "@/components/ui/embed-frame";
+import { sanitizeUrl } from "@/lib/safeUrl";
 import { matchSmartLinkProvider } from "@/lib/smartLinkProviders";
 import { cn } from "@/lib/utils";
 
@@ -75,7 +76,7 @@ export function SmartLinkFileViewer({ content, className }: SmartLinkFileViewerP
         {match.embedHintKey ? t(match.embedHintKey) : t("smartLink.unsupportedProvider")}
       </p>
       <Button asChild variant="default" size="sm">
-        <a href={url} target="_blank" rel="noopener noreferrer">
+        <a href={sanitizeUrl(url)} target="_blank" rel="noopener noreferrer">
           <ExternalLink className="h-4 w-4" />
           {t("smartLink.openInNewTab")}
         </a>

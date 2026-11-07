@@ -34,6 +34,7 @@ import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { openExternal, reserveTab } from "@/lib/openExternal";
 import { Capability, hasCapability } from "@/lib/permissions";
 
 type Door = "insights" | "contracts" | "directory" | "control";
@@ -70,8 +71,7 @@ export const OperatorDashboardBillingPage = () => {
     if (!billing) return;
     setOpening(door);
     // Opened inside the click, before the request, so it is not a popup.
-    const tab = window.open("about:blank", "_blank");
-    if (tab) tab.opener = null;
+    const tab = reserveTab();
     try {
       const { handoff_token } = await MINT[door]();
       const lang = i18n.resolvedLanguage ?? i18n.language;
@@ -79,8 +79,7 @@ export const OperatorDashboardBillingPage = () => {
       const url = `${billing.url.replace(/\/+$/, "")}/${door}?lang=${encodeURIComponent(
         lang
       )}#${door}_handoff=${encodeURIComponent(handoff_token)}`;
-      if (tab) tab.location.href = url;
-      else window.open(url, "_blank", "noopener,noreferrer");
+      openExternal(url, tab);
     } catch (err) {
       tab?.close();
       toast.error(getErrorMessage(err, OPEN_ERROR[door]));

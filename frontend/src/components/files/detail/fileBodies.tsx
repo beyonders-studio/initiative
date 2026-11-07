@@ -23,6 +23,7 @@ import { useCommunityPath } from "@/lib/communityUrl";
 import { normalizeEditorState } from "@/lib/editorState";
 import { type EditorFileType, isStoredFileType } from "@/lib/fileTypes";
 import { supportsEntityMentions } from "@/lib/mentions";
+import { sanitizeUrl } from "@/lib/safeUrl";
 import { referenceRef } from "@/lib/smartChips";
 import type { SpreadsheetSheetContent } from "@/lib/spreadsheet/content";
 import { toolDetailRoute } from "@/lib/tools";
@@ -312,7 +313,7 @@ const SmartLinkActions = ({ file }: { file: FileRead }) => {
   if (typeof url !== "string") return null;
   return (
     <Button asChild type="button" variant="ghost" size="sm" className="ml-auto">
-      <a href={url} target="_blank" rel="noopener noreferrer">
+      <a href={sanitizeUrl(url)} target="_blank" rel="noopener noreferrer">
         <ExternalLink className="h-4 w-4" />
         {t("smartLink.openInNewTab")}
       </a>

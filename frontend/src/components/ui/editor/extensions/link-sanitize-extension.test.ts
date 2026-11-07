@@ -1,46 +1,36 @@
+import { buildEditorFromExtensions } from "@lexical/extension";
 import {
   $createLinkNode,
   $isAutoLinkNode,
   $isLinkNode,
   AutoLinkNode,
-  LinkNode,
+  LinkExtension,
 } from "@lexical/link";
-import { $createParagraphNode, $createTextNode, $getRoot, createEditor } from "lexical";
+import {
+  $createParagraphNode,
+  $createTextNode,
+  $getRoot,
+  defineExtension,
+  type LexicalEditor,
+} from "lexical";
 import { describe, expect, it } from "vitest";
 
-import { sanitizeUrl } from "@/components/ui/editor/utils/url";
-
-/**
- * Mirrors the node transform registered by LinkSanitizePlugin. Lexical only
- * sanitizes link URLs at the DOM/render boundary; the raw `__url` survives in
- * editor state and is returned by `getURL()`. This transform neutralizes the
- * stored value so every consumer (window.open, serialization) is safe.
- */
-function registerLinkSanitizer(editor: ReturnType<typeof createEditor>) {
-  const sanitizeNode = (node: LinkNode) => {
-    if (!$isLinkNode(node) && !$isAutoLinkNode(node)) {
-      return;
-    }
-    const url = node.getURL();
-    const safe = sanitizeUrl(url);
-    if (safe !== url) {
-      node.setURL(safe);
-    }
-  };
-  editor.registerNodeTransform(LinkNode, sanitizeNode);
-  editor.registerNodeTransform(AutoLinkNode, sanitizeNode);
-}
+import { LinkSanitizeExtension } from "./link-sanitize-extension";
 
 function makeEditor() {
-  const editor = createEditor({
-    namespace: "test",
-    nodes: [LinkNode, AutoLinkNode],
+  return buildEditorFromExtensions({
+    name: "test",
+    // The autolink node alone: AutoLinkExtension's matching would unlink the
+    // test link's text before the check reads it.
+    dependencies: [
+      LinkExtension,
+      defineExtension({ name: "test/autolink-node", nodes: [AutoLinkNode] }),
+      LinkSanitizeExtension,
+    ],
     onError: (e) => {
       throw e;
     },
   });
-  registerLinkSanitizer(editor);
-  return editor;
 }
 
 /**
@@ -93,31 +83,12 @@ function buildLinkDocument(url: string, type: "link" | "autolink" = "link") {
   };
 }
 
-/** Imports a serialized document and flushes node transforms, then returns the link URL. */
+/** Loads a serialized document the way a stored one is loaded, then returns the link URL. */
 async function importAndReadLinkUrl(
-  editor: ReturnType<typeof createEditor>,
+  editor: LexicalEditor,
   serialized: object
 ): Promise<{ storedUrl: string | null; renderedHref: string | null }> {
-  const state = editor.parseEditorState(JSON.stringify(serialized));
-  editor.setEditorState(state);
-
-  // setEditorState does not run transforms; an explicit update marking the node
-  // dirty flushes the registered transforms (this is also what the editor does
-  // on the first user edit after load).
-  await new Promise<void>((resolve) => {
-    editor.update(
-      () => {
-        const link = $getRoot()
-          .getAllTextNodes()
-          .map((n) => n.getParent())
-          .find((p) => $isLinkNode(p) || $isAutoLinkNode(p));
-        if (link && ($isLinkNode(link) || $isAutoLinkNode(link))) {
-          link.markDirty();
-        }
-      },
-      { onUpdate: resolve }
-    );
-  });
+  editor.setEditorState(editor.parseEditorState(JSON.stringify(serialized)));
 
   let storedUrl: string | null = null;
   let renderedHref: string | null = null;
@@ -135,7 +106,7 @@ async function importAndReadLinkUrl(
   return { storedUrl, renderedHref };
 }
 
-describe("LinkSanitizePlugin (imported document hardening)", () => {
+describe("LinkSanitizeExtension", () => {
   it("neutralizes a stored javascript: link on import", async () => {
     const editor = makeEditor();
     const { storedUrl, renderedHref } = await importAndReadLinkUrl(
