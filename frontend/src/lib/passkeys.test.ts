@@ -313,6 +313,21 @@ describe("a prompt in the system browser", () => {
     ).resolves.toBeNull();
   });
 
+  it("leaves a sign-in for a server the app has left unfinished", async () => {
+    void signInWithPasskey({ deviceName: "iPhone" }).catch(() => undefined);
+    await waitFor(() => expect(Browser.open).toHaveBeenCalledTimes(1));
+    const prompt = lastPrompt();
+    vi.resetModules();
+    const restarted = await import("./passkeys");
+    setStoredServerUrl("https://two.example.com/api/v1");
+    mocks.finishPasskeySignIn.mockReset();
+
+    await expect(
+      restarted.takeBrowserAnswer(callback({ prompt, credential: JSON.stringify({ id: "cred" }) }))
+    ).resolves.toBeNull();
+    expect(mocks.finishPasskeySignIn).not.toHaveBeenCalled();
+  });
+
   it("leaves other links to whoever takes them", async () => {
     await expect(
       takeBrowserAnswer(new URL("initiative://oidc/callback?code=x"))

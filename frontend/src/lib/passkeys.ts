@@ -167,9 +167,9 @@ interface SignInToFinish {
   deviceName: string;
 }
 
-/** A sign-in whose prompt is in the browser, with the prompt's id. Kept while
- *  the browser is in front, because the phone can close the app meanwhile and
- *  the answer then starts it afresh. */
+/** A sign-in whose prompt is in the browser, with the prompt's id and the
+ *  server it is for. Kept while the browser is in front, because the phone can
+ *  close the app meanwhile and the answer then starts it afresh. */
 const SIGN_IN_IN_BROWSER_KEY = "initiative-passkey-sign-in";
 
 /** The browser prompt waiting for its answer, if one is, by the id its page
@@ -210,7 +210,7 @@ const viaBrowser = async (
     closed = Browser.addListener("browserFinished", () => settle(promptEnded("NotAllowedError")));
   });
 
-  if (signIn) await setItem(SIGN_IN_IN_BROWSER_KEY, JSON.stringify({ ...signIn, prompt }));
+  if (signIn) await setItem(SIGN_IN_IN_BROWSER_KEY, JSON.stringify({ ...signIn, prompt, origin }));
   const fragment = new URLSearchParams({ [kind]: JSON.stringify(options), prompt });
   try {
     await Browser.open({ url: `${origin}${PROMPT_PATH}#${fragment}` });
@@ -236,8 +236,8 @@ const finishSignIn = (credential: unknown, { verifier, deviceName }: SignInToFin
  *
  * The answer goes to the prompt waiting for it, and one from any other prompt
  * is dropped. Where nothing is waiting, the answer started the app afresh: a
- * sign-in it answers is finished here, and its session is what this resolves
- * to. Null for anything else.
+ * sign-in it answers, begun on the server the app is still on, is finished
+ * here, and its session is what this resolves to. Null for anything else.
  */
 export const takeBrowserAnswer = async (url: URL): Promise<Token | null> => {
   if (url.protocol !== "initiative:" || url.host !== "passkey" || url.pathname !== "/callback") {
@@ -253,8 +253,10 @@ export const takeBrowserAnswer = async (url: URL): Promise<Token | null> => {
   void removeItem(SIGN_IN_IN_BROWSER_KEY);
   const credential = url.searchParams.get("credential");
   if (!kept || !credential) return null;
-  const signIn = JSON.parse(kept) as SignInToFinish & { prompt: string };
-  return signIn.prompt === prompt ? finishSignIn(JSON.parse(credential), signIn) : null;
+  const signIn = JSON.parse(kept) as SignInToFinish & { prompt: string; origin: string };
+  return signIn.prompt === prompt && signIn.origin === serverOrigin()
+    ? finishSignIn(JSON.parse(credential), signIn)
+    : null;
 };
 
 /** Run a prompt wherever it can run here. `inBrowser` sends an app's prompt to
