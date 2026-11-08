@@ -185,9 +185,8 @@ export const CreateInitiativeWizard = ({
         audience,
       });
     } catch {
-      // The initiative exists and is correct; only the widening failed, and
-      // saying "could not create" about it would be false.
-      toast.error(t("createWizard.memberGrantFailed"));
+      // The initiative exists and is correct; only the widening failed, which
+      // the grant reports as its own failure rather than "could not create".
     }
     onOpenChange(false);
     onCreated?.(created);

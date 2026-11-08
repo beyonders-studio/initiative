@@ -40,7 +40,8 @@
   "errors": {
     "communityContext": "Unable to determine community context for this task.",
     "statusUpdate": "Unable to update task status.",
-    "statusNoMatch": "Unable to update task status. No matching status found."
+    "statusNoMatch": "Unable to update task status. No matching status found.",
+    "reorder": "Couldn't move the task."
   },
   "updating": "Updating…",
   "projectFallback": "Project #{{id}}",

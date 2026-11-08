@@ -40,7 +40,8 @@
   "errors": {
     "communityContext": "No se pudo determinar el contexto de la comunidad para esta tarea.",
     "statusUpdate": "No se pudo actualizar el estado de la tarea.",
-    "statusNoMatch": "No se pudo actualizar el estado de la tarea. No se encontró un estado coincidente."
+    "statusNoMatch": "No se pudo actualizar el estado de la tarea. No se encontró un estado coincidente.",
+    "reorder": "No se pudo mover la tarea."
   },
   "updating": "Actualizando…",
   "projectFallback": "Proyecto #{{id}}",

@@ -9,7 +9,6 @@
     "delete": "Supprimer",
     "deleteTitle": "Supprimer l'étiquette ?",
     "deleteDescription": "L'étiquette « {{name}} » sera envoyée à la corbeille et masquée de toutes les tâches, projets et fichiers qui l'utilisent. Vous pouvez la restaurer depuis Paramètres → Corbeille avant la fin de la période de rétention.",
-    "deleted": "Étiquette supprimée",
     "saving": "Enregistrement…",
     "save": "Enregistrer",
     "toolTab": "{{tool}} ({{count}})",

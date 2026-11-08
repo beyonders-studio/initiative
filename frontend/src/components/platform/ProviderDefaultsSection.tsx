@@ -24,7 +24,6 @@ import {
   useProviderDefault,
   useSetProviderDefault,
 } from "@/hooks/useSettings";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
@@ -64,8 +63,6 @@ const ProviderDefaultRow = ({ provider }: { provider: AuthProviderOwnerRead }) =
           toast.success(t("providerDefaults.saved"));
           setEditing(false);
         },
-        onError: (error) =>
-          toast.error(getErrorMessage(error, "settings:providerDefaults.saveError")),
       }
     );
   };
@@ -99,8 +96,6 @@ const ProviderDefaultRow = ({ provider }: { provider: AuthProviderOwnerRead }) =
               onClick={() =>
                 clearDefault.mutate(undefined, {
                   onSuccess: () => toast.success(t("providerDefaults.withdrawn")),
-                  onError: (error) =>
-                    toast.error(getErrorMessage(error, "settings:providerDefaults.saveError")),
                 })
               }
             >

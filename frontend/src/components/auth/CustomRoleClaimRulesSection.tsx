@@ -25,7 +25,6 @@ import {
   useUpdateCustomRoleClaimRule,
 } from "@/hooks/useCommunityAuthPolicy";
 import { useCustomRoles } from "@/hooks/useCustomRoles";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -109,13 +108,6 @@ export const CustomRoleClaimRulesSection = ({ communityId }: { communityId: numb
         toast.success(adding ? t("customRoleRules.added") : t("customRoleRules.saved"));
         setDialogOpen(false);
       },
-      onError: (error: unknown) =>
-        toast.error(
-          getErrorMessage(
-            error,
-            adding ? "settings:customRoleRules.addError" : "settings:customRoleRules.saveError"
-          )
-        ),
     };
     if (draft.ruleId === null) {
       createRule.mutate({ provider_id: Number(draft.providerId), ...fields }, callbacks);
@@ -128,10 +120,7 @@ export const CustomRoleClaimRulesSection = ({ communityId }: { communityId: numb
   const move = (index: number, by: -1 | 1) => {
     const ids = rules.map((rule) => rule.id);
     [ids[index], ids[index + by]] = [ids[index + by], ids[index]];
-    orderRules.mutate(ids, {
-      onError: (error) =>
-        toast.error(getErrorMessage(error, "settings:customRoleRules.orderError")),
-    });
+    orderRules.mutate(ids);
   };
 
   const canSubmit =
@@ -301,11 +290,7 @@ export const CustomRoleClaimRulesSection = ({ communityId }: { communityId: numb
         onConfirm={() => {
           if (!removing) return;
           deleteRule.mutate(removing.id, {
-            onSuccess: () => setRemoving(null),
-            onError: (error) => {
-              toast.error(getErrorMessage(error, "settings:customRoleRules.removeError"));
-              setRemoving(null);
-            },
+            onSettled: () => setRemoving(null),
           });
         }}
       />

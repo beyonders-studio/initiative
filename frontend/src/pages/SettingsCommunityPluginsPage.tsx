@@ -61,7 +61,6 @@ import {
   useUpdateCommunityPlugin,
 } from "@/hooks/useCommunityPlugins";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { formatDate } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { hasInitiativeSurfaces } from "@/lib/pluginSurfaces";
@@ -193,7 +192,6 @@ function PluginRow({
   const save = (patch: { name?: string; enabled?: boolean }) =>
     update.mutate(patch, {
       onSuccess: () => toast.success(t("plugins:manage.saved")),
-      onError: (error) => toast.error(getErrorMessage(error, "plugins:error")),
     });
 
   const remove = () =>
@@ -204,7 +202,6 @@ function PluginRow({
           toast.success(t("plugins:manage.removed", { name: plugin.name }));
           setConfirming(false);
         },
-        onError: (error) => toast.error(getErrorMessage(error, "plugins:error")),
       }
     );
 

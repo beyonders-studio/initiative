@@ -40,7 +40,8 @@
   "errors": {
     "communityContext": "Der Community-Kontext für diese Aufgabe konnte nicht ermittelt werden.",
     "statusUpdate": "Aufgabenstatus konnte nicht aktualisiert werden.",
-    "statusNoMatch": "Aufgabenstatus konnte nicht aktualisiert werden. Kein passender Status gefunden."
+    "statusNoMatch": "Aufgabenstatus konnte nicht aktualisiert werden. Kein passender Status gefunden.",
+    "reorder": "Die Aufgabe konnte nicht verschoben werden."
   },
   "updating": "Wird aktualisiert…",
   "projectFallback": "Projekt #{{id}}",

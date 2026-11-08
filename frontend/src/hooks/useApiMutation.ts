@@ -17,9 +17,10 @@ interface ApiMutationConfig<TData, TVariables> {
   /** Perform the request. The runtime result is the unwrapped payload. */
   mutationFn: (variables: TVariables) => Promise<TData>;
   /**
-   * Invalidations fired on success, before the caller's `onSuccess`.
-   * Receives the mutation result and variables; the return value is not
-   * awaited (fire-and-forget, matching the hand-written hooks).
+   * The hook's own work on success (invalidations, cache writes, its success
+   * toast), done before the caller's `onSuccess`. Receives the mutation result
+   * and variables; the return value is not awaited (fire-and-forget, matching
+   * the hand-written hooks).
    */
   invalidate?: (data: TData, variables: TVariables) => unknown;
   /** `getErrorMessage` fallback key for the error toast, raised only while

@@ -89,12 +89,15 @@
     "loadingRecent": "Chargement des éléments récents…",
     "closeItem": "Fermer {{name}}",
     "closeOthers": "Fermer les autres",
-    "closeAll": "Fermer tout"
+    "closeAll": "Fermer tout",
+    "closeError": "Impossible de fermer l'onglet.",
+    "closeSomeError": "Certains onglets n'ont pas pu être fermés."
   },
   "pin": {
     "pinned": "Projet épinglé",
     "unpin": "Désépingler le projet",
-    "pin": "Épingler le projet"
+    "pin": "Épingler le projet",
+    "error": "Impossible d'épingler ou de désépingler le projet."
   },
   "taskComposer": {
     "createTask": "Créer la tâche"
@@ -404,7 +407,8 @@
     "updated": "Mise à jour {{date}}",
     "tasksDone": "{{completed}}/{{total}} terminées",
     "archivedOn": "Archivé le {{date}}",
-    "reorder": "Réordonner le projet"
+    "reorder": "Réordonner le projet",
+    "reorderError": "Impossible de déplacer le projet."
   },
   "presets": {
     "label": "Préréglages",

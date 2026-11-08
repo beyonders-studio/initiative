@@ -9,7 +9,6 @@
     "delete": "Eliminar",
     "deleteTitle": "¿Eliminar etiqueta?",
     "deleteDescription": "La etiqueta \"{{name}}\" se enviará a la papelera y se ocultará de todas las tareas, proyectos y archivos que la usen. Puedes restaurarla desde Configuración → Papelera antes de que finalice el período de retención.",
-    "deleted": "Etiqueta eliminada",
     "saving": "Guardando…",
     "save": "Guardar",
     "toolTab": "{{tool}} ({{count}})",
