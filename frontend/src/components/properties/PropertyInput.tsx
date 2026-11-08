@@ -20,7 +20,7 @@ import { toPickerValue } from "@/ui/lib/localDateTime";
 import { cn } from "@/ui/lib/utils";
 import { Slider } from "@/ui/slider";
 
-import { FileFieldInput } from "./FileFieldInput";
+import { type FileFieldFiles, FileFieldInput } from "./FileFieldInput";
 import {
   counterCount,
   counterSettings,
@@ -61,6 +61,9 @@ export interface PropertyInputProps {
    *  stepping it at once both count. Without it, a step is a value like any
    *  other: something nothing has saved yet, a filter. */
   onStep?: (up: boolean) => void;
+  /** What a `file` value is picked from, linked to and drawn with. A file
+   *  field draws nothing without it. */
+  files?: FileFieldFiles;
   /** When the item last changed, on its own page, which a signature made
    *  before it says. */
   updatedAt?: string | null;
@@ -298,6 +301,7 @@ export const PropertyInput = ({
   selectedUser,
   display,
   onStep,
+  files,
   updatedAt,
 }: PropertyInputProps) => {
   const { t } = useTranslation(["properties", "common"]);
@@ -520,17 +524,15 @@ export const PropertyInput = ({
     }
 
     case MetadataType.file: {
-      return (
+      return files ? (
         <FileFieldInput
           value={coerceId(value)}
           shown={"value" in definition ? fileFieldValue(definition.value) : null}
           onChange={onChange}
-          initiativeId={
-            initiativeId ?? ("initiative_id" in definition ? definition.initiative_id : null)
-          }
+          files={files}
           disabled={disabled}
         />
-      );
+      ) : null;
     }
 
     case MetadataType.signature: {

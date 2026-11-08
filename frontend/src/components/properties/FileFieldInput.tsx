@@ -1,21 +1,27 @@
-import { Link } from "@tanstack/react-router";
-import { FilePlus } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { EntityPicker } from "@/components/entities/EntityPicker";
-import { CreateFileDialog } from "@/components/files/CreateFileDialog";
-import { ReadOnlyFileBody } from "@/components/files/detail/ReadOnlyFileBody";
-import { useFile } from "@/hooks/useFiles";
-import { useInitiative } from "@/hooks/useInitiatives";
-import { useCommunityPath } from "@/lib/communityUrl";
-import { isStoredFileType } from "@/lib/fileTypes";
-import { entityRefRoute } from "@/lib/tools";
-import { Button } from "@/ui/button";
+import { Combobox, type ComboboxItem } from "@/ui/combobox";
+import { host } from "@/ui/host";
 
 import { FileFieldName } from "./PropertyValueCell";
 import type { FileFieldValue } from "./propertyHelpers";
+
+/** A file the picker offers: its id, and its row. */
+export type FileChoice = Pick<ComboboxItem, "label" | "icon" | "sublabel"> & { id: number };
+
+/** What a file field asks of the app around it. */
+export interface FileFieldFiles {
+  /** The files the reader may pick that match `query`; with "", the ones
+   *  offered before anything is typed. */
+  find: (query: string) => Promise<FileChoice[]>;
+  /** The path of a file's page. */
+  href: (fileId: number) => string;
+  /** The file drawn under its name, read-only, where the app draws it. */
+  preview: (file: FileFieldValue) => ReactNode;
+  /** A way to make a new file beside the picker, which hands it to `take`. */
+  newFile: (take: (file: FileFieldValue) => void) => ReactNode;
+}
 
 interface FileFieldInputProps {
   /** The id of the file the field holds. */
@@ -23,45 +29,42 @@ interface FileFieldInputProps {
   /** The field as the server last read it back. */
   shown: FileFieldValue | null;
   onChange: (value: number | null) => void;
-  initiativeId: number | null;
+  files: FileFieldFiles;
   disabled?: boolean;
 }
 
-/** A file this app draws itself, as its own page draws it, read-only. A
- *  body loads its content once, so it waits for this visit's own fetch. */
-const FilePreview = ({ fileId }: { fileId: number }) => {
-  const fileQuery = useFile(fileId);
-  const file = fileQuery.data;
-  return file && fileQuery.isFetchedAfterMount ? (
-    <ReadOnlyFileBody file={file} className="max-h-96" />
-  ) : null;
-};
-
 /**
- * A file field: the one file it holds, a link to it, and a way to pick another
- * of the initiative's files or make one with Files' own dialog.
- *
- * A file the app draws itself (a page, a whiteboard, a sheet, a smart link) is
- * shown under its name as its own page shows it; an uploaded file is its name
- * alone.
+ * A file field: the one file it holds, a link to it, and a way to pick
+ * another or make a new one.
  */
 export const FileFieldInput = ({
   value,
   shown,
   onChange,
-  initiativeId,
+  files,
   disabled = false,
 }: FileFieldInputProps) => {
-  const { t } = useTranslation("properties");
-  const gp = useCommunityPath();
-  const [creating, setCreating] = useState(false);
+  const { t } = useTranslation(["relations", "search"]);
   // What was picked here, drawn until the server reads it back: the picker
   // knows only the file's name.
   const [picked, setPicked] = useState<FileFieldValue | null>(null);
-  const initiative = useInitiative(disabled ? null : initiativeId).data;
-  const canCreate = Boolean(
-    initiative?.can.view.includes(Tool.file) && initiative.can.create.includes(Tool.file)
-  );
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  // The last answer, listed until the next one comes.
+  const [found, setFound] = useState<FileChoice[] | null>(null);
+
+  const { find } = files;
+  useEffect(() => {
+    if (!open) return;
+    let current = true;
+    const answer = (choices: FileChoice[]) => {
+      if (current) setFound(choices);
+    };
+    void find(query).then(answer, () => answer([]));
+    return () => {
+      current = false;
+    };
+  }, [find, open, query]);
 
   const file =
     value === null ? null : ([shown, picked].find((each) => each?.id === value) ?? { id: value });
@@ -74,54 +77,43 @@ export const FileFieldInput = ({
     <div className="flex min-w-0 flex-col gap-2">
       {file ? (
         file.name ? (
-          <Link
-            to={gp(entityRefRoute(Tool.file, file.id))}
+          <host.Link
+            to={files.href(file.id)}
             className="min-w-0 self-start text-sm hover:underline"
           >
             <FileFieldName file={file} />
-          </Link>
+          </host.Link>
         ) : (
           <FileFieldName file={file} />
         )
       ) : null}
-      {file?.file_type && !isStoredFileType(file.file_type) ? (
-        <FilePreview fileId={file.id} />
-      ) : null}
+      {file ? files.preview(file) : null}
       {disabled ? null : (
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
-            <EntityPicker
-              initiativeId={initiativeId}
-              types={[SearchEntityType.file]}
+            <Combobox
+              items={(found ?? []).map(({ id, ...row }) => ({
+                ...row,
+                value: String(id),
+                hint: t("search:types.file"),
+              }))}
               value={null}
-              onChange={(next) => {
-                if (next) take({ id: next.entity_id, name: next.title });
+              onValueChange={(next) => {
+                const choice = found?.find((each) => String(each.id) === next);
+                if (choice) take({ id: choice.id, name: choice.label });
               }}
+              onSearchChange={setQuery}
+              onOpenChange={setOpen}
+              loading={found === null}
+              placeholder={t("relations:dialog.entityPlaceholder")}
+              searchPlaceholder={t("relations:dialog.entityPlaceholder")}
+              emptyMessage={t("relations:dialog.noResults")}
+              aria-label={t("relations:dialog.entity")}
             />
           </div>
-          {canCreate && initiativeId !== null ? (
-            <Button type="button" variant="outline" size="sm" onClick={() => setCreating(true)}>
-              <FilePlus className="h-4 w-4" />
-              {t("input.newFile")}
-            </Button>
-          ) : null}
+          {files.newFile(take)}
         </div>
       )}
-      {canCreate && initiativeId !== null ? (
-        <CreateFileDialog
-          open={creating}
-          onOpenChange={setCreating}
-          initiativeId={initiativeId}
-          onSuccess={(made) =>
-            take({
-              id: made.id,
-              name: made.name,
-              file_type: made.file_type,
-              smart_link_url: made.smart_link_url,
-            })
-          }
-        />
-      ) : null}
     </div>
   );
 };
