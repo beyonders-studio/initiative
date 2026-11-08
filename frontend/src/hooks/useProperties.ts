@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -6,7 +6,6 @@ import { setCollectionFileMetadata } from "@/api/generated/files/files";
 import type {
   PropertyDefinitionBulkDelete,
   PropertyDefinitionCreate,
-  PropertyDefinitionGroups,
   PropertyDefinitionPromote,
   PropertyDefinitionRead,
   PropertyDefinitionUpdate,
@@ -20,12 +19,10 @@ import {
   createPropertyDefinition,
   deletePropertyDefinition,
   deletePropertyDefinitions,
-  getListPropertyDefinitionsByOwnerQueryKey,
-  getListPropertyDefinitionsQueryKey,
-  listPropertyDefinitions,
-  listPropertyDefinitionsByOwner,
   promotePropertyDefinitions,
   updatePropertyDefinition,
+  useListPropertyDefinitions,
+  useListPropertyDefinitionsByOwner,
 } from "@/api/generated/property-definitions/property-definitions";
 import { invalidate, q } from "@/api/query-keys";
 import { buildUniqueOptionSlug, findOptionByLabel } from "@/components/properties/propertyHelpers";
@@ -74,11 +71,8 @@ export const useProperties = (options?: {
   };
   if (initiativeId !== undefined) params.initiative_id = initiativeId;
   const hasParams = Object.keys(params).length > 0;
-  return useQuery<PropertyDefinitionRead[]>({
-    queryKey: getListPropertyDefinitionsQueryKey(communityId, hasParams ? params : undefined),
-    queryFn: () => listPropertyDefinitions(communityId, hasParams ? params : undefined),
-    enabled: options?.enabled ?? true,
-    staleTime: 60 * 1000,
+  return useListPropertyDefinitions(communityId, hasParams ? params : undefined, {
+    query: { enabled: options?.enabled ?? true, staleTime: 60 * 1000 },
   });
 };
 
@@ -90,10 +84,8 @@ export const useProperties = (options?: {
 export const usePropertyGroups = (initiativeId: number) => {
   const communityId = useActiveCommunityId();
   const params = { initiative_id: initiativeId };
-  return useQuery<PropertyDefinitionGroups>({
-    queryKey: getListPropertyDefinitionsByOwnerQueryKey(communityId, params),
-    queryFn: () => listPropertyDefinitionsByOwner(communityId, params),
-    staleTime: 60 * 1000,
+  return useListPropertyDefinitionsByOwner(communityId, params, {
+    query: { staleTime: 60 * 1000 },
   });
 };
 

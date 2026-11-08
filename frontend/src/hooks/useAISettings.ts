@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 
 import {
   createCommunityConnection,
@@ -7,17 +7,12 @@ import {
   deletePlatformConnection,
   fetchCommunityConnectionModels,
   fetchPlatformConnectionModels,
-  getGetPlatformAiModeQueryKey,
-  getListCommunityConnectionsQueryKey,
-  getListPlatformConnectionsQueryKey,
-  getPlatformAiMode,
-  listCommunityConnections,
-  listPlatformConnections,
   testCommunityConnection,
   testPlatformConnection,
   updateCommunityConnection,
   updatePlatformAiMode,
   updatePlatformConnection,
+  useListCommunityConnections,
 } from "@/api/generated/ai-settings/ai-settings";
 import type {
   AIConnectionCreate,
@@ -46,14 +41,6 @@ const invalidateConnectionSurfaces = (scope: ConnectionScope) =>
 
 // ── Platform mode (personal / platform) ───────────────────────────────────────
 
-export const usePlatformAIMode = (options?: QueryOpts<PlatformAIModeResponse>) => {
-  return useQuery<PlatformAIModeResponse>({
-    queryKey: getGetPlatformAiModeQueryKey(),
-    queryFn: () => getPlatformAiMode(),
-    ...options,
-  });
-};
-
 export const useUpdatePlatformAIMode = (
   options?: MutationOpts<PlatformAIModeResponse, PlatformAIModeUpdate>
 ) => {
@@ -71,14 +58,6 @@ export const useUpdatePlatformAIMode = (
 };
 
 // ── Platform connections (personal / platform) ────────────────────────────────
-
-export const usePlatformConnections = (options?: QueryOpts<AIConnectionResponse[]>) => {
-  return useQuery<AIConnectionResponse[]>({
-    queryKey: getListPlatformConnectionsQueryKey(),
-    queryFn: () => listPlatformConnections(),
-    ...options,
-  });
-};
 
 export const useCreatePlatformConnection = (
   options?: MutationOpts<AIConnectionResponse, AIConnectionCreate>
@@ -146,11 +125,8 @@ export const useFetchPlatformConnectionModels = (
 export const useCommunityConnections = (options?: QueryOpts<AIConnectionResponse[]>) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<AIConnectionResponse[]>({
-    queryKey: getListCommunityConnectionsQueryKey(communityId),
-    queryFn: () => listCommunityConnections(communityId),
-    enabled: userEnabled && communityId > 0,
-    ...rest,
+  return useListCommunityConnections(communityId, {
+    query: { enabled: userEnabled && communityId > 0, ...rest },
   });
 };
 

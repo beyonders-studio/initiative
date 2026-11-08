@@ -9,13 +9,11 @@
  * consumer shares one request.
  */
 
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 
 import {
-  getReadFieldCatalogQueryKey,
-  getReadQueryVocabularyQueryKey,
-  readFieldCatalog,
-  readQueryVocabulary,
+  getReadFieldCatalogQueryOptions,
+  useReadQueryVocabulary,
 } from "@/api/generated/fields/fields";
 import type { DatasetName } from "@/api/generated/initiativeAPI.schemas";
 import type { DatasetFields } from "@/lib/widgets/completion";
@@ -33,12 +31,7 @@ const NO_FIELDS: DatasetFields[] = [];
 
 /** What a statement may name and call. */
 export const useQueryVocabulary = (enabled = true) => {
-  const query = useQuery({
-    queryKey: getReadQueryVocabularyQueryKey(),
-    queryFn: () => readQueryVocabulary(),
-    enabled,
-    ...FOREVER,
-  });
+  const query = useReadQueryVocabulary({ query: { enabled, ...FOREVER } });
   return {
     datasets: query.data?.datasets ?? NO_DATASETS,
     functions: query.data?.functions ?? NO_FUNCTIONS,
@@ -56,12 +49,9 @@ export const useQueryVocabulary = (enabled = true) => {
  */
 export const useFieldCatalogs = (datasets: string[], enabled = true): DatasetFields[] =>
   useQueries({
-    queries: datasets.map((dataset) => ({
-      queryKey: getReadFieldCatalogQueryKey(dataset as DatasetName),
-      queryFn: () => readFieldCatalog(dataset as DatasetName),
-      enabled,
-      ...FOREVER,
-    })),
+    queries: datasets.map((dataset) =>
+      getReadFieldCatalogQueryOptions(dataset as DatasetName, { query: { enabled, ...FOREVER } })
+    ),
     // Reduced here rather than after the hook returns, so the array is stable
     // between renders and the completion list is not rebuilt on every keystroke.
     combine: (results) => {

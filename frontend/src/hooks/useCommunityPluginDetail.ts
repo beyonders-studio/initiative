@@ -8,14 +8,13 @@
  * configuring — which the list shows.
  */
 
-import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation } from "@tanstack/react-query";
 
 import type {
   CommunityPluginConfigUpdateValues,
   CommunityPluginConnectStart,
   CommunityPluginConsentRead,
   CommunityPluginDetail,
-  CommunityPluginMembersResponse,
   CommunityPluginUpgrade,
   ConsentAccess,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -24,9 +23,7 @@ import {
   connectCommunityPlugin,
   declineCommunityPluginUpgrade,
   disconnectCommunityPlugin,
-  getCommunityPlugin,
   grantMyConsent,
-  listCommunityPluginMembers,
   revokeAllMemberConnections,
   revokeAllMemberConsents,
   revokeMemberConnection,
@@ -36,34 +33,25 @@ import {
   updateCommunityPluginConfig,
   updateCommunityPluginSetting,
   upgradeCommunityPlugin,
+  useGetCommunityPlugin,
+  useListCommunityPluginMembers,
 } from "@/api/generated/plugins/plugins";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 
-export const communityPluginDetailKey = (communityId: number, pluginId: number) =>
-  ["community-plugin", communityId, pluginId] as const;
-
-export const communityPluginMembersKey = (communityId: number, pluginId: number) =>
-  ["community-plugin-members", communityId, pluginId] as const;
-
-export const useCommunityPluginDetail = (pluginId: number) => {
-  const communityId = useActiveCommunityId();
-  return useQuery<CommunityPluginDetail>({
-    queryKey: communityPluginDetailKey(communityId, pluginId),
-    queryFn: () => getCommunityPlugin(communityId, pluginId),
-  });
-};
+export const useCommunityPluginDetail = (pluginId: number) =>
+  useGetCommunityPlugin(useActiveCommunityId(), pluginId);
 
 /** Community admins only; the server refuses everyone else. */
 /** One page of the members who connected to the plug-in or answered it. */
 export const useCommunityPluginMembers = (pluginId: number, page: number, enabled: boolean) => {
   const communityId = useActiveCommunityId();
-  return useQuery<CommunityPluginMembersResponse>({
-    queryKey: [...communityPluginMembersKey(communityId, pluginId), page],
-    queryFn: () => listCommunityPluginMembers(communityId, pluginId, { page }),
-    placeholderData: keepPreviousData,
-    enabled,
-  });
+  return useListCommunityPluginMembers(
+    communityId,
+    pluginId,
+    { page },
+    { query: { placeholderData: keepPreviousData, enabled } }
+  );
 };
 
 // Every mutation below refreshes the same three reads through the shared

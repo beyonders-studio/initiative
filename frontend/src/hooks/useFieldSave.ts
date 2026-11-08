@@ -208,13 +208,13 @@ export const useHeldItem = <I extends object, P>(
 };
 
 /** {@link usePendingShown} over the item as `query` read it. */
-export const useShownWithPending = <I, P>(
+export const useShownWithPending = <I, P, E>(
   kind: FieldSaveKind<I, P>,
   id: number | null,
-  query: UseQueryResult<I>
-): UseQueryResult<I> => {
+  query: UseQueryResult<I, E>
+): UseQueryResult<I, E> => {
   const data = usePendingShown(kind, id, query.data);
-  return data === query.data ? query : ({ ...query, data } as UseQueryResult<I>);
+  return data === query.data ? query : ({ ...query, data } as UseQueryResult<I, E>);
 };
 
 /**

@@ -1,5 +1,9 @@
 import { useTranslation } from "react-i18next";
 
+import {
+  useGetPlatformAiMode,
+  useListPlatformConnections,
+} from "@/api/generated/ai-settings/ai-settings";
 import type { AIConfigMode } from "@/api/generated/initiativeAPI.schemas";
 import {
   AIConnectionManager,
@@ -9,8 +13,6 @@ import {
   useCreatePlatformConnection,
   useDeletePlatformConnection,
   useFetchPlatformConnectionModels,
-  usePlatformAIMode,
-  usePlatformConnections,
   useTestPlatformConnection,
   useUpdatePlatformAIMode,
   useUpdatePlatformConnection,
@@ -34,7 +36,7 @@ export const SettingsAIPage = () => {
   const { user } = useAuth();
   const isPlatformOwner = hasCapability(user, Capability.configManage);
 
-  const modeQuery = usePlatformAIMode({ enabled: isPlatformOwner });
+  const modeQuery = useGetPlatformAiMode({ query: { enabled: isPlatformOwner } });
   // Chosen, then saved: a refetch in between must not put the old mode back.
   const form = useServerForm(
     modeQuery.data,
@@ -52,8 +54,8 @@ export const SettingsAIPage = () => {
   });
 
   const savedMode = modeQuery.data?.mode;
-  const connectionsQuery = usePlatformConnections({
-    enabled: isPlatformOwner && savedMode === "platform",
+  const connectionsQuery = useListPlatformConnections({
+    query: { enabled: isPlatformOwner && savedMode === "platform" },
   });
 
   const mutations: ConnectionMutations = {

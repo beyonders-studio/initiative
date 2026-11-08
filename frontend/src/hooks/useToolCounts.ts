@@ -9,19 +9,10 @@
  *   tree beside the view being shown.
  */
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 
-import type {
-  GetToolCountsParams,
-  Tool,
-  ToolCountsResponse,
-} from "@/api/generated/initiativeAPI.schemas";
-import {
-  getGetToolCountsByInitiativeQueryKey,
-  getGetToolCountsQueryKey,
-  getToolCounts,
-  getToolCountsByInitiative,
-} from "@/api/generated/tools/tools";
+import type { GetToolCountsParams, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { useGetToolCounts, useGetToolCountsByInitiative } from "@/api/generated/tools/tools";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { TOOLS } from "@/lib/tools";
 
@@ -50,12 +41,7 @@ const toCountMap = (counts: Record<string, number> | undefined): Map<number, num
 
 export function useToolCountsByInitiative(options?: UseToolCountsOptions): ToolCountsByInitiative {
   const communityId = useActiveCommunityId();
-  const query = useQuery({
-    queryKey: getGetToolCountsByInitiativeQueryKey(communityId),
-    queryFn: () => getToolCountsByInitiative(communityId),
-    enabled: options?.enabled ?? true,
-    staleTime: options?.staleTime ?? 30_000,
-  });
+  const query = useGetToolCountsByInitiative(communityId, { query: options });
 
   // One small map per tool, built during render rather than memoized against
   // a query result that changes identity on its own.
@@ -75,10 +61,7 @@ export const useToolCounts = (
   options?: { enabled?: boolean }
 ) => {
   const communityId = useActiveCommunityId();
-  return useQuery<ToolCountsResponse>({
-    queryKey: getGetToolCountsQueryKey(communityId, tool, params),
-    queryFn: () => getToolCounts(communityId, tool, params),
-    placeholderData: keepPreviousData,
-    enabled: options?.enabled ?? true,
+  return useGetToolCounts(communityId, tool, params, {
+    query: { placeholderData: keepPreviousData, enabled: options?.enabled ?? true },
   });
 };

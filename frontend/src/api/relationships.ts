@@ -16,7 +16,6 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   createRelationship as createRelationshipRequest,
-  listRelationships,
   removeRelationship as removeRelationshipRequest,
   replaceRelationshipSlice,
 } from "@/api/generated/relationships/relationships";
@@ -32,28 +31,6 @@ const ref = (end: EndpointRef) => `${end.type}:${end.id}`;
  * direction carries meaning: what this page names, and what names it.
  */
 export type Direction = "inbound" | "outbound" | "both";
-
-/**
- * Live links touching one thing.
- *
- * Both narrowings are optional, and passing neither asks the question a
- * relations surface actually has: *everything* connected to this, however it
- * runs. Each row says its own type and which way it points, so seven headings
- * are seven filters over one answer rather than seven requests.
- */
-export const listRelated = (
-  communityId: number,
-  entity: EndpointRef,
-  otherType: EndpointKind | null = null,
-  relationshipType: RelationshipType | null = null,
-  direction: Direction = "both"
-): Promise<RelationshipRead[]> =>
-  listRelationships(communityId, {
-    entity: ref(entity),
-    relationship_type: relationshipType,
-    other_type: otherType,
-    direction,
-  });
 
 /** Link two things. */
 export const relate = async (

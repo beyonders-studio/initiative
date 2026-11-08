@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { getReadCollectionQueryKey, readCollection } from "@/api/generated/files/files";
+import { getReadCollectionQueryOptions } from "@/api/generated/files/files";
 import { CollectionPage } from "@/pages/initiativeTools/files/CollectionPage";
 
 /**
@@ -16,11 +16,7 @@ export const Route = createFileRoute(
     // Warm the cache without holding the navigation on it; the page reports a
     // failed read itself.
     void context.queryClient
-      .ensureQueryData({
-        queryKey: getReadCollectionQueryKey(communityId, collectionId),
-        queryFn: () => readCollection(communityId, collectionId),
-        staleTime: 30_000,
-      })
+      .ensureQueryData(getReadCollectionQueryOptions(communityId, collectionId))
       .catch(() => {});
   },
   component: CollectionPage,

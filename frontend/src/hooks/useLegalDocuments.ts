@@ -21,8 +21,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-import type { LegalDocumentRead, LegalIndexRead } from "@/api/generated/initiativeAPI.schemas";
-import { readLegalDocument, readLegalIndex } from "@/api/generated/legal/legal";
+import type { LegalDocumentRead } from "@/api/generated/initiativeAPI.schemas";
+import { readLegalDocument, useReadLegalIndex } from "@/api/generated/legal/legal";
 import { useAppConfig } from "@/hooks/useAppConfig";
 
 /** Where a reader goes to read one served through the app. */
@@ -39,13 +39,7 @@ const LEGAL_STALE_MS = 10 * 60 * 1000;
 export const useLegalIndex = () => {
   const { billing } = useAppConfig();
   const enabled = Boolean(billing);
-  const query = useQuery<LegalIndexRead>({
-    queryKey: ["legal", "index"],
-    queryFn: () => readLegalIndex(),
-    enabled,
-    staleTime: LEGAL_STALE_MS,
-    retry: false,
-  });
+  const query = useReadLegalIndex({ query: { enabled, staleTime: LEGAL_STALE_MS, retry: false } });
 
   const documents = query.data?.documents ?? [];
   const required = query.data?.required ?? [];

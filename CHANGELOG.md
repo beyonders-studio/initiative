@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The members table no longer offers page sizes that change nothing.** It always shows 25 members a page, and its menu offered 10 to 100.
 - **A collection's grid and timeline, and posts, keep your place as they appear.** Switching to one partway down the page jumped back to the top.
 - **Closing a confirmation puts you back on the button that opened it,** so the keyboard carries on where it left off.
+- **A plug-in's widgets are offered as soon as it is installed.** The dashboard's widget list showed a new or upgraded plug-in's widgets only up to five minutes later.
 - **Confirmations, pickers and tables speak your language.** Cancel, Continue, Please wait, a picker's placeholder, a table's filter and the labels a screen reader hears were English in every language.
 
 ## [0.78.0] - 2026-11-06

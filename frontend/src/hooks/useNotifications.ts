@@ -13,7 +13,6 @@ import type {
   NotificationListResponse,
   NotificationRead,
   SubjectReadResponse,
-  UnreadPlacesResponse,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   dismissNotification,
@@ -24,7 +23,8 @@ import {
   markNotificationRead,
   markNotificationUnread,
   readNotificationSubject,
-  unreadNotificationPlaces,
+  useListNotifications,
+  useUnreadNotificationPlaces,
 } from "@/api/generated/notifications/notifications";
 import { describes, invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -47,23 +47,15 @@ export const useNotifications = (options?: {
   communityId?: number;
   personalOnly?: boolean;
 }) => {
-  return useQuery<NotificationListResponse>({
-    queryKey: getListNotificationsQueryKey({
+  return useListNotifications(
+    {
       limit: NOTIFICATION_PAGE_SIZE,
       unread_only: options?.unreadOnly,
       community_id: options?.communityId,
       personal_only: options?.personalOnly,
-    }),
-    queryFn: () =>
-      listNotifications({
-        limit: NOTIFICATION_PAGE_SIZE,
-        unread_only: options?.unreadOnly,
-        community_id: options?.communityId,
-        personal_only: options?.personalOnly,
-      }),
-    enabled: options?.enabled,
-    refetchInterval: options?.refetchInterval,
-  });
+    },
+    { query: { enabled: options?.enabled, refetchInterval: options?.refetchInterval } }
+  );
 };
 
 /**
@@ -219,11 +211,8 @@ export const useUnreadPlaces = (options?: {
   enabled?: boolean;
   refetchInterval?: number | false;
 }) => {
-  return useQuery<UnreadPlacesResponse>({
-    queryKey: getUnreadNotificationPlacesQueryKey(),
-    queryFn: () => unreadNotificationPlaces(),
-    enabled: options?.enabled,
-    refetchInterval: options?.refetchInterval,
+  return useUnreadNotificationPlaces({
+    query: { enabled: options?.enabled, refetchInterval: options?.refetchInterval },
   });
 };
 

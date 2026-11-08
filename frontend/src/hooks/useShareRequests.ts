@@ -1,5 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
-
 import type {
   ListShareRequestsParams,
   SearchEntityType,
@@ -7,15 +5,12 @@ import type {
   ShareRequestBatch,
   ShareRequestCreate,
   ShareRequestRead,
-  ShareStanding,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   answerShareRequests,
   createShareRequest,
-  getListShareRequestsQueryKey,
-  getReadShareStandingQueryKey,
-  listShareRequests,
-  readShareStanding,
+  useListShareRequests,
+  useReadShareStanding,
 } from "@/api/generated/sharing/sharing";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -37,24 +32,20 @@ export const useShareStanding = (
 ) => {
   const communityId = useActiveCommunityId();
   const params = { kind, entity_id: entityId ?? 0 };
-  return useQuery<ShareStanding>({
-    queryKey: getReadShareStandingQueryKey(communityId, params),
-    queryFn: () => readShareStanding(communityId, params),
-    enabled: enabled && entityId !== null && Number.isFinite(entityId),
-    retry: false,
-    // Another thing's standing is never this one's.
-    placeholderData: undefined,
+  return useReadShareStanding(communityId, params, {
+    query: {
+      enabled: enabled && entityId !== null && Number.isFinite(entityId),
+      retry: false,
+      // Another thing's standing is never this one's.
+      placeholderData: undefined,
+    },
   });
 };
 
 /** The requests waiting on the reader's answer: from one ask, or on one thing. */
 export const useShareRequests = (params: ListShareRequestsParams, enabled = true) => {
   const communityId = useActiveCommunityId();
-  return useQuery<ShareRequestRead[]>({
-    queryKey: getListShareRequestsQueryKey(communityId, params),
-    queryFn: () => listShareRequests(communityId, params),
-    enabled,
-  });
+  return useListShareRequests(communityId, params, { query: { enabled } });
 };
 
 /** Ask for one thing, or for the files of a collection or a wiki. */

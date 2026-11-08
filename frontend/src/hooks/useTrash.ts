@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type {
   EntityType,
@@ -10,10 +10,10 @@ import type {
 import {
   getListCommunityTrashQueryKey,
   getListMyTrashQueryKey,
-  listCommunityTrash,
-  listMyTrash,
   purgeTrashEntity,
   restoreTrashEntity,
+  useListCommunityTrash,
+  useListMyTrash,
 } from "@/api/generated/trash/trash";
 import { invalidate, q, type Spec } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -29,12 +29,7 @@ import type { QueryOpts } from "@/types/query";
  * per item via its `community_id`.
  */
 export const useMyTrashList = (params: ListMyTrashParams, options?: QueryOpts<TrashListResponse>) =>
-  useQuery<TrashListResponse>({
-    queryKey: getListMyTrashQueryKey(params),
-    queryFn: () => listMyTrash(params),
-    placeholderData: keepPreviousData,
-    ...options,
-  });
+  useListMyTrash(params, { query: { placeholderData: keepPreviousData, ...options } });
 
 /**
  * One page of the active community's trash, newest deletion first — the
@@ -46,11 +41,8 @@ export const useCommunityTrashList = (
   options?: QueryOpts<TrashListResponse>
 ) => {
   const communityId = useActiveCommunityId();
-  return useQuery<TrashListResponse>({
-    queryKey: getListCommunityTrashQueryKey(communityId, params),
-    queryFn: () => listCommunityTrash(communityId, params),
-    placeholderData: keepPreviousData,
-    ...options,
+  return useListCommunityTrash(communityId, params, {
+    query: { placeholderData: keepPreviousData, ...options },
   });
 };
 

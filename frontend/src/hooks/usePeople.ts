@@ -11,24 +11,17 @@
 
 import { useInfiniteQuery } from "@tanstack/react-query";
 
-import { listPeopleSections, useListPeopleSections } from "@/api/generated/people/people";
+import {
+  getListPeopleSectionsQueryKey,
+  listPeopleSections,
+  useListPeopleSections,
+} from "@/api/generated/people/people";
 
 /** Members read per community at a time. */
 const PEOPLE_PAGE_SIZE = 20;
 
-/** How long a page of a community stays fresh enough to reuse. */
-const PAGE_STALE_MS = 30_000;
-
 const sectionParams = (search: string) =>
   search.trim() ? { search, page_size: PEOPLE_PAGE_SIZE } : { page_size: PEOPLE_PAGE_SIZE };
-
-/** One community, one page — the request a roster makes for itself. */
-const communityPageParams = (communityId: number, page: number, search: string) => ({
-  community_ids: [communityId],
-  page,
-  page_size: PEOPLE_PAGE_SIZE,
-  ...(search.trim() ? { search } : {}),
-});
 
 /**
  * Every community's first page, under one term.
@@ -59,15 +52,20 @@ export const usePeopleSections = (search: string, options?: { enabled?: boolean 
  * community, and it does not run at all until the reader asks for more, so a
  * roster nobody reaches the bottom of costs nothing.
  */
-export const useMoreCommunityPeople = (communityId: number, search: string, enabled: boolean) =>
-  useInfiniteQuery({
-    queryKey: ["people", "community", communityId, search.trim()] as const,
-    queryFn: ({ pageParam }) =>
-      listPeopleSections(communityPageParams(communityId, pageParam, search)),
+export const useMoreCommunityPeople = (communityId: number, search: string, enabled: boolean) => {
+  // One community's roster: the aggregate's own request, narrowed to it.
+  const params = { community_ids: [communityId], ...sectionParams(search) };
+  return useInfiniteQuery({
+    // Under the aggregate's path, so whatever refreshes the rosters refreshes
+    // this too. The last element keeps it apart from the aggregate's own
+    // entry, which holds one answer rather than a list of pages.
+    queryKey: [...getListPeopleSectionsQueryKey(params), "pages"],
+    queryFn: ({ pageParam, signal }) =>
+      listPeopleSections({ ...params, page: pageParam }, undefined, signal),
     initialPageParam: 2,
     // The section says whether there is one after it; the page number is how
     // many have been fetched, offset by the one that arrived with the walk.
     getNextPageParam: (last, all) => (last.sections?.[0]?.has_next ? all.length + 2 : undefined),
     enabled,
-    staleTime: PAGE_STALE_MS,
   });
+};

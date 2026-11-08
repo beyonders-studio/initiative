@@ -16,11 +16,9 @@ import {
   type NotificationPreferencesUpdate,
   type UserRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { useReadMyNotificationPreferences } from "@/api/generated/notifications/notifications";
 import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
-import {
-  useNotificationPreferences,
-  useUpdateNotificationPreferences as useWritePreferences,
-} from "@/hooks/useNotificationPreferences";
+import { useUpdateNotificationPreferences as useWritePreferences } from "@/hooks/useNotificationPreferences";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useServerForm } from "@/hooks/useServerForm";
 import { useFcmConfig } from "@/hooks/useSettings";
@@ -95,7 +93,7 @@ export const UserSettingsNotificationsPage = ({
   const { data: fcmConfig } = useFcmConfig();
   const showPushColumn = fcmConfig?.enabled ?? false;
 
-  const { data: preferences, isLoading } = useNotificationPreferences();
+  const { data: preferences, isLoading } = useReadMyNotificationPreferences();
   const writePreferences = useWritePreferences();
 
   // The lead time the account holds, or the one just picked until its save

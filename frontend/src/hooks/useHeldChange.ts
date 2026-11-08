@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import type { HeldChangeRead } from "@/api/generated/initiativeAPI.schemas";
@@ -6,7 +5,6 @@ import {
   applyHeldChange,
   cancelHeldChange,
   getReadHeldChangeQueryKey,
-  readHeldChange,
 } from "@/api/generated/users/users";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { formatDateTime } from "@/lib/formatDate";
@@ -17,13 +15,6 @@ import type { MutationOpts } from "@/types/mutation";
 export const HELD_CHANGE_QUERY_KEY = getReadHeldChangeQueryKey();
 
 const refresh = () => queryClient.invalidateQueries({ queryKey: HELD_CHANGE_QUERY_KEY });
-
-/** The change this account has waiting, or `null`. */
-export const useHeldChange = () =>
-  useQuery<HeldChangeRead | null>({
-    queryKey: HELD_CHANGE_QUERY_KEY,
-    queryFn: () => readHeldChange(),
-  });
 
 /**
  * Whether a change came back waiting rather than made: the routes that can

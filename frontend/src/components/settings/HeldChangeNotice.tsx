@@ -3,8 +3,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useListPasskeys } from "@/api/generated/auth/auth";
+import { useReadHeldChange } from "@/api/generated/users/users";
 import { useAuth } from "@/hooks/useAuth";
-import { useApplyHeldChange, useCancelHeldChange, useHeldChange } from "@/hooks/useHeldChange";
+import { useApplyHeldChange, useCancelHeldChange } from "@/hooks/useHeldChange";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
@@ -28,7 +29,7 @@ const CHANGE_KEYS = {
 export const HeldChangeNotice = () => {
   const { t } = useTranslation(["settings", "auth"]);
   const { stepUpWithPasskey } = useAuth();
-  const { data: held } = useHeldChange();
+  const { data: held } = useReadHeldChange();
   const passkeys = useListPasskeys();
   const [steppingUp, setSteppingUp] = useState(false);
 

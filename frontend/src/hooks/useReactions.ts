@@ -4,13 +4,10 @@
  * toggle and the suggested set.
  */
 
-import { useQuery } from "@tanstack/react-query";
-
 import type { ReactionSummary, ReactionTarget } from "@/api/generated/initiativeAPI.schemas";
 import {
-  getSuggestedReactionsQueryKey,
-  suggestedReactions,
   toggleReaction,
+  useSuggestedReactions as useSuggestedReactionsQuery,
 } from "@/api/generated/reactions/reactions";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -35,12 +32,9 @@ const INVALIDATE_BY_TARGET: Record<ReactionTarget, () => void> = {
  */
 export const useSuggestedReactions = (options?: QueryOpts<string[]>) => {
   const communityId = useActiveCommunityId();
-  return useQuery<string[]>({
-    queryKey: getSuggestedReactionsQueryKey(communityId),
-    queryFn: () => suggestedReactions(communityId),
+  return useSuggestedReactionsQuery(communityId, {
     // A fixed list; there is no reason to ask again this session.
-    staleTime: Number.POSITIVE_INFINITY,
-    ...options,
+    query: { staleTime: Number.POSITIVE_INFINITY, ...options },
   });
 };
 

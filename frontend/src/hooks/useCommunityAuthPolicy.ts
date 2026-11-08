@@ -3,13 +3,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getListCommunityLoginProvidersQueryKey,
   getListLoginProvidersQueryKey,
-  listCommunityLoginProviders,
   listLoginProviders,
+  useListCommunityLoginProviders,
 } from "@/api/generated/auth/auth";
 import {
-  getCommunityAuthSettings,
   getGetCommunityAuthSettingsQueryKey,
   updateCommunityAuthSettings,
+  useGetCommunityAuthSettings,
 } from "@/api/generated/communities/communities";
 import {
   createCommunityClaimRule,
@@ -22,14 +22,14 @@ import {
   getListCommunityProviderConnectionsQueryKey,
   getListConnectableProvidersQueryKey,
   getListCustomRoleClaimRulesQueryKey,
-  listCommunityClaimRules,
-  listCommunityProviderConnections,
-  listConnectableProviders,
-  listCustomRoleClaimRules,
   orderCustomRoleClaimRules,
   updateCommunityClaimRule,
   updateCommunityProviderConnection,
   updateCustomRoleClaimRule,
+  useListCommunityClaimRules,
+  useListCommunityProviderConnections,
+  useListConnectableProviders,
+  useListCustomRoleClaimRules,
 } from "@/api/generated/community-provider-connections/community-provider-connections";
 import type {
   CommunityAuthSettingsRead,
@@ -66,12 +66,8 @@ export const useCommunityLoginProviders = (
   communityId: number,
   options?: QueryOpts<LoginProvidersResponse>
 ) => {
-  return useQuery<LoginProvidersResponse>({
-    queryKey: getListCommunityLoginProvidersQueryKey(communityId),
-    queryFn: () => listCommunityLoginProviders(communityId),
-    staleTime: 60_000,
-    enabled: communityId > 0,
-    ...options,
+  return useListCommunityLoginProviders(communityId, {
+    query: { staleTime: 60_000, enabled: communityId > 0, ...options },
   });
 };
 
@@ -85,12 +81,8 @@ export const useCommunityAuthSettings = (
   communityId: number,
   options?: QueryOpts<CommunityAuthSettingsRead>
 ) => {
-  return useQuery<CommunityAuthSettingsRead>({
-    queryKey: getGetCommunityAuthSettingsQueryKey(communityId),
-    queryFn: () => getCommunityAuthSettings(communityId),
-    enabled: communityId > 0,
-    refetchOnMount: "always",
-    ...options,
+  return useGetCommunityAuthSettings(communityId, {
+    query: { enabled: communityId > 0, refetchOnMount: "always", ...options },
   });
 };
 
@@ -116,11 +108,8 @@ export const useCommunityProviderConnections = (
   communityId: number,
   options?: QueryOpts<CommunityProviderConnectionRead[]>
 ) => {
-  return useQuery<CommunityProviderConnectionRead[]>({
-    queryKey: getListCommunityProviderConnectionsQueryKey(communityId),
-    queryFn: () => listCommunityProviderConnections(communityId),
-    enabled: communityId > 0,
-    ...options,
+  return useListCommunityProviderConnections(communityId, {
+    query: { enabled: communityId > 0, ...options },
   });
 };
 
@@ -129,11 +118,8 @@ export const useConnectableProviders = (
   communityId: number,
   options?: QueryOpts<ConnectableProviderRead[]>
 ) => {
-  return useQuery<ConnectableProviderRead[]>({
-    queryKey: getListConnectableProvidersQueryKey(communityId),
-    queryFn: () => listConnectableProviders(communityId),
-    enabled: communityId > 0,
-    ...options,
+  return useListConnectableProviders(communityId, {
+    query: { enabled: communityId > 0, ...options },
   });
 };
 
@@ -203,11 +189,8 @@ export const useCommunityClaimRules = (
   communityId: number,
   options?: QueryOpts<CommunityClaimRulesResponse>
 ) => {
-  return useQuery<CommunityClaimRulesResponse>({
-    queryKey: getListCommunityClaimRulesQueryKey(communityId),
-    queryFn: () => listCommunityClaimRules(communityId),
-    enabled: communityId > 0,
-    ...options,
+  return useListCommunityClaimRules(communityId, {
+    query: { enabled: communityId > 0, ...options },
   });
 };
 
@@ -250,11 +233,8 @@ export const useCustomRoleClaimRules = (
   communityId: number,
   options?: QueryOpts<CustomRoleClaimRuleRead[]>
 ) => {
-  return useQuery<CustomRoleClaimRuleRead[]>({
-    queryKey: getListCustomRoleClaimRulesQueryKey(communityId),
-    queryFn: () => listCustomRoleClaimRules(communityId),
-    enabled: communityId > 0,
-    ...options,
+  return useListCustomRoleClaimRules(communityId, {
+    query: { enabled: communityId > 0, ...options },
   });
 };
 

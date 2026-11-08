@@ -22,19 +22,16 @@ import {
   deleteInitiative,
   denyJoinRequest,
   getGetInitiativeMembersQueryKey,
-  getGetInitiativeQueryKey,
-  getInitiative,
   getInitiativeMembers,
-  getListInitiativeDirectoryQueryKey,
-  getListInitiativesQueryKey,
-  getListJoinRequestsQueryKey,
   joinInitiative,
-  listInitiativeDirectory,
-  listInitiatives,
-  listJoinRequests,
   removeInitiativeMember,
   updateInitiative,
   updateInitiativeMember,
+  useGetInitiative,
+  useGetInitiativeMembers,
+  useListInitiativeDirectory,
+  useListInitiatives,
+  useListJoinRequests,
 } from "@/api/generated/initiatives/initiatives";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -56,11 +53,7 @@ import type { QueryOpts } from "@/types/query";
  */
 export const useInitiatives = (options?: QueryOpts<InitiativeRead[]>) => {
   const communityId = useActiveCommunityId();
-  return useQuery<InitiativeRead[]>({
-    queryKey: getListInitiativesQueryKey(communityId),
-    queryFn: () => listInitiatives(communityId),
-    ...options,
-  });
+  return useListInitiatives(communityId, undefined, { query: options });
 };
 
 const COMMUNITY_SCOPE = { scope: InitiativeListScope.community } as const;
@@ -71,11 +64,7 @@ const COMMUNITY_SCOPE = { scope: InitiativeListScope.community } as const;
  */
 export const useCommunityInitiatives = (options?: QueryOpts<InitiativeRead[]>) => {
   const communityId = useActiveCommunityId();
-  return useQuery<InitiativeRead[]>({
-    queryKey: getListInitiativesQueryKey(communityId, COMMUNITY_SCOPE),
-    queryFn: () => listInitiatives(communityId, COMMUNITY_SCOPE),
-    ...options,
-  });
+  return useListInitiatives(communityId, COMMUNITY_SCOPE, { query: options });
 };
 
 /**
@@ -89,11 +78,8 @@ export const useInitiativesForCommunity = (
   options?: QueryOpts<InitiativeRead[]>
 ) => {
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<InitiativeRead[]>({
-    queryKey: getListInitiativesQueryKey(communityId!),
-    queryFn: () => listInitiatives(communityId!),
-    enabled: !!communityId && userEnabled,
-    ...rest,
+  return useListInitiatives(communityId!, undefined, {
+    query: { enabled: !!communityId && userEnabled, ...rest },
   });
 };
 
@@ -109,11 +95,8 @@ export const useInitiativeDirectory = (options?: QueryOpts<InitiativeDirectoryEn
   const communityId = useActiveCommunityId();
   const communityWide = Boolean(useCommunities().activeCommunity?.can.community_wide);
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<InitiativeDirectoryEntry[]>({
-    queryKey: getListInitiativeDirectoryQueryKey(communityId),
-    queryFn: () => listInitiativeDirectory(communityId),
-    enabled: communityId > 0 && communityWide && userEnabled,
-    ...rest,
+  return useListInitiativeDirectory(communityId, {
+    query: { enabled: communityId > 0 && communityWide && userEnabled, ...rest },
   });
 };
 
@@ -135,22 +118,19 @@ export const useInitiativeJoinRequests = (
 ) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<InitiativeJoinRequestRead[]>({
-    queryKey: getListJoinRequestsQueryKey(communityId, initiativeId!, params),
-    queryFn: () => listJoinRequests(communityId, initiativeId!, params),
-    enabled: communityId > 0 && initiativeId !== null && userEnabled,
-    ...rest,
+  return useListJoinRequests(communityId, initiativeId!, params, {
+    query: { enabled: communityId > 0 && initiativeId !== null && userEnabled, ...rest },
   });
 };
 
 export const useInitiative = (initiativeId: number | null, options?: QueryOpts<InitiativeRead>) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<InitiativeRead>({
-    queryKey: getGetInitiativeQueryKey(communityId, initiativeId!),
-    queryFn: () => getInitiative(communityId, initiativeId!),
-    enabled: initiativeId !== null && Number.isFinite(initiativeId) && userEnabled,
-    ...rest,
+  return useGetInitiative(communityId, initiativeId!, undefined, {
+    query: {
+      enabled: initiativeId !== null && Number.isFinite(initiativeId) && userEnabled,
+      ...rest,
+    },
   });
 };
 
@@ -166,13 +146,13 @@ export const useInitiativeRoster = (
 ) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<InitiativeMemberListResponse>({
-    queryKey: getGetInitiativeMembersQueryKey(communityId, initiativeId!, params),
-    queryFn: () => getInitiativeMembers(communityId, initiativeId!, params),
-    enabled: initiativeId !== null && userEnabled,
-    // Keep the page on screen while the next one (or the next search) loads.
-    placeholderData: keepPreviousData,
-    ...rest,
+  return useGetInitiativeMembers(communityId, initiativeId!, params, {
+    query: {
+      enabled: initiativeId !== null && userEnabled,
+      // Keep the page on screen while the next one (or the next search) loads.
+      placeholderData: keepPreviousData,
+      ...rest,
+    },
   });
 };
 

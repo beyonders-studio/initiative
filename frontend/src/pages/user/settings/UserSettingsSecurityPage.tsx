@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { useReadSecondFactor } from "@/api/generated/auth/auth";
 import type { ApiKeyMetadata } from "@/api/generated/initiativeAPI.schemas";
+import { useListMyApiKeys } from "@/api/generated/users/users";
 import {
   isSubscription,
   NewSubscriptionLinkDialog,
@@ -23,7 +24,7 @@ import {
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
-import { useCreateApiKey, useDeleteApiKey, useMyApiKeys } from "@/hooks/useSecurity";
+import { useCreateApiKey, useDeleteApiKey } from "@/hooks/useSecurity";
 import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { Badge } from "@/ui/badge";
@@ -231,7 +232,7 @@ export const UserSettingsSecurityPage = () => {
   const communityName = (id: number) =>
     communities.find((community) => community.id === id)?.name ?? String(id);
 
-  const apiKeysQuery = useMyApiKeys();
+  const apiKeysQuery = useListMyApiKeys();
   const apiKeys = apiKeysQuery.data?.keys ?? [];
 
   const deleteKey = useDeleteApiKey({

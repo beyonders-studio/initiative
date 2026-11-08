@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { getReadFileQueryKey, readFile } from "@/api/generated/files/files";
+import { getReadFileQueryOptions } from "@/api/generated/files/files";
 import { commentThreadQueryOptions } from "@/hooks/useComments";
 import { FileDetailPage } from "@/pages/initiativeTools/files/FileDetailPage";
 
@@ -16,11 +16,7 @@ export const Route = createFileRoute(
     // its placeholder at once and the reads land into it. A failed prefetch
     // is swallowed here; the page fetches for itself and reports the error.
     void Promise.all([
-      queryClient.ensureQueryData({
-        queryKey: getReadFileQueryKey(communityId, fileId),
-        queryFn: () => readFile(communityId, fileId),
-        staleTime: 30_000,
-      }),
+      queryClient.ensureQueryData(getReadFileQueryOptions(communityId, fileId)),
       queryClient.ensureInfiniteQueryData({
         ...commentThreadQueryOptions(communityId, { file_id: fileId }),
         staleTime: 30_000,

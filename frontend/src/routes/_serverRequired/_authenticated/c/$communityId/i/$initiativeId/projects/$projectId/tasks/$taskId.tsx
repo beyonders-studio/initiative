@@ -1,11 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { getReadProjectQueryKey, readProject } from "@/api/generated/projects/projects";
-import {
-  getListTaskStatusesQueryKey,
-  listTaskStatuses,
-} from "@/api/generated/task-statuses/task-statuses";
-import { getReadTaskQueryKey, readTask } from "@/api/generated/tasks/tasks";
+import { getReadProjectQueryOptions } from "@/api/generated/projects/projects";
+import { getListTaskStatusesQueryOptions } from "@/api/generated/task-statuses/task-statuses";
+import { getReadTaskQueryOptions } from "@/api/generated/tasks/tasks";
 import { commentThreadQueryOptions } from "@/hooks/useComments";
 import { TaskEditPage } from "@/pages/initiativeTools/projects/TaskEditPage";
 
@@ -24,25 +21,15 @@ export const Route = createFileRoute(
     // The project comes from the path, so all four reads start together
     // instead of waiting on the task to name its project.
     void Promise.all([
-      queryClient.ensureQueryData({
-        queryKey: getReadTaskQueryKey(communityId, taskId),
-        queryFn: () => readTask(communityId, taskId),
-        staleTime: 30_000,
-      }),
+      queryClient.ensureQueryData(getReadTaskQueryOptions(communityId, taskId)),
       queryClient.ensureInfiniteQueryData({
         ...commentThreadQueryOptions(communityId, { task_id: taskId }),
         staleTime: 30_000,
       }),
-      queryClient.ensureQueryData({
-        queryKey: getReadProjectQueryKey(communityId, projectId),
-        queryFn: () => readProject(communityId, projectId),
-        staleTime: 30_000,
-      }),
-      queryClient.ensureQueryData({
-        queryKey: getListTaskStatusesQueryKey(communityId, projectId),
-        queryFn: () => listTaskStatuses(communityId, projectId),
-        staleTime: 60_000,
-      }),
+      queryClient.ensureQueryData(getReadProjectQueryOptions(communityId, projectId)),
+      queryClient.ensureQueryData(
+        getListTaskStatusesQueryOptions(communityId, projectId, { query: { staleTime: 60_000 } })
+      ),
     ]).catch(() => {});
   },
   component: TaskEditPage,

@@ -1,10 +1,10 @@
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type TaskPriority, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { getListTagsQueryKey, listTags } from "@/api/generated/tags/tags";
-import { getListTaskTypesQueryOptions } from "@/api/generated/task-types/task-types";
+import { useListTags } from "@/api/generated/tags/tags";
+import { useListTaskTypes } from "@/api/generated/task-types/task-types";
 import { getSearchUsersQueryOptions } from "@/api/generated/users/users";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -80,17 +80,12 @@ export const useSmartTitle = ({
   const [chosen, setChosen] = useState<TitlePerson[]>([]);
   const hasCommunity = communityId != null;
 
-  const tags = useQuery({
-    queryKey: getListTagsQueryKey(communityId ?? 0),
-    queryFn: () => listTags(communityId ?? 0),
-    staleTime: 60 * 1000,
-    enabled: enabled && hasCommunity && text.includes("#"),
+  const tags = useListTags(communityId ?? 0, {
+    query: { staleTime: 60 * 1000, enabled: enabled && hasCommunity && text.includes("#") },
   });
 
-  const types = useQuery({
-    ...getListTaskTypesQueryOptions(communityId ?? 0, projectId),
-    staleTime: 60 * 1000,
-    enabled: enabled && hasCommunity && text.includes(":"),
+  const types = useListTaskTypes(communityId ?? 0, projectId, {
+    query: { staleTime: 60 * 1000, enabled: enabled && hasCommunity && text.includes(":") },
   });
 
   // Looked up once typing pauses, rather than for every letter of a name.

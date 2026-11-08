@@ -3,7 +3,6 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
-  InitiativeRoleRead,
   ResourceGrantBulkItem,
   ResourceGrantSchema,
   SearchInitiativeMembersParams,
@@ -12,10 +11,8 @@ import type {
   UserSummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
-  getListInitiativeRolesQueryKey,
-  getSearchInitiativeMembersQueryKey,
-  listInitiativeRoles,
-  searchInitiativeMembers,
+  getListInitiativeRolesQueryOptions,
+  getSearchInitiativeMembersQueryOptions,
 } from "@/api/generated/initiatives/initiatives";
 import { bulkSetResourceGrants } from "@/api/generated/resource-grants/resource-grants";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -141,11 +138,10 @@ export function BulkEditAccessDialog({
 
   // One query per initiative and params: the people matching what was typed
   // (grant), or the people already granted, named by id (revoke).
-  const memberQuery = (initiativeId: number, params: MemberSearchParams, enabled: boolean) => ({
-    queryKey: getSearchInitiativeMembersQueryKey(communityId, initiativeId, params),
-    queryFn: () => searchInitiativeMembers(communityId, initiativeId, params),
-    enabled,
-  });
+  const memberQuery = (initiativeId: number, params: MemberSearchParams, enabled: boolean) =>
+    getSearchInitiativeMembersQueryOptions(communityId, initiativeId, params, {
+      query: { enabled },
+    });
 
   // Granting: each relevant initiative's members matching what was typed,
   // matched on the server.
@@ -202,12 +198,9 @@ export function BulkEditAccessDialog({
 
   // Fetch roles for each relevant initiative (reuses same query key as useInitiativeRoles)
   const roleQueries = useQueries({
-    queries: initiativeIds.map((id) => ({
-      queryKey: getListInitiativeRolesQueryKey(communityId, id),
-      queryFn: () =>
-        listInitiativeRoles(communityId, id) as unknown as Promise<InitiativeRoleRead[]>,
-      enabled: open,
-    })),
+    queries: initiativeIds.map((id) =>
+      getListInitiativeRolesQueryOptions(communityId, id, { query: { enabled: open } })
+    ),
   });
 
   // Build selectable roles from all relevant initiatives

@@ -22,6 +22,7 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { getGetLayoutsQueryKey, putLayout } from "@/api/generated/layouts/layouts";
+import { useListMyProjects } from "@/api/generated/my-tools/my-tools";
 import {
   getListProjectsQueryKey,
   getReadProjectQueryKey,
@@ -32,21 +33,20 @@ import {
 import {
   createTaskStatus,
   deleteTaskStatus,
-  getListTaskStatusesQueryKey,
-  listTaskStatuses,
   reorderTaskStatuses,
   updateTaskStatus,
+  useListTaskStatuses,
 } from "@/api/generated/task-statuses/task-statuses";
 import {
   copyTaskTypes,
   createTaskType,
   deleteTaskType,
   getListTaskTypeGalleryQueryKey,
-  getListTaskTypesQueryKey,
-  listTaskTypeGallery,
-  listTaskTypes,
+  getListTaskTypesQueryOptions,
   reorderTaskTypes,
   updateTaskType,
+  useListTaskTypeGallery,
+  useListTaskTypes,
 } from "@/api/generated/task-types/task-types";
 import { invalidate, q, type Spec } from "@/api/query-keys";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
@@ -110,11 +110,8 @@ export const useProjectTaskStatuses = (
 ) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<TaskStatusRead[]>({
-    queryKey: getListTaskStatusesQueryKey(communityId, projectId!),
-    queryFn: () => listTaskStatuses(communityId, projectId!),
-    enabled: projectId !== null && Number.isFinite(projectId) && userEnabled,
-    ...rest,
+  return useListTaskStatuses(communityId, projectId!, {
+    query: { enabled: projectId !== null && Number.isFinite(projectId) && userEnabled, ...rest },
   });
 };
 
@@ -123,10 +120,7 @@ export const useProjectTaskStatuses = (
 export const useTaskTypesOf = (projectIds: readonly number[]) => {
   const communityId = useActiveCommunityId();
   return useQueries({
-    queries: projectIds.map((projectId) => ({
-      queryKey: getListTaskTypesQueryKey(communityId, projectId),
-      queryFn: () => listTaskTypes(communityId, projectId),
-    })),
+    queries: projectIds.map((projectId) => getListTaskTypesQueryOptions(communityId, projectId)),
   });
 };
 
@@ -138,11 +132,12 @@ export const useTaskTypeGallery = (
 ) => {
   const communityId = useActiveCommunityId();
   const { i18n } = useTranslation();
-  return useQuery<TaskTypeGalleryGroup[]>({
-    queryKey: [...getListTaskTypeGalleryQueryKey(communityId, projectId), i18n.language],
-    queryFn: () => listTaskTypeGallery(communityId, projectId),
-    staleTime: Number.POSITIVE_INFINITY,
-    ...options,
+  return useListTaskTypeGallery(communityId, projectId, {
+    query: {
+      queryKey: [...getListTaskTypeGalleryQueryKey(communityId, projectId), i18n.language],
+      staleTime: Number.POSITIVE_INFINITY,
+      ...options,
+    },
   });
 };
 
@@ -153,11 +148,8 @@ export const useProjectTaskTypes = (
 ) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<TaskTypeRead[]>({
-    queryKey: getListTaskTypesQueryKey(communityId, projectId!),
-    queryFn: () => listTaskTypes(communityId, projectId!),
-    enabled: projectId !== null && Number.isFinite(projectId) && userEnabled,
-    ...rest,
+  return useListTaskTypes(communityId, projectId!, {
+    query: { enabled: projectId !== null && Number.isFinite(projectId) && userEnabled, ...rest },
   });
 };
 
@@ -167,10 +159,7 @@ export const useGlobalProjects = (
   params?: ListMyProjectsParams,
   options?: QueryOpts<ProjectListResponse>
 ) => {
-  return useQuery<ProjectListResponse>({
-    ...projects.myListQuery(params),
-    ...options,
-  });
+  return useListMyProjects(params, { query: options });
 };
 
 // ── Mutations ───────────────────────────────────────────────────────────────
