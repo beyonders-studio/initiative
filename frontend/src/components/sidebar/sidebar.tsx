@@ -241,9 +241,11 @@ const SidebarProvider = React.forwardRef<
     }, []);
     const isSwipeCloseLocked = React.useCallback(() => swipeCloseLockedRef.current, []);
 
-    // Adds a keyboard shortcut to toggle the sidebar.
+    // Adds a keyboard shortcut to toggle the sidebar. A key something focused
+    // has already taken (bold, in the editor) is left to it.
     React.useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.defaultPrevented) return;
         if (event.key === SIDEBAR_KEYBOARD_SHORTCUT && (event.metaKey || event.ctrlKey)) {
           event.preventDefault();
           toggleSidebar();

@@ -45,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Making a thing from `[[` works in wiki pages and posts.** Choosing **Create** when nothing matched did nothing outside text documents; it now asks what kind of thing to make and links it, as it does in a document. An empty wiki says to link pages with `#`.
+- **Cmd/Ctrl+B and Cmd/Ctrl+K do one thing in a document.** Bold no longer folds the sidebar too, and making a link no longer opens search.
+- **The storage page gives the S3 move in the order that works.** Save S3 with **Serve missing objects from local** on, then start the backfill; **Start backfill** waits until S3 is saved, where before the page said to backfill first, which the server refused.
 - **Wrong text in the app.** The Support and Moderator descriptions under platform users said each other's powers, and the announcement editor listed Support before Moderator. Moving a task says it takes the destination project's default status rather than Backlog. Break glass, community AI, the cookie notice and the encryption note in group messages say what actually happens, dashboard datasets show their names, and the app's name is capitalized again.
 - **An error shows once.** Saving or deleting an initiative's settings, changing a plug-in, assigning yourself from a task's quick actions and changing a status in My Tasks no longer show the same error twice, and deleting a tag from its page says so once. Pinning a project, reordering projects or tasks, and closing tabs now say when they fail.
 - **Every passkey button works in the apps.** Signing in, creating an account, adding a passkey, a community's passkey ask, making a waiting change now, breaking glass and the billing console open your browser for the passkey and carry on in the app, with no second sign-in. The Android and Windows apps do the same for a server they can't use passkeys with directly.

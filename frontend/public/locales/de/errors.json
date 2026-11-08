@@ -313,7 +313,7 @@
   "NATIVE_OTA_BUNDLE_NOT_AVAILABLE": "Dieser Server-Build hat kein Over-the-Air-Update-Bundle verfügbar",
   "NATIVE_APP_UPDATE_REQUIRED": "Mit dieser Version der App ist keine Anmeldung mehr möglich. Aktualisiere die App und versuche es erneut.",
   "SETTINGS_STORAGE_BACKFILL_RUNNING": "Ein Backfill läuft bereits.",
-  "SETTINGS_STORAGE_BACKFILL_NOT_CONFIGURED": "Konfiguriere einen S3-Bucket, bevor du den Backfill ausführst.",
+  "SETTINGS_STORAGE_BACKFILL_NOT_CONFIGURED": "Speichere S3 als Speicher-Backend, bevor du die Übertragung startest.",
   "SETTINGS_STORAGE_BACKFILL_FAILED": "Der Backfill wurde wegen eines Fehlers abgebrochen. Details stehen im Serverprotokoll.",
   "SETTINGS_STORAGE_BUCKET_REQUIRED": "Gib einen Bucket-Namen ein, um die Verbindung zu testen.",
   "SETTINGS_STORAGE_CONNECTION_FAILED": "Der Bucket war nicht erreichbar. Prüfe die Einstellungen; Details stehen im Serverprotokoll.",

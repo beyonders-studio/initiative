@@ -172,6 +172,7 @@
     "gone": "Deleted",
     "noMatches": "Nothing in this initiative matches “{{query}}”.",
     "scopeHint": "Only this document’s initiative can be named here.",
+    "searchOrCreate": "Type to search, or make what is not there yet",
     "searching": "Searching…",
     "unavailable": "This is no longer available to you"
   },

@@ -150,9 +150,11 @@ export function CommandCenter() {
     };
   }, []);
 
-  // Keyboard shortcut
+  // Keyboard shortcut. A key something focused has already taken (a link, in
+  // the editor) is left to it.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setOpen((prev) => !prev);

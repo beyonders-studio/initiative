@@ -667,12 +667,22 @@ async def test_storage_update_refreshes_process_config(
     assert cfg.use_path_style is True
 
 
-async def test_storage_backfill_requires_bucket(
+async def test_storage_backfill_requires_s3_saved(
     client: AsyncClient, owner, reset_storage_cache: None
 ) -> None:
-    """The backfill writes to S3, so it needs a bucket configured first."""
+    """The backfill copies into the bucket the server is saved to use: no bucket,
+    or a bucket saved while the backend stays local, is refused up front."""
     resp = await client.post("/api/v1/settings/storage/backfill", headers=owner.headers)
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "SETTINGS_STORAGE_BACKFILL_NOT_CONFIGURED"
 
+    resp = await client.put(
+        "/api/v1/settings/storage",
+        json={**_S3_PAYLOAD, "backend": "local"},
+        headers=owner.headers,
+    )
+    assert resp.status_code == 200
+    resp = await client.post("/api/v1/settings/storage/backfill", headers=owner.headers)
     assert resp.status_code == 400
     assert resp.json()["detail"] == "SETTINGS_STORAGE_BACKFILL_NOT_CONFIGURED"
 

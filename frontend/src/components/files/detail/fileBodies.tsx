@@ -15,7 +15,6 @@ import {
   stampWhiteboardSceneCache,
   type WhiteboardSceneLoad,
 } from "@/components/files/whiteboardSceneCache";
-import { CreateReferencedThingDialog } from "@/components/references/CreateReferencedThingDialog";
 import type { UseCollaborationResult } from "@/hooks/useCollaboration";
 import { useCommunities, useSelfInCommunity } from "@/hooks/useCommunities";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -132,13 +131,6 @@ const NativeBody = ({
 }: FileBodyProps) => {
   const navigate = useNavigate();
   const gp = useCommunityPath();
-  // `[[ ]]` found nothing and offered to make it. The dialog owns which kind
-  // and whether this writer may; the reference it answers with goes straight
-  // into the sentence, so making something never costs the writer their place.
-  const [creating, setCreating] = useState<{
-    name: string;
-    onCreated: (entityType: SearchEntityType, entityId: number, name: string) => void;
-  } | null>(null);
 
   const handleWikilinkNavigate = useCallback(
     (targetFileId: number) => {
@@ -148,44 +140,25 @@ const NativeBody = ({
     },
     [navigate, gp, file.initiative_id]
   );
-  const handleCreateReferencedThing = useCallback(
-    (name: string, onCreated: NonNullable<typeof creating>["onCreated"]) =>
-      setCreating({ name, onCreated }),
-    []
-  );
 
   return (
-    <>
-      <Editor
-        editorSerializedState={saved as SerializedEditorState}
-        onSerializedChange={onChange}
-        readOnly={!canEdit}
-        showToolbar={canEdit}
-        className={cn("max-h-[80vh] bg-card", className)}
-        collaborative={live}
-        providerFactory={collaboration.providerFactory}
-        // Always track changes so the page's copy stays updated for periodic saves
-        trackChanges={true}
-        hasSynced={collaboration.hasSynced}
-        initiativeId={file.initiative_id}
-        subject={referenceRef(SearchEntityType.file, file.id)}
-        supportsEntityMentions={supportsEntityMentions(file.file_type)}
-        onWikilinkNavigate={handleWikilinkNavigate}
-        onCreateReferencedThing={handleCreateReferencedThing}
-        compact={compact}
-      />
-      {creating && (
-        <CreateReferencedThingDialog
-          name={creating.name}
-          initiativeId={file.initiative_id}
-          onCreated={(made) => {
-            creating.onCreated(made.entityType, made.entityId, made.name);
-            setCreating(null);
-          }}
-          onClose={() => setCreating(null)}
-        />
-      )}
-    </>
+    <Editor
+      editorSerializedState={saved as SerializedEditorState}
+      onSerializedChange={onChange}
+      readOnly={!canEdit}
+      showToolbar={canEdit}
+      className={cn("max-h-[80vh] bg-card", className)}
+      collaborative={live}
+      providerFactory={collaboration.providerFactory}
+      // Always track changes so the page's copy stays updated for periodic saves
+      trackChanges={true}
+      hasSynced={collaboration.hasSynced}
+      initiativeId={file.initiative_id}
+      subject={referenceRef(SearchEntityType.file, file.id)}
+      supportsEntityMentions={supportsEntityMentions(file.file_type)}
+      onWikilinkNavigate={handleWikilinkNavigate}
+      compact={compact}
+    />
   );
 };
 

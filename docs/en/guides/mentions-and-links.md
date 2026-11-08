@@ -54,7 +54,7 @@ The list reaches only this initiative (the document's own, when you're writing i
 1. Type `[[` and a few letters of the name.
 2. Pick it from the list.
 
-The difference from `#` is what happens when nothing matches. In a comment, a description or a text document, `[[` offers to make it on the spot, so you don't abandon the sentence you were halfway through:
+The difference from `#` is what happens when nothing matches. In a comment, a description, a text document, a wiki page or a post, `[[` offers to make it on the spot, so you don't abandon the sentence you were halfway through:
 
 1. Type `[[` and the new name.
 2. Select **Create "…"** at the end of the list.

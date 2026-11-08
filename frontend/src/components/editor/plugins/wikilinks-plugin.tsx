@@ -14,6 +14,7 @@ import {
 import { FileText, Plus } from "lucide-react";
 import { type JSX, useCallback, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 
 import { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import { $createEntityMentionNode } from "@/components/editor/nodes/entity-mention-node";
@@ -21,6 +22,7 @@ import {
   $createReferenceEmbedNode,
   $placeEmbed,
 } from "@/components/editor/nodes/reference-embed-node";
+import { CreateReferencedThingDialog } from "@/components/references/CreateReferencedThingDialog";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
 import { MENTIONABLE_TYPES } from "@/lib/mentions";
@@ -176,23 +178,23 @@ export interface WikilinksPluginProps {
    *  offered, and never made: a thing does not point at itself. */
   subject?: string | null;
   onNavigate?: (fileId: number) => void;
-  /** Asked to make what `[[ ]]` could not find. The caller opens the dialog
-   *  that knows which tools this initiative has; it answers with the reference
-   *  to drop in. */
-  onCreateThing?: (
-    name: string,
-    onCreated: (entityType: SearchEntityType, entityId: number, name: string) => void
-  ) => void;
 }
 
 export function WikilinksPlugin({
   initiativeId,
   subject,
   onNavigate,
-  onCreateThing,
 }: WikilinksPluginProps): JSX.Element | null {
+  const { t } = useTranslation(["editor", "comments"]);
   const [editor] = useLexicalComposerContext();
   const [queryString, setQueryString] = useState<string | null>(null);
+  // `[[ ]]` found nothing and offered to make it. The dialog owns which kind
+  // and whether this writer may; the reference it answers with goes straight
+  // into the sentence, so making something never costs the writer their place.
+  const [creating, setCreating] = useState<{
+    name: string;
+    onCreated: (entityType: SearchEntityType, entityId: number, name: string) => void;
+  } | null>(null);
 
   const embed = queryString !== null && pendingEmbed;
   const { options, isLoading } = useWikilinkSearch(queryString, initiativeId, subject, embed);
@@ -230,8 +232,11 @@ export function WikilinksPlugin({
       // comes back here to go in the sentence.
       if (selectedOption.isCreateNew) {
         closeMenu();
-        onCreateThing?.(selectedOption.title, (entityType, entityId, name) => {
-          editor.update(() => $place(entityType, entityId, name, nodeToReplace));
+        setCreating({
+          name: selectedOption.title,
+          onCreated: (entityType, entityId, name) => {
+            editor.update(() => $place(entityType, entityId, name, nodeToReplace));
+          },
         });
         return;
       }
@@ -262,7 +267,7 @@ export function WikilinksPlugin({
         closeMenu();
       });
     },
-    [editor, onCreateThing]
+    [editor]
   );
 
   const checkForTriggerMatch = useCallback(
@@ -277,98 +282,113 @@ export function WikilinksPlugin({
   }
 
   return (
-    <LexicalTypeaheadMenuPlugin<WikilinkTypeaheadOption>
-      onQueryChange={setQueryString}
-      onSelectOption={onSelectOption}
-      triggerFn={checkForTriggerMatch}
-      options={options}
-      anchorClassName="z-[60]"
-      menuRenderFn={(
-        anchorElementRef,
-        { selectedIndex, selectOptionAndCleanUp, setHighlightedIndex }
-      ) => {
-        if (!anchorElementRef.current) {
-          return null;
-        }
+    <>
+      <LexicalTypeaheadMenuPlugin<WikilinkTypeaheadOption>
+        onQueryChange={setQueryString}
+        onSelectOption={onSelectOption}
+        triggerFn={checkForTriggerMatch}
+        options={options}
+        anchorClassName="z-[60]"
+        menuRenderFn={(
+          anchorElementRef,
+          { selectedIndex, selectOptionAndCleanUp, setHighlightedIndex }
+        ) => {
+          if (!anchorElementRef.current) {
+            return null;
+          }
 
-        // Don't show menu if no query yet
-        if (queryString === null) {
-          return null;
-        }
+          // Don't show menu if no query yet
+          if (queryString === null) {
+            return null;
+          }
 
-        // Show loading or options
-        if (isLoading && options.length === 0) {
+          // Show loading or options
+          if (isLoading && options.length === 0) {
+            return createPortal(
+              <div className="absolute z-10 w-[300px] rounded-md border bg-popover p-2 text-popover-foreground shadow-md">
+                <span className="text-muted-foreground text-sm">{t("references.searching")}</span>
+              </div>,
+              anchorElementRef.current
+            );
+          }
+
+          if (options.length === 0) {
+            return createPortal(
+              <div className="absolute z-10 w-[300px] rounded-md border bg-popover p-2 text-popover-foreground shadow-md">
+                <span className="text-muted-foreground text-sm">
+                  {t("references.searchOrCreate")}
+                </span>
+              </div>,
+              anchorElementRef.current
+            );
+          }
+
           return createPortal(
-            <div className="absolute z-10 w-[300px] rounded-md border bg-popover p-2 text-popover-foreground shadow-md">
-              <span className="text-muted-foreground text-sm">Searching...</span>
+            <div className="absolute z-10 w-[300px] rounded-md shadow-md">
+              <Command
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setHighlightedIndex(
+                      selectedIndex !== null
+                        ? (selectedIndex - 1 + options.length) % options.length
+                        : options.length - 1
+                    );
+                  } else if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setHighlightedIndex(
+                      selectedIndex !== null ? (selectedIndex + 1) % options.length : 0
+                    );
+                  }
+                }}
+              >
+                <CommandList>
+                  <CommandGroup>
+                    {options.map((option, index) => (
+                      <CommandItem
+                        key={option.key}
+                        value={option.title}
+                        onSelect={() => {
+                          selectOptionAndCleanUp(option);
+                        }}
+                        className={`flex items-center gap-2 ${
+                          selectedIndex === index ? "bg-accent" : "bg-transparent!"
+                        }`}
+                      >
+                        {option.isCreateNew ? (
+                          <>
+                            <Plus className="h-4 w-4 text-muted-foreground" />
+                            <span className="truncate">
+                              {t("comments:createNamed", { name: option.title })}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            <span className="truncate">{option.title}</span>
+                          </>
+                        )}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
             </div>,
             anchorElementRef.current
           );
-        }
-
-        if (options.length === 0) {
-          return createPortal(
-            <div className="absolute z-10 w-[300px] rounded-md border bg-popover p-2 text-popover-foreground shadow-md">
-              <span className="text-muted-foreground text-sm">
-                Type to search, or make what is not there yet
-              </span>
-            </div>,
-            anchorElementRef.current
-          );
-        }
-
-        return createPortal(
-          <div className="absolute z-10 w-[300px] rounded-md shadow-md">
-            <Command
-              onKeyDown={(e) => {
-                if (e.key === "ArrowUp") {
-                  e.preventDefault();
-                  setHighlightedIndex(
-                    selectedIndex !== null
-                      ? (selectedIndex - 1 + options.length) % options.length
-                      : options.length - 1
-                  );
-                } else if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  setHighlightedIndex(
-                    selectedIndex !== null ? (selectedIndex + 1) % options.length : 0
-                  );
-                }
-              }}
-            >
-              <CommandList>
-                <CommandGroup>
-                  {options.map((option, index) => (
-                    <CommandItem
-                      key={option.key}
-                      value={option.title}
-                      onSelect={() => {
-                        selectOptionAndCleanUp(option);
-                      }}
-                      className={`flex items-center gap-2 ${
-                        selectedIndex === index ? "bg-accent" : "bg-transparent!"
-                      }`}
-                    >
-                      {option.isCreateNew ? (
-                        <>
-                          <Plus className="h-4 w-4 text-muted-foreground" />
-                          <span className="truncate">Create &ldquo;{option.title}&rdquo;</span>
-                        </>
-                      ) : (
-                        <>
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          <span className="truncate">{option.title}</span>
-                        </>
-                      )}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </div>,
-          anchorElementRef.current
-        );
-      }}
-    />
+        }}
+      />
+      {creating && (
+        <CreateReferencedThingDialog
+          name={creating.name}
+          initiativeId={initiativeId}
+          onCreated={(made) => {
+            creating.onCreated(made.entityType, made.entityId, made.name);
+            setCreating(null);
+          }}
+          onClose={() => setCreating(null)}
+        />
+      )}
+    </>
   );
 }

@@ -92,6 +92,8 @@ describe("SettingsStoragePage", () => {
     expect(screen.queryByLabelText("Bucket")).not.toBeInTheDocument();
     // Test connection is disabled for local (nothing remote to reach).
     expect(screen.getByRole("button", { name: "Test connection" })).toBeDisabled();
+    // The backfill copies into the saved bucket, which local has not got.
+    expect(screen.getByRole("button", { name: "Start backfill" })).toBeDisabled();
     storageData = { ...storageData, backend: "s3" }; // restore for other tests
   });
 });

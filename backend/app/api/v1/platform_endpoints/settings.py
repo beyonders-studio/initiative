@@ -683,10 +683,12 @@ async def start_storage_backfill(
     session: SystemSessionDep,
     _owner: ConfigManageDep,
 ) -> StorageBackfillStatusResponse:
-    # The backfill writes to S3 via the saved credentials, so they must be set
-    # (the documented flow runs it while still serving on "local").
+    # The backfill copies into the bucket the server is saved to use, so it runs
+    # once S3 is the saved backend ("Serve missing objects from local" covers
+    # the files it has not copied yet).
     settings_obj = await app_settings_service.get_app_settings(session)
-    if not settings_obj.s3_bucket:
+    saved_backend = (settings_obj.storage_backend or "local").lower()
+    if saved_backend != "s3" or not settings_obj.s3_bucket:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=SettingsMessages.STORAGE_BACKFILL_NOT_CONFIGURED,
