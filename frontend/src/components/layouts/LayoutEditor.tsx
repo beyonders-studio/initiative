@@ -14,8 +14,8 @@ import type {
   ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
-import type { FieldDisplay } from "@/components/properties/propertyHelpers";
-import { type MetadataOwner, NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
+import type { FieldDisplay, MetadataOwner } from "@/components/properties/propertyHelpers";
+import { NO_DEFINITIONS, useCreateProperty, useOwnedDefinitions } from "@/hooks/useProperties";
 import {
   detailLayoutOf,
   type LayoutChange,
@@ -354,6 +354,7 @@ export const LayoutEditor = ({
     initiativeId,
     owner: project ? owner : undefined,
   });
+  const createProperty = useCreateProperty();
   // A detail's fields are its own; a list's are its target's.
   const fields = useMemo(
     () =>
@@ -535,7 +536,7 @@ export const LayoutEditor = ({
   const choices =
     current?.kind === "calendar" || current?.kind === "gantt" || (!current && !detail)
       ? listed
-      : { ...listed, newField: { initiativeId, owner } };
+      : { ...listed, newField: { initiativeId, owner, create: createProperty.mutateAsync } };
   const addersAt = (place?: Place): Adders =>
     current?.kind === "table"
       ? { onField: (id) => edits.addColumn(id, place?.index), onPart: noop, onNode: noop }

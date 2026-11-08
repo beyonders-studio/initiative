@@ -1,5 +1,5 @@
-import { ChevronDown, Minus, Plus, RotateCcw, Star, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ChevronDown, ChevronsUpDown, Minus, Plus, RotateCcw, Star, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -9,8 +9,7 @@ import {
   type PropertySummary,
   type Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { type MemberLike, MemberSelect } from "@/components/members/MemberSearchSelect";
-import { useAppendPropertyOption } from "@/hooks/useProperties";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import { Combobox } from "@/ui/combobox";
@@ -35,6 +34,27 @@ import { SignatureFieldInput } from "./SignatureFieldInput";
 
 type PropertyDefinitionLike = PropertyDefinitionRead | PropertySummary;
 
+/** Someone a person-valued property may name, as they are drawn. */
+export interface Member {
+  id: number;
+  name: string;
+  /** Their picture; their initials are drawn where they have none. */
+  picture?: string;
+  initials: string;
+}
+
+/** Whose people a person-valued property may name: who can open the row it
+ *  is on, or, without one, its initiative's members. */
+export type MemberScope =
+  | { type: "canOpen"; tool: Tool; id: number | null | undefined }
+  | { type: "initiative"; initiativeId: number | null | undefined };
+
+/** The members of `scope` whose names match `search`, or those `ids` names. */
+export type SearchMembers = (
+  scope: MemberScope,
+  query: { search: string } | { ids: number[] }
+) => Promise<Member[]>;
+
 export interface PropertyInputProps {
   definition: PropertyDefinitionLike;
   value: unknown;
@@ -50,10 +70,18 @@ export interface PropertyInputProps {
    *  project, the event's calendar, the file). Without it the picker
    *  offers the initiative's members, which is what a filter wants. */
   canOpen?: { tool: Tool; id: number | null | undefined };
-  /** Display info for a pre-set `user_reference` value so the picker shows a
-   *  name without a search round-trip (the server returns `{id, display_name}`
-   *  on reads). */
-  selectedUser?: MemberLike | null;
+  /** Adds an option named `label` to a select property, or finds the one
+   *  already named so, and answers with it. A failure is told by this, and
+   *  rejects. */
+  appendOption: (
+    definition: { id: number; options: PropertyOption[] },
+    label: string
+  ) => Promise<PropertyOption>;
+  /** Finds the people a `user_reference` value may name. */
+  searchMembers: SearchMembers;
+  /** Who a pre-set `user_reference` value names, so the picker shows them
+   *  without a search round-trip. Without it, the value is looked up. */
+  selectedUser?: Member | null;
   /** How a scale is set: as a number, by stars, or along a bar. A number
    *  without. */
   display?: FieldDisplay | null;
@@ -105,32 +133,6 @@ const coerceId = (value: unknown): number | null => {
     if (typeof id === "number" && Number.isFinite(id)) return id;
   }
   return null;
-};
-
-// Construct the (minimal) ``PropertyDefinitionRead`` shape the append-option
-// hook expects. The local definition may arrive as a ``PropertySummary``
-// embedded on an entity read; those have the same ``options`` + id fields
-// under different names.
-const toDefinitionForPatch = (defn: PropertyDefinitionLike): PropertyDefinitionRead => {
-  if ("id" in defn) return defn;
-  const summary = defn as PropertySummary;
-  return {
-    id: summary.property_id,
-    // The remaining fields aren't used by the append helper, but the type
-    // demands them. They're harmless placeholders.
-    initiative_id: 0,
-    name: summary.name,
-    type: summary.type,
-    position: 0,
-    color: null,
-    options: summary.options ?? null,
-    currency: summary.currency ?? null,
-    counter: summary.counter ?? null,
-    project_id: summary.project_id,
-    collection_id: summary.collection_id,
-    created_at: "",
-    updated_at: "",
-  } as PropertyDefinitionRead;
 };
 
 /** A scale of 0–100 set as its layout draws it: a number, one of five stars
@@ -288,6 +290,139 @@ const CounterInput = ({
   );
 };
 
+const MemberAvatar = ({ member, className }: { member: Member; className?: string }) => (
+  <Avatar className={cn("h-6 w-6 border text-3xs", className)}>
+    {member.picture ? <AvatarImage src={member.picture} alt={member.name} /> : null}
+    <AvatarFallback userId={member.id}>{member.initials}</AvatarFallback>
+  </Avatar>
+);
+
+/** One of the people who can open `canOpen`, or else of `initiativeId`,
+ *  searched for by name while the list is open; or nobody. */
+const MemberInput = ({
+  searchMembers,
+  canOpen,
+  initiativeId,
+  value,
+  selected,
+  onChange,
+  disabled,
+  className,
+}: {
+  searchMembers: SearchMembers;
+  canOpen: PropertyInputProps["canOpen"];
+  initiativeId: number | null | undefined;
+  value: number | null;
+  selected: Member | null;
+  onChange: (value: unknown) => void;
+  disabled: boolean;
+  className?: string;
+}) => {
+  const { t } = useTranslation(["properties", "common"]);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [found, setFound] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(false);
+  // Who the value names once it is picked or looked up.
+  const [named, setNamed] = useState<Member | null>(null);
+
+  // Kept by its parts, so a scope given afresh each render asks nothing new.
+  const tool = canOpen?.tool;
+  const rowId = canOpen?.id;
+  const search = useCallback(
+    (asked: Parameters<SearchMembers>[1]) =>
+      searchMembers(
+        tool ? { type: "canOpen", tool, id: rowId } : { type: "initiative", initiativeId },
+        asked
+      ),
+    [searchMembers, tool, rowId, initiativeId]
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    let current = true;
+    setLoading(true);
+    search({ search: query })
+      .then((members) => {
+        if (current) setFound(members);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (current) setLoading(false);
+      });
+    return () => {
+      current = false;
+    };
+  }, [open, query, search]);
+
+  const shown =
+    value === null
+      ? null
+      : ([named, selected, ...found].find((each) => each?.id === value) ?? null);
+  const unnamed = value !== null && shown === null ? value : null;
+  useEffect(() => {
+    if (unnamed === null) return;
+    let current = true;
+    search({ ids: [unnamed] })
+      .then(([member]) => {
+        if (current && member) setNamed(member);
+      })
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  }, [unnamed, search]);
+
+  const drawn =
+    shown ??
+    (value === null
+      ? null
+      : { id: value, name: t("common:userWithId", { id: value }), initials: "?" });
+
+  return (
+    <Combobox
+      items={[
+        // Clearing is listed first while there is something to clear: "" is
+        // no member's id.
+        ...(value !== null ? [{ value: "", label: t("common:clear"), icon: X }] : []),
+        ...found.map((member) => ({
+          value: String(member.id),
+          label: member.name,
+          icon: <MemberAvatar member={member} />,
+        })),
+      ]}
+      value={value !== null ? String(value) : null}
+      onValueChange={(next) => {
+        const member = found.find((each) => String(each.id) === next) ?? null;
+        setNamed(member);
+        onChange(member ? member.id : null);
+      }}
+      onSearchChange={setQuery}
+      onOpenChange={setOpen}
+      loading={loading && found.length === 0}
+      searchPlaceholder={t("properties:input.userPlaceholder")}
+      emptyMessage={t("properties:input.textPlaceholder")}
+      disabled={disabled}
+      trigger={
+        <Button
+          variant="outline"
+          role="combobox"
+          disabled={disabled}
+          className={cn("w-full justify-between", !drawn && "text-muted-foreground", className)}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            {drawn ? <MemberAvatar member={drawn} className="h-5 w-5 text-3xs" /> : null}
+            <span className="truncate">
+              {drawn ? drawn.name : t("properties:input.userPlaceholder")}
+            </span>
+          </span>
+          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      }
+    />
+  );
+};
+
 // ── Component ──────────────────────────────────────────────────────────────
 
 export const PropertyInput = ({
@@ -298,6 +433,8 @@ export const PropertyInput = ({
   className,
   initiativeId,
   canOpen,
+  appendOption,
+  searchMembers,
   selectedUser,
   display,
   onStep,
@@ -475,6 +612,7 @@ export const PropertyInput = ({
         <PropertyOptionPicker
           definition={definition}
           options={options}
+          appendOption={appendOption}
           mode="single"
           selected={coerceString(value)}
           onChangeSingle={(next) => onChange(next ?? null)}
@@ -489,6 +627,7 @@ export const PropertyInput = ({
         <PropertyOptionPicker
           definition={definition}
           options={options}
+          appendOption={appendOption}
           mode="multi"
           selectedMulti={coerceStringArray(value)}
           onChangeMulti={(next) => onChange(next)}
@@ -499,24 +638,19 @@ export const PropertyInput = ({
     }
 
     case MetadataType.user_reference: {
-      const currentId = coerceId(value);
       // The people who can open the row the value sits on; without that row
       // (a filter), the property's initiative. Prefer the explicit prop,
       // falling back to the definition's own initiative when it carries one.
-      const scopedInitiativeId =
-        initiativeId ?? ("initiative_id" in definition ? definition.initiative_id : null);
       return (
-        <MemberSelect
-          scope={
-            canOpen
-              ? { type: "canOpen", ...canOpen }
-              : { type: "initiative", initiativeId: scopedInitiativeId }
+        <MemberInput
+          searchMembers={searchMembers}
+          canOpen={canOpen}
+          initiativeId={
+            initiativeId ?? ("initiative_id" in definition ? definition.initiative_id : null)
           }
-          value={currentId}
-          onChange={(next) => onChange(next)}
-          selectedUser={selectedUser ?? null}
-          placeholder={t("properties:input.userPlaceholder")}
-          emptyMessage={t("properties:input.textPlaceholder")}
+          value={coerceId(value)}
+          selected={selectedUser ?? null}
+          onChange={onChange}
           disabled={disabled}
           className={className}
         />
@@ -563,6 +697,7 @@ export const PropertyInput = ({
 type PropertyOptionPickerProps = {
   definition: PropertyDefinitionLike;
   options: PropertyOption[];
+  appendOption: PropertyInputProps["appendOption"];
   disabled?: boolean;
   className?: string;
 } & (
@@ -585,6 +720,7 @@ type PropertyOptionPickerProps = {
 const PropertyOptionPicker = ({
   definition,
   options,
+  appendOption,
   mode,
   selected,
   onChangeSingle,
@@ -595,23 +731,28 @@ const PropertyOptionPicker = ({
 }: PropertyOptionPickerProps) => {
   const { t } = useTranslation(["properties", "common"]);
   const [open, setOpen] = useState(false);
-  const { appendOption, isPending } = useAppendPropertyOption();
+  const [adding, setAdding] = useState(false);
 
   const isMulti = mode === "multi";
   const selectedArr = isMulti ? (selectedMulti ?? []) : selected ? [selected] : [];
 
   const knownValues = useMemo(() => new Set(options.map((option) => option.value)), [options]);
 
-  // A failure is toasted by the hook, and rejects so the picker keeps the
-  // typed name to try again.
+  // A failure rejects, so the picker keeps the typed name to try again.
   const handleCreate = async (label: string) => {
-    if (isPending) return;
-    const slug = (await appendOption(toDefinitionForPatch(definition), label)).option.value;
-    if (isMulti) {
-      if (!selectedArr.includes(slug)) onChangeMulti([...selectedArr, slug]);
-    } else {
-      onChangeSingle(slug);
-      setOpen(false);
+    if (adding) return;
+    setAdding(true);
+    try {
+      const id = "id" in definition ? definition.id : definition.property_id;
+      const slug = (await appendOption({ id, options }, label)).value;
+      if (isMulti) {
+        if (!selectedArr.includes(slug)) onChangeMulti([...selectedArr, slug]);
+      } else {
+        onChangeSingle(slug);
+        setOpen(false);
+      }
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -641,7 +782,7 @@ const PropertyOptionPicker = ({
     onOpenChange: setOpen,
     typedLabel: (typed: string) => typed && t("properties:input.createOption", { label: typed }),
     onCreate: handleCreate,
-    loading: isPending,
+    loading: adding,
     searchPlaceholder: t("properties:input.searchOptions"),
     emptyMessage: t("properties:picker.empty"),
     disabled,

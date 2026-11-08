@@ -1,11 +1,8 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
 import { buildPropertyDefinition } from "@/__tests__/factories/properties";
-import { communityHttp } from "@/__tests__/helpers/communityHttp";
-import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import type { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 
@@ -21,6 +18,7 @@ describe("AddPropertyButton", () => {
           buildPropertyDefinition({ id: 3, name: "Gamma" }),
         ]}
         initiativeId={7}
+        create={vi.fn()}
         currentPropertyIds={[]}
         onAdd={vi.fn()}
       />
@@ -39,6 +37,7 @@ describe("AddPropertyButton", () => {
           buildPropertyDefinition({ id: 1, name: "Budget" }),
         ]}
         initiativeId={7}
+        create={vi.fn()}
         owner={{ kind: "project", id: 4 }}
         currentPropertyIds={[]}
         onAdd={vi.fn()}
@@ -61,6 +60,7 @@ describe("AddPropertyButton", () => {
           buildPropertyDefinition({ id: 2, name: "Beta" }),
         ]}
         initiativeId={7}
+        create={vi.fn()}
         currentPropertyIds={[1]}
         onAdd={vi.fn()}
       />
@@ -77,6 +77,7 @@ describe("AddPropertyButton", () => {
       <AddPropertyButton
         definitions={defs}
         initiativeId={7}
+        create={vi.fn()}
         currentPropertyIds={[]}
         onAdd={onAdd}
       />
@@ -96,6 +97,7 @@ describe("AddPropertyButton", () => {
           buildPropertyDefinition({ id: 2, name: "Beta" }),
         ]}
         initiativeId={7}
+        create={vi.fn()}
         currentPropertyIds={[]}
         onAdd={vi.fn()}
       />
@@ -109,25 +111,20 @@ describe("AddPropertyButton", () => {
     });
   });
 
-  it("creates a new property via the mutation and calls onAdd with the returned definition", async () => {
-    const bodies: unknown[] = [];
-    server.use(
-      communityHttp.post("/property-definitions/", async ({ request }) => {
-        const body = await request.json();
-        bodies.push(body);
-        return HttpResponse.json(
-          buildPropertyDefinition({
-            id: 99,
-            name: (body as { name: string }).name,
-            type: (body as { type: MetadataType }).type,
-          })
-        );
-      })
+  it("creates a new property through create and calls onAdd with the returned definition", async () => {
+    const create = vi.fn(async (body: { name: string; type: MetadataType }) =>
+      buildPropertyDefinition({ id: 99, name: body.name, type: body.type })
     );
 
     const onAdd = vi.fn();
     renderWithProviders(
-      <AddPropertyButton definitions={[]} initiativeId={7} currentPropertyIds={[]} onAdd={onAdd} />
+      <AddPropertyButton
+        definitions={[]}
+        initiativeId={7}
+        create={create}
+        currentPropertyIds={[]}
+        onAdd={onAdd}
+      />
     );
 
     await userEvent.click(screen.getByRole("button", { name: /Add metadata/i }));
@@ -143,9 +140,9 @@ describe("AddPropertyButton", () => {
     await userEvent.click(submit);
 
     await waitFor(() => {
-      expect(bodies).toHaveLength(1);
+      expect(create).toHaveBeenCalledTimes(1);
     });
-    expect(bodies[0]).toEqual(
+    expect(create.mock.calls[0][0]).toEqual(
       expect.objectContaining({
         name: "Quarter",
         type: "text",
@@ -162,6 +159,7 @@ describe("AddPropertyButton", () => {
       <AddPropertyButton
         definitions={[]}
         initiativeId={7}
+        create={vi.fn()}
         currentPropertyIds={[]}
         onAdd={vi.fn()}
         disabled

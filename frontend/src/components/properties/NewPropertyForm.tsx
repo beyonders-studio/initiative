@@ -10,7 +10,6 @@ import {
   type PropertyDefinitionRead,
   type PropertyOption,
 } from "@/api/generated/initiativeAPI.schemas";
-import { type MetadataOwner, ownerColumns, useCreateProperty } from "@/hooks/useProperties";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
@@ -18,7 +17,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
 
 import { CounterSettingsFields, counterSettingsValid } from "./CounterSettingsFields";
 import { CurrencySelect, useDefaultCurrency } from "./CurrencySelect";
-import { normalizeOptionList, typeRequiresOptions } from "./propertyHelpers";
+import {
+  type MetadataOwner,
+  normalizeOptionList,
+  ownerColumns,
+  typeRequiresOptions,
+} from "./propertyHelpers";
 import { iconForPropertyType } from "./propertyTypeIcons";
 
 /** The types people define a property or metadata as, in the order they are
@@ -40,6 +44,12 @@ export const PROPERTY_TYPES: MetadataType[] = [
   MetadataType.signature,
 ];
 
+/** Makes a property, answering with it as made. A failure is told by this,
+ *  and rejects. */
+export type CreateProperty = (
+  property: PropertyDefinitionCreate
+) => Promise<PropertyDefinitionRead>;
+
 /**
  * A new property for an initiative, or metadata of one of its projects or
  * collections: its name, its type and, for a select, its options, for money
@@ -53,6 +63,7 @@ export const PROPERTY_TYPES: MetadataType[] = [
 export const NewPropertyForm = ({
   initiativeId,
   owner,
+  create,
   name: startName = "",
   type: startType = MetadataType.text,
   onCreated,
@@ -63,6 +74,7 @@ export const NewPropertyForm = ({
   /** The project or collection it may be metadata of; left out, it is the
    *  initiative's property. */
   owner?: MetadataOwner;
+  create: CreateProperty;
   /** What the name starts as: what was searched for, say. */
   name?: string;
   /** The type it starts as. */
@@ -83,7 +95,7 @@ export const NewPropertyForm = ({
   const defaultCurrency = useDefaultCurrency();
   const [newCurrency, setNewCurrency] = useState<CurrencyCode>(defaultCurrency);
   const [newCounter, setNewCounter] = useState<CounterSettingsInput>({});
-  const createPropertyMutation = useCreateProperty();
+  const [pending, setPending] = useState(false);
 
   const handleAddOption = () => setNewOptions((prev) => [...prev, { value: "", label: "" }]);
   const handleOptionChange = (index: number, patch: Partial<PropertyOption>) =>
@@ -110,12 +122,14 @@ export const NewPropertyForm = ({
       ...(newType === MetadataType.currency ? { currency: newCurrency } : {}),
       ...(newType === MetadataType.counter ? { counter: newCounter } : {}),
     };
+    setPending(true);
     onPendingChange?.(true);
     try {
-      onCreated(await createPropertyMutation.mutateAsync(payload));
+      onCreated(await create(payload));
     } catch {
-      // toast handled inside the mutation hook
+      // `create` tells of the failure.
     } finally {
+      setPending(false);
       onPendingChange?.(false);
     }
   };
@@ -270,17 +284,11 @@ export const NewPropertyForm = ({
           size="sm"
           className="flex-1"
           onClick={() => void handleCreate()}
-          disabled={!canSubmit || createPropertyMutation.isPending}
+          disabled={!canSubmit || pending}
         >
           {t("properties:picker.createButton")}
         </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={onCancel}
-          disabled={createPropertyMutation.isPending}
-        >
+        <Button type="button" size="sm" variant="outline" onClick={onCancel} disabled={pending}>
           {t("common:cancel")}
         </Button>
       </div>

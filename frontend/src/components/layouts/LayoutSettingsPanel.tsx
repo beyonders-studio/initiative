@@ -13,11 +13,11 @@ import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import {
   COUNTER_DISPLAYS,
   type FieldDisplay,
+  type MetadataOwner,
   SCALE_DISPLAYS,
 } from "@/components/properties/propertyHelpers";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { MAX_COLUMN_LIMIT } from "@/hooks/useColumnLimits";
-import type { MetadataOwner } from "@/hooks/useProperties";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { LAYOUT_REGIONS } from "@/lib/layouts/detailLayout";
 import {

@@ -18,12 +18,15 @@ import {
 } from "@/components/properties/CounterSettingsFields";
 import { CurrencySelect, useDefaultCurrency } from "@/components/properties/CurrencySelect";
 import { PROPERTY_TYPES } from "@/components/properties/NewPropertyForm";
-import { normalizeOptionList, typeRequiresOptions } from "@/components/properties/propertyHelpers";
+import {
+  type MetadataOwner,
+  normalizeOptionList,
+  ownerColumns,
+  typeRequiresOptions,
+} from "@/components/properties/propertyHelpers";
 import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import {
-  type MetadataOwner,
-  ownerColumns,
   useCreateProperty,
   useDeleteProperties,
   useDeleteProperty,

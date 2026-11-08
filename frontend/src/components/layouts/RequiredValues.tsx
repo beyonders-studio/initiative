@@ -12,7 +12,9 @@ import { useFileFieldFiles } from "@/components/files/useFileFieldFiles";
 import { PropertyInput } from "@/components/properties/PropertyInput";
 import { isEmptyPropertyValue } from "@/components/properties/propertyHelpers";
 import { TagPicker } from "@/components/tags";
+import { useAppendPropertyOption } from "@/hooks/useProperties";
 import { detailLayoutOf, useToolLayouts } from "@/hooks/useToolLayouts";
+import { useSearchMembers } from "@/hooks/useUsers";
 import { missingRequired, requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
 import { PROPERTY_FIELD_PREFIX } from "@/lib/layouts/fields";
 import { Label } from "@/ui/label";
@@ -100,6 +102,8 @@ export const RequiredValues = ({
   idPrefix: string;
 }) => {
   const { t } = useTranslation("common");
+  const appendOption = useAppendPropertyOption();
+  const searchMembers = useSearchMembers();
   const files = useFileFieldFiles(initiativeId);
   const byId = new Map(definitions.map((definition) => [definition.id, definition]));
   return keys.map((key) => {
@@ -126,6 +130,8 @@ export const RequiredValues = ({
             onChange({ ...draft, values: new Map(draft.values).set(definition.id, value) })
           }
           initiativeId={initiativeId}
+          appendOption={appendOption}
+          searchMembers={searchMembers}
           files={files}
         />
       </Asked>

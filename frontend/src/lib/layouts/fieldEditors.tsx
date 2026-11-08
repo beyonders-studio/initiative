@@ -33,6 +33,7 @@ import { PropertyInput } from "@/components/properties/PropertyInput";
 import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
 import {
   isEmptyPropertyValue,
+  type MetadataOwner,
   normalizePropertyValue,
   ownProperties,
   propertyStubFromDefinition,
@@ -56,11 +57,17 @@ import {
   useItemFieldSave,
 } from "@/hooks/useFieldSave";
 import { usePastedImages } from "@/hooks/usePastedImages";
-import { type MetadataOwner, NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
-import type { MemberSearchScope } from "@/hooks/useUsers";
+import {
+  NO_DEFINITIONS,
+  useAppendPropertyOption,
+  useCreateProperty,
+  useOwnedDefinitions,
+} from "@/hooks/useProperties";
+import { type MemberSearchScope, useSearchMembers } from "@/hooks/useUsers";
 import { getHttpStatus } from "@/lib/errorMessage";
 import { currentServerKey } from "@/lib/offlineSession";
 import { getItem, removeItem, setItem } from "@/lib/storage";
+import { hasDisplayName, toMember } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -353,9 +360,12 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
 }) => {
   const { t } = useTranslation(["properties", "common"]);
   const save = useItemFieldSave(kind, id, property.name);
+  const appendOption = useAppendPropertyOption();
+  const searchMembers = useSearchMembers();
   const adding = useContext(ItemDraftContext) !== null;
   const files = useFileFieldFiles(initiativeId);
   const saved = normalizePropertyValue(property);
+  const person = userReferenceValue(property);
   const edit = (value: unknown): ItemEdit<I, P> => ({
     properties: { values: [{ property_id: property.property_id, value }] },
     shows: { properties: withValue(properties, property, value) } as Partial<I>,
@@ -424,7 +434,9 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
         disabled={readOnly}
         initiativeId={initiativeId}
         canOpen={canOpen}
-        selectedUser={userReferenceValue(property)}
+        appendOption={appendOption}
+        searchMembers={searchMembers}
+        selectedUser={person && hasDisplayName(person) ? toMember(person) : null}
         updatedAt={updatedAt}
         files={files}
       />
@@ -565,6 +577,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
   const label = t(props.owner ? "titleWithMetadata" : "title");
   const none = t(props.owner ? "noPropertiesOrMetadata" : "noMetadata");
   const save = useItemFieldSave(kind, id, label);
+  const createProperty = useCreateProperty();
   const add = (definition: PropertyDefinitionRead) => {
     if (properties.some((p) => p.property_id === definition.id)) return;
     void save.save({
@@ -629,6 +642,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
         loading={definitions.isLoading}
         initiativeId={initiativeId ?? 0}
         owner={props.owner}
+        create={createProperty.mutateAsync}
         currentPropertyIds={[...listed.map((p) => p.property_id), ...(except ?? [])]}
         onAdd={add}
         disabled={readOnly || !initiativeId}

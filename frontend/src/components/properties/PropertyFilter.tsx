@@ -7,7 +7,7 @@ import { Button } from "@/ui/button";
 import { cn } from "@/ui/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
-import { PropertyInput, type PropertyInputProps } from "./PropertyInput";
+import { PropertyInput, type PropertyInputProps, type SearchMembers } from "./PropertyInput";
 import { iconForPropertyType } from "./propertyTypeIcons";
 
 export interface PropertyFilterCondition {
@@ -37,6 +37,9 @@ export interface PropertyFilterProps {
   /** The properties the list may be filtered by, and the metadata of the
    *  project it lists, where it lists one project's tasks. */
   definitions: PropertyDefinitionRead[];
+  /** What a value's input adds or looks up, as `PropertyInput` takes them. */
+  appendOption: PropertyInputProps["appendOption"];
+  searchMembers: SearchMembers;
   /** Plug-in fields offered beside the properties, and the filters on them. */
   plugins?: { fields: PluginFilterField[]; value: PluginFilterCondition[] };
   maxFilters?: number;
@@ -149,6 +152,8 @@ export const PropertyFilter = ({
   value,
   onChange,
   definitions,
+  appendOption,
+  searchMembers,
   plugins,
   maxFilters = DEFAULT_MAX_FILTERS,
   className,
@@ -380,6 +385,8 @@ export const PropertyFilter = ({
                       definition={definition.input}
                       value={entry.value}
                       onChange={(next) => handleValueChange(index, next)}
+                      appendOption={appendOption}
+                      searchMembers={searchMembers}
                     />
                   ) : (
                     <div className="text-muted-foreground text-sm">{opLabel(entry.op)}</div>

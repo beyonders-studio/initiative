@@ -25,7 +25,12 @@ import type {
 import { FileKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { PropertyFilter, parsePropertyFilters } from "@/components/properties/PropertyFilter";
 import { TagFilterPicker } from "@/components/tags/TagFilterPicker";
-import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
+import {
+  NO_DEFINITIONS,
+  useAppendPropertyOption,
+  useOwnedDefinitions,
+} from "@/hooks/useProperties";
+import { useSearchMembers } from "@/hooks/useUsers";
 import { toolCamelPlural } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
 import { Input } from "@/ui/input";
@@ -109,6 +114,8 @@ const SearchTagFields = ({
   const { t: translate } = useTranslation([toolCamelPlural(tool) as FlatNamespace, "tags"]);
   const t = translate as TranslateFn;
   const id = useId();
+  const appendOption = useAppendPropertyOption();
+  const searchMembers = useSearchMembers();
   const { data: definitions = NO_DEFINITIONS } = useOwnedDefinitions({ initiativeId });
 
   return (
@@ -151,6 +158,8 @@ const SearchTagFields = ({
           })
         }
         definitions={definitions}
+        appendOption={appendOption}
+        searchMembers={searchMembers}
       />
     </>
   );
