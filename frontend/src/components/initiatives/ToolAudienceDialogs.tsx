@@ -40,65 +40,66 @@ export interface ToolEnableDialogProps {
   isSaving: boolean;
 }
 
-export const ToolEnableDialog = ({ onOpenChange, ...props }: ToolEnableDialogProps) => (
-  <Dialog open={props.tool !== null} onOpenChange={onOpenChange}>
-    <DialogContent>
-      <ToolAudienceForm {...props} />
-    </DialogContent>
-  </Dialog>
-);
-
-// Drawn only while the dialog is open: each tool is its own question, so the
-// last answer is not carried into the next.
-const ToolAudienceForm = ({
+export const ToolEnableDialog = ({
   tool,
+  onOpenChange,
   onConfirm,
   isSaving,
-}: Omit<ToolEnableDialogProps, "onOpenChange">) => {
+}: ToolEnableDialogProps) => {
   const { t } = useTranslation(["initiatives", "common"]);
   const [audience, setAudience] = useState<ToolAudience>("everyone");
+
+  // Each tool is its own question; don't carry the last answer into the next.
+  const [prevTool, setPrevTool] = useState(tool);
+  if (prevTool !== tool) {
+    setPrevTool(tool);
+    if (tool) setAudience("everyone");
+  }
+
   const toolName = tool ? t(`${toolCamelPlural(tool)}Feature` as never) : "";
 
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>{t("settings.toolAudience.enableTitle", { tool: toolName })}</DialogTitle>
-        <DialogDescription>{t("settings.toolAudience.enableDescription")}</DialogDescription>
-      </DialogHeader>
-      <RadioGroup
-        value={audience}
-        onValueChange={(value) => setAudience(value as ToolAudience)}
-        className="gap-3"
-      >
-        <div className="flex items-start gap-3 rounded-md border p-3">
-          <RadioGroupItem value="everyone" id="tool-audience-everyone" className="mt-1" />
-          <div className="space-y-0.5">
-            <Label htmlFor="tool-audience-everyone" className="font-medium">
-              {t("settings.toolAudience.everyoneLabel")}
-            </Label>
-            <p className="text-muted-foreground text-xs">
-              {t("settings.toolAudience.everyoneDescription")}
-            </p>
+    <Dialog open={tool !== null} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("settings.toolAudience.enableTitle", { tool: toolName })}</DialogTitle>
+          <DialogDescription>{t("settings.toolAudience.enableDescription")}</DialogDescription>
+        </DialogHeader>
+        <RadioGroup
+          value={audience}
+          onValueChange={(value) => setAudience(value as ToolAudience)}
+          className="gap-3"
+        >
+          <div className="flex items-start gap-3 rounded-md border p-3">
+            <RadioGroupItem value="everyone" id="tool-audience-everyone" className="mt-1" />
+            <div className="space-y-0.5">
+              <Label htmlFor="tool-audience-everyone" className="font-medium">
+                {t("settings.toolAudience.everyoneLabel")}
+              </Label>
+              <p className="text-muted-foreground text-xs">
+                {t("settings.toolAudience.everyoneDescription")}
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-start gap-3 rounded-md border p-3">
-          <RadioGroupItem value="managers" id="tool-audience-managers" className="mt-1" />
-          <div className="space-y-0.5">
-            <Label htmlFor="tool-audience-managers" className="font-medium">
-              {t("settings.toolAudience.managersLabel")}
-            </Label>
-            <p className="text-muted-foreground text-xs">
-              {t("settings.toolAudience.managersDescription")}
-            </p>
+          <div className="flex items-start gap-3 rounded-md border p-3">
+            <RadioGroupItem value="managers" id="tool-audience-managers" className="mt-1" />
+            <div className="space-y-0.5">
+              <Label htmlFor="tool-audience-managers" className="font-medium">
+                {t("settings.toolAudience.managersLabel")}
+              </Label>
+              <p className="text-muted-foreground text-xs">
+                {t("settings.toolAudience.managersDescription")}
+              </p>
+            </div>
           </div>
-        </div>
-      </RadioGroup>
-      <DialogFooter
-        submitLabel={t("settings.toolAudience.enableConfirm")}
-        onSubmit={() => tool && onConfirm(tool, audience)}
-        pending={isSaving}
-      />
-    </>
+        </RadioGroup>
+        <DialogFooter
+          submitLabel={t("settings.toolAudience.enableConfirm")}
+          onSubmit={() => tool && onConfirm(tool, audience)}
+          pending={isSaving}
+        />
+      </DialogContent>
+    </Dialog>
   );
 };
 
