@@ -52,7 +52,8 @@ export const CommunityCardFace = ({
   const banner = renderableBanner(community.banner);
 
   return (
-    <Card className={cn("flex h-full flex-col overflow-hidden", className)}>
+    // What a report of the listing pictures.
+    <Card data-report-target className={cn("flex h-full flex-col overflow-hidden", className)}>
       {banner.image_url ? (
         <img
           src={banner.image_url}

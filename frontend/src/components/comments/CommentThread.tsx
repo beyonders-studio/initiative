@@ -200,6 +200,8 @@ export const CommentThread = ({
         </div>
       ) : (
         <div
+          // What a report of the comment pictures.
+          data-report-target
           data-unread={isUnread || undefined}
           data-linked={isLinked || undefined}
           className={cn(

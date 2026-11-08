@@ -7,7 +7,7 @@
  */
 
 import { CircleAlert, Heart, Lightbulb, type LucideIcon } from "lucide-react";
-import type { ElementType, Ref } from "react";
+import type { ComponentProps, ElementType, Ref } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -62,6 +62,8 @@ interface FeedbackFormProps {
   context: DeviceContext | null;
   /** What may be attached, or null where pictures are not taken. */
   evidence: EvidencePolicyRead | null | undefined;
+  /** A picture of the page behind, where the form is over one. */
+  pagePicture?: ComponentProps<typeof TicketComposer>["pagePicture"];
   /** The community a problem's "ask for help" is asked in; left out, the
    *  form offers no help. */
   help?: { communityId: number | null };
@@ -82,6 +84,7 @@ export const FeedbackForm = ({
   onDiscard,
   context,
   evidence,
+  pagePicture,
   help,
   pending,
   sent,
@@ -163,6 +166,7 @@ export const FeedbackForm = ({
             policy={evidence}
             files={draft.files}
             onFilesChange={(files) => onChange({ files })}
+            pagePicture={pagePicture}
             disabled={pending}
           />
         </div>

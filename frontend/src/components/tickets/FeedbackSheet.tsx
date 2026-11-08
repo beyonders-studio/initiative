@@ -156,6 +156,7 @@ const FeedbackSheet = () => {
           onDiscard={() => setForm(EMPTY_DRAFT)}
           context={context}
           evidence={feedback.evidence}
+          pagePicture={{ hidePeople: true }}
           help={{ communityId }}
           pending={pending}
           sent={sent}
