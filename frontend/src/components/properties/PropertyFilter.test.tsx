@@ -1,19 +1,12 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
 import { buildPropertyDefinition, buildPropertyOption } from "@/__tests__/factories/properties";
-import { communityHttp } from "@/__tests__/helpers/communityHttp";
-import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import { MetadataType, type PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
+import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 
 import { opsForType, PropertyFilter, type PropertyFilterCondition } from "./PropertyFilter";
-
-const mockDefinitions = (defs: PropertyDefinitionRead[]) => {
-  server.use(communityHttp.get("/property-definitions/", () => HttpResponse.json(defs)));
-};
 
 describe("opsForType", () => {
   it("returns the expected operators for each property type", () => {
@@ -50,19 +43,16 @@ describe("PropertyFilter", () => {
     ],
   });
 
-  it("renders nothing if there are no eligible definitions and no existing filters", async () => {
-    mockDefinitions([]);
-    const { container } = renderWithProviders(<PropertyFilter value={[]} onChange={vi.fn()} />);
-    // Wait one tick for the query to settle.
-    await waitFor(() => {
-      expect(container.querySelector("button")).toBeNull();
-    });
+  it("renders nothing if there are no eligible definitions and no existing filters", () => {
+    const { container } = renderWithProviders(
+      <PropertyFilter value={[]} definitions={[]} onChange={vi.fn()} />
+    );
+    expect(container.querySelector("button")).toBeNull();
   });
 
   it("adds a new filter row when the Add button is clicked", async () => {
-    mockDefinitions([textDef]);
     const onChange = vi.fn();
-    renderWithProviders(<PropertyFilter value={[]} onChange={onChange} />);
+    renderWithProviders(<PropertyFilter definitions={[textDef]} value={[]} onChange={onChange} />);
     const addBtn = await screen.findByRole("button", { name: /Add filter/i });
     expect(addBtn).toBeEnabled();
     await userEvent.click(addBtn);
@@ -70,7 +60,7 @@ describe("PropertyFilter", () => {
   });
 
   it("caps the number of filters at the configured max (default 5)", async () => {
-    mockDefinitions([
+    const definitions = [
       textDef,
       numberDef,
       selectDef,
@@ -89,7 +79,7 @@ describe("PropertyFilter", () => {
         name: "Sixth",
         type: MetadataType.text,
       }),
-    ]);
+    ];
     const full: PropertyFilterCondition[] = [
       { property_id: 1, op: "eq", value: "a" },
       { property_id: 2, op: "eq", value: 1 },
@@ -97,16 +87,19 @@ describe("PropertyFilter", () => {
       { property_id: 4, op: "eq", value: "x" },
       { property_id: 5, op: "eq", value: "y" },
     ];
-    renderWithProviders(<PropertyFilter value={full} onChange={vi.fn()} />);
+    renderWithProviders(
+      <PropertyFilter definitions={definitions} value={full} onChange={vi.fn()} />
+    );
     const addBtn = await screen.findByRole("button", { name: /Add filter/i });
     expect(addBtn).toBeDisabled();
   });
 
   it("resets op to the first valid op for the new type when the property dropdown changes", async () => {
-    mockDefinitions([textDef, numberDef]);
     const onChange = vi.fn();
     const existing: PropertyFilterCondition[] = [{ property_id: 1, op: "ilike", value: "ada" }];
-    renderWithProviders(<PropertyFilter value={existing} onChange={onChange} />);
+    renderWithProviders(
+      <PropertyFilter definitions={[textDef, numberDef]} value={existing} onChange={onChange} />
+    );
     // The property dropdown is the first combobox in the row.
     const propertyCombo = (await screen.findAllByLabelText(/Filter by/i))[0];
     await userEvent.click(propertyCombo);
@@ -125,10 +118,11 @@ describe("PropertyFilter", () => {
   });
 
   it("emits {property_id, op, value} when the value changes", async () => {
-    mockDefinitions([textDef]);
     const onChange = vi.fn();
     const existing: PropertyFilterCondition[] = [{ property_id: 1, op: "eq", value: "" }];
-    renderWithProviders(<PropertyFilter value={existing} onChange={onChange} />);
+    renderWithProviders(
+      <PropertyFilter definitions={[textDef]} value={existing} onChange={onChange} />
+    );
     // Type into the text value input — placeholder "Empty" comes from the
     // text PropertyInput.
     const valueInput = await screen.findByPlaceholderText(/Empty/i);
@@ -137,13 +131,14 @@ describe("PropertyFilter", () => {
   });
 
   it("removes a row when the remove button is clicked", async () => {
-    mockDefinitions([textDef, numberDef]);
     const onChange = vi.fn();
     const existing: PropertyFilterCondition[] = [
       { property_id: 1, op: "eq", value: "a" },
       { property_id: 2, op: "eq", value: 1 },
     ];
-    renderWithProviders(<PropertyFilter value={existing} onChange={onChange} />);
+    renderWithProviders(
+      <PropertyFilter definitions={[textDef, numberDef]} value={existing} onChange={onChange} />
+    );
     const removeButtons = await screen.findAllByRole("button", {
       name: /Remove filter/i,
     });
@@ -153,12 +148,13 @@ describe("PropertyFilter", () => {
   });
 
   it("disables already-used property options in the property dropdown", async () => {
-    mockDefinitions([textDef, numberDef]);
     const existing: PropertyFilterCondition[] = [
       { property_id: 1, op: "eq", value: "a" },
       { property_id: 2, op: "eq", value: 1 },
     ];
-    renderWithProviders(<PropertyFilter value={existing} onChange={vi.fn()} />);
+    renderWithProviders(
+      <PropertyFilter definitions={[textDef, numberDef]} value={existing} onChange={vi.fn()} />
+    );
     // Open the first row's property dropdown. "Hours" is used in the other
     // row, so when enumerating options here it must be disabled (and the
     // currently-selected "Owner" must stay enabled).
@@ -171,10 +167,10 @@ describe("PropertyFilter", () => {
   });
 
   it("offers a plug-in's fields beside the properties, and emits them apart", async () => {
-    mockDefinitions([textDef]);
     const onChange = vi.fn();
     renderWithProviders(
       <PropertyFilter
+        definitions={[textDef]}
         value={[{ property_id: 1, op: "ilike", value: "ada" }]}
         plugins={{
           fields: [{ id: "plugin:3:ci.issue", name: "Issue", type: MetadataType.number }],
@@ -199,9 +195,8 @@ describe("PropertyFilter", () => {
       type: MetadataType.multi_select,
       options: [buildPropertyOption({ value: "a", label: "A" })],
     });
-    mockDefinitions([multiDef]);
     const onChange = vi.fn();
-    renderWithProviders(<PropertyFilter value={[]} onChange={onChange} />);
+    renderWithProviders(<PropertyFilter definitions={[multiDef]} value={[]} onChange={onChange} />);
     const addBtn = await screen.findByRole("button", { name: /Add filter/i });
     await userEvent.click(addBtn);
     expect(onChange).toHaveBeenCalledWith([{ property_id: 10, op: "eq", value: [] }], []);

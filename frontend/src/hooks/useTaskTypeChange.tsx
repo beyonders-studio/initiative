@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { type TaskUpdate, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { useFillRequired } from "@/components/layouts/FillRequiredDialog";
+import { useFillRequired } from "@/hooks/useFillRequired";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
 import { useReadTaskNow } from "@/hooks/useTasks";
 import { detailLayoutOf, instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";

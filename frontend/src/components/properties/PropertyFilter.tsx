@@ -2,8 +2,7 @@ import { Plus, X } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
-import { type MetadataOwner, useOwnedDefinitions } from "@/hooks/useProperties";
+import { MetadataType, type PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import { cn } from "@/ui/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
@@ -35,16 +34,11 @@ export interface PropertyFilterProps {
   value: PropertyFilterCondition[];
   /** Called with the property filters, and the plug-in fields' filters. */
   onChange: (next: PropertyFilterCondition[], plugins: PluginFilterCondition[]) => void;
+  /** The properties the list may be filtered by, and the metadata of the
+   *  project it lists, where it lists one project's tasks. */
+  definitions: PropertyDefinitionRead[];
   /** Plug-in fields offered beside the properties, and the filters on them. */
   plugins?: { fields: PluginFilterField[]; value: PluginFilterCondition[] };
-  /**
-   * Initiative to scope the definitions to. Omit on global views
-   * (union across every initiative the caller can see).
-   */
-  initiativeId?: number;
-  /** The project whose metadata is offered beside the properties: a
-   *  project's own task list. */
-  owner?: MetadataOwner;
   maxFilters?: number;
   className?: string;
 }
@@ -154,23 +148,17 @@ const PROPERTY_KEY = "property:";
 export const PropertyFilter = ({
   value,
   onChange,
+  definitions,
   plugins,
-  initiativeId,
-  owner,
   maxFilters = DEFAULT_MAX_FILTERS,
   className,
 }: PropertyFilterProps) => {
   const { t } = useTranslation("properties");
   const opLabel = useOpLabel();
 
-  // Pull the definitions the caller can see (scoped when ``initiativeId`` is
-  // provided, union across accessible initiatives otherwise). The hook
-  // caches cross-page so we don't incur a request per component.
-  const definitionsQuery = useOwnedDefinitions({ initiativeId, owner });
-
   const options = useMemo<FilterOption[]>(
     () => [
-      ...(definitionsQuery.data ?? []).map((definition) => ({
+      ...definitions.map((definition) => ({
         key: `${PROPERTY_KEY}${definition.id}`,
         name: definition.name,
         type: definition.type,
@@ -197,7 +185,7 @@ export const PropertyFilter = ({
         plugin: true,
       })),
     ],
-    [definitionsQuery.data, plugins?.fields]
+    [definitions, plugins?.fields]
   );
 
   const optionsByKey = useMemo(
@@ -438,23 +426,3 @@ export const parsePropertyFilters = (
     return [];
   }
 };
-
-export interface PropertyFilterParamProps {
-  /** The list's `property_filters` param. */
-  value: string | null | undefined;
-  onChange: (next: string | undefined) => void;
-  initiativeId?: number;
-}
-
-/** A {@link PropertyFilter} over a tool list's `property_filters` param. */
-export const PropertyFilterParam = ({
-  value,
-  onChange,
-  initiativeId,
-}: PropertyFilterParamProps) => (
-  <PropertyFilter
-    value={parsePropertyFilters(value)}
-    onChange={(next) => onChange(next.length > 0 ? JSON.stringify(next) : undefined)}
-    initiativeId={initiativeId}
-  />
-);

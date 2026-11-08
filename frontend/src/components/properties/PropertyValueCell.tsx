@@ -10,9 +10,9 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { fileIcon } from "@/lib/fileIcon";
 import { formatDate, formatDateTime } from "@/lib/formatDate";
-import { openExternal } from "@/lib/openExternal";
 import { getAvatarSrc, getInitialsForUser, getUserDisplayName } from "@/lib/userDisplay";
 import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { host } from "@/ui/host";
 import { numberFormat } from "@/ui/lib/intl";
 import { sanitizeUrl } from "@/ui/lib/safeUrl";
 import { cn } from "@/ui/lib/utils";
@@ -441,13 +441,13 @@ export const PropertyValueCell = ({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            if (href) openExternal(href);
+            if (href) host.openExternal(href);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
               e.stopPropagation();
-              if (href) openExternal(href);
+              if (href) host.openExternal(href);
             }
           }}
         >
