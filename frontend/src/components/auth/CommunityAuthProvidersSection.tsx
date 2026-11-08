@@ -14,51 +14,65 @@
  *
  * A connection of the community's own also says whether the deployment's
  * placement rules for that provider may place people here, beside the
- * community's own rules.
+ * community's own rules. Connecting, taking over the deployment's arrangement
+ * and editing are all the one wizard.
  */
 
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Power, Unplug } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
   CommunityProviderConnectionRead,
+  CommunityProviderConnectionUpdate,
   ConnectableProviderRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { ConnectSignInWizard, NARROWING_CLAIMS } from "@/components/auth/ConnectSignInWizard";
 import { ProviderMark } from "@/components/auth/ProviderMark";
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import {
   useCommunityProviderConnections,
   useConnectableProviders,
   useDisconnectProvider,
   useUpdateProviderConnection,
 } from "@/hooks/useCommunityAuthPolicy";
+import { useServer } from "@/hooks/useServer";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
-import { Label } from "@/ui/label";
-import { Switch } from "@/ui/switch";
+import { CopyButton } from "@/ui/copy-button";
+import {
+  DropdownMenuCheckboxItem,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/ui/dropdown-menu";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/ui/empty";
+import { RowActionsMenu } from "@/ui/row-actions-menu";
 
 export const CommunityAuthProvidersSection = ({
   communityId,
-  onConnect,
+  communityName,
 }: {
   communityId: number;
-  /** Opens the setup wizard. Connecting a provider is a guided flow with
-   *  four questions in it, and this card used to carry a second, shorter
-   *  version of the first two — two ways to do one thing, and two places to
-   *  keep the narrowing honest. There is one now, and this asks for it. */
-  onConnect: (providerId?: number) => void;
+  communityName: string;
 }) => {
-  const { t } = useTranslation("settings");
+  const { t } = useTranslation(["settings", "common"]);
   const connectionsQuery = useCommunityProviderConnections(communityId);
   const availableQuery = useConnectableProviders(communityId);
   const updateConnection = useUpdateProviderConnection(communityId);
   const disconnect = useDisconnectProvider(communityId);
+  const { getServerOrigin } = useServer();
 
   const [removing, setRemoving] = useState<CommunityProviderConnectionRead | null>(null);
+  // The wizard opens on the picker, or on a connection to take over or edit.
+  const [wizard, setWizard] = useState<{
+    open: boolean;
+    connection: CommunityProviderConnectionRead | null;
+  }>({ open: false, connection: null });
+  const openWizard = (connection: CommunityProviderConnectionRead | null = null) =>
+    setWizard({ open: true, connection });
 
   const connections = connectionsQuery.data ?? [];
   // Only what this community said itself: a provider it merely inherits is
@@ -73,152 +87,167 @@ export const CommunityAuthProvidersSection = ({
     (row: ConnectableProviderRead) => !connectedIds.has(row.id)
   );
 
-  /** Take over an arrangement the deployment answered for. The wizard opens
-   *  on that provider and seeds itself from the inherited row, so the
-   *  community starts from what is already in force rather than a blank
-   *  form; saving writes a connection of its own, which shadows the default
-   *  from then on. */
-  const adopt = (row: CommunityProviderConnectionRead) => onConnect(row.provider_id);
+  const change = (row: CommunityProviderConnectionRead, data: CommunityProviderConnectionUpdate) =>
+    updateConnection.mutate(
+      { connectionId: row.id as number, data },
+      {
+        onError: (error) =>
+          toast.error(getErrorMessage(error, "settings:communityAuth.connections.connectError")),
+      }
+    );
+
+  // The community's shareable sign-in URL, built on the server's origin (which
+  // is the app's own origin on web, or the configured server on native).
+  const memberLoginUrl = `${getServerOrigin() ?? window.location.origin}/community/${communityId}/login`;
+  const empty = !connectionsQuery.isLoading && connections.length === 0;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-        <div>
-          <CardTitle>{t("communityAuth.connections.title")}</CardTitle>
-          <CardDescription>{t("communityAuth.connections.description")}</CardDescription>
-        </div>
-        <Button type="button" onClick={() => onConnect()} disabled={choosable.length === 0}>
-          <Plus className="h-4 w-4" />
-          {t("communityAuth.connections.connect")}
-        </Button>
-      </CardHeader>
-      <CardContent>
-        {connectionsQuery.isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("authProviders.loading")}</p>
-        ) : connections.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            {choosable.length === 0
-              ? t("communityAuth.connections.noneOffered")
-              : t("communityAuth.connections.empty")}
-          </p>
-        ) : (
+    <SettingsSection
+      title={t("communityAuth.connections.title")}
+      description={t("communityAuth.connections.description")}
+      action={
+        empty ? null : (
+          <Button type="button" onClick={() => openWizard()} disabled={choosable.length === 0}>
+            <Plus className="h-4 w-4" />
+            {t("communityAuth.connections.connect")}
+          </Button>
+        )
+      }
+    >
+      {connectionsQuery.isLoading ? (
+        <p className="text-muted-foreground text-sm">{t("authProviders.loading")}</p>
+      ) : empty ? (
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyTitle>{t("communityAuth.emptyState.title")}</EmptyTitle>
+            <EmptyDescription>
+              {choosable.length === 0
+                ? t("communityAuth.connections.noneOffered")
+                : t("communityAuth.emptyState.body")}
+            </EmptyDescription>
+          </EmptyHeader>
+          {choosable.length > 0 && (
+            <EmptyContent>
+              <Button type="button" onClick={() => openWizard()}>
+                {t("communityAuth.emptyState.button")}
+              </Button>
+            </EmptyContent>
+          )}
+        </Empty>
+      ) : (
+        <>
           <ul className="divide-y rounded-md border">
             {connections.map((row) => (
-              <li key={row.id} className="flex items-center justify-between gap-4 px-3 py-3">
-                <div className="flex min-w-0 items-start gap-3">
-                  <ProviderMark icon={row.provider_icon} className="mt-0.5" />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{row.provider_display_name}</span>
-                      {row.inherited && (
-                        <Badge variant="outline">{t("communityAuth.connections.inherited")}</Badge>
-                      )}
-                      {!row.enabled && (
-                        <Badge variant="outline">{t("authProviders.disabledBadge")}</Badge>
-                      )}
-                      {!row.login_ready && (
-                        <Badge variant="outline">{t("communityAuth.connections.notReady")}</Badge>
-                      )}
-                    </div>
-                    <p className="text-muted-foreground text-sm">
-                      {row.claim && row.claim_values.length > 0
-                        ? t("communityAuth.connections.narrowedTo", {
-                            claim: row.claim,
-                            values: row.claim_values.join(", "),
-                          })
-                        : t("communityAuth.connections.anyoneItVouchesFor")}
-                    </p>
-                    {row.auto_join && (
-                      <p className="text-muted-foreground text-xs">
-                        {row.narrowing_approved
-                          ? t("communityAuth.connections.joinsOnArrival")
-                          : t("communityAuth.connections.joinsOnceAgreed")}
-                      </p>
-                    )}
-                    {/* Only a connection of this community's own carries the
-                        answer; an inherited row has none to change. */}
-                    {!row.inherited && row.id !== null && (
-                      <div className="mt-2 flex items-start gap-2">
-                        <Switch
-                          id={`accepts-placement-${row.id}`}
-                          className="mt-0.5"
-                          checked={row.accepts_provider_placement}
-                          onCheckedChange={(checked) =>
-                            updateConnection.mutate(
-                              {
-                                connectionId: row.id as number,
-                                data: { accepts_provider_placement: Boolean(checked) },
-                              },
-                              {
-                                onError: (error) =>
-                                  toast.error(
-                                    getErrorMessage(
-                                      error,
-                                      "settings:communityAuth.connections.connectError"
-                                    )
-                                  ),
-                              }
-                            )
-                          }
-                        />
-                        <div className="space-y-0.5">
-                          <Label htmlFor={`accepts-placement-${row.id}`} className="text-sm">
-                            {t("communityAuth.connections.acceptsPlacementLabel")}
-                          </Label>
-                          <p className="text-muted-foreground text-xs">
-                            {t("communityAuth.connections.acceptsPlacementHelp")}
-                          </p>
-                        </div>
-                      </div>
+              <li key={row.provider_id} className="flex items-center gap-3 px-3 py-3">
+                <ProviderMark icon={row.provider_icon} />
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{row.provider_display_name}</span>
+                    {!row.login_ready ? (
+                      <Badge variant="outline">{t("communityAuth.connections.notReady")}</Badge>
+                    ) : row.inherited ? (
+                      <Badge variant="secondary">{t("communityAuth.connections.inherited")}</Badge>
+                    ) : row.enabled ? (
+                      <Badge variant="outline" className="gap-1.5">
+                        <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
+                        {t("communityAuth.on")}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">{t("communityAuth.off")}</Badge>
                     )}
                   </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  {row.inherited || row.id === null ? (
-                    <Button type="button" variant="outline" size="sm" onClick={() => adopt(row)}>
-                      {t("communityAuth.connections.makeItOurs")}
-                    </Button>
-                  ) : (
-                    <>
-                      <Switch
-                        aria-label={t("authProviders.enabledLabel")}
-                        checked={row.enabled}
-                        onCheckedChange={(checked) =>
-                          updateConnection.mutate(
-                            {
-                              connectionId: row.id as number,
-                              data: { enabled: Boolean(checked) },
-                            },
-                            {
-                              onError: (error) =>
-                                toast.error(
-                                  getErrorMessage(
-                                    error,
-                                    "settings:communityAuth.connections.connectError"
-                                  )
-                                ),
-                            }
-                          )
-                        }
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive"
-                        aria-label={t("communityAuth.connections.disconnect")}
-                        onClick={() => setRemoving(row)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
+                  <p className="text-muted-foreground text-sm">
+                    {[
+                      row.claim && row.claim_values.length > 0
+                        ? t("communityAuth.connections.narrowedTo", {
+                            claim: (NARROWING_CLAIMS as readonly string[]).includes(row.claim)
+                              ? t(
+                                  `communityAuth.connections.claimOptions.${row.claim as (typeof NARROWING_CLAIMS)[number]}`
+                                )
+                              : row.claim,
+                            values: row.claim_values.join(", "),
+                          })
+                        : t("communityAuth.connections.anyoneItVouchesFor"),
+                      row.auto_join && row.narrowing_approved
+                        ? t("communityAuth.connections.joinsOnArrival")
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                  {row.auto_join && !row.narrowing_approved && (
+                    <p className="text-muted-foreground text-xs">
+                      {t("communityAuth.connections.joinsOnceAgreed")}
+                    </p>
                   )}
                 </div>
+                {row.inherited || row.id === null ? (
+                  // The deployment's arrangement has nothing of the community's
+                  // own to change; it is taken over instead.
+                  <Button type="button" variant="outline" size="sm" onClick={() => openWizard(row)}>
+                    {t("communityAuth.connections.makeItOurs")}
+                  </Button>
+                ) : (
+                  <RowActionsMenu subject={row.provider_display_name}>
+                    <DropdownMenuItem onSelect={() => openWizard(row)}>
+                      <Pencil className="h-4 w-4" />
+                      {t("common:edit")}
+                    </DropdownMenuItem>
+                    <DropdownMenuCheckboxItem
+                      checked={row.accepts_provider_placement}
+                      onCheckedChange={(checked) =>
+                        change(row, { accepts_provider_placement: checked === true })
+                      }
+                    >
+                      {t("communityAuth.connections.acceptsPlacementLabel")}
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuItem onSelect={() => change(row, { enabled: !row.enabled })}>
+                      <Power className="h-4 w-4" />
+                      {row.enabled
+                        ? t("communityAuth.connections.turnOff")
+                        : t("communityAuth.connections.turnOn")}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onSelect={() => setRemoving(row)}
+                    >
+                      <Unplug className="h-4 w-4" />
+                      {t("communityAuth.connections.disconnect")}
+                    </DropdownMenuItem>
+                  </RowActionsMenu>
+                )}
               </li>
             ))}
           </ul>
-        )}
-      </CardContent>
+          <SettingsRow
+            label={t("communityAuth.shareUrl.title")}
+            description={t("communityAuth.shareUrl.description", { community: communityName })}
+            below={
+              <div className="flex items-center gap-2">
+                <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1.5 text-sm">
+                  {memberLoginUrl}
+                </code>
+                <CopyButton
+                  value={memberLoginUrl}
+                  label={t("communityAuth.shareUrl.copy")}
+                  copiedMessage={t("communityAuth.shareUrl.copied")}
+                />
+              </div>
+            }
+          />
+        </>
+      )}
+
+      {/* Shown only where the community may configure providers, which is
+          also what setting the requirement asks for. */}
+      <ConnectSignInWizard
+        communityId={communityId}
+        open={wizard.open}
+        onOpenChange={(open) => setWizard((previous) => ({ ...previous, open }))}
+        canRequire
+        connection={wizard.connection}
+      />
 
       <ConfirmDialog
         open={removing !== null}
@@ -248,6 +277,6 @@ export const CommunityAuthProvidersSection = ({
           });
         }}
       />
-    </Card>
+    </SettingsSection>
   );
 };

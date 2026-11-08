@@ -27,19 +27,23 @@ import {
   listConnectableProviders,
   listCustomRoleClaimRules,
   orderCustomRoleClaimRules,
+  updateCommunityClaimRule,
   updateCommunityProviderConnection,
+  updateCustomRoleClaimRule,
 } from "@/api/generated/community-provider-connections/community-provider-connections";
 import type {
   CommunityAuthSettingsRead,
   CommunityAuthSettingsUpdate,
   CommunityClaimRuleCreate,
   CommunityClaimRulesResponse,
+  CommunityClaimRuleUpdate,
   CommunityProviderConnectionCreate,
   CommunityProviderConnectionRead,
   CommunityProviderConnectionUpdate,
   ConnectableProviderRead,
   CustomRoleClaimRuleCreate,
   CustomRoleClaimRuleRead,
+  CustomRoleClaimRuleUpdate,
   LoginProvidersResponse,
 } from "@/api/generated/initiativeAPI.schemas";
 import type { QueryOpts } from "@/types/query";
@@ -220,6 +224,15 @@ export const useCreateClaimRule = (communityId: number) => {
   });
 };
 
+export const useUpdateClaimRule = (communityId: number) => {
+  const invalidate = useInvalidateClaimRules(communityId);
+  return useMutation({
+    mutationFn: ({ ruleId, data }: { ruleId: number; data: CommunityClaimRuleUpdate }) =>
+      updateCommunityClaimRule(communityId, ruleId, data),
+    onSuccess: invalidate,
+  });
+};
+
 export const useDeleteClaimRule = (communityId: number) => {
   const invalidate = useInvalidateClaimRules(communityId);
   return useMutation({
@@ -255,6 +268,15 @@ export const useCreateCustomRoleClaimRule = (communityId: number) => {
   const invalidate = useInvalidateCustomRoleClaimRules(communityId);
   return useMutation({
     mutationFn: (data: CustomRoleClaimRuleCreate) => createCustomRoleClaimRule(communityId, data),
+    onSuccess: invalidate,
+  });
+};
+
+export const useUpdateCustomRoleClaimRule = (communityId: number) => {
+  const invalidate = useInvalidateCustomRoleClaimRules(communityId);
+  return useMutation({
+    mutationFn: ({ ruleId, data }: { ruleId: number; data: CustomRoleClaimRuleUpdate }) =>
+      updateCustomRoleClaimRule(communityId, ruleId, data),
     onSuccess: invalidate,
   });
 };

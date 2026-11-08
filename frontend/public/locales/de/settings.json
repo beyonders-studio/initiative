@@ -211,12 +211,7 @@
     "adminOnly": "Nur Community-Admins können KI-Verbindungen verwalten.",
     "disabledDescription": "KI-Funktionen sind für die Plattform deaktiviert.",
     "managedByPlatform": "KI-Verbindungen werden auf Plattformebene verwaltet. Mitglieder legen ihren eigenen Schlüssel in ihren Profileinstellungen fest.",
-    "managedByServer": "Die Betreiber dieses Servers verwalten die KI für diese Community.",
-    "switchTitle": "KI",
-    "switchLabel": "KI-Funktionen erlauben",
-    "switchHelp": "Lässt Mitglieder KI-Funktionen in dieser Community nutzen. Ausgeschaltet wird nichts von hier an einen KI-Anbieter gesendet.",
-    "switchSaved": "KI-Einstellung gespeichert",
-    "switchError": "Die KI-Einstellung konnte nicht gespeichert werden."
+    "managedByServer": "Die Betreiber dieses Servers verwalten die KI für diese Community."
   },
   "platformAI": {
     "title": "Plattform-KI",
@@ -1497,19 +1492,19 @@
     "setByDeployment": "Wer diesen Server betreibt, legt das für deine Community fest.",
     "shareUrl": {
       "title": "Anmeldelink für Mitglieder",
-      "description": "Teile diesen Link mit Mitgliedern — er bietet die Anmeldeanbieter dieser Community an und führt sie direkt in die Community.",
-      "copy": "Link kopieren",
+      "description": "Bietet diese Anbieter an und bringt Leute direkt zu {{community}}.",
+      "copy": "Kopieren",
       "copied": "Anmeldelink kopiert"
     },
     "policy": {
-      "title": "Anmeldeanforderung",
-      "description": "Lege fest, mit welcher Anmeldung eine Sitzung erfolgt sein muss, bevor sie auf diese Community zugreifen kann.",
-      "openLabel": "Offen",
-      "openHelp": "Jedes angemeldete Mitglied kann auf diese Community zugreifen.",
-      "requiredLabel": "Single Sign-on erforderlich",
-      "requiredHelp": "Mitglieder können erst nach der Anmeldung über den ausgewählten Anbieter auf diese Community zugreifen.",
+      "title": "Anmeldung der Mitglieder",
+      "description": "Was Mitglieder brauchen, bevor sie {{community}} öffnen können.",
+      "openLabel": "Jedes angemeldete Konto",
+      "openHelp": "Mitglieder melden sich so an, wie dieser Server es erlaubt.",
+      "requiredLabel": "Über unsere Anbieter",
+      "requiredHelp": "Nur eine Anmeldung über den gewählten Anbieter zählt.",
       "providerPlaceholder": "Anbieter auswählen …",
-      "noProviders": "Verbindet zuerst einen Anbieter unter „Wer hereinkommt“.",
+      "noProviders": "Verbindet zuerst einen Anbieter unter „Anmeldeanbieter“.",
       "saved": "Anmeldeanforderung gespeichert",
       "error": "Anmeldeanforderung konnte nicht gespeichert werden",
       "selfUnsatisfied": "Deine aktuelle Sitzung hat sich noch nicht über {{providerName}} angemeldet. Melde dich einmal damit an, um zu bestätigen, dass es funktioniert, bevor du es verpflichtend machst.",
@@ -1520,22 +1515,44 @@
       "presentPasskey": "Passkey vorlegen",
       "anyProvider": "Einer unserer Anmeldeanbieter",
       "anyProviderHelp": "Mitglieder können über jeden Anbieter kommen, den diese Community eingerichtet hat. Eine Anmeldung anderswo auf dieser Installation zählt nicht.",
-      "requireFactor": "Zusätzlich einen zweiten Faktor verlangen",
-      "requireFactorHelp": "Mitglieder müssen in dieser Sitzung einen Code aus ihrer Authenticator-App vorgelegt haben. Sie können ihn ohne Abmelden nachreichen.",
       "requirePasskey": "Zusätzlich einen Passkey verlangen",
       "requirePasskeyHelp": "Mitglieder müssen sich in dieser Sitzung mit einem Passkey angemeldet oder einen vorgelegt haben. Sie können ihn ohne Abmelden nachreichen.",
-      "factorRequiredByPlatform": "Dein Server verlangt bereits von allen einen zweiten Faktor — hier gibt es nichts hinzuzufügen."
+      "save": "Anforderung speichern",
+      "value": {
+        "through": "Über {{provider}}",
+        "throughWithPasskey": "Über {{provider}}, mit Passkey",
+        "any": "Über einen unserer Anbieter",
+        "anyWithPasskey": "Über einen unserer Anbieter, mit Passkey",
+        "passkey": "Mit Passkey"
+      },
+      "impact": {
+        "provider": "Mitglieder, die anders hereingekommen sind, werden beim nächsten Öffnen von {{community}} gebeten, sich über {{provider}} anzumelden. Niemand wird abgemeldet.",
+        "anyProvider": "Mitglieder, die anders hereingekommen sind, werden beim nächsten Öffnen von {{community}} gebeten, sich über einen eurer Anbieter anzumelden. Niemand wird abgemeldet.",
+        "passkey": "Mitglieder, die in dieser Sitzung keinen Passkey verwendet haben, werden beim nächsten Öffnen von {{community}} nach einem gefragt. Niemand wird abgemeldet.",
+        "selfProvider": "Hat deine eigene Sitzung {{provider}} noch nicht verwendet, meldest du dich einmal damit an, bevor das gespeichert wird.",
+        "selfOther": "Erfüllt deine eigene Sitzung das noch nicht, wirst du vor dem Speichern darum gebeten.",
+        "neverThrough_one": "{{count}} von {{total}} Mitgliedern hat sich noch nie über {{provider}} angemeldet.",
+        "neverThrough_other": "{{count}} von {{total}} Mitgliedern haben sich noch nie über {{provider}} angemeldet.",
+        "neverThroughAny_one": "{{count}} von {{total}} Mitgliedern hat sich noch nie über einen eurer Anbieter angemeldet.",
+        "neverThroughAny_other": "{{count}} von {{total}} Mitgliedern haben sich noch nie über einen eurer Anbieter angemeldet.",
+        "noPasskey_one": "{{count}} von {{total}} Mitgliedern hat noch keinen Passkey.",
+        "noPasskey_other": "{{count}} von {{total}} Mitgliedern haben noch keinen Passkey."
+      }
     },
     "sessionLimit": {
-      "title": "Sitzungsdauer",
-      "allowLabel": "Alle zwölf Stunden neu anmelden",
+      "title": "Alle 12 Stunden neu anmelden",
       "saved": "Sitzungslimit gespeichert",
       "error": "Sitzungslimit konnte nicht gespeichert werden",
-      "help": "Für Communities, die angehalten wurden, die Anmeldedauer zu begrenzen. Es gilt überall für eure Mitglieder, nicht nur hier."
+      "description": "Für Communities, die angehalten wurden, die Anmeldedauer zu begrenzen.",
+      "offLabel": "Aus",
+      "onLabel": "Alle 12 Stunden neu anmelden",
+      "onDetail": "diese Mitglieder melden sich überall auf diesem Server neu an",
+      "offDetail": "es gilt die Sitzungsdauer deines Servers",
+      "impact": "Es gilt für diese Mitglieder in jeder Community auf diesem Server, nicht nur hier."
     },
     "connections": {
-      "title": "Welche Anmeldungen eure sind",
-      "description": "Angemeldet wird sich bei dieser Installation. Sagt, welche ihrer Anmeldeanbieter zu eurer Community zählen und wer darauf als eure Leute gilt.",
+      "title": "Anmeldeanbieter",
+      "description": "Die Anbieter, über die sich eure Mitglieder anmelden, und welche ihrer Konten als eure zählen.",
       "connect": "Anbieter verbinden",
       "connected": "Anbieter verbunden",
       "connectError": "Diese Verbindung konnte nicht geändert werden",
@@ -1543,15 +1560,10 @@
       "disconnected": "Anbieter getrennt",
       "disconnectTitle": "{{name}} trennen?",
       "disconnectDescription": "Sie zählt nicht mehr als eure: Der Button verschwindet von eurer Anmeldeseite und niemand kommt mehr neu darüber herein. Niemand wird abgemeldet, kein Konto ändert sich. Wenn ihr eine Anmeldung darüber verlangt, hebt das zuerst auf.",
-      "empty": "Noch keine Anbieter verbunden — eure Mitglieder melden sich wie gewohnt an.",
       "noneOffered": "Wer diese Installation betreibt, hat noch keine Anbieter zum Verbinden angeboten.",
       "notReady": "Nicht verfügbar",
-      "narrowedTo": "Nur Konten, deren {{claim}} {{values}} ist",
+      "narrowedTo": "{{claim}}: {{values}}",
       "anyoneItVouchesFor": "Alle, für die dieser Anbieter bürgt",
-      "dialogTitle": "Anmeldeanbieter verbinden",
-      "dialogDescription": "Wähle den Anbieter, den eure Mitglieder nutzen, und sage dann, welche Konten darauf euch gehören.",
-      "providerLabel": "Anbieter",
-      "providerPlaceholder": "Einen auswählen",
       "claimLabel": "Wessen Konten als eure gelten",
       "claimHelp": "Communitys sind hier getrennt, also gib an, welche Konten bei diesem Anbieter deine sind – eine Google-Workspace-Domain, ein Entra-Mandant, eine Gruppe. Nur diese Leute zählen als deine Community.",
       "claimPlaceholder": "Wähle, was deine Leute kennzeichnet",
@@ -1559,7 +1571,7 @@
       "claimValuesPlaceholder": "example.com, example.org",
       "autoJoinLabel": "Sie dieser Community hinzufügen",
       "autoJoinHelp": "Wer als eure Leute zählt, wird bei der ersten Anmeldung Mitglied. Lasst es aus, wenn ihr selbst einladen wollt.",
-      "joinsOnArrival": "Neue treten automatisch bei",
+      "joinsOnArrival": "Neue treten bei",
       "claimOptions": {
         "hd": "Google-Workspace-Domain",
         "tid": "Microsoft-Entra-Mandant",
@@ -1567,26 +1579,26 @@
         "domain": "Domain",
         "other": "Ein anderer Claim …"
       },
-      "inherited": "Von der Installation",
+      "inherited": "Von deinem Server",
       "makeItOurs": "Zu unserer machen",
       "claimNameLabel": "Claim-Name",
       "claimNamePlaceholder": "z. B. org, realm",
       "joinsOnceAgreed": "Passende Ankommende treten sofort bei, sobald die Serverbetreiberin bestätigt, dass diese Werte Ihnen gehören. Bis dahin werden sie hereingelassen, und der Beitritt erfolgt per Einladung.",
-      "acceptsPlacementLabel": "Die Installation Leute von diesem Anbieter zuordnen lassen",
-      "acceptsPlacementHelp": "Die Zuordnungsregeln der Installation für diesen Anbieter können hier Leute hinzufügen, neben euren eigenen Regeln."
+      "acceptsPlacementLabel": "Server Leute zuordnen lassen",
+      "saved": "Verbindung gespeichert",
+      "turnOff": "Ausschalten",
+      "turnOn": "Einschalten"
     },
     "rules": {
-      "title": "Wo eure Leute landen",
-      "description": "Euer Anbieter meldet, in welchen Gruppen jemand ist. Legt hier fest, was diese Gruppen bedeuten – wer als Mitglied beitritt, wer als Admin, und in welcher Initiative sie starten.",
+      "title": "Wo Leute landen",
       "add": "Regel hinzufügen",
       "added": "Regel hinzugefügt",
       "addError": "Regel konnte nicht hinzugefügt werden",
       "empty": "Noch keine Regeln – wer über eure Anbieter kommt, tritt ohne besondere Zuordnung bei.",
-      "connectFirst": "Verbindet zuerst einen Anbieter, dann legt fest, was seine Gruppen bedeuten.",
       "noGroupsBadge": "Keine Gruppen gemeldet",
       "noGroupsHint": "Die Betreiber dieser Installation haben diesem Anbieter nicht mitgeteilt, wo seine Gruppen stehen. Bis dahin trifft diese Regel auf niemanden zu.",
-      "landsInCommunity": "Ankunft über {{provider}} – tritt bei als {{role}}",
-      "landsInInitiative": "Ankunft über {{provider}} – tritt bei als {{role}}, und {{initiative}} als {{initiativeRole}}",
+      "landsInCommunity": "Über {{provider}}, tritt bei als {{role}}",
+      "landsInInitiative": "Über {{provider}}, tritt bei als {{role}}, und {{initiative}} als {{initiativeRole}}",
       "dialogDescription": "Nennt eine Gruppe, die euer Anbieter meldet, und legt fest, wohin ihre Leute gehören.",
       "providerLabel": "Anbieter",
       "providerPlaceholder": "Einen auswählen",
@@ -1608,14 +1620,14 @@
       "removeTitle": "Diese Regel entfernen?",
       "removeDescription": "Wer {{group}} trägt, wird hier nicht mehr zugeordnet, und wer durch diese Regel hier ist, verliert diese Stellung bei der nächsten Anmeldung über diesen Anbieter.",
       "deployment": {
-        "title": "Von der Installation festgelegt",
-        "description": "Zuordnungsregeln, die die Betreiber dieser Installation für ihre Anbieter geschrieben haben und die diese Community nennen. Sie ordnen Leute hier neben euren eigenen Regeln zu, sobald ihr die Regeln eines Anbieters in seiner Verbindung zulasst.",
-        "everywhere": "Die Installation wendet ihre Zuordnungsregeln auf jede Community an."
-      }
-    },
-    "sections": {
-      "whoGetsIn": "Wer hereinkommt",
-      "onWhatTerms": "Zu welchen Bedingungen"
+        "description": "Regeln, die dein Server für seine Anbieter geschrieben hat und die diese Community nennen. Sie ordnen Leute hier neben euren eigenen Regeln zu, sobald die Verbindung dieses Anbieters deinen Server Leute zuordnen lässt.",
+        "everywhere": "Dein Server wendet seine Zuordnungsregeln auf jede Community an.",
+        "count_one": "{{count}} Regel von deinem Server",
+        "count_other": "{{count}} Regeln von deinem Server"
+      },
+      "saved": "Regel gespeichert",
+      "saveError": "Regel konnte nicht gespeichert werden",
+      "editTitle": "Regel bearbeiten"
     },
     "emptyState": {
       "title": "Noch nichts verbunden",
@@ -1641,7 +1653,6 @@
           "prompt": "Ob dies der einzige Weg herein wird."
         }
       },
-      "skip": "Überspringen",
       "ruleTitle": "Eine erste Gruppe",
       "ruleHelp": "Optional. Nennen Sie eine Gruppe, die Ihr Anbieter meldet, und wo ihre Leute landen. Weitere können Sie später hinzufügen.",
       "requireLabel": "Mitglieder müssen über diesen Anbieter kommen",
@@ -1649,33 +1660,66 @@
     },
     "secondFactor": {
       "title": "Zweiter Faktor",
-      "description": "Ob der Zugang zu dieser Community einen verlangt.",
-      "allowLabel": "Zweiten Faktor verlangen",
-      "help": "Mitglieder müssen in dieser Sitzung einen zweiten Faktor vorgelegt haben. Welche Arten zählen, entscheidet die Serverbetreiberin, nicht diese Community — ein Faktor lässt sich ohne Abmeldung hinzufügen.",
-      "askedByPlatform": "Ihr Server verlangt bereits von allen hier einen zweiten Faktor; es gibt nichts hinzuzufügen.",
+      "description": "Ob das Öffnen von {{community}} in jeder Sitzung einen zweiten Faktor verlangt.",
       "saved": "Zweiter Faktor gespeichert.",
-      "error": "Die Anforderung für den zweiten Faktor konnte nicht gespeichert werden."
+      "error": "Die Anforderung für den zweiten Faktor konnte nicht gespeichert werden.",
+      "offLabel": "Nicht verlangt",
+      "onLabel": "In jeder Sitzung verlangt",
+      "guestsToo": "auch für Gäste",
+      "impact": "Alle, die {{community}} öffnen, Gäste eingeschlossen, legen in jeder Sitzung einen Code aus einer Authenticator-App oder einen Passkey vor. Sie können einen ohne Abmeldung hinzufügen.",
+      "withoutFactor_one": "{{count}} von {{total}} Personen hier hat noch keinen Authenticator und keinen Passkey.",
+      "withoutFactor_other": "{{count}} von {{total}} Personen hier haben noch keinen Authenticator und keinen Passkey."
     },
     "guestPolicy": {
-      "title": "Anmeldeanforderung für Gäste",
-      "description": "Lege fest, welche Anmeldung die Sitzung eines Gastes verwendet haben muss, bevor sie diese Community erreicht. Du musst sie nicht selbst erfüllen.",
-      "openHelp": "Jeder angemeldete Gast erreicht, was ihm gegeben wurde.",
-      "requiredHelp": "Gäste erreichen diese Community erst nach der Anmeldung über den ausgewählten Anbieter.",
+      "title": "Anmeldung der Gäste",
+      "description": "Was Gäste brauchen, bevor sie {{community}} öffnen können. Du selbst musst es nicht erfüllen.",
+      "openHelp": "Gäste melden sich so an, wie dieser Server es erlaubt.",
       "anyProviderHelp": "Gäste können über jeden Anbieter kommen, den diese Community eingerichtet hat. Eine Anmeldung anderswo auf dieser Installation zählt nicht.",
       "requirePasskeyHelp": "Gäste müssen sich in dieser Sitzung mit einem Passkey angemeldet oder einen vorgelegt haben. Sie können ihn ohne Abmelden nachreichen.",
       "saved": "Anmeldeanforderung für Gäste gespeichert",
       "error": "Die Anmeldeanforderung für Gäste konnte nicht gespeichert werden",
-      "save": "Anmeldeanforderung für Gäste speichern"
+      "impact": {
+        "provider": "Gäste, die anders hereingekommen sind, werden beim nächsten Öffnen von {{community}} gebeten, sich über {{provider}} anzumelden. Niemand wird abgemeldet.",
+        "anyProvider": "Gäste, die anders hereingekommen sind, werden beim nächsten Öffnen von {{community}} gebeten, sich über einen eurer Anbieter anzumelden. Niemand wird abgemeldet.",
+        "passkey": "Gäste, die in dieser Sitzung keinen Passkey verwendet haben, werden beim nächsten Öffnen von {{community}} nach einem gefragt. Niemand wird abgemeldet.",
+        "neverThrough_one": "{{count}} von {{total}} Gästen hat sich noch nie über {{provider}} angemeldet.",
+        "neverThrough_other": "{{count}} von {{total}} Gästen haben sich noch nie über {{provider}} angemeldet.",
+        "neverThroughAny_one": "{{count}} von {{total}} Gästen hat sich noch nie über einen eurer Anbieter angemeldet.",
+        "neverThroughAny_other": "{{count}} von {{total}} Gästen haben sich noch nie über einen eurer Anbieter angemeldet.",
+        "noPasskey_one": "{{count}} von {{total}} Gästen hat noch keinen Passkey.",
+        "noPasskey_other": "{{count}} von {{total}} Gästen haben noch keinen Passkey."
+      }
     },
     "guestStay": {
-      "title": "Aufenthalt von Gästen",
+      "title": "Längster Gastaufenthalt",
       "description": "Gasteinladungen und Verlängerungen laufen nie länger als das. Gäste, die schon da sind, behalten ihr Enddatum.",
       "label": "Längster Aufenthalt eines Gastes (Tage)",
       "hint_one": "Leer lassen, um das Limit des Servers von {{count}} Tag zu verwenden. Mehr kannst du auch nicht festlegen.",
       "hint_other": "Leer lassen, um das Limit des Servers von {{count}} Tagen zu verwenden. Mehr kannst du auch nicht festlegen.",
       "saved": "Längster Gastaufenthalt gespeichert",
       "error": "Der längste Gastaufenthalt konnte nicht gespeichert werden",
-      "save": "Längsten Gastaufenthalt speichern"
+      "value_one": "{{count}} Tag",
+      "value_other": "{{count}} Tage",
+      "defaultDetail": "das Limit deines Servers",
+      "ceilingDetail": "dein Server erlaubt bis zu {{days}}"
+    },
+    "setByServer": "Von deinem Server festgelegt",
+    "intro": "Wie man sich bei {{community}} anmeldet, was man zum Hereinkommen braucht und was die Community verlässt.",
+    "change": "Ändern",
+    "changeRule": "{{rule}} ändern",
+    "on": "An",
+    "off": "Aus",
+    "whenYouSave": "Beim Speichern",
+    "signInRules": {
+      "title": "Anmelderegeln",
+      "description": "Was man braucht, bevor man {{community}} öffnen kann.",
+      "members": "Mitglieder",
+      "guests": "Gäste"
+    },
+    "groupRules": {
+      "title": "Gruppenregeln",
+      "description": "Was die Gruppen, die eure Anbieter melden, hier bedeuten. Jede greift bei der nächsten Anmeldung.",
+      "add": "Hinzufügen"
     }
   },
   "authProviders": {
@@ -2128,37 +2172,38 @@
       "offHelp": "Eine Benachrichtigung, die die App verlässt, nennt, worum es geht: wer gehandelt hat und woran."
     }
   },
-  "communityNotifications": {
-    "title": "Benachrichtigungen, die die App verlassen",
-    "description": "Was die Benachrichtigungen dieser Community mitnehmen, wenn sie die App verlassen. Der Server beantwortet dieselben drei Fragen für alle; es gilt die strengere Antwort.",
-    "saved": "Benachrichtigungseinstellungen gespeichert",
-    "error": "Benachrichtigungseinstellungen konnten nicht gespeichert werden",
+  "communityPrivacy": {
+    "title": "Datenschutz",
+    "description": "Was {{community}} verlässt und was über Aktivität gespeichert wird.",
+    "saved": "Datenschutzeinstellung gespeichert",
+    "error": "Die Einstellung konnte nicht gespeichert werden",
     "push": {
       "label": "Benachrichtigungen auf Telefon und Desktop",
       "onHelp": "Die Benachrichtigungen dieser Community erreichen die Telefone und Desktop-Apps der Mitglieder.",
       "offHelp": "Zu dieser Community wird nichts an ein Telefon oder die Desktop-App gesendet. Die Glocke bleibt, und E-Mail ebenfalls, falls sie aktiv ist.",
-      "platformHelp": "Dieser Server sendet nichts an ein Telefon oder die Desktop-App – hier gibt es nichts zu entscheiden."
+      "platformHelp": "dein Server sendet nichts an Telefone oder die Desktop-App"
     },
     "email": {
       "label": "E-Mail-Benachrichtigungen",
       "onHelp": "Die Benachrichtigungen dieser Community erreichen die Postfächer der Mitglieder.",
       "offHelp": "Zu dieser Community wird keine Benachrichtigungs-E-Mail gesendet. Anmeldecodes und Passwort-Zurücksetzungen gehören zum Konto und gehen weiterhin raus.",
-      "platformHelp": "Dieser Server sendet keine Benachrichtigungs-E-Mail – hier gibt es nichts zu entscheiden."
+      "platformHelp": "dein Server sendet keine Benachrichtigungs-E-Mails"
     },
     "redact": {
       "label": "Details in Benachrichtigungen ausblenden",
       "onHelp": "Benachrichtigungen zu dieser Community nennen nur die Art des Ereignisses, sobald sie die App verlassen. Hier sehen Mitglieder alles.",
       "offHelp": "Benachrichtigungen zu dieser Community nennen, worum es geht, sobald sie die App verlassen.",
-      "platformHelp": "Dieser Server blendet Details überall aus – diese Community ist bereits abgedeckt."
+      "platformHelp": "dein Server blendet Benachrichtigungsdetails überall aus"
+    },
+    "ai": {
+      "label": "KI-Funktionen",
+      "help": "Lässt Mitglieder KI-Funktionen in dieser Community nutzen. Ausgeschaltet wird nichts von hier an einen KI-Anbieter gesendet."
+    },
+    "ranking": {
+      "label": "Suche nach Beteiligung ordnen",
+      "help": "Die Suche zeigt weiter oben, was mehr Mitglieder in letzter Zeit geöffnet oder bearbeitet haben. Für jedes Element wird nur eine grobe Stufe gespeichert, nie wer es geöffnet hat oder wie oft, und sie wird nie außerhalb dieser Community geteilt.",
+      "platformHelp": "dein Server hat die Ordnung nach Beteiligung für alle Communities ausgeschaltet"
     }
-  },
-  "communityEngagementRanking": {
-    "title": "Suchreihenfolge",
-    "label": "Suchergebnisse nach Beteiligung in der Community ordnen",
-    "help": "Die Suche zeigt weiter oben, was mehr Mitglieder in letzter Zeit geöffnet oder bearbeitet haben. Für jedes Element wird nur eine grobe Stufe gespeichert, nie wer es geöffnet hat oder wie oft, und sie wird nie außerhalb dieser Community geteilt.",
-    "platformHelp": "Dieser Server hat die Ordnung nach Beteiligung für alle Communities ausgeschaltet.",
-    "saved": "Suchreihenfolge gespeichert.",
-    "error": "Die Suchreihenfolge konnte nicht gespeichert werden."
   },
   "billingInsights": {
     "title": "Abrechnungskennzahlen",
@@ -2286,8 +2331,7 @@
     "setByDeployment": "Diese Rolle wird von den Serverbetreibenden festgelegt. Du kannst sie hier vergeben, aber nicht ändern oder löschen."
   },
   "customRoleRules": {
-    "title": "Eigene Rollen nach Gruppe",
-    "description": "Gib allen, die sich mit einer Gruppe anmelden, eine eigene Rolle. Eine Anmeldung liest diese Regeln der Reihe nach, und die erste passende Gruppe entscheidet. Eine von Hand vergebene Rolle bleibt bestehen.",
+    "title": "Eigene Rollen · die erste Übereinstimmung entscheidet",
     "add": "Rollenregel hinzufügen",
     "empty": "Noch keine Gruppe vergibt eine eigene Rolle.",
     "gives": "Über {{provider}}: {{role}}",
@@ -2296,7 +2340,7 @@
     "remove": "Regel entfernen",
     "removeTitle": "Diese Regel entfernen?",
     "removeDescription": "Wer in {{group}} ist, behält die Rolle bis zur nächsten Anmeldung.",
-    "dialogDescription": "Wer sich über diesen Anbieter mit der Gruppe anmeldet, bekommt die Rolle, sofern keine frühere Regel zuerst passt.",
+    "dialogDescription": "Wer sich über diesen Anbieter mit der Gruppe anmeldet, bekommt die Rolle, sofern keine frühere Regel zuerst passt. Eine von Hand vergebene Rolle bleibt bestehen.",
     "roleLabel": "Eigene Rolle",
     "rolePlaceholder": "Rolle wählen",
     "added": "Regel hinzugefügt",
@@ -2306,6 +2350,9 @@
     "closed": "Dein Server hat eigene Rollen für diese Community abgeschaltet. Diese Regeln gelten weiter; hier kann sie niemand ändern.",
     "loading": "Regeln werden geladen …",
     "loadError": "Die Regeln konnten nicht geladen werden.",
-    "retry": "Erneut versuchen"
+    "retry": "Erneut versuchen",
+    "editTitle": "Rollenregel bearbeiten",
+    "saved": "Regel gespeichert",
+    "saveError": "Die Regel konnte nicht gespeichert werden"
   }
 }
