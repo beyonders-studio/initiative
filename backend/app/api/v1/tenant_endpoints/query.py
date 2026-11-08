@@ -16,7 +16,8 @@ What the statement may say, and what running it may cost, are answered in
 :mod:`app.services.query`.
 """
 
-from typing import Annotated, Iterable
+from collections.abc import Iterable
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
@@ -25,13 +26,13 @@ from app.db.session import routed_context
 from app.schemas.field_catalog import FieldDescription
 from app.schemas.sql_query import (
     QueryBuildRequest,
-    QueryFilterGroupSpec,
-    QueryFilterNode,
     QueryBuildResponse,
     QueryColumnDescription,
+    QueryFilterGroupSpec,
+    QueryFilterNode,
+    QueryPluginDescription,
     QueryRequest,
     QueryResponse,
-    QueryPluginDescription,
     QueryShapeResponse,
     QuerySheetDescription,
 )

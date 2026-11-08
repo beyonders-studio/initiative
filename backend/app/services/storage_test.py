@@ -22,9 +22,9 @@ from app.services.storage import (
     ReadableBlob,
     S3Storage,
     build_upload_response,
-    requested_range,
     get_guild_storage,
     open_seekable,
+    requested_range,
 )
 
 
@@ -245,7 +245,7 @@ def test_s3_key_reduces_to_basename():
 
 
 def test_s3_exists_and_delete():
-    client, storage = _s3()
+    _client, storage = _s3()
     assert storage.exists("a.txt") is False
     storage.write("a.txt", b"hi")
     assert storage.exists("a.txt") is True
@@ -558,7 +558,7 @@ def _dual(tmp_path):
 
 
 def test_dualread_write_goes_to_primary_only(tmp_path):
-    client, _, local, dual = _dual(tmp_path)
+    client, _, _local, dual = _dual(tmp_path)
     dual.write("x.png", b"data", content_type="image/png")
     assert ("bucket", "guild_7/x.png") in client.objects
     assert not (tmp_path / "guild_7" / "x.png").exists()

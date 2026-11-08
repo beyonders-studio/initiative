@@ -4,69 +4,79 @@ icon: lucide/megaphone
 
 # Reporting a problem
 
-If something about Initiative's security doesn't look right, telling someone is the responsible thing to do — and it's appreciated. This page covers both the everyday case and formal vulnerability reports.
+If something about security doesn't look right, please tell somebody. Where the report goes depends on what it's about:
 
-## "I can see something I don't think I should"
+| What you found | Who to tell |
+|---|---|
+| Something you can see that you think you shouldn't, or a weakness in the server you use | Whoever runs that server, with **Report a security problem** |
+| An email saying your account changed, when you didn't change it | Whoever runs that server, with **This wasn't me** in the email |
+| A comment, post, picture or profile that shouldn't be there | The people who look after it, with **Report** |
+| A flaw in the Initiative software itself, which every server running it would have | The Initiative project, privately by email |
 
-If you come across data you don't believe you should have access to — another group's content, a project that wasn't shared with you — please report it. It might be a misconfiguration, or it might be a genuine bug worth fixing.
+Whichever it is, don't look further than you need to confirm it, and don't share what you saw.
 
-- **On a server your group runs:** tell your **community's admin, or whoever runs the server**, first. They can check whether it's a settings issue.
-- **If it looks like a real flaw in Initiative itself:** follow the responsible-disclosure steps below.
+## Something you can see that you shouldn't
 
-## A problem with this server
+If you come across content you don't think you should have access to, such as another community's content or a project that wasn't shared with you, report it. It might be a setting, or it might be a bug. A community admin can check the community's sharing, and whoever runs the server can look into the rest.
 
-To tell whoever runs the server you use about a security problem, choose **Report a security problem**: it's under **User settings → Security**, in **My Tickets**, and in the command palette. Say what it's about, what you found, and attach a screenshot if it helps. The people who run the server read it, and you follow it, and talk with them about it, in **My Tickets**. Where the server isn't set up to take these reports, you're shown the address to write to instead.
+## A problem with the server you use
 
-From outside, a server says where to send these at `/.well-known/security.txt`. That file names its security address and, where reports are taken in the app, the form.
+To tell whoever runs your server about a security problem:
 
-**If an email says your account changed and it wasn't you**, choose **This wasn't me** in it. Your account is signed out everywhere, and the people who run the server are told; where nobody is set up to hear it, the page names who to tell.
+1. Select **Report a security problem**. It's under **My Settings → Security**, in **My Tickets**, and in the command palette.
+2. Under **What is it about?**, choose **A weakness in this server**, **Someone else got into my account** or **Something else**.
+3. Under **What did you find?**, say what you saw, where, and how to see it again. Attach a screenshot if it helps.
+4. Select **Send report**.
 
-A problem with **this server** goes to the people who run it. A problem with **the Initiative software itself**, which every server running it would have, goes to the project, below.
+The people who run the server read it, and you follow it and talk with them about it in **My Tickets**. Where the server doesn't take these reports in the app, **Report a security problem** shows the address to write to.
 
-Either way, please **don't poke further** than needed to confirm it, and **don't share** what you saw.
+From outside, a server says where to send security reports at `/.well-known/security.txt`. That file names its security contact and, where the server takes reports in the app, the form.
+
+## An account change you didn't make
+
+Every email about a change to how your account signs in has a **This wasn't me** button. Choosing it signs your account out on every browser and device, turns off your API keys, and tells the people who run the server. Where nobody is set up to hear it, the page says who to tell. See [Profile & preferences](../account/profile-and-preferences.md).
 
 ## Content that shouldn't be there
 
-For something somebody posted — a comment, a notice, a picture, a profile — use **Report** on it. Anything a community holds goes to that community's moderators, and anything about an account goes to whoever runs the server.
+For something somebody posted, such as a comment, a post, a picture or a profile, use **Report** on it. A report about something in a community goes to that community's moderators. A report about an account goes to whoever runs the server. A report that cites a law goes to both.
 
-## Reporting a security vulnerability
+## A vulnerability in Initiative
 
-If you've found a genuine security vulnerability in Initiative, please report it **privately** so it can be fixed before it's made public.
+A flaw in the Initiative software itself goes to the project, privately, so it can be fixed before it's made public. If you run a server and receive a report about the software, forward it there.
 
-!!! warning "Please don't open a public issue for security problems"
-    Public issues are visible to everyone, including anyone who might misuse the flaw. Use the private channel below instead.
-
-### How to report
+!!! warning "Please don't open a public issue for a security problem"
+    Public issues are visible to everyone. Use the email address below.
 
 Email **<security@beyonders.studio>** with:
 
-- A description of the vulnerability.
-- Steps to reproduce it.
-- The potential impact.
-- A suggested fix, if you have one (optional).
+- a description of the problem
+- steps to reproduce it
+- what it could affect
+- a suggested fix, if you have one
 
-### What to expect
+The project will:
 
-- **Acknowledgment within 48 hours.**
-- An estimated **timeline for a fix**.
-- A **notification when it's resolved**.
-- **Credit in the release notes**, unless you'd prefer to stay anonymous.
+- acknowledge your report within 48 hours
+- give an estimated timeline for a fix
+- tell you when it's resolved
+- credit you in the release notes, unless you'd rather stay anonymous
 
-## What's in scope
+Fixes go into the latest release, so that's the version to run.
 
-Reports are welcome about:
+### What's covered
 
-- The application (the web interface and the service behind it).
-- The mobile and desktop apps.
-- The deployment setup (Docker configuration and related scripts).
+- the service behind the app (`backend/`)
+- the web app, and the phone and desktop apps built from it (`frontend/`)
+- the Docker configuration and deployment scripts
+- the project's GitHub Actions workflows
 
-Vulnerabilities in third-party dependencies are generally out of scope, but a heads-up about a vulnerable dependency is still appreciated.
+Vulnerabilities in third-party dependencies are out of scope, but a heads-up about a vulnerable dependency is welcome.
 
-## A note on responsible testing
+### Testing responsibly
 
-Probing a server you don't own or administer, without permission, isn't okay — even with good intentions. Test against your own deployment, and report what you find rather than exploiting it.
+Test against a server you run. Probing a server you don't own or administer, without its owner's permission, isn't acceptable, whatever the intention.
 
 ## Related
 
-- [How your data is kept separate](how-your-data-is-kept-separate.md) — what the boundaries are supposed to be.
-- [Security & privacy](index.md) — the everyday overview.
+- [How your data is kept separate](how-your-data-is-kept-separate.md): what the boundaries are.
+- [Security & privacy](index.md): the short version.

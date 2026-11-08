@@ -16,7 +16,7 @@ major removes or changes. A listing that says nothing runs anywhere.
 from __future__ import annotations
 
 import re
-from typing import Any, Optional
+from typing import Any
 
 from app.services.marketplace import contract
 
@@ -37,7 +37,7 @@ _MIN_PLUGIN_API = r"[0-9]+\.[0-9]+"
 MAX_MIN_PLUGIN_API = 32
 
 
-def check_min_plugin_api(value: Any) -> Optional[str]:
+def check_min_plugin_api(value: Any) -> str | None:
     """``value`` as a stored ``min_plugin_api``, ``None`` when it is absent.
     Raises ``ValueError`` when it is not ``MAJOR.MINOR``."""
     if value is None:
@@ -61,7 +61,7 @@ def _major_minor(version: str) -> tuple[int, int]:
 
 
 def serves_plugin_api(
-    min_plugin_api: Optional[str], served: str = PLUGIN_API_VERSION
+    min_plugin_api: str | None, served: str = PLUGIN_API_VERSION
 ) -> bool:
     """Whether a server serving contract ``served`` can run a plug-in that needs
     ``min_plugin_api``. A value that cannot be read is not one it can run."""

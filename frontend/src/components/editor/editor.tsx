@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import type * as Y from "yjs";
 
 import { writeWithAi } from "@/api/generated/ai/ai";
-import { FileType, type SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
+import { FileType } from "@/api/generated/initiativeAPI.schemas";
 import { EditorInitiativeContext } from "@/components/editor/context/editor-initiative-context";
 import { InitiativeExtension } from "@/components/editor/initiative-extension";
 import { AIWritingMenu, AIWritingPlugin } from "@/components/editor/plugins/ai-writing-plugin";
@@ -54,10 +54,6 @@ export interface EditorProps
    *  or a linked page has no body of its own to write in. */
   supportsEntityMentions?: boolean;
   onWikilinkNavigate?: (fileId: number) => void;
-  onCreateReferencedThing?: (
-    name: string,
-    onCreated: (entityType: SearchEntityType, entityId: number, name: string) => void
-  ) => void;
 }
 
 /**
@@ -87,7 +83,6 @@ export function Editor({
   subject,
   supportsEntityMentions = false,
   onWikilinkNavigate,
-  onCreateReferencedThing,
   ...props
 }: EditorProps) {
   const { t } = useTranslation("editor");
@@ -156,7 +151,6 @@ export function Editor({
               initiativeId={initiativeId}
               subject={subject}
               onNavigate={onWikilinkNavigate}
-              onCreateThing={onCreateReferencedThing}
             />
             {aiWriting && (
               <AIWritingPlugin

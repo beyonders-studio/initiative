@@ -26,18 +26,18 @@ the edges are meaning, and they are kept apart on purpose.
 
 from __future__ import annotations
 
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import cast, func
 from sqlalchemy.dialects.postgresql import JSONPATH
+from sqlalchemy.orm import defer, selectinload, undefer
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from sqlalchemy.orm import defer, selectinload, undefer
-
-from app.core.tools import KINDS
 from app.core.messages import WikiMessages
+from app.core.tools import KINDS
 from app.models.tenant.wiki import Wiki, WikiPage, WikiPageOrder
 from app.services.permissions import with_tool
 from app.services.tenant import comments as comments_service

@@ -28,7 +28,7 @@
     "deleteTitle": "Supprimer cette page ?",
     "deleteDescription": "Ses sous-pages partent avec elle. Vous pouvez les restaurer depuis la corbeille.",
     "empty": "Pas encore de page",
-    "emptyDescription": "Commencez par une page. Reliez-en une autre avec [[ : elle sera créée quand vous la suivrez.",
+    "emptyDescription": "Commencez par une page. Tapez # dedans pour en relier une autre.",
     "createFirst": "Écrire la première page",
     "notFound": "Cette page n’est pas dans ce wiki",
     "isHome": "Page d’accueil",

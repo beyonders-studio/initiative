@@ -2,14 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import AliasChoices, ConfigDict, Field
 
 from app.core.tools import TRASH_TARGETS
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.query import PageMeta
-
 
 # Derived from the Tool enum plus the non-tool trashable extras, exactly the way
 # TagTarget derives from TAG_TARGETS — a new tool reaches the trash can without
@@ -31,14 +29,14 @@ class TrashItem(SanitizedBaseModel):
     community_id: int = Field(validation_alias=AliasChoices("community_id", "guild_id"))
     name: str
     deleted_at: datetime
-    deleted_by_id: Optional[int] = None
+    deleted_by_id: int | None = None
     deleted_by_display: str
-    purge_at: Optional[datetime] = None
+    purge_at: datetime | None = None
 
 
 class TrashListResponse(PageMeta):
     items: list[TrashItem]
-    retention_days: Optional[int] = None
+    retention_days: int | None = None
 
 
 class RestoreResponse(SanitizedBaseModel):

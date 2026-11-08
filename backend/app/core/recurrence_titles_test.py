@@ -9,7 +9,7 @@ with the zone it was picked in.
 
 import json
 import pathlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -29,7 +29,7 @@ _CASES = [case for case in json.loads(_FIXTURE.read_text())["cases"] if case["rr
 
 #: The end of Thursday 22 October 2026 in Los Angeles, already the 23rd in UTC:
 #: the case where the days a rule was picked on and its UTC days differ.
-_DUE = datetime(2026, 10, 23, 6, 59, tzinfo=timezone.utc)
+_DUE = datetime(2026, 10, 23, 6, 59, tzinfo=UTC)
 _ZONE = "America/Los_Angeles"
 
 
@@ -66,7 +66,7 @@ def test_an_interval_from_completion_runs_from_the_day_it_was_done():
     weekday that was: the rule carries no day of its own to fall back to."""
     (case,) = [case for case in _CASES if case["text"] == "Mow the lawn every! 2 weeks"]
     assert case["strategy"] == "rolling"
-    finished = datetime(2026, 10, 26, 17, 0, tzinfo=timezone.utc)  # a Monday
+    finished = datetime(2026, 10, 26, 17, 0, tzinfo=UTC)  # a Monday
     assert recurrence.next_start(case["rrule"], finished, 0, count=False) == datetime(
-        2026, 11, 9, 17, 0, tzinfo=timezone.utc
+        2026, 11, 9, 17, 0, tzinfo=UTC
     )

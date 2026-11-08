@@ -15,19 +15,18 @@ from app.core.notification_categories import category_of
 from app.core.tools import COMMENT_TARGETS, Tool
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import NotificationType
-from app.services.platform import notification_policy, user_notifications
+from app.services.platform import notification_policy, rules, user_notifications
 from app.testing.factories import (
+    create_collection,
     create_guild,
     create_task,
     create_tool_entity,
     create_user,
-    create_collection,
     create_wiki_page,
     enable_all_tools,
     get_auth_headers,
     set_notification_prefs,
 )
-from app.services.platform import rules
 
 
 async def _seed_notification(session: AsyncSession, user_id: int) -> int:

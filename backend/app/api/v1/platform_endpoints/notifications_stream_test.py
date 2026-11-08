@@ -11,7 +11,7 @@ the endpoint did to it.
 """
 
 import asyncio
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 import pytest
 from fastapi import WebSocketDisconnect
@@ -269,9 +269,8 @@ async def test_the_socket_closes_when_its_sign_in_ends(
     from sqlalchemy import update
 
     from app.models.platform.user import User
-    from app.services.content_sockets import WS_CREDENTIAL_ENDED
-
     from app.services.auth import sessions as session_service
+    from app.services.content_sockets import WS_CREDENTIAL_ENDED
 
     user = await create_user(session)
     issued = await session_service.create_session(

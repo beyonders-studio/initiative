@@ -18,8 +18,8 @@ from app.models.platform.user import User
 from app.models.tenant.contact import DETAILS, Contact
 from app.models.tenant.initiative import Initiative, PermissionKey
 from app.schemas.tenant.import_envelopes import ContactEnvelope
-from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.context import ImportContext
+from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.importers._base import (
     NamesPeopleInPassing,
     PropertyRestore,

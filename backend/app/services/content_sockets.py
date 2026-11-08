@@ -51,9 +51,10 @@ import enum
 import logging
 import time
 import uuid
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, Iterable, Mapping, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import WebSocket, status
 from sqlmodel import col, select
@@ -89,7 +90,7 @@ OUTBOX_LIMIT = 256
 WS_CREDENTIAL_ENDED = 4001
 
 #: ``(guild_id, kind, id)``; ``guild_id`` is ``None`` only for an account room.
-RoomKey = tuple[Optional[int], str, int]
+RoomKey = tuple[int | None, str, int]
 
 _GUILD = "guild"
 _INITIATIVE = "initiative"
@@ -128,12 +129,12 @@ class Wire(enum.Enum):
 #: Decides which rooms one socket may be in, on a session the guild entry has
 #: already routed. The join and every re-check call it; ``None`` or an empty
 #: set refuses.
-Authorizer = Callable[[AsyncSession, User], Awaitable[Optional[frozenset[RoomKey]]]]
+Authorizer = Callable[[AsyncSession, User], Awaitable[frozenset[RoomKey] | None]]
 
 
 async def account_authorizer(
     _session: AsyncSession, user: User
-) -> Optional[frozenset[RoomKey]]:
+) -> frozenset[RoomKey] | None:
     """An account socket's rooms: its account's own, while the account is
     active and the sign-in it was opened with stands (both asked before this
     runs)."""
@@ -154,11 +155,11 @@ class Credential:
     satisfied_providers: frozenset[int] = frozenset()
     session_amr: frozenset[str] = frozenset()
     satisfied_claims: dict[str, dict[str, list[str]]] = field(default_factory=dict)
-    session_id: Optional[uuid.UUID] = None
-    token_version: Optional[int] = None
+    session_id: uuid.UUID | None = None
+    token_version: int | None = None
 
     @classmethod
-    def captured(cls) -> "Credential":
+    def captured(cls) -> Credential:
         recorded = auth_context.current()
         session = recorded.session_credential
         return cls(
@@ -191,7 +192,7 @@ class Subscriber:
     user: User
     #: The guild the socket was admitted to, or ``None`` for an account socket:
     #: its re-check is the credential and the account's standing alone.
-    guild_id: Optional[int]
+    guild_id: int | None
     wire: Wire
     authorize: Authorizer
     credential: Credential
@@ -206,16 +207,16 @@ class Subscriber:
     #: The first frame's payload, for a channel that reads more than the token.
     first_frame: Mapping[str, Any] = field(default_factory=dict)
     #: The sign-in chain moves forward as re-checks find the row it has reached.
-    session_id: Optional[uuid.UUID] = None
+    session_id: uuid.UUID | None = None
     outbox: asyncio.Queue[Any] = field(
         default_factory=lambda: asyncio.Queue(maxsize=OUTBOX_LIMIT)
     )
-    writer: Optional[asyncio.Task[None]] = None
+    writer: asyncio.Task[None] | None = None
     #: When a frame was last queued for this socket, on the monotonic clock:
     #: what the heartbeat measures the server's own silence against.
     last_sent_at: float = field(default_factory=time.monotonic)
     #: The register it joined, which owns its writer.
-    register: Optional["ContentSockets"] = field(default=None, repr=False)
+    register: ContentSockets | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         # Read once: the row outlives the session that loaded it, and an
@@ -257,11 +258,11 @@ class ContentSockets:
         self._subs: dict[WebSocket, Subscriber] = {}
         self._rooms: dict[RoomKey, set[Subscriber]] = {}
         # user_id -> guild_id (``None`` for the account socket) -> sockets.
-        self._by_user: dict[int, dict[Optional[int], set[Subscriber]]] = {}
+        self._by_user: dict[int, dict[int | None, set[Subscriber]]] = {}
         # guild_id -> user_id -> how many of that user's presence sockets are
         # open here. Two tabs are one person.
         self._present: dict[int, dict[int, int]] = {}
-        self._loop_task: Optional[asyncio.Task[None]] = None
+        self._loop_task: asyncio.Task[None] | None = None
 
     # ── membership ─────────────────────────────────────────────────────────
 
@@ -270,7 +271,7 @@ class ContentSockets:
         sub: Subscriber,
         *,
         chosen_presence: Presence = Presence.online,
-        presence_known_at: Optional[float] = None,
+        presence_known_at: float | None = None,
     ) -> None:
         """Register an admitted socket in the rooms it was admitted to."""
         sub.register = self
@@ -361,7 +362,7 @@ class ContentSockets:
                 self.enqueue(sub, frame)
 
     def emit_bytes(
-        self, room: RoomKey, payload: bytes, *, exclude: Optional[WebSocket] = None
+        self, room: RoomKey, payload: bytes, *, exclude: WebSocket | None = None
     ) -> None:
         """Send one binary frame to every byte-stream socket in a room.
 
@@ -373,7 +374,7 @@ class ContentSockets:
                 self.enqueue(sub, payload)
 
     def signal(
-        self, guild_id: Optional[int], tool: Tool, resource_id: int, event: str
+        self, guild_id: int | None, tool: Tool, resource_id: int, event: str
     ) -> None:
         """Tell a tool's room that it changed, and nothing else.
 
@@ -388,7 +389,7 @@ class ContentSockets:
             {
                 "type": event,
                 "id": resource_id,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         )
 
@@ -497,7 +498,7 @@ class ContentSockets:
         Fail closed: an error drops the sockets it was deciding for.
         """
         first = group[0]
-        decided: dict[Subscriber, Optional[frozenset[RoomKey]]] = {}
+        decided: dict[Subscriber, frozenset[RoomKey] | None] = {}
         try:
             async with request_sessionmaker(first.guild_id)() as session:
                 current = await session.get(User, first.user_id)

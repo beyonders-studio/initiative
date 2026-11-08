@@ -12,7 +12,6 @@ account — so this table names nobody. The system engine's alone.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import Column, DateTime, Integer, PrimaryKeyConstraint, String
 from sqlmodel import Field, SQLModel
@@ -34,6 +33,6 @@ class SecuritySignalWindow(SQLModel, table=True):
     count: int = Field(sa_column=Column(Integer, nullable=False))
     #: When the count reached the rule's threshold and a case was opened. Set
     #: once, by whichever instance's flush took it over.
-    crossed_at: Optional[datetime] = Field(
+    crossed_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )

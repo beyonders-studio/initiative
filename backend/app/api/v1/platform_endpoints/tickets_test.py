@@ -11,16 +11,17 @@ import json
 import pytest
 from sqlmodel import select
 
-from app.core.rules import SetBy
-from app.services.platform import rules
 from app.core.intake import IntakeStream, meta
 from app.core.messages import SupportMessages, TicketMessages
+from app.core.rules import SetBy
+from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
+from app.services.platform import rules
 from app.testing import (
     create_guild,
     create_initiative,
@@ -28,8 +29,6 @@ from app.testing import (
     create_user,
     make_operations_community,
 )
-from app.db.request_context import SystemGuild, Unattributed
-
 
 TICKETS = "/api/v1/me/tickets"
 

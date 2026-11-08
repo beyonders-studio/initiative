@@ -7,6 +7,7 @@ plus the guild-admin PATCH that sets the opt-in and its categories.
 """
 
 from collections.abc import Callable
+from datetime import UTC
 
 import pytest
 from httpx import AsyncClient
@@ -14,15 +15,15 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import (
-    Guild,
-    GuildMembership,
     CommunityRole,
     CommunityStatus,
+    Guild,
+    GuildMembership,
 )
 from app.models.platform.user import User, UserRole, UserStatus
 from app.models.tenant.initiative import InitiativeMember
-from app.services.platform import rules
 from app.services.platform import guilds as guilds_service
+from app.services.platform import rules
 from app.testing.factories import (
     create_guild,
     create_guild_membership,
@@ -852,24 +853,24 @@ async def test_a_profile_names_no_communities_where_the_directory_is_off(
 
 def _birthdate_for_age(years: int) -> str:
     """A date somebody of this age could have been born on, as ISO text."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     return today.replace(year=today.year - years).isoformat()
 
 
 def _birthdate_days_before_turning(years: int, days: int) -> str:
     """A date that is ``days`` short of a ``years``-th birthday."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     return (today.replace(year=today.year - years) + timedelta(days=days)).isoformat()
 
 
 def _tomorrow() -> str:
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
-    return (datetime.now(timezone.utc).date() + timedelta(days=1)).isoformat()
+    return (datetime.now(UTC).date() + timedelta(days=1)).isoformat()
 
 
 #: Comfortably past the minimum, for the tests that are not about the boundary.

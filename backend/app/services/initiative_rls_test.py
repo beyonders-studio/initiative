@@ -13,12 +13,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.project import Project
 from app.testing import (
-    create_resource_grant,
     create_guild,
     create_guild_membership,
     create_initiative,
     create_initiative_member,
     create_project,
+    create_resource_grant,
     create_user,
 )
 

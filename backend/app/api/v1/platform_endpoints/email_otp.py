@@ -16,7 +16,7 @@ there is nobody to scope a policy to until one of them returns.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import (
@@ -43,12 +43,12 @@ from app.api.v1.platform_endpoints.session_opening import (
     second_factor_outstanding,
     upgrade_session,
 )
+from app.core import audit_context
 from app.core.config import is_device
+from app.core.email_i18n import SUPPORTED_EMAIL_LOCALES
 from app.core.encryption import normalize_email
 from app.core.login_methods import LoginMethod
 from app.core.messages import AuthMessages
-from app.core.email_i18n import SUPPORTED_EMAIL_LOCALES
-from app.core import audit_context
 from app.core.rate_limit import MAIL_SENDS, limiter
 from app.db import session as db_session
 from app.db.session import get_session
@@ -300,7 +300,7 @@ async def verify_sign_in_code(
         )
         row = await system_session.get(UserEmail, challenge.user_email_id)
         if row is not None:
-            row.last_login_at = datetime.now(timezone.utc)
+            row.last_login_at = datetime.now(UTC)
             system_session.add(row)
 
     native = email_otp_service.is_native(challenge)

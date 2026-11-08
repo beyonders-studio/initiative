@@ -33,25 +33,27 @@ leaves it set, so it applies again when the option comes back.
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import or_, select as sa_select
+from sqlalchemy import or_
+from sqlalchemy import select as sa_select
 from sqlmodel import col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import rules as rule_catalog
-from app.core.rules import SignInRequirement
 from app.core.audit_events import AuditEventType
+from app.core.guild_auth_options import CommunityAuthOption
 from app.core.login_methods import (
     FACTOR_METHODS,
     PRIMARY_LOGIN_METHODS,
     LoginMethod,
     SecondFactorRequirement,
 )
-from app.core.guild_auth_options import CommunityAuthOption
 from app.core.messages import AuthMessages, GuildMessages, SettingsMessages
+from app.core.rules import SignInRequirement
 from app.core.security import AUTH_POLICY_UNMET_HEADER, has_usable_password
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.auth_provider import AuthProvider
@@ -67,11 +69,9 @@ from app.services import email as email_service
 from app.services.auth import guild_provider_connections as guild_connections
 from app.services.auth import identity as identity_service
 from app.services.auth.platform_provider import is_login_ready
-from app.services.platform import account_stream
+from app.services.platform import account_stream, guild_entitlements, push_tokens
 from app.services.platform import app_settings as app_settings_service
-from app.services.platform import guild_entitlements
 from app.services.platform import guilds as guilds_service
-from app.services.platform import push_tokens
 from app.services.platform import rules as rules_service
 from app.services.platform.app_settings import GLOBAL_SETTINGS_ID
 

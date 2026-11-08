@@ -12,7 +12,7 @@ See ``app.services.platform.holds``.
 
 from __future__ import annotations
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -81,7 +81,7 @@ async def place_hold(
 async def list_holds(
     session: RLSSessionDep,
     guild_context: GuildContextDep,
-    case_task_id: Optional[int] = Query(default=None),
+    case_task_id: int | None = Query(default=None),
     open_only: bool = Query(default=False),
 ) -> list[ContentHoldRead]:
     """The holds in the community, newest first, for a ``moderate``

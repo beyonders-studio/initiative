@@ -16,8 +16,9 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from webauthn.helpers import bytes_to_base64url
 
-from app.core.login_methods import LoginMethod
 from app.core.audit_events import AuditEventType
+from app.core.email_i18n import email_t
+from app.core.login_methods import LoginMethod
 from app.core.security import (
     get_password_hash,
 )
@@ -25,9 +26,8 @@ from app.models.platform.auth_challenge import AuthChallenge
 from app.models.platform.auth_session import AuthSession
 from app.models.platform.user import User, UserStatus
 from app.models.platform.user_passkey import UserPasskey
-from app.core.email_i18n import email_t
-from app.services.platform import email_outbox
 from app.services.auth import passkeys as passkey_service
+from app.services.platform import email_outbox
 from app.testing import (
     assertion_for,
     create_passkey,
@@ -40,7 +40,6 @@ from app.testing import (
     stub_assertion,
     stub_registration,
 )
-
 
 PASSWORD = "correct-horse-battery-staple"
 

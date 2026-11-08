@@ -4,8 +4,6 @@ The socket's side of ``app.services.auth.credentials``, which every transport
 reads a credential through: a session token, held to the same rules — ``ver`` included — that the HTTP path holds it to.
 """
 
-from typing import Optional
-
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import auth_context
@@ -15,7 +13,7 @@ from app.services.auth import credentials
 from app.services.auth.credentials import CredentialRefused
 
 
-async def authenticate_ws_token(token: str, session: AsyncSession) -> Optional[User]:
+async def authenticate_ws_token(token: str, session: AsyncSession) -> User | None:
     """The active account a socket's session token names.
 
     ``None`` (rather than raising) when it names nobody, so the caller can

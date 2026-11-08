@@ -17,7 +17,6 @@ from app.core.config import settings
 from app.core.messages import PluginServiceMessages
 from app.services.marketplace import context_jwt
 
-
 JWKS_URL = "/api/v1/plugin-platform/jwks.json"
 
 _keypair = ed25519.Ed25519PrivateKey.generate()

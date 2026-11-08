@@ -16,8 +16,8 @@ reader cannot open is not there: the relationships policy clears both ends.
 from __future__ import annotations
 
 import re
-
-from typing import Any, Iterable, Optional
+from collections.abc import Iterable
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import literal, null, text, union_all
@@ -172,7 +172,7 @@ async def _descends_from(session: AsyncSession, task_id: int, other_id: int) -> 
 
 
 async def set_parent(
-    session: AsyncSession, task: Task, parent_id: Optional[int], *, user_id: int | None
+    session: AsyncSession, task: Task, parent_id: int | None, *, user_id: int | None
 ) -> None:
     """Make ``parent_id`` the task ``task`` is part of, in place of the tasks
     it was part of; ``None`` takes it out of them.

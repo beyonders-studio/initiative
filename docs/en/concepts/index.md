@@ -4,18 +4,18 @@ icon: lucide/network
 
 # How Initiative is organized
 
-There's a simple shape underneath all of this, and it's worth about four minutes. Once you can picture how the bits nest inside each other, the rest of the app stops needing explaining and you can go back to your actual life.
+Everything in Initiative sits inside something bigger, and once you can picture how it nests, most of the app explains itself. This takes about four minutes, and then you can go back to your actual life.
 
 ## The big picture
 
 ```mermaid
 graph TD
   G["Community<br/>(your group's workspace)"]
-  I1["Initiative<br/>(a big effort)"]
+  I1["Initiative<br/>(one big effort)"]
   I2["Initiative"]
-  P1["Project<br/>(a task board)"]
+  P1["Project<br/>(a list of tasks)"]
   D1["File"]
-  T1["Calendar · Counter · Dashboard<br/>Posts · Wiki · Contacts"]
+  T1["Calendar · Counters · Dashboard<br/>Posts · Wiki · Contacts"]
   TASK["Tasks"]
 
   G --> I1
@@ -26,105 +26,91 @@ graph TD
   P1 --> TASK
 ```
 
-Biggest to smallest:
+From biggest to smallest:
 
-1. **Community** — the whole workspace for one group of people.
-2. **Initiative** — a folder inside it for one big effort.
-3. **Tools** — the nine kinds of thing that hold the work, kept inside an initiative.
-4. **Tasks** — the individual to-dos on a project's board.
+1. **Community**: the whole workspace for one group of people.
+2. **Initiative**: a folder inside it for one big effort.
+3. **Tools**: the projects, files, calendars and so on that hold the work.
+4. **Tasks**: the individual to-dos inside a project.
 
-!!! tip "You do not have to build all of this"
-    One initiative with one project in it. That's the setup. Done. Plenty of groups run happily on exactly that for years and never touch anything else on this page.
+!!! tip "You don't have to build all of this"
+    One initiative with one project in it is a complete setup, and plenty of groups run on exactly that for years. This is a map of what's available. It isn't a checklist, and you aren't behind.
 
-    This diagram is a map of what's *available*. It is not a checklist, and you are not behind.
+## Community: your group's workspace
 
-## Community — your group's workspace
+A community is one separate space for one group of people. Your small business, your volunteer committee and your neighborhood association would each get their own.
 
-The outermost box: one separate space for one group of people. Your business, your volunteer committee and your neighbourhood association would each be their own community.
+Communities don't mix, and nothing in one shows up in another. You can belong to several and switch between them on the rail down the left edge of the screen.
 
-Communities don't mix. Nothing in one is visible from another — not to other people, and not to you either. You can belong to several and hop between them from the rail down the left, but each one is a sealed world that knows nothing of the others.
+The one thing that spans them is you. The Initiative logo at the top of the rail opens [your own pages](../guides/your-space.md), which gather your tasks, events and messages from every community you're in. They show you nothing you couldn't already open, and they save you checking four communities to find out what you agreed to.
 
-The one thing that spans them is **you**. The Initiative logo above the rail opens [your space](../guides/your-space.md), which gathers your own tasks, events and messages out of every community at once — because you belong to all of them. It shows you nothing you couldn't already reach. It just saves you opening four communities to find out what you agreed to.
-
-Inside a community there are three levels of person: **member** (is in the place), **admin** (runs the place), and **superadmin** (runs it, and also holds the keys: sign-in, AI and plug-ins). That's the whole hierarchy. Nobody has to be promoted to Senior Member. See [Working with communities](../guides/communities.md).
+Most people in a community are **members**. **Admins** run it, and its **superadmin** also decides how people sign in and which plug-ins and AI it uses. See [Communities](../guides/communities.md).
 
 !!! example "A running example"
-    *Riverside Players* is a community theatre group. They make one community for everything they do together. Inside it, one initiative per production.
+    *Riverside Players* is a community theater group. They make one community for everything they do together, and inside it, one initiative per production.
 
-## Initiative — a big effort
+## Initiative: one big effort
 
-A folder for one major undertaking, holding all the tools that effort uses. This is the level where you decide **who's involved**.
+An initiative is a folder for one major undertaking, holding the tools that effort uses. It's also where you decide who's involved.
 
-Why is there a middle layer at all? Because real groups have four things on the go simultaneously, and not everybody needs to see all four — or, frankly, wants to. The person doing the raffle does not need the budget spreadsheet in their sidebar every morning.
+Why have a middle layer at all? Because real groups have four things going at once, and not everybody needs all four. The person running the raffle doesn't need the budget spreadsheet in their sidebar every morning.
 
 !!! example "Continuing the example"
-    Riverside Players make an initiative called *Spring Play: Our Town*. Into it go the rehearsal schedule, the budget spreadsheet, the script, and the performance calendar.
+    Riverside Players make an initiative called *Spring Play: Our Town*. Into it go the rehearsal schedule, the budget, the script and the performance calendar.
 
-    Only the spring play people are in it. The summer show crew never see it, never scroll past it, and are never once tempted to have an opinion about it.
+    Only the spring play people are in it. The summer show crew never see it, and so they're never tempted to have an opinion about it.
 
-A new community has no initiatives — you make the first one and name it after the work it holds. (Sign up with **For a group** or **Just for me** and the first one is made for you.) Add as many more as you need.
+A new community has no initiatives until you make one and name it after the work it holds. If you sign up with **For a group** or **Just for me**, the first one is made for you.
 
-People are added as **members**, each with a **role** — "Director", "Cast" — that decides which tools they can use. See [Initiative roles](../sharing/initiative-roles.md).
+Everybody in an initiative has a **role** that decides which tools they can use. Every initiative comes with **Moderator**, **Project Manager** and **Member**, and you can add your own, like "Director" or "Cast". See [Initiative roles](../sharing/initiative-roles.md).
 
-## Tools — the things that hold the work
+## Tools: the things that hold the work
 
-Everything inside an initiative is a **tool**. There are nine kinds, and they all behave the same way: they're shared the same way, they take tags, they have comment threads, and you can point at any of them with `#` from anywhere you write.
-
-Learn how one works and you've learned how the next one works. That's the whole idea.
+Everything inside an initiative is a **tool**, and the tools all work alike. You share each one the same way, tag it, comment on it, and point at it with `#` from anything you write. Once you've learned one, you've mostly learned the next.
 
 ### The two you'll start with
 
-**Projects** are boards. A project holds **tasks**, and shows them however you like — a **Table**, a drag-and-drop **Kanban** board, a **Gantt** timeline or a **Calendar**. Same work, four ways of looking at it, so the person who thinks in tidy lists and the person who thinks in columns can share a project without either of them quietly suffering.
+**Projects** hold **tasks** and show them as a **Table**, a **Board** you drag cards across, a **Gantt** timeline or a **Calendar**. The person who thinks in tidy lists and the person who thinks in columns can share a project without either of them quietly suffering. See [Projects & tasks](../guides/projects-and-tasks.md).
 
-A **task** carries a description, a status, a priority, dates, the people doing it, a checklist and tags. This is where the day-to-day actually happens. See [Projects & tasks](../guides/projects-and-tasks.md).
-
-**Files** hold the knowledge: meeting notes, a plan, a script, a budget, a **whiteboard** for the things that are far easier drawn than described, and the PDF somebody sent round in March. Most kinds can be edited by several people at once, live, so there's no emailing versions around. See [Files](../guides/files.md).
+**Files** hold what your group writes and collects: text documents, spreadsheets and whiteboards that several people can edit at once, plus uploads like the PDF somebody sent around in March. See [Files](../guides/files.md).
 
 ### The rest, when you grow into them
 
-- **Calendar & events** — things that happen at a time.
-- **Counters** — numbers that move.
-- **Dashboards** — one screen that answers "how are we doing?"
-- **Posts** — a noticeboard, for the things that need saying rather than doing.
-- **Wikis** — linked pages, for the things your group knows rather than the things it is doing.
-- **Contacts** — the people and places your work involves, and how to reach them.
+| Tool | What it's for |
+|---|---|
+| **Calendars** | Things that happen at a time, with RSVPs |
+| **Counters** | Numbers that go up and down, like seats left or money raised |
+| **Dashboards** | One screen that answers "how are we doing?" |
+| **Posts** | A bulletin board, for things that need saying rather than doing |
+| **Wikis** | Linked pages for what your group knows |
+| **Contacts** | An address book of the people and places your work involves |
 
-Use none of these and nothing is missing. They aren't sitting there judging you. See [Tools](../guides/tools.md).
+Each initiative switches its tools on and off, and projects and files are the ones on to begin with. If you never turn on the rest, nothing is missing. See [Tools](../guides/tools.md).
 
-!!! info "Eight today"
-    The list of tools is a real, defined thing in the app rather than a loose category, and it has grown before — Contacts is the most recent. When a ninth arrives it'll turn up here, in the roles you can hand out, and in everything else that treats a tool as a tool, because there's one list and everything reads from it.
+## Plug-ins: what other groups already built
 
-## Plug-ins — what other groups already built
+The **marketplace** has ready-made dashboards, projects and plug-ins, built by people who had your problem first. A dashboard or a project lands in an initiative like any other tool. A plug-in adds something the whole community shares, so the community's superadmin adds it. See [Plug-ins & the marketplace](../guides/plugins-and-marketplace.md).
 
-Some of what a group needs isn't in that list, and doesn't have to be.
+## Who can see what
 
-The **marketplace** has ready-made **dashboards** and **plug-ins** built by people who had the same problem first. Adding one is a couple of clicks: pick it, choose where it goes, name it.
-
-Dashboards land in an initiative like any other tool. Plug-ins get added community-wide by an admin, because they add something everybody shares. See [Plug-ins & the marketplace](../guides/plugins-and-marketplace.md).
-
-## The other half: who can see what
-
-Everything above is about *where things live*. The other half is *who's allowed near them*. Access layers from the outside in:
+Everything above is about where things live. The other half is who's allowed near them, and that works from the outside in:
 
 | Layer | The question it answers |
 |---|---|
 | **Community** | Are you in this group at all? |
 | **Initiative** | Are you part of this particular effort? |
-| **Initiative role** | Which kinds of tools may you use here? |
-| **Sharing** | For *this specific* project or file — look, edit, or own? |
+| **Initiative role** | Which kinds of tools can you use here? |
+| **Sharing** | For this one project or file, can you look, edit, or decide who else gets in? |
 
-Each layer sits inside the one above it. You reach a file only if you're in its community, **and** its initiative, **and** it's been shared with you.
+You reach a file only when all four say yes. Community admins are the exception, because somebody has to be able to find the thing that went missing: they can open everything in their own community.
 
-Which sounds like a lot of gates until you notice what they buy you: you never have to think about any of this again. The only people who see a thing are the people you put in front of it, and that stays true whether or not you're paying attention.
+It sounds like a lot of gates, and the payoff is that you rarely have to think about them. The people who see a thing are the people you put in front of it. [Sharing & access](../sharing/index.md) has the friendly version, and [Security & privacy](../security/index.md) has the technical one.
 
-The friendly version is [Sharing & access](../sharing/index.md). The one with the technical detail is [Security & privacy](../security/index.md).
+??? techspec "For the technically minded: these layers are enforced in the database"
+    The **community** layer is structural. Each community's content lives in its own PostgreSQL schema, and a request routed into one can't address another's tables. The **initiative**, **role** and **sharing** layers are enforced inside that schema by row-level security on every statement, so the database has the final say rather than the application. Two overrides sit above them: a **community admin** has full access within their own community, and platform staff can hold **temporary, time-limited, recorded** access, never a standing one. The full model is in [How your data is kept separate](../security/how-your-data-is-kept-separate.md).
 
-??? techspec "For the technically minded — these layers are enforced in the database"
-    They're not interface conveniences. The **community** layer is structural: each community's content lives in its own PostgreSQL schema, and a request routed into one cannot address another's tables. The **initiative**, **role** and **sharing** layers are enforced inside that schema by PostgreSQL row-level security, evaluated on every statement — so the database, not the application, has the final say. Two overrides sit above them: a **community administrator** has full access within their own community, and platform staff can hold **temporary, time-limited, audited** access for support, never a standing one. Full model in [How your data is kept separate](../security/how-your-data-is-kept-separate.md).
+## Where to go next
 
-## Where next
-
-- Want to actually *do* things? [The how-to guides](../guides/index.md).
-- Worried about who can see what? [Sharing & access](../sharing/index.md).
-- Need something the built-in tools don't do? [Plug-ins & the marketplace](../guides/plugins-and-marketplace.md).
-- Hit a word you don't recognise? [The glossary](../reference/glossary.md), or just search for it.
+- To start doing things, open [the how-to guides](../guides/index.md).
+- To find out who can see what, read [Sharing & access](../sharing/index.md).
+- For a word you don't recognize, try [the glossary](../reference/glossary.md), or search for it.

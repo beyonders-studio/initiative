@@ -17,7 +17,7 @@ which only cancels a verification in progress, and both devices start again.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import ConfigDict
 from sqlalchemy import (
@@ -75,7 +75,7 @@ class DmVerificationItem(SQLModel, table=True):
     )
     body: str = Field(sa_column=Column(Text, nullable=False))
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(
             DateTime(timezone=True), nullable=False, server_default=text("now()")
         ),

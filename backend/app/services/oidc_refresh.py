@@ -4,17 +4,17 @@ import base64
 import binascii
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.encryption import (
+    SALT_OIDC_CLIENT_SECRET,
     decrypt_field,
     decrypt_token,
     encrypt_token,
-    SALT_OIDC_CLIENT_SECRET,
 )
 from app.db import session as db_session
 from app.models.platform.auth_provider import AuthProvider
@@ -38,8 +38,7 @@ _SYNC_INTERVAL = timedelta(minutes=15)
 async def _fetch_oidc_metadata(issuer_url: str) -> dict:
     normalized = issuer_url.rstrip("/")
     well_known_suffix = "/.well-known/openid-configuration"
-    if normalized.endswith(well_known_suffix):
-        normalized = normalized[: -len(well_known_suffix)]
+    normalized = normalized.removesuffix(well_known_suffix)
     discovery_url = f"{normalized}{well_known_suffix}"
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.get(discovery_url)
@@ -172,7 +171,7 @@ async def _refresh_and_sync_identity(
                 user.id,
                 ", ".join(missing),
             )
-            identity.last_synced_at = datetime.now(timezone.utc)
+            identity.last_synced_at = datetime.now(UTC)
             session.add(identity)
             await session.commit()
             return True
@@ -196,7 +195,7 @@ async def _refresh_and_sync_identity(
         len(sync_result.initiatives_removed),
     )
 
-    identity.last_synced_at = datetime.now(timezone.utc)
+    identity.last_synced_at = datetime.now(UTC)
     session.add(identity)
     await session.commit()
     return True
@@ -214,7 +213,7 @@ async def process_oidc_refresh_sync() -> None:
         provider_ids = (
             await session.exec(
                 select(AuthProvider.id).where(
-                    AuthProvider.enabled == True,  # noqa: E712
+                    AuthProvider.enabled == True,
                     provider_placement.syncs_placement(),
                     AuthProvider.issuer.is_not(None),
                     AuthProvider.client_id.is_not(None),
@@ -271,7 +270,7 @@ async def _sweep_provider(session: AsyncSession, provider: AuthProvider) -> None
         )
         return
 
-    cutoff = datetime.now(timezone.utc) - _SYNC_INTERVAL
+    cutoff = datetime.now(UTC) - _SYNC_INTERVAL
     stmt = (
         select(FederatedIdentity, FederatedIdentitySecret, User)
         .join(

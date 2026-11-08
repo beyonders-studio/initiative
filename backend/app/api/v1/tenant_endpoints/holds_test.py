@@ -8,7 +8,7 @@ real request through the seam, so the row policies decide, not the code.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import text
@@ -20,15 +20,15 @@ from app.db.holds import HoldsInForce, refuse_while_held
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
+from app.models.tenant.collection import Collection
 from app.models.tenant.comment import Comment
 from app.models.tenant.content_hold import ContentHold
-from app.models.tenant.collection import Collection
 from app.models.tenant.intake import IntakeCase
 from app.models.tenant.task import Task
 from app.services.platform import holds as holds_service
 from app.testing import (
-    create_comment,
     create_collection,
+    create_comment,
     create_file,
     create_user,
 )
@@ -451,7 +451,7 @@ async def test_a_reminder_that_could_not_be_noted_is_tried_again(
     guild_id = scene["guild"].id
     await _system(session, guild_id)
     hold = (await session.exec(select(ContentHold))).one()
-    hold.placed_at = datetime.now(timezone.utc) - timedelta(days=31)
+    hold.placed_at = datetime.now(UTC) - timedelta(days=31)
     session.add(hold)
     await session.commit()
 
@@ -585,7 +585,7 @@ async def test_a_hold_standing_30_days_is_noted_on_its_case(
     guild_id = scene["guild"].id
     await _system(session, guild_id)
     hold = (await session.exec(select(ContentHold))).one()
-    hold.placed_at = datetime.now(timezone.utc) - timedelta(days=31)
+    hold.placed_at = datetime.now(UTC) - timedelta(days=31)
     session.add(hold)
     await session.commit()
 

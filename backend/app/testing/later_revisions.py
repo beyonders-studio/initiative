@@ -14,9 +14,10 @@ left it, and it is one function for the whole database.
 from __future__ import annotations
 
 import importlib.util
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Callable
+from typing import Any
 
 from sqlalchemy import text
 

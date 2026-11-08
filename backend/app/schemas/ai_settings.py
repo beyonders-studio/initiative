@@ -7,7 +7,6 @@ destination: provider, base_url, model, and its key). Members configure nothing.
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import ConfigDict
 
@@ -57,7 +56,7 @@ class AIConnectionCommunity(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     id: int
-    name: Optional[str] = None
+    name: str | None = None
 
 
 class AIConnectionResponse(SanitizedBaseModel):
@@ -70,8 +69,8 @@ class AIConnectionResponse(SanitizedBaseModel):
     scope: ConnectionScope
     label: str
     provider: AIProvider
-    base_url: Optional[str] = None
-    model: Optional[str] = None
+    base_url: str | None = None
+    model: str | None = None
     has_api_key: bool = False
     enabled: bool = True
     is_default: bool = False
@@ -80,16 +79,16 @@ class AIConnectionResponse(SanitizedBaseModel):
     communities: list[AIConnectionCommunity] = []
     #: The message code its last request failed with, and since when; none
     #: once one succeeds.
-    last_error: Optional[str] = None
-    last_error_at: Optional[datetime] = None
+    last_error: str | None = None
+    last_error_at: datetime | None = None
 
 
 class AIConnectionCreate(SanitizedBaseModel):
     label: str
     provider: AIProvider
-    base_url: Optional[str] = None
-    model: Optional[str] = None
-    api_key: Optional[RawTextStr] = None
+    base_url: str | None = None
+    model: str | None = None
+    api_key: RawTextStr | None = None
     enabled: bool = True
     is_default: bool = False
     #: An operator's connection only. Giving it a community takes that
@@ -98,14 +97,14 @@ class AIConnectionCreate(SanitizedBaseModel):
 
 
 class AIConnectionUpdate(SanitizedBaseModel):
-    label: Optional[str] = None
-    provider: Optional[AIProvider] = None
-    base_url: Optional[str] = None
-    model: Optional[str] = None
-    api_key: Optional[RawTextStr] = None
-    enabled: Optional[bool] = None
-    is_default: Optional[bool] = None
-    community_ids: Optional[list[int]] = None
+    label: str | None = None
+    provider: AIProvider | None = None
+    base_url: str | None = None
+    model: str | None = None
+    api_key: RawTextStr | None = None
+    enabled: bool | None = None
+    is_default: bool | None = None
+    community_ids: list[int] | None = None
 
 
 # --- Platform mode (operator-set, on app_settings) ---------------------------
@@ -122,16 +121,16 @@ class PlatformAIModeUpdate(SanitizedBaseModel):
 # --- Resolved (final computed, used internally) ------------------------------
 class ResolvedAISettings(SanitizedBaseModel):
     enabled: bool = False
-    provider: Optional[AIProvider] = None
-    api_key: Optional[RawTextStr] = None
+    provider: AIProvider | None = None
+    api_key: RawTextStr | None = None
     has_api_key: bool = False
-    base_url: Optional[str] = None
-    model: Optional[str] = None
+    base_url: str | None = None
+    model: str | None = None
     # ``allow_private`` is server-computed as (provider == ollama and the chosen
     # connection is a platform connection); never influenced by request input.
     allow_private: bool = False
-    scope: Optional[ConnectionScope] = None
-    connection_id: Optional[int] = None
+    scope: ConnectionScope | None = None
+    connection_id: int | None = None
     source: str = "disabled"  # "platform" | "community" | "disabled"
 
 
@@ -141,10 +140,10 @@ class ResolvedAISettingsResponse(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     enabled: bool = False
-    provider: Optional[AIProvider] = None
+    provider: AIProvider | None = None
     has_api_key: bool = False
-    base_url: Optional[str] = None
-    model: Optional[str] = None
+    base_url: str | None = None
+    model: str | None = None
     source: str = "disabled"
 
 
@@ -154,12 +153,12 @@ class AIConnectionTestResponse(SanitizedBaseModel):
 
     success: bool
     #: The failure's message code; none on success.
-    message: Optional[str] = None
-    available_models: Optional[list[str]] = None
+    message: str | None = None
+    available_models: list[str] | None = None
 
 
 class AIModelsResponse(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     models: list[str]
-    error: Optional[str] = None
+    error: str | None = None

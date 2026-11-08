@@ -172,6 +172,7 @@
     "gone": "Eliminado",
     "noMatches": "Nada en esta iniciativa coincide con «{{query}}».",
     "scopeHint": "Aquí solo se puede nombrar la iniciativa de este documento.",
+    "searchOrCreate": "Escribe para buscar, o crea lo que aún no existe",
     "searching": "Buscando…",
     "unavailable": "Esto ya no está disponible para ti"
   },

@@ -10,7 +10,6 @@ every inbound delivery without us holding their long-term secret.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import (
     Boolean,
@@ -29,9 +28,9 @@ from app.models.tenant._mixins import CreatedByMixin
 class WebhookSubscription(CreatedByMixin, table=True):
     __tablename__ = "webhook_subscriptions"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
 
-    initiative_id: Optional[int] = Field(
+    initiative_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -49,7 +48,7 @@ class WebhookSubscription(CreatedByMixin, table=True):
     # No foreign key — ``guild_plugins`` rows go when a plug-in is uninstalled, and a
     # subscription outliving that is one whose deliveries stop, not one that
     # should disappear from the owner's list.
-    plugin_install_id: Optional[int] = Field(
+    plugin_install_id: int | None = Field(
         default=None,
         sa_column=Column(Integer, nullable=True, index=True),
     )
@@ -64,7 +63,7 @@ class WebhookSubscription(CreatedByMixin, table=True):
     # Column names this subscription cares about. NULL means any change to a
     # named event type. An update is delivered when the changed set intersects
     # this one; created/deleted always are, since neither names columns.
-    fields: Optional[list[str]] = Field(
+    fields: list[str] | None = Field(
         default=None,
         sa_column=Column(ARRAY(String(length=63)), nullable=True),
     )

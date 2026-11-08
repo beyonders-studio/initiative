@@ -103,7 +103,7 @@ async def notify(
                 accepted=accepted,
             )
             await session.commit()
-    except Exception:  # noqa: BLE001 - a notice never fails the request
+    except Exception:
         logger.exception("contact-grant notification failed")
 
 

@@ -15,29 +15,29 @@ import logging
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import text
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.testing import community_plan
 from app.core.intake import IntakeStream
 from app.core.messages import GuildMessages
+from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
-from app.models.platform.guild import Guild, CommunityRole, CommunityStatus
 from app.models.platform.access_grant import AccessLevel
+from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.platform.user import UserRole
 from app.models.tenant.intake import IntakeBinding
 from app.services import email as email_service
 from app.testing import (
+    community_plan,
     create_guild,
     create_guild_membership,
     create_initiative,
     create_project,
     create_user,
-    guild_administration,
     drain_notices,
+    guild_administration,
     make_operations_community,
 )
-from sqlmodel import select
-from app.db.request_context import SystemGuild, Unattributed
 
 GUILDS = "/api/v1/settings/communities"
 
@@ -381,7 +381,7 @@ async def test_raising_cap_reopens_joins(
     invitee = await acting_user()
     # Minted while the seat is still free, redeemed after it is taken —
     # minting itself is capacity-gated, so the order here is the scenario.
-    invite, invite_code = await guild_service.create_guild_invite(
+    _invite, invite_code = await guild_service.create_guild_invite(
         session, guild_id=guild.id, created_by=operator.user.id, max_uses=5
     )
     await guild_service.ensure_membership(
@@ -667,12 +667,22 @@ async def test_storage_update_refreshes_process_config(
     assert cfg.use_path_style is True
 
 
-async def test_storage_backfill_requires_bucket(
+async def test_storage_backfill_requires_s3_saved(
     client: AsyncClient, owner, reset_storage_cache: None
 ) -> None:
-    """The backfill writes to S3, so it needs a bucket configured first."""
+    """The backfill copies into the bucket the server is saved to use: no bucket,
+    or a bucket saved while the backend stays local, is refused up front."""
     resp = await client.post("/api/v1/settings/storage/backfill", headers=owner.headers)
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "SETTINGS_STORAGE_BACKFILL_NOT_CONFIGURED"
 
+    resp = await client.put(
+        "/api/v1/settings/storage",
+        json={**_S3_PAYLOAD, "backend": "local"},
+        headers=owner.headers,
+    )
+    assert resp.status_code == 200
+    resp = await client.post("/api/v1/settings/storage/backfill", headers=owner.headers)
     assert resp.status_code == 400
     assert resp.json()["detail"] == "SETTINGS_STORAGE_BACKFILL_NOT_CONFIGURED"
 

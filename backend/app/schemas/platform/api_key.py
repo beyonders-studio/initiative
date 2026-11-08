@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 
 from pydantic import AliasChoices, ConfigDict, Field, model_validator
 
@@ -18,14 +17,14 @@ class ApiKeyMetadata(SanitizedBaseModel):
     token_prefix: str
     is_active: bool
     read_only: bool = False
-    community_id: Optional[int] = Field(
+    community_id: int | None = Field(
         default=None, validation_alias=AliasChoices("community_id", "guild_id")
     )
-    resource_type: Optional[Tool] = None
-    resource_id: Optional[int] = None
+    resource_type: Tool | None = None
+    resource_id: int | None = None
     created_at: datetime
-    last_used_at: Optional[datetime] = None
-    expires_at: Optional[datetime] = None
+    last_used_at: datetime | None = None
+    expires_at: datetime | None = None
 
 
 class ApiKeyListResponse(SanitizedBaseModel):
@@ -36,15 +35,15 @@ class ApiKeyListResponse(SanitizedBaseModel):
 
 class ApiKeyCreateRequest(SanitizedBaseModel):
     name: str = Field(min_length=1, max_length=100)
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
     # Least-privilege scoping. ``read_only`` blocks all writes; ``guild_id`` pins
     # the key to a single guild. Recommended for machine credentials (MCP, CI).
     read_only: bool = False
-    community_id: Optional[int] = None
+    community_id: int | None = None
     # One tool resource the key reads, for a tool in ``FEED_TOOLS``: its feed
     # and nothing else. Needs ``community_id``; such a key is read-only.
-    resource_type: Optional[Tool] = None
-    resource_id: Optional[int] = None
+    resource_type: Tool | None = None
+    resource_id: int | None = None
 
     @model_validator(mode="after")
     def _one_resource(self) -> "ApiKeyCreateRequest":

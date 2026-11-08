@@ -24,9 +24,10 @@ the assignee, links and the parent are edges. Those are never considered.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from app.models.tenant.metadata import MetadataType
 from app.services.import_engine.adf import adf_to_markdown
@@ -78,7 +79,7 @@ def _is_empty(value: Any) -> bool:
     return value is None or value == "" or value == [] or value == {}
 
 
-def _text(value: Any) -> Optional[str]:
+def _text(value: Any) -> str | None:
     """A string, or a rich-text field's ADF rendered as markdown."""
     if isinstance(value, str):
         return value.strip() or None
@@ -87,13 +88,13 @@ def _text(value: Any) -> Optional[str]:
     return None
 
 
-def _number(value: Any) -> Optional[float]:
+def _number(value: Any) -> float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     return float(value)
 
 
-def _hours(value: Any) -> Optional[float]:
+def _hours(value: Any) -> float | None:
     """Jira keeps estimates in seconds; a person reads them in hours."""
     seconds = _number(value)
     if seconds is None:
@@ -101,7 +102,7 @@ def _hours(value: Any) -> Optional[float]:
     return round(seconds / _SECONDS_PER_HOUR, 2)
 
 
-def _date(value: Any) -> Optional[str]:
+def _date(value: Any) -> str | None:
     if not isinstance(value, str) or len(value) < 10:
         return None
     candidate = value[:10]
@@ -112,7 +113,7 @@ def _date(value: Any) -> Optional[str]:
     return candidate
 
 
-def _datetime(value: Any) -> Optional[str]:
+def _datetime(value: Any) -> str | None:
     """Jira's ``2024-03-04T09:30:00.000+0000`` as ISO 8601 in UTC."""
     if not isinstance(value, str) or not value:
         return None
@@ -121,11 +122,11 @@ def _datetime(value: Any) -> Optional[str]:
             parsed = datetime.strptime(value, pattern)
         except ValueError:
             continue
-        return parsed.astimezone(timezone.utc).isoformat()
+        return parsed.astimezone(UTC).isoformat()
     return None
 
 
-def _label(value: Any) -> Optional[str]:
+def _label(value: Any) -> str | None:
     """What an option, a version, a component or a priority is called."""
     if isinstance(value, str):
         return value.strip() or None
@@ -137,7 +138,7 @@ def _label(value: Any) -> Optional[str]:
     return None
 
 
-def _labels(value: Any) -> Optional[list[str]]:
+def _labels(value: Any) -> list[str] | None:
     if not isinstance(value, list):
         return None
     out: list[str] = []
@@ -148,7 +149,7 @@ def _labels(value: Any) -> Optional[list[str]]:
     return out or None
 
 
-def _person(value: Any) -> Optional[str]:
+def _person(value: Any) -> str | None:
     """A display name — never an address, which Jira withholds anyway."""
     if not isinstance(value, dict):
         return None
@@ -156,7 +157,7 @@ def _person(value: Any) -> Optional[str]:
     return name.strip() if isinstance(name, str) and name.strip() else None
 
 
-def _cascade(value: Any) -> Optional[str]:
+def _cascade(value: Any) -> str | None:
     """A cascading select, ``Parent → Child``."""
     parent = _label(value)
     if parent is None:
@@ -209,7 +210,7 @@ _HANDLED_ELSEWHERE = frozenset(
 _URL_CUSTOM = "com.atlassian.jira.plugin.system.customfieldtypes:url"
 
 
-def _custom_spec(entry: dict) -> tuple[Optional[MetadataType], Callable[[Any], Any]]:
+def _custom_spec(entry: dict) -> tuple[MetadataType | None, Callable[[Any], Any]]:
     """The property type and reader for a custom field, from its schema.
 
     ``(None, …)`` means the field has no home here and is dropped.
@@ -289,7 +290,7 @@ class FieldMapper:
         taken: set[str] = {JIRA_KEY_PROPERTY.lower()}
         self._specs: list[FieldSpec] = []
         self._no_home: dict[str, str] = {}
-        self._start_date_id: Optional[str] = None
+        self._start_date_id: str | None = None
 
         for field_id, (name, ptype, reader) in _SYSTEM_FIELDS.items():
             self._specs.append(FieldSpec(field_id, _unique(name, taken), ptype, reader))

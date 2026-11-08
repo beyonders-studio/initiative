@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
-from typing import List, Optional, TYPE_CHECKING
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, ClassVar, Optional
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, text
 from sqlalchemy.dialects.postgresql import JSONB
@@ -18,10 +18,10 @@ from app.models.tenant._mixins import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
+    from app.models.platform.user_profile_view import MemberProfile
     from app.models.tenant.initiative import Initiative
     from app.models.tenant.post_poll import PostPoll
     from app.models.tenant.resource_grant import ResourceGrant
-    from app.models.platform.user_profile_view import MemberProfile
 
 
 class Post(
@@ -79,9 +79,9 @@ class Post(
     # A tool row is written before anything has been shared, so it is read
     # back by no RETURNING clause: the id comes from the sequence first and
     # the INSERT stands alone. See app/db/initiative_rls.py.
-    __table_args__ = {"implicit_returning": False}
+    __table_args__: ClassVar[dict[str, bool]] = {"implicit_returning": False}
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     initiative_id: int = Field(
         sa_column=Column(
             Integer,
@@ -105,33 +105,33 @@ class Post(
     )
     # Set when a manager lifts the post above the feed; NULL is the normal
     # state. The pair below is meaningless while this is NULL.
-    pinned_at: Optional[datetime] = Field(
+    pinned_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
     )
-    pinned_by: Optional[int] = Field(default=None, nullable=True)
-    pin_expires_at: Optional[datetime] = Field(
+    pinned_by: int | None = Field(default=None, nullable=True)
+    pin_expires_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
     # When the author asked for it to go up. NULL on a notice posted straight
     # away — there was nothing to schedule.
-    scheduled_for: Optional[datetime] = Field(
+    scheduled_for: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
     )
     # When it went up. NULL means it has not yet: only people who can write it
     # can see it, and it is in no board, count, or search index.
-    published_at: Optional[datetime] = Field(
+    published_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
@@ -142,7 +142,7 @@ class Post(
             "viewonly": True,
         }
     )
-    grants: List["ResourceGrant"] = Relationship(
+    grants: list["ResourceGrant"] = Relationship(
         sa_relationship_kwargs={
             "primaryjoin": (
                 "and_(foreign(ResourceGrant.resource_id) == Post.id, "
@@ -165,14 +165,14 @@ class Post(
         :func:`is_published_clause`."""
         return self.published_at is not None
 
-    def is_pinned_now(self, now: Optional[datetime] = None) -> bool:
+    def is_pinned_now(self, now: datetime | None = None) -> bool:
         """Whether this row's pin is live — the Python side of
         :func:`pin_is_live`, for a post already loaded."""
         if self.pinned_at is None:
             return False
         if self.pin_expires_at is None:
             return True
-        return self.pin_expires_at > (now or datetime.now(timezone.utc))
+        return self.pin_expires_at > (now or datetime.now(UTC))
 
 
 def pin_is_live():

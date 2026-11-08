@@ -23,7 +23,6 @@ unchanged task is a no-op. That is also what keeps a move between two different
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from sqlmodel import select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -33,7 +32,7 @@ from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 
 def sync_completed_at(
     task: Task,
-    category: Optional[TaskStatusCategory],
+    category: TaskStatusCategory | None,
     *,
     now: datetime,
 ) -> None:

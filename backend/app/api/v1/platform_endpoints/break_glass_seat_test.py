@@ -13,12 +13,11 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import (
-    Guild,
-    GuildMembership,
     CommunityRole,
     CommunityStatus,
+    Guild,
+    GuildMembership,
 )
-
 
 BREAK_GLASS = "/api/v1/access-grants/break-glass"
 PASSWORD = "testpassword123"

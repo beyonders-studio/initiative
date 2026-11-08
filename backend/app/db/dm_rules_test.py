@@ -19,8 +19,8 @@ from app.models.platform.contact_grant import (
     canonical_pair,
 )
 from app.models.platform.user import UserRole
-from app.models.platform.user_dm_settings import DmPolicy, UserDmSettings
 from app.models.platform.user_dm_guild_optout import UserDmGuildOptout
+from app.models.platform.user_dm_settings import DmPolicy, UserDmSettings
 from app.models.platform.user_ignore import UserIgnore
 from app.services.platform import rules
 from app.testing import create_guild, create_guild_membership, create_user

@@ -6,7 +6,7 @@ account still wants, and whether one message or several.
 """
 
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
@@ -21,9 +21,8 @@ from app.models.platform.notification import NotificationType
 from app.models.platform.user_token import UserToken, UserTokenPurpose
 from app.services import email as email_service
 from app.services.auth import account_changes, addresses
-from app.services.platform import email_outbox, user_notifications
+from app.services.platform import email_outbox, rules, user_notifications
 from app.testing import create_guild, create_user, set_notification_prefs
-from app.services.platform import rules
 
 
 def _pieces(
@@ -103,7 +102,7 @@ async def test_an_install_with_no_mail_server_queues_nothing(
 
 async def test_instant_is_due_immediately(session: AsyncSession, configured):
     user = await create_user(session, email="instant@example.com")
-    before = datetime.now(timezone.utc)
+    before = datetime.now(UTC)
     assert await email_outbox.enqueue(
         session, user, category=NotificationCategory.mentions, pieces=_pieces()
     )
@@ -123,8 +122,8 @@ async def test_a_cadence_defers_the_row(session: AsyncSession, configured):
     )
     await session.commit()
     (row,) = await _rows(session, user.id)
-    assert row.deliver_after > datetime.now(timezone.utc)
-    assert row.deliver_after.astimezone(timezone.utc).hour == 8
+    assert row.deliver_after > datetime.now(UTC)
+    assert row.deliver_after.astimezone(UTC).hour == 8
 
 
 async def test_one_row_goes_out_as_one_message(session: AsyncSession, configured, sent):
@@ -134,7 +133,7 @@ async def test_one_row_goes_out_as_one_message(session: AsyncSession, configured
     )
     await session.commit()
 
-    await email_outbox._run_pass(session, now=datetime.now(timezone.utc))
+    await email_outbox._run_pass(session, now=datetime.now(UTC))
     assert len(sent) == 1
     assert sent[0]["subject"] == "You were mentioned"
     assert "mentioned you" in sent[0]["html"]
@@ -157,7 +156,7 @@ async def test_several_rows_go_out_as_one_digest(
         )
     await session.commit()
 
-    await email_outbox._run_pass(session, now=datetime.now(timezone.utc))
+    await email_outbox._run_pass(session, now=datetime.now(UTC))
     assert len(sent) == 1
     html = sent[0]["html"]
     # One message, both lines, grouped under the community they happened in.
@@ -185,10 +184,10 @@ async def test_a_line_read_in_the_app_is_not_emailed(
         notification_id=notification.id,
         pieces=_pieces(),
     )
-    notification.read_at = datetime.now(timezone.utc)
+    notification.read_at = datetime.now(UTC)
     await session.commit()
 
-    await email_outbox._run_pass(session, now=datetime.now(timezone.utc))
+    await email_outbox._run_pass(session, now=datetime.now(UTC))
     assert sent == []
     assert await _rows(session, user.id) == []
 
@@ -203,7 +202,7 @@ async def test_a_row_with_no_bell_line_is_never_superseded(
         session, user, category=NotificationCategory.mentions, pieces=_pieces()
     )
     await session.commit()
-    await email_outbox._run_pass(session, now=datetime.now(timezone.utc))
+    await email_outbox._run_pass(session, now=datetime.now(UTC))
     assert len(sent) == 1
 
 
@@ -239,7 +238,7 @@ async def test_a_channel_switched_off_after_writing_is_not_delivered(
         user, _pieces(body="Your password was changed")
     )
 
-    await email_outbox._run_pass(session, now=datetime.now(timezone.utc))
+    await email_outbox._run_pass(session, now=datetime.now(UTC))
     letter, reply = sent
     assert letter["recipient"] == "switched-off@example.com"
     assert "Your password was changed" in letter["html"]
@@ -274,7 +273,7 @@ async def test_an_account_letter_goes_to_each_address_with_its_own_link(
         also_to=["gone@example.com"],
     )
 
-    await email_outbox._run_pass(session, now=datetime.now(timezone.utc))
+    await email_outbox._run_pass(session, now=datetime.now(UTC))
     own = ["first@example.com", "second@example.com"]
     assert sorted(letter["recipient"] for letter in sent) == sorted(
         [*own, "gone@example.com"]
@@ -309,7 +308,7 @@ async def test_an_account_letter_without_a_notice_carries_no_link(
     user = await create_user(session, email="locked@example.com")
     await email_outbox.enqueue_account_letter(user, _pieces(body="Locked"))
 
-    await email_outbox._run_pass(session, now=datetime.now(timezone.utc))
+    await email_outbox._run_pass(session, now=datetime.now(UTC))
     [letter] = sent
     assert "/account/not-me" not in letter["html"]
 
@@ -329,7 +328,7 @@ async def test_a_failed_send_backs_off_rather_than_vanishing(
     monkeypatch.setattr(
         email_service, "deliver", AsyncMock(side_effect=RuntimeError("smtp down"))
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await email_outbox._run_pass(session, now=now)
 
     (row,) = await _rows(session, user.id)
@@ -345,13 +344,13 @@ async def test_changing_when_you_read_re_times_what_is_waiting(
 ):
     """Resuming early has to release what the pause was holding."""
     user = await create_user(session, email="retime@example.com", timezone="UTC")
-    until = datetime.now(timezone.utc) + timedelta(days=7)
+    until = datetime.now(UTC) + timedelta(days=7)
     await set_notification_prefs(
         session,
         user,
         {
             "pause": {
-                "since": datetime.now(timezone.utc).isoformat(),
+                "since": datetime.now(UTC).isoformat(),
                 "until": until.isoformat(),
             }
         },
@@ -369,7 +368,7 @@ async def test_changing_when_you_read_re_times_what_is_waiting(
     await session.commit()
     assert moved == 1
     (row,) = await _rows(session, user.id)
-    assert row.deliver_after <= datetime.now(timezone.utc) + timedelta(seconds=5)
+    assert row.deliver_after <= datetime.now(UTC) + timedelta(seconds=5)
 
 
 async def test_settled_mail_is_swept_and_waiting_mail_is_not(
@@ -382,7 +381,7 @@ async def test_settled_mail_is_swept_and_waiting_mail_is_not(
         )
     await session.commit()
     rows = await _rows(session, user.id)
-    old = datetime.now(timezone.utc) - timedelta(days=30)
+    old = datetime.now(UTC) - timedelta(days=30)
     await session.exec(
         text(
             "UPDATE email_outbox SET sent_at = :old, created_at = :old WHERE id = :id"
@@ -419,7 +418,7 @@ async def test_going_back_to_instant_releases_what_a_digest_was_holding(
     # eleven hours off if this runs on a Sunday evening, and the day-away form
     # then fails on the clock rather than on the behaviour.
     (row,) = await _rows(session, user.id)
-    assert row.deliver_after > datetime.now(timezone.utc)
+    assert row.deliver_after > datetime.now(UTC)
     assert row.deliver_after.weekday() == 0  # the configured weekday
     assert (row.deliver_after.hour, row.deliver_after.minute) == (9, 0)
 
@@ -432,4 +431,4 @@ async def test_going_back_to_instant_releases_what_a_digest_was_holding(
     await session.commit()
     assert moved == 1
     (row,) = await _rows(session, user.id)
-    assert row.deliver_after <= datetime.now(timezone.utc) + timedelta(seconds=5)
+    assert row.deliver_after <= datetime.now(UTC) + timedelta(seconds=5)

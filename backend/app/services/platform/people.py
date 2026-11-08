@@ -4,13 +4,14 @@ The rosters of the reader's own guilds, gathered the way every other ``/me``
 aggregate is: one routed visit per guild, via ``gather_across_guilds``.
 """
 
-from typing import Iterable, Optional, Sequence
+from collections.abc import Iterable, Sequence
 
 from sqlalchemy import exists, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
 from app.db.query import apply_pagination, ids_in, page_has_next
+from app.db.request_context import Platform
 from app.db.session import set_rls_context
 from app.models.platform.guild import (
     LIVE_STATUS_VALUES,
@@ -18,7 +19,6 @@ from app.models.platform.guild import (
     Guild,
     GuildMembership,
 )
-from app.services.membership import live_membership_clause
 from app.models.platform.guild_image import GuildImageVariant
 from app.models.platform.user import User, UserStatus
 from app.models.platform.user_profile_view import MemberProfile
@@ -27,17 +27,17 @@ from app.schemas.platform.people import (
     PersonRead,
 )
 from app.services.cross_guild import gather_across_guilds
+from app.services.membership import live_membership_clause
 from app.services.platform import guild_images as guild_images_service
 from app.services.platform import presence as presence_service
 from app.services.platform import users as users_service
-from app.db.request_context import Platform
 
 #: Members per guild section. Small enough that somebody in a dozen guilds gets
 #: a sane first response, and every section pages from there.
 DEFAULT_PAGE_SIZE = 20
 
 #: ``(guild_id, name, icon_url)`` — one of the reader's guilds, as a section.
-GuildRow = tuple[int, str, Optional[str]]
+GuildRow = tuple[int, str, str | None]
 
 
 async def ordered_member_guilds(
@@ -97,7 +97,7 @@ async def guild_sections(
     *,
     user_id: int,
     guilds: Sequence[GuildRow],
-    search: Optional[str] = None,
+    search: str | None = None,
     page: int = 1,
     page_size: int = DEFAULT_PAGE_SIZE,
 ) -> list[PeopleCommunitySection]:

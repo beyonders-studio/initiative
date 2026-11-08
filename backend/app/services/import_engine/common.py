@@ -32,7 +32,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 
 class TagResolved:
-    __slots__ = ("id", "created")
+    __slots__ = ("created", "id")
 
     def __init__(self, *, id: int, created: bool) -> None:
         self.id = id
@@ -196,7 +196,7 @@ def decode_property_value(
     pv: _EnvelopePropertyValue,
     initiative_member_handles: dict[str, int],
     *,
-    people: "PeopleMap | None" = None,
+    people: PeopleMap | None = None,
 ) -> dict[str, Any] | None:
     """Convert an envelope property value back to the typed column kwargs.
 

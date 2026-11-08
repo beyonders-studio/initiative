@@ -44,21 +44,21 @@ from __future__ import annotations
 import secrets
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
-from app.core.errors import CodedError
 from app.core.encryption import SALT_PLUGIN_CONFIG, decrypt_field, encrypt_field
+from app.core.errors import CodedError
 from app.core.messages import GuildPluginMessages
 from app.services.marketplace.manifest_values import is_unique_setting_value
 
 __all__ = [
-    "REMOVED_AT",
-    "RESERVED_TOKEN_KEYS",
-    "PluginConfigError",
-    "ConfigState",
+    "CONFIG_STATES",
     "MAX_CONFIG_VALUE_LENGTH",
     "MAX_SECRET_VALUE_LENGTH",
-    "CONFIG_STATES",
+    "REMOVED_AT",
+    "RESERVED_TOKEN_KEYS",
+    "ConfigState",
+    "PluginConfigError",
     "apply_connection_values",
     "config_state",
     "connection_by_id",
@@ -130,7 +130,7 @@ class ConfigState:
 
     needs_config: bool
     state: str
-    detail: Optional[str] = None
+    detail: str | None = None
 
 
 # --- reading the pinned definition ------------------------------------------
@@ -146,7 +146,7 @@ def definition_connections(definition: dict[str, Any] | None) -> list[dict[str, 
 
 def connection_by_id(
     definition: dict[str, Any] | None, connection_id: str
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     for connection in definition_connections(definition):
         if connection.get("id") == connection_id:
             return connection
@@ -171,7 +171,7 @@ def install_settings(plugin: Any) -> dict[str, Any]:
     }
 
 
-def token_of(connection: Mapping[str, Any] | None) -> Optional[dict[str, Any]]:
+def token_of(connection: Mapping[str, Any] | None) -> dict[str, Any] | None:
     """The connection's ``token``, when it declares one."""
     token = (connection or {}).get("token")
     return token if isinstance(token, dict) else None
@@ -220,7 +220,7 @@ def guild_connection_ref(plugin: Any, connection_id: str) -> str:
     return refs[connection_id]
 
 
-def connection_id_for_ref(plugin: Any, connection_ref: str) -> Optional[str]:
+def connection_id_for_ref(plugin: Any, connection_ref: str) -> str | None:
     """Which guild connection a handle names, or ``None`` for none of them.
 
     ``None`` is the ordinary answer for a member's ref, which this install keeps
@@ -282,7 +282,7 @@ def _coerce(field: dict[str, Any], value: Any) -> Any:
         return text
 
     if field_type == "url":
-        if not (text.startswith("https://") or text.startswith("http://")):
+        if not text.startswith(("https://", "http://")):
             raise PluginConfigError(GuildPluginMessages.CONFIG_INVALID_VALUE)
         if " " in text:
             raise PluginConfigError(GuildPluginMessages.CONFIG_INVALID_VALUE)
@@ -291,7 +291,7 @@ def _coerce(field: dict[str, Any], value: Any) -> Any:
     return text
 
 
-def setting_value(setting: Mapping[str, Any], value: Any) -> Optional[str]:
+def setting_value(setting: Mapping[str, Any], value: Any) -> str | None:
     """A value submitted for ``setting``, as it is kept: one line of text, or
     ``None`` to clear a setting that is not unique.
 

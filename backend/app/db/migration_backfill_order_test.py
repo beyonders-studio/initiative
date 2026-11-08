@@ -35,8 +35,10 @@ _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 # "ALTER TABLE public.x FORCE ROW LEVEL SECURITY". The optional "public." and
 # the required whitespace before FORCE keep this from matching the "NO FORCE"
 # half of a lift-and-restore.
-_FORCE = re.compile(r"ALTER\s+TABLE\s+(?:public\.)?(\w+)\s+FORCE\s+ROW\s+LEVEL", re.I)
-_WRITE = re.compile(r"(?:INSERT\s+INTO|UPDATE)\s+(?:public\.)?(\w+)", re.I)
+_FORCE = re.compile(
+    r"ALTER\s+TABLE\s+(?:public\.)?(\w+)\s+FORCE\s+ROW\s+LEVEL", re.IGNORECASE
+)
+_WRITE = re.compile(r"(?:INSERT\s+INTO|UPDATE)\s+(?:public\.)?(\w+)", re.IGNORECASE)
 
 
 def _module_functions(tree: ast.Module) -> dict[str, ast.FunctionDef]:

@@ -9,19 +9,19 @@ Tests the business logic in app.services.guilds including:
 """
 
 import logging
+from datetime import UTC, datetime, timedelta
 
 import pytest
-from datetime import datetime, timedelta, timezone
 from sqlalchemy import text
 from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.testing import community_plan
 from app.db import post_commit
 from app.db.advisory_locks import LockNamespace, advisory_lock
-from app.models.platform.guild import GuildInvite, CommunityRole
+from app.models.platform.guild import CommunityRole, GuildInvite
 from app.models.tenant.initiative import InitiativeMember, InitiativeRoleModel
 from app.services.platform import guilds as guild_service
+from app.testing import community_plan
 from app.testing.factories import (
     create_access_grant,
     create_guild,
@@ -270,7 +270,7 @@ async def test_redeem_invite_blocked_when_full(session: AsyncSession):
 
     # Minted while the seat is still free, redeemed after it is taken — minting
     # itself is capacity-gated, so the order here is the scenario.
-    invite, invite_code = await guild_service.create_guild_invite(
+    _invite, invite_code = await guild_service.create_guild_invite(
         session, guild_id=guild.id, created_by=creator.id, max_uses=5
     )
     await guild_service.ensure_membership(
@@ -435,12 +435,12 @@ async def test_invite_code_is_unique(session: AsyncSession):
     guild = await create_guild(session)
     user = await create_user(session)
 
-    invite1, invite1_code = await guild_service.create_guild_invite(
+    _invite1, invite1_code = await guild_service.create_guild_invite(
         session,
         guild_id=guild.id,
         created_by=user.id,
     )
-    invite2, invite2_code = await guild_service.create_guild_invite(
+    _invite2, invite2_code = await guild_service.create_guild_invite(
         session,
         guild_id=guild.id,
         created_by=user.id,
@@ -454,12 +454,12 @@ async def test_invite_is_active_valid(session: AsyncSession):
     guild = await create_guild(session)
     user = await create_user(session)
 
-    invite, invite_code = await guild_service.create_guild_invite(
+    invite, _invite_code = await guild_service.create_guild_invite(
         session,
         guild_id=guild.id,
         created_by=user.id,
         max_uses=5,
-        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+        expires_at=datetime.now(UTC) + timedelta(days=7),
     )
 
     assert guild_service.invite_is_active(invite) is True
@@ -470,11 +470,11 @@ async def test_invite_is_active_expired(session: AsyncSession):
     guild = await create_guild(session)
     user = await create_user(session)
 
-    invite, invite_code = await guild_service.create_guild_invite(
+    invite, _invite_code = await guild_service.create_guild_invite(
         session,
         guild_id=guild.id,
         created_by=user.id,
-        expires_at=datetime.now(timezone.utc) - timedelta(days=1),  # Expired
+        expires_at=datetime.now(UTC) - timedelta(days=1),  # Expired
     )
 
     assert guild_service.invite_is_active(invite) is False
@@ -485,7 +485,7 @@ async def test_invite_is_active_max_uses_exceeded(session: AsyncSession):
     guild = await create_guild(session)
     user = await create_user(session)
 
-    invite, invite_code = await guild_service.create_guild_invite(
+    invite, _invite_code = await guild_service.create_guild_invite(
         session,
         guild_id=guild.id,
         created_by=user.id,
@@ -545,11 +545,11 @@ async def test_redeem_invite_expired_raises_error(session: AsyncSession):
     creator = await create_user(session)
     invitee = await create_user(session, email="invitee@example.com")
 
-    invite, invite_code = await guild_service.create_guild_invite(
+    _invite, invite_code = await guild_service.create_guild_invite(
         session,
         guild_id=guild.id,
         created_by=creator.id,
-        expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+        expires_at=datetime.now(UTC) - timedelta(days=1),
     )
 
     with pytest.raises(guild_service.GuildInviteError, match="INVITE_EXPIRED_OR_USED"):
@@ -578,7 +578,7 @@ async def test_an_invite_reaches_the_address_it_was_sent_to(session: AsyncSessio
     )
     await session.commit()
 
-    invite, invite_code = await guild_service.create_guild_invite(
+    _invite, invite_code = await guild_service.create_guild_invite(
         session,
         guild_id=guild.id,
         created_by=creator.id,
@@ -610,7 +610,7 @@ async def test_an_invite_does_not_reach_an_unproven_claim(session: AsyncSession)
     )
     await session.commit()
 
-    invite, invite_code = await guild_service.create_guild_invite(
+    _invite, invite_code = await guild_service.create_guild_invite(
         session,
         guild_id=guild.id,
         created_by=creator.id,
@@ -701,7 +701,7 @@ async def test_redeem_unbound_invite_any_user_succeeds(session: AsyncSession):
     # A billing grant reaches no part of the community, so it holds nothing back.
     await create_access_grant(session, user=redeemer, guild=guild, purpose="billing")
 
-    invite, invite_code = await guild_service.create_guild_invite(
+    _invite, invite_code = await guild_service.create_guild_invite(
         session,
         guild_id=guild.id,
         created_by=creator.id,
@@ -729,7 +729,7 @@ async def test_delete_guild_invite(session: AsyncSession):
     guild = await create_guild(session)
     creator = await create_user(session)
 
-    invite, invite_code = await guild_service.create_guild_invite(
+    invite, _invite_code = await guild_service.create_guild_invite(
         session,
         guild_id=guild.id,
         created_by=creator.id,
@@ -930,7 +930,7 @@ async def test_archived_and_deleted_auto_join_initiatives_are_skipped(
         name="Archived",
         join_policy="open",
         auto_join=True,
-        archived_at=datetime.now(timezone.utc),
+        archived_at=datetime.now(UTC),
     )
     deleted = await create_initiative(
         session,
@@ -939,7 +939,7 @@ async def test_archived_and_deleted_auto_join_initiatives_are_skipped(
         name="Deleted",
         join_policy="open",
         auto_join=True,
-        deleted_at=_datetime.now(timezone.utc),
+        deleted_at=_datetime.now(UTC),
     )
 
     joiner = await create_user(session, email="joiner@example.com")

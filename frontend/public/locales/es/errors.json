@@ -313,7 +313,7 @@
   "NATIVE_OTA_BUNDLE_NOT_AVAILABLE": "Esta versión del servidor no tiene un paquete de actualización por aire disponible",
   "NATIVE_APP_UPDATE_REQUIRED": "Esta versión de la app ya no puede iniciar sesión. Actualiza la app y vuelve a intentarlo.",
   "SETTINGS_STORAGE_BACKFILL_RUNNING": "Ya hay una migración en curso.",
-  "SETTINGS_STORAGE_BACKFILL_NOT_CONFIGURED": "Configura un bucket de S3 antes de ejecutar la migración.",
+  "SETTINGS_STORAGE_BACKFILL_NOT_CONFIGURED": "Guarda S3 como backend de almacenamiento antes de ejecutar la migración.",
   "SETTINGS_STORAGE_BACKFILL_FAILED": "La migración se detuvo por un error. Consulta los registros del servidor para más detalles.",
   "SETTINGS_STORAGE_BUCKET_REQUIRED": "Escribe el nombre de un bucket para probar la conexión.",
   "SETTINGS_STORAGE_CONNECTION_FAILED": "No se pudo acceder al bucket. Revisa la configuración o consulta los registros del servidor para más detalles.",

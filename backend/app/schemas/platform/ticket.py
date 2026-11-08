@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Any, List, Literal, Optional, Union
+from typing import Annotated, Any, Literal
 
 from pydantic import (
     AfterValidator,
     ConfigDict,
     Discriminator,
-    Field as PydanticField,
     Tag,
     model_validator,
+)
+from pydantic import (
+    Field as PydanticField,
 )
 
 from app.core.intake import (
@@ -54,25 +56,25 @@ class DeviceContext(SanitizedBaseModel):
     before sending and chose to send it. Nothing that names a person or a
     thing: the route is its template, with every id left out."""
 
-    app_version: Optional[str] = PydanticField(
+    app_version: str | None = PydanticField(
         default=None, max_length=32, pattern=_CONTEXT_TEXT
     )
     #: ``web``, ``android``, ``ios``, ``desktop``.
-    platform: Optional[str] = PydanticField(
+    platform: str | None = PydanticField(
         default=None, max_length=16, pattern=_CONTEXT_TEXT
     )
-    locale: Optional[str] = PydanticField(
+    locale: str | None = PydanticField(
         default=None, max_length=35, pattern=_CONTEXT_TEXT
     )
-    theme: Optional[str] = PydanticField(
+    theme: str | None = PydanticField(
         default=None, max_length=16, pattern=_CONTEXT_TEXT
     )
     #: The page's route template, e.g. ``/c/$communityId/i/$initiativeId``.
-    route: Optional[str] = PydanticField(
+    route: str | None = PydanticField(
         default=None, max_length=200, pattern=_CONTEXT_TEXT
     )
     #: The width class the window was in.
-    viewport: Optional[str] = PydanticField(
+    viewport: str | None = PydanticField(
         default=None, max_length=16, pattern=_CONTEXT_TEXT
     )
 
@@ -87,7 +89,7 @@ class SupportTicketCreate(SanitizedBaseModel):
     type: SupportTopic = SupportTopic.community
     #: The community they are asking about. Whether its members may ask is the
     #: operator's entitlement, checked against their own access to it.
-    community_id: Optional[int] = None
+    community_id: int | None = None
     #: One line saying what this is about. Becomes the case's title.
     subject: Annotated[str, AfterValidator(_said_something)] = PydanticField(
         min_length=1, max_length=SUBJECT_LENGTH
@@ -97,10 +99,10 @@ class SupportTicketCreate(SanitizedBaseModel):
         min_length=1, max_length=BODY_LENGTH
     )
     #: The device and page they asked from, where they chose to send it.
-    context: Optional[DeviceContext] = None
+    context: DeviceContext | None = None
 
     @model_validator(mode="after")
-    def _names_its_community(self) -> "SupportTicketCreate":
+    def _names_its_community(self) -> SupportTicketCreate:
         if self.type in COMMUNITY_SUPPORT_TOPICS and self.community_id is None:
             raise ValueError("a question about a community names it")
         return self
@@ -154,12 +156,12 @@ class FeedbackTicketCreate(SanitizedBaseModel):
     #: they tick it.
     contactable: bool = False
     #: The device and page they sent it from, where they chose to send it.
-    context: Optional[DeviceContext] = None
+    context: DeviceContext | None = None
     #: The published idea they voted for while writing it, which it joins.
-    idea_task_id: Optional[int] = None
+    idea_task_id: int | None = None
 
 
-def _ticket_kind(value: Any) -> Optional[str]:
+def _ticket_kind(value: Any) -> str | None:
     """Which shape a filing is: its stream, and for moderation whether it is
     an appeal rather than a report."""
     if isinstance(value, dict):
@@ -174,13 +176,11 @@ def _ticket_kind(value: Any) -> Optional[str]:
 #: One filing, told apart by its stream, and a moderation filing by whether it
 #: is an appeal.
 TicketCreate = Annotated[
-    Union[
-        Annotated[SupportTicketCreate, Tag(IntakeStream.support.value)],
-        Annotated[ModerationTicketCreate, Tag(IntakeStream.moderation.value)],
-        Annotated[SecurityTicketCreate, Tag(IntakeStream.security.value)],
-        Annotated[FeedbackTicketCreate, Tag(IntakeStream.feedback.value)],
-        Annotated[AppealTicketCreate, Tag(APPEAL)],
-    ],
+    Annotated[SupportTicketCreate, Tag(IntakeStream.support.value)]
+    | Annotated[ModerationTicketCreate, Tag(IntakeStream.moderation.value)]
+    | Annotated[SecurityTicketCreate, Tag(IntakeStream.security.value)]
+    | Annotated[FeedbackTicketCreate, Tag(IntakeStream.feedback.value)]
+    | Annotated[AppealTicketCreate, Tag(APPEAL)],
     Discriminator(_ticket_kind),
 ]
 
@@ -196,10 +196,10 @@ class TicketAccepted(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     accepted: bool = True
-    venue: Optional[ReportVenue] = None
+    venue: ReportVenue | None = None
     #: For an ``illegal`` report the platform takes no cases about: where to
     #: tell whoever runs this server, alongside the community.
-    platform_contact: Optional[str] = None
+    platform_contact: str | None = None
 
 
 class StreamAvailabilityRead(SanitizedBaseModel):
@@ -209,10 +209,10 @@ class StreamAvailabilityRead(SanitizedBaseModel):
 
     mode: TicketMode
     #: Who to write to about it, whatever the mode.
-    contact: Optional[str] = None
+    contact: str | None = None
     #: The topics the reader may file from here, in the order they are
     #: offered. Empty for a stream whose filings name no topic of their own.
-    types: List[str] = PydanticField(default_factory=list)
+    types: list[str] = PydanticField(default_factory=list)
     #: What may be attached to a filing or an answer in this stream.
     evidence: EvidencePolicyRead
 
@@ -234,18 +234,18 @@ class FiledTicketRead(SanitizedBaseModel):
     task_id: int
     stream: IntakeStream
     #: What it is about within its stream, as they chose.
-    topic: Optional[str] = None
+    topic: str | None = None
     #: What they called it, in their own words.
-    subject: Optional[str] = None
+    subject: str | None = None
     state: FilerState
     opened_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
 
 class FiledTicketList(SanitizedBaseModel):
     """The cases the reader filed, most recently moved first."""
 
-    items: List[FiledTicketRead]
+    items: list[FiledTicketRead]
 
 
 class TicketMessageRead(SanitizedBaseModel):
@@ -261,7 +261,7 @@ class TicketMessageRead(SanitizedBaseModel):
     content: RichTextStr
     created_at: datetime
     #: The files that came with it. Only the reader's own: what they sent.
-    attachments: List[EvidenceRead] = PydanticField(default_factory=list)
+    attachments: list[EvidenceRead] = PydanticField(default_factory=list)
 
 
 class FiledTicketDetailRead(FiledTicketRead):
@@ -273,7 +273,7 @@ class FiledTicketDetailRead(FiledTicketRead):
     can_reply: bool
     #: What an answer may carry with it, for this kind of case.
     evidence: EvidencePolicyRead
-    messages: List[TicketMessageRead]
+    messages: list[TicketMessageRead]
 
 
 class TicketReplyCreate(SanitizedBaseModel):

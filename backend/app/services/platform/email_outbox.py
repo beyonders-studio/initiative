@@ -24,14 +24,14 @@ is no endpoint over it, and what the recipient sees is the email.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Any, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import Table, func, insert, text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.notification_categories import Channel, NotificationCategory
 from app.core.email_i18n import email_t
 from app.core.encryption import (
     SALT_EMAIL,
@@ -40,18 +40,19 @@ from app.core.encryption import (
     hash_email,
     normalize_email,
 )
+from app.core.notification_categories import Channel, NotificationCategory
+from app.db.request_context import Unattributed
 from app.models.platform.email_outbox import EmailOutboxItem
 from app.models.platform.guild import Guild
 from app.models.platform.user import User
-from app.models.platform.user_notification_prefs import EmailCadence
 from app.models.platform.user_email import UserEmail
+from app.models.platform.user_notification_prefs import EmailCadence
 from app.models.platform.user_token import UserTokenPurpose
 from app.services import email as email_service
 from app.services import outbox_ledger
 from app.services.auth import account_changes, addresses
 from app.services.background_tasks import Loop
 from app.services.platform import notification_policy, notification_prefs, user_tokens
-from app.db.request_context import Unattributed
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +143,7 @@ async def enqueue(
             body=pieces.body,
             link=pieces.link,
             link_label=pieces.link_label,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             deliver_after=due,
         )
         .inline()
@@ -153,7 +154,7 @@ async def enqueue(
 
 async def _wake_if_due(session: AsyncSession, due: datetime) -> None:
     """Wake the worker once ``session`` commits, when the mail is due now."""
-    if due <= datetime.now(timezone.utc):
+    if due <= datetime.now(UTC):
         await session.exec(select(func.pg_notify(CHANNEL, "")))
 
 
@@ -190,7 +191,7 @@ async def enqueue_account_letter(
             )
             await own_session.commit()
         return
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if not await email_service.email_configured(session):
         return
     own = await addresses.proven_addresses(session, user_id=user.id)
@@ -251,7 +252,7 @@ async def recompute_pending(
             )
         )
     ).all()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     moved = 0
     soonest: datetime | None = None
     for row in rows:
@@ -600,15 +601,13 @@ async def process_email_outbox() -> None:
 
     async with SystemSessionLocal() as session:
         await set_rls_context(session, Unattributed())
-        await _run_pass(session, now=datetime.now(timezone.utc))
+        await _run_pass(session, now=datetime.now(UTC))
 
 
-async def sweep_settled(
-    session: AsyncSession, *, now: Optional[datetime] = None
-) -> int:
+async def sweep_settled(session: AsyncSession, *, now: datetime | None = None) -> int:
     """Drop rows that have gone out, or run out of attempts, and are old enough
     that nobody is still asking about them."""
-    cutoff = (now or datetime.now(timezone.utc)) - RETENTION
+    cutoff = (now or datetime.now(UTC)) - RETENTION
     result = await session.exec(
         text(
             "DELETE FROM email_outbox "

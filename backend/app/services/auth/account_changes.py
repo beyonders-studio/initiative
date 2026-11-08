@@ -11,7 +11,7 @@ was proved before that newest one; :func:`apply_undo` carries it out.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from cryptography.fernet import InvalidToken
@@ -49,7 +49,7 @@ async def change_record(
     (``any_address``) counts the moment it was made as the newest instead, so
     every address the account held then may answer it.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     newest = (
         now
         if any_address

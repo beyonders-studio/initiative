@@ -13,7 +13,6 @@ from app.services.import_engine import confluence_export as ce
 from app.services.import_engine.confluence_storage import storage_to_lexical
 from app.services.import_engine.jira_attachments import AssetBudget
 
-
 PNG = b"\x89PNG\r\n\x1a\nchart"
 PDF = b"%PDF-spec"
 
@@ -285,8 +284,8 @@ def real_export_bytes() -> bytes:
 
 
 def _real_fetched():
-    from app.services.import_engine.zip_bounds import open_zip
     from app.services.import_engine.jira_attachments import bundle_budget
+    from app.services.import_engine.zip_bounds import open_zip
 
     return ce.export_to_fetched(
         open_zip(real_export_bytes()),

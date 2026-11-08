@@ -31,11 +31,11 @@ parameters, credentials, the cache, the in-flight cap, the minted token — runs
 for real.
 """
 
-from datetime import datetime, timezone
-from urllib.parse import quote
-
 import asyncio
 import json
+from datetime import UTC, datetime
+from urllib.parse import quote
+
 import httpx
 import jwt
 import pytest
@@ -44,33 +44,35 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
 from app.core.encryption import SALT_PLUGIN_CONFIG, encrypt_field
-from app.core.messages import PluginDataMessages, GuildPluginMessages
-from app.models.platform.plugin_service_registration import PluginServiceRegistration
+from app.core.messages import GuildPluginMessages, PluginDataMessages
+from app.models.platform.access_grant import AccessGrantPurpose, SettingsLevel
 from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
+from app.models.platform.plugin_service_registration import PluginServiceRegistration
+from app.models.platform.user import UserRole
+from app.models.tenant.dashboard import DashboardViewMode
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
 from app.models.tenant.initiative import InitiativeMember
 from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
-from app.models.tenant.task import Task
 from app.models.tenant.plugin_placement import PluginPlacement
+from app.models.tenant.resource_grant import ResourceAccessLevel
+from app.models.tenant.task import Task
+from app.services.marketplace import plugin_data as plugin_data_service
+from app.services.marketplace.context_jwt_test import _PRIVATE_PEM
 from app.services.marketplace.plugin_refs import (
     ensure_plugin_guild_ref,
     ensure_plugin_ref,
 )
-from app.services.marketplace import plugin_data as plugin_data_service
-from app.services.marketplace.context_jwt_test import _PRIVATE_PEM
 from app.services.marketplace.registration_lookup import invalidate_registrations
 from app.services.tenant import plugin_connection_flows
-from app.services.tenant.plugin_connection_flows import TokenSet, seal_tokens
 from app.services.tenant.dashboard_definition import normalize_dashboard_definition
-from app.testing.fake_vendor import API_HOST, FakeVendor, declarative_plugin
-from app.models.platform.access_grant import AccessGrantPurpose, SettingsLevel
-from app.models.platform.user import UserRole
-from app.models.tenant.dashboard import DashboardViewMode
-from app.models.tenant.resource_grant import ResourceAccessLevel
+from app.services.tenant.plugin_connection_flows import TokenSet, seal_tokens
 from app.testing import (
-    create_plugin_user_connection,
     create_access_grant,
+    create_dashboard,
+    create_guild_plugin,
     create_initiative,
+    create_plugin_service_registration,
+    create_plugin_user_connection,
     create_project,
     create_property_definition,
     create_property_value,
@@ -78,12 +80,9 @@ from app.testing import (
     create_task,
     create_user,
     get_auth_headers,
-    create_plugin_service_registration,
-    create_dashboard,
-    create_guild_plugin,
     route_session_to_guild,
 )
-
+from app.testing.fake_vendor import API_HOST, FakeVendor, declarative_plugin
 
 PLUGIN_UID = "SHPAPP00000001"
 PUBLIC_ID = "acme.shop"
@@ -733,7 +732,7 @@ class TestConnections:
                 user_id=a.user.id,
                 connection_ref="cr_blocked",
                 status="blocked",
-                blocked_at=datetime.now(timezone.utc),
+                blocked_at=datetime.now(UTC),
             )
         )
         await session.commit()
@@ -1429,7 +1428,7 @@ class TestTheCanvas:
             {"days": "tue", "totals": 5},
         ]
         upstream.values = {"total": 12}
-        a, plugin, dashboard = await _workspace(session, acting_user)
+        a, _plugin, dashboard = await _workspace(session, acting_user)
         dashboard.definition = normalize_dashboard_definition(
             {
                 "widgets": [
@@ -1476,7 +1475,7 @@ class TestTheCanvas:
         """Each widget's call is settled first, and then every plug-in is
         called at once, so the canvas waits for the slowest of them."""
         upstream.together = asyncio.Barrier(2)
-        a, plugin, dashboard = await _workspace(session, acting_user)
+        a, _plugin, dashboard = await _workspace(session, acting_user)
         dashboard.definition = normalize_dashboard_definition(
             {
                 "widgets": [

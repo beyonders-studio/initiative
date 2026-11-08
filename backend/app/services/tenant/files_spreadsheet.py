@@ -50,7 +50,6 @@ from typing import Any
 from app.core.messages import FileMessages
 from app.services.tenant.files import FileContentError
 
-
 SCHEMA_VERSION = 3
 """Current snapshot shape. Bump on breaking changes."""
 
@@ -199,10 +198,8 @@ def _normalize_sheet(
         # through the JS layer, mismatched stored / canonical keys would
         # silently lose cells.
         cells_out[f"{row}:{col}"] = value
-        if row > max_row:
-            max_row = row
-        if col > max_col:
-            max_col = col
+        max_row = max(max_row, row)
+        max_col = max(max_col, col)
 
     dims_in = payload.get("dimensions", {})
     if not isinstance(dims_in, dict):

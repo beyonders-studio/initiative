@@ -5,7 +5,8 @@ definitions (every tool's but the project's)."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterable, Type
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ValidationError
 from sqlmodel import select
@@ -37,9 +38,9 @@ from app.services.import_engine.common import (
 )
 from app.services.import_engine.contract import ImportEngineError
 from app.services.import_engine.people import bring_in_named
-from app.services.tenant import tags as tags_service
-from app.services.tenant import named_people
 from app.services.tenant import metadata as metadata_service
+from app.services.tenant import named_people
+from app.services.tenant import tags as tags_service
 from app.services.tenant.metadata import link_for
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -59,7 +60,7 @@ class NamesPeopleInPassing:
     the name, or on nobody.
     """
 
-    def people(self, validated: BaseModel) -> list["ManifestPerson"]:
+    def people(self, validated: BaseModel) -> list[ManifestPerson]:
         from app.schemas.tenant.backup_export import ManifestPerson
         from app.services.import_engine.common import handle_key
         from app.services.import_engine.mentions import mention_handles_in
@@ -78,7 +79,7 @@ class NamesPeopleInPassing:
         ]
 
 
-def parse_envelope(model: Type[BaseModel], envelope: dict[str, Any]) -> BaseModel:
+def parse_envelope(model: type[BaseModel], envelope: dict[str, Any]) -> BaseModel:
     """Pydantic-parse + version-gate a raw envelope dict."""
     try:
         validated = model.model_validate(envelope)
@@ -229,7 +230,7 @@ class PropertyRestore:
         session: AsyncSession,
         *,
         initiative_id: int,
-        context: "ImportContext | None",
+        context: ImportContext | None,
         member_handles: dict[str, int] | None = None,
     ) -> None:
         self._session = session

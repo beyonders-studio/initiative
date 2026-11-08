@@ -23,8 +23,8 @@ from dataclasses import dataclass
 from enum import Enum
 
 from app.core.plugin_scopes import (
-    PluginScopeResource,
     READ_ONLY_RESOURCES,
+    PluginScopeResource,
     tool_resource,
 )
 from app.core.search import SearchEntityType

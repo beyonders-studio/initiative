@@ -53,7 +53,6 @@ import logging
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Optional
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
@@ -61,8 +60,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
 from app.db import gucs
-from app.db.advisory_locks import LockNamespace, advisory_lock, advisory_unlock
 from app.db import session as db_session
+from app.db.advisory_locks import LockNamespace, advisory_lock, advisory_unlock
 from app.db.tenancy import OPERATIONS_TABLES
 
 logger = logging.getLogger(__name__)
@@ -319,7 +318,7 @@ async def _provision(conn: AsyncConnection, guild_id: int) -> None:
 
 
 async def _deprovision(
-    conn: AsyncConnection, guild_id: int, schema: Optional[str]
+    conn: AsyncConnection, guild_id: int, schema: str | None
 ) -> None:
     """Drop every reader role ``guild_id`` has, their policies first."""
     for spec in OPERATIONS_ROLES:
@@ -327,7 +326,7 @@ async def _deprovision(
 
 
 async def _deprovision_role(
-    conn: AsyncConnection, spec: OperationsRole, role: str, schema: Optional[str]
+    conn: AsyncConnection, spec: OperationsRole, role: str, schema: str | None
 ) -> None:
     from app.db.schema_provisioning import _exec_batch
 
@@ -520,7 +519,7 @@ async def reconcile_operations() -> None:
         await follow_choice(await configured_operations_guild_id())
 
 
-async def follow_choice(operations_guild_id: Optional[int]) -> None:
+async def follow_choice(operations_guild_id: int | None) -> None:
     """Make the operations tables and the reader roles exist where
     ``operations_guild_id`` is, holding :func:`choice_turn`: re-assert them
     there, and take them from every other community. With no operations

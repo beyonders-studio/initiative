@@ -18,9 +18,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.config import INSTALL_HEADER
 from app.core.security import decode_session_token
 from app.models.platform.auth_session import AuthSession
-from app.testing import create_user
 from app.services.platform import rules
-
+from app.testing import create_user
 
 PASSWORD = "testpassword123"
 APP_ORIGIN = {"Origin": "https://studio.beyonders.initiative"}

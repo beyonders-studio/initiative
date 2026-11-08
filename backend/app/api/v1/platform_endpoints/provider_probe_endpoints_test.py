@@ -23,7 +23,6 @@ from app.testing.factories import (
 )
 from app.testing.oidc import ISSUER, FakeIdp
 
-
 OPERATOR_BASE = "/api/v1/settings/auth/providers"
 
 

@@ -8,11 +8,10 @@ reaching a socket.
 import pytest
 
 from app.models.platform.guild import CommunityRole
-from app.services.platform import account_stream, user_stream
-from app.services.platform import rules
+from app.services.platform import account_stream, rules, user_stream
 from app.services.platform import guilds as guilds_service
-from app.testing.sockets import settle
 from app.testing import create_guild, create_guild_membership, create_user
+from app.testing.sockets import settle
 
 
 @pytest.fixture

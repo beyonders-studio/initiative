@@ -19,15 +19,16 @@ in the ``support`` stream, and the binding says which project that is.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Optional, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.intake import COMMUNITY_SUPPORT_TOPICS, IntakeStream, SupportTopic
-from app.services.platform import rules
-from app.models.platform.user import User
 from app.db import cohorts
+from app.models.platform.user import User
+from app.services.platform import rules
 from app.services.platform.intake import CaseFiler, CaseRefs, open_case
 
 if TYPE_CHECKING:
@@ -102,14 +103,14 @@ def offered_topics(
 
 async def request_help(
     *,
-    guild_id: Optional[int],
+    guild_id: int | None,
     requester: User,
     subject: str,
     body: str,
     topic: SupportTopic = SupportTopic.community,
-    context: Optional["DeviceContext"] = None,
-    evidence: Sequence["PreparedEvidence"] = (),
-    now: Optional[datetime] = None,
+    context: DeviceContext | None = None,
+    evidence: Sequence[PreparedEvidence] = (),
+    now: datetime | None = None,
 ) -> int:
     """File one help request as a support case. Returns the case's task id.
 
@@ -131,7 +132,7 @@ async def request_help(
         raise SupportUnavailable
     subject_guild = guild_id if about_community else None
 
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     summary = f"Help request ({topic.value}) from account {requester.id}"
     outcome = await open_case(
         IntakeStream.support,

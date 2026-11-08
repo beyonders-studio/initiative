@@ -14,11 +14,12 @@ Nothing here commits, so a caller can compose it into a larger transaction.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
 from collections.abc import Callable, Sequence
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
-from fastapi import HTTPException, status as http_status
+from fastapi import HTTPException
+from fastapi import status as http_status
 from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
@@ -42,13 +43,11 @@ from app.models.tenant.task import (
 from app.schemas.recurrence import validate_task_recurrence
 from app.schemas.tenant.task import ChecklistItemInput
 from app.services import notifications as notifications_service
-from app.services.tenant import relationships
-from app.services.tenant import named_people
+from app.services.tenant import descriptions as descriptions_service
 from app.services.tenant import metadata as metadata_service
+from app.services.tenant import named_people, relationships, task_completion
 from app.services.tenant import tags as tags_service
 from app.services.tenant import task_checklist as checklist_service
-from app.services.tenant import task_completion
-from app.services.tenant import descriptions as descriptions_service
 from app.services.tenant import task_statuses as task_statuses_service
 from app.services.tenant import task_types as task_types_service
 from app.services.tenant.names import copy_name
@@ -67,7 +66,7 @@ async def resolve_start_status(
     session: AsyncSession,
     *,
     project_id: int,
-    task_status_id: Optional[int] = None,
+    task_status_id: int | None = None,
 ) -> TaskStatus:
     """The status a new task starts in, seeding the project's defaults first.
 
@@ -102,7 +101,7 @@ async def resolve_type_row(
     session: AsyncSession,
     *,
     project_id: int,
-    task_type_id: Optional[int] = None,
+    task_type_id: int | None = None,
 ) -> TaskType:
     """The type a task is: the one named, which must be this project's, or
     the project's default."""
@@ -121,7 +120,7 @@ async def resolve_type(
     session: AsyncSession,
     *,
     project_id: int,
-    task_type_id: Optional[int] = None,
+    task_type_id: int | None = None,
 ) -> int:
     """:func:`resolve_type_row`'s id."""
     found = await resolve_type_row(
@@ -186,9 +185,9 @@ async def create_task_row(
     session: AsyncSession,
     *,
     project: Project,
-    task_status_id: Optional[int] = None,
-    task_type_id: Optional[int] = None,
-    now: Optional[datetime] = None,
+    task_status_id: int | None = None,
+    task_type_id: int | None = None,
+    now: datetime | None = None,
     **fields: Any,
 ) -> Task:
     """Build, add and flush one task at the end of ``project``.
@@ -213,9 +212,7 @@ async def create_task_row(
             session, project_id=project.id, task_type_id=task_type_id
         ),
     )
-    sync_completed_at(
-        task, selected_status.category, now=now or datetime.now(timezone.utc)
-    )
+    sync_completed_at(task, selected_status.category, now=now or datetime.now(UTC))
     session.add(task)
     await session.flush()
     return task
@@ -431,7 +428,7 @@ async def copy_tasks(
     ``keep_done``.
     """
     beside = status_of is None
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     categories = await task_completion.status_categories(session, target.id)
     end = await next_position(session, target.id) if beside else 0
     copies: list[Task] = []

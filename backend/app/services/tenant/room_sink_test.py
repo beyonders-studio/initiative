@@ -8,14 +8,15 @@ the log covering for each other.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from typing import Self
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.db.request_context import SystemGuild
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.event_outbox import EventOutbox
 from app.services.content_sockets import RoomKey, guild_room, initiative_room, sockets
-from app.testing.sockets import FakeWebSocket, settle, watch_events_bus
 from app.services.tenant import room_sink
 from app.testing import (
     create_comment,
@@ -24,8 +25,7 @@ from app.testing import (
     create_tag,
     create_task,
 )
-from app.db.request_context import SystemGuild
-
+from app.testing.sockets import FakeWebSocket, settle, watch_events_bus
 
 #: A socket belonging to nobody in particular. Rooms are otherwise recomputed
 #: for whoever holds the socket when a roster they are on moves, so a test that
@@ -44,7 +44,7 @@ class _Watcher:
         self._user_id = user_id
         self.socket = FakeWebSocket()
 
-    async def __aenter__(self) -> "_Watcher":
+    async def __aenter__(self) -> Self:
         room_sink._missed_hints = False
         watch_events_bus(
             self._guild_id,
@@ -185,8 +185,9 @@ async def test_what_is_remembered_is_pruned_to_the_window(session, acting_user):
         await create_task(session, a.project)
         await watcher.catch_up()
 
-        from app.db.session import set_rls_context
         from sqlmodel import select
+
+        from app.db.session import set_rls_context
 
         await set_rls_context(session, SystemGuild(a.guild.id))
         in_window = {
@@ -194,7 +195,7 @@ async def test_what_is_remembered_is_pruned_to_the_window(session, acting_user):
             for row in await session.exec(
                 select(EventOutbox).where(
                     EventOutbox.occurred_at
-                    > datetime.now(timezone.utc)
+                    > datetime.now(UTC)
                     - timedelta(seconds=room_sink.SWEEP_WINDOW_SECONDS)
                 )
             )
@@ -229,8 +230,9 @@ async def test_the_same_change_is_not_sent_twice_by_the_sweep(session, acting_us
 
 async def _txn_of(session, guild_id: int, resource_type: str, resource_id: int) -> int:
     """The transaction the log recorded one change under."""
-    from app.db.session import set_rls_context
     from sqlmodel import select
+
+    from app.db.session import set_rls_context
 
     await set_rls_context(session, SystemGuild(guild_id))
     row = (
@@ -378,8 +380,9 @@ def test_one_row_written_repeatedly_is_one_change() -> None:
 
 async def _age_the_log(session: AsyncSession, guild_id: int) -> None:
     """Push everything already in the log out of any reasonable gap."""
-    from app.db.session import set_rls_context
     from sqlalchemy import text
+
+    from app.db.session import set_rls_context
 
     await set_rls_context(session, SystemGuild(guild_id))
     await session.exec(

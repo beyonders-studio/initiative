@@ -28,7 +28,6 @@ still name it as a string, while its table stays out of ``SQLModel.metadata``.
 """
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import Column, MetaData, String, Table
 from sqlmodel import SQLModel
@@ -90,8 +89,8 @@ class MemberProfile:
     id: int
     username: str
     discriminator: int
-    display_name: Optional[str]
-    avatar_url: Optional[str]
+    display_name: str | None
+    avatar_url: str | None
     status: UserStatus
     custom_status: dict
     profile_decorations: dict
@@ -118,7 +117,7 @@ class GuildMember:
     id: int
     username: str
     discriminator: int
-    avatar_url: Optional[str]
+    avatar_url: str | None
     status: UserStatus
     custom_status: dict
     profile_decorations: dict

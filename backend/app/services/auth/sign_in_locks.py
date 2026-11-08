@@ -26,11 +26,11 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
+from app.core.clock import utcnow
 from app.core.rate_limit import SIGN_IN_FAILURES
 from app.models.platform.sign_in_lock import SignInLock
 from app.services import audit as audit_service
 from app.services.auth import addresses
-from app.core.clock import utcnow
 
 logger = logging.getLogger(__name__)
 

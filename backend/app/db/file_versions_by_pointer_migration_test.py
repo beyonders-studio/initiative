@@ -14,13 +14,13 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
 
-from app.testing.later_revisions import later_revisions
 from app.testing import (
     create_file,
     create_guild,
     create_initiative,
     create_user,
 )
+from app.testing.later_revisions import later_revisions
 
 _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 _MIGRATION = _VERSIONS / "20261005_0459_file_versions_by_pointer.py"

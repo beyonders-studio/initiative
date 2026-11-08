@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from app.models.tenant.tag import Tag
-
 from seed.common import Community
 
 #: ``(name, colour)`` per community.

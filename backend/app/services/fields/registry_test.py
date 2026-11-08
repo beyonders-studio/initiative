@@ -17,16 +17,16 @@ from sqlalchemy.dialects import postgresql
 from app.core.tools import Tool
 from app.models.tenant.task import Task, TaskAssignee
 from app.schemas.query import FilterOp
-from app.services.fields.derive import derive_fields
 from app.services.fields import (
     FieldContext,
     allowed_fields,
     allowed_ops,
-    default_filters,
     dataset,
+    default_filters,
     describe,
     sort_fields,
 )
+from app.services.fields.derive import derive_fields
 from app.services.fields.registry import dataset_names
 from app.services.query.resolve import resolve
 

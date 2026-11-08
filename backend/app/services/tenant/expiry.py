@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func
@@ -51,8 +51,8 @@ def _rules() -> tuple[Rule, ...]:
     from app.services.tenant import (
         change_log,
         outbox_poller,
-        plugin_hooks,
         personal_items,
+        plugin_hooks,
     )
 
     return (
@@ -129,7 +129,7 @@ async def prepare() -> Visit:
     let go."""
     from app.services.tenant import personal_items
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     tab_limits = await _tab_limits()
     rules = _rules()
 

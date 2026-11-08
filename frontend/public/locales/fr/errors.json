@@ -313,7 +313,7 @@
   "NATIVE_OTA_BUNDLE_NOT_AVAILABLE": "Cette version du serveur n'a pas de paquet de mise à jour à distance disponible",
   "NATIVE_APP_UPDATE_REQUIRED": "Cette version de l'application ne peut plus se connecter. Mettez l'application à jour, puis réessayez.",
   "SETTINGS_STORAGE_BACKFILL_RUNNING": "Une migration est déjà en cours.",
-  "SETTINGS_STORAGE_BACKFILL_NOT_CONFIGURED": "Configurez un bucket S3 avant de lancer la migration.",
+  "SETTINGS_STORAGE_BACKFILL_NOT_CONFIGURED": "Enregistrez S3 comme backend de stockage avant de lancer la migration.",
   "SETTINGS_STORAGE_BACKFILL_FAILED": "La migration s'est arrêtée sur une erreur. Consultez les journaux du serveur pour plus de détails.",
   "SETTINGS_STORAGE_BUCKET_REQUIRED": "Saisissez le nom d'un bucket pour tester la connexion.",
   "SETTINGS_STORAGE_CONNECTION_FAILED": "Impossible de joindre le bucket. Vérifiez les paramètres, ou consultez les journaux du serveur pour plus de détails.",

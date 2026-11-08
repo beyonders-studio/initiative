@@ -202,7 +202,7 @@
     "title": "IA de la comunidad",
     "adminOnly": "Solo los administradores de la comunidad pueden gestionar las conexiones de IA.",
     "disabledDescription": "Las funciones de IA están desactivadas para la plataforma.",
-    "managedByPlatform": "Las conexiones de IA se gestionan a nivel de plataforma. Los miembros configuran su propia clave en la configuración de su perfil.",
+    "managedByPlatform": "Las conexiones de IA se gestionan a nivel de plataforma.",
     "managedByServer": "Quien gestiona este servidor administra la IA de esta comunidad."
   },
   "platformAI": {
@@ -817,8 +817,8 @@
     },
     "roleDescriptions": {
       "member": "Acceso estándar a sus propias comunidades. Sin privilegios a nivel de plataforma.",
-      "support": "Visibilidad de solo lectura de la plataforma (usuarios, comunidades) y puede solicitar acceso temporal a una comunidad.",
-      "moderator": "Todo lo que puede hacer Soporte, además de gestión de usuarios (suspender/reactivar) y moderación de contenido.",
+      "support": "Todo lo que puede hacer Moderador, además de la recuperación de cuentas (inicio de sesión, segundo factor, reactivación), y puede solicitar acceso temporal de lectura o de lectura y escritura a una comunidad.",
+      "moderator": "Ve los usuarios y las comunidades de la plataforma, modera cuentas y contenido, suspende cuentas y puede solicitar acceso temporal de moderación a una comunidad.",
       "operator": "Gestiona usuarios, comunidades y roles en toda la plataforma, con acceso a datos entre comunidades y aprueba solicitudes de acceso.",
       "owner": "Control total, incluida la configuración de toda la plataforma (autenticación, personalización, email, IA). El único rol que puede gestionar la configuración."
     },
@@ -988,7 +988,7 @@
     "requestDescription": "Pide acceso temporal y limitado a una comunidad. Los aprobadores lo conceden y caduca automáticamente.",
     "breakGlass": {
       "title": "Acceso de emergencia",
-      "description": "Concédete acceso de emergencia a una comunidad: aprobado al instante, limitado a esa comunidad y con caducidad automática. Lectura y escritura actúa como administrador completo de la comunidad. Cada acceso de emergencia queda registrado.",
+      "description": "Concédete acceso de emergencia a una comunidad: aprobado al instante, limitado a esa comunidad y con caducidad automática. Te permite editar el contenido existente y cambiar la configuración de la comunidad. Cada acceso de emergencia queda registrado.",
       "reasonPlaceholder": "Por qué necesitas acceso de emergencia (p. ej. incidente n.º 123)",
       "submit": "Acceso de emergencia",
       "activated": "Acceso de emergencia activado",
@@ -1421,7 +1421,7 @@
     "backendS3": "Compatible con S3",
     "backendHelp": "Local guarda los archivos en el disco del servidor. S3 funciona con cualquier almacén compatible con S3, como una instancia autoalojada de Garage o MinIO, o Cloudflare R2.",
     "cutoverTitle": "Cambiar a S3 no mueve los archivos existentes",
-    "cutoverHelp": "Guarda esta configuración, ejecuta Probar conexión y luego usa Migración a continuación para copiar los archivos locales existentes al bucket. Cambia el backend a S3 solo cuando termine la migración; opcionalmente deja activado «Servir objetos faltantes desde local» durante un periodo de verificación.",
+    "cutoverHelp": "Ejecuta primero Probar conexión. Después guarda con «Servir objetos faltantes desde local» activado: los archivos nuevos van al bucket y uno que aún no está allí se lee del disco. Copia los archivos existentes con la migración de abajo y desactiva esa opción cuando termine sin fallos.",
     "bucketLabel": "Bucket",
     "bucketPlaceholder": "my-initiative-uploads",
     "regionLabel": "Región",
@@ -1446,7 +1446,7 @@
     "testSuccess": "Conexión correcta.",
     "testError": "La conexión falló.",
     "backfillTitle": "Migrar archivos locales a S3",
-    "backfillHelp": "Copia cada archivo local existente al bucket configurado. Idempotente y seguro de volver a ejecutar; hazlo antes de cambiar el backend a S3.",
+    "backfillHelp": "Copia cada archivo local existente al bucket y omite lo que ya está allí, así que es seguro volver a ejecutarla. Se ejecuta una vez que S3 es el backend guardado.",
     "startBackfill": "Iniciar migración",
     "backfillRunning": "Migración en curso…",
     "backfillStarted": "Migración iniciada.",

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import or_, update
 from sqlalchemy.exc import IntegrityError
@@ -263,7 +263,7 @@ async def hold(
     """Record the change to be made after :data:`HOLD_FOR`, commit what the
     request has staged with it, and tell the account. Raises
     :class:`ChangePending` while another change waits."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     row = AccountChangeHold(
         user_id=user.id,
         kind=kind,
@@ -319,7 +319,7 @@ async def cancel(
                 col(AccountChangeHold.user_id) == user_id,
                 _pending(),
             )
-            .values(cancelled_at=datetime.now(timezone.utc))
+            .values(cancelled_at=datetime.now(UTC))
             .returning(AccountChangeHold.kind)
         )
     ).scalar_one_or_none()
@@ -348,7 +348,7 @@ async def apply(
 
     A change that ends other sessions keeps ``keep_session``, or else the one
     that asked for it."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     user_id = user.id
     # Claimed and made in one transaction, so a second sweep finds it gone.
     claimed = (
@@ -420,7 +420,7 @@ async def apply(
 async def apply_due(session: AsyncSession, *, now: datetime | None = None) -> int:
     """Make every held change whose wait is over, and forget the ones settled
     a day ago. Returns how many were made."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     due = (
         await session.exec(
             select(AccountChangeHold.id, AccountChangeHold.user_id).where(

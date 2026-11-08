@@ -1,15 +1,15 @@
 """Backfill: copy existing local uploads into the configured S3 bucket.
 
-The final step of the local→S3 migration. Run it with the ``S3_*`` settings
-pointed at your object store **while the app is still on
-``STORAGE_BACKEND=local``**: it copies every blob under
+The step that moves existing files in the local→S3 migration. Run it once the
+app is on ``STORAGE_BACKEND=s3`` with ``S3_LOCAL_FALLBACK=true``, so a file not
+copied yet is still read from disk, and with the ``S3_*`` settings pointed at
+your object store: it copies every blob under
 ``UPLOADS_DIR/guild_<id>/`` to the S3 key ``guild_<id>/<file>``, setting the
 content-type recorded on the ``uploads`` row (falling back to a guess from the
 extension). It's **idempotent** — an object already present in S3 is skipped — so
 it is safe to re-run and resume.
 
-After it reports 0 failures, cut over: set ``STORAGE_BACKEND=s3`` (with
-``S3_LOCAL_FALLBACK=true`` for a verification window, then turn it off).
+After it reports 0 failures, turn ``S3_LOCAL_FALLBACK`` off.
 
     python -m app.db.backfill_uploads_to_s3 [--dry-run]
 """
@@ -30,8 +30,9 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app.core.config import settings
 from app.db import cohorts
-from app.db.advisory_locks import LockNamespace, advisory_lock, advisory_unlock
 from app.db import session as db_session
+from app.db.advisory_locks import LockNamespace, advisory_lock, advisory_unlock
+from app.db.request_context import SystemGuild
 from app.db.schema_provisioning import guild_schema_name
 from app.services import storage_config
 from app.services.storage import (
@@ -40,7 +41,6 @@ from app.services.storage import (
     StorageBackend,
     build_s3_client,
 )
-from app.db.request_context import SystemGuild
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +151,7 @@ def backfill_guild_dir(
                 continue
             dest.write(key, data, content_type=content_type)
             summary.copied += 1
-        except Exception:  # noqa: BLE001 — one bad blob must not abort the run
+        except Exception:
             logger.exception("failed to back up %s", label)
             summary.failed += 1
             summary.failed_keys.append(label)
@@ -176,9 +176,7 @@ async def _guild_upload_meta(
     rows = (
         await conn.execute(
             # schema = guild_schema_name(int), a digits-only identifier.
-            text(
-                f'SELECT filename, content_type, content_hash FROM "{schema}".uploads'  # noqa: S608
-            )
+            text(f'SELECT filename, content_type, content_hash FROM "{schema}".uploads')
         )
     ).all()
     return {row[0]: (row[1], row[2]) for row in rows if row[0]}
@@ -189,7 +187,7 @@ async def _guild_import_payloads(conn: AsyncConnection, schema: str) -> frozense
     rows = await conn.execute(
         # schema = guild_schema_name(int), a digits-only identifier.
         text(
-            f'SELECT file_ref FROM "{schema}".data_jobs '  # noqa: S608
+            f'SELECT file_ref FROM "{schema}".data_jobs '
             "WHERE direction = 'import' AND file_ref IS NOT NULL"
         )
     )
@@ -199,7 +197,7 @@ async def _guild_import_payloads(conn: AsyncConnection, schema: str) -> frozense
 async def backfill_uploads_to_s3(
     *,
     dry_run: bool = False,
-    on_progress: "Callable[[BackfillSummary], Awaitable[None]] | None" = None,
+    on_progress: Callable[[BackfillSummary], Awaitable[None]] | None = None,
 ) -> BackfillSummary:
     """Copy every guild's local blobs into S3. See module docstring.
 

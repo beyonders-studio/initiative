@@ -41,9 +41,9 @@ write no bell line: what they gather is already there, told as it happened.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Mapping
 
 from app.models.platform.notification import NotificationType
 
@@ -374,7 +374,7 @@ def sample_type(category: NotificationCategory) -> NotificationType:
     but is sent and stored by type — the summary when a hold lifts. Sorted so
     the choice is stable rather than dependent on set ordering.
     """
-    return sorted(CATEGORY_SPECS[category].types, key=lambda t: t.value)[0]
+    return min(CATEGORY_SPECS[category].types, key=lambda t: t.value)
 
 
 def category_of(notification_type: NotificationType) -> NotificationCategory:

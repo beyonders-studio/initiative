@@ -48,6 +48,7 @@ def dev_port() -> int:
         ["bash", "-c", f". {shlex.quote(str(DEV_PORTS_SH))} && {{ {printed}; }}"],
         capture_output=True,
         text=True,
+        check=False,
     )
     # dev-ports.sh explains itself on stderr when it cannot resolve a port, and
     # fails when it cannot give a worktree its own database.

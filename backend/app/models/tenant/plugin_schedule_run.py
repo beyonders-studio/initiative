@@ -12,7 +12,6 @@ Written and read by the system engine alone.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlmodel import Field, SQLModel
@@ -32,7 +31,7 @@ class PluginScheduleRun(SQLModel, table=True):
     #: The schedule's id in the pinned definition, a manifest identifier.
     schedule_id: str = Field(sa_column=Column(String(length=64), primary_key=True))
     #: When the last call that succeeded started: the hook's ``since``.
-    last_success_at: Optional[datetime] = Field(
+    last_success_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     next_due_at: datetime = Field(
@@ -43,6 +42,6 @@ class PluginScheduleRun(SQLModel, table=True):
         default=0, sa_column=Column(Integer, nullable=False, default=0)
     )
     #: Set while a worker is calling the plug-in, so no other claims the row.
-    claimed_until: Optional[datetime] = Field(
+    claimed_until: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )

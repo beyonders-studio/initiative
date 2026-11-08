@@ -10,8 +10,9 @@ revocation, authorship, the identity boundary, route opt-in and round trips.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any
 
 import pytest
 from sqlalchemy import event, text
@@ -23,35 +24,35 @@ from app.api import actor_route
 from app.api.actor_route import ActorRoute
 from app.api.deps import route_plugin_scopes
 from app.core.identity_boundary import BoundaryPhase
-from app.core.plugin_scopes import ALL_SCOPES
+from app.core.image_headers import validate_image
 from app.core.messages import PluginMessages
+from app.core.plugin_scopes import ALL_SCOPES
 from app.db.search_index import COMMENT_PREVIEW_CHARS
 from app.main import app
-from app.models.platform.guild import Guild, CommunityRole, CommunityStatus
+from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.platform.notification import Notification, NotificationType
-from app.models.tenant.plugin_placement import PluginPlacement
+from app.models.platform.user_avatar import AVATAR_SPEC
 from app.models.tenant.comment import Comment
 from app.models.tenant.file import File
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.metadata import MetadataType
+from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.services.marketplace import plugin_refs
-from app.core.image_headers import validate_image
-from app.models.platform.user_avatar import AVATAR_SPEC
 from app.services.platform import user_avatars
 from app.services.platform.user_avatars_test import png
 from app.testing import (
-    create_resource_grant,
-    guild_url,
     create_comment,
     create_file,
-    create_post,
     create_guild_calendar,
+    create_post,
     create_project,
     create_property_definition,
     create_property_value,
+    create_resource_grant,
     create_task,
     drain_notices,
+    guild_url,
     lexical_body,
     route_as,
     route_as_install,
@@ -60,12 +61,11 @@ from app.testing import (
 from app.testing.plugin_clients import (
     CLIENT,
     assert_names_nobody,
-    install_plugin,
     install_headers,
+    install_plugin,
     lift_person_and_guild_ids,
     share_with_members,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

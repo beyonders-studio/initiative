@@ -22,7 +22,7 @@ import hashlib
 import hmac
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -75,7 +75,7 @@ async def deliver(
     hostname's resolution can change between registration and delivery.
     """
     body = json.dumps(envelope, default=str, separators=(",", ":")).encode("utf-8")
-    timestamp = str(int(datetime.now(timezone.utc).timestamp()))
+    timestamp = str(int(datetime.now(UTC).timestamp()))
     signature = _sign(secret, timestamp, body)
 
     headers = {
@@ -114,7 +114,7 @@ async def deliver(
             type(exc).__name__,
         )
         return False
-    except Exception as exc:  # noqa: BLE001 — best-effort delivery
+    except Exception as exc:  # best-effort delivery
         logger.warning(
             "webhook delivery failed: origin=%s event=%s err=%s",
             origin,

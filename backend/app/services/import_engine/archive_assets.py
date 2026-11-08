@@ -18,9 +18,10 @@ from __future__ import annotations
 import asyncio
 import tempfile
 import zipfile
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Awaitable, BinaryIO, Callable, Literal, Sequence
+from typing import TYPE_CHECKING, BinaryIO, Literal
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -186,56 +187,56 @@ async def restore_assets(
 
     read_total = 0
     # Each file is copied here before it is checked and stored.
-    spool = tempfile.NamedTemporaryFile(prefix="import-asset-")
-    try:
-        for asset, info in pending:
-            spool.seek(0)
-            spool.truncate()
-            # What the quota was checked against also bounds what is read: a
-            # member is read no further than what is left of it.
-            size = await while_beating(
-                asyncio.to_thread(
-                    _copy_out, archive, info, spool, incoming - read_total
-                ),
-                heartbeat,
-                every=HEARTBEAT_SECONDS,
-                finish=True,
-            )
-            if size is None:
-                outcome.missing.append(asset.key)
-                continue
-            read_total += size
-            spool.flush()
-            spool.seek(0)
-            content_type, warning = await asyncio.to_thread(_detect, asset, spool, size)
-            if content_type is None:
-                if warning is not None:
-                    outcome.warnings.append(warning)
-                continue
-            await while_beating(
-                store_upload(
-                    session,
-                    guild_id=guild_id,
-                    filename=asset.key,
-                    data=Path(spool.name),
-                    content_type=content_type,
-                    created_by=user.id,
-                    initiative_id=initiative_id,
-                ),
-                heartbeat,
-                every=HEARTBEAT_SECONDS,
-                finish=True,
-            )
-            outcome.written.append(asset.key)
-            outcome.content_types[asset.key] = content_type
-            outcome.restored_bytes += size
-            if heartbeat is not None:
-                await heartbeat()
-    except BaseException:
-        remove_written(guild_id, outcome.written)
-        raise
-    finally:
-        spool.close()
+    with tempfile.NamedTemporaryFile(prefix="import-asset-") as spool:
+        try:
+            for asset, info in pending:
+                spool.seek(0)
+                spool.truncate()
+                # What the quota was checked against also bounds what is read: a
+                # member is read no further than what is left of it.
+                size = await while_beating(
+                    asyncio.to_thread(
+                        _copy_out, archive, info, spool, incoming - read_total
+                    ),
+                    heartbeat,
+                    every=HEARTBEAT_SECONDS,
+                    finish=True,
+                )
+                if size is None:
+                    outcome.missing.append(asset.key)
+                    continue
+                read_total += size
+                spool.flush()
+                spool.seek(0)
+                content_type, warning = await asyncio.to_thread(
+                    _detect, asset, spool, size
+                )
+                if content_type is None:
+                    if warning is not None:
+                        outcome.warnings.append(warning)
+                    continue
+                await while_beating(
+                    store_upload(
+                        session,
+                        guild_id=guild_id,
+                        filename=asset.key,
+                        data=Path(spool.name),
+                        content_type=content_type,
+                        created_by=user.id,
+                        initiative_id=initiative_id,
+                    ),
+                    heartbeat,
+                    every=HEARTBEAT_SECONDS,
+                    finish=True,
+                )
+                outcome.written.append(asset.key)
+                outcome.content_types[asset.key] = content_type
+                outcome.restored_bytes += size
+                if heartbeat is not None:
+                    await heartbeat()
+        except BaseException:
+            remove_written(guild_id, outcome.written)
+            raise
     return outcome
 
 

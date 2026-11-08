@@ -15,22 +15,23 @@ The matrix under test:
   an ordinary expired invite.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.testing import community_plan
 from app.core.messages import GuildMessages
 from app.core.tools import Tool
+from app.db.request_context import Unattributed
 from app.models.platform.access_grant import AccessGrant
 from app.models.platform.app_setting import AppSetting
-from app.models.platform.guild import Guild, CommunityRole, CommunityStatus
+from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.platform.user import UserRole
 from app.services.platform import guilds as guild_service
 from app.services.tenant import task_statuses as task_statuses_service
 from app.testing import (
+    community_plan,
     create_guild,
     create_initiative,
     create_task,
@@ -38,14 +39,13 @@ from app.testing import (
     get_auth_headers,
     route_as,
 )
-from app.db.request_context import Unattributed
 
 
 async def _set_status(session: AsyncSession, guild: Guild, status: CommunityStatus):
     """Flip a guild's lifecycle status the way the (future) operator endpoint
     will: status + timestamp on the shared row."""
     guild.status = status.value
-    guild.status_changed_at = datetime.now(timezone.utc)
+    guild.status_changed_at = datetime.now(UTC)
     session.add(guild)
     await session.commit()
 
@@ -54,7 +54,7 @@ async def _live_grant(
     session: AsyncSession, *, user, guild, level: str = "read"
 ) -> AccessGrant:
     """An approved, unexpired PAM grant (the access_grants_test pattern)."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     grant = AccessGrant(
         user_id=user.id,
         guild_id=guild.id,
@@ -243,20 +243,20 @@ async def test_read_only_status_visible_to_admin_not_member(
     member = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
     await _set_status(session, admin.guild, CommunityStatus.read_only)
 
-    admin_row = [
+    admin_row = next(
         g
         for g in (
             await client.get("/api/v1/communities/", headers=admin.headers)
         ).json()
         if g["id"] == admin.guild.id
-    ][0]
-    member_row = [
+    )
+    member_row = next(
         g
         for g in (
             await client.get("/api/v1/communities/", headers=member.headers)
         ).json()
         if g["id"] == admin.guild.id
-    ][0]
+    )
     assert admin_row["status"] == "read_only"
     assert member_row["status"] is None
 
@@ -678,24 +678,24 @@ async def test_content_read_only_flag_serialized_to_members(
     admin = await acting_user(guild_role=CommunityRole.admin)
     member = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
 
-    row = [
+    row = next(
         g
         for g in (
             await client.get("/api/v1/communities/", headers=member.headers)
         ).json()
         if g["id"] == admin.guild.id
-    ][0]
+    )
     assert row["content_read_only"] is False
 
     await _set_status(session, admin.guild, CommunityStatus.read_only)
 
-    row = [
+    row = next(
         g
         for g in (
             await client.get("/api/v1/communities/", headers=member.headers)
         ).json()
         if g["id"] == admin.guild.id
-    ][0]
+    )
     assert row["content_read_only"] is True
     assert row["status"] is None, "the status itself stays undisclosed to members"
 

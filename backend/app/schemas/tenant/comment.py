@@ -2,11 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
-from app.core.identity_boundary import PersonId
-from app.core.moderation import RemovalReason
-from app.core.tools import COMMENT_TARGETS
 from pydantic import (
     ConfigDict,
     Field,
@@ -16,11 +12,14 @@ from pydantic import (
     model_validator,
 )
 
-from app.schemas.base import RichMentionStr, RichTextStr, SanitizedBaseModel
-from app.schemas.tenant.reaction import ReactionGroup
+from app.core.identity_boundary import PersonId
+from app.core.moderation import RemovalReason
+from app.core.tools import COMMENT_TARGETS
 from app.models.platform.user import Presence
 from app.models.tenant.comment import CommentAudience
+from app.schemas.base import RichMentionStr, RichTextStr, SanitizedBaseModel
 from app.schemas.platform.user import PersonShape, ProfileDecorations
+from app.schemas.tenant.reaction import ReactionGroup
 from app.services.platform import presence
 
 
@@ -41,8 +40,8 @@ class CommentAuthor(PersonShape):
     id: PersonId
     username: str
     discriminator: int
-    display_name: Optional[str] = None
-    avatar_url: Optional[str] = None
+    display_name: str | None = None
+    avatar_url: str | None = None
     profile_decorations: ProfileDecorations = Field(default_factory=ProfileDecorations)
 
     @computed_field(return_type=Presence)  # type: ignore[misc]
@@ -83,25 +82,25 @@ _CommentCreateTargets = create_model(
     "_CommentCreateTargets",
     __base__=CommentBase,
     **{
-        field: (Optional[int], Field(default=None, gt=0))
+        field: (int | None, Field(default=None, gt=0))
         for field in COMMENT_TARGET_FIELDS
     },
 )
 _CommentReadParents = create_model(
     "_CommentReadParents",
     __base__=CommentBase,
-    **{field: (Optional[int], None) for field in COMMENT_TARGET_FIELDS},
+    **{field: (int | None, None) for field in COMMENT_TARGET_FIELDS},
 )
 
 
 class CommentCreate(_CommentCreateTargets):
-    parent_comment_id: Optional[int] = Field(default=None, gt=0)
+    parent_comment_id: int | None = Field(default=None, gt=0)
     #: Who it is said to. ``filer`` only on an operations case somebody filed,
     #: where it is the reply they are shown; ``members`` everywhere else.
     audience: CommentAudience = CommentAudience.members
 
     @model_validator(mode="after")
-    def validate_target(self) -> "CommentCreate":
+    def validate_target(self) -> CommentCreate:
         provided = [
             field for field in COMMENT_TARGET_FIELDS if getattr(self, field) is not None
         ]
@@ -109,7 +108,7 @@ class CommentCreate(_CommentCreateTargets):
             raise ValueError("Provide exactly one comment target")
         return self
 
-    def target_ids(self) -> dict[str, Optional[int]]:
+    def target_ids(self) -> dict[str, int | None]:
         """The target fields as service kwargs."""
         return {field: getattr(self, field) for field in COMMENT_TARGET_FIELDS}
 
@@ -128,8 +127,6 @@ class ToolCommentSettings(SanitizedBaseModel):
 class CommentUpdate(CommentBase):
     """Schema for updating a comment. Only content can be changed."""
 
-    pass
-
 
 class RemovedBy(str, Enum):
     """Who took a comment out of the conversation."""
@@ -147,7 +144,7 @@ class CommentRemoval(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     by: RemovedBy
-    reason: Optional[RemovalReason] = None
+    reason: RemovalReason | None = None
 
 
 class CommentRead(_CommentReadParents):
@@ -159,16 +156,16 @@ class CommentRead(_CommentReadParents):
     )
 
     id: int
-    created_by: Optional[PersonId] = None
-    parent_comment_id: Optional[int] = None
+    created_by: PersonId | None = None
+    parent_comment_id: int | None = None
     created_at: datetime
-    updated_at: Optional[datetime] = None
-    author: Optional[CommentAuthor] = None
+    updated_at: datetime | None = None
+    author: CommentAuthor | None = None
     # Who said this where it came from, when an import could not match them
     # to an account here. Display text: the client shows this name instead of
     # the author's, with no avatar and no profile link, because it names a
     # person rather than an account. Null on everything written in this app.
-    imported_author_name: Optional[str] = None
+    imported_author_name: str | None = None
     # Reactions ride along with the comment rather than costing a request per
     # row: a thread renders its chips from one list call. Empty until the
     # loader stamps them (see ``comments_service.attach_reactions``).
@@ -180,14 +177,14 @@ class CommentRead(_CommentReadParents):
     # Set on a tombstone: a comment a moderator took down, or one its author
     # deleted with replies under it. Its content is empty, and it names no
     # author.
-    removed: Optional[CommentRemoval] = None
+    removed: CommentRemoval | None = None
     # Who it is said to. ``filer`` on the part of an operations case that is
     # said to the person who filed it; ``members`` on everything else.
     audience: CommentAudience = CommentAudience.members
     # What the platform posted it as, on a note the platform wrote on an
     # operations case. Null on everything a person or a plug-in wrote — which
     # is how a client tells the platform's notes from a plug-in's.
-    system_kind: Optional[str] = None
+    system_kind: str | None = None
 
     @field_validator("content")
     @classmethod
@@ -205,7 +202,7 @@ class CommentListResponse(SanitizedBaseModel):
     #: The page's comments, in the order they were written.
     comments: list[CommentRead]
     #: The next page, or null at the end of the thread.
-    next_cursor: Optional[str] = None
+    next_cursor: str | None = None
     #: A moderator closed the thread: it reads as before, and only the
     #: moderation set adds to it.
     locked: bool = False
@@ -223,19 +220,19 @@ class RecentActivityEntry(SanitizedBaseModel):
     comment_id: int
     content: RichTextStr
     created_at: datetime
-    author: Optional[CommentAuthor] = None
+    author: CommentAuthor | None = None
     # The project a task comment's task is in. None for any other parent.
-    project_id: Optional[int] = None
-    project_name: Optional[str] = None
+    project_id: int | None = None
+    project_name: str | None = None
     # What the comment is on: "task", "wiki_page" or a Tool value, with the
     # entity's id and display name.
-    entity_type: Optional[str] = None
-    entity_id: Optional[int] = None
-    entity_name: Optional[str] = None
+    entity_type: str | None = None
+    entity_id: int | None = None
+    entity_name: str | None = None
     # The initiative the commented-on entity lives in, so the row can link at
     # its real address. None when the parent is gone or unreadable (or the
     # parent is a guild-level calendar, which belongs to no initiative).
-    initiative_id: Optional[int] = None
+    initiative_id: int | None = None
     # The same chips the thread shows. The feed is where a guild sees what is
     # going on, and a comment that drew six reactions reads differently from
     # one that drew none — so the row carries them rather than looking like a

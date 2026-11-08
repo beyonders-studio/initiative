@@ -5,16 +5,17 @@ thing now. The comment fan-out is driven end to end; the rest are asked of the
 service directly.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlmodel import select
 
 from app.core.tools import Tool
+from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification, NotificationType
-from app.services.platform import user_notifications
 from app.services import notifications
+from app.services.platform import user_notifications
 from app.testing import (
     create_collection,
     create_file,
@@ -24,7 +25,6 @@ from app.testing import (
     drain_notices,
     route_session_to_guild,
 )
-from app.db.request_context import SystemGuild, Unattributed
 
 
 async def _mentions(user_id: int) -> list[Notification]:
@@ -215,7 +215,7 @@ async def test_read_notifications_are_kept_thirty_days_and_unread_forever(sessio
     from app.db.session import SystemSessionLocal
 
     user = await create_user(session)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     ages = {"old_read": 31, "recent_read": 29, "old_unread": 400}
     async with SystemSessionLocal() as system_session:
         await set_rls_context(system_session, Unattributed())

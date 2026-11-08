@@ -9,7 +9,7 @@ CI if a ``SoftDeleteMixin`` subclass ever lands outside ``app/models/tenant/``.
 """
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, ClassVar, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from sqlalchemy import ARRAY, DateTime, Integer, String, func, literal_column, select
 from sqlalchemy.orm import column_property
@@ -19,8 +19,6 @@ from app.db import gucs
 
 if TYPE_CHECKING:  # pragma: no cover
     from app.core.tools import Tool
-
-_M = TypeVar("_M", bound=SQLModel)
 
 
 class SoftDeleteMixin(SQLModel):
@@ -35,7 +33,7 @@ class SoftDeleteMixin(SQLModel):
     the note on it below.
     """
 
-    deleted_at: Optional[datetime] = Field(
+    deleted_at: datetime | None = Field(
         default=None,
         sa_type=DateTime(timezone=True),
         nullable=True,
@@ -45,8 +43,8 @@ class SoftDeleteMixin(SQLModel):
     # fail to auto-determine join conditions on relationships that join to
     # users. Audit lookups go through the trash service, never through an ORM
     # relationship, so SQLAlchemy doesn't need the metadata.
-    deleted_by: Optional[int] = Field(default=None, nullable=True)
-    purge_at: Optional[datetime] = Field(
+    deleted_by: int | None = Field(default=None, nullable=True)
+    purge_at: datetime | None = Field(
         default=None,
         sa_type=DateTime(timezone=True),
         nullable=True,
@@ -77,7 +75,7 @@ class ArchiveMixin(SQLModel):
     and derives the archivable tables from this mixin.
     """
 
-    archived_at: Optional[datetime] = Field(
+    archived_at: datetime | None = Field(
         default=None,
         sa_type=DateTime(timezone=True),
         nullable=True,
@@ -99,12 +97,12 @@ class HoldMixin(SQLModel):
     mixin, and a new kind is holdable the day it declares it.
     """
 
-    held_at: Optional[datetime] = Field(
+    held_at: datetime | None = Field(
         default=None,
         sa_type=DateTime(timezone=True),
         nullable=True,
     )
-    hold_id: Optional[int] = Field(default=None, nullable=True)
+    hold_id: int | None = Field(default=None, nullable=True)
 
 
 class CreatedByMixin(SQLModel):
@@ -172,9 +170,7 @@ class CreatedByMixin(SQLModel):
     this mixin nor an entry in ``tenancy.CREATED_BY_EXEMPT_TABLES``.
     """
 
-    created_by: Optional[int] = Field(
-        default=None, foreign_key="users.id", nullable=True
-    )
+    created_by: int | None = Field(default=None, foreign_key="users.id", nullable=True)
 
 
 class ListingProvenanceMixin(SQLModel):
@@ -192,10 +188,8 @@ class ListingProvenanceMixin(SQLModel):
     without ``sa_column`` so each table builds its own Column.
     """
 
-    listing_uid: Optional[str] = Field(default=None, sa_type=String(14), nullable=True)
-    listing_version: Optional[str] = Field(
-        default=None, sa_type=String(32), nullable=True
-    )
+    listing_uid: str | None = Field(default=None, sa_type=String(14), nullable=True)
+    listing_version: str | None = Field(default=None, sa_type=String(32), nullable=True)
 
 
 class CommentsToggleMixin(SQLModel):
@@ -235,16 +229,16 @@ class CommentLockMixin(SQLModel):
     theirs to flip.
     """
 
-    comments_locked_at: Optional[datetime] = Field(
+    comments_locked_at: datetime | None = Field(
         default=None,
         sa_type=DateTime(timezone=True),
         nullable=True,
     )
 
 
-def _mapped_subclasses(base: type[_M]) -> dict[str, type[_M]]:
+def _mapped_subclasses[M: SQLModel](base: type[M]) -> dict[str, type[M]]:
     """Every mapped table model under ``base``, however indirectly, by table."""
-    found: dict[str, type[_M]] = {}
+    found: dict[str, type[M]] = {}
     stack = list(base.__subclasses__())
     while stack:
         cls = stack.pop()

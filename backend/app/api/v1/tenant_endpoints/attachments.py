@@ -5,27 +5,27 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 from app.api.deps import (
+    GuildContextDep,
     RLSSessionDep,
     get_current_active_user,
-    GuildContextDep,
 )
-from app.core.messages import ImageMessages, AttachmentMessages
+from app.core.messages import AttachmentMessages, ImageMessages
 from app.models.platform.user import User
 from app.schemas.tenant.attachment import AttachmentUploadResponse
+from app.services import storage_config
+from app.services.storage import get_guild_storage
+from app.services.tenant import attachments as attachments_service
 from app.services.tenant.attachments import (
     IMAGE_SUFFIXES,
     MAX_IMAGE_BYTES,
-    detect_document_image_type,
-    FileTooLargeError,
     PASTED_IMAGE_PREFIX,
+    FileTooLargeError,
+    detect_document_image_type,
     enforce_storage_quota,
     new_upload_filename,
     read_upload_bounded,
     store_upload,
 )
-from app.services import storage_config
-from app.services.tenant import attachments as attachments_service
-from app.services.storage import get_guild_storage
 
 router = APIRouter()
 

@@ -9,6 +9,7 @@ from types import ModuleType
 import pytest
 from sqlalchemy import text
 
+from app.db.request_context import SystemMaintenance
 from app.db.session import set_rls_context
 from app.testing.factories import (
     create_comment,
@@ -18,7 +19,6 @@ from app.testing.factories import (
     create_task,
     create_user,
 )
-from app.db.request_context import SystemMaintenance
 
 OUTBOX_SCAN_MIGRATION = (
     Path(__file__).resolve().parents[2]

@@ -25,7 +25,7 @@ import threading
 import zipfile
 from datetime import date, datetime, time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from openpyxl import load_workbook
 from openpyxl.cell.cell import Cell
@@ -34,7 +34,6 @@ from openpyxl.utils.cell import coordinate_from_string
 from openpyxl.worksheet.worksheet import Worksheet
 
 from app.core.messages import FileMessages
-from app.services.worker_pool import Pool, PoolError
 from app.services.tenant.files_spreadsheet import (
     MAX_COLS,
     MAX_ROWS,
@@ -42,6 +41,7 @@ from app.services.tenant.files_spreadsheet import (
     FileContentError,
     normalize_spreadsheet_content,
 )
+from app.services.worker_pool import Pool, PoolError
 
 # The same conversions the renderer uses, read the other way.
 _PX_TO_POINTS = 0.75
@@ -102,7 +102,7 @@ def parse_spreadsheet_file(
 
     if lower.endswith(TEXT_TABLE_SUFFIXES):
         raw = [_parse_csv(data, base, tab=lower.endswith(".tsv"), strict=strict)]
-    elif lower.endswith(".xlsx") or lower.endswith(".xlsm"):
+    elif lower.endswith((".xlsx", ".xlsm")):
         raw = _parse_xlsx(data)
     elif lower.endswith(CALAMINE_SUFFIXES):
         raw = _parse_with_calamine(data, suffix=lower[lower.rindex(".") :])
@@ -259,7 +259,7 @@ _TIME_MS = 60_000
 _IDLE_SECONDS = 300
 _ADDRESS_SPACE_BYTES = 1536 * 1024 * 1024
 
-_pool: Optional[Pool] = None
+_pool: Pool | None = None
 _pool_lock = threading.Lock()
 
 

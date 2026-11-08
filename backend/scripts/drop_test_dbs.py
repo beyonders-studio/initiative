@@ -39,7 +39,7 @@ from sqlalchemy.engine import make_url
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.core.config import settings  # noqa: E402
+from app.core.config import settings
 
 # Must match conftest.CHECKOUT_ID, which is the definition — importing conftest
 # here would pull in the whole app, so the level is spelled out instead:

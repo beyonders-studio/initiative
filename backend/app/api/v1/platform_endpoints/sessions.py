@@ -19,7 +19,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from app.api.deps import AccountHolder, require_first_party_session, SystemSessionDep
+from app.api.deps import AccountHolder, SystemSessionDep, require_first_party_session
 from app.api.v1.platform_endpoints.session_opening import current_session_row
 from app.core.audit_events import AuditEventType
 from app.core.messages import AuthMessages

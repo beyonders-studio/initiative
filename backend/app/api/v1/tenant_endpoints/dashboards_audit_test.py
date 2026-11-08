@@ -14,7 +14,6 @@ from app.core.audit_events import AuditEventType
 from app.models.platform.guild import CommunityRole
 from app.testing import emitted
 
-
 COUNT_TASKS = "SELECT count(*) AS n FROM tasks"
 
 

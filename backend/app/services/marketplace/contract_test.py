@@ -26,30 +26,30 @@ from jsonschema import Draft202012Validator
 
 from app.core.plugin_scopes import ALL_SCOPES
 from app.services.marketplace import contract
+from app.services.marketplace.definitions import normalize_listing_definition
 from app.services.marketplace.manifest_values import (
     MAX_IDENTIFIER_LENGTH,
     MAX_PATH_LENGTH,
     MAX_PUBLIC_ID_LENGTH,
 )
-from app.services.marketplace.definitions import normalize_listing_definition
-from app.services.marketplace.widget_meta import MAX_LOCALES, MAX_TEXT_LENGTH
 from app.services.marketplace.service_plugins import (
     ACTOR_KINDS,
-    PLUGIN_PROTOCOL_VERSIONS,
     CONNECTION_SCOPES,
     DIRECTIONS,
-    PAGE_CAPABILITIES,
     FEATURES,
     FIELD_TYPES,
     MAX_CONNECTIONS,
     MAX_ENDPOINTS,
-    MAX_RETURNS_PER_ENDPOINT,
     MAX_PAGES,
+    MAX_RETURNS_PER_ENDPOINT,
     MAX_WIDGETS,
+    PAGE_CAPABILITIES,
     PARAM_TYPES,
+    PLUGIN_PROTOCOL_VERSIONS,
     RETURN_TYPES,
     SURFACE_SCOPES,
 )
+from app.services.marketplace.widget_meta import MAX_LOCALES, MAX_TEXT_LENGTH
 
 pytestmark = pytest.mark.always
 

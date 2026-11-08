@@ -36,7 +36,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.encryption import SALT_PLUGIN_CONFIG, encrypt_field
-from app.core.messages import GuildPluginMessages, GuildMessages, MarketplaceMessages
+from app.core.messages import GuildMessages, GuildPluginMessages, MarketplaceMessages
 from app.models.platform.guild import CommunityRole
 from app.models.platform.plugin_install import PluginInstallClaim
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
@@ -46,12 +46,12 @@ from app.services.tenant import plugin_revocation
 from app.services.tenant.plugin_connection_flows import callback_url
 from app.services.tenant.plugin_connections import load_connection_secrets
 from app.testing import (
-    create_plugin_user_connection,
-    create_plugin_service_registration,
     create_guild,
-    create_guild_plugin,
     create_guild_membership,
+    create_guild_plugin,
     create_marketplace_listing,
+    create_plugin_service_registration,
+    create_plugin_user_connection,
     marketplace_uid,
     route_session_to_guild,
     sealed_vendor_values,
@@ -1553,7 +1553,7 @@ class TestUninstallKillsAccess:
         """An uninstalled plug-in still receiving a guild's data is the thing this
         prevents — so the values go, and the plug-in is told."""
         a = await acting_user(guild_role=CommunityRole.superadmin)
-        plugin, member = await _connected_member(client, acting_user, session, a)
+        plugin, _member = await _connected_member(client, acting_user, session, a)
         await client.put(
             a.g(f"/plugins/{plugin.id}/config"),
             headers=a.headers,

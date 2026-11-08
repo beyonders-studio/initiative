@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import ConfigDict
 
@@ -32,19 +31,19 @@ class PersonalItemState(SanitizedBaseModel):
 
     entity_type: ContentKind
     entity_id: int
-    viewed_at: Optional[datetime] = None
-    view_source: Optional[ViewSource] = None
-    bookmarked_at: Optional[datetime] = None
+    viewed_at: datetime | None = None
+    view_source: ViewSource | None = None
+    bookmarked_at: datetime | None = None
     #: When they subscribed by hand.
-    subscribed_at: Optional[datetime] = None
+    subscribed_at: datetime | None = None
     #: Whether they are subscribed, by hand or by making it or being named on
     #: it (``personal_items.subscribers_of``). Left out of a recorded open,
     #: which does not ask.
-    subscribed: Optional[bool] = None
+    subscribed: bool | None = None
     #: When to remind them of it: tasks only.
-    remind_at: Optional[datetime] = None
+    remind_at: datetime | None = None
     #: When that reminder went out, if it has.
-    reminded_at: Optional[datetime] = None
+    reminded_at: datetime | None = None
 
 
 class ReminderSet(SanitizedBaseModel):
@@ -64,13 +63,13 @@ class PersonalItemRead(SanitizedBaseModel):
     community_id: int
     # The initiative it lives in, which its URL addresses. NULL for a
     # community-level tool: only calendars have any.
-    initiative_id: Optional[int] = None
+    initiative_id: int | None = None
     name: str
-    viewed_at: Optional[datetime] = None
-    bookmarked_at: Optional[datetime] = None
+    viewed_at: datetime | None = None
+    bookmarked_at: datetime | None = None
     # Projects: the emoji on the project itself.
-    icon: Optional[str] = None
+    icon: str | None = None
     # Files: what picks the file's own icon and colour.
-    file_type: Optional[str] = None
-    mime_type: Optional[str] = None
-    original_filename: Optional[str] = None
+    file_type: str | None = None
+    mime_type: str | None = None
+    original_filename: str | None = None

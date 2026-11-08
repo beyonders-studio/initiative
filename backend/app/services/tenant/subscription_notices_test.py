@@ -3,7 +3,7 @@ to, read as themselves: whoever made it or its tool, whoever is named on it,
 and whoever subscribed by hand, from then on; never their own changes, nothing
 after they unsubscribe, and nothing the platform holds."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import cast
 
 from sqlalchemy import text, update
@@ -125,7 +125,7 @@ async def test_subscribers_hear_of_what_others_change(
     await session.exec(
         update(Notification)
         .where(Notification.user_id.in_([b_id, c_id]))  # type: ignore[attr-defined]
-        .values(read_at=datetime.now(timezone.utc))
+        .values(read_at=datetime.now(UTC))
     )
     await session.commit()
     edited = await client.patch(a.g(path), headers=a.headers, json={"title": "Rent"})
@@ -140,7 +140,7 @@ async def test_subscribers_hear_of_what_others_change(
     await session.exec(
         update(Notification)
         .where(Notification.user_id == b_id)
-        .values(read_at=datetime.now(timezone.utc))
+        .values(read_at=datetime.now(UTC))
     )
     await session.commit()
     edited = await client.patch(a.g(path), headers=a.headers, json={"title": "Lend"})

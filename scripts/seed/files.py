@@ -3,14 +3,13 @@ what their bodies name in one another."""
 
 from __future__ import annotations
 
+from app.core.file_types import FileType
 from app.core.relationships import Provenance, RelationshipType
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
-from app.core.file_types import FileType
 from app.models.tenant.file import File
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.services.tenant import relationships as relationships_service
-
 from seed.common import Community, lexical, para, share, tag
 
 # --- spreadsheets -----------------------------------------------------------
@@ -240,14 +239,20 @@ FILES: dict[str, list[dict]] = {
             "readers": ["Thorn Ironforge", "Elara Moonwhisper"],
             "general": ResourceAccessLevel.read,
             "paragraphs": [
-                "Barovia is a demiplane of dread, shrouded in perpetual mist. The land "
-                "is ruled by Count Strahd von Zarovich, a vampire lord who has cursed "
-                "this realm for centuries.",
-                "No one enters or leaves without Strahd's permission. The sun never "
-                "truly shines here, and the people live in constant fear of the "
-                "creatures that stalk the night.",
-                "Key locations: Village of Barovia, Vallaki, Krezk, the Amber Temple, "
-                "Castle Ravenloft, Old Bonegrinder, Argynvostholt, and Yester Hill.",
+                (
+                    "Barovia is a demiplane of dread, shrouded in perpetual mist. The land "
+                    "is ruled by Count Strahd von Zarovich, a vampire lord who has cursed "
+                    "this realm for centuries."
+                ),
+                (
+                    "No one enters or leaves without Strahd's permission. The sun never "
+                    "truly shines here, and the people live in constant fear of the "
+                    "creatures that stalk the night."
+                ),
+                (
+                    "Key locations: Village of Barovia, Vallaki, Krezk, the Amber Temple, "
+                    "Castle Ravenloft, Old Bonegrinder, Argynvostholt, and Yester Hill."
+                ),
             ],
             "tags": ["lore"],
             "projects": ["Barovia Arc"],
@@ -258,14 +263,20 @@ FILES: dict[str, list[dict]] = {
             "creator": "Dungeon Master",
             "roles": [("strahd", ResourceAccessLevel.read)],
             "paragraphs": [
-                "Strahd von Zarovich — The vampire lord of Barovia. Ancient, cunning, "
-                "and tragically cursed.",
-                "Ireena Kolyana — Adopted daughter of the burgomaster. Strahd believes "
-                "she is Tatyana reborn.",
+                (
+                    "Strahd von Zarovich — The vampire lord of Barovia. Ancient, cunning, "
+                    "and tragically cursed."
+                ),
+                (
+                    "Ireena Kolyana — Adopted daughter of the burgomaster. Strahd believes "
+                    "she is Tatyana reborn."
+                ),
                 "Ismark the Lesser — Ireena's brother, desperate to protect her.",
                 "Madam Eva — Vistani seer who reads the party's fortune with the Tarokka deck.",
-                "Kasimir Velikov — Dusk elf mage who seeks to resurrect his sister from "
-                "the Amber Temple.",
+                (
+                    "Kasimir Velikov — Dusk elf mage who seeks to resurrect his sister from "
+                    "the Amber Temple."
+                ),
                 "Ezmerelda d'Avenir — Monster hunter and Van Richten's former protege.",
             ],
             "tags": ["NPC", "lore"],
@@ -278,13 +289,17 @@ FILES: dict[str, list[dict]] = {
             "creator": "Admin User",
             "writers": ["Dungeon Master"],
             "paragraphs": [
-                "Key NPCs: Gundren Rockseeker (quest giver), Sildar Hallwinter (Lords' "
-                "Alliance agent), Sister Garaele (Harper contact in Phandalin), "
-                "Nezznar the Black Spider (main antagonist), Glasstaff/Iarno Albrek "
-                "(Redbrand leader).",
-                "Phandalin Townfolk: Toblen Stonehill (innkeeper), Elmar Barthen "
-                "(merchant), Linene Graywind (Lionshield Coster), Harbin Wester "
-                "(cowardly townmaster).",
+                (
+                    "Key NPCs: Gundren Rockseeker (quest giver), Sildar Hallwinter (Lords' "
+                    "Alliance agent), Sister Garaele (Harper contact in Phandalin), "
+                    "Nezznar the Black Spider (main antagonist), Glasstaff/Iarno Albrek "
+                    "(Redbrand leader)."
+                ),
+                (
+                    "Phandalin Townfolk: Toblen Stonehill (innkeeper), Elmar Barthen "
+                    "(merchant), Linene Graywind (Lionshield Coster), Harbin Wester "
+                    "(cowardly townmaster)."
+                ),
             ],
             "tags": ["NPC"],
             "projects": ["Phandalin Adventures"],
@@ -300,10 +315,14 @@ FILES: dict[str, list[dict]] = {
                 "Seraphina Dawnlight",
             ],
             "paragraphs": [
-                "The party received a mysterious letter and traveled to the village of "
-                "Barovia. After surviving the Death House, they met Ismark and Ireena.",
-                "The session ended with the party heading toward the church in the "
-                "village center. Next session: travel to Vallaki.",
+                (
+                    "The party received a mysterious letter and traveled to the village of "
+                    "Barovia. After surviving the Death House, they met Ismark and Ireena."
+                ),
+                (
+                    "The session ended with the party heading toward the church in the "
+                    "village center. Next session: travel to Vallaki."
+                ),
             ],
             "projects": ["Session Zero & Planning"],
             "links": [
@@ -316,11 +335,15 @@ FILES: dict[str, list[dict]] = {
             "initiative": "default",
             "creator": "Dungeon Master",
             "paragraphs": [
-                "The party escorted Ireena through the Svalich Woods, fighting off dire "
-                "wolves. They discovered the windmill at Old Bonegrinder was inhabited "
-                "by night hags.",
-                "Arrived at Vallaki and met Baron Vargas Vallakovich, who insists that "
-                "'All Will Be Well.'",
+                (
+                    "The party escorted Ireena through the Svalich Woods, fighting off dire "
+                    "wolves. They discovered the windmill at Old Bonegrinder was inhabited "
+                    "by night hags."
+                ),
+                (
+                    "Arrived at Vallaki and met Baron Vargas Vallakovich, who insists that "
+                    "'All Will Be Well.'"
+                ),
             ],
             "projects": ["Session Zero & Planning"],
             "links": [
@@ -333,11 +356,15 @@ FILES: dict[str, list[dict]] = {
             "initiative": "default",
             "creator": "Dungeon Master",
             "paragraphs": [
-                "The Baron's festival went horribly wrong. The wicker sun failed to "
-                "light, and the crowd nearly rioted. The party intervened to prevent "
-                "bloodshed.",
-                "Vex discovered a secret stash of bones beneath St. Andral's church. A "
-                "vampire spawn attacked during the night.",
+                (
+                    "The Baron's festival went horribly wrong. The wicker sun failed to "
+                    "light, and the crowd nearly rioted. The party intervened to prevent "
+                    "bloodshed."
+                ),
+                (
+                    "Vex discovered a secret stash of bones beneath St. Andral's church. A "
+                    "vampire spawn attacked during the night."
+                ),
             ],
             "projects": ["Session Zero & Planning"],
             "links": ["NPC Roster: Curse of Strahd"],
@@ -362,11 +389,15 @@ FILES: dict[str, list[dict]] = {
             "initiative": "strahd",
             "creator": "Dungeon Master",
             "paragraphs": [
-                "Strahd is not hunting the party — he is auditioning them. He wants a "
-                "successor who can break the curse he no longer believes he deserves "
-                "to escape.",
-                "If the players read this document, the seed data's private share "
-                "status is broken.",
+                (
+                    "Strahd is not hunting the party — he is auditioning them. He wants a "
+                    "successor who can break the curse he no longer believes he deserves "
+                    "to escape."
+                ),
+                (
+                    "If the players read this document, the seed data's private share "
+                    "status is broken."
+                ),
             ],
         },
         {
@@ -377,8 +408,10 @@ FILES: dict[str, list[dict]] = {
             "general": ResourceAccessLevel.write,
             "paragraphs": [
                 "1. Critical hits: Roll damage dice twice plus modifiers (no doubling modifiers).",
-                "2. Potions: Drinking a potion is a bonus action. Feeding one to "
-                "another is an action.",
+                (
+                    "2. Potions: Drinking a potion is a bonus action. Feeding one to "
+                    "another is an action."
+                ),
                 "3. Inspiration: Can be given to other players. Max 1 at a time.",
                 "4. Death saves: Hidden from other players unless Medicine check DC 10.",
                 "5. Flanking: +2 bonus instead of advantage.",
@@ -418,16 +451,22 @@ FILES: dict[str, list[dict]] = {
             "writers": ["Finley Goldtongue"],
             "readers": ["Kael Windrunner", "Aurelia Brightshield"],
             "paragraphs": [
-                "The year is 2487. Earth was rendered uninhabitable by the Cascade "
-                "Event — a catastrophic chain reaction in the planet's magnetic field. "
-                "The last 50,000 humans fled aboard the Exodus Fleet: 12 ships of "
-                "varying size and capability.",
-                "The fleet has been traveling for 73 years. Most colonists are in "
-                "cryosleep, rotated in shifts. The active crew numbers about 2,000 at "
-                "any given time.",
-                "FTL travel exists but is expensive and unreliable. The fleet's main "
-                "FTL drive can make one jump per month. Smaller scout ships have "
-                "limited-range jump drives.",
+                (
+                    "The year is 2487. Earth was rendered uninhabitable by the Cascade "
+                    "Event — a catastrophic chain reaction in the planet's magnetic field. "
+                    "The last 50,000 humans fled aboard the Exodus Fleet: 12 ships of "
+                    "varying size and capability."
+                ),
+                (
+                    "The fleet has been traveling for 73 years. Most colonists are in "
+                    "cryosleep, rotated in shifts. The active crew numbers about 2,000 at "
+                    "any given time."
+                ),
+                (
+                    "FTL travel exists but is expensive and unreliable. The fleet's main "
+                    "FTL drive can make one jump per month. Smaller scout ships have "
+                    "limited-range jump drives."
+                ),
             ],
             "tags": ["main quest"],
             "projects": ["The Exodus Fleet"],
@@ -438,13 +477,17 @@ FILES: dict[str, list[dict]] = {
             "creator": "Admin User",
             "general": ResourceAccessLevel.read,
             "paragraphs": [
-                "The Krellix are a territorial insectoid species that controls a swathe "
-                "of space between the fleet and the target system. They are "
-                "technologically advanced but not inherently hostile — diplomacy is "
-                "possible.",
-                "Krellix society is caste-based: Workers, Warriors, Diplomats, and the "
-                "Overmind. Trade agreements require approval from a local Diplomat "
-                "caste leader.",
+                (
+                    "The Krellix are a territorial insectoid species that controls a swathe "
+                    "of space between the fleet and the target system. They are "
+                    "technologically advanced but not inherently hostile — diplomacy is "
+                    "possible."
+                ),
+                (
+                    "Krellix society is caste-based: Workers, Warriors, Diplomats, and the "
+                    "Overmind. Trade agreements require approval from a local Diplomat "
+                    "caste leader."
+                ),
             ],
             "tags": ["NPC", "diplomacy"],
             "projects": ["The Exodus Fleet"],
@@ -456,12 +499,16 @@ FILES: dict[str, list[dict]] = {
             "creator": "Finley Goldtongue",
             "roles": [("fringe", ResourceAccessLevel.write)],
             "paragraphs": [
-                "Station Omega is a decommissioned military research station now "
-                "operated by the Crimson Syndicate. Inside the vault: a prototype "
-                "cloaking device worth enough credits to fund the fleet for a decade.",
-                "The station has 5 levels. Security increases with each level. The "
-                "vault is on Level 5. Self-destruct activates 10 minutes after the "
-                "vault is breached.",
+                (
+                    "Station Omega is a decommissioned military research station now "
+                    "operated by the Crimson Syndicate. Inside the vault: a prototype "
+                    "cloaking device worth enough credits to fund the fleet for a decade."
+                ),
+                (
+                    "The station has 5 levels. Security increases with each level. The "
+                    "vault is on Level 5. Self-destruct activates 10 minutes after the "
+                    "vault is breached."
+                ),
             ],
             "tags": ["stealth", "loot"],
             "projects": ["Smuggler's Run"],
@@ -472,10 +519,14 @@ FILES: dict[str, list[dict]] = {
             "initiative": "default",
             "creator": "Admin User",
             "paragraphs": [
-                "The crew awoke from cryosleep to find the fleet's AI, ORACLE, had gone "
-                "silent. Emergency protocols activated. The FTL drive was offline.",
-                "The team discovered sabotage — someone had manually overridden "
-                "ORACLE's core directives. Suspicion fell on the Deck 7 separatists.",
+                (
+                    "The crew awoke from cryosleep to find the fleet's AI, ORACLE, had gone "
+                    "silent. Emergency protocols activated. The FTL drive was offline."
+                ),
+                (
+                    "The team discovered sabotage — someone had manually overridden "
+                    "ORACLE's core directives. Suspicion fell on the Deck 7 separatists."
+                ),
             ],
             "projects": ["Campaign Planning"],
             "links": ["Setting Bible: The Exodus Protocol"],
@@ -512,14 +563,20 @@ FILES: dict[str, list[dict]] = {
             "readers": ["Admin User", "Thorn Ironforge"],
             "general": ResourceAccessLevel.read,
             "paragraphs": [
-                "The Shattered Seas are a vast archipelago formed when the old "
-                "continent sank a thousand years ago. Hundreds of islands dot the warm "
-                "waters, from volcanic peaks to coral atolls.",
-                "Major factions: The Imperial Navy (law and order), the Pirate Lords "
-                "(freedom and chaos), the Coral Elves (ancient guardians), and the "
-                "Deep Ones (mysterious undersea dwellers).",
-                "Currency: Gold doubloons, silver pieces, and trade goods. A good ship "
-                "is worth more than gold — it's your life.",
+                (
+                    "The Shattered Seas are a vast archipelago formed when the old "
+                    "continent sank a thousand years ago. Hundreds of islands dot the warm "
+                    "waters, from volcanic peaks to coral atolls."
+                ),
+                (
+                    "Major factions: The Imperial Navy (law and order), the Pirate Lords "
+                    "(freedom and chaos), the Coral Elves (ancient guardians), and the "
+                    "Deep Ones (mysterious undersea dwellers)."
+                ),
+                (
+                    "Currency: Gold doubloons, silver pieces, and trade goods. A good ship "
+                    "is worth more than gold — it's your life."
+                ),
             ],
             "tags": ["exploration"],
             "projects": ["Treasure of the Leviathan"],
@@ -529,8 +586,10 @@ FILES: dict[str, list[dict]] = {
             "initiative": "crimson",
             "creator": "Finley Goldtongue",
             "paragraphs": [
-                "Captain: Finley 'Goldtongue' Ashford — Bard/Swashbuckler. Charisma is "
-                "the real weapon.",
+                (
+                    "Captain: Finley 'Goldtongue' Ashford — Bard/Swashbuckler. Charisma is "
+                    "the real weapon."
+                ),
                 "First Mate: Thorn Ironforge — Fighter/Battlemaster. Handles boarding actions.",
                 "Navigator: Kael Windrunner — Ranger/Horizon Walker. Reads the stars and tides.",
                 "Quartermaster: Aurelia Brightshield — Paladin of the Sea. Keeps the crew honest.",
@@ -548,12 +607,16 @@ FILES: dict[str, list[dict]] = {
             "readers": ["Finley Goldtongue", "Thorn Ironforge"],
             "roles": [("navy", ResourceAccessLevel.read)],
             "paragraphs": [
-                "Admiral Helena Blackwood commands the 3rd Imperial Fleet from her "
-                "flagship, the HMS Vengeance (a 74-gun ship of the line). She is "
-                "ruthless, brilliant, and has a personal vendetta against Captain "
-                "Ashford.",
-                "Known ships: HMS Vengeance (flagship), HMS Ironclad (sunk by party), "
-                "HMS Stormbreak, HMS Resolute, plus 8 frigates and 12 sloops.",
+                (
+                    "Admiral Helena Blackwood commands the 3rd Imperial Fleet from her "
+                    "flagship, the HMS Vengeance (a 74-gun ship of the line). She is "
+                    "ruthless, brilliant, and has a personal vendetta against Captain "
+                    "Ashford."
+                ),
+                (
+                    "Known ships: HMS Vengeance (flagship), HMS Ironclad (sunk by party), "
+                    "HMS Stormbreak, HMS Resolute, plus 8 frigates and 12 sloops."
+                ),
                 "Weakness: Blackwood's supply lines are stretched thin. Hit the convoys.",
             ],
             "tags": ["NPC", "naval combat"],
@@ -565,11 +628,15 @@ FILES: dict[str, list[dict]] = {
             "initiative": "default",
             "creator": "Finley Goldtongue",
             "paragraphs": [
-                "The Crimson Maiden was ambushed by a kraken near the Abyssal Trench. "
-                "The battle was fierce — we lost 6 crew and the mainmast before "
-                "driving the beast off with alchemist's fire.",
-                "Limped into Port Havoc for repairs. Made contact with a fence who "
-                "claims to know a translator for the Leviathan Map.",
+                (
+                    "The Crimson Maiden was ambushed by a kraken near the Abyssal Trench. "
+                    "The battle was fierce — we lost 6 crew and the mainmast before "
+                    "driving the beast off with alchemist's fire."
+                ),
+                (
+                    "Limped into Port Havoc for repairs. Made contact with a fence who "
+                    "claims to know a translator for the Leviathan Map."
+                ),
             ],
             "projects": ["Campaign Notes"],
             "links": [
@@ -582,12 +649,16 @@ FILES: dict[str, list[dict]] = {
             "initiative": "default",
             "creator": "Finley Goldtongue",
             "paragraphs": [
-                "Ambushed the HMS Ironclad in a fog bank near Dagger Isle. Thorn led "
-                "the boarding party while Kael maneuvered us alongside. The Ironclad's "
-                "captain surrendered after we took the helm.",
-                "Salvaged: 200 gold doubloons, 50 barrels of gunpowder, a chest of "
-                "maps, and the enchanted compass (which turned out to be a Tidestone "
-                "detector).",
+                (
+                    "Ambushed the HMS Ironclad in a fog bank near Dagger Isle. Thorn led "
+                    "the boarding party while Kael maneuvered us alongside. The Ironclad's "
+                    "captain surrendered after we took the helm."
+                ),
+                (
+                    "Salvaged: 200 gold doubloons, 50 barrels of gunpowder, a chest of "
+                    "maps, and the enchanted compass (which turned out to be a Tidestone "
+                    "detector)."
+                ),
             ],
             "projects": ["Campaign Notes"],
             "links": [

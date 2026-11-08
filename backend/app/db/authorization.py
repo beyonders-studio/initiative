@@ -48,10 +48,15 @@ at call time is still the caller's route, which is the same schema.
 """
 
 from __future__ import annotations
+
+import hashlib
 from collections.abc import Iterable
-from app.db import gucs
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
 from app.core.plugin_scopes import PluginScopeResource, tool_resource
 from app.core.tools import Tool
+from app.db import gucs
 from app.models.platform.access_grant import (
     AccessGrantPurpose,
     AccessGrantStatus,
@@ -66,10 +71,6 @@ from app.models.tenant.resource_grant import (
     ResourceAccessLevel,
 )
 
-import hashlib
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:  # pragma: no cover
     from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
@@ -80,29 +81,29 @@ DEPENDENT_OBJECTS_STILL_EXIST_SQLSTATE = "2BP01"
 __all__ = [
     "AUTHORIZATION_FUNCTIONS",
     "CURRENT_STANDING",
+    "GUEST_MEMBERSHIP_LIVE",
     "GUILD_AUTHORIZATION_FUNCTIONS",
+    "GUILD_FUNCTION_SIGNATURES",
+    "GUILD_SUPERADMIN",
     "IN_BODY",
     "IN_POLICY",
-    "Legs",
+    "READ_FUNCTIONS",
+    "RETIRED_GUILD_FUNCTION_SIGNATURES",
     "STANDING",
     "STANDING_FIELDS",
-    "READ_FUNCTIONS",
-    "GUILD_FUNCTION_SIGNATURES",
-    "RETIRED_GUILD_FUNCTION_SIGNATURES",
-    "GUILD_SUPERADMIN",
-    "GUEST_MEMBERSHIP_LIVE",
     "DropReport",
-    "plugin_narrowed",
-    "plugin_refused",
-    "plugin_scope",
+    "Legs",
     "apply_authorization_functions",
     "authorization_functions_digest",
     "drop_public_copies",
     "ensure_authorization_functions",
-    "live_membership",
     "ensure_public_copies_dropped",
-    "render_guild_authorization_functions",
     "in_body",
+    "live_membership",
+    "plugin_narrowed",
+    "plugin_refused",
+    "plugin_scope",
+    "render_guild_authorization_functions",
     "standing_arg",
 ]
 
@@ -1593,7 +1594,7 @@ def authorization_functions_digest() -> str:
     return digest.hexdigest()[:16]
 
 
-async def apply_authorization_functions(conn: "AsyncConnection") -> None:
+async def apply_authorization_functions(conn: AsyncConnection) -> None:
     """Create or replace every function in :data:`AUTHORIZATION_FUNCTIONS`.
 
     Idempotent, and cheap enough to run unconditionally on boot: eight
@@ -1641,7 +1642,7 @@ WHERE d.refclassid = 'pg_proc'::regclass
 """
 
 
-async def drop_public_copies(engine: "AsyncEngine") -> DropReport:
+async def drop_public_copies(engine: AsyncEngine) -> DropReport:
     """Retire the ``public`` copies of the seven guild functions.
 
     Runs after the guild back-fill. Each drop is its own transaction: a copy

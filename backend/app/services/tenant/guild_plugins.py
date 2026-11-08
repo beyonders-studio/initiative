@@ -33,11 +33,11 @@ row behind.
 from __future__ import annotations
 
 import logging
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Awaitable, Callable, Iterable, Optional
+from typing import Any
 
 from sqlalchemy import delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -92,19 +92,18 @@ __all__ = [
     "PlacementRoleError",
     "SurfaceAccess",
     "SurfaceOpenability",
-    "plugin_artifacts",
     "apply_static_config",
     "artifacts_by_install",
     "assign_settings",
     "claim_newly_unique",
     "clear_static_connection",
-    "declared_surfaces",
     "create_plugin_artifacts",
+    "declared_surfaces",
+    "definition_public_id",
     "find_mounting_plugin",
     "has_initiative_surfaces",
     "initiative_surface_ids",
     "install_plugin",
-    "definition_public_id",
     "install_public_id",
     "installed_plugin_ids",
     "is_placed",
@@ -116,6 +115,7 @@ __all__ = [
     "placed_initiative_ids",
     "placement_role_ids",
     "placements_by_install",
+    "plugin_artifacts",
     "plugin_callers",
     "set_granted_scopes",
     "set_placed_initiatives",
@@ -145,7 +145,7 @@ class ArtifactHandler:
     """
 
     remove: Callable[..., Awaitable[None]]
-    create: Optional[Callable[..., Awaitable[None]]] = None
+    create: Callable[..., Awaitable[None]] | None = None
 
 
 async def _create_calendar(
@@ -172,15 +172,15 @@ async def _create_calendar(
     )
 
 
-def _trash(model: type[Calendar] | type[Contact]) -> Callable[..., Awaitable[None]]:
+def _trash(model: type[Calendar | Contact]) -> Callable[..., Awaitable[None]]:
     """Removal that sends one of ``model``'s rows to the trash."""
 
     async def remove(
         session: AsyncSession,
         artifact_id: int,
         *,
-        deleted_by_user_id: Optional[int],
-        retention_days: Optional[int],
+        deleted_by_user_id: int | None,
+        retention_days: int | None,
     ) -> None:
         row = (await session.exec(select(model).where(model.id == artifact_id))).first()
         if row is None:
@@ -246,7 +246,7 @@ async def plugin_artifacts(
     return (await artifacts_by_install(session, [plugin.id]))[plugin.id]
 
 
-async def lock_install(session: AsyncSession, plugin_id: int) -> Optional[GuildPlugin]:
+async def lock_install(session: AsyncSession, plugin_id: int) -> GuildPlugin | None:
     """Hold one install's row for the rest of this transaction.
 
     Several things on this row are values rewritten whole rather than appended
@@ -321,7 +321,7 @@ async def store_secrets(
 
 async def find_mounting_plugin(
     session: AsyncSession, *, tool: str
-) -> Optional[GuildPlugin]:
+) -> GuildPlugin | None:
     """The install that mounts ``tool`` at guild scope, if this guild has one.
 
     A tool-instance install is the container for what it mounts, so this is the
@@ -395,10 +395,10 @@ async def install_plugin(
     guild_id: int,
     created_by: int,
     name: str,
-    actor_user_id: Optional[int] = None,
+    actor_user_id: int | None = None,
     via: str = "install",
     granted_scopes: Sequence[str] = (),
-    allowed_callers: Optional[Collection[int]] = (),
+    allowed_callers: Collection[int] | None = (),
 ) -> GuildPlugin:
     """Create the install row, and whatever the plug-in mounts alongside it.
 
@@ -702,7 +702,7 @@ def _unverified(plugin: GuildPlugin) -> None:
 
 
 def touch(plugin: GuildPlugin) -> None:
-    plugin.updated_at = datetime.now(timezone.utc)
+    plugin.updated_at = datetime.now(UTC)
 
 
 # --- settings ---------------------------------------------------------------
@@ -963,7 +963,7 @@ async def placed_initiative_ids(session: AsyncSession, install_id: int) -> set[i
 
 
 async def is_placed(
-    session: AsyncSession, install_id: int, initiative_id: Optional[int]
+    session: AsyncSession, install_id: int, initiative_id: int | None
 ) -> bool:
     """Whether this install offers its initiative surfaces in that initiative.
 
@@ -984,7 +984,7 @@ async def is_placed(
 
 async def placement_role_ids(
     session: AsyncSession, install_id: int, initiative_id: int
-) -> Optional[list[int]]:
+) -> list[int] | None:
     """The roles allowed to open this install's surfaces in one initiative.
 
     ``None`` when the install is not placed there, which is a different answer
@@ -1056,7 +1056,7 @@ async def set_placement_roles(
         await show_on_saved_layouts(session, plugin, [initiative_id])
     else:
         placement.role_ids = sorted(wanted)
-        placement.updated_at = datetime.now(timezone.utc)
+        placement.updated_at = datetime.now(UTC)
     session.add(placement)
     await session.flush()
     return placement
@@ -1128,7 +1128,7 @@ async def place_in_every_initiative(session: AsyncSession, plugin: GuildPlugin) 
 async def place_with_roles(
     session: AsyncSession,
     plugin: GuildPlugin,
-    initiative_ids: Optional[Iterable[int]],
+    initiative_ids: Iterable[int] | None,
     role_names: Iterable[str],
 ) -> list[int]:
     """Place a new install in these initiatives, each with these built-in roles.
@@ -1201,7 +1201,7 @@ async def show_on_saved_layouts(
     initiative_ids: Iterable[int],
     *,
     previous: Any = None,
-    only: Optional[tool_layouts_service.Target] = None,
+    only: tool_layouts_service.Target | None = None,
 ) -> None:
     """Show the install's fields, then its parts, on the saved details of these
     initiatives, for each kind of item whose page draws plug-ins, and its task
@@ -1341,9 +1341,7 @@ def grantable_scopes(
     ]
 
 
-async def definition_public_id(
-    definition: dict, listing_uid: Optional[str]
-) -> Optional[str]:
+async def definition_public_id(definition: dict, listing_uid: str | None) -> str | None:
     """The public id of the plug-in a pinned definition is, for one that is
     installed or about to be: the registration's when this deployment has
     one, else the ``service.public_id`` the definition pinned, which is what
@@ -1357,7 +1355,7 @@ async def definition_public_id(
     return registration_lookup.service_public_id(definition)
 
 
-async def install_public_id(plugin: GuildPlugin) -> Optional[str]:
+async def install_public_id(plugin: GuildPlugin) -> str | None:
     """The public id of the plug-in an existing install is of: what names it,
     acts for it and keys its references, whether or not its registration still
     stands. The registration's when it speaks for this install (its listing,
@@ -1392,7 +1390,7 @@ async def installed_plugin_ids(session: AsyncSession) -> frozenset[str]:
 
 
 async def plugin_callers(
-    session: AsyncSession, public_id: str, *, exclude_id: Optional[int] = None
+    session: AsyncSession, public_id: str, *, exclude_id: int | None = None
 ) -> list[GuildPlugin]:
     """The installs here that may be let use ``public_id``: their pinned version
     requests ``plugins:<public_id>`` and their registration's ceiling allows it.
@@ -1420,7 +1418,7 @@ async def set_granted_scopes(
     plugin: GuildPlugin,
     scopes: Iterable[str],
     *,
-    actor_user_id: Optional[int],
+    actor_user_id: int | None,
     guild_id: int,
 ) -> None:
     """Grant the install exactly ``scopes``, recording the change when there is
@@ -1430,7 +1428,7 @@ async def set_granted_scopes(
     if before == after:
         return
     plugin.granted_scopes = after
-    plugin.updated_at = datetime.now(timezone.utc)
+    plugin.updated_at = datetime.now(UTC)
     session.add(plugin)
     await audit_service.record(
         session,
@@ -1452,10 +1450,10 @@ async def set_granted_scopes(
 async def set_plugin_callers(
     session: AsyncSession,
     public_id: str,
-    allowed: Optional[Collection[int]],
+    allowed: Collection[int] | None,
     *,
-    exclude_id: Optional[int] = None,
-    actor_user_id: Optional[int],
+    exclude_id: int | None = None,
+    actor_user_id: int | None,
     guild_id: int,
 ) -> None:
     """Let exactly the ``allowed`` installs use ``public_id`` (``None`` lets every
@@ -1577,8 +1575,8 @@ ITEM_SURFACE: dict[str, Any] = {"scopes": ["initiative"]}
 def surface_access(
     page: dict[str, Any],
     *,
-    initiative_id: Optional[int],
-    placement_role_ids: Optional[Collection[int]],
+    initiative_id: int | None,
+    placement_role_ids: Collection[int] | None,
     is_guild_admin: bool,
     member_role_ids: Collection[int],
     age_allows: bool = True,

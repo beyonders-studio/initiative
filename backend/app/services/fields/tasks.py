@@ -22,8 +22,6 @@ from app.models.tenant.task import Task, TaskAssignee, TaskStatus
 from app.schemas.query import FilterOp
 from app.services.fields.derive import derive_fields, options_for
 from app.services.fields.spec import (
-    Hop,
-    Relation,
     EQUALITY,
     MEMBERSHIP,
     ORDERED,
@@ -32,6 +30,8 @@ from app.services.fields.spec import (
     Dataset,
     FieldContext,
     FieldSpec,
+    Hop,
+    Relation,
     SortContext,
     computed,
 )

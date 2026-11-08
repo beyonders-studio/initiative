@@ -1,6 +1,5 @@
 import uuid
 from datetime import datetime
-from typing import List, Optional
 
 from pydantic import AliasChoices, ConfigDict, EmailStr, Field, field_validator
 
@@ -16,23 +15,23 @@ class LoginProviderEntry(SanitizedBaseModel):
 
     # Registry row id — what the guild auth-policy endpoints identify a
     # provider by. None only for a platform entry not yet reconciled to a row.
-    id: Optional[int] = None
+    id: int | None = None
     slug: str
     display_name: str
     kind: str
     login_url: str
-    icon: Optional[str] = None
-    button_style: Optional[str] = None
+    icon: str | None = None
+    button_style: str | None = None
 
 
 class LoginProvidersResponse(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    providers: List[LoginProviderEntry]
+    providers: list[LoginProviderEntry]
     # Guild-addressed listings only: the guild's display name for its login
     # page. Set exactly when the listing is non-empty, so a guild without
     # login-ready providers stays indistinguishable from an unknown id.
-    community_name: Optional[str] = Field(
+    community_name: str | None = Field(
         default=None, validation_alias=AliasChoices("community_name", "guild_name")
     )
 
@@ -49,7 +48,7 @@ class AccountChangeDone(VerificationSendResponse):
     #: Whether the people who run this server were told, as a security case.
     platform_told: bool = False
     #: Who to tell where they weren't, if anybody is named.
-    contact: Optional[str] = None
+    contact: str | None = None
 
 
 class VerificationConfirmRequest(SanitizedBaseModel):
@@ -71,10 +70,10 @@ class AccountChangeRead(SanitizedBaseModel):
     sign_out: bool
     #: What it may undo (``proved``, ``primary``, ``removed`` or ``passkey``),
     #: or ``None``.
-    undo: Optional[str] = None
+    undo: str | None = None
     #: What the undo acts on, as the notice named it: an address or a
     #: passkey's name.
-    subject: Optional[str] = None
+    subject: str | None = None
 
 
 class PasswordResetRequest(SanitizedBaseModel):
@@ -114,10 +113,10 @@ class RefreshRequest(SanitizedBaseModel):
     over explicitly.
     """
 
-    refresh_token: Optional[str] = None
+    refresh_token: str | None = None
     #: How long ago the person last did something here. The idle window runs
     #: from then; absent, from now.
-    idle_seconds: Optional[int] = Field(default=None, ge=0, le=1_000_000_000)
+    idle_seconds: int | None = Field(default=None, ge=0, le=1_000_000_000)
 
 
 class SignedInSessionInfo(SanitizedBaseModel):
@@ -136,14 +135,14 @@ class SignedInSessionInfo(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    id: Optional[uuid.UUID]
-    message_device_id: Optional[uuid.UUID]
+    id: uuid.UUID | None
+    message_device_id: uuid.UUID | None
     device: bool
-    label: Optional[str]
+    label: str | None
     kind: ClientKind
-    ip: Optional[str]
+    ip: str | None
     started_at: datetime
-    last_used_at: Optional[datetime]
+    last_used_at: datetime | None
     is_current: bool
 
 
@@ -181,7 +180,7 @@ class UsernameAvailabilityResponse(SanitizedBaseModel):
     """
 
     available: bool
-    reason: Optional[str] = None
+    reason: str | None = None
     #: The number this name would get, and the signed offer that keeps it.
-    discriminator: Optional[int] = None
-    offer: Optional[str] = None
+    discriminator: int | None = None
+    offer: str | None = None

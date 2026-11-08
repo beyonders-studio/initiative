@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List
 
 from pydantic import ConfigDict
 
@@ -32,10 +31,10 @@ class EvidencePolicyRead(SanitizedBaseModel):
 
     max_files: int
     max_bytes: int
-    types: List[str]
+    types: list[str]
 
     @classmethod
-    def of(cls, policy: EvidencePolicy) -> "EvidencePolicyRead":
+    def of(cls, policy: EvidencePolicy) -> EvidencePolicyRead:
         return cls(
             max_files=policy.max_files,
             max_bytes=policy.max_bytes,

@@ -7,7 +7,7 @@ written as an older release wrote them, up, and down again."""
 from __future__ import annotations
 
 import importlib.util
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from alembic.migration import MigrationContext
@@ -65,8 +65,8 @@ async def test_opens_stars_and_orders_merge_and_come_back(session) -> None:
     async def sql(statement: str, **params):
         return await (await session.connection()).execute(text(statement), params)
 
-    jan = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    feb = datetime(2026, 2, 1, tzinfo=timezone.utc)
+    jan = datetime(2026, 1, 1, tzinfo=UTC)
+    feb = datetime(2026, 2, 1, tzinfo=UTC)
 
     # Back to the shape an older release had, with its rows as it wrote them.
     await session.run_sync(run(migration._apply_downgrade))

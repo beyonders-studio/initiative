@@ -3,7 +3,6 @@
 import pytest
 from pydantic import ValidationError
 from pydantic_settings import SettingsConfigDict
-
 from sqlalchemy.engine import make_url
 
 from app.core.config import (

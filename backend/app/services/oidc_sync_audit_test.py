@@ -12,6 +12,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
+from app.db.request_context import Unattributed
 from app.db.session import set_rls_context
 from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
 from app.models.tenant.initiative import InitiativeRoleModel
@@ -23,12 +24,11 @@ from app.testing.factories import (
     NARROWED_VALUE,
     create_auth_provider,
     create_claim_rule,
-    create_guild_provider_connection,
     create_guild,
+    create_guild_provider_connection,
     create_initiative,
     create_user,
 )
-from app.db.request_context import Unattributed
 
 
 def _where(row) -> tuple:

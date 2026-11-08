@@ -6,7 +6,7 @@ entity and one purpose, and the coarse one, which is every entity for a purpose.
 """
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -165,7 +165,7 @@ class TestReissuingOne:
         await reissue_ref(
             session, entity_type=IdentityEntity.guild, entity_id=1, purpose=BILLING
         )
-        later = datetime.now(timezone.utc) + REF_GRACE_PERIOD + timedelta(days=1)
+        later = datetime.now(UTC) + REF_GRACE_PERIOD + timedelta(days=1)
         assert await resolve_ref(session, ref=before, now=later) is None
 
     async def test_it_moves_nothing_else(self, session):
@@ -366,7 +366,7 @@ class TestRemoval:
         purged = await purge_retired_refs(session)
         assert purged == 0
 
-        later = datetime.now(timezone.utc) + REF_GRACE_PERIOD + timedelta(days=1)
+        later = datetime.now(UTC) + REF_GRACE_PERIOD + timedelta(days=1)
         assert await purge_retired_refs(session, now=later) == 1
         assert await resolve_ref(session, ref=live) is not None
         assert await resolve_ref(session, ref=retired) is None
@@ -411,11 +411,11 @@ class TestTheSweep:
     async def test_it_takes_what_names_nobody_and_keeps_what_can_come_back(
         self, session
     ):
-        from app.models.platform.guild import CommunityStatus
-        from app.models.platform.user import UserStatus
         from sqlmodel import select
 
+        from app.models.platform.guild import CommunityStatus
         from app.models.platform.identity_ref import IdentityRef
+        from app.models.platform.user import UserStatus
         from app.services.platform.identity_refs import sweep_identity_refs
         from app.testing import create_guild, create_user
 

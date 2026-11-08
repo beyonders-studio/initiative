@@ -26,10 +26,10 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import text
 
-from app.models.platform.user import UserRole
-from app.db.user_columns import PUBLIC_PROFILE_COLUMNS, PUBLISHED_COLUMNS
 from app.db.public_rls import PUBLIC_RLS, platform_tier, role_name
 from app.db.system_grants import ROLE_GRANTS, grantee, tier_table_grants
+from app.db.user_columns import PUBLIC_PROFILE_COLUMNS, PUBLISHED_COLUMNS
+from app.models.platform.user import UserRole
 
 pytestmark = pytest.mark.always
 

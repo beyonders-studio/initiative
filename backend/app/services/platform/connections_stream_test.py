@@ -9,20 +9,20 @@ that it was lifted.
 import json
 from typing import Any
 
+from sqlalchemy import text
 
 from app.models.platform.contact_grant import ContactGrantKind
 from app.models.platform.user_dm_settings import DmPolicy
 from app.models.platform.user_ignore import UserIgnore
-from app.services.platform import contact_grants as contact_grants_service
 from app.services.platform import (
     connections_stream,
     notify_bus,
     user_ignores,
     user_stream,
 )
-from app.testing.sockets import FakeWebSocket, settle
+from app.services.platform import contact_grants as contact_grants_service
 from app.testing import create_user
-from sqlalchemy import text
+from app.testing.sockets import FakeWebSocket, settle
 
 
 async def _socket_for(account_socket, user) -> FakeWebSocket:

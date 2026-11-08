@@ -12,13 +12,15 @@ community in ``read_only`` lifecycle status routes a **real member** in while
 keeping the membership GUCs, so the gate runs in full — which is the case here.
 """
 
+import json
+
 from sqlalchemy import text
 
-from app.db.schema_provisioning import GuildRoleKind, guild_role_name
-from app.testing.factories import create_auth_provider, create_guild
 from app.core.login_methods import LoginMethod
 from app.core.rules import SignInRequirement
+from app.db.schema_provisioning import GuildRoleKind, guild_role_name
 from app.services.platform import rules
+from app.testing.factories import create_auth_provider, create_guild
 
 
 async def test_the_read_floor_can_answer_the_gate(session, engine):
@@ -87,7 +89,10 @@ async def test_the_read_floor_reads_a_deployment_wide_answer(session, engine):
             ("app.current_user_id", "1"),
             ("app.current_guild_id", str(guild_id)),
             ("app.satisfied_providers", str(provider_id)),
-            ("app.satisfied_claims", '{"%s": {"tid": ["acme-tenant"]}}' % provider_id),
+            (
+                "app.satisfied_claims",
+                json.dumps({str(provider_id): {"tid": ["acme-tenant"]}}),
+            ),
         ):
             await conn.execute(
                 text("SELECT set_config(:k, :v, true)"), {"k": key, "v": value}

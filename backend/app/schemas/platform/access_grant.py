@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
-from typing import Any, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import (
     AliasChoices,
@@ -8,14 +8,14 @@ from pydantic import (
     computed_field,
 )
 
+from app.core.intake import CommunityNoticeRule, IntakeStream
 from app.models.platform.access_grant import (
     AccessGrantStatus,
-    CommunityNotice,
-    grant_is_live,
     AccessLevel,
+    CommunityNotice,
     SettingsLevel,
+    grant_is_live,
 )
-from app.core.intake import CommunityNoticeRule, IntakeStream
 from app.models.platform.guild import CommunityStatus
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.platform.user import UserIdentity
@@ -42,22 +42,22 @@ class AccessGrantCreate(SanitizedBaseModel):
 
     community_id: int
     #: The content rung, or ``None`` to ask for no content access.
-    access_level: Optional[AccessLevel] = None
+    access_level: AccessLevel | None = None
     #: The settings rung, or ``None`` to ask for no settings access. There is
     #: no default: nothing sits between what an admin runs and what the seat
     #: holds.
-    settings_level: Optional[SettingsLevel] = None
+    settings_level: SettingsLevel | None = None
     # Omit to use the platform default; capped server-side to the configured
     # maximum regardless of what's requested.
-    requested_duration_minutes: Optional[int] = Field(default=None, gt=0)
+    requested_duration_minutes: int | None = Field(default=None, gt=0)
     reason: str = Field(min_length=1, max_length=2000)
     #: The operations case this access is for. Required wherever the
     #: operations community takes cases a grant may serve.
-    case_task_id: Optional[int] = Field(default=None, gt=0)
+    case_task_id: int | None = Field(default=None, gt=0)
     #: Whether, and when, the community's superadmins are emailed about the
     #: access. Chosen only for a case whose stream leaves it open; a support
     #: case always tells them when it starts.
-    community_notice: Optional[CommunityNotice] = None
+    community_notice: CommunityNotice | None = None
 
     @property
     def wanted(self) -> list[tuple[str, str]]:
@@ -82,10 +82,10 @@ class SecondFactorAnswer(SanitizedBaseModel):
     belongs to this request.
     """
 
-    code: Optional[str] = Field(default=None, max_length=64)
-    recovery_code: Optional[str] = Field(default=None, max_length=64)
+    code: str | None = Field(default=None, max_length=64)
+    recovery_code: str | None = Field(default=None, max_length=64)
     #: ``AuthenticationResponseJSON`` — the assertion as the browser returned it.
-    passkey: Optional[dict[str, Any]] = None
+    passkey: dict[str, Any] | None = None
 
 
 class BreakGlassCreate(SecondFactorAnswer):
@@ -102,21 +102,21 @@ class BreakGlassCreate(SecondFactorAnswer):
     community_id: int
     # Omit to use the break-glass default; capped server-side to the
     # break-glass maximum regardless of what's requested.
-    requested_duration_minutes: Optional[int] = Field(default=None, gt=0)
+    requested_duration_minutes: int | None = Field(default=None, gt=0)
     reason: str = Field(min_length=1, max_length=2000)
     #: The operations case this is for, where there is one. Optional: an
     #: emergency may come before its case, and the steps are then written on
     #: the case by hand.
-    case_task_id: Optional[int] = Field(default=None, gt=0)
+    case_task_id: int | None = Field(default=None, gt=0)
     #: As on a request: whether, and when, the community is told.
-    community_notice: Optional[CommunityNotice] = None
+    community_notice: CommunityNotice | None = None
 
 
 class AccessGrantApprove(SanitizedBaseModel):
     """Approval payload. The approver may shorten/extend the window, still
     subject to the server-side cap."""
 
-    duration_minutes: Optional[int] = Field(default=None, gt=0)
+    duration_minutes: int | None = Field(default=None, gt=0)
 
 
 class AccessGrantRead(SanitizedBaseModel):
@@ -141,14 +141,14 @@ class AccessGrantRead(SanitizedBaseModel):
     reason: str
     requested_duration_minutes: int
     requested_by_id: int
-    approved_by_id: Optional[int] = None
-    revoked_by_id: Optional[int] = None
+    approved_by_id: int | None = None
+    revoked_by_id: int | None = None
     requested_at: datetime
-    decided_at: Optional[datetime] = None
-    expires_at: Optional[datetime] = None
-    revoked_at: Optional[datetime] = None
+    decided_at: datetime | None = None
+    expires_at: datetime | None = None
+    revoked_at: datetime | None = None
     #: The operations case this grant serves, where it names one.
-    case_task_id: Optional[int] = None
+    case_task_id: int | None = None
     #: Whether, and when, the community's superadmins are told of it.
     community_notice: CommunityNotice = CommunityNotice.none
 
@@ -157,24 +157,24 @@ class AccessGrantRead(SanitizedBaseModel):
     # ORM row still works.
     #: Who holds the grant, by handle: what an approver reads to decide on a
     #: request. Never their address.
-    user: Optional[UserIdentity] = None
-    community_name: Optional[str] = Field(
+    user: UserIdentity | None = None
+    community_name: str | None = Field(
         default=None, validation_alias=AliasChoices("community_name", "guild_name")
     )
     # The grant's guild lifecycle status, so an operator holding the grant sees
     # a suspended / read-only guild they're acting in (surfaced in the access
     # banner). Operators get this context — unlike a plain guild member.
-    community_status: Optional[CommunityStatus] = Field(
+    community_status: CommunityStatus | None = Field(
         default=None, validation_alias=AliasChoices("community_status", "guild_status")
     )
     #: Who approved it, by handle.
-    approved_by: Optional[UserIdentity] = None
+    approved_by: UserIdentity | None = None
 
     @computed_field(return_type=bool)  # type: ignore[misc]
     @property
     def is_live(self) -> bool:
         """Whether this grant currently confers access (approved, unexpired)."""
-        return grant_is_live(self.status, self.expires_at, datetime.now(timezone.utc))
+        return grant_is_live(self.status, self.expires_at, datetime.now(UTC))
 
 
 class BreakGlassRequirements(SanitizedBaseModel):
@@ -203,7 +203,7 @@ class GrantCaseRead(SanitizedBaseModel):
     stream: IntakeStream
     #: The community the case is about, where it names one: a grant for the
     #: case reaches that community and no other.
-    subject_community_id: Optional[int] = None
+    subject_community_id: int | None = None
     #: Assigned to the reader.
     mine: bool = False
     #: Whether a grant for the case tells the community it reaches.
@@ -214,7 +214,7 @@ class GrantCaseList(SanitizedBaseModel):
     """The open cases the reader may name, theirs first. ``required`` says
     whether a request must name one here."""
 
-    items: List[GrantCaseRead]
+    items: list[GrantCaseRead]
     required: bool
 
 
@@ -228,4 +228,4 @@ class AccessGrantLimits(SanitizedBaseModel):
 
 
 class AccessGrantListResponse(PageMeta):
-    items: List[AccessGrantRead]
+    items: list[AccessGrantRead]

@@ -13,13 +13,11 @@ the task reads nothing here either.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Optional
-
-from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import selectinload
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.intake import Conversation, IntakeStream, conversation_for
 from app.models.platform.user_profile_view import MemberProfile
@@ -33,12 +31,12 @@ from app.models.tenant.task import Task, TaskAssignee, TaskStatus, TaskStatusCat
 class CaseView:
     stream: IntakeStream
     opened_at: datetime
-    filer: Optional[MemberProfile]
-    filer_subject: Optional[str]
+    filer: MemberProfile | None
+    filer_subject: str | None
     #: What the case allows with whoever filed it; ``none`` where nobody did.
     conversation: Conversation
-    awaiting_filer_status_id: Optional[int]
-    active_status_id: Optional[int]
+    awaiting_filer_status_id: int | None
+    active_status_id: int | None
     #: The conversation with whoever filed it, oldest first: their words and
     #: what the team said to them. Not part of the task's thread.
     messages: list[Comment]
@@ -46,18 +44,18 @@ class CaseView:
     evidence: list[Evidence]
     #: What it is about, as its references recorded it: the community, and
     #: the kind and id of the thing in it. ``None`` where they say nothing.
-    subject_guild_id: Optional[int] = None
-    resource_type: Optional[str] = None
-    resource_id: Optional[int] = None
+    subject_guild_id: int | None = None
+    resource_type: str | None = None
+    resource_id: int | None = None
     #: What it is about within its stream, as its filer chose.
-    topic: Optional[str] = None
+    topic: str | None = None
     #: How many voted for it, on a published idea; ``None`` on any other case.
-    votes: Optional[int] = None
+    votes: int | None = None
     #: The Ideas board's project, on a feedback case or an idea where the
     #: board is set up: what it may be joined to.
-    ideas_board_id: Optional[int] = None
+    ideas_board_id: int | None = None
     #: The idea a feedback case is joined to, as ``(task_id, title)``.
-    joined_idea: Optional[tuple[int, str]] = None
+    joined_idea: tuple[int, str] | None = None
 
 
 async def holds_cases(session: AsyncSession) -> bool:
@@ -73,7 +71,7 @@ async def holds_cases(session: AsyncSession) -> bool:
     )
 
 
-async def read_case(session: AsyncSession, task_id: int) -> Optional[CaseView]:
+async def read_case(session: AsyncSession, task_id: int) -> CaseView | None:
     """The case behind ``task_id``, or ``None`` where the task is not one. A
     published idea is the ``ideas`` stream's case, which nobody filed: its
     type on the Ideas board is what makes it one."""
@@ -147,7 +145,7 @@ async def _ideas(session: AsyncSession, task_id: int) -> dict[str, object]:
     }
 
 
-async def _idea(session: AsyncSession, task_id: int) -> Optional[CaseView]:
+async def _idea(session: AsyncSession, task_id: int) -> CaseView | None:
     """``task_id`` as the ``ideas`` stream's case, where it is a published
     idea."""
     from app.services.platform import ideas as ideas_service
@@ -184,7 +182,7 @@ async def _subject(session: AsyncSession, task_id: int) -> dict[str, object]:
         )
     }
 
-    def whole(name: str) -> Optional[int]:
+    def whole(name: str) -> int | None:
         value = values.get(name)
         try:
             return int(value) if value is not None else None
@@ -199,7 +197,7 @@ async def _subject(session: AsyncSession, task_id: int) -> dict[str, object]:
     }
 
 
-async def take(session: AsyncSession, task: Task, user_id: int) -> Optional[bool]:
+async def take(session: AsyncSession, task: Task, user_id: int) -> bool | None:
     """Assign ``user_id`` to case ``task`` beside whoever already has it, and
     move a case still waiting to be picked up to the status its stream calls
     active. Returns whether they were newly assigned, or ``None`` where the
@@ -252,6 +250,6 @@ async def take(session: AsyncSession, task: Task, user_id: int) -> Optional[bool
         ).first()
         if waiting and belongs is not None:
             task.task_status_id = active
-    task.updated_at = datetime.now(timezone.utc)
+    task.updated_at = datetime.now(UTC)
     session.add(task)
     return newly

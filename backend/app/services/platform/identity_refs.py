@@ -16,14 +16,15 @@ from __future__ import annotations
 import logging
 import secrets
 from collections.abc import Awaitable, Callable, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import and_, exists, func, or_
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import delete, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.db.request_context import Unattributed
 from app.models.platform.guild import Guild, GuildInvite
 from app.models.platform.identity_ref import (
     REF_ENTROPY_BYTES,
@@ -35,31 +36,30 @@ from app.models.platform.identity_ref import (
     ref_prefix,
 )
 from app.models.platform.user import User, UserStatus
-from app.db.request_context import Unattributed
 
 __all__ = [
+    "IDENTITY_REF_SWEEP_POLL_SECONDS",
     "REF_GRACE_PERIOD",
     "billing_ref",
     "billing_refs",
     "drop_entity_refs",
     "drop_guild_refs",
     "drop_sector_refs",
-    "forget_user",
-    "IDENTITY_REF_SWEEP_POLL_SECONDS",
     "ensure_ref",
     "existing_ref",
+    "forget_user",
     "mint_ref",
     "process_identity_ref_sweep",
     "purge_orphaned_entity_refs",
     "purge_orphaned_sector_refs",
     "purge_retired_refs",
-    "sweep_identity_refs",
     "reissue_all_refs",
     "reissue_ref",
     "resolve_billing_ref",
     "resolve_billing_refs",
     "resolve_ref",
     "resolve_refs",
+    "sweep_identity_refs",
 ]
 
 logger = logging.getLogger(__name__)
@@ -115,7 +115,7 @@ async def ensure_ref(
             purpose=purpose.value,
             sector_guild_id=sector_guild_id,
             sector_plugin=sector_plugin,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         # A core-level insert, so the model's default factories do not run and
         # the conflict target must name the partial index's columns and
@@ -284,7 +284,7 @@ async def resolve_refs(
     wanted = [ref for ref in refs if ref and len(ref) <= REF_MAX_LENGTH]
     if not wanted:
         return []
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     return list(
         (
             await session.exec(
@@ -333,7 +333,7 @@ async def reissue_ref(
     The old value keeps resolving for ``REF_GRACE_PERIOD``. Nothing else about
     the entity moves, and no other entity is touched.
     """
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     sector = (sector_guild_id, sector_plugin)
     await session.exec(
         update(IdentityRef)
@@ -373,7 +373,7 @@ async def reissue_all_refs(
     with no live reference gets a fresh one, and an entity already re-minted is
     skipped.
     """
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     sector = (sector_guild_id, sector_plugin)
     retired = await session.exec(
         update(IdentityRef)
@@ -555,7 +555,7 @@ async def purge_retired_refs(
     session: AsyncSession, *, now: datetime | None = None
 ) -> int:
     """Drop the rows whose grace window has closed. Returns the count."""
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     result = await session.exec(
         delete(IdentityRef).where(
             IdentityRef.retired_at.is_not(None),

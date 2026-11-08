@@ -2,24 +2,24 @@
 Service for calculating user statistics and metrics.
 """
 
-from datetime import date, datetime, timedelta, timezone
-from typing import List, Literal, Optional, Set
+from datetime import UTC, date, datetime, timedelta
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import case, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.user_input_validators import resolve_zone
+from app.models.platform.user import User
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task, TaskAssignee, TaskStatus, TaskStatusCategory
-from app.models.platform.user import User
 from app.schemas.tenant.stats import (
     CommunityTaskBreakdown,
     HeatmapDayData,
     UserStatsResponse,
     VelocityWeekData,
 )
-from app.core.user_input_validators import resolve_zone
 
 
 def _get_week_start(dt: date, week_starts_on: int) -> date:
@@ -39,7 +39,7 @@ def _get_week_start(dt: date, week_starts_on: int) -> date:
 
 def _get_week_boundaries(
     user_tz: ZoneInfo, week_starts_on: int, num_weeks: int = 12
-) -> List[tuple[datetime, datetime]]:
+) -> list[tuple[datetime, datetime]]:
     """
     Calculate week boundaries for the last N weeks.
 
@@ -70,7 +70,7 @@ async def calculate_user_streak(
     session: AsyncSession,
     user_id: int,
     user_timezone: str,
-    guild_id: Optional[int] = None,
+    guild_id: int | None = None,
 ) -> int:
     """
     Calculate the user's current streak of consecutive work days (Mon-Fri) with task activity.
@@ -98,7 +98,7 @@ async def calculate_user_streak(
     rows = activity_result.all()
 
     # Collect all activity dates (both created_at and updated_at)
-    activity_dates: Set[date] = set()
+    activity_dates: set[date] = set()
     for created_at, updated_at in rows:
         if created_at:
             activity_dates.add(created_at.astimezone(user_tz).date())
@@ -144,7 +144,7 @@ async def calculate_user_streak(
 async def calculate_on_time_rate(
     session: AsyncSession,
     user_id: int,
-    guild_id: Optional[int] = None,
+    guild_id: int | None = None,
 ) -> float:
     """
     Calculate the percentage of completed tasks that were finished before their due date.
@@ -187,8 +187,8 @@ async def calculate_on_time_rate(
 async def calculate_avg_completion_days(
     session: AsyncSession,
     user_id: int,
-    guild_id: Optional[int] = None,
-) -> Optional[float]:
+    guild_id: int | None = None,
+) -> float | None:
     """
     Calculate average days from start_date to completion.
 
@@ -227,7 +227,7 @@ async def get_completed_counts(
     user_id: int,
     user_timezone: str,
     week_starts_on: int,
-    guild_id: Optional[int] = None,
+    guild_id: int | None = None,
 ) -> tuple[int, int]:
     """
     Get total completed tasks and tasks completed this week.
@@ -246,8 +246,8 @@ async def get_completed_counts(
     week_end_dt = week_start_dt + timedelta(days=7)
 
     # Convert to UTC for database query
-    week_start_utc = week_start_dt.astimezone(timezone.utc)
-    week_end_utc = week_end_dt.astimezone(timezone.utc)
+    week_start_utc = week_start_dt.astimezone(UTC)
+    week_end_utc = week_end_dt.astimezone(UTC)
 
     base_stmt = (
         select(
@@ -290,8 +290,8 @@ async def get_velocity_data(
     user_id: int,
     user_timezone: str,
     week_starts_on: int,
-    guild_id: Optional[int] = None,
-) -> List[VelocityWeekData]:
+    guild_id: int | None = None,
+) -> list[VelocityWeekData]:
     """
     Get weekly velocity data for the last 12 weeks.
 
@@ -301,11 +301,11 @@ async def get_velocity_data(
     user_tz = resolve_zone(user_timezone)
     week_boundaries = _get_week_boundaries(user_tz, week_starts_on, num_weeks=12)
 
-    velocity_data: List[VelocityWeekData] = []
+    velocity_data: list[VelocityWeekData] = []
 
     for week_start_local, week_end_local in week_boundaries:
-        week_start_utc = week_start_local.astimezone(timezone.utc)
-        week_end_utc = week_end_local.astimezone(timezone.utc)
+        week_start_utc = week_start_local.astimezone(UTC)
+        week_end_utc = week_end_local.astimezone(UTC)
 
         # Count assigned tasks this week (using task created_at as proxy for assignment)
         assigned_stmt = (
@@ -362,8 +362,8 @@ async def get_heatmap_data(
     session: AsyncSession,
     user_id: int,
     user_timezone: str,
-    guild_id: Optional[int] = None,
-) -> List[HeatmapDayData]:
+    guild_id: int | None = None,
+) -> list[HeatmapDayData]:
     """
     Get daily activity counts for the last 365 days.
 
@@ -381,8 +381,8 @@ async def get_heatmap_data(
     )
 
     # Convert to UTC
-    start_utc = start_dt.astimezone(timezone.utc)
-    end_utc = end_dt.astimezone(timezone.utc)
+    start_utc = start_dt.astimezone(UTC)
+    end_utc = end_dt.astimezone(UTC)
 
     # Query task activity (created_at and updated_at) for user's assigned tasks
     activity_stmt = (
@@ -413,7 +413,7 @@ async def get_heatmap_data(
             activity_by_date[local_date] = activity_by_date.get(local_date, 0) + 1
 
     # Build result with all dates (including zero-activity days)
-    heatmap_data: List[HeatmapDayData] = []
+    heatmap_data: list[HeatmapDayData] = []
     current_date = start_date
     while current_date <= today:
         activity_count = activity_by_date.get(current_date, 0)
@@ -429,7 +429,7 @@ async def get_guild_breakdown(
     session: AsyncSession,
     user_id: int,
     guild_id: int,
-) -> List[CommunityTaskBreakdown]:
+) -> list[CommunityTaskBreakdown]:
     """This community's completed-task count for the reader.
 
     One row, or none when there is nothing to report. The session is routed
@@ -470,7 +470,7 @@ async def get_backlog_trend(
     user_id: int,
     user_timezone: str,
     week_starts_on: int,
-    guild_id: Optional[int] = None,
+    guild_id: int | None = None,
 ) -> Literal["Growing", "Shrinking"]:
     """
     Determine if backlog is growing or shrinking this week.
@@ -490,8 +490,8 @@ async def get_backlog_trend(
     week_end_dt = week_start_dt + timedelta(days=7)
 
     # Convert to UTC
-    week_start_utc = week_start_dt.astimezone(timezone.utc)
-    week_end_utc = week_end_dt.astimezone(timezone.utc)
+    week_start_utc = week_start_dt.astimezone(UTC)
+    week_end_utc = week_end_dt.astimezone(UTC)
 
     # Count assigned this week (using task created_at as proxy for assignment)
     assigned_stmt = (
@@ -575,7 +575,7 @@ async def _compute_guild_stats(
     )
 
 
-def _merge_stats(parts: List[UserStatsResponse]) -> UserStatsResponse:
+def _merge_stats(parts: list[UserStatsResponse]) -> UserStatsResponse:
     """Merge per-guild stats for the cross-guild ("all guilds") view. Additive
     metrics sum exactly; rate-style metrics are weighted by completed volume."""
     total_completed = sum(p.tasks_completed_total for p in parts)
@@ -641,7 +641,7 @@ def _merge_stats(parts: List[UserStatsResponse]) -> UserStatsResponse:
 async def get_user_stats(
     session: AsyncSession,
     user: User,
-    guild_id: Optional[int] = None,
+    guild_id: int | None = None,
     days: int = 90,
 ) -> UserStatsResponse:
     """Get comprehensive user statistics, routed per guild.
@@ -662,7 +662,7 @@ async def get_user_stats(
         session, user.id, restrict_to=[guild_id] if guild_id is not None else None
     )
 
-    async def fetch(routed: AsyncSession, gid: int) -> List[UserStatsResponse]:
+    async def fetch(routed: AsyncSession, gid: int) -> list[UserStatsResponse]:
         return [await _compute_guild_stats(routed, user, gid, days)]
 
     parts = await gather_across_guilds(session, {user.id: target_guilds}, fetch)

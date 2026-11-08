@@ -21,8 +21,8 @@ Three things here are the wiki's own rather than the generic tool shape:
 """
 
 from copy import deepcopy
-from datetime import datetime, timezone
-from typing import Annotated, Optional
+from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -33,20 +33,22 @@ from app.api.deps import (
     ActorContext,
     ActorSessionDep,
     ActorUserDep,
-    RLSSessionDep,
-    plugin_scope,
-    get_current_active_user,
     GuildContext,
     GuildContextDep,
+    RLSSessionDep,
+    get_current_active_user,
+    plugin_scope,
 )
-from app.core.messages import CommonMessages, WikiMessages
 from app.core.body_limit import max_document_body
+from app.core.messages import CommonMessages, WikiMessages
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
 from app.core.tools import KINDS, Tool
 from app.models.platform.user import User
 from app.models.tenant.wiki import Wiki, WikiPage
 from app.schemas.ai_generation import AIStreamEvent
+from app.schemas.tenant.share_request import HiddenFiles
+from app.schemas.tenant.tool import serialize_tool
 from app.schemas.tenant.wiki import (
     WikiCreate,
     WikiPageCreate,
@@ -56,15 +58,19 @@ from app.schemas.tenant.wiki import (
     WikiPageUpdate,
     WikiRead,
     WikiUpdate,
-    serialize_wiki_page,
     serialize_file_as_page,
+    serialize_wiki_page,
     serialize_wiki_page_summary,
 )
-from app.schemas.tenant.share_request import HiddenFiles
-from app.schemas.tenant.tool import serialize_tool
 from app.services import ai_generation
 from app.services.tenant import attachments as attachments_service
-from app.services.tenant import body_states
+from app.services.tenant import body_states, content_references
+from app.services.tenant import metadata as metadata_service
+from app.services.tenant import relationships as relationships_service
+from app.services.tenant import share_requests as share_requests_service
+from app.services.tenant import soft_delete as soft_delete_service
+from app.services.tenant import tags as tags_service
+from app.services.tenant import wikis as wikis_service
 from app.services.tenant.collaboration import (
     collaboration_manager,
     content_version,
@@ -72,13 +78,6 @@ from app.services.tenant.collaboration import (
     versioned,
     written_into,
 )
-from app.services.tenant import content_references
-from app.services.tenant import relationships as relationships_service
-from app.services.tenant import share_requests as share_requests_service
-from app.services.tenant import soft_delete as soft_delete_service
-from app.services.tenant import metadata as metadata_service
-from app.services.tenant import tags as tags_service
-from app.services.tenant import wikis as wikis_service
 
 router = APIRouter(route_class=ActorRoute)
 #: A page addressed by its own id, mounted at the guild root the way a counter
@@ -232,10 +231,10 @@ async def update_wiki(
         if field in data and data[field] is not None:
             setattr(wiki, field, data[field])
     if "accent_color" in data:
-        setattr(wiki, "accent_color", (data["accent_color"] or "").strip() or None)
+        wiki.accent_color = (data["accent_color"] or "").strip() or None
 
     if data:
-        wiki.updated_at = datetime.now(timezone.utc)
+        wiki.updated_at = datetime.now(UTC)
     session.add(wiki)
     await attachments_service.claim_uploads(session, wiki)
     await session.commit()
@@ -245,7 +244,7 @@ async def update_wiki(
 async def read_after_write(
     session: RLSSessionDep,
     wiki_id: int,
-    user: Optional[User],
+    user: User | None,
     guild_context: ActorContext,
 ) -> WikiRead:
     """The wiki a write answers with: re-read after the commit, serialized.
@@ -643,7 +642,7 @@ async def update_wiki_page(
         )
 
     if data:
-        page.updated_at = datetime.now(timezone.utc)
+        page.updated_at = datetime.now(UTC)
     session.add(page)
     await session.flush()
 

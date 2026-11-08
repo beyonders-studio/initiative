@@ -14,19 +14,18 @@ from asyncpg.exceptions import DatabaseDroppedError, SerializationError
 from app.core.messages import QueryMessages
 from app.db.guild_standing import GuildContext
 from app.db.request_context import ContentGrantee, Member, Platform
-from app.models.platform.guild import Guild
 from app.db.schema_provisioning import drop_guild_schema, provision_guild_schema
+from app.models.platform.guild import Guild
 from app.services.fields.spec import FieldType
-from app.services.query import executor
 from app.services.query import (
     QueryColumn,
     QueryError,
     describe,
     execute,
+    executor,
     resolve,
     run,
 )
-
 
 _GID = 990_200
 
@@ -215,7 +214,7 @@ async def test_a_guild_runs_only_so_many_at_once(guild, monkeypatch):
         assert busy.value.code == QueryMessages.BUSY
     finally:
         held.cancel()
-        with pytest.raises(BaseException):
+        with pytest.raises(asyncio.CancelledError):
             await held
 
 

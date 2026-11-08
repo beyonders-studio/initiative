@@ -4,22 +4,20 @@ the body every tool's duplicate takes."""
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, List, Optional, TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Any
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.core.identity_boundary import GuildId, PersonId
 from app.schemas.base import MAX_TITLE_LENGTH, SanitizedBaseModel
 from app.schemas.tenant.archive import ToolState
-from app.schemas.tenant.resource_grant import ResourceGrantSchema
 from app.schemas.tenant.property import PropertySummary, annotated_properties
+from app.schemas.tenant.resource_grant import ResourceGrantSchema
 from app.schemas.tenant.tag import TagSummary, annotated_tags
 
 if TYPE_CHECKING:  # pragma: no cover
     from app.db.guild_standing import ActorContext
 
-Model = TypeVar("Model", bound=BaseModel)
-Summary = TypeVar("Summary", bound="ToolSummaryBase")
 
 _UNSET = object()
 
@@ -43,17 +41,17 @@ class ToolSummaryBase(ToolState):
     # and the API refuses to read or post one. Tasks are unaffected; their
     # thread belongs to the task, not to the tool.
     comments_enabled: bool = True
-    tags: List[TagSummary] = Field(default_factory=list)
+    tags: list[TagSummary] = Field(default_factory=list)
     # Every tool carries custom properties, filled by
     # ``metadata_service.annotate_properties`` beside the tags.
-    properties: List[PropertySummary] = Field(default_factory=list)
+    properties: list[PropertySummary] = Field(default_factory=list)
     # The full sharing state — every resource_grants row for this tool. Exposed
     # on the summary so a list can manage sharing without a detail fetch.
-    grants: List[ResourceGrantSchema] = Field(default_factory=list)
+    grants: list[ResourceGrantSchema] = Field(default_factory=list)
 
     @classmethod
     def derived_fields(
-        cls, row: Any, *, context: ActorContext, user_id: Optional[int]
+        cls, row: Any, *, context: ActorContext, user_id: int | None
     ) -> dict[str, Any]:
         """The fields this tool works out from ``row`` rather than reading off
         it by name."""
@@ -66,11 +64,11 @@ class ToolDuplicateRequest(SanitizedBaseModel):
 
     #: Held to the rule its tool holds a name to (``tool_copy.duplicate``):
     #: free of reserved sigils except where the tool's names may carry them.
-    name: Optional[str] = Field(default=None, max_length=MAX_TITLE_LENGTH)
-    target_initiative_id: Optional[int] = None
+    name: str | None = Field(default=None, max_length=MAX_TITLE_LENGTH)
+    target_initiative_id: int | None = None
 
 
-def from_row(schema: type[Model], row: Any, **fields: Any) -> Model:
+def from_row[Model: BaseModel](schema: type[Model], row: Any, **fields: Any) -> Model:
     """``schema`` built from ``fields``, and from ``row``'s attribute of the same
     name for every other field it has one for.
 
@@ -83,12 +81,12 @@ def from_row(schema: type[Model], row: Any, **fields: Any) -> Model:
     return schema(**fields)
 
 
-def serialize_tool(
+def serialize_tool[Summary: "ToolSummaryBase"](
     schema: type[Summary],
     row: Any,
     *,
     context: ActorContext,
-    user_id: Optional[int] = None,
+    user_id: int | None = None,
     **fields: Any,
 ) -> Summary:
     """One tool row in ``schema``: its columns, the sharing state, tags,

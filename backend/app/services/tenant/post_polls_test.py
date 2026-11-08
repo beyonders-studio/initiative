@@ -28,7 +28,6 @@ from app.testing import (
 )
 from app.testing.schema_harness import route_session_to_guild
 
-
 #: Long enough that a lock genuinely held is still held when the second
 #: transaction gives up, short enough that the case is not a pause.
 _LOCK_TIMEOUT = "400ms"

@@ -12,9 +12,9 @@ import pytest
 from httpx import AsyncClient
 
 from app.core.config import CAPACITOR_NATIVE_ORIGINS, settings
+from app.core.version import get_min_desktop_version, get_min_native_version
 from app.services import captcha_config
 from app.services.captcha_config import ResolvedCaptchaConfig
-from app.core.version import get_min_desktop_version, get_min_native_version
 from app.services.tenant.attachments import MAX_FILE_SIZE
 
 

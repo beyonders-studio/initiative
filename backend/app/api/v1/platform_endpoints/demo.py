@@ -15,8 +15,8 @@ runs as the demo (``DEMO_MODE``).
   OpenAPI document: only the plug-in calls them.
 """
 
-from datetime import datetime, timezone
-from typing import Annotated, Optional, cast
+from datetime import UTC, datetime
+from typing import Annotated, cast
 
 from fastapi import (
     APIRouter,
@@ -47,8 +47,8 @@ from app.demo import accounts, copies, pitches, sales
 from app.models.platform.guild import CommunityRole
 from app.models.platform.guild_image import IMAGE_SPECS, GuildImageVariant
 from app.models.platform.identity_ref import IdentityEntity
-from app.models.tenant.data_job import DataJobStatus
 from app.models.platform.user import User
+from app.models.tenant.data_job import DataJobStatus
 from app.schemas.platform.demo import (
     DemoCopyRead,
     DemoDirectoryCard,
@@ -67,8 +67,8 @@ from app.schemas.platform.demo import (
     DemoPitchesFind,
     DemoPitchesFound,
     DemoPitchFound,
-    DemoPitchSeats,
     DemoPitchRead,
+    DemoPitchSeats,
     DemoRedeem,
     DemoRedemption,
     PitchSeat,
@@ -308,10 +308,10 @@ async def make_demo_pitch(
     install: SalesInstallDep,
     name: Annotated[str, Form(min_length=1, max_length=100)],
     bundle: Annotated[UploadFile, File()],
-    logo: Annotated[Optional[UploadFile], File()] = None,
-    editors: Annotated[list[str], Form(max_length=50)] = [],
-    seats: Annotated[Optional[str], Form(max_length=10000)] = None,
-    directory: Annotated[Optional[str], Form(max_length=2000)] = None,
+    logo: Annotated[UploadFile | None, File()] = None,
+    editors: Annotated[list[str], Form(max_length=50)] = [],  # noqa: B006
+    seats: Annotated[str | None, Form(max_length=10000)] = None,
+    directory: Annotated[str | None, Form(max_length=2000)] = None,
 ) -> DemoPitchCreated:
     """Make a pitch from an uploaded ``bundle``, named ``name``, with ``logo``
     as its icon, and publish it. Each ``editors`` field names by handle an
@@ -396,7 +396,7 @@ async def make_demo_link(
     """Make a link to a pitch, an invite into it: each opening gets its own
     copy, with ``role``. It ends at ``expires_at``, 30 days from now by
     default."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if payload.expires_at is not None and payload.expires_at <= now:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

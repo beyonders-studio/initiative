@@ -1,11 +1,10 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 import sqlalchemy as sa
+from pydantic import ConfigDict
 from sqlalchemy import Column, DateTime, Integer, String
 from sqlmodel import Field, SQLModel
-from pydantic import ConfigDict
 
 
 class OIDCMappingTargetType(str, Enum):
@@ -31,7 +30,7 @@ class OIDCClaimMapping(SQLModel, table=True):
     __allow_unmapped__ = True
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     #: Whose claim this rule reads. Two providers spell their groups their own
     #: way, so a rule is about one of them; the sign-in that evaluates rules
     #: evaluates only the ones belonging to the provider it came through.
@@ -50,7 +49,7 @@ class OIDCClaimMapping(SQLModel, table=True):
     )
     #: The group the rule places. Null only on a provider rule that names a
     #: directory instead, which places everybody arriving from it.
-    claim_value: Optional[str] = Field(
+    claim_value: str | None = Field(
         default=None,
         max_length=500,
         sa_column=Column(String(500), nullable=True),
@@ -59,10 +58,10 @@ class OIDCClaimMapping(SQLModel, table=True):
     #: provider's directories the rule is about — for a provider that signs in
     #: people from more than one, such as a bridge in front of several. Both or
     #: neither.
-    scope_claim: Optional[str] = Field(
+    scope_claim: str | None = Field(
         default=None, sa_column=Column(String(64), nullable=True)
     )
-    scope_value: Optional[str] = Field(
+    scope_value: str | None = Field(
         default=None, sa_column=Column(String(256), nullable=True)
     )
     #: Whether the rule also places people in one of the community's
@@ -89,13 +88,13 @@ class OIDCClaimMapping(SQLModel, table=True):
         sa_column=Column(String(20), nullable=False, server_default="member"),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(
             DateTime(timezone=True), nullable=False, server_default=sa.func.now()
         ),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(
             DateTime(timezone=True), nullable=False, server_default=sa.func.now()
         ),

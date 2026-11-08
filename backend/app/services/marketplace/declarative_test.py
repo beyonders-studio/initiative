@@ -8,22 +8,22 @@ answering from recorded answers; the one difference from the SDK's rendered
 requests is the credential, which only Initiative adds.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
 from app.core.messages import PluginDataMessages
-from app.services.marketplace.plugin_data import PluginDataError
 from app.services.marketplace.declarative import (
     after_connect,
     request_refusal,
     run_endpoint,
 )
 from app.services.marketplace.definitions import normalize_listing_definition
+from app.services.marketplace.plugin_data import PluginDataError
 from app.services.tenant.plugin_connection_flows import HookError
 from app.testing.fake_vendor import FakeVendor
 
-NOW = datetime(2026, 10, 2, 12, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 2, 12, tzinfo=UTC)
 API = "https://api.tracker.example"
 CREDENTIALS = {"workspace": "tok-workspace", "account": "tok-account"}
 WORKSPACE = {"workspace": {"owner": "acme"}}

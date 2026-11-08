@@ -24,11 +24,10 @@ from app.testing import (
 )
 from app.testing.plugin_clients import (
     assert_names_nobody,
-    install_plugin,
     install_headers,
+    install_plugin,
     lift_person_and_guild_ids,
 )
-
 
 SHARE = ["projects:write", "sharing:write", "members:read", "initiatives:read"]
 

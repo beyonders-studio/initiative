@@ -25,51 +25,51 @@ bookmarks, recents. Those would extend the schema under a future
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from collections.abc import Mapping
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
-from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.relationships import RelationshipType, decode_node_id, node_id
 from app.core.search import SearchEntityType
+from app.core.tools import Tool
 from app.core.user_display import display_name, handle_of
-from app.schemas.tenant.import_envelopes import EnvelopePropertyValue
-from app.services.export.property_values import (
-    exported_properties,
-    portable_summaries,
-)
 from app.core.version import get_version
-from app.models.tenant.comment import Comment, in_thread
-from app.models.tenant.relationship import EntityRelationship
-from app.models.tenant.project import Project
-from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.models.platform.user_profile_view import MemberProfile
+from app.models.tenant.comment import Comment, in_thread
+from app.models.tenant.metadata import MetadataDefinition, MetadataType
+from app.models.tenant.project import Project
+from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.tag import Tag
 from app.models.tenant.task import Task, TaskStatus
+from app.schemas.tenant.import_envelopes import EnvelopePropertyValue
 from app.schemas.tenant.project_export import (
+    ProjectExportChecklistItem,
     ProjectExportComment,
     ProjectExportEnvelope,
     ProjectExportLayout,
     ProjectExportProject,
     ProjectExportPropertyDefinition,
-    ProjectExportChecklistItem,
     ProjectExportTag,
     ProjectExportTask,
     ProjectExportTaskLink,
     ProjectExportTaskStatus,
     ProjectExportTaskType,
 )
+from app.services.export.property_values import (
+    exported_properties,
+    portable_summaries,
+)
+from app.services.import_engine.common import load_initiative_properties
 from app.services.import_engine.mentions import (
     detach_markdown_mentions,
     load_mention_handles,
     markdown_mention_ids,
 )
 from app.services.import_engine.references import detach_markdown_references
-from app.core.tools import Tool
-from app.services.import_engine.common import load_initiative_properties
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import task_types as task_types_service
@@ -80,9 +80,9 @@ async def build_project_export(
     session: AsyncSession,
     project: Project,
     *,
-    exported_by_handle: Optional[str] = None,
-    source_instance_url: Optional[str] = None,
-    source_guild_id: Optional[int] = None,
+    exported_by_handle: str | None = None,
+    source_instance_url: str | None = None,
+    source_guild_id: int | None = None,
 ) -> ProjectExportEnvelope:
     """Serialize ``project`` and its tasks to an envelope.
 
@@ -255,7 +255,7 @@ async def build_project_export(
     }
     property_places: dict[int, int] = {}
 
-    def property_place(property_id: int) -> Optional[int]:
+    def property_place(property_id: int) -> int | None:
         if property_id not in definitions:
             return None
         return property_places.setdefault(property_id, len(property_places) + 1)
@@ -317,7 +317,7 @@ async def build_project_export(
 
     return ProjectExportEnvelope(
         app_version=get_version(),
-        exported_at=datetime.now(timezone.utc),
+        exported_at=datetime.now(UTC),
         exported_by_handle=exported_by_handle,
         source_instance_url=source_instance_url,
         source_guild_id=source_guild_id,

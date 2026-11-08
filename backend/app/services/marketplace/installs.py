@@ -15,7 +15,6 @@ response.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -30,8 +29,7 @@ from app.models.platform.marketplace import (
 )
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.services.marketplace import catalog as catalog_service
-from app.services.marketplace import plugin_api
-from app.services.marketplace import registration_lookup
+from app.services.marketplace import plugin_api, registration_lookup
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +153,7 @@ async def listing_is_offered(
     return listing.bundled_with_uid in await installed_plugin_uids(session)
 
 
-async def count_install(guild_id: int, listing_id: Optional[int]) -> None:
+async def count_install(guild_id: int, listing_id: int | None) -> None:
     """Add one to a listing's install tally, after the install has committed.
 
     On a system session from the installing community's cohort, because the

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Optional
 
 from sqlalchemy import (
@@ -13,10 +13,10 @@ from sqlalchemy import (
 )
 from sqlmodel import Field, Relationship
 
-from app.db.registry_checks import FROM_REGISTRY
 from app.core.reactions import REACTION_TARGETS
-from app.models.tenant._mixins import CreatedByMixin
+from app.db.registry_checks import FROM_REGISTRY
 from app.models.platform.user_profile_view import MemberProfile
+from app.models.tenant._mixins import CreatedByMixin
 
 #: The target vocabulary, frozen into the CHECK constraint from the registry so
 #: the column can never hold a kind nothing knows how to authorize.
@@ -53,7 +53,7 @@ class Reaction(CreatedByMixin, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     target_type: str = Field(sa_column=Column(String(32), nullable=False))
     target_id: int = Field(sa_column=Column(Integer, nullable=False))
     #: The emoji itself, as the grapheme cluster the client rendered. Stored
@@ -66,7 +66,7 @@ class Reaction(CreatedByMixin, table=True):
         sa_column=Column(Integer, ForeignKey("users.id"), nullable=False),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 

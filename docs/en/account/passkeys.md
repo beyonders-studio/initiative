@@ -4,60 +4,88 @@ icon: lucide/fingerprint
 
 # Passkeys
 
-A passkey is a sign-in with nothing to type. Your phone, your laptop or your password manager holds a key; the site asks it a question; you prove it's you with the fingerprint, face or PIN you already unlock the device with; done. No password, no code from an app, nothing to remember and nothing to spell wrong at eleven at night.
+A passkey signs you in with nothing to type. Your phone, laptop or password manager holds a key, and you unlock it with the fingerprint, face or PIN you already use for the device. There's no password to remember and nothing to misspell at eleven at night.
 
-## Adding one
+Passkeys appear in **My Settings › Security** when your server offers them. If there's no **Passkeys** section, it doesn't.
 
-1. **My Settings → Security → Passkeys → Add a passkey**.
-2. Give it a name you'll recognise in a list — *Laptop*, *Phone*, *The blue key on the lanyard*.
-3. Confirm your password. No password on your account, or none on your server? Then it asks you to prove it's you with a fresh sign-in.
-4. Your browser takes over from here (in the Android app it's your phone, in the Windows app it's Windows, and the Mac, Linux and iPhone apps open your browser for it): it asks where to keep the key and how you'd like to prove it's you. Say yes to whatever you normally unlock with.
+## Add a passkey
 
-That's it. It's in the list, with the date you added it.
+1. Open **My Settings › Security**.
+2. Under **Passkeys**, select **Add a passkey**.
+3. Give it a **Name** you'll recognize in a list, like "Laptop", "Phone" or "The blue key on the lanyard".
+4. Type your **Current password**, if asked.
+5. Select **Continue**.
+6. Follow the prompt that appears, and unlock it the way you unlock the device.
 
-Where the key ends up is your browser's decision, not ours. Signed in to a password manager or the phone's own keychain? It probably goes there, and shows up as **Synced** in the list — meaning the same key is now on your other devices too, and losing this one doesn't lose it. Not synced? It lives on that device and nowhere else, so add another for the next one. You can have twenty.
+The new passkey joins the list with the date you added it. No password on your account? Initiative asks for a [fresh sign-in](sign-in-and-security.md#when-initiative-asks-you-to-prove-its-you) at step 4.
 
-## Signing in with it
+Where the key is kept is up to your browser or phone, which asks where to save it. A passkey marked **Synced** lives in a password manager or your phone's keychain, so it's on your other devices too and losing one device doesn't lose it. One without that mark lives on the device that made it, so add another for each device you use. You can have up to 20.
 
-On the sign-in screen, press **Sign in with a passkey**, or just click into the email box — most browsers offer your passkeys right there, above the addresses they've remembered. Prove it's you, and you're in.
+The prompt comes from different places depending on where you are. In a browser and the Android app, your browser or phone asks directly. The Windows app opens Windows' own passkey window, which offers Windows Hello, your phone or a security key. The Mac and Linux apps open your browser for a moment and hand you back.
 
-In the Android app, the button asks your phone directly: same fingerprint, same face, and you never leave the app. The Windows app does the same through Windows' own passkey window, which offers Windows Hello, your phone or a security key. On an iPhone, a Mac or Linux, or on a server the app can't sign in to this way, it opens your browser for a moment, because that's where your passkeys live, and hands you straight back once you've unlocked one.
+## Sign in with a passkey
 
-Keep your passkeys in a browser's password manager? In the Windows app, **Use a passkey saved in your browser**, just under the button, sends that one sign-in to your browser, where they are.
+Select **Sign in with a passkey** on the sign-in card, or click into the **Email** box and pick your passkey from the browser's list. [Signing in](../getting-started/signing-in.md#sign-in-with-a-passkey) has the details for each app.
 
-## When a device goes
+## Rename a passkey
 
-Remove its passkey: **My Settings → Security → Passkeys**, the bin next to the name, and your password (or a fresh sign-in) to confirm. Sign in with your password or another passkey first if you need to. Nothing on the lost device can add one back.
+1. In **My Settings › Security**, select **Rename** beside the passkey.
+2. Type the new **Name**.
+3. Select **Save**.
 
-Not sure which one was the lost phone? The list says when each was last used. The one that stopped is the one that went.
+The name is only for you, so you can tell your passkeys apart.
 
-## Going without a password
+## Remove a passkey
 
-Once a passkey is in the list, the password is optional. **My Settings → Security → Password → Remove your password** — from a browser, not the phone app — takes it away for good: from then on the passkey is how you get in, every other device is signed out, and you're shown ten **recovery codes**, once, unless you already hold a full set. If you were down to your last couple, a fresh ten replaces them, and the old ones stop working.
+When a device is gone, remove its passkey.
 
-Keep those somewhere that isn't the device with the passkey on it. They're the way back if the passkey is ever gone: on the sign-in screen, **Forgot password? → Use a recovery code**, and you set a new password with one. Then you're an account with a password again, free to add a fresh passkey and take the password away once more.
+1. In **My Settings › Security**, select **Remove** beside the passkey.
+2. Type your **Current password**, if asked.
+3. Select **Remove**.
 
-You can't remove the last way in. Your only passkey stays until you set a password or add another, and your password stays until there's a passkey to replace it.
+That passkey stops signing you in, and nothing on the lost device can add it back. Not sure which one was the lost phone? Each passkey says when it was last used, and the one that stopped is the one that went.
 
-Removing your last passkey from somewhere you've only just signed in [waits two days](profile-and-preferences.md#changes-that-wait) before it happens.
+You can't remove your last way in, so your only passkey stays until you set a password or add another. Removing your last passkey may [wait two days](sign-in-and-security.md#changes-that-wait) before it happens.
 
-## If a community asks for one
+## Go without a password
 
-A community can require that everybody in it signed in with a passkey, the same way it can require a code from an authenticator app. Signed in with your password instead? You're asked for the passkey where you are — a small prompt, then everything fills in behind it. Nobody is signed out to satisfy a new rule.
+Once you have a passkey, the password is optional. Giving it up has to happen in a browser, not the phone or desktop app.
 
-The Android and Windows apps ask for it right there in the app. On an iPhone, a Mac or Linux, your browser opens for the passkey and hands you straight back.
+1. Open **My Settings › Security** in a browser.
+2. Under **Password**, select **Remove your password**.
+3. Type your **Current password**.
+4. Select **Remove your password**.
+5. If Initiative shows recovery codes, save them somewhere that isn't the device with your passkey, then select **Done**.
+
+From then on your passkey is how you get in, and you're signed out everywhere else. You're shown ten fresh recovery codes if you held fewer than three, and any old ones stop working. They're shown once.
+
+Those codes are the way back if the passkey is ever lost: [set a password with a recovery code](../getting-started/signing-in.md#set-a-password-with-a-recovery-code), sign in with it, add a fresh passkey, and remove the password again if you like. **My Settings › Security** shows how many codes you have left, under **Two-factor authentication**, with **New recovery codes** to replace the set.
+
+## When a community asks for a passkey
+
+A community can require everyone in it to have signed in with a passkey. If you signed in some other way, a box asks for your passkey when you open that community. Select **Use your passkey** and unlock it, and everything fills in behind it. Nobody is signed out to satisfy a new rule. No passkey yet? Select **Add a passkey**, add one, and come back.
+
+## If you can't add a passkey
+
+The message under **Passkeys** says what's wrong:
+
+| Message | What to do |
+|---|---|
+| "This browser can't make a passkey" | Use an up-to-date browser. |
+| "This device or password manager already holds a passkey for this site" | You already have one there. Use it, or save the new one somewhere else. |
+| "This account holds as many passkeys as it can" | Remove one you don't use. |
+| "Passkeys need this site to have a proper domain name and https" | Ask whoever runs the server. |
+| "A passkey can't be made at this address" | You opened Initiative at a different address from the one it's set up under. Ask whoever runs the server. |
 
 ??? techspec "The details"
-    WebAuthn, through the reference libraries on both sides. Credentials are made as discoverable, so a sign-in can start from the key rather than from a typed address, and every ceremony requires user verification: a passkey that cannot prove the person as well as the device is not one this site will register or accept.
+    WebAuthn, through the reference libraries on both sides. Credentials are requested as discoverable (resident key preferred), so a sign-in can start from the key rather than from a typed address. Every ceremony requires user verification: a passkey that can't prove the person as well as the device is not registered or accepted.
 
-    The relying party is the host of the deployment's own address, and the origin must match it exactly. Each credential records the host it was made under, so a deployment that moves to a new address refuses its old passkeys and records a plain reason in the audit log rather than a signature that does not verify. A sign-in through a passkey is recorded as a multi-factor cryptographic authenticator — `hwk` for a device-bound key, `swk` for a synced one, and `mfa` — which is what a community requiring a second factor reads.
+    The relying party is the host of the deployment's own address (`APP_URL`), and the origin must match it exactly. Each credential records the host it was made under, so a deployment that moves to a new address refuses its old passkeys and records a plain reason in the audit log rather than a signature that doesn't verify. A passkey sign-in is recorded as a multi-factor cryptographic authenticator: `hwk` for a device-bound key, `swk` for a synced one, plus `mfa`. That's what a community requiring a second factor reads.
 
-    Public keys only are stored, alongside the authenticator's counter, which must never go backwards. No attestation is requested or kept.
+    Only public keys are stored, with the authenticator's signature counter, which must never go backwards. No attestation is requested or kept. An account holds at most 20 passkeys.
 
-    The Android app runs the ceremony through the platform's credential manager. The server names the app in `/.well-known/assetlinks.json` and accepts the origin Android reports for it, the hash of the app's signing certificate, beside its own address. Where the phone won't confirm that association, the app uses the system browser.
+    The Android app runs the ceremony through the platform's credential manager. The server names the app in `/.well-known/assetlinks.json` and accepts the origin Android reports for it (the hash of the app's signing certificate) beside its own address. Where the phone won't confirm that association, the app uses the system browser.
 
-    The Windows app runs each ceremony in a page of its own, laid over the app and loaded at the deployment's address, so the origin the server checks is the deployment's own and Windows shows its own passkey dialog. Nothing is fetched for that page. Where Windows can't use the address, the app uses the system browser.
+    The Windows app runs each ceremony in a page of its own, laid over the app and loaded at the deployment's address, so the origin the server checks is the deployment's own and Windows shows its own passkey dialog. Where Windows can't use the address, the app uses the system browser.
 
-    The server answers `/.well-known/apple-app-site-association` once the iPhone app is published. Until then the iPhone app runs every ceremony in the browser, on every server.
-
-    In the browser, only the prompt leaves the app. The app begins the ceremony, opens the deployment's own page in the system browser with the options in the address's fragment, and that page runs the prompt and hands the credential back through `initiative://passkey/callback`; the app then finishes the ceremony itself, as it would with its own prompt. A sign-in or sign-up begun this way carries a PKCE challenge (RFC 7636), and its finish carries the verifier.
+    In the browser hand-off, only the prompt leaves the app. The app begins the ceremony, opens the deployment's own page in the system browser with the options in the address's fragment, and that page runs the prompt and hands the credential back through `initiative://passkey/callback`. The app then finishes the ceremony itself. A sign-in or sign-up begun this way carries a PKCE challenge (RFC 7636), and its finish carries the verifier.

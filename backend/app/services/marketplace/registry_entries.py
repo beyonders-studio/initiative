@@ -35,9 +35,10 @@ import hashlib
 import hmac
 import json
 import logging
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Awaitable, Callable, Mapping, NamedTuple, Optional
+from typing import Any, NamedTuple
 
 from fastapi import HTTPException
 from sqlalchemy import update as sa_update
@@ -46,10 +47,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.core.messages import MarketplaceRegistryMessages as Codes
-from app.models.platform.plugin_service_registration import (
-    PluginServiceRegistration,
-    RegistrationSource,
-)
 from app.models.platform.marketplace import (
     UID_ALPHABET,
     UID_LENGTH,
@@ -57,6 +54,10 @@ from app.models.platform.marketplace import (
     MarketplaceListingVersion,
 )
 from app.models.platform.marketplace_registry import MarketplaceMedia
+from app.models.platform.plugin_service_registration import (
+    PluginServiceRegistration,
+    RegistrationSource,
+)
 from app.models.platform.publisher import (
     Publisher,
     PublisherSource,
@@ -79,9 +80,9 @@ from app.services.marketplace.definitions import LISTING_KINDS
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "MAX_PUBLISHER_RECORD_BYTES",
     "EntryContext",
     "ListingPath",
-    "MAX_PUBLISHER_RECORD_BYTES",
     "RegistryError",
     "UnsupportedEntry",
     "apply_entry",
@@ -135,7 +136,7 @@ class ListingPath(NamedTuple):
     uid: str
 
 
-def parse_prefix(value: str) -> Optional[str]:
+def parse_prefix(value: str) -> str | None:
     """``value`` when it can be a registry publisher's prefix, else ``None``."""
     if value == RESERVED_PREFIX or not publishers_service.valid_prefix(value):
         return None
@@ -155,7 +156,7 @@ def publisher_record_path(prefix: str) -> str:
     return f"publishers/{prefix}.json"
 
 
-def parse_listing_path(path: str) -> Optional[ListingPath]:
+def parse_listing_path(path: str) -> ListingPath | None:
     """The publisher and uid a listing target names, or ``None`` when ``path``
     is not ``publishers/<prefix>/<uid>/listing.json``."""
     parts = path.split("/")
@@ -175,7 +176,7 @@ class EntryContext:
     fetch: Callable[[str, int], Awaitable[bytes]]
     #: The bytes of ``publishers/<prefix>.json`` as the top-level role signs
     #: it, or ``None`` when there is no record.
-    publisher_record: Callable[[str], Awaitable[Optional[bytes]]]
+    publisher_record: Callable[[str], Awaitable[bytes | None]]
     now: datetime
 
 
@@ -221,7 +222,7 @@ def _relative(directory: str, value: Any, *, what: str) -> str:
     return directory + value
 
 
-def _optional_text(entry: Mapping[str, Any], key: str) -> Optional[str]:
+def _optional_text(entry: Mapping[str, Any], key: str) -> str | None:
     value = entry.get(key)
     if value is None:
         return None
@@ -235,9 +236,9 @@ class _Version:
     version: str
     manifest: str
     sha256: str
-    min_app_version: Optional[str]
-    min_plugin_api: Optional[str]
-    release_notes: Optional[str]
+    min_app_version: str | None
+    min_plugin_api: str | None
+    release_notes: str | None
 
 
 def _versions(entry: Mapping[str, Any], directory: str) -> list[_Version]:
@@ -361,7 +362,7 @@ async def _keep_picture(
     spec: Any,
     *,
     what: str,
-) -> Optional[str]:
+) -> str | None:
     """Keep one picture the entry names, and return the path it is served
     from; ``None`` for a picture of a type the catalogue does not keep.
 
@@ -501,7 +502,7 @@ async def apply_entry(session: AsyncSession, path: str, context: EntryContext) -
             )
         ).all()
     }
-    listing: Optional[MarketplaceListing] = None
+    listing: MarketplaceListing | None = None
     for index, version in enumerate(versions):
         latest = index == len(versions) - 1
         if version.version in held and not latest:

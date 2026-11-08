@@ -12,8 +12,8 @@ the plug-in called; everything above it runs for real.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import httpx
 import jwt
@@ -22,29 +22,28 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.plugin_access_token import seal_install_token
 from app.core.audit_events import AuditEventType
 from app.core.config import settings
 from app.core.messages import PluginDataMessages, PluginHubMessages
+from app.core.plugin_access_token import seal_install_token
 from app.models.platform.guild import CommunityRole, GuildMembership
-from app.models.tenant.plugin_member_consent import PluginMemberConsent
-from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
+from app.models.tenant.plugin_member_consent import PluginMemberConsent
+from app.models.tenant.plugin_placement import PluginPlacement
 from app.services.marketplace import plugin_data as plugin_data_service
-from app.services.marketplace.plugin_refs import ensure_plugin_ref
 from app.services.marketplace.context_jwt_test import _PRIVATE_PEM
+from app.services.marketplace.plugin_refs import ensure_plugin_ref
+from app.services.tenant.plugin_connection_flows import TokenSet, seal_tokens
 from app.testing import (
-    create_plugin_user_connection,
-    create_plugin_service_registration,
     create_guild_plugin,
+    create_plugin_service_registration,
+    create_plugin_user_connection,
     emitted,
     route_session_to_guild,
 )
-from app.services.tenant.plugin_connection_flows import TokenSet, seal_tokens
-from app.testing.plugin_clients import CLIENT, InstalledPlugin, install_plugin
 from app.testing.fake_vendor import API_HOST, FakeVendor, declarative_plugin
-
+from app.testing.plugin_clients import CLIENT, InstalledPlugin, install_plugin
 
 TARGET = "tests.github"
 TARGET_UID = "TESTGTHB000001"
@@ -179,8 +178,8 @@ async def _hub(
     place_target: bool = True,
     install_target: bool = True,
     declarative: bool = False,
-    definition: Optional[dict[str, Any]] = None,
-) -> tuple[InstalledPlugin, Optional[GuildPlugin]]:
+    definition: dict[str, Any] | None = None,
+) -> tuple[InstalledPlugin, GuildPlugin | None]:
     """A caller asking for ``plugins:tests.github``, and the target installed in
     the same community, placed where the caller is unless told otherwise. A
     ``declarative`` target is called by Initiative itself, on the community's
@@ -242,7 +241,7 @@ async def _hub(
 def _installation_headers(
     installed: InstalledPlugin,
     scopes: tuple[str, ...] = (PLUGINS_SCOPE,),
-    initiative_id: Optional[int] = None,
+    initiative_id: int | None = None,
 ) -> dict[str, str]:
     token, _exp = seal_install_token(
         guild_id=installed.guild.id,
@@ -277,7 +276,7 @@ async def _member(
             label="Comment as you",
             requested_access="read_write",
             granted_access=access,
-            granted_at=datetime.now(timezone.utc),
+            granted_at=datetime.now(UTC),
         )
     )
     await session.commit()
@@ -641,7 +640,7 @@ async def test_a_member_token_for_a_member_who_left_is_refused(
     with."""
     installed, _target = await _hub(session, acting_user, role_session)
     member = await _member(session, acting_user, installed)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if ended == "consent":
         await route_session_to_guild(session, installed.guild.id)
         consent = (
@@ -742,7 +741,7 @@ async def test_a_declarative_target_is_called_by_initiative(
     assert vendor.api_requests[0]["headers"]["authorization"] == "Bearer gho_community"
 
 
-def _with_member_account(requires: Optional[dict[str, Any]]) -> dict[str, Any]:
+def _with_member_account(requires: dict[str, Any] | None) -> dict[str, Any]:
     """:func:`declarative_plugin` with a member's own account beside the
     community's workspace: its read open to members, on the workspace, under
     ``requires``; and a member's comment on their account."""

@@ -5,7 +5,7 @@ logout / password reset / password change (which revoke purely by bumping the
 counter) also close realtime sockets.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt as pyjwt
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -38,7 +38,7 @@ async def test_the_pre_session_token_no_longer_opens_a_socket(
         {
             "sub": str(user.id),
             "ver": user.token_version,
-            "exp": datetime.now(timezone.utc) + timedelta(minutes=10),
+            "exp": datetime.now(UTC) + timedelta(minutes=10),
         },
         settings.jwt_signing_key,
         algorithm=JWT_ALGORITHM,
@@ -94,7 +94,7 @@ async def test_token_without_version_claim_rejected(session: AsyncSession):
     """A valid-signature JWT with NO ``ver`` claim at all (e.g. a legacy token
     minted before versioning existed) exercises the ``ver is not None`` guard
     and must be rejected."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     import jwt as pyjwt
 
@@ -104,7 +104,7 @@ async def test_token_without_version_claim_rejected(session: AsyncSession):
     legacy_token = pyjwt.encode(
         {
             "sub": str(user.id),
-            "exp": datetime.now(timezone.utc) + timedelta(minutes=10),
+            "exp": datetime.now(UTC) + timedelta(minutes=10),
         },
         settings.jwt_signing_key,
         algorithm=JWT_ALGORITHM,
@@ -115,14 +115,14 @@ async def test_token_without_version_claim_rejected(session: AsyncSession):
 
 async def test_jwt_without_sub_rejected(session: AsyncSession):
     """A valid-signature JWT carrying no ``sub`` names nobody."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     import jwt as pyjwt
 
     from app.core.config import settings
 
     subless_token = pyjwt.encode(
-        {"exp": datetime.now(timezone.utc) + timedelta(minutes=10)},
+        {"exp": datetime.now(UTC) + timedelta(minutes=10)},
         settings.jwt_signing_key,
         algorithm=JWT_ALGORITHM,
     )

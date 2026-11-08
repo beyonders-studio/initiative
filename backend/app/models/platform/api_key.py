@@ -1,8 +1,16 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Optional
 
-from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Index, Integer
-from sqlalchemy import String, text
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    text,
+)
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.core.tools import Tool
@@ -31,7 +39,7 @@ class UserApiKey(SQLModel, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(
         foreign_key="users.id", ondelete="CASCADE", nullable=False, index=True
     )
@@ -44,7 +52,7 @@ class UserApiKey(SQLModel, table=True):
     # key is pinned to that one guild. Both default to the legacy full-access
     # behavior so existing keys are unchanged.
     read_only: bool = Field(default=False, nullable=False)
-    guild_id: Optional[int] = Field(
+    guild_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -56,21 +64,21 @@ class UserApiKey(SQLModel, table=True):
     # The one tool resource a key reads, named as ``resource_grants`` names
     # it: that resource's feed, for a tool in ``FEED_TOOLS``, and no other
     # route. No FK — the row lives in the guild's schema.
-    resource_type: Optional[Tool] = Field(
+    resource_type: Tool | None = Field(
         default=None, sa_column=Column(String(length=32), nullable=True)
     )
-    resource_id: Optional[int] = Field(
+    resource_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
-    last_used_at: Optional[datetime] = Field(
+    last_used_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
-    expires_at: Optional[datetime] = Field(
+    expires_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
@@ -78,4 +86,4 @@ class UserApiKey(SQLModel, table=True):
     user: Optional["User"] = Relationship(back_populates="api_keys")
 
 
-from app.models.platform.user import User  # noqa: E402
+from app.models.platform.user import User

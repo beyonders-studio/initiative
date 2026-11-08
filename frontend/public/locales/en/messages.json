@@ -1,7 +1,7 @@
 {
   "title": "My Messages",
   "backToNav": "Back to navigation",
-  "encryptedNotice": "End-to-end encrypted. Only you and the other person can read these.",
+  "encryptedNotice": "End-to-end encrypted. Only the people in this conversation can read these.",
   "empty": {
     "title": "Pick a conversation"
   },
@@ -111,7 +111,7 @@
     "noMatch": "They don't match",
     "waitingForOther": "Waiting for your other device to confirm.",
     "verified": "Verified. This device can now read and send your messages.",
-    "mismatch": "Not verified, and nothing was changed. If you don't recognise this device, remove it.",
+    "mismatch": "Not verified, and nothing was changed. If you don't recognize this device, remove it.",
     "cancelled": "The verification was stopped on the other device. Nothing was changed.",
     "timeout": "The verification took too long and was stopped. Nothing was changed. Try again.",
     "elsewhere": "A verification is already running in another tab.",

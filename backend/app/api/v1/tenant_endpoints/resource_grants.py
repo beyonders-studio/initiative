@@ -16,20 +16,20 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.core.errors import CodedError
 from app.api import resource_access
 from app.api.deps import (
+    GuildContextDep,
     RLSSessionDep,
     get_current_active_user,
-    GuildContextDep,
 )
+from app.core.errors import CodedError
 from app.models.platform.user import User
-from app.services.content_sockets import resource_room, sockets
 from app.schemas.tenant.resource_grant import (
     ResourceGrantBulkItemResult,
     ResourceGrantBulkRequest,
     ResourceGrantBulkResponse,
 )
+from app.services.content_sockets import resource_room, sockets
 
 router = APIRouter()
 

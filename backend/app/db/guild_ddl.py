@@ -24,7 +24,6 @@ migrations (``scripts/gen_guild_migration.py``).
 from __future__ import annotations
 
 import json
-
 import re
 from collections.abc import Callable
 
@@ -41,32 +40,7 @@ from app.core.tools import (
     PROPERTY_TARGETS,
     Tool,
 )
-from app.db.plugin_rls import (
-    PLUGIN_REFUSED_TABLES,
-    PLUGIN_TABLE_ACCESS,
-    SEARCH_ENTRY_READ_SCOPE,
-    PluginTableKind,
-)
-from app.db.guild_migrations import split_sql_statements
-from app.db.initiative_rls import (
-    ANSWERED,
-    COMMENT_PARENTS,
-    ENTITY_INITIATIVE_FN,
-    INITIATIVE_PATHS,
-    NAMED_PEOPLE,
-    NamedPerson,
-    initiative_of,
-    INITIATIVE_SCOPED_TABLES,
-    dac_asks_at_write,
-    governing_path,
-    managed_write,
-    render_content_item_fn,
-    render_entity_access_fn,
-    render_entity_initiative_fn,
-    InitiativePath,
-)
 from app.db import gucs
-from app.db.presence import VIEW as PRESENCE_VIEW
 from app.db.authorization import (
     IN_POLICY,
     POLICY_SEAT,
@@ -82,23 +56,48 @@ from app.db.frozen import (
     FROZEN_TABLES,
     LIFECYCLE_COLUMNS,
     freeze_leg,
-    frozen_write_triggers,
     frozen_guard_trigger,
+    frozen_write_triggers,
     render_frozen_ancestor_fn,
     render_frozen_guard_fn,
     render_frozen_parent_guard_fn,
     render_resource_frozen_fn,
     render_resource_frozen_for_grant_fn,
 )
+from app.db.guild_migrations import split_sql_statements
+from app.db.initiative_rls import (
+    ANSWERED,
+    COMMENT_PARENTS,
+    ENTITY_INITIATIVE_FN,
+    INITIATIVE_PATHS,
+    INITIATIVE_SCOPED_TABLES,
+    NAMED_PEOPLE,
+    InitiativePath,
+    NamedPerson,
+    dac_asks_at_write,
+    governing_path,
+    initiative_of,
+    managed_write,
+    render_content_item_fn,
+    render_entity_access_fn,
+    render_entity_initiative_fn,
+)
+from app.db.plugin_rls import (
+    PLUGIN_REFUSED_TABLES,
+    PLUGIN_TABLE_ACCESS,
+    SEARCH_ENTRY_READ_SCOPE,
+    PluginTableKind,
+)
+from app.db.presence import VIEW as PRESENCE_VIEW
 from app.db.soft_delete_filter import SOFT_DELETE_TABLES
 from app.db.tenancy import (
     GUILD_SCOPED_TABLES,
     LEDGER_TABLES,
-    OPERATIONS_TABLES,
     MANAGED_TABLES,
-    OWN_ROW_TABLES,
     MEMBER_CREDENTIAL_TABLES,
     MEMBER_SECRET_TABLES,
+    OPERATIONS_TABLES,
+    OWN_ROW_TABLES,
     PRIVATE_ROW_SHARED_READ,
     PRIVATE_ROW_TABLES,
     SEAT_READ_TABLES,
@@ -109,7 +108,6 @@ from app.models.platform.guild import AdminSurface, CommunityRole
 from app.models.tenant.batched_notice import BatchedNoticeKind
 from app.models.tenant.initiative import InitiativeJoinPolicy
 from app.models.tenant.resource_grant import ResourceAccessLevel
-
 
 # Hard delete = purge, and only a guild admin may purge (the interactive endpoint
 # 403s otherwise; the background auto-purge worker runs as app_admin/BYPASSRLS, so
@@ -369,13 +367,17 @@ def _managed_block(table: str, initiative_expr: str) -> str:
     if table == "initiatives":
         lines += [
             "DROP POLICY IF EXISTS private_initiative_read ON initiatives;",
-            "CREATE POLICY private_initiative_read ON initiatives AS RESTRICTIVE"
-            f" FOR SELECT USING ({_PRIVATE_INITIATIVE_READ});",
+            (
+                "CREATE POLICY private_initiative_read ON initiatives AS RESTRICTIVE"
+                f" FOR SELECT USING ({_PRIVATE_INITIATIVE_READ});"
+            ),
             _INITIATIVE_COMMUNITY_COLUMNS_FN,
-            "CREATE OR REPLACE TRIGGER tr_initiatives_community_columns"
-            f" BEFORE UPDATE OF {', '.join(INITIATIVE_COMMUNITY_COLUMNS)}"
-            " ON initiatives FOR EACH ROW"
-            " EXECUTE FUNCTION public.fn_initiative_community_columns();",
+            (
+                "CREATE OR REPLACE TRIGGER tr_initiatives_community_columns"
+                f" BEFORE UPDATE OF {', '.join(INITIATIVE_COMMUNITY_COLUMNS)}"
+                " ON initiatives FOR EACH ROW"
+                " EXECUTE FUNCTION public.fn_initiative_community_columns();"
+            ),
         ]
     return "\n".join(lines)
 
@@ -618,7 +620,7 @@ $comment_author$;
 
 def _trashed_with(table: str, column: str) -> str:
     return (
-        f"EXISTS (SELECT 1 FROM {table} c WHERE c.id = NEW.{column}"  # noqa: S608
+        f"EXISTS (SELECT 1 FROM {table} c WHERE c.id = NEW.{column}"
         " AND c.deleted_at = NEW.deleted_at)"
     )
 
@@ -675,22 +677,30 @@ def _authored_block() -> str:
                 for t in AUTHORED_TABLES
             ),
             _COMMENT_AUTHOR_GUARD_FN,
-            "CREATE OR REPLACE TRIGGER tr_comments_author_guard"
-            " BEFORE UPDATE ON comments FOR EACH ROW"
-            " EXECUTE FUNCTION public.fn_comment_author_guard();",
+            (
+                "CREATE OR REPLACE TRIGGER tr_comments_author_guard"
+                " BEFORE UPDATE ON comments FOR EACH ROW"
+                " EXECUTE FUNCTION public.fn_comment_author_guard();"
+            ),
             _COMMENT_TRASH_FOLLOWS_FN,
             "DROP TRIGGER IF EXISTS tr_comments_trash_follows ON comments;",
-            "CREATE CONSTRAINT TRIGGER tr_comments_trash_follows"
-            " AFTER UPDATE ON comments DEFERRABLE INITIALLY DEFERRED FOR EACH ROW"
-            " WHEN (OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL)"
-            " EXECUTE FUNCTION public.fn_comment_trash_follows();",
+            (
+                "CREATE CONSTRAINT TRIGGER tr_comments_trash_follows"
+                " AFTER UPDATE ON comments DEFERRABLE INITIALLY DEFERRED FOR EACH ROW"
+                " WHEN (OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL)"
+                " EXECUTE FUNCTION public.fn_comment_trash_follows();"
+            ),
             "DROP POLICY IF EXISTS owner_insert ON calendar_event_answers;",
-            "CREATE POLICY owner_insert ON calendar_event_answers AS RESTRICTIVE"
-            f" FOR INSERT WITH CHECK ({_REQUESTER} OR ({gucs.IMPORTING}) IS TRUE);",
+            (
+                "CREATE POLICY owner_insert ON calendar_event_answers AS RESTRICTIVE"
+                f" FOR INSERT WITH CHECK ({_REQUESTER} OR ({gucs.IMPORTING}) IS TRUE);"
+            ),
             _ANSWER_OWNER_GUARD_FN,
-            "CREATE OR REPLACE TRIGGER tr_calendar_event_answers_owner_guard"
-            " BEFORE UPDATE ON calendar_event_answers FOR EACH ROW"
-            " EXECUTE FUNCTION public.fn_calendar_event_answer_owner_guard();",
+            (
+                "CREATE OR REPLACE TRIGGER tr_calendar_event_answers_owner_guard"
+                " BEFORE UPDATE ON calendar_event_answers FOR EACH ROW"
+                " EXECUTE FUNCTION public.fn_calendar_event_answer_owner_guard();"
+            ),
         ]
     )
 
@@ -867,15 +877,23 @@ def _custom_roles_block() -> str:
                 f"DROP POLICY IF EXISTS custom_role_{c} ON {table};"
                 for c in ("select", "insert", "update", "delete")
             ),
-            f"CREATE POLICY custom_role_select ON {table} AS PERMISSIVE FOR SELECT"
-            "  USING (true);",
-            f"CREATE POLICY custom_role_insert ON {table} AS PERMISSIVE FOR INSERT"
-            f"  WITH CHECK ({write});",
-            f"CREATE POLICY custom_role_update ON {table} AS PERMISSIVE FOR UPDATE"
-            f"  USING ({remove if table == 'custom_role_members' else write})"
-            f" WITH CHECK ({write});",
-            f"CREATE POLICY custom_role_delete ON {table} AS PERMISSIVE FOR DELETE"
-            f"  USING ({remove});",
+            (
+                f"CREATE POLICY custom_role_select ON {table} AS PERMISSIVE FOR SELECT"
+                "  USING (true);"
+            ),
+            (
+                f"CREATE POLICY custom_role_insert ON {table} AS PERMISSIVE FOR INSERT"
+                f"  WITH CHECK ({write});"
+            ),
+            (
+                f"CREATE POLICY custom_role_update ON {table} AS PERMISSIVE FOR UPDATE"
+                f"  USING ({remove if table == 'custom_role_members' else write})"
+                f" WITH CHECK ({write});"
+            ),
+            (
+                f"CREATE POLICY custom_role_delete ON {table} AS PERMISSIVE FOR DELETE"
+                f"  USING ({remove});"
+            ),
         ]
     communitys = f"({IN_POLICY.system} OR set_by = '{SetBy.community.value}')"
     lines += [
@@ -883,16 +901,24 @@ def _custom_roles_block() -> str:
             f"DROP POLICY IF EXISTS custom_role_set_by_{c} ON custom_roles;"
             for c in ("insert", "update", "delete")
         ),
-        "CREATE POLICY custom_role_set_by_insert ON custom_roles AS RESTRICTIVE"
-        f" FOR INSERT WITH CHECK ({communitys});",
-        "CREATE POLICY custom_role_set_by_update ON custom_roles AS RESTRICTIVE"
-        f" FOR UPDATE USING ({communitys}) WITH CHECK ({communitys});",
-        "CREATE POLICY custom_role_set_by_delete ON custom_roles AS RESTRICTIVE"
-        f" FOR DELETE USING ({communitys});",
+        (
+            "CREATE POLICY custom_role_set_by_insert ON custom_roles AS RESTRICTIVE"
+            f" FOR INSERT WITH CHECK ({communitys});"
+        ),
+        (
+            "CREATE POLICY custom_role_set_by_update ON custom_roles AS RESTRICTIVE"
+            f" FOR UPDATE USING ({communitys}) WITH CHECK ({communitys});"
+        ),
+        (
+            "CREATE POLICY custom_role_set_by_delete ON custom_roles AS RESTRICTIVE"
+            f" FOR DELETE USING ({communitys});"
+        ),
         CUSTOM_ROLE_RUNG_FIXED_FN,
-        "CREATE OR REPLACE TRIGGER tr_custom_roles_rung_fixed"
-        " BEFORE UPDATE OF base_rung ON custom_roles FOR EACH ROW"
-        " EXECUTE FUNCTION public.fn_custom_role_rung_fixed();",
+        (
+            "CREATE OR REPLACE TRIGGER tr_custom_roles_rung_fixed"
+            " BEFORE UPDATE OF base_rung ON custom_roles FOR EACH ROW"
+            " EXECUTE FUNCTION public.fn_custom_role_rung_fixed();"
+        ),
     ]
     return "\n".join(lines)
 
@@ -1257,7 +1283,7 @@ def _metadata_values_scope(write: bool) -> str:
     # The tool's scope is named once: the one a value no plug-in owns is
     # written with, or the read scope an install keeps its own with.
     return (
-        f"({_IID} IS NULL OR COALESCE((SELECT (md.install_id IS NULL"  # noqa: S608
+        f"({_IID} IS NULL OR COALESCE((SELECT (md.install_id IS NULL"
         f" OR md.install_id = {_IID}{hold}) AND ((md.install_id IS NOT NULL"
         f" AND metadata_values.entity_type = '{INSTALL_METADATA_KIND}')"
         f" OR COALESCE({scope} = ANY (CASE WHEN md.install_id IS NULL THEN {held}"
@@ -1556,13 +1582,17 @@ def _draft_block() -> str:
         [
             "DROP POLICY IF EXISTS published_read ON posts;",
             "CREATE POLICY published_read ON posts AS RESTRICTIVE FOR SELECT",
-            f"  USING (NOT ({DRAFTS['posts']}) OR resource_access('post', posts.id,"
-            f" {_PLUGIN_MEMBER}, posts.initiative_id, true, {STANDING}));",
+            (
+                f"  USING (NOT ({DRAFTS['posts']}) OR resource_access('post', posts.id,"
+                f" {_PLUGIN_MEMBER}, posts.initiative_id, true, {STANDING}));"
+            ),
             "DROP POLICY IF EXISTS finished_read ON wiki_pages;",
             "CREATE POLICY finished_read ON wiki_pages AS RESTRICTIVE FOR SELECT",
-            f"  USING (NOT ({DRAFTS['wiki_pages']}) OR EXISTS (SELECT 1 FROM wikis w"
-            " WHERE w.id = wiki_pages.wiki_id AND resource_access('wiki', w.id,"
-            f" {_PLUGIN_MEMBER}, w.initiative_id, true, {STANDING})));",
+            (
+                f"  USING (NOT ({DRAFTS['wiki_pages']}) OR EXISTS (SELECT 1 FROM wikis w"
+                " WHERE w.id = wiki_pages.wiki_id AND resource_access('wiki', w.id,"
+                f" {_PLUGIN_MEMBER}, w.initiative_id, true, {STANDING})));"
+            ),
         ]
     )
 
@@ -1643,13 +1673,17 @@ def _definitions_block() -> str:
     return "\n".join(
         [
             "DROP POLICY IF EXISTS definition_removal ON metadata_definitions;",
-            "CREATE POLICY definition_removal ON metadata_definitions AS RESTRICTIVE"
-            f" FOR DELETE USING (NOT ({_INITIATIVE_FIELD})"
-            f" OR {_sets_up('initiative_id')});",
+            (
+                "CREATE POLICY definition_removal ON metadata_definitions AS RESTRICTIVE"
+                f" FOR DELETE USING (NOT ({_INITIATIVE_FIELD})"
+                f" OR {_sets_up('initiative_id')});"
+            ),
             _DEFINITION_RESHAPE_FN,
-            "CREATE OR REPLACE TRIGGER tr_metadata_definitions_reshape"
-            " BEFORE UPDATE ON metadata_definitions FOR EACH ROW"
-            " EXECUTE FUNCTION public.fn_metadata_definition_reshape();",
+            (
+                "CREATE OR REPLACE TRIGGER tr_metadata_definitions_reshape"
+                " BEFORE UPDATE ON metadata_definitions FOR EACH ROW"
+                " EXECUTE FUNCTION public.fn_metadata_definition_reshape();"
+            ),
         ]
     )
 
@@ -1746,8 +1780,10 @@ def _departure_policies() -> str:
             f"DROP POLICY IF EXISTS departure_read ON {t};",
             f"DROP POLICY IF EXISTS departure_update ON {t};",
             f"DROP POLICY IF EXISTS departure_delete ON {t};",
-            f"CREATE POLICY departure_read ON {t} AS PERMISSIVE FOR SELECT"
-            f"  USING ({departed});",
+            (
+                f"CREATE POLICY departure_read ON {t} AS PERMISSIVE FOR SELECT"
+                f"  USING ({departed});"
+            ),
             f"CREATE POLICY {write}",
         ]
     return "\n".join(lines)
@@ -1807,7 +1843,7 @@ def render_guild_rls_ddl() -> str:
     from app.db.guest_access import render_guest_rls_ddl
     from app.db.holds import render_holds_ddl
     from app.db.moderation_log import render_moderation_log_ddl
-    from app.db.presence import render_presence_policies  # noqa: PLC0415
+    from app.db.presence import render_presence_policies
 
     blocks = [_table_block(t, INITIATIVE_PATHS[t]) for t in sorted(INITIATIVE_PATHS)]
     # Shared, and written before the policies that call it. Re-rendered on every
@@ -1979,7 +2015,7 @@ def _build_tables(sync_conn, tables: frozenset[str]) -> list[str]:
 # The only interpolation below is the _SRC_SCHEMA string literal — no user input
 # reaches this module's rendered SQL (scanner: hardcoded_sql_expressions is the
 # point; this file IS the DDL renderer).
-_INDEX_SQL = text(  # noqa: S608
+_INDEX_SQL = text(
     f"""
     SELECT tc.relname AS tbl, pg_get_indexdef(i.indexrelid) AS indexdef
     FROM pg_index i
@@ -2008,7 +2044,7 @@ def _schema_relative_index(indexdef: str) -> str:
 # the registries render (freeze, capture, search) are not structure and are
 # left out by name below — see ``rendered_trigger_names`` — so a template that
 # still carries them from an earlier boot contributes nothing of theirs here.
-_TRIGGER_SQL = text(  # noqa: S608 — interpolates only the _SRC_SCHEMA literal
+_TRIGGER_SQL = text(
     f"""
     SELECT cl.relname AS tbl, tg.tgname AS name, pg_get_triggerdef(tg.oid) AS triggerdef
     FROM pg_trigger tg

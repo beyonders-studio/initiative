@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer
@@ -39,7 +39,7 @@ class PostRead(SQLModel, table=True):
     #: the same shape every other reader-scoped column here takes.
     user_id: int = Field(primary_key=True, nullable=False, index=True)
     read_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 

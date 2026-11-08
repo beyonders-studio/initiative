@@ -45,8 +45,9 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, Mapping, Optional
+from collections.abc import Iterable, Mapping
+from datetime import UTC, datetime
+from typing import Any
 
 from app.db import post_commit
 
@@ -78,7 +79,7 @@ RESOURCE_RESYNC = "resync"
 #: the frames carry no content, so "your inbox changed" twice is once. Bounded,
 #: because a bus that stays down must not grow this without limit — past the
 #: bound the far side is brought up to date by its own reconnect instead.
-_pending_remote: Dict[tuple[int, str], Dict[str, Any]] = {}
+_pending_remote: dict[tuple[int, str], dict[str, Any]] = {}
 MAX_PENDING_REMOTE = 2048
 
 #: Whether the bound above was reached, which is the one case where what was
@@ -88,8 +89,8 @@ _dropped_remote = False
 
 
 def build_frame(
-    resource: str, action: str, ids: Dict[str, Any] | None = None
-) -> Dict[str, Any]:
+    resource: str, action: str, ids: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """The shape both channels send.
 
     ``ids`` names what to refetch and nothing about it; for a channel addressed
@@ -99,11 +100,11 @@ def build_frame(
         "resource": resource,
         "action": action,
         "ids": ids or {},
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
-async def publish(user_ids: Iterable[int], frame: Dict[str, Any]) -> None:
+async def publish(user_ids: Iterable[int], frame: dict[str, Any]) -> None:
     """Deliver one frame to these users, wherever their tabs are.
 
     Local sockets first and unconditionally, then the bus for everybody else's
@@ -115,7 +116,7 @@ async def publish(user_ids: Iterable[int], frame: Dict[str, Any]) -> None:
     await _publish_remote(user_ids, frame)
 
 
-def _deliver_local(user_ids: Optional[Iterable[int]], frame: Dict[str, Any]) -> None:
+def _deliver_local(user_ids: Iterable[int] | None, frame: dict[str, Any]) -> None:
     """Queue the frame on this process's sockets for these users, or for every
     account socket here when ``user_ids`` is ``None``."""
     from app.services.content_sockets import account_room, sockets
@@ -124,7 +125,7 @@ def _deliver_local(user_ids: Optional[Iterable[int]], frame: Dict[str, Any]) -> 
         sockets.emit_json(account_room(user_id), frame)
 
 
-async def _publish_remote(user_ids: list[int], frame: Dict[str, Any]) -> None:
+async def _publish_remote(user_ids: list[int], frame: dict[str, Any]) -> None:
     """Hand the frame to the other workers, if we can reach them.
 
     A bus we cannot reach is not an error anybody can act on — the frame was
@@ -175,7 +176,7 @@ async def deliver_remote(payload: str) -> None:
     _deliver_local(user_ids, frame)
 
 
-async def _publish_to_everyone(frame: Dict[str, Any]) -> bool:
+async def _publish_to_everyone(frame: dict[str, Any]) -> bool:
     """One frame for every socket on every other worker, and whether it went.
 
     For the case where a frame is owed and whose it was cannot be said. Costs
@@ -194,7 +195,7 @@ async def _publish_to_everyone(frame: Dict[str, Any]) -> bool:
         return False
 
 
-async def publish_to_everyone(frame: Dict[str, Any]) -> None:
+async def publish_to_everyone(frame: dict[str, Any]) -> None:
     """``frame`` for every connected reader, on this worker and the others.
 
     For a change every account's answer is read from, such as a deployment
@@ -239,8 +240,8 @@ async def on_bus_connected() -> None:
 
 
 def queue_frame(
-    session: Any, user_id: int | None, frame: Dict[str, Any]
-) -> Dict[str, Any] | None:
+    session: Any, user_id: int | None, frame: dict[str, Any]
+) -> dict[str, Any] | None:
     """Note a frame this session has earned but not yet committed.
 
     Nothing is sent here — the frames go once the transaction commits, so a
@@ -281,10 +282,10 @@ def queue_signals(
         queue_frame(session, user_id, build_frame(resource, action))
 
 
-class _Frames(dict[tuple[int, str], Dict[str, Any]]):
+class _Frames(dict[tuple[int, str], dict[str, Any]]):
     """One transaction's frames, keyed by ``(user_id, resource)``."""
 
-    def join(self, released: Mapping[tuple[int, str], Dict[str, Any]]) -> None:
+    def join(self, released: Mapping[tuple[int, str], dict[str, Any]]) -> None:
         """Take a released savepoint's frames: each one this lacks, and for one
         it holds already, what the savepoint's names beside its own."""
         for key, frame in released.items():
@@ -302,10 +303,10 @@ class _Frames(dict[tuple[int, str], Dict[str, Any]]):
 
 
 def _grouped(
-    frames: Mapping[tuple[int, str], Dict[str, Any]],
-) -> list[tuple[list[int], Dict[str, Any]]]:
+    frames: Mapping[tuple[int, str], dict[str, Any]],
+) -> list[tuple[list[int], dict[str, Any]]]:
     """Frames that say the same thing, each with every reader it is for."""
-    groups: Dict[str, tuple[list[int], Dict[str, Any]]] = {}
+    groups: dict[str, tuple[list[int], dict[str, Any]]] = {}
     for (user_id, _resource), frame in frames.items():
         said = json.dumps(
             [frame.get("resource"), frame.get("action"), frame.get("ids")],

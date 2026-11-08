@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import AwareDatetime, EmailStr, Field, field_validator
 
@@ -16,9 +16,9 @@ class DemoRedeem(SanitizedBaseModel):
     """A demo link's token, read from the link's fragment."""
 
     token: str = Field(min_length=1, max_length=128)
-    captcha_token: Optional[str] = None
+    captcha_token: str | None = None
     #: An address to leave for a follow-up, kept apart from the account.
-    email: Optional[EmailStr] = None
+    email: EmailStr | None = None
 
 
 class DemoRedemption(Token):
@@ -45,7 +45,7 @@ class DemoCopyRead(SanitizedBaseModel):
     community_id: int
     ready: bool
     failed: bool = False
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
 
 
 class DemoPitchRead(SanitizedBaseModel):
@@ -53,7 +53,7 @@ class DemoPitchRead(SanitizedBaseModel):
     version visitors get."""
 
     is_pitch: bool
-    last_published_at: Optional[datetime] = None
+    last_published_at: datetime | None = None
 
 
 # --- the sales plug-in's API ---------------------------------------------------
@@ -143,10 +143,10 @@ class DemoPitchCreated(SanitizedBaseModel):
 class DemoLinkCreate(SanitizedBaseModel):
     pitch_ref: str = Field(min_length=1, max_length=64)
     role: Literal["member", "admin", "superadmin"] = "admin"
-    max_redemptions: Optional[int] = Field(default=None, ge=1)
+    max_redemptions: int | None = Field(default=None, ge=1)
     #: When the link stops opening copies, with its zone; 30 days from now
     #: when omitted.
-    expires_at: Optional[AwareDatetime] = None
+    expires_at: AwareDatetime | None = None
 
 
 class DemoLinkCreated(SanitizedBaseModel):

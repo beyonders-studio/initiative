@@ -1,5 +1,6 @@
-from datetime import datetime, timedelta, timezone
-from typing import Any, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import delete, func, tuple_, update
 from sqlmodel import select
@@ -15,7 +16,7 @@ from app.services.platform import (
 )
 
 
-def _int_or_none(value: object) -> Optional[int]:
+def _int_or_none(value: object) -> int | None:
     try:
         return int(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
@@ -53,9 +54,9 @@ async def create_notification(
     user_id: int,
     notification_type: NotificationType,
     data: Mapping[str, object],
-    prefs: Optional[Mapping[str, Any]] = None,
-    read_at: Optional[datetime] = None,
-) -> Optional[Notification]:
+    prefs: Mapping[str, Any] | None = None,
+    read_at: datetime | None = None,
+) -> Notification | None:
     """Write one notification, unless its recipient has switched the bell off
     for that category. ``read_at`` writes it already read: the record of
     something the recipient was shown elsewhere.
@@ -116,7 +117,7 @@ async def announce_on_desktop(session: AsyncSession, line: Notification) -> None
 
 async def get_notification(
     session: AsyncSession, *, user_id: int, notification_id: int
-) -> Optional[Notification]:
+) -> Notification | None:
     """One of this account's lines, or ``None``."""
     result = await session.exec(
         select(Notification).where(
@@ -184,7 +185,7 @@ async def refresh_notification(
     """
     notification.data = dict(data)
     if bump:
-        notification.created_at = datetime.now(timezone.utc)
+        notification.created_at = datetime.now(UTC)
         notification.read_at = None
     session.add(notification)
     await session.flush()
@@ -309,7 +310,7 @@ async def read_subject(
                     Notification.subject_id == subject_id,
                     Notification.read_at.is_(None),
                 )
-                .values(read_at=datetime.now(timezone.utc))
+                .values(read_at=datetime.now(UTC))
                 .returning(Notification.data)
             )
         )
@@ -345,7 +346,7 @@ async def mark_notification_read(
     if notification is None:
         return None
     if notification.read_at is None:
-        notification.read_at = datetime.now(timezone.utc)
+        notification.read_at = datetime.now(UTC)
         session.add(notification)
         # The tab that clicked already knows; this is for the user's *other*
         # tabs and devices, whose badge would otherwise keep the stale count.
@@ -402,7 +403,7 @@ async def mark_all_notifications_read(
     guild_id: int | None = None,
 ) -> int:
     """Clear the unread set, or just one community's part of it."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     stmt = (
         update(Notification)
         .where(Notification.user_id == user_id, Notification.read_at.is_(None))

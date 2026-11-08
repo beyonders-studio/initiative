@@ -25,7 +25,6 @@ from app.services.auth.oidc.flow_state import s256
 from app.services.platform import auth_posture
 from app.testing import create_user, registration_for, stub_registration
 
-
 BEGIN = "/api/v1/auth/register/passkey/begin"
 FINISH = "/api/v1/auth/register/passkey/finish"
 

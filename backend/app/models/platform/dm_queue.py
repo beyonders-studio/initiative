@@ -17,7 +17,7 @@ session or continue one.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import ConfigDict
 from sqlalchemy import (
@@ -65,6 +65,6 @@ class DmQueueItem(SQLModel, table=True):
     message_type: int = Field(sa_column=Column(SmallInteger, nullable=False))
     payload: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

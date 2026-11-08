@@ -1,12 +1,12 @@
 """Integration tests for authenticated /uploads/* file serving."""
 
+from datetime import UTC
 from pathlib import Path
 
 import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.testing.schema_harness import route_session_to_guild
 from app.core.config import settings
 from app.core.security import create_upload_token
 from app.services.storage import USER_CONTENT_CSP
@@ -23,6 +23,7 @@ from app.testing.factories import (
     get_auth_headers,
     get_auth_token,
 )
+from app.testing.schema_harness import route_session_to_guild
 
 
 def _uploads_dir() -> Path:
@@ -94,9 +95,8 @@ async def test_a_served_upload_is_cacheable_but_not_indefinitely(
     would let a reader who lost access go on drawing what they fetched. So
     the window is bounded, private to that browser, and not reusable once
     stale."""
-    from app.models.tenant.upload import Upload
-
     from app.main import UPLOAD_CACHE_SECONDS
+    from app.models.tenant.upload import Upload
 
     user = await create_user(session)
     guild = await create_guild(session, creator=user)
@@ -434,7 +434,7 @@ async def test_upload_suspended_guild_member_404_grant_still_served(
     """A member of a SUSPENDED guild can no longer fetch its uploads (404, the
     route's fail-closed shape), while a live PAM grant still serves — the
     seam's member-only status gate."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from app.models.platform.access_grant import AccessGrant
     from app.models.platform.guild import CommunityStatus
@@ -450,7 +450,7 @@ async def test_upload_suspended_guild_member_404_grant_still_served(
         user,
         filename="suspended_guild.txt",
         initiative_id=initiative.id,
-        claimed_at=datetime.now(timezone.utc),
+        claimed_at=datetime.now(UTC),
     )
     guild.status = CommunityStatus.suspended.value
     await session.commit()
@@ -462,7 +462,7 @@ async def test_upload_suspended_guild_member_404_grant_still_served(
 
     # A scoped PAM read grantee is unaffected (PAM overrides suspension).
     grantee = await create_user(session, role="support")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     session.add(
         AccessGrant(
             user_id=grantee.id,
@@ -629,7 +629,7 @@ async def test_an_upload_is_reached_through_the_initiative_that_shows_it(
     initiative's content, that initiative's members read it and nobody else
     in the guild does. Saved into content of the whole guild, every member
     does."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     uploader = await create_user(session)
     guild = await create_guild(session, creator=uploader)
@@ -640,7 +640,7 @@ async def test_an_upload_is_reached_through_the_initiative_that_shows_it(
     await create_guild_membership(session, user=outsider, guild=guild)
     initiative = await create_initiative(session, guild, uploader)
     await create_initiative_member(session, initiative, member)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     kept = {
         "draft.txt": {},
         "initiative.txt": {"initiative_id": initiative.id, "claimed_at": now},

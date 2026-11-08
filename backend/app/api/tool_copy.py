@@ -17,7 +17,7 @@ from collections.abc import Awaitable, Callable, Collection, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import or_
@@ -50,18 +50,22 @@ from app.schemas.tenant.resource_grant import ResourceGrantSchema
 from app.services import notifications as notifications_service
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import calendar_occurrences as occurrences_service
+from app.services.tenant import (
+    content_references,
+    named_people,
+    project_grants,
+    relationships,
+    task_creation,
+)
 from app.services.tenant import files as files_service
-from app.services.tenant import named_people, project_grants
 from app.services.tenant import metadata as metadata_service
-from app.services.tenant import content_references, relationships
-from app.services.tenant.relationships import Endpoint
 from app.services.tenant import tags as tags_service
-from app.services.tenant import task_creation
-from app.services.tenant import task_types as task_types_service
 from app.services.tenant import task_statuses as task_statuses_service
+from app.services.tenant import task_types as task_types_service
 from app.services.tenant import tool_layouts as tool_layouts_service
 from app.services.tenant import wikis as wikis_service
 from app.services.tenant.names import copy_name, ensure_name_free
+from app.services.tenant.relationships import Endpoint
 
 #: async (session, source, copy, actor) -> the rows made inside ``copy``
 Contents = Callable[[AsyncSession, Any, Any, ActorContext], Awaitable[Sequence[Any]]]
@@ -75,18 +79,18 @@ class ToolCopier:
     #: filed under it (``lifecycle_tree.CASCADE_CHILDREN``) stays with the
     #: source; ``tool_copy_test`` holds the two to each other.
     copies: frozenset[type] = frozenset()
-    contents: Optional[Contents] = None
+    contents: Contents | None = None
     #: Columns a copy starts afresh rather than carries.
     reset: Mapping[str, Any] = field(default_factory=dict)
     #: The refusal when the target initiative already has one of this name;
     #: ``None`` where names may repeat.
-    name_taken: Optional[str] = None
+    name_taken: str | None = None
     #: Whether a name may carry the reserved sigils, as a file's may: it
     #: starts life as a filename.
     name_takes_sigils: bool = False
     #: async (session, copy_id, user): tell people about the copy, once it is
     #: committed.
-    announce: Optional[Callable[[AsyncSession, int, User], Awaitable[None]]] = None
+    announce: Callable[[AsyncSession, int, User], Awaitable[None]] | None = None
 
 
 #: What a row says about its own lifecycle and origin rather than its content.
@@ -193,7 +197,7 @@ async def load_source(
     session: AsyncSession,
     tool: Tool,
     source_id: int,
-    user: Optional[User],
+    user: User | None,
     actor: ActorContext,
 ) -> Any:
     """The row to copy, once the caller may copy it. Read is enough for a
@@ -212,13 +216,13 @@ async def duplicate(
     tool: Tool,
     source: Any,
     *,
-    initiative_id: Optional[int],
-    name: Optional[str],
-    user: Optional[User],
+    initiative_id: int | None,
+    name: str | None,
+    user: User | None,
     actor: ActorContext,
     payload: Any,
     values: Mapping[str, Any] | None = None,
-    grants: Optional[list[ResourceGrantSchema]] = None,
+    grants: list[ResourceGrantSchema] | None = None,
 ) -> Any:
     """Copy ``source`` into ``initiative_id`` (its own when ``None``), held to
     what a create there is held to. Beside its source the copy is called
@@ -402,7 +406,10 @@ async def _post_contents(
             )
         ).all()
         await _copy_children(
-            session, options, beside=False, values=lambda _: {"poll_id": clone.id}
+            session,
+            options,
+            beside=False,
+            values=lambda _, clone=clone: {"poll_id": clone.id},
         )
     return []
 
@@ -413,7 +420,7 @@ async def _copy_events(
     *,
     beside: bool,
     values: Callable[[Any], Mapping[str, Any]],
-    people: Optional[Collection[int]] = None,
+    people: Collection[int] | None = None,
 ) -> list[tuple[Any, Any]]:
     """Copy ``events``, each series among them with the occurrences changed on
     their own, and their invitees (those in ``people`` when it is given),
@@ -548,7 +555,7 @@ async def duplicate_event(
     session: AsyncSession,
     event: CalendarEvent,
     calendar: Calendar,
-    at: Optional[datetime] = None,
+    at: datetime | None = None,
 ) -> CalendarEvent:
     """Copy ``event``, in ``calendar``, beside itself as "<title> (Copy)",
     with its invitees who can open the calendar. A series takes the

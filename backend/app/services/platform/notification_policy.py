@@ -31,8 +31,9 @@ whichever session happens to be sending.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Iterable, Mapping, TypeVar, cast
+from typing import TYPE_CHECKING, cast
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -52,7 +53,7 @@ class NotificationPolicy:
     email: bool
     redact: bool
 
-    def stricter_than(self, other: "NotificationPolicy") -> "NotificationPolicy":
+    def stricter_than(self, other: NotificationPolicy) -> NotificationPolicy:
         return NotificationPolicy(
             push=self.push and other.push,
             email=self.email and other.email,
@@ -187,9 +188,6 @@ async def for_send_many(
 
 # --- What a notification says as it leaves ----------------------------------
 
-#: What a channel carries: a push's ``(title, body)``, or a notification email.
-Pieces = TypeVar("Pieces", tuple[str, str], "EmailPieces")
-
 
 def redacted_line(category: NotificationCategory, locale: str) -> tuple[str, str]:
     """The title and body a redacted notification carries, as ``(title, body)``.
@@ -205,7 +203,7 @@ def redacted_line(category: NotificationCategory, locale: str) -> tuple[str, str
     )
 
 
-def apply(
+def apply[Pieces: (tuple[str, str], "EmailPieces")](
     policy: NotificationPolicy,
     pieces: Pieces,
     *,

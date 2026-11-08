@@ -4,65 +4,33 @@ icon: lucide/shield-check
 
 # Security & privacy
 
-"Is my stuff safe and private?" is a fair question to ask of anything you hand your group's information to.
+In Initiative, the people who can see something are the people it was shared with. The database checks that on every request, so it holds without anybody having to set it up.
 
-Short answer: the only people who see something are the people you deliberately gave it to. That isn't a setting to hunt for and switch on — it's how the layers work by default, all the way down to the database. Here's what that means day to day, and where the detail lives.
+This section explains how. Pick the page that answers your question:
 
-- **This page** explains what security means for *you*, as someone using Initiative day to day.
-- **[How your data is kept separate](how-your-data-is-kept-separate.md)** is the technical explanation of multi-tenancy and how the boundaries are enforced — written for project managers, people who run servers, and anyone evaluating Initiative.
-- **[Your community's sign-in and security](community-security.md)** is for a community that decides who gets in and on what terms — its own single sign-on, where groups land, personal API keys, and session length.
-- **[Private messages](private-messages.md)** explains what end-to-end encryption covers, and what could and could not be handed over if somebody asked.
-- **[Data & compliance](data-and-compliance.md)** covers data ownership, encryption, your data rights, and what compliance posture you can expect.
-- **[Reporting a problem](reporting-a-problem.md)** is how to responsibly report a security concern.
+| If you want to know | Read |
+|---|---|
+| How communities are kept apart, and how an initiative stays private inside its community | [How your data is kept separate](how-your-data-is-kept-separate.md) |
+| What end-to-end encryption covers in direct messages, and what the server can see | [Private messages](private-messages.md) |
+| What Initiative keeps, where it lives, what leaves the server, and how to export or erase it | [Data & compliance](data-and-compliance.md) |
+| How a community can require its own single sign-on, a second factor or shorter sessions | [Your community's sign-in and security](community-security.md) |
+| Where to report a security problem | [Reporting a problem](reporting-a-problem.md) |
 
-## What "secure" means for you
+## What you can rely on
 
-In everyday terms, Initiative is built so that:
+- **Each community is separate.** Its content lives in its own part of the database, and members of other communities on the same server can't reach it.
+- **An initiative is private to its members.** Inside a community, somebody who isn't in an initiative can't open anything in it unless an item was shared with them. The community's admins can see everything in their community. See [Sharing & access](../sharing/index.md).
+- **Direct messages are end-to-end encrypted.** Only the devices in the conversation hold the keys to read them.
+- **Your sign-in is protected.** Your session is kept in a cookie the page's own scripts can't read, and passwords are at least 12 characters and stored only as a one-way hash. You can add [two-factor authentication](../account/two-factor-authentication.md) or a [passkey](../account/passkeys.md).
+- **Staff access is temporary and recorded.** Somebody who helps run the server can open a community they don't belong to only through a grant that expires, and every grant is recorded in the audit log.
 
-### Your group's data is separate from every other group's
+## Looking after your account
 
-Each community is a sealed space. Another group using the same Initiative server cannot see your projects, files, or tasks — and you can't see theirs. This separation isn't a setting that could be toggled off by accident: every community's content lives in its own dedicated area of the database (a separate *schema*), created with the community and removed with it. The finer layers — which effort, which role, which item — are enforced inside that space by the database as well (more in the technical pages).
-
-### Sensitive work stays with the people involved
-
-Inside a community, an **initiative** is only visible to its members. So a small group can work on something private without the rest of the community seeing it — a business's finances away from its seasonal staff, a hiring committee's notes away from the rest of the team. And individual projects and files can be narrowed further still — see [Sharing & access](../sharing/index.md).
-
-This is the layer most groups rely on day to day, and it needs no configuration: someone who isn't in an initiative simply doesn't have it.
-
-### Your sign-in is protected
-
-- Your sign-in session is held in a cookie the page's own scripts can't read.
-- You can use your organization's **single sign-on** instead of a separate password.
-- Passwords must be **at least 12 characters**, and are never stored in readable form.
-
-### Sensitive information is encrypted
-
-The most sensitive stored fields — saved API keys, email addresses, and the like — are **encrypted at rest**, so the raw database file doesn't carry them in the clear. More in [Data & compliance](data-and-compliance.md).
-
-### Your private messages are only yours
-
-Direct messages are **end-to-end encrypted**: written on your device, read on theirs, and unreadable everywhere in between. A community admin can't read them, whoever runs the server can't read them, and neither can we — not as a policy, but because no key to them exists outside the two devices talking.
-
-The trade is that your history lives on your devices rather than on a server, so a new device starts from when it arrived and signing out of a browser takes its copy with it. See [Private messages](private-messages.md).
-
-### You stay in control of your account
-
-- See **where you're signed in** and sign out or remove any device you don't recognize, from **My Settings → Security**.
-- Every email about a change to how you sign in carries a **This wasn't me** button. It signs your account out on every browser, phone and computer and turns off its API keys. When the change looks out of place, the emails to your older addresses can also undo it. See ["This wasn't me"](../account/profile-and-preferences.md#this-wasnt-me).
-- Some changes wait two days when they're made from somewhere your account hasn't been signed in for long: moving your primary address, removing a confirmed address, turning off two-factor authentication, and removing your last passkey. Every confirmed address is emailed with a link to cancel, and the change shows at the top of **Account** and **Security** in your settings with **Cancel the change**. See [Changes that wait](../account/profile-and-preferences.md#changes-that-wait).
-- Create and **revoke access keys** for apps and scripts at any time (see [API keys & integrations](../account/api-keys-and-integrations.md)).
-- **Deactivate or delete your account** whenever you choose, from the bottom of **My Settings → Account**. You decide whether your content is preserved or removed. See [Data & compliance](data-and-compliance.md).
-
-## A few habits that do most of the work
-
-Security is a partnership, and your half of it is genuinely not complicated:
-
-- **Use a strong, unique password** (or single sign-on). A password manager makes this effortless.
-- **Sign out on shared computers**, and don't tick "stay signed in" on a device that isn't yours.
-- **Share at the lowest level that works** — Viewer rather than Editor, a few people rather than everyone — and widen later if needed.
-- **Be careful with access keys.** Treat an API key like a password; if one might be exposed, delete it.
-- **Tell someone if something looks wrong.** If you can see something you don't think you should, that's worth reporting — see [Reporting a problem](reporting-a-problem.md).
+- **My Settings → Security** shows everywhere you're signed in, and you can sign out any browser or device you don't recognize there.
+- Every email about a change to how you sign in has a **This wasn't me** button. It signs your account out everywhere and turns off your API keys. See [Sign-in and security](../account/sign-in-and-security.md#this-wasnt-me).
+- If an [API key](../account/api-keys-and-integrations.md) might have been seen by somebody else, delete it.
+- You can deactivate or delete your account from **My Settings → Account**. [Removing data](data-and-compliance.md#removing-data) explains what each one does.
 
 ## If you run the server
 
-If you run the server, security also depends on how you set it up and look after it — strong secrets, backups, updates, and sensible configuration. That's covered in the [server guide](../running-a-server/index.md), especially [Configuration](../running-a-server/configuration.md) and [Backups & updates](../running-a-server/backups-and-updates.md).
+How the server is set up and looked after matters too: its secret key, HTTPS, backups and updates. The [server guide](../running-a-server/index.md) covers it, starting with [Configuration](../running-a-server/configuration.md) and [Backups & updates](../running-a-server/backups-and-updates.md).

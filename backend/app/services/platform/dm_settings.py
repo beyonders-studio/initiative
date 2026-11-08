@@ -12,11 +12,10 @@ operator's choice, silently, which is what ``dm_settings_test`` is for.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from sqlmodel import col, select
 
 from app.core.errors import CodedError
@@ -47,7 +46,7 @@ async def seed_for_new_account(session: AsyncSession, *, user_id: int) -> None:
     policy = (await rules.platform_values(session))["default_dm_policy"]
     # A core insert, so the model's default factories do not run: the
     # timestamps are named here.
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await session.exec(
         pg_insert(UserDmSettings)
         .values(
@@ -177,14 +176,17 @@ async def update_settings(
 
     row = await _row_for(session, user.id)
 
-    if dm_policy is not None and dm_policy is not DmPolicy.private:
-        if (
+    if (
+        dm_policy is not None
+        and dm_policy is not DmPolicy.private
+        and (
             user.age_confirmed_at is None
             and await app_settings_service.community_age_gate_enabled(session)
-        ):
-            raise DirectMessageSettingsError(
-                DirectMessageMessages.AGE_CONFIRMATION_REQUIRED
-            )
+        )
+    ):
+        raise DirectMessageSettingsError(
+            DirectMessageMessages.AGE_CONFIRMATION_REQUIRED
+        )
 
     if communities:
         member_of = {
@@ -214,7 +216,7 @@ async def update_settings(
     if send_receipts is not None:
         row.send_receipts = send_receipts
     if dm_policy is not None or communities or send_receipts is not None:
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = datetime.now(UTC)
         session.add(row)
 
     if dm_policy is not None or communities:

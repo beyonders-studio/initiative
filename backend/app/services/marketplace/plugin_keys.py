@@ -22,9 +22,10 @@ import hashlib
 import json
 import logging
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Mapping, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 import httpx
@@ -45,12 +46,12 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "JWKS_MAX_BYTES",
     "KEY_SET_PATH",
-    "KeySetUnreadableError",
-    "PRIVATE_JWK_MEMBERS",
     "PLUGIN_KEY_CURVE",
     "PLUGIN_KEY_TYPE",
-    "is_plugin_key",
+    "PRIVATE_JWK_MEMBERS",
+    "KeySetUnreadableError",
     "clear_fetched_keys",
+    "is_plugin_key",
     "jwk_thumbprint",
     "jwks_uri_allowed",
     "key_for",
@@ -95,7 +96,7 @@ class KeySetUnreadableError(Exception):
     """A key set address that did not answer 200 with a JSON document."""
 
 
-def _origin(url: str) -> Optional[tuple[str, str, Optional[int]]]:
+def _origin(url: str) -> tuple[str, str, int | None] | None:
     parsed = urlparse(url)
     if not parsed.scheme or not parsed.hostname:
         return None
@@ -245,7 +246,7 @@ async def key_for(
     kid: str,
     *,
     transport: httpx.AsyncBaseTransport | None = None,
-) -> Optional[Any]:
+) -> Any | None:
     """The public key ``kid`` names in this registration's key sets, or
     ``None``: the pasted set first, then the published one."""
     if not kid:

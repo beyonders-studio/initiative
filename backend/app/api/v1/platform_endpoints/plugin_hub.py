@@ -13,7 +13,7 @@ how it ended and none of its parameters.
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
@@ -22,16 +22,16 @@ from app.api.deps import (
     CREDENTIAL_INSTALL,
     InstallAccessError,
     SessionDep,
+    SystemSessionDep,
     VerifiedInstall,
     establish_install_access,
     oauth2_scheme,
-    SystemSessionDep,
 )
 from app.core import audit_context
-from app.core.plugin_access_token import InstallAccessToken
 from app.core.audit_events import AuditEventType
 from app.core.identify import bearer_plugin_token
-from app.core.messages import PluginDataMessages, AuthMessages
+from app.core.messages import AuthMessages, PluginDataMessages
+from app.core.plugin_access_token import InstallAccessToken
 from app.core.rate_limit import (
     PLUGIN_HUB_CALLS_PER_INSTALL,
     PLUGIN_HUB_CALLS_PER_TARGET,
@@ -66,7 +66,7 @@ async def hub_caller(
     request: Request,
     session: SessionDep,
     # Declares the scheme for the API description; read by ``bearer_plugin_token``.
-    bearer: Annotated[Optional[str], Depends(oauth2_scheme)] = None,
+    bearer: Annotated[str | None, Depends(oauth2_scheme)] = None,
 ) -> hub_service.HubCaller:
     """The plug-in the request's installation or member token names, or 401.
 
@@ -128,7 +128,7 @@ def _audit(
     target: str,
     endpoint_id: str,
     outcome: str,
-    direction: Optional[str] = None,
+    direction: str | None = None,
 ) -> None:
     detail: dict[str, Any] = {
         "caller": caller.client_id,

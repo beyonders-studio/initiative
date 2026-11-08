@@ -38,9 +38,10 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.audit_events import AuditEventType
 from app.core.messages import AuthProviderMessages, GuildMessages, SettingsMessages
 from app.db import cohorts
+from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.platform.auth_provider import AuthProvider
-from app.models.platform.guild import GUILD_ASSIGNABLE_ROLES, Guild, CommunityStatus
+from app.models.platform.guild import GUILD_ASSIGNABLE_ROLES, CommunityStatus, Guild
 from app.models.platform.guild_provider_connection import (
     GuildProviderConnection,
     narrowing_admits,
@@ -64,7 +65,6 @@ from app.schemas.platform.settings import (
 )
 from app.services import audit as audit_service
 from app.services.platform import rules
-from app.db.request_context import SystemGuild
 
 logger = logging.getLogger(__name__)
 
@@ -781,22 +781,16 @@ async def rewrite_rule(
     before = audited(row, fields, was)
 
     row.claim_value, row.scope_claim, row.scope_value = _clean_match(
-        data["claim_value"] if "claim_value" in data else row.claim_value,
-        data["scope_claim"] if "scope_claim" in data else row.scope_claim,
-        data["scope_value"] if "scope_value" in data else row.scope_value,
+        data.get("claim_value", row.claim_value),
+        data.get("scope_claim", row.scope_claim),
+        data.get("scope_value", row.scope_value),
     )
     if data.get("community_role") is not None:
         _require_mappable_role(data["community_role"])
         row.guild_role = data["community_role"]
-    initiative_id = (
-        data["initiative_id"]
-        if "initiative_id" in data
-        else (was.initiative_id if was else None)
-    )
-    initiative_role_id = (
-        data["initiative_role_id"]
-        if "initiative_role_id" in data
-        else (was.initiative_role_id if was else None)
+    initiative_id = data.get("initiative_id", was.initiative_id if was else None)
+    initiative_role_id = data.get(
+        "initiative_role_id", was.initiative_role_id if was else None
     )
     row.target_type = destination_type(initiative_id, initiative_role_id)
     # Moving the rule writes its next version, which it names once committed

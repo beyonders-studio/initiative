@@ -5,7 +5,8 @@ reaches across initiatives, and an answer rendered from the side that asked —
 so a caller never has to know that a symmetric edge is stored in node-id order.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from httpx import AsyncClient
 from sqlalchemy import text
 
@@ -14,10 +15,7 @@ from app.core.relationships import EndpointKind, RelationshipType
 from app.models.platform.guild import CommunityRole
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import rules
-from app.testing.routing import route_as
-from app.testing.schema_harness import route_session_to_guild
 from app.testing import (
-    create_resource_grant,
     create_calendar_event,
     create_file,
     create_guest,
@@ -26,11 +24,14 @@ from app.testing import (
     create_initiative,
     create_project,
     create_relationship,
+    create_resource_grant,
     create_tag,
     create_task,
     create_user,
     get_auth_headers,
 )
+from app.testing.routing import route_as
+from app.testing.schema_harness import route_session_to_guild
 
 
 def _url(a) -> str:
@@ -408,7 +409,7 @@ async def test_an_archived_project_takes_no_new_links(
     )
     doc = await create_file(session, a.initiative, a.user)
     await route_session_to_guild(session, a.guild.id)
-    a.project.archived_at = datetime.now(timezone.utc)
+    a.project.archived_at = datetime.now(UTC)
     session.add(a.project)
     await session.commit()
 

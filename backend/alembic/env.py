@@ -3,24 +3,25 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+import sys
+from datetime import UTC, datetime
 from logging.config import fileConfig
 from pathlib import Path
-import sys
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlmodel import SQLModel
 
+from alembic import context
+
 BASE_DIR = Path(__file__).resolve().parents[1]
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from app.core.config import settings  # noqa: E402
-from app.db import base  # noqa: F401,E402  # ensure models are imported
-from app.db.migration_filters import (  # noqa: E402
+from app.core.config import settings
+from app.db import base  # noqa: F401  # ensure models are imported
+from app.db.migration_filters import (
     make_include_object,
     reaches_operations_only,
     strip_cross_schema_foreign_keys,
@@ -70,7 +71,7 @@ def _process_revision_directives(context, revision, directives):
         strip_cross_schema_foreign_keys(directives)
         # A change to the operations tables runs where they are.
         config.attributes["operations_only"] = reaches_operations_only(directives)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     date_prefix = now.strftime("%Y%m%d")
 
     # Find the highest existing revision number for any date

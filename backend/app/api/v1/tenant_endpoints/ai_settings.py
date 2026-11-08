@@ -15,16 +15,17 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from app.api.deps import get_guild_settings_session, require_surface_open
-from app.core.rules import SURFACE_AI_CONNECTIONS
 from app.api.deps import (
+    CurrentUser,
     GuildContext,
     RLSSessionDep,
     SettingsRLSSessionDep,
     get_guild_membership,
+    get_guild_settings_session,
     require_guild_roles,
-    CurrentUser,
+    require_surface_open,
 )
+from app.core.rules import SURFACE_AI_CONNECTIONS
 from app.models.platform.guild import CommunityRole
 from app.schemas.ai_settings import (
     AIConnectionCreate,

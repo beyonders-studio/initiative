@@ -31,9 +31,9 @@ from sqlalchemy import delete, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from app.core.clock import utcnow
 from app.core.encryption import SALT_EMAIL, decrypt_field, encrypt_field
 from app.models.platform.auth_challenge import AuthChallenge
-from app.core.clock import utcnow
 
 #: Bytes of randomness behind the value handed to the client.
 _CHALLENGE_BYTES = 32

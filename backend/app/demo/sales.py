@@ -17,9 +17,10 @@ subscriptions of every install there whose grant holds that standing.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Sequence, cast
+from datetime import UTC, datetime, timedelta
+from typing import cast
 
 from sqlalchemy import delete, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -140,7 +141,7 @@ async def keep_lead(session: AsyncSession, invite_id: int, email: str) -> bool:
             invite_id=invite_id,
             email_hash=hash_email(email),
             email_encrypted=encrypt_field(normalize_email(email), SALT_EMAIL),
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         .on_conflict_do_nothing(constraint="uq_demo_leads_invite_email")
         .returning(DemoLead.__table__.c.id)
@@ -153,7 +154,7 @@ async def read_links(
 ) -> list[LinkReport]:
     """What happened on each link, with the leads left on it, oldest first.
     ``session`` is a platform system session."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     links = (
         await session.exec(
             select(GuildInvite)

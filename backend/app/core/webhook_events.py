@@ -19,12 +19,12 @@ from functools import lru_cache
 from sqlmodel import SQLModel
 
 from app.core.plugin_scopes import PluginScopeAccess, PluginScopeResource, scope_name
-from app.db.plugin_rls import PLUGIN_TABLE_ACCESS, PluginTableKind
 from app.db.event_capture import (
     HOUSEKEEPING_COLUMNS,
     HOUSEKEEPING_SUFFIXES,
     build_specs,
 )
+from app.db.plugin_rls import PLUGIN_TABLE_ACCESS, PluginTableKind
 
 #: What the capture trigger emits. A soft delete arrives as ``deleted`` and a
 #: restore as ``created``, so this is the whole vocabulary.

@@ -3,7 +3,7 @@ leaving an address, publishing a pitch, and the sales plug-in's API."""
 
 import json
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import func
@@ -11,8 +11,8 @@ from sqlmodel import select
 
 from app.core import webhook_events
 from app.core.config import settings
-from app.core.plugin_scopes import LEVEL_SCOPES, InstallLevel
 from app.core.messages import DemoMessages, GuildMessages
+from app.core.plugin_scopes import LEVEL_SCOPES, InstallLevel
 from app.db import cohorts
 from app.demo import accounts, copies, pitches
 from app.models.platform.auth_session import AuthSession
@@ -43,6 +43,7 @@ from app.services.platform import app_settings as app_settings_service
 from app.services.platform import rules
 from app.services.platform import users as users_service
 from app.services.platform.app_settings import get_app_settings
+from app.services.tenant.webhook_subscriptions_test import _grant_scopes
 from app.testing import (
     create_export_job,
     create_guild,
@@ -56,7 +57,6 @@ from app.testing import (
     route_session_to_guild,
 )
 from app.testing.plugin_clients import InstalledPlugin, install_headers, install_plugin
-from app.services.tenant.webhook_subscriptions_test import _grant_scopes
 
 ADMIN = LEVEL_SCOPES[InstallLevel.community_admin]
 REDEEM = "/api/v1/demo/redeem"
@@ -208,7 +208,7 @@ async def test_an_expired_copy_leaves_no_community_and_no_account(
     link, _bea, _source = pitch
     copy_id = await copies.build_copy()
     _opened, _headers, me = await _open(client, await link(CommunityRole.superadmin))
-    later = datetime.now(timezone.utc) + timedelta(days=pitches.COPY_DAYS, minutes=1)
+    later = datetime.now(UTC) + timedelta(days=pitches.COPY_DAYS, minutes=1)
 
     async def fails(*_args, **_kwargs) -> None:
         raise RuntimeError("account deletion failed")
@@ -277,7 +277,7 @@ async def test_the_export_gc_keeps_what_a_pitch_publishes(pitch, client, session
     link, _bea, source = pitch
     token = await link()
     host = await accounts.demo_host(session)
-    past = datetime.now(timezone.utc) - timedelta(hours=1)
+    past = datetime.now(UTC) - timedelta(hours=1)
     backup = {
         "source": "community",
         "format": "zip",
@@ -435,7 +435,7 @@ async def test_a_pitch_whose_import_fails_is_not_left_behind(
 
 async def test_cleanup_removes_an_idle_pitch_and_leftovers(demo, session):
     host = await accounts.demo_host(session)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     old = now - copies.CLEANUP_AFTER - timedelta(days=10)
     idle = await create_guild(session, creator=host, created_at=old)
     kept = await create_guild(session, creator=host, created_at=old)
@@ -509,12 +509,12 @@ async def test_a_copy_ends_a_day_after_its_claim_whatever_its_guest_holds(
     if swept_first:
         await session.delete(membership)
     else:
-        membership.guest_until = datetime.now(timezone.utc) + timedelta(days=30)
+        membership.guest_until = datetime.now(UTC) + timedelta(days=30)
         session.add(membership)
     await session.commit()
 
     await copies.expire_copies(
-        datetime.now(timezone.utc) + timedelta(days=pitches.COPY_DAYS, minutes=1)
+        datetime.now(UTC) + timedelta(days=pitches.COPY_DAYS, minutes=1)
     )
 
     session.expire_all()
@@ -549,7 +549,7 @@ async def test_a_link_used_up_ends_then(pitch, client, session):
 
     session.expire_all()
     ended = await session.get(GuildInvite, invite_id)
-    assert ended is not None and ended.expires_at <= datetime.now(timezone.utc)
+    assert ended is not None and ended.expires_at <= datetime.now(UTC)
 
 
 async def test_a_visitor_neither_extends_nor_promotes_itself(pitch, client, session):
@@ -576,12 +576,12 @@ async def test_a_copys_other_guests_keep_their_accounts(pitch, client, session):
         user=invited,
         guild=await session.get(Guild, copy_id),
         role=CommunityRole.guest,
-        guest_until=datetime.now(timezone.utc) + timedelta(hours=1),
+        guest_until=datetime.now(UTC) + timedelta(hours=1),
     )
     invited_id = invited.id
 
     await copies.expire_copies(
-        datetime.now(timezone.utc) + timedelta(days=pitches.COPY_DAYS, minutes=1)
+        datetime.now(UTC) + timedelta(days=pitches.COPY_DAYS, minutes=1)
     )
 
     session.expire_all()
@@ -760,7 +760,7 @@ async def test_personas_are_ensured_once_and_never_over_a_real_account(
 async def test_a_listed_pitch_from_the_api_and_its_deletion(
     pitch, client, session, acting_user, role_session
 ):
-    _link, bea, source = pitch
+    _link, _bea, source = pitch
     installed = await _sales_install(session, acting_user, role_session)
     ops = installed.guild.id
     headers = install_headers(installed, [ADMIN])
@@ -947,7 +947,7 @@ async def test_a_link_from_the_api_reports_its_opening_and_its_leads(
 
 
 def test_a_used_up_link_says_so_though_it_ended_then():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     link = GuildInvite(
         code_hash="x",
         guild_id=1,
@@ -973,7 +973,7 @@ async def test_a_guest_invited_into_a_copy_has_no_copy_of_its_own(
         user=invited,
         guild=await session.get(Guild, copy_id),
         role=CommunityRole.guest,
-        guest_until=datetime.now(timezone.utc) + timedelta(hours=1),
+        guest_until=datetime.now(UTC) + timedelta(hours=1),
     )
 
     copy = await client.get("/api/v1/demo/copy", headers=get_auth_headers(invited))

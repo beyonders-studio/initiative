@@ -96,7 +96,7 @@ async def test_archiving_an_initiative_archives_what_is_inside_it(
     assert task.archived_at is not None
     # One stamp, shared — including the one the endpoint answered with.
     assert a.project.archived_at == group.archived_at == task.archived_at
-    assert a.project.archived_at == datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    assert a.project.archived_at == datetime.fromisoformat(stamp)
 
 
 async def test_unarchiving_leaves_what_was_archived_on_its_own(

@@ -129,6 +129,9 @@ export const SettingsStoragePage = () => {
   }
 
   const isS3 = form.values.backend === "s3";
+  // The backfill copies into the bucket the server is saved to use, so it waits
+  // for S3 to be saved, not merely chosen in the form.
+  const backfillReady = storageQuery.data.backend === "s3" && Boolean(storageQuery.data.s3_bucket);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -257,7 +260,7 @@ export const SettingsStoragePage = () => {
           type="button"
           variant="outline"
           onClick={() => backfillMutation.mutate()}
-          disabled={backfillMutation.isPending || isBackfilling}
+          disabled={!backfillReady || backfillMutation.isPending || isBackfilling}
         >
           {isBackfilling ? t("storage.backfillRunning") : t("storage.startBackfill")}
         </Button>

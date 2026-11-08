@@ -16,12 +16,12 @@ import json
 from types import SimpleNamespace
 from typing import Any
 
+from sqlmodel.ext.asyncio.session import AsyncSession
 from webauthn.helpers import bytes_to_base64url
 
 from app.models.platform.user import User
 from app.models.platform.user_passkey import UserPasskey
 from app.services.auth import passkeys as passkey_service
-from sqlmodel.ext.asyncio.session import AsyncSession
 
 #: Where the browser says it was. The ceremonies check this against the
 #: deployment's own address, which the test settings put here.

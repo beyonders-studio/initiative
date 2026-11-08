@@ -18,7 +18,6 @@ from app.services.marketplace.tool_listings import (
 )
 from app.services.tenant.dashboard_definition import normalize_dashboard_definition
 
-
 CANVAS = {
     "widgets": [
         {

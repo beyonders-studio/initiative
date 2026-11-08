@@ -7,27 +7,27 @@ they would show either way — but the split is exactly what these pin down, and
 mixing the two sessions would hide which half refused a write.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.db.errors import dbapi_sqlstate
 from app.db import gucs
+from app.db.errors import dbapi_sqlstate
 from app.db.frozen import FROZEN_SQLSTATE
 from app.db.session import raise_flag
-from app.services.tenant import archive as archive_service
-from app.services.tenant.soft_delete import soft_delete_entity
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.project import Project
+from app.services.tenant import archive as archive_service
+from app.services.tenant.soft_delete import soft_delete_entity
 from app.testing import (
     create_comment,
     create_guild,
-    create_initiative_member,
     create_guild_membership,
     create_initiative,
+    create_initiative_member,
     create_project,
     create_resource_grant,
     create_task,
@@ -219,7 +219,7 @@ class TestAncestorFreeze:
     ):
         """Sharing an archived thing is a change to it. The endpoint refuses
         this too; the point here is that the table does."""
-        user, guild, initiative, project, _t = workspace
+        user, _guild, initiative, project, _t = workspace
         await _archive(session, project)
         with pytest.raises(DBAPIError) as excinfo:
             await routed.exec(
@@ -486,7 +486,7 @@ class TestAncestorFreeze:
     async def test_reading_frozen_content_is_the_point_of_keeping_it(
         self, session, routed, workspace
     ):
-        _u, _g, initiative, project, task = workspace
+        _u, _g, initiative, _project, task = workspace
         await _archive(session, initiative)
         rows = (
             await routed.exec(
@@ -644,7 +644,7 @@ class TestTrashedRowsAreOutOfSight:
         self, session, role_session, workspace, other_member
     ):
         user, guild, _i, _p, task = workspace
-        task.deleted_at = datetime.now(timezone.utc)
+        task.deleted_at = datetime.now(UTC)
         task.deleted_by = user.id
         session.add(task)
         await session.commit()
@@ -662,7 +662,7 @@ class TestTrashedRowsAreOutOfSight:
         self, session, role_session, workspace
     ):
         user, guild, _i, _p, task = workspace
-        task.deleted_at = datetime.now(timezone.utc)
+        task.deleted_at = datetime.now(UTC)
         task.deleted_by = user.id
         session.add(task)
         await session.commit()
@@ -680,7 +680,7 @@ class TestTrashedRowsAreOutOfSight:
         self, session, role_session, workspace, other_admin
     ):
         user, guild, _i, _p, task = workspace
-        task.deleted_at = datetime.now(timezone.utc)
+        task.deleted_at = datetime.now(UTC)
         task.deleted_by = user.id
         session.add(task)
         await session.commit()
@@ -701,7 +701,7 @@ class TestTrashedRowsAreOutOfSight:
         hiding it also hid it from the guard, everything hanging off a trashed
         row would become writable by anyone who did not delete it."""
         user, guild, _i, _p, task = workspace
-        task.deleted_at = datetime.now(timezone.utc)
+        task.deleted_at = datetime.now(UTC)
         task.deleted_by = user.id
         session.add(task)
         await session.commit()

@@ -44,11 +44,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "backend"))
 
-if sys.version_info < (3, 11):
-    raise SystemExit(
-        "run this under the backend venv (backend/.venv/bin/python): app.core.config "
-        "uses logging.getLevelNamesMapping(), added in 3.11"
-    )
 
 # config.py instantiates Settings at import, so describing the SCHEMA needs an
 # environment that validates. Placeholders for exactly the fields with no
@@ -57,7 +52,7 @@ if sys.version_info < (3, 11):
 # add it here, deliberately, rather than having the contract quietly omit it.
 os.environ.setdefault("SECRET_KEY", "0" * 64)
 
-from app.core.config import (  # noqa: E402
+from app.core.config import (
     ENV_ONLY_FEATURE_CREDENTIALS,
     RUNTIME_SEEDED_SETTINGS,
     Settings,

@@ -28,14 +28,13 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Callable, Iterable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, exists, false, func, or_, true, tuple_
-from sqlalchemy import Select
+from sqlalchemy import Select, and_, exists, false, func, or_, true, tuple_
 from sqlalchemy import delete as sa_delete
-from sqlalchemy import update as sa_update
 from sqlalchemy import select as sa_select
+from sqlalchemy import update as sa_update
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import select
@@ -44,27 +43,27 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.messages import CommonMessages
 from app.core.tools import DEFAULT_ENABLED_TOOLS, Tool
 from app.db import cohorts
+from app.db.request_context import SystemGuild
 from app.db.session import (
     guild_context,
     install_context,
     routed_guild_id,
     set_rls_context,
 )
-from app.models.platform.guild import GUILD_LADDER, GuildMembership, CommunityRole
+from app.models.platform.guild import GUILD_LADDER, CommunityRole, GuildMembership
 from app.models.platform.user_profile_view import MemberProfile
+from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
 from app.models.tenant.initiative import (
     Initiative,
     InitiativeMember,
     InitiativeRoleModel,
     InitiativeRule,
 )
-from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
 from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
 from app.models.tenant.resource_grant import ResourceGrant
 from app.models.tenant.task import Task, TaskAssignee
 from app.services.membership import live_membership_clause
 from app.services.platform.users import guild_members, visible_to_other_people
-from app.db.request_context import SystemGuild
 from app.services.tenant.initiative_tools import member_permission_sql, tool_on_sql
 
 _ADMIN_RUNGS = [rung for rung in GUILD_LADDER if rung.reaches(CommunityRole.admin)]
@@ -80,16 +79,16 @@ class Governing:
     those files."""
 
     tool: Tool
-    resource_id: Optional[int]
-    initiative_id: Optional[int]
+    resource_id: int | None
+    initiative_id: int | None
     resource_ids: Any = None
 
     @classmethod
-    def of(cls, tool: Tool, row: Any) -> "Governing":
+    def of(cls, tool: Tool, row: Any) -> Governing:
         return cls(tool, row.id, row.initiative_id)
 
     @classmethod
-    def of_collection(cls, row: Any) -> "Governing":
+    def of_collection(cls, row: Any) -> Governing:
         """Whoever can open a file in the collection that is not in the
         trash."""
         from app.models.tenant.collection import CollectionFile

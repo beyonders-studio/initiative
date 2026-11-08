@@ -1,11 +1,11 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import (
     Boolean,
-    Column,
     CheckConstraint,
+    Column,
     DateTime,
     ForeignKey,
     Index,
@@ -17,22 +17,23 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlmodel import Enum as SQLEnum, Field, Relationship, SQLModel
+from sqlmodel import Enum as SQLEnum
+from sqlmodel import Field, Relationship, SQLModel
 
 from app.core import recurrence
 from app.core.task_types import LAYOUT_SHAPES
 from app.db.registry_checks import FROM_REGISTRY
 from app.models.tenant._mixins import (
     ArchiveMixin,
-    CreatedByMixin,
     CommentLockMixin,
+    CreatedByMixin,
     HoldMixin,
     SoftDeleteMixin,
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    from app.models.tenant.project import Project
     from app.models.platform.user_profile_view import MemberProfile
+    from app.models.tenant.project import Project
 
 
 class TaskStatusCategory(str, Enum):
@@ -61,7 +62,7 @@ class RecurrenceStrategy(str, Enum):
 class TaskStatus(CreatedByMixin, table=True):
     __tablename__ = "task_statuses"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     project_id: int = Field(
         foreign_key="projects.id", ondelete="CASCADE", nullable=False
     )
@@ -93,7 +94,7 @@ class TaskStatus(CreatedByMixin, table=True):
     )
 
     project: Optional["Project"] = Relationship(back_populates="task_statuses")
-    tasks: List["Task"] = Relationship(back_populates="task_status")
+    tasks: list["Task"] = Relationship(back_populates="task_status")
 
 
 _SHAPE_VALUES = ", ".join(f"'{shape}'" for shape in LAYOUT_SHAPES)
@@ -125,7 +126,7 @@ class TaskType(CreatedByMixin, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     project_id: int = Field(
         sa_column=Column(
             Integer,
@@ -160,7 +161,7 @@ class TaskType(CreatedByMixin, table=True):
     # What a new task of the type starts with where its creator left the field
     # empty: a description outline, checklist lines, a priority, a repeat
     # (``app.schemas.tenant.task_type.TaskTypeStartingValues``).
-    starting_values: Optional[dict] = Field(
+    starting_values: dict | None = Field(
         default=None, sa_column=Column(JSONB, nullable=True)
     )
 
@@ -199,7 +200,7 @@ class Task(
     )
     _display_field = "title"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     project_id: int = Field(foreign_key="projects.id", nullable=False)
     task_status_id: int = Field(
         foreign_key="task_statuses.id", ondelete="RESTRICT", nullable=False
@@ -214,11 +215,11 @@ class Task(
     )
     title: str = Field(nullable=False)
     # TEXT in DDL (unbounded); sa_column keeps autogen quiet vs AutoString
-    description: Optional[str] = Field(default=None, sa_column=Column(Text))
+    description: str | None = Field(default=None, sa_column=Column(Text))
     # Ordered ``{"id", "text", "done"}`` objects — the task's checklist. JSONB
     # so one item can be addressed by id and rewritten in place; see
     # ``app.services.tenant.task_checklist``.
-    checklist: List[dict] = Field(
+    checklist: list[dict] = Field(
         default_factory=list,
         sa_column=Column(JSONB, nullable=False, server_default="[]"),
     )
@@ -226,14 +227,14 @@ class Task(
         default=TaskPriority.medium,
         sa_column=Column(SQLEnum(TaskPriority, name="task_priority"), nullable=False),
     )
-    start_date: Optional[datetime] = Field(
+    start_date: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-    due_date: Optional[datetime] = Field(
+    due_date: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     # RFC 5545 recurrence lines as picked (``app.core.recurrence``).
-    recurrence: Optional[str] = Field(default=None, sa_column=Column(Text))
+    recurrence: str | None = Field(default=None, sa_column=Column(Text))
     # Minutes from the start's UTC time to where the repeat was picked: whole
     # days for a rule of days, the offset for a rule of hours.
     recurrence_shift: int = Field(
@@ -241,7 +242,7 @@ class Task(
     )
     # The fixed series' phase survives extra dates and in-place skips. Unlike
     # series_id it remains usable after older task rows have been purged.
-    recurrence_anchor: Optional[datetime] = Field(
+    recurrence_anchor: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     # Already-consumed starts before a retained anchor when older history was
@@ -252,7 +253,7 @@ class Task(
     )
     # No occurrence of the series starts after this; null when it never ends.
     # Written from ``recurrence`` on every save (see the listener below).
-    recurrence_until: Optional[datetime] = Field(
+    recurrence_until: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     recurrence_strategy: RecurrenceStrategy = Field(
@@ -264,18 +265,18 @@ class Task(
         sa_column=Column(Integer, nullable=False, server_default="0"),
     )
     # An optional maximum number of actual completions on the completer's day.
-    recurrence_limit: Optional[int] = Field(
+    recurrence_limit: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
     # The first task of the repeating series this task is in, set when the
     # series first moves on. A name for the series rather than a key: the
     # series goes on when its first task is purged.
-    series_id: Optional[int] = Field(
+    series_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True, index=True)
     )
     # What an edit of just this task changed from, by field; the next task in
     # the series is made with these (``app.services.tenant.task_series``).
-    recurrence_carry: Optional[dict] = Field(
+    recurrence_carry: dict | None = Field(
         default=None, sa_column=Column(JSONB, nullable=True)
     )
     position: float = Field(
@@ -287,22 +288,22 @@ class Task(
     # When the task entered a ``done``-category status, cleared when it leaves
     # one. Kept in step with ``task_status.category`` by
     # ``app.services.tenant.task_completion`` — never set directly.
-    completed_at: Optional[datetime] = Field(
+    completed_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
     project: Optional["Project"] = Relationship(back_populates="tasks")
-    task_status: Optional[TaskStatus] = Relationship(back_populates="tasks")
-    task_type: Optional[TaskType] = Relationship()
-    assignees: List["MemberProfile"] = Relationship(
+    task_status: TaskStatus | None = Relationship(back_populates="tasks")
+    task_type: TaskType | None = Relationship()
+    assignees: list["MemberProfile"] = Relationship(
         sa_relationship_kwargs={
             "secondary": "task_assignees",
             "primaryjoin": "Task.id == foreign(TaskAssignee.task_id)",

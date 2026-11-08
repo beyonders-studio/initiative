@@ -21,7 +21,6 @@ from app.testing.plugin_clients import (
     mint_client_assertion,
 )
 
-
 TOKEN_URL = "/api/v1/plugin-platform/oauth/token"
 ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 PLUGIN_BASE = "https://tracker.example.test"

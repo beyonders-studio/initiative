@@ -101,7 +101,7 @@ def parse_header(data: bytes) -> Header | None:
     encrypted object (one stored before encryption was on)."""
     if len(data) < HEADER_SIZE or data[:4] != MAGIC:
         return None
-    magic, chunk_size, length, generation, nonce, wrapped = _HEADER.unpack(
+    _magic, chunk_size, length, generation, nonce, wrapped = _HEADER.unpack(
         bytes(data[:HEADER_SIZE])
     )
     if chunk_size <= 0:

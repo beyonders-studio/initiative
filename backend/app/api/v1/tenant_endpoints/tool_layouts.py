@@ -11,7 +11,7 @@ a shared tool managing the initiative, and for a collection changing it.
 """
 
 from dataclasses import dataclass
-from typing import Annotated, Any, List, Optional
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import undefer
@@ -28,18 +28,17 @@ from app.api.deps import (
 from app.core.messages import InitiativeMessages, KindMessages, ToolLayoutMessages
 from app.core.tools import (
     INSTANCE_LAYOUT_TOOLS,
+    KINDS,
     LAYOUT_KIND_TARGETS,
     LAYOUTS_PER_INSTANCE,
     LAYOUTS_SHARED,
-    KINDS,
     Tool,
     kind_refusal,
 )
 from app.db.base import MODELS_BY_TABLE
-from app.models.tenant._mixins import tool_models
-
 from app.models.platform.guild import AdminSurface
 from app.models.platform.user import User
+from app.models.tenant._mixins import tool_models
 from app.models.tenant.initiative import Initiative
 from app.schemas.tenant.tool_layout import (
     InitiativeToolLayoutsRead,
@@ -59,7 +58,7 @@ CurrentUser = Annotated[User, Depends(get_current_active_user)]
 
 #: The target a request names.
 ToolQuery = Annotated[LayoutTarget, Query()]
-InstanceQuery = Annotated[Optional[int], Query()]
+InstanceQuery = Annotated[int | None, Query()]
 
 
 @dataclass(frozen=True)
@@ -77,8 +76,8 @@ async def _resolve(
     context: GuildContext,
     user: User,
     target: LayoutTarget,
-    tool_id: Optional[int],
-    initiative_id: Optional[int],
+    tool_id: int | None,
+    initiative_id: int | None,
 ) -> _Resolved:
     invalid = HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
@@ -178,8 +177,8 @@ async def _configured(
     context: GuildContext,
     user: User,
     tool: LayoutTarget,
-    tool_id: Optional[int],
-    initiative_id: Optional[int],
+    tool_id: int | None,
+    initiative_id: int | None,
 ) -> _Resolved:
     """The target, once the reader is known to be allowed to change it."""
     resolved = await _resolve(session, context, user, tool, tool_id, initiative_id)
@@ -204,13 +203,13 @@ async def get_layouts(
     return await _read(session, resolved)
 
 
-@router.get("/initiative", response_model=List[InitiativeToolLayoutsRead])
+@router.get("/initiative", response_model=list[InitiativeToolLayoutsRead])
 async def get_initiative_layouts(
     session: RLSSessionDep,
     current_user: CurrentUser,
     guild_context: GuildContextDep,
     initiative_id: int = Query(),
-) -> List[InitiativeToolLayoutsRead]:
+) -> list[InitiativeToolLayoutsRead]:
     """The layouts of every instance in the initiative the reader can open,
     of each tool whose instances lay out their own items (a project's), by
     tool and name, for the initiative's settings. A layout is changed on its

@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     Boolean,
@@ -36,7 +35,7 @@ class FederatedIdentity(SQLModel, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
 
     user_id: int = Field(
         sa_column=Column(
@@ -66,14 +65,14 @@ class FederatedIdentity(SQLModel, table=True):
     )
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
-    last_login_at: Optional[datetime] = Field(
+    last_login_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     # When the background group re-sync (or a login, which also syncs) last ran
     # for this link — the due-date the re-sync sweep filters on.
-    last_synced_at: Optional[datetime] = Field(
+    last_synced_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )

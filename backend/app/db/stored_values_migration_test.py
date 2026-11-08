@@ -17,13 +17,13 @@ from sqlalchemy import text
 from app.models.platform.notification import NotificationType
 from app.services.platform import notice_outbox, user_notifications
 from app.testing import (
-    create_plugin_service_registration,
+    create_dashboard,
     create_export_job,
     create_guild,
-    create_dashboard,
     create_guild_plugin,
     create_initiative,
     create_marketplace_listing,
+    create_plugin_service_registration,
     create_user,
 )
 
