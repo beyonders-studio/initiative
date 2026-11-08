@@ -63,8 +63,8 @@ Further down are **Initiatives**, split into **Your initiatives** and **Open to 
 
 To see every project, file or dashboard that has reached you, here and in your other communities, open [My Tools](your-space.md).
 
-!!! screenshot "The community front page"
-    The banner with the member count, the **All** circle with a few activity cards, the **Initiatives** section and **Coming up**. Save as `docs/en/images/communities/community-front-page.png`.
+![A community front page: the banner, activity cards under the All circle, the initiatives and Coming up](../images/communities/community-front-page.webp#only-light)
+![A community front page: the banner, activity cards under the All circle, the initiatives and Coming up](../images/communities/community-front-page.dark.webp#only-dark)
 
 ## Join a community with an invite link
 
@@ -95,8 +95,8 @@ Search covers names and places, so "Seattle" finds communities in Seattle, and t
 !!! info "Why it asks your age"
     On servers that check ages, every account gives its date of birth once and is never asked again. A listed community is open to anyone signed in, so joining one, from the directory or by invite, takes being 16 or older. Communities that aren't listed have no age limit. Your date of birth is kept encrypted, used only to check age limits, and never shown to anyone. See [Data and compliance](../security/data-and-compliance.md).
 
-!!! screenshot "The community directory"
-    The directory with its categories in the sidebar, the **Near me** button and a row of community cards. Save as `docs/en/images/communities/community-directory.png`.
+![The community directory, with categories in the sidebar, the Near me button and community cards](../images/communities/community-directory.webp#only-light)
+![The community directory, with categories in the sidebar, the Near me button and community cards](../images/communities/community-directory.dark.webp#only-dark)
 
 ### Show the communities near you first
 

@@ -74,7 +74,8 @@ A profile wears three kinds of decoration, mixed however you like:
 
 Picking the one you're already wearing takes it off, so there's no "none" to hunt for. Some frames let you choose their colors, and some decorations carry a year you can set. Several frames stand in front of your picture, so you can end up sitting in a teacup or wearing headphones. We had a lot of fun with these.
 
-!!! screenshot "My Settings › Profile with the card at the top wearing a banner, frame and trophies, and Your look below it with the Banner, Frame and Trophies pickers. Save as docs/en/images/account/profile-settings.png"
+![The Profile tab of My Settings, with a banner, a frame and three trophies on the card and the Banner, Frame and Trophies pickers below](../images/account/profile-settings.webp#only-light)
+![The Profile tab of My Settings, with a banner, a frame and three trophies on the card and the Banner, Frame and Trophies pickers below](../images/account/profile-settings.dark.webp#only-dark)
 
 Banners and frames move; trophies hold still, because six wiggling things in a row would be upsetting. If your device is set to reduce motion, everything holds still.
 

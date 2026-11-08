@@ -51,8 +51,8 @@ The initiative's managers and community admins can change roles.
 
 Each switch saves as you flip it, and it applies to everyone on the Member role straight away. A switch showing **On** or **Off** with a lock was set by your community for every initiative (see [Set the rules for every initiative](#set-the-rules-for-every-initiative)).
 
-!!! screenshot "Role permissions"
-    The **Roles** tab of Initiative settings: the Moderator and Project Manager cards, the Member card with its **View** and **Create** switches, and **Add custom role**. Save as `docs/en/images/sharing/role-permissions.png`.
+![The Roles tab of Initiative settings, with the Moderator and Project Manager cards, the Member card's View and Create switches for each tool, and Add custom role](../images/sharing/role-permissions.webp#only-light)
+![The Roles tab of Initiative settings, with the Moderator and Project Manager cards, the Member card's View and Create switches for each tool, and Add custom role](../images/sharing/role-permissions.dark.webp#only-dark)
 
 ## Make your own role
 

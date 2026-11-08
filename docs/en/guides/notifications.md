@@ -67,11 +67,8 @@ You only hear about things you can open. A comment on a project that isn't share
 
 If you answer cases on your server, new [cases](../running-a-server/platform-roles.md#where-operations-work-lands) reach you too, with no row to switch, because answering them is the job.
 
-!!! screenshot "Notification settings"
-    **Show:** My Settings → Notifications, scrolled to **What you hear about**, with the rows grouped under their headings and the Bell, Email and Desktop columns.
-
-    Save as `en/images/notifications/settings.png`, then replace this box with:
-    `![Notification settings](../images/notifications/settings.png)`
+![Notification settings: what you hear about, with a Bell, Email and Desktop switch for each](../images/notifications/settings.webp#only-light)
+![Notification settings: what you hear about, with a Bell, Email and Desktop switch for each](../images/notifications/settings.dark.webp#only-dark)
 
 ### Choose when event reminders arrive
 

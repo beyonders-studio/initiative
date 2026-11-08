@@ -33,11 +33,8 @@ Home is a page of widgets, and it starts out arranged for whatever brought you h
 
 On a phone the widgets stack in one column, so step 2 is the up and down arrows on each widget, and there's no resizing to do.
 
-!!! screenshot "Customizing Home"
-    **Show:** Home while customizing: two or three widgets with their settings button and **X** showing, the view tabs with **+** and **⋯**, and **Add widget**, **Banner** and **Done** at the top.
-
-    Save as `en/images/your-space/home-customize.png`, then replace this box with:
-    `![Customizing Home](../images/your-space/home-customize.png)`
+![Home while customizing](../images/your-space/home-customize.webp#only-light)
+![Home while customizing](../images/your-space/home-customize.dark.webp#only-dark)
 
 ### Add a widget
 

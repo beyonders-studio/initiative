@@ -53,10 +53,7 @@ A **screenshot** callout marks where a picture is still needed, as a dashed purp
 
 ```markdown
 !!! screenshot "Where this is"
-    **Show:** what the picture should contain.
-
-    Save as `en/images/<section>/<name>.png`, then replace this box with:
-    `![Alt text](../images/<section>/<name>.png)`
+    **Show:** what the picture should contain. Save as `en/images/<section>/<name>.webp`.
 ```
 
 A **techspec** callout holds detail for technical readers, as a teal box with a wrench. `???` starts it collapsed and `!!!` open:
@@ -68,9 +65,24 @@ A **techspec** callout holds detail for technical readers, as a teal box with a 
 
 ## Pictures
 
-Save a screenshot under `docs/en/images/<section>/`. From a page in a section folder its path is `../images/<section>/<name>.png`; from `docs/en/index.md` it's `images/<section>/<name>.png`. Crop to what matters, and cap a wide one with `![Alt](path){ width="700" }`.
+A picture of the app is taken by a script, so it can be taken again whenever the screen changes. Each one is a short Playwright walk in `frontend/e2e/shots/help/<name>.shot.ts` that opens the screen and calls `shootHelp(page, "<section>/<name>")`, or `shootHelp(page, "<section>/<name>", locator)` to crop to one part of it. Run them against a dev environment with its seed data:
 
-A picture has to match the app as it stands, so retake or remove one when the screen it shows changes.
+```bash
+cd frontend
+pnpm screenshots e2e/shots/help                      # every help picture
+pnpm screenshots e2e/shots/help/tag-page.shot.ts     # one
+```
+
+Each shot saves a light and a dark copy, `docs/en/images/<section>/<name>.webp` and `<name>.dark.webp`. The page shows the one that matches the reader's theme:
+
+```markdown
+![Alt text](../images/<section>/<name>.webp#only-light)
+![Alt text](../images/<section>/<name>.dark.webp#only-dark)
+```
+
+That path is from a page in a section folder; from `docs/en/index.md` it's `images/<section>/<name>.webp`. A shot signs in as a seeded community admin, and `signInAs(page, "user1@example.com")` switches to somebody whose view the picture needs.
+
+A picture has to match the app as it stands, so retake it when the screen it shows changes, and remove it when the screen is gone.
 
 ## Adding another language
 

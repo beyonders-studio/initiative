@@ -36,8 +36,8 @@ The body is written in the same editor as a text document, with a shorter toolba
 
 If the initiative's notices [require](layouts.md#required-fields) tags or metadata, the dialog asks for them under the editor and waits until they're in.
 
-!!! screenshot "A board"
-    An initiative's **Posts** tab with **New Post** and **Filters**, a pinned notice showing **Pinned until** a date and **Change end date**, a notice with a poll, the reaction and **Read by** row, and the month rail down the side. Save to `docs/en/images/tools/posts.png`.
+![An initiative's board, with a pinned post, a poll and who has read each post](../images/tools/posts.webp#only-light)
+![An initiative's board, with a pinned post, a poll and who has read each post](../images/tools/posts.dark.webp#only-dark)
 
 ## Choose who sees a notice
 

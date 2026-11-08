@@ -148,11 +148,8 @@ Open a project, a dashboard or most other tools and the top of the page is laid 
 
 A wiki and a calendar are laid out differently. See [Wikis](wikis.md) and [Calendar](calendar.md).
 
-!!! screenshot "The top of a tool's page"
-    **Show:** a project's page, top only: the initiative-colored band with the breadcrumb and **Settings**, the project's name with the bookmark and bell, and the strip with **Status**, **Progress**, **Dates**, **Tags** and **Metadata**.
-
-    Save as `en/images/tools/tool-header.png`, then replace this box with:
-    `![The top of a project's page](../images/tools/tool-header.png)`
+![The top of a project's page](../images/tools/tool-header.webp#only-light)
+![The top of a project's page](../images/tools/tool-header.dark.webp#only-dark)
 
 ## Change a tool's settings
 
