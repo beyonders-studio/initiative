@@ -34,8 +34,11 @@ COMMUNITIES: dict[str, dict] = {
         "title": "Community 1: Primary Community (TTRPG Campaign)",
         "photo": "fantasy-map",
         # kael joins the community but no initiative in it: his view of it
-        # must be empty (initiative RLS hides everything; content 404s).
+        # must be empty (initiative RLS hides everything; content 404s). The
+        # owner made this community on a fresh database, but one that already
+        # held a community (the upgrade check's) finds that one first.
         "members": [
+            "Admin User",
             "Guildmaster Aldric",
             "Archivist Okoro",
             "Dungeon Master",
@@ -161,14 +164,26 @@ async def add_members(
     *,
     admins: list[User] | None = None,
 ) -> None:
-    """Add users to a guild as members, or admins where named.
+    """Add users to a guild as members, or admins where named, leaving anyone
+    already in it as they are.
 
     Membership rows carrying a role are a system-engine write, so any community
     routing left from a previous community is reset first.
     """
     await set_rls_context(session, Unattributed())
     admin_ids = {u.id for u in admins or []}
+    present = set(
+        (
+            await session.exec(
+                select(GuildMembership.user_id).where(
+                    GuildMembership.guild_id == guild.id
+                )
+            )
+        ).all()
+    )
     for user in users:
+        if user.id in present:
+            continue
         role = CommunityRole.admin if user.id in admin_ids else CommunityRole.member
         session.add(GuildMembership(guild_id=guild.id, user_id=user.id, role=role))
     await session.flush()
