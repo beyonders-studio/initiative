@@ -6,18 +6,18 @@ export function nameWithoutExtension(filename: string): string {
 }
 
 /**
- * Whether a file's extension is on an `accept` list of extensions.
+ * Whether a file's name ends in one of the extensions on an `accept` list,
+ * `.tar.gz` as well as `.zip`.
  *
  * A file picker filters by `accept` itself; a file dropped from the desktop
  * skips the picker, so a drop target has to ask.
  */
 export function matchesAccept(filename: string, accept: string): boolean {
-  const ext = getFileExtension(filename);
-  if (!ext) return false;
+  const name = filename.toLowerCase();
   return accept
     .split(",")
     .map((token) => token.trim().toLowerCase())
-    .includes(`.${ext}`);
+    .some((token) => token.startsWith(".") && name.endsWith(token));
 }
 
 /**

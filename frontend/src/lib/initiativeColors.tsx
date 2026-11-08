@@ -1,6 +1,10 @@
 import { cn } from "../ui/lib/utils";
 
 export const INITIATIVE_COLOR_FALLBACK = "#94a3b8";
+
+/** The colour a new initiative, calendar or tag starts on, and a wiki's accent
+ *  until it has one: the server's own default. */
+export const DEFAULT_COLOR = "#6366F1";
 const HEX_COLOR_REGEX = /^#(?:[0-9a-fA-F]{3}){1,2}$/i;
 
 export const resolveInitiativeColor = (color?: string | null): string => {

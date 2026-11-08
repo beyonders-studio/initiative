@@ -1,6 +1,6 @@
 /**
- * The chrome a multi-step dialog shares: the frame, the heading, where you are
- * and the way back.
+ * The chrome a multi-step dialog shares: the frame, the heading, where you are,
+ * the way back, and the cards a step's choices are drawn as.
  *
  * It holds no strings and no opinion about size. Both are deliberate. The
  * dialogs that use this disagree about width and scrolling — a two-question
@@ -156,4 +156,42 @@ export const WizardDialog = ({ open, onOpenChange, className, ...frame }: Wizard
       <WizardFrame inDialog {...frame} />
     </DialogContent>
   </Dialog>
+);
+
+export interface WizardOptionProps extends Omit<ComponentProps<"button">, "title" | "type"> {
+  /** What leads the card: an icon, a mark, an avatar. */
+  icon?: ReactNode;
+  title: ReactNode;
+  description?: ReactNode;
+}
+
+/**
+ * One of the choices a wizard step offers, as a card: the icon, then the title
+ * over its description. Anything passed as children follows the text.
+ */
+export const WizardOption = ({
+  icon,
+  title,
+  description,
+  className,
+  children,
+  ...props
+}: WizardOptionProps) => (
+  <button
+    type="button"
+    className={cn(
+      "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent",
+      className
+    )}
+    {...props}
+  >
+    {icon}
+    <span className="min-w-0 flex-1">
+      <span className="block font-medium text-sm">{title}</span>
+      {description ? (
+        <span className="block text-muted-foreground text-xs">{description}</span>
+      ) : null}
+    </span>
+    {children}
+  </button>
 );

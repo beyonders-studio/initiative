@@ -4,16 +4,10 @@ import {
   type DragEndEvent,
   DragOverlay,
   type DragStartEvent,
-  KeyboardSensor,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
 } from "@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -30,6 +24,7 @@ import { useSidebar } from "@/components/sidebar/sidebar";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { type CommunityEntry, useCommunities } from "@/hooks/useCommunities";
+import { useDragSensors } from "@/hooks/useDragSensors";
 import { useMessagesWaiting } from "@/hooks/useMyMessages";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { communityPath } from "@/lib/communityUrl";
@@ -645,22 +640,9 @@ export const CommunitySidebar = ({ isHomeMode = false }: { isHomeMode?: boolean 
   const startReorder = useCallback(() => setReorderMode(true), []);
   const stopReorder = useCallback(() => setReorderMode(false), []);
 
-  // Mouse always reorders on a small drag; the touch sensor only joins the
-  // context while reorder mode is on (useSensors drops the nulls).
-  const mouseSensor = useSensor(MouseSensor, {
-    activationConstraint: {
-      distance: 6,
-    },
-  });
-  const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: {
-      distance: 8,
-    },
-  });
-  const keyboardSensor = useSensor(KeyboardSensor, {
-    coordinateGetter: sortableKeyboardCoordinates,
-  });
-  const sensors = useSensors(mouseSensor, reorderMode ? touchSensor : null, keyboardSensor);
+  // Mouse always reorders on a small drag; touch only joins in while reorder
+  // mode is on.
+  const sensors = useDragSensors({ keyboard: true, touch: reorderMode });
   const draggedCommunity = useMemo(
     () => communities.find((community) => community.id === activeDragId) ?? null,
     [communities, activeDragId]

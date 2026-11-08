@@ -1,4 +1,4 @@
-import { AlertTriangle, ExternalLink, FileUp, Loader2 } from "lucide-react";
+import { AlertTriangle, ExternalLink, Loader2 } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -20,6 +20,7 @@ import { uploadInPieces } from "@/lib/resumableUpload";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import { Field } from "@/ui/field";
+import { FileDropArea } from "@/ui/file-drop";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { formatBytes } from "@/ui/lib/fileUtils";
@@ -293,20 +294,14 @@ export function AtlassianExportStep({ initiatives, onStarted }: AtlassianExportS
 
   return (
     <div className="space-y-4">
-      <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed p-6 text-center transition-colors hover:bg-accent">
-        <FileUp className="h-8 w-8 text-muted-foreground" />
-        <span className="font-medium text-sm">
-          {file ? file.name : t("wizard.atlassian.export.pick")}
-        </span>
-        <span className="text-muted-foreground text-xs">{t("wizard.atlassian.export.where")}</span>
-        <input
-          type="file"
+      <div className="space-y-2">
+        <FileDropArea
           accept=".zip,application/zip"
-          className="hidden"
-          aria-label={t("wizard.atlassian.export.pick")}
-          onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          onFile={setFile}
+          prompt={file ? file.name : t("wizard.atlassian.export.pick")}
         />
-      </label>
+        <p className="text-muted-foreground text-xs">{t("wizard.atlassian.export.where")}</p>
+      </div>
 
       <Field label={t("wizard.choose.initiativeLabel")}>
         <Select value={chosen} onValueChange={setInitiativeId}>

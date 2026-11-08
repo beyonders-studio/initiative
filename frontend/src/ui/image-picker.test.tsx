@@ -137,6 +137,23 @@ describe("on the native app", () => {
     );
   });
 
+  it("opens the file dialog straight away when the field takes no pictures", async () => {
+    const { container } = render(
+      <ImagePicker variant="button" accept=".zip" onSelect={vi.fn()}>
+        Upload
+      </ImagePicker>
+    );
+
+    const clicked = vi.spyOn(
+      container.querySelector("input[type=file]") as HTMLInputElement,
+      "click"
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Upload" }));
+
+    expect(clicked).toHaveBeenCalled();
+    expect(screen.queryByRole("menuitem")).not.toBeInTheDocument();
+  });
+
   it("also offers a plain file when the accept list takes more than images", async () => {
     render(<ImagePicker onSelect={vi.fn()} accept=".png,.pdf" />);
 

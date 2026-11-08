@@ -3,7 +3,6 @@ export { CALENDAR_VIEW_MODE_KEY, CALENDAR_VIEW_OPTIONS, CalendarView } from "./C
 export {
   allDayRange,
   buildEventCalendarEntry,
-  DEFAULT_CALENDAR_COLOR,
   type EventEntryMeta,
   occurrenceTarget,
 } from "./eventCalendarEntry";
