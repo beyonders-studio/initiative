@@ -512,4 +512,5 @@ PY
       ```
 - [ ] Nothing describes an attack or what breaks without a guard.
 - [ ] Security and compliance pages untouched, unless that was the actual task.
-- [ ] Docs-only changes go **straight to `dev`**, with no branch and no PR.
+- [ ] Docs-only changes go through a pull request into `dev`, like every
+      other change.
