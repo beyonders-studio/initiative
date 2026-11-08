@@ -11,7 +11,8 @@
       "privacy": "Confidentialité"
     },
     "loginRequired": "Vous devez être connecté pour gérer votre profil.",
-    "goToLogin": "Aller à la connexion"
+    "goToLogin": "Aller à la connexion",
+    "version": "Initiative v{{version}}"
   },
   "communityLayout": {
     "title": "Paramètres de la communauté",

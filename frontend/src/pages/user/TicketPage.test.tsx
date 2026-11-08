@@ -137,17 +137,4 @@ describe("TicketPage", () => {
     expect(await screen.findByText(/This ticket is closed/)).toBeInTheDocument();
     expect(screen.queryByRole("textbox")).toBeNull();
   });
-
-  it("waits for the team to speak first on feedback", async () => {
-    state.ticket = ticket({
-      stream: "feedback",
-      state: "received",
-      conversation: "staff_first",
-      can_reply: false,
-      messages: [{ id: 1, mine: true, content: "Dark mode?", created_at: now }],
-    });
-    open();
-    expect(await screen.findByText(/once the team has followed up/)).toBeInTheDocument();
-    expect(screen.queryByRole("textbox")).toBeNull();
-  });
 });

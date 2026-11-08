@@ -24,8 +24,8 @@ import { toast } from "@/lib/mascotToast";
 import { isAdminRole } from "@/lib/permissions";
 import { toolCamelPlural } from "@/lib/tools";
 import { getUserDisplayName } from "@/lib/userDisplay";
-import { AsyncCombobox } from "@/ui/async-combobox";
 import { Button } from "@/ui/button";
+import { Combobox, type ComboboxItem } from "@/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -35,7 +35,6 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { Label } from "@/ui/label";
-import type { SearchableComboboxItem } from "@/ui/searchable-combobox";
 
 /**
  * Counts keyed by tool, rendered as "3 projects · 1 calendar". The label comes
@@ -150,7 +149,7 @@ export const TransferContentOwnershipDialog = ({
     pageSize: USER_ID_LOOKUP_MAX,
     enabled: open && pickerOpen,
   });
-  const recipients = useMemo<SearchableComboboxItem[]>(() => {
+  const recipients = useMemo<ComboboxItem[]>(() => {
     const term = search.trim().toLowerCase();
     return [
       ...(adminSearch.data?.items ?? [])
@@ -235,7 +234,7 @@ export const TransferContentOwnershipDialog = ({
 
             <div className="space-y-2">
               <Label>{t("transferOwnership.recipientLabel")}</Label>
-              <AsyncCombobox
+              <Combobox
                 items={recipients}
                 value={recipientId}
                 onValueChange={(value) => {

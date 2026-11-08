@@ -28,13 +28,13 @@ import { HomeWidgetCard } from "@/components/home/HomeWidgetCard";
 import { toast } from "@/lib/mascotToast";
 import { isKnownTimezone, TIMEZONE_OPTIONS } from "@/lib/timezones";
 import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
 import { useTimeFormat } from "@/ui/host";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { dateTimeFormat, numberFormat } from "@/ui/lib/intl";
 import { hour12Option } from "@/ui/lib/timeFormat";
 import { cn } from "@/ui/lib/utils";
-import { SearchableCombobox } from "@/ui/searchable-combobox";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 import type { HomeWidgetProps, HomeWidgetSettingsProps } from "./types";
@@ -449,7 +449,7 @@ export const ClockSettings = ({ options, onChange }: HomeWidgetSettingsProps) =>
           </ul>
         ) : null}
         {zones.length < MAX_CLOCK_ZONES ? (
-          <SearchableCombobox
+          <Combobox
             items={TIMEZONE_OPTIONS.filter((zone) => !zones.includes(zone)).map((zone) => ({
               value: zone,
               label: zone,

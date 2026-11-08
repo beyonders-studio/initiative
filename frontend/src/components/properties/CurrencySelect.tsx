@@ -2,8 +2,8 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CurrencyCode } from "@/api/generated/initiativeAPI.schemas";
+import { Combobox } from "@/ui/combobox";
 import { collator, displayNames } from "@/ui/lib/intl";
-import { SearchableCombobox } from "@/ui/searchable-combobox";
 
 /** The currency a new money property starts in: the one the reader's language
  *  is most often written about. */
@@ -35,7 +35,7 @@ export const CurrencySelect = ({
       .sort((a, b) => order.compare(a.label, b.label));
   }, [i18n.language]);
   return (
-    <SearchableCombobox
+    <Combobox
       items={items}
       value={value}
       onValueChange={(code) => onChange(code as CurrencyCode)}

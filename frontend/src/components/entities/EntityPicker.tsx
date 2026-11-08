@@ -9,7 +9,7 @@ import {
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
 import type { ItemEndKind } from "@/lib/relationships";
 import { hitIcon } from "@/lib/searchResults";
-import { AsyncCombobox } from "@/ui/async-combobox";
+import { Combobox } from "@/ui/combobox";
 
 /**
  * The kinds a relation picker offers, derived from the generated enum so a kind
@@ -120,7 +120,7 @@ export const EntityPicker = ({
   );
 
   return (
-    <AsyncCombobox
+    <Combobox
       items={items}
       value={value ? `${value.entity_type}:${value.entity_id}` : null}
       // What was picked, said the same way the row said it — otherwise the

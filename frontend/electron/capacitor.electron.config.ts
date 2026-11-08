@@ -23,8 +23,17 @@ export default defineConfig({
     height: 320,
   },
   hooks: {
-    // The window keeps its title bar but hides the menu bar under it until
-    // Alt is pressed; its shortcuts (zoom, reload, full screen) still work.
-    windowFactory: (options) => new BrowserWindow({ ...options, autoHideMenuBar: true }),
+    // The page draws the title bar (`DesktopTitleBar`): the app's name, the
+    // update button and the help links, in a row that still drags the window.
+    // The computer keeps drawing the window's own buttons at its end, coloured
+    // to the page's theme by `Desktop.setTitleBarColors`. The menu bar stays
+    // hidden; its shortcuts (zoom, reload, full screen) still work.
+    windowFactory: (options) =>
+      new BrowserWindow({
+        ...options,
+        autoHideMenuBar: true,
+        titleBarStyle: "hidden",
+        titleBarOverlay: { height: 36 },
+      }),
   },
 });

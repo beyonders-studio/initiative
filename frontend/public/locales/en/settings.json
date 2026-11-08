@@ -11,7 +11,8 @@
       "privacy": "Privacy"
     },
     "loginRequired": "You need to be logged in to manage your profile.",
-    "goToLogin": "Go to login"
+    "goToLogin": "Go to login",
+    "version": "Initiative v{{version}}"
   },
   "communityLayout": {
     "title": "Community settings",

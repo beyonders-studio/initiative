@@ -11,7 +11,8 @@
       "privacy": "Privatsphäre"
     },
     "loginRequired": "Du musst angemeldet sein, um dein Profil zu verwalten.",
-    "goToLogin": "Zur Anmeldung"
+    "goToLogin": "Zur Anmeldung",
+    "version": "Initiative v{{version}}"
   },
   "communityLayout": {
     "title": "Community-Einstellungen",

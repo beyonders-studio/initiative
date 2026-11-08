@@ -282,7 +282,9 @@ Reporting something **illegal** asks which law it breaks, and goes to the commun
 
 ## Asking for help
 
-The lifebuoy at the foot of the sidebar is **Ask for help**. Where your server takes help requests, it opens a short form — what it's about, a line to name it, what happened — and it goes to the people who run the server, not to the community's own admins.
+The question mark at the foot of the sidebar, and in the desktop app's title bar, is **Help**. It searches these pages first, from inside the app, and before you type it shows answers for the page you're on. Where your server takes help requests, **Ask the team** sits under the results and starts a request with whatever you searched. Say what happened, pick what it's about, and paste, drop or attach a screenshot if it helps. The request goes to the people who run the server, not to the community's own admins.
+
+Each request carries this device's details: the app's version, the platform, your language and theme, the page you were on (without anything that names what was on it) and the window's size. The line above **Send** shows them, and its switch leaves them out. Close Help halfway through and your draft waits for you as a **Help request draft** button in the corner.
 
 What it's about decides what you can ask:
 
@@ -290,11 +292,13 @@ What it's about decides what you can ask:
 - **This community** — where the server takes help requests from the community you're in.
 - **A copy of this community's data, or deleting it** — for whoever holds the community's seat, where it takes help requests.
 
-Notices that used to say "contact whoever runs this server" — the age question, a read-only or suspended community, running out of seats — have the same **Ask for help** beside them, opened on what the notice is about.
+Notices that used to say "contact whoever runs this server" — the age question, a read-only or suspended community, running out of seats — have **Ask for help** beside them, which opens the same request already set to what the notice is about.
 
-Where the server takes no requests but has said who to write to, the button gives you that address instead. Where there's neither, the button isn't there, and **Documentation**, the question mark beside it, is where to look.
+Where the server takes no requests but has said who to write to, that address sits under the results instead. Where there's neither, the search is all there is, with these pages one click away.
 
-**Send feedback**, in your account menu and the command palette, tells the people who run the server what you think: an idea, a problem, praise or something else, with screenshots if they help. It shows you where the app was — its version, platform, language, theme, the page (without anything that names what was on it) and the window's size — and sends that with it unless you remove it. A problem you need an answer to has **I need an answer**, which sends it as a help request instead. Feedback lands in **My Tickets** too; the team writes first if they write at all, and you're told when it's been read.
+**Send feedback**, in your account menu and the command palette, is where an idea goes, or something that got in your way, or something you love. Pick which it is and write it; a screenshot pasted into the box comes along too. **See what** shows exactly what else gets sent (the app's version, platform, language, theme, the page without anything that names what was on it, and the window's size), and the switch beside it leaves all that out.
+
+Feedback goes one way unless you tick **You can contact me with questions about this**. Then the team can write to you about it, and it shows up in **My Tickets** when they do. Anything you need sorted out for you belongs in **Ask for help**, which **Something's not right** points you to.
 
 Every request you send lands in **My Tickets**, in the sidebar: where each one stands (**Received**, **In progress**, **Waiting on you**, **Closed**), what the team said, and your replies. You get a notification when it moves, so there's no need to keep checking. A report is listed there too, though the team looks into reports without replying to them.
 

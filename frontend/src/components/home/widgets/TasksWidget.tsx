@@ -24,8 +24,8 @@ import { LAYOUT_NAMESPACES, type LayoutEnv } from "@/lib/layouts/fields";
 import { taskFields } from "@/lib/layouts/tasks";
 import { entityRefRoute, taskRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
-import { AsyncCombobox } from "@/ui/async-combobox";
 import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
 import { DataTable } from "@/ui/data-table";
 import { Label } from "@/ui/label";
 import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
@@ -314,7 +314,7 @@ export const TasksSettings = ({ options, onChange }: HomeWidgetSettingsProps) =>
   return (
     <div className="space-y-2">
       <Label>{t("widgets.tasks.addTo")}</Label>
-      <AsyncCombobox
+      <Combobox
         aria-label={t("widgets.tasks.addTo")}
         items={lists.map((row) => ({
           value: key(row.communityId, row.id),

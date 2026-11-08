@@ -1,6 +1,7 @@
 import { useLocation } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 
+import { useHelpOpen } from "@/components/help/helpStore";
 import { useSidebar } from "@/components/sidebar/sidebar";
 
 /**
@@ -30,4 +31,10 @@ export const useAutoCloseSidebar = () => {
       setOpenMobile(false);
     }
   }, [pathname, isMobile, setOpenMobile, consumeAutoCloseSuppression]);
+
+  // Help opens over the page as a sheet of its own on a phone.
+  const helpOpen = useHelpOpen();
+  useEffect(() => {
+    if (helpOpen && isMobile) setOpenMobile(false);
+  }, [helpOpen, isMobile, setOpenMobile]);
 };

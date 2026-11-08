@@ -323,6 +323,7 @@
     "accountSuspended": "Votre compte a été suspendu.",
     "accountSuspendedWithReason": "Votre compte a été suspendu : {{reason}}",
     "accountUnsuspended": "Votre compte n'est plus suspendu.",
+    "announcement": "Annonce : {{title}}",
     "communityOnHold": "{{community}} est en attente. Contactez la personne qui gère ce serveur pour régler la situation.",
     "pluginConsentRequested": "{{plugin}} demande à agir en votre nom : « {{label}} »",
     "pluginUpdatePending": "{{plugin}} version {{version}} demande plus d'accès",

@@ -89,8 +89,8 @@ async def list_announcements(
 ) -> AnnouncementListResponse:
     """Live announcements for this reader, newest first.
 
-    The archive page asks for the dismissed ones too; an expired notice is
-    gone from both, which is what an end date is for.
+    A bell line opening a notice again asks for the dismissed ones too; an
+    expired notice is gone from both, which is what an end date is for.
     """
     items = await announcements_service.list_for_user(
         session, user=current_user, include_dismissed=include_dismissed

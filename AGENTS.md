@@ -243,7 +243,7 @@ is "everybody, immediately", which is usually wrong for a notice worth shipping.
 | `guild_admins_only` | Only people who administer a community can act on it. |
 | `trigger_route` | It explains a screen. The notice waits for a matching path (`*` one segment, `**` the rest) instead of queueing at sign-in. |
 | `dismissals_required` | Missing it would cost somebody real work. Two or three, never more; it comes back until acknowledged that many times. |
-| `expires_at` | It stops being true on a date. An end date retires it from the archive as well as the queue. |
+| `expires_at` | It stops being true on a date. An end date retires it from the queue, and its bell line no longer opens it. |
 
 **Announcement text is not translated.** Sections are markdown written once and
 shown as-is — only the dialog's own chrome goes through i18n. Write in English

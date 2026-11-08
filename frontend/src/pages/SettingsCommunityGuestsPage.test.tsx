@@ -128,7 +128,7 @@ describe("SettingsCommunityGuestsPage", () => {
     await user.type(days, "5");
 
     await user.click(screen.getByLabelText("Initiatives they join"));
-    await user.click(await screen.findByRole("button", { name: "Select all" }));
+    await user.click(await screen.findByRole("option", { name: "Select all" }));
     await user.keyboard("{Escape}");
 
     await user.click(screen.getByRole("combobox", { name: "Thing" }));

@@ -86,18 +86,38 @@
   },
   "help": {
     "action": "Ask for help",
-    "title": "Ask for help",
-    "description": "Tell us what is going on and somebody will pick it up.",
+    "panel": {
+      "search": "Search the user guide",
+      "guide": "User guide",
+      "guideBody": "How to use every part of Initiative, from your first project on.",
+      "back": "Back to search",
+      "forThisPage": "For this page",
+      "noMatch": "Nothing in the user guide matches “{{query}}”.",
+      "noMatchAsk": "Try other words, or ask the team below. Your search goes into the request.",
+      "noMatchWrite": "Try other words, or write to the address below.",
+      "noMatchBrowse": "Try other words, or browse the user guide.",
+      "unavailable": "Search isn't set up on this server. The user guide link above has everything.",
+      "noAnswer": "No answer here?",
+      "openRequests_one": "{{count}} open request",
+      "openRequests_other": "{{count}} open requests",
+      "askTeam": "Ask the team",
+      "writeTo": "No answer here? Write to the people who run this server:",
+      "needsText": "Say what's going on to send.",
+      "needsTopic": "Choose what it's about to send.",
+      "sendShortcut": "Ctrl+Enter sends",
+      "discard": "Discard",
+      "sent": "Sent to the team",
+      "sentBody": "The people who run this server will pick it up. Their answer arrives in your notifications, and the request stays in My tickets.",
+      "openTickets": "Open My tickets"
+    },
     "subjectLabel": "Title",
     "subjectPlaceholder": "One line, so it can be found again",
     "bodyLabel": "What happened?",
     "bodyPlaceholder": "What you were doing, what you expected, and what happened instead.",
-    "browseFaq": "Browse the FAQ",
     "submit": "Send",
     "thanks": "Sent. Somebody will pick it up.",
     "error": "Could not send that. Try again in a moment.",
     "topicLabel": "What is it about?",
-    "topicPlaceholder": "Choose one",
     "topics": {
       "account": "My account",
       "community": "This community",
@@ -133,13 +153,13 @@
     "replyError": "Could not send your reply. Try again in a moment.",
     "closedNote": "This ticket is closed. If something else comes up, ask for help again.",
     "noConversation": "Thanks for the report. The team looks into every one, but they don't reply to reports here.",
-    "staffFirst": "Thanks for telling us. You can reply here once the team has followed up.",
     "empty": "You haven't filed any tickets. When you ask for help, it shows up here so you can follow it.",
     "loadError": "Could not load your tickets."
   },
   "case": {
     "filedBy": "Filed by",
     "noFiler": "Opened automatically",
+    "noContact": "They chose not to be contacted",
     "theyCalledIt": "Their subject:",
     "noConversation": "This kind of case doesn't open a conversation with whoever filed it.",
     "staffFirst": "They can reply once the team has said something to them.",
@@ -211,6 +231,7 @@
   },
   "evidence": {
     "attach": "Attach files",
+    "dropHere": "Drop to attach",
     "limits_one": "Up to {{count}} file, {{size}} at most.",
     "limits_other": "Up to {{count}} files, {{size}} each at most.",
     "remove": "Remove {{name}}",
@@ -221,9 +242,7 @@
     "heading": "Attached",
     "reveal": "Show {{name}}",
     "view": "View {{name}}",
-    "open": "Open {{name}}",
-    "dropped_one": "Took off {{names}}: this doesn't take it.",
-    "dropped_other": "Took off {{names}}: this doesn't take them."
+    "open": "Open {{name}}"
   },
   "security": {
     "action": "Report a security problem",
@@ -246,28 +265,34 @@
     "error": "Could not send that. Try again in a moment."
   },
   "feedback": {
-    "action": "Send feedback",
-    "title": "Send feedback",
-    "description": "Tell the people who run this server what you think. You can follow it under My Tickets.",
-    "typeLabel": "What kind of feedback is it?",
-    "typePlaceholder": "Choose one",
-    "topics": {
-      "idea": "An idea",
-      "problem": "A problem",
-      "praise": "Praise",
-      "other": "Something else"
+    "title": "Tell us what you think",
+    "kindLabel": "What kind of feedback",
+    "kinds": {
+      "idea": {
+        "label": "Suggest an idea",
+        "question": "What would you like Initiative to do?",
+        "placeholder": "The idea, and what it would help you do."
+      },
+      "problem": {
+        "label": "Something's not right",
+        "question": "What got in your way?",
+        "placeholder": "What you were doing, and what happened."
+      },
+      "praise": {
+        "label": "Give a compliment",
+        "question": "What do you love about it?",
+        "placeholder": "The part you'd tell a friend about."
+      }
     },
-    "bodyLabel": "What do you want to tell them?",
-    "bodyPlaceholder": "What you'd like, what got in your way, or what you liked.",
-    "needsAnswer": "I need an answer",
-    "needsAnswerHelp": "Sends this as a help request instead, so somebody writes back.",
-    "submit": "Send feedback",
-    "thanks": "Thanks! The people who run this server will read it.",
-    "error": "Could not send that. Try again in a moment.",
+    "addPicture": "Add a picture",
+    "contactable": "You can contact me with questions about this",
+    "stuck": "Need somebody to sort it out for you? Ask for help",
     "context": {
-      "title": "Sent with it",
-      "help": "Where the app was, so they can see what you saw. Nothing here names you or anything you opened.",
-      "remove": "Remove",
+      "on": "Includes your app version and which page you're on.",
+      "off": "Leaves out your app version and page.",
+      "switch": "Include your app version and page",
+      "show": "See what",
+      "hide": "Hide",
       "fields": {
         "app_version": "Version",
         "platform": "Platform",
@@ -276,7 +301,14 @@
         "route": "Page",
         "viewport": "Window"
       }
-    }
+    },
+    "discard": "Discard",
+    "writeSomething": "Write something to send.",
+    "submit": "Send feedback",
+    "thanks": "Thanks for the feedback!",
+    "thanksBody": "The team reads every one.",
+    "done": "Done",
+    "error": "Could not send that. Try again in a moment."
   },
   "moderationTopics": {
     "appeal": "Appeal against your suspension"

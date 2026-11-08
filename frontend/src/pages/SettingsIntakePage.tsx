@@ -42,10 +42,10 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
-import { AsyncCombobox } from "@/ui/async-combobox";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Combobox } from "@/ui/combobox";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
@@ -135,7 +135,7 @@ export const SettingsIntakePage = () => {
         </CardHeader>
         <CardContent className="space-y-3">
           <Label>{t("community.label")}</Label>
-          <AsyncCombobox
+          <Combobox
             className="max-w-md"
             aria-label={t("community.label")}
             value={boundCommunityId === null ? NONE : String(boundCommunityId)}

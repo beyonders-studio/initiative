@@ -6,6 +6,8 @@ import { AgeGateDialog } from "@/components/auth/AgeGateDialog";
 import { SecondFactorStepUpDialog } from "@/components/auth/SecondFactorStepUpDialog";
 import { StepUpDialog } from "@/components/auth/StepUpDialog";
 import { CookieConsent } from "@/components/CookieConsent";
+import { DesktopTitleBar } from "@/components/DesktopTitleBar";
+import { HelpHost } from "@/components/help/HelpHost";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useClockSync } from "@/hooks/useClockSync";
 import { useColorTheme } from "@/hooks/useColorTheme";
@@ -43,6 +45,8 @@ const RootComponent = () => {
 
   return (
     <>
+      {/* Over every screen, sign-in included: the desktop app has no other title bar. */}
+      <DesktopTitleBar />
       <Suspense fallback={<PageLoader />}>
         <Outlet />
       </Suspense>
@@ -50,6 +54,7 @@ const RootComponent = () => {
       <SecondFactorStepUpDialog />
       <AgeGateDialog />
       <CookieConsent />
+      <HelpHost />
     </>
   );
 };

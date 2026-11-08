@@ -86,18 +86,38 @@
   },
   "help": {
     "action": "Demander de l'aide",
-    "title": "Demander de l'aide",
-    "description": "Dites-nous ce qui se passe et quelqu'un s'en chargera.",
+    "panel": {
+      "search": "Rechercher dans le guide d'utilisation",
+      "guide": "Guide d'utilisation",
+      "guideBody": "Comment utiliser chaque partie d'Initiative, dès votre premier projet.",
+      "back": "Retour à la recherche",
+      "forThisPage": "Pour cette page",
+      "noMatch": "Rien dans le guide d'utilisation ne correspond à « {{query}} ».",
+      "noMatchAsk": "Essayez d'autres mots, ou demandez à l'équipe ci-dessous. Votre recherche est reprise dans la demande.",
+      "noMatchWrite": "Essayez d'autres mots, ou écrivez à l'adresse ci-dessous.",
+      "noMatchBrowse": "Essayez d'autres mots, ou parcourez le guide d'utilisation.",
+      "unavailable": "La recherche n'est pas configurée sur ce serveur. Le lien vers le guide d'utilisation ci-dessus donne accès à tout.",
+      "noAnswer": "Pas de réponse ici ?",
+      "openRequests_one": "{{count}} demande ouverte",
+      "openRequests_other": "{{count}} demandes ouvertes",
+      "askTeam": "Demander à l'équipe",
+      "writeTo": "Pas de réponse ici ? Écrivez aux personnes qui gèrent ce serveur :",
+      "needsText": "Dites ce qui se passe pour envoyer.",
+      "needsTopic": "Choisissez le sujet pour envoyer.",
+      "sendShortcut": "Ctrl+Entrée envoie",
+      "discard": "Abandonner",
+      "sent": "Envoyé à l'équipe",
+      "sentBody": "Les personnes qui gèrent ce serveur s'en occuperont. Leur réponse arrive dans vos notifications, et la demande reste dans Mes tickets.",
+      "openTickets": "Ouvrir Mes tickets"
+    },
     "subjectLabel": "Titre",
     "subjectPlaceholder": "Une ligne, pour pouvoir le retrouver",
     "bodyLabel": "Que s'est-il passé ?",
     "bodyPlaceholder": "Ce que vous faisiez, ce que vous attendiez et ce qui s'est passé à la place.",
-    "browseFaq": "Consulter la FAQ",
     "submit": "Envoyer",
     "thanks": "Envoyé. Quelqu'un s'en chargera.",
     "error": "Impossible d'envoyer. Réessayez dans un instant.",
     "topicLabel": "De quoi s'agit-il ?",
-    "topicPlaceholder": "Choisissez une option",
     "topics": {
       "account": "Mon compte",
       "community": "Cette communauté",
@@ -133,13 +153,13 @@
     "replyError": "Votre réponse n'a pas pu être envoyée. Réessayez dans un instant.",
     "closedNote": "Ce ticket est clôturé. Si autre chose se présente, demandez de l'aide à nouveau.",
     "noConversation": "Merci pour le signalement. L'équipe examine chacun d'eux, mais ne répond pas aux signalements ici.",
-    "staffFirst": "Merci de nous en avoir parlé. Vous pourrez répondre ici une fois que l'équipe vous aura écrit.",
     "empty": "Vous n'avez envoyé aucun ticket. Quand vous demandez de l'aide, elle apparaît ici pour que vous puissiez la suivre.",
     "loadError": "Impossible de charger vos tickets."
   },
   "case": {
     "filedBy": "Envoyé par",
     "noFiler": "Ouvert automatiquement",
+    "noContact": "Ne souhaite pas être contacté",
     "theyCalledIt": "Son objet :",
     "noConversation": "Ce type de dossier n'ouvre pas de conversation avec la personne qui l'a envoyé.",
     "staffFirst": "Cette personne pourra répondre une fois que l'équipe lui aura écrit.",
@@ -211,6 +231,7 @@
   },
   "evidence": {
     "attach": "Joindre des fichiers",
+    "dropHere": "Déposez pour joindre",
     "limits_one": "Jusqu'à {{count}} fichier, {{size}} au maximum.",
     "limits_other": "Jusqu'à {{count}} fichiers, {{size}} chacun au maximum.",
     "remove": "Retirer {{name}}",
@@ -221,9 +242,7 @@
     "heading": "Pièces jointes",
     "reveal": "Afficher {{name}}",
     "view": "Voir {{name}}",
-    "open": "Ouvrir {{name}}",
-    "dropped_one": "{{names}} a été retiré : ce formulaire ne l'accepte pas.",
-    "dropped_other": "{{names}} ont été retirés : ce formulaire ne les accepte pas."
+    "open": "Ouvrir {{name}}"
   },
   "security": {
     "action": "Signaler un problème de sécurité",
@@ -246,28 +265,34 @@
     "error": "Impossible d'envoyer. Réessayez dans un instant."
   },
   "feedback": {
-    "action": "Envoyer un avis",
-    "title": "Envoyer un avis",
-    "description": "Dites à celles et ceux qui gèrent ce serveur ce que vous en pensez. Vous pouvez le suivre dans Mes tickets.",
-    "typeLabel": "De quel type d'avis s'agit-il ?",
-    "typePlaceholder": "Choisissez une option",
-    "topics": {
-      "idea": "Une idée",
-      "problem": "Un problème",
-      "praise": "Un compliment",
-      "other": "Autre chose"
+    "title": "Dites-nous ce que vous en pensez",
+    "kindLabel": "Type d'avis",
+    "kinds": {
+      "idea": {
+        "label": "Proposer une idée",
+        "question": "Que voudriez-vous qu'Initiative fasse ?",
+        "placeholder": "L'idée, et ce qu'elle vous permettrait de faire."
+      },
+      "problem": {
+        "label": "Quelque chose ne va pas",
+        "question": "Qu'est-ce qui vous a gêné ?",
+        "placeholder": "Ce que vous faisiez, et ce qui s'est passé."
+      },
+      "praise": {
+        "label": "Faire un compliment",
+        "question": "Qu'est-ce que vous aimez ?",
+        "placeholder": "Ce dont vous parleriez à un ami."
+      }
     },
-    "bodyLabel": "Que voulez-vous leur dire ?",
-    "bodyPlaceholder": "Ce que vous aimeriez, ce qui vous a gêné ou ce qui vous a plu.",
-    "needsAnswer": "J'ai besoin d'une réponse",
-    "needsAnswerHelp": "L'envoie plutôt comme demande d'aide, pour que quelqu'un vous réponde.",
-    "submit": "Envoyer l'avis",
-    "thanks": "Merci ! Celles et ceux qui gèrent ce serveur le liront.",
-    "error": "Impossible d'envoyer. Réessayez dans un instant.",
+    "addPicture": "Ajouter une image",
+    "contactable": "Vous pouvez me contacter si vous avez des questions à ce sujet",
+    "stuck": "Besoin que quelqu'un s'en occupe ? Demander de l'aide",
     "context": {
-      "title": "Envoyé avec",
-      "help": "Où en était l'application, pour qu'ils voient ce que vous avez vu. Rien ici ne vous nomme, ni rien de ce que vous avez ouvert.",
-      "remove": "Retirer",
+      "on": "Inclut la version de l'application et la page où vous êtes.",
+      "off": "Sans la version de l'application ni la page.",
+      "switch": "Inclure la version de l'application et la page",
+      "show": "Voir le détail",
+      "hide": "Masquer",
       "fields": {
         "app_version": "Version",
         "platform": "Plateforme",
@@ -276,7 +301,14 @@
         "route": "Page",
         "viewport": "Fenêtre"
       }
-    }
+    },
+    "discard": "Abandonner",
+    "writeSomething": "Écrivez quelque chose pour l'envoyer.",
+    "submit": "Envoyer l'avis",
+    "thanks": "Merci pour votre avis !",
+    "thanksBody": "L'équipe lit chaque message.",
+    "done": "Terminé",
+    "error": "Impossible d'envoyer. Réessayez dans un instant."
   },
   "moderationTopics": {
     "appeal": "Recours contre votre suspension"

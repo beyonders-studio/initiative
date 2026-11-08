@@ -4,6 +4,8 @@ backend/app/**/*_test.py
 backend/alembic/**/*_test.py
 backend/app/services/import_engine/fixtures/
 backend/scripts/
+# Except the one the image build runs (the Dockerfile's help-index stage).
+!backend/scripts/build_help_index.py
 backend/conftest.py
 backend/pytest.ini
 backend/.coveragerc

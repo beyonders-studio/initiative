@@ -17,6 +17,8 @@ export interface DesktopPlugin {
   getSettings(): Promise<{ tray: boolean; keepRunning: boolean; openAtLogin: boolean }>;
   setKeepRunning(options: { enabled: boolean }): Promise<void>;
   setOpenAtLogin(options: { enabled: boolean }): Promise<void>;
+  /** Colour the window's own buttons at the end of the title bar (Windows, Linux). */
+  setTitleBarColors(options: { color: string; symbolColor: string }): Promise<void>;
   addListener(
     eventName: "notificationClicked",
     listener: (event: { tag: string }) => void

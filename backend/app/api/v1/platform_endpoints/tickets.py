@@ -245,9 +245,10 @@ async def _send_feedback(
 ) -> TicketAccepted:
     try:
         await feedback_service.send(
-            filer=sender,
+            sender=sender,
             topic=payload.type,
             body=payload.body,
+            contactable=payload.contactable,
             context=payload.context,
             evidence=attached,
         )
@@ -324,6 +325,7 @@ async def _ask_for_help(
             subject=payload.subject,
             body=payload.body,
             topic=payload.type,
+            context=payload.context,
             evidence=attached,
         )
     except support_service.SupportUnavailable as exc:

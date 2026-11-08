@@ -75,9 +75,10 @@ async def seed(session: AsyncSession, users: dict[str, User], primary: Guild) ->
         body="Opening a shared file's link while signed out shows its comments.",
     )
     await feedback.send(
-        filer=filer,
+        sender=filer,
         topic=FeedbackTopic.idea,
         body="It would help to pin a comment to the top of a task.",
+        contactable=True,
     )
     opened += 3
 

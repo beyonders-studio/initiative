@@ -11,9 +11,9 @@ import type { PluginDataParam } from "@/api/pluginData";
 import { usePluginParamOptions } from "@/hooks/usePluginData";
 import { asControlValue, asDeclaredList, asDeclaredType } from "@/lib/widgets/pluginParams";
 import { localized } from "@/lib/widgets/widgetMeta";
+import { Combobox } from "@/ui/combobox";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
-import { MultiSelect } from "@/ui/multi-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /**
@@ -197,14 +197,15 @@ export function PluginParamControl({
       <div className="space-y-2">
         {heading}
         {offered.length ? (
-          <MultiSelect
+          <Combobox
+            multiple
             id={controlId}
-            selectedValues={chosen}
-            options={offered.map((option) => ({
+            value={chosen}
+            items={offered.map((option) => ({
               value: option.value,
               label: option.label ?? option.value,
             }))}
-            onChange={(next) => onChange(param.key, asDeclaredList(param, next))}
+            onValueChange={(next) => onChange(param.key, asDeclaredList(param, next))}
             placeholder={t("dashboards:config.pluginParamPlaceholder")}
           />
         ) : (

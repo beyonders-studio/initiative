@@ -81,7 +81,12 @@ export const AgeConfirmationDialog = ({
             <p className="text-muted-foreground text-sm">{t("auth:confirmAge.blockedHelp")}</p>
             <DialogFooter>
               {/* Their own answer, so a question about their account. */}
-              <HelpLink topic={SupportTopic.account} communityId={null} variant="ghost" />
+              <HelpLink
+                topic={SupportTopic.account}
+                communityId={null}
+                variant="ghost"
+                onAsk={() => setOpen(false)}
+              />
               <Button variant="outline" onClick={() => setOpen(false)}>
                 {t("common:close")}
               </Button>

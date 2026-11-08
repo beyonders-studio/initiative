@@ -297,10 +297,12 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
         guild_scoped=True,
         mutable_channels=_ALL_MUTABLE,
     ),
-    # Somebody else acted on this account. Being told is not a preference.
+    # Somebody else acted on this account, or the platform told it something.
+    # Being told is not a preference.
     NotificationCategory.account: CategorySpec(
         types=frozenset(
             {
+                NotificationType.announcement,
                 NotificationType.avatar_removed,
                 NotificationType.username_changed,
                 NotificationType.profile_field_cleared,

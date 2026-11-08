@@ -23,7 +23,6 @@ import { Route as ServerRequiredVerifyEmailRouteImport } from './routes/_serverR
 import { Route as ServerRequiredWelcomeRouteImport } from './routes/_serverRequired/welcome'
 import { Route as PluginsConnectedRouteImport } from './routes/plugins.connected'
 import { Route as ServerRequiredAuthenticatedIndexRouteImport } from './routes/_serverRequired/_authenticated/index'
-import { Route as ServerRequiredAuthenticatedAnnouncementsRouteImport } from './routes/_serverRequired/_authenticated/announcements'
 import { Route as ServerRequiredAuthenticatedCommunitiesRouteImport } from './routes/_serverRequired/_authenticated/communities'
 import { Route as ServerRequiredAuthenticatedLicencesRouteImport } from './routes/_serverRequired/_authenticated/licences'
 import { Route as ServerRequiredAuthenticatedMarketplaceRouteImport } from './routes/_serverRequired/_authenticated/marketplace'
@@ -260,12 +259,6 @@ const ServerRequiredAuthenticatedIndexRoute =
   ServerRequiredAuthenticatedIndexRouteImport.update({
     id: '/',
     path: '/',
-    getParentRoute: () => ServerRequiredAuthenticatedRoute,
-  } as any)
-const ServerRequiredAuthenticatedAnnouncementsRoute =
-  ServerRequiredAuthenticatedAnnouncementsRouteImport.update({
-    id: '/announcements',
-    path: '/announcements',
     getParentRoute: () => ServerRequiredAuthenticatedRoute,
   } as any)
 const ServerRequiredAuthenticatedCommunitiesRoute =
@@ -1529,7 +1522,6 @@ export interface FileRoutesByFullPath {
   '/verify-email': typeof ServerRequiredVerifyEmailRoute
   '/welcome': typeof ServerRequiredWelcomeRoute
   '/plugins/connected': typeof PluginsConnectedRoute
-  '/announcements': typeof ServerRequiredAuthenticatedAnnouncementsRoute
   '/communities': typeof ServerRequiredAuthenticatedCommunitiesRoute
   '/licences': typeof ServerRequiredAuthenticatedLicencesRoute
   '/marketplace': typeof ServerRequiredAuthenticatedMarketplaceRoute
@@ -1708,7 +1700,6 @@ export interface FileRoutesByTo {
   '/verify-email': typeof ServerRequiredVerifyEmailRoute
   '/welcome': typeof ServerRequiredWelcomeRoute
   '/plugins/connected': typeof PluginsConnectedRoute
-  '/announcements': typeof ServerRequiredAuthenticatedAnnouncementsRoute
   '/communities': typeof ServerRequiredAuthenticatedCommunitiesRoute
   '/licences': typeof ServerRequiredAuthenticatedLicencesRoute
   '/marketplace': typeof ServerRequiredAuthenticatedMarketplaceRoute
@@ -1872,7 +1863,6 @@ export interface FileRoutesById {
   '/_serverRequired/verify-email': typeof ServerRequiredVerifyEmailRoute
   '/_serverRequired/welcome': typeof ServerRequiredWelcomeRoute
   '/plugins/connected': typeof PluginsConnectedRoute
-  '/_serverRequired/_authenticated/announcements': typeof ServerRequiredAuthenticatedAnnouncementsRoute
   '/_serverRequired/_authenticated/communities': typeof ServerRequiredAuthenticatedCommunitiesRoute
   '/_serverRequired/_authenticated/licences': typeof ServerRequiredAuthenticatedLicencesRoute
   '/_serverRequired/_authenticated/marketplace': typeof ServerRequiredAuthenticatedMarketplaceRoute
@@ -2054,7 +2044,6 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/welcome'
     | '/plugins/connected'
-    | '/announcements'
     | '/communities'
     | '/licences'
     | '/marketplace'
@@ -2233,7 +2222,6 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/welcome'
     | '/plugins/connected'
-    | '/announcements'
     | '/communities'
     | '/licences'
     | '/marketplace'
@@ -2396,7 +2384,6 @@ export interface FileRouteTypes {
     | '/_serverRequired/verify-email'
     | '/_serverRequired/welcome'
     | '/plugins/connected'
-    | '/_serverRequired/_authenticated/announcements'
     | '/_serverRequired/_authenticated/communities'
     | '/_serverRequired/_authenticated/licences'
     | '/_serverRequired/_authenticated/marketplace'
@@ -2667,13 +2654,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof ServerRequiredAuthenticatedIndexRouteImport
-      parentRoute: typeof ServerRequiredAuthenticatedRoute
-    }
-    '/_serverRequired/_authenticated/announcements': {
-      id: '/_serverRequired/_authenticated/announcements'
-      path: '/announcements'
-      fullPath: '/announcements'
-      preLoaderRoute: typeof ServerRequiredAuthenticatedAnnouncementsRouteImport
       parentRoute: typeof ServerRequiredAuthenticatedRoute
     }
     '/_serverRequired/_authenticated/communities': {
@@ -4449,7 +4429,6 @@ const ServerRequiredAuthenticatedSettingsPlatformRouteWithChildren =
   )
 
 interface ServerRequiredAuthenticatedRouteChildren {
-  ServerRequiredAuthenticatedAnnouncementsRoute: typeof ServerRequiredAuthenticatedAnnouncementsRoute
   ServerRequiredAuthenticatedCommunitiesRoute: typeof ServerRequiredAuthenticatedCommunitiesRoute
   ServerRequiredAuthenticatedLicencesRoute: typeof ServerRequiredAuthenticatedLicencesRoute
   ServerRequiredAuthenticatedMarketplaceRoute: typeof ServerRequiredAuthenticatedMarketplaceRoute
@@ -4473,8 +4452,6 @@ interface ServerRequiredAuthenticatedRouteChildren {
 
 const ServerRequiredAuthenticatedRouteChildren: ServerRequiredAuthenticatedRouteChildren =
   {
-    ServerRequiredAuthenticatedAnnouncementsRoute:
-      ServerRequiredAuthenticatedAnnouncementsRoute,
     ServerRequiredAuthenticatedCommunitiesRoute:
       ServerRequiredAuthenticatedCommunitiesRoute,
     ServerRequiredAuthenticatedLicencesRoute:

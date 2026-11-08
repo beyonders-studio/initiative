@@ -66,7 +66,6 @@
     "close": "Schließen"
   },
   "multiSelect": {
-    "placeholder": "Auswählen…",
     "empty": "Keine Optionen verfügbar",
     "allSelected": "Alle ausgewählt",
     "countSelected": "{{count}} ausgewählt",

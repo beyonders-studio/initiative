@@ -1,5 +1,5 @@
-"""Feedback: what the sheet offers, what a filing becomes, and the app context
-that travels with it."""
+"""Feedback: what the sheet offers, what a filing becomes with and without
+leave to contact its sender, and the app context that travels with it."""
 
 from __future__ import annotations
 
@@ -48,56 +48,70 @@ async def test_the_form_is_offered_wherever_feedback_is_taken(
     sender = await acting_user()
     offered = (await tickets_test._offered(client, sender))["feedback"]
     assert offered["mode"] == "form"
-    assert offered["types"] == ["idea", "problem", "praise", "other"]
+    assert offered["types"] == ["idea", "problem", "praise"]
 
 
-async def test_feedback_is_a_case_its_sender_follows(
+async def test_feedback_is_a_case_its_sender_may_be_contacted_about(
     client, session, acting_user, feedback_desk
 ):
-    """Their words open the case, said to them; the team's board names it by
-    its kind and how it begins, and nothing the sender typed becomes a
-    subject of theirs."""
+    """The board names a case by its kind and how it begins. A sender who may
+    be contacted is the case's filer, and their words open the conversation
+    with them; any other sender's words are the description, with nobody to
+    write to."""
     sender = await acting_user()
-    response = await _send(
-        client, sender, type="problem", body="Export drops the last row.\nEvery time."
-    )
-    assert response.status_code == 202, response.text
+    words = "Export drops the last row.\nEvery time."
+    quiet = await _send(client, sender, type="problem", body=words)
+    assert quiet.status_code == 202, quiet.text
+    open_to_contact = await _send(client, sender, body="Print view.", contactable=True)
+    assert open_to_contact.status_code == 202, open_to_contact.text
 
     await set_rls_context(session, SystemGuild(feedback_desk["guild"].id))
-    case = (await session.exec(select(IntakeCase))).one()
-    assert case.stream == IntakeStream.feedback
-    assert case.topic == "problem"
-    assert case.filer_user_id == sender.user.id
-    assert case.filer_subject is None
-    task = (await session.exec(select(Task).where(Task.id == case.task_id))).one()
-    assert task.title == "Problem: Export drops the last row."
-    opening = (
-        await session.exec(select(Comment).where(Comment.task_id == task.id))
-    ).one()
+    quiet_case, contact_case = (
+        await session.exec(select(IntakeCase).order_by(IntakeCase.id))
+    ).all()
+    tasks = {
+        task.id: task
+        for task in await session.exec(
+            select(Task).where(
+                Task.id.in_([quiet_case.task_id, contact_case.task_id])  # type: ignore[union-attr]
+            )
+        )
+    }
+    comments = (await session.exec(select(Comment))).all()
+
+    assert quiet_case.filer_user_id is None and quiet_case.topic == "problem"
+    quiet_task = tasks[quiet_case.task_id]
+    assert quiet_task.title == "Problem: Export drops the last row."
+    assert "did not offer to be contacted" in quiet_task.description
+    assert words in quiet_task.description
+
+    assert contact_case.filer_user_id == sender.user.id
+    assert contact_case.filer_subject is None and contact_case.topic == "idea"
+    assert tasks[contact_case.task_id].title == "Idea: Print view."
+    (opening,) = comments
+    assert opening.task_id == contact_case.task_id
     assert opening.audience == CommentAudience.filer
-    assert opening.content == "Export drops the last row.\nEvery time."
+    assert opening.content == "Print view."
     await set_rls_context(session, Unattributed())
+
+
+@pytest.mark.parametrize("kind", ["other", "rating"])
+async def test_feedback_is_one_of_three_kinds(client, acting_user, feedback_desk, kind):
+    sender = await acting_user()
+    assert (await _send(client, sender, type=kind)).status_code == 422
 
 
 async def test_the_app_context_goes_to_the_team_where_it_was_sent(
     client, session, acting_user, feedback_desk
 ):
     sender = await acting_user()
-    context = {
-        "app_version": "0.70.0",
-        "platform": "web",
-        "locale": "en-GB",
-        "theme": "dark",
-        "route": "/c/$communityId/i/$initiativeId",
-        "viewport": "md",
-    }
-    response = await _send(client, sender, context=context)
+    response = await _send(client, sender, context=tickets_test.DEVICE)
     assert response.status_code == 202, response.text
 
     await set_rls_context(session, SystemGuild(feedback_desk["guild"].id))
     case = (await session.exec(select(IntakeCase))).one()
     task = (await session.exec(select(Task).where(Task.id == case.task_id))).one()
-    for value in context.values():
+    for value in tickets_test.DEVICE.values():
         assert f"`{value}`" in task.description
     await set_rls_context(session, Unattributed())
 

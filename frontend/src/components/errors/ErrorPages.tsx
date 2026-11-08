@@ -63,7 +63,7 @@ export const ErrorState = ({
   const details = error === undefined ? null : errorText(error);
 
   return (
-    <Empty role="alert" className={cn(fullScreen ? "min-h-screen" : "min-h-[60vh]")}>
+    <Empty role="alert" className={cn(fullScreen ? "min-h-app" : "min-h-[60vh]")}>
       <EmptyHeader>
         <EmptyMedia variant="icon">{icon}</EmptyMedia>
         <EmptyTitle>{title}</EmptyTitle>
