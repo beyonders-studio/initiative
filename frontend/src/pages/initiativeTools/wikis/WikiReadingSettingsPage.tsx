@@ -23,6 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { Label } from "@/ui/label";
 import { cn } from "@/ui/lib/utils";
+import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Separator } from "@/ui/separator";
@@ -61,7 +62,11 @@ export const WikiReadingSettingsPage = () => {
   const wiki = wikiQuery.data;
 
   if (!wiki) {
-    return <p className="text-muted-foreground text-sm">{t("loading")}</p>;
+    return (
+      <SkeletonRegion>
+        <FormSkeleton />
+      </SkeletonRegion>
+    );
   }
 
   const canWrite = wiki.can.edit;

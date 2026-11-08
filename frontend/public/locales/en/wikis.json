@@ -10,7 +10,6 @@
   "noWikis": "No wikis yet",
   "noWikisDescription": "A wiki is pages that link to each other. Write one, link it to the next, and the shape of what you know shows up on its own.",
   "createFirst": "Create the First Wiki",
-  "loading": "Loading wikis...",
   "error": "Something went wrong",
   "notFound": "Wiki not found",
   "notFoundDescription": "The wiki you're looking for does not exist or has been removed.",
