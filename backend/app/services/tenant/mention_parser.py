@@ -15,6 +15,7 @@ it takes out what a collaboration state may still hold.
 """
 
 from pycrdt import Doc, Text, XmlElement, XmlText
+from pycrdt._base import base_types
 from sqlalchemy import Text as SqlText
 from sqlalchemy import cast
 from sqlmodel import col, select, update
@@ -69,8 +70,11 @@ def nameless_state(state: bytes) -> bytes | None:
 
     def walk(text: Text) -> None:
         nonlocal changed
-        # An embedded type comes back as its own wrapper.
-        for node, _ in text.diff():
+        for value, _ in text.diff():
+            # An embedded type comes back unwrapped; pycrdt keeps the wrappers
+            # by the type it returns.
+            kind = base_types.get(type(value))
+            node = kind(_doc=doc, _integrated=value) if kind else None
             if isinstance(node, XmlText):
                 walk(node)
             elif (
