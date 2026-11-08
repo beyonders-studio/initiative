@@ -12,7 +12,12 @@ def test_a_server_is_cloud_when_its_app_url_has_clouds_origin(monkeypatch):
     origin = root_file("CLOUD_ORIGIN").read_text().strip()
     assert origin.startswith("https://")
 
-    for app_url in (origin, f"{origin}/", f"{origin.upper()}/welcome"):
+    for app_url in (
+        origin,
+        f"{origin}/",
+        f"{origin.upper()}/welcome",
+        f"{origin}:443",
+    ):
         monkeypatch.setattr(settings, "APP_URL", app_url)
         assert cloud.is_cloud(), app_url
 

@@ -681,6 +681,21 @@ class Settings(BaseSettings):
         """
         return urlsplit(self.APP_URL.strip()).scheme == "https"
 
+    @property
+    def app_origin(self) -> str | None:
+        """The public app's origin as a browser names it: ``scheme://host`` with
+        a port only where it is not the scheme's default. ``None`` when
+        ``APP_URL`` is not a whole URL."""
+        parts = urlsplit(self.APP_URL.strip())
+        if not parts.scheme or not parts.hostname:
+            return None
+        scheme = parts.scheme.lower()
+        hostname = parts.hostname
+        host = f"[{hostname}]" if ":" in hostname else hostname
+        default = {"https": 443, "http": 80}.get(scheme)
+        port = f":{parts.port}" if parts.port not in (None, default) else ""
+        return f"{scheme}://{host}{port}"
+
     # APP_URL should point to the frontend entry so redirect URIs resolve correctly
     APP_URL: str = "http://localhost:5173"
     # Extra browser origins allowed to make credentialed cross-origin requests,

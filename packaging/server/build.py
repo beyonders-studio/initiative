@@ -128,6 +128,7 @@ def stage_payload(
         "VERSION",
         "MIN_NATIVE_VERSION",
         "MIN_DESKTOP_VERSION",
+        "CLOUD_ORIGIN",
         "CHANGELOG.md",
     ):
         copy_file(REPO / name, root / name)
