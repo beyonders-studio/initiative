@@ -28,7 +28,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator
 from typing import Any
 
-from fastapi.routing import APIRoute
+from fastapi.routing import APIRoute, iter_route_contexts
 
 from app.api.deps import route_plugin_scope_declaration
 from app.core.config import API_V1_STR, PLUGIN_SERVER_URL
@@ -69,29 +69,37 @@ _UPLOAD = (
 
 def _scoped_operations(
     openapi_schema: dict[str, Any], routes: Iterable[Any]
-) -> Iterator[tuple[APIRoute, str, Any, dict[str, Any]]]:
-    """Each operation of a route that declares a plug-in scope, with the route,
-    its method and the declaration."""
+) -> Iterator[tuple[str, str, str, Any, dict[str, Any]]]:
+    """Each operation of a route that declares a plug-in scope: the route's
+    name, its path, the method, the declaration and the operation. A route in
+    an included router is read as FastAPI runs it, with the router's prefix
+    and dependencies."""
     paths = openapi_schema["paths"]
-    for route in routes:
-        if not isinstance(route, APIRoute) or not route.include_in_schema:
+    for route in iter_route_contexts(list(routes)):
+        original, path = route.original_route, route.path_format
+        if (
+            not isinstance(original, APIRoute)
+            or path is None
+            or not route.include_in_schema
+        ):
             continue
         declaration = route_plugin_scope_declaration(route)
         if declaration is None:
             continue
-        for method in sorted(route.methods):
+        for method in sorted(route.methods or ()):
             yield (
-                route,
+                original.name,
+                path,
                 method.lower(),
                 declaration,
-                paths[route.path_format][method.lower()],
+                paths[path][method.lower()],
             )
 
 
 def mark_plugin_scopes(openapi_schema: dict[str, Any], routes: Iterable[Any]) -> None:
     """Set ``x-plugin-scope`` on each operation a plug-in may call, as its route's
     dependency declares it."""
-    for _, _, declaration, operation in _scoped_operations(openapi_schema, routes):
+    for *_, declaration, operation in _scoped_operations(openapi_schema, routes):
         operation["x-plugin-scope"] = declaration
 
 
@@ -156,16 +164,18 @@ def build_plugin_openapi(
     outside a community, or on two such routes with one name."""
     paths: dict[str, dict[str, Any]] = {}
     named: dict[str, str] = {}
-    for route, method, _, operation in _scoped_operations(openapi_schema, routes):
-        if not route.path_format.startswith(f"{COMMUNITY_PREFIX}/"):
-            raise RuntimeError(f"{route.path_format} is not a community route")
-        path = route.path_format.removeprefix(COMMUNITY_PREFIX)
+    for name, full_path, method, _, operation in _scoped_operations(
+        openapi_schema, routes
+    ):
+        if not full_path.startswith(f"{COMMUNITY_PREFIX}/"):
+            raise RuntimeError(f"{full_path} is not a community route")
+        path = full_path.removeprefix(COMMUNITY_PREFIX)
         where = f"{method.upper()} {path}"
-        if route.name in named:
+        if name in named:
             raise RuntimeError(
-                f"two plug-in routes are named {route.name}: {named[route.name]} and {where}"
+                f"two plug-in routes are named {name}: {named[name]} and {where}"
             )
-        named[route.name] = where
+        named[name] = where
         parameters = [
             parameter
             for parameter in operation.get("parameters", ())
