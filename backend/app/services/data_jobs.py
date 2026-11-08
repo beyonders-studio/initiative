@@ -62,8 +62,9 @@ from app.services.platform import notice_outbox
 
 logger = logging.getLogger(__name__)
 
-#: Who to tell, what to tell them, and the notification's data.
-JobOutcome = tuple[int, NotificationType, dict[str, Any]]
+#: Who to tell (nobody, for a job no member started), what to tell them, and
+#: the notification's data.
+JobOutcome = tuple[int | None, NotificationType, dict[str, Any]]
 
 Heartbeat = Callable[[], Awaitable[None]]
 
@@ -355,6 +356,7 @@ async def notify(session: AsyncSession, outcomes: list[JobOutcome]) -> None:
                 user_id, data.get("community_id"), notification_type, data
             )
             for user_id, notification_type, data in outcomes
+            if user_id is not None
         ],
     )
     await session.commit()

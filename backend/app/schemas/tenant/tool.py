@@ -10,7 +10,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.core.identity_boundary import GuildId
 from app.schemas.base import MAX_TITLE_LENGTH, SanitizedBaseModel
-from app.schemas.tenant.archive import ToolState
+from app.schemas.tenant.archive import ToolCan, ToolState
 from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.property import PropertySummary, annotated_properties
 from app.schemas.tenant.resource_grant import ResourceGrantSchema
@@ -23,7 +23,7 @@ if TYPE_CHECKING:  # pragma: no cover
 _UNSET = object()
 
 
-class ToolSummaryBase(ToolState, CreatedByRead):
+class ToolSummaryBase[CanT: ToolCan](ToolState[CanT], CreatedByRead):
     """What every tool's summary reports beside its own fields."""
 
     model_config = ConfigDict(
@@ -31,7 +31,6 @@ class ToolSummaryBase(ToolState, CreatedByRead):
     )
 
     id: int
-    initiative_id: int
     community_id: GuildId = Field(
         validation_alias=AliasChoices("community_id", "guild_id")
     )

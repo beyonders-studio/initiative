@@ -111,7 +111,13 @@ export function buildUserSummary(overrides: Partial<UserSummary> = {}): UserSumm
     display_name: `User ${counter}`,
     avatar_url: null,
     status: "active",
-    profile_decorations: null,
+    profile_decorations: {
+      banner: null,
+      frame: null,
+      frame_tint: [],
+      trophies: [],
+      grad_year: null,
+    },
     community_role: null,
     ...overrides,
   };

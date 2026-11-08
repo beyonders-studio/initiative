@@ -5,6 +5,7 @@ from pydantic import Field
 from app.models.tenant.calendar import DEFAULT_CALENDAR_COLOR
 from app.schemas.base import MentionStr, SanitizedBaseModel, TitleStr, reject_null
 from app.schemas.query import PageMeta
+from app.schemas.tenant.archive import ToolCan
 from app.schemas.tenant.property import PropertiesOnCreate
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
 from app.schemas.tenant.tool import ToolSummaryBase
@@ -40,7 +41,7 @@ class CalendarUpdate(SanitizedBaseModel):
     _required = reject_null("name", "color")
 
 
-class CalendarSummary(CalendarBase, ToolSummaryBase):
+class CalendarSummary(CalendarBase, ToolSummaryBase[ToolCan]):
     #: NULL on a guild-level calendar — one a plug-in mounted, belonging to the
     #: guild rather than to any initiative.
     initiative_id: int | None = None

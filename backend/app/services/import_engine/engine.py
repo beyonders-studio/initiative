@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -492,7 +492,9 @@ def _spool_to_file(source: BinaryIO, max_bytes: int) -> Path:
 
 
 @asynccontextmanager
-async def spooled_upload(source: BinaryIO, *, max_bytes: int) -> AsyncIterator[Path]:
+async def spooled_upload(
+    source: BinaryIO, *, max_bytes: int
+) -> AsyncGenerator[Path, None]:
     """An uploaded file as a local file for the length of the block.
 
     Copied off the event loop a chunk at a time, so no more than one chunk is
@@ -532,7 +534,9 @@ def _spool_payload(guild_id: int, payload_ref: str) -> tuple[Path, bool] | None:
 
 
 @asynccontextmanager
-async def open_payload(guild_id: int, payload_ref: str) -> AsyncIterator[Path | None]:
+async def open_payload(
+    guild_id: int, payload_ref: str
+) -> AsyncGenerator[Path | None, None]:
     """A staged payload as a local file for the length of the block, or
     ``None`` when the blob is gone.
 

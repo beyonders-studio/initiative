@@ -10,7 +10,7 @@ routing now needs a membership or a grant to exist first.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 
 from sqlalchemy import text
@@ -119,7 +119,7 @@ async def route_system(session: AsyncSession, *, guild_id: int) -> None:
 
 
 @asynccontextmanager
-async def platform_session(user: User) -> AsyncIterator[AsyncSession]:
+async def platform_session(user: User) -> AsyncGenerator[AsyncSession, None]:
     """A request-path session on the platform context ``user``'s requests run
     in, as ``UserSessionDep`` hands one to a ``/me/*`` route: work across
     communities made on it reads each one from its own cohort."""
@@ -135,7 +135,7 @@ async def platform_session(user: User) -> AsyncIterator[AsyncSession]:
 @asynccontextmanager
 async def as_role(
     session: AsyncSession, role: str, user_id: int
-) -> AsyncIterator[None]:
+) -> AsyncGenerator[None, None]:
     """Run the block as the Postgres ``role`` with ``user_id`` as the current
     user, on the session's connection, then return to the login role.
 

@@ -10,6 +10,7 @@ from app.core.identity_boundary import GuildId
 from app.models.tenant.wiki import WikiPageOrder, WikiReadingWidth
 from app.schemas.base import LexicalState, MentionStr, SanitizedBaseModel, TitleStr
 from app.schemas.query import PageMeta
+from app.schemas.tenant.archive import ToolCan
 from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.file import smart_link_url
 from app.schemas.tenant.property import (
@@ -73,7 +74,8 @@ class WikiUpdate(WikiSettings):
     home_page_id: int | None = None
 
 
-class WikiSummary(WikiBase, ToolSummaryBase):
+class WikiSummary(WikiBase, ToolSummaryBase[ToolCan]):
+    initiative_id: int
     #: The page it opens on, or ``null`` where none was chosen.
     home_page_id: int | None = None
     #: What this wiki is for — see :class:`WikiSettings`.

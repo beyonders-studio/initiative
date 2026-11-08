@@ -23,7 +23,7 @@ perfectly legal, and it does so without executing it.
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncGenerator, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
@@ -259,7 +259,7 @@ async def _estimated_cost(connection: Any, statement: ResolvedQuery) -> float:
 
 
 @asynccontextmanager
-async def _translated_failures() -> AsyncIterator[None]:
+async def _translated_failures() -> AsyncGenerator[None, None]:
     """Turn what the database says into what this surface answers.
 
     Three things a statement this surface accepted can still do. It can run out

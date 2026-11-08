@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import and_, case, exists, func, or_, select
+from sqlalchemy import and_, case, exists, func, not_, or_, select
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -96,8 +96,8 @@ def member_permission_sql(
     held = or_(
         and_(role.is_builtin, role.name == BUILTIN_MEMBER_ROLE),
         and_(
-            ~role.is_builtin,
-            ~role.is_manager,
+            not_(role.is_builtin),
+            not_(role.is_manager),
             exists().where(custom_roles, off.enabled.is_(False)),  # type: ignore[union-attr]
         ),
     )

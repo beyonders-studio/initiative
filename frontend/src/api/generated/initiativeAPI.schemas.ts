@@ -1928,7 +1928,6 @@ export interface ProjectRead {
   archived_at: string | null;
   can: ProjectCan;
   id: number;
-  initiative_id: number;
   community_id: number;
   created_at: string;
   updated_at: string;
@@ -1941,6 +1940,7 @@ export interface ProjectRead {
   icon: string | null;
   start_date: string | null;
   end_date: string | null;
+  initiative_id: number;
   owner_id: number | null;
   is_template: boolean;
   pinned_at: string | null;
@@ -2097,7 +2097,6 @@ export interface PostRead {
   archived_at: string | null;
   can: ToolCan;
   id: number;
-  initiative_id: number;
   community_id: number;
   created_at: string;
   updated_at: string;
@@ -2110,6 +2109,7 @@ export interface PostRead {
    * @maxLength 255
    */
   name: string;
+  initiative_id: number;
   author: CommentAuthor | null;
   excerpt: string;
   pinned_at: string | null;
@@ -2283,7 +2283,6 @@ export interface CalendarSummary {
   archived_at: string | null;
   can: ToolCan;
   id: number;
-  initiative_id: number | null;
   community_id: number;
   created_at: string;
   updated_at: string;
@@ -2299,6 +2298,7 @@ export interface CalendarSummary {
   description: string | null;
   /** @maxLength 32 */
   color: string;
+  initiative_id: number | null;
 }
 
 export interface CalendarListResponse {
@@ -2317,7 +2317,6 @@ export interface CalendarRead {
   archived_at: string | null;
   can: ToolCan;
   id: number;
-  initiative_id: number | null;
   community_id: number;
   created_at: string;
   updated_at: string;
@@ -2333,6 +2332,7 @@ export interface CalendarRead {
   description: string | null;
   /** @maxLength 32 */
   color: string;
+  initiative_id: number | null;
 }
 
 export interface CalendarUpdate {
@@ -2846,7 +2846,6 @@ export interface CollectionFileSummary {
   archived_at: string | null;
   can: ToolCan;
   id: number;
-  initiative_id: number;
   community_id: number;
   created_at: string;
   updated_at: string;
@@ -2855,6 +2854,7 @@ export interface CollectionFileSummary {
   properties: PropertySummary[];
   grants: ResourceGrantSchema[];
   name: string;
+  initiative_id: number;
   featured_image_url: string | null;
   is_template: boolean;
   initiative: InitiativeSummary | null;
@@ -4498,7 +4498,7 @@ export interface CommunityRosterMember {
   avatar_url: string | null;
   status: UserStatus;
   display_name: string | null;
-  profile_decorations: ProfileDecorationsOutput | null;
+  profile_decorations: ProfileDecorationsOutput;
   community_role: string | null;
   presence: Presence;
   custom_status: CustomStatusOutput;
@@ -4817,7 +4817,6 @@ export interface ContactSummary {
   archived_at: string | null;
   can: ToolCan;
   id: number;
-  initiative_id: number | null;
   community_id: number;
   created_at: string;
   updated_at: string;
@@ -4825,6 +4824,7 @@ export interface ContactSummary {
   tags: TagSummary[];
   properties: PropertySummary[];
   grants: ResourceGrantSchema[];
+  initiative_id: number | null;
   name: string;
   is_organization: boolean;
   emails: ContactDetail[];
@@ -4850,7 +4850,6 @@ export interface ContactRead {
   archived_at: string | null;
   can: ToolCan;
   id: number;
-  initiative_id: number | null;
   community_id: number;
   created_at: string;
   updated_at: string;
@@ -4858,6 +4857,7 @@ export interface ContactRead {
   tags: TagSummary[];
   properties: PropertySummary[];
   grants: ResourceGrantSchema[];
+  initiative_id: number | null;
   name: string;
   is_organization: boolean;
   emails: ContactDetail[];
@@ -5110,7 +5110,6 @@ export interface CounterGroupSummary {
   archived_at: string | null;
   can: ToolCan;
   id: number;
-  initiative_id: number;
   community_id: number;
   created_at: string;
   updated_at: string;
@@ -5124,6 +5123,7 @@ export interface CounterGroupSummary {
    */
   name: string;
   description: string | null;
+  initiative_id: number;
   preview: CounterPreview[] | null;
 }
 
@@ -5165,7 +5165,6 @@ export interface CounterGroupRead {
   archived_at: string | null;
   can: ToolCan;
   id: number;
-  initiative_id: number;
   community_id: number;
   created_at: string;
   updated_at: string;
@@ -5179,6 +5178,7 @@ export interface CounterGroupRead {
    */
   name: string;
   description: string | null;
+  initiative_id: number;
   preview: CounterPreview[] | null;
   counters: CounterRead[];
 }
@@ -5482,7 +5482,6 @@ export interface DashboardSummary {
   archived_at: string | null;
   can: ToolCan;
   id: number;
-  initiative_id: number;
   community_id: number;
   created_at: string;
   updated_at: string;
@@ -5496,6 +5495,7 @@ export interface DashboardSummary {
    */
   name: string;
   description: string | null;
+  initiative_id: number;
   listing_uid: string | null;
   listing_version: string | null;
   view_mode: DashboardViewMode;
@@ -5522,7 +5522,6 @@ export interface DashboardRead {
   archived_at: string | null;
   can: ToolCan;
   id: number;
-  initiative_id: number;
   community_id: number;
   created_at: string;
   updated_at: string;
@@ -5536,6 +5535,7 @@ export interface DashboardRead {
    */
   name: string;
   description: string | null;
+  initiative_id: number;
   listing_uid: string | null;
   listing_version: string | null;
   view_mode: DashboardViewMode;
@@ -6759,7 +6759,6 @@ export interface FileSummary {
   archived_at: string | null;
   can: ToolCan;
   id: number;
-  initiative_id: number;
   community_id: number;
   created_at: string;
   updated_at: string;
@@ -6768,6 +6767,7 @@ export interface FileSummary {
   properties: PropertySummary[];
   grants: ResourceGrantSchema[];
   name: string;
+  initiative_id: number;
   featured_image_url: string | null;
   is_template: boolean;
   initiative: InitiativeSummary | null;
@@ -6805,7 +6805,6 @@ export interface FileRead {
   archived_at: string | null;
   can: ToolCan;
   id: number;
-  initiative_id: number;
   community_id: number;
   created_at: string;
   updated_at: string;
@@ -6814,6 +6813,7 @@ export interface FileRead {
   properties: PropertySummary[];
   grants: ResourceGrantSchema[];
   name: string;
+  initiative_id: number;
   featured_image_url: string | null;
   is_template: boolean;
   initiative: InitiativeSummary | null;
@@ -7458,7 +7458,7 @@ export interface UserSummary {
   avatar_url: string | null;
   status: UserStatus;
   display_name: string | null;
-  profile_decorations: ProfileDecorationsOutput | null;
+  profile_decorations: ProfileDecorationsOutput;
   community_role: string | null;
 }
 
@@ -8999,9 +8999,8 @@ export const UserAction = {
  * masked form without opting in.
  */
 export interface OperatorUserRead {
-  email: string;
-  role: UserRole;
   id: number;
+  role: UserRole;
   username: string;
   discriminator: number;
   username_chosen: boolean;
@@ -9012,6 +9011,7 @@ export interface OperatorUserRead {
   birthdate_required: boolean;
   cookie_consent: CookieConsentRead | null;
   status: UserStatus;
+  email: string | null;
   email_verified: boolean;
   created_at: string;
   updated_at: string;
@@ -12160,9 +12160,8 @@ export interface UserProfile {
 }
 
 export interface UserRead {
-  email: string | null;
-  role: UserRole;
   id: number;
+  role: UserRole;
   username: string;
   discriminator: number;
   username_chosen: boolean;
@@ -12173,6 +12172,7 @@ export interface UserRead {
   birthdate_required: boolean;
   cookie_consent: CookieConsentRead | null;
   status: UserStatus;
+  email: string | null;
   email_verified: boolean;
   created_at: string;
   updated_at: string;
@@ -12540,7 +12540,6 @@ export interface WikiSummary {
   archived_at: string | null;
   can: ToolCan;
   id: number;
-  initiative_id: number;
   community_id: number;
   created_at: string;
   updated_at: string;
@@ -12554,6 +12553,7 @@ export interface WikiSummary {
    */
   name: string;
   description: string | null;
+  initiative_id: number;
   home_page_id: number | null;
   page_order: WikiPageOrder;
   contents_depth: number;
@@ -12728,7 +12728,6 @@ export interface WikiRead {
   archived_at: string | null;
   can: ToolCan;
   id: number;
-  initiative_id: number;
   community_id: number;
   created_at: string;
   updated_at: string;
@@ -12742,6 +12741,7 @@ export interface WikiRead {
    */
   name: string;
   description: string | null;
+  initiative_id: number;
   home_page_id: number | null;
   page_order: WikiPageOrder;
   contents_depth: number;

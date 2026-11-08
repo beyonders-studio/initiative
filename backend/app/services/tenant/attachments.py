@@ -9,7 +9,7 @@ import logging
 import re
 import unicodedata
 import zipfile
-from collections.abc import AsyncIterator, Iterable, Mapping
+from collections.abc import AsyncGenerator, Iterable, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -250,7 +250,7 @@ def _like(filename: str) -> str:
 
 
 @asynccontextmanager
-async def guild_wide(guild_id: int) -> AsyncIterator[Any]:
+async def guild_wide(guild_id: int) -> AsyncGenerator[Any, None]:
     """A system session from the guild's cohort, routed into it: every upload
     it stores, whoever can read which."""
     from app.db import cohorts

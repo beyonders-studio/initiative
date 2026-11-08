@@ -8,7 +8,7 @@ archivable by joining the ``Tool`` enum rather than by being listed again here.
 from datetime import datetime
 from enum import Enum
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict
 
 from app.core.tools import ARCHIVE_TARGETS
 from app.schemas.base import SanitizedBaseModel
@@ -61,10 +61,10 @@ class ToolCan(ContentCan):
     unarchive: bool = False
 
 
-class ToolState(SanitizedBaseModel):
+class ToolState[CanT: ToolCan](SanitizedBaseModel):
     """What every tool's read carries beside its own fields: the archive stamp
     and what the caller may do to it."""
 
     #: When this was put away, or ``null`` while it is live.
     archived_at: datetime | None = None
-    can: ToolCan = Field(default_factory=ToolCan)
+    can: CanT

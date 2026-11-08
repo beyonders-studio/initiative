@@ -65,7 +65,7 @@ def test_every_plugin_route_is_in_the_plugin_document_once_with_its_scope():
         if not isinstance(route, APIRoute) or not route.include_in_schema:
             continue
         declaration = route_plugin_scope_declaration(route)
-        for method in route.methods:
+        for method in route.methods or ():
             operation = main["paths"][route.path_format][method.lower()]
             assert operation.get("x-plugin-scope") == declaration, route.path_format
             if declaration is not None:

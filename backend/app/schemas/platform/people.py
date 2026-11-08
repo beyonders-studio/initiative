@@ -10,7 +10,7 @@ from pydantic import AliasChoices, ConfigDict, Field
 
 from app.models.platform.user import Presence
 from app.schemas.base import SanitizedBaseModel
-from app.schemas.platform.user import ProfileDecorations, UserSummary
+from app.schemas.platform.user import UserSummary
 
 
 class PersonRead(UserSummary):
@@ -27,9 +27,6 @@ class PersonRead(UserSummary):
 
     #: How this person appears right now, from the one roll that decides it.
     presence: Presence = Presence.offline
-    #: What they have put around their picture, so a row draws them the way
-    #: every other surface does. Public, like the profile it comes from.
-    profile_decorations: ProfileDecorations = Field(default_factory=ProfileDecorations)
     #: The reader's *own* guilds this person is also in, in the same order the
     #: sections come in. Never names a guild the reader is not in — it is built
     #: from their own guild list. The section a row sits in is included; the

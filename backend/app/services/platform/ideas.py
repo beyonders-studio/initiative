@@ -13,7 +13,7 @@ Only Initiative Cloud has the board (``app.core.intake.offered_streams``).
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -116,7 +116,7 @@ def board_open() -> bool:
 
 
 @asynccontextmanager
-async def _as_reader(user: User | None) -> AsyncIterator[AsyncSession | None]:
+async def _as_reader(user: User | None) -> AsyncGenerator[AsyncSession | None, None]:
     """A request session routed as ``user``, or nobody signed in, reading the
     published ideas; ``None`` where there is no board to read."""
     from app.api.deps import FilerAccessError, establish_ideas_access

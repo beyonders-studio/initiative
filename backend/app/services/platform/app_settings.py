@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -613,7 +613,7 @@ async def _settings_area(
     actor_user_id: int | None,
     secret: _SecretChange | None = None,
     commit: bool = True,
-) -> AsyncIterator[AppSetting]:
+) -> AsyncGenerator[AppSetting, None]:
     """Save one area of the settings row with its record, in one commit.
 
     Yields the stored row for the caller to change. On leaving, the fields

@@ -138,3 +138,11 @@ include = ["app/models/**"]
 
 [tool.ty.overrides.rules]
 invalid-assignment = "ignore"
+
+[[tool.ty.overrides]]
+# A merged revision is never edited (AGENTS.md, "Never edit a migration"), so
+# a deprecation ty learns of later stays where the revision froze it.
+include = ["alembic/versions/**"]
+
+[tool.ty.overrides.rules]
+deprecated = "ignore"

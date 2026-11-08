@@ -10,6 +10,7 @@ from app.core.identity_boundary import PersonId, with_mention_markup
 from app.schemas.base import LexicalState, MentionStr, SanitizedBaseModel, TitleStr
 from app.schemas.platform.user import ProfileDecorations
 from app.schemas.query import PageMeta
+from app.schemas.tenant.archive import ToolCan
 from app.schemas.tenant.comment import CommentAuthor
 from app.schemas.tenant.post_poll import PollRead, PollWrite, serialize_poll
 from app.schemas.tenant.property import PropertiesOnCreate
@@ -107,13 +108,15 @@ class PostPinUpdate(SanitizedBaseModel):
         return self
 
 
-class PostSummary(PostBase, ToolSummaryBase):
+class PostSummary(PostBase, ToolSummaryBase[ToolCan]):
     """A post without its body — for the surfaces that show one in a line.
 
     The board is not one of them: it renders notices, so its list returns
     :class:`PostRead`. This shape is for the guild-wide table, recents, and
     anywhere else a post is a row rather than a thing being read.
     """
+
+    initiative_id: int
 
     #: Who wrote it, ready to draw: handle, picture, what they wear around it,
     #: and how they are appearing. The same shape a comment's author takes, so

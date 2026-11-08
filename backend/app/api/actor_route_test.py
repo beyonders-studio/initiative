@@ -11,7 +11,7 @@ design puts them.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
@@ -129,7 +129,7 @@ def _mounted():
 
 
 @contextmanager
-def _counting() -> Iterator[list[str]]:
+def _counting() -> Generator[list[str], None, None]:
     """Every statement any engine runs meanwhile, in order."""
     statements: list[str] = []
     _state["statements"] = statements

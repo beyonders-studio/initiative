@@ -14,7 +14,7 @@ than the address it replaces.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
@@ -291,7 +291,7 @@ class ReplyRefused(Exception):
 
 
 @asynccontextmanager
-async def _as_filer(user: User) -> AsyncIterator[AsyncSession | None]:
+async def _as_filer(user: User) -> AsyncGenerator[AsyncSession | None, None]:
     """A request session routed as ``user`` reading the cases they filed, or
     ``None`` where there is no operations community to read them in.
 

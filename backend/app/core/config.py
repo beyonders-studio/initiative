@@ -1314,7 +1314,7 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     # The required field (SECRET_KEY) is loaded from the environment by
     # pydantic-settings, which ty can't see.
-    return Settings()  # ty: ignore[missing-argument]
+    return Settings()
 
 
 settings = get_settings()

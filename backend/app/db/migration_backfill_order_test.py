@@ -66,7 +66,7 @@ def _reachable_strings(
 
 
 def _created_tables(upgrade: ast.FunctionDef) -> set[str]:
-    created = set()
+    created: set[str] = set()
     for node in ast.walk(upgrade):
         if (
             isinstance(node, ast.Call)
@@ -74,6 +74,7 @@ def _created_tables(upgrade: ast.FunctionDef) -> set[str]:
             and node.func.attr == "create_table"
             and node.args
             and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
         ):
             created.add(node.args[0].value)
     return created

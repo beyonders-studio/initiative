@@ -73,13 +73,8 @@ from app.services.platform import user_avatars
 # than one string because the client styles them differently.
 
 
-class UserBase(SanitizedBaseModel):
-    email: EmailStr
-    role: UserRole = UserRole.member
-
-
 class UserCreate(SanitizedBaseModel):
-    # Deliberately does NOT inherit ``UserBase.role``. Platform role must
+    # Deliberately carries no ``role``. Platform role must
     # never be settable from a create payload: this schema backs both
     # self-registration (``/auth/register``) and guild-admin user creation
     # (``POST /users/``), and neither caller is authorized to grant a
@@ -280,7 +275,10 @@ class UserSummary(UserIdentity, PersonShape):
     """
 
     display_name: str | None = None
-    profile_decorations: Optional["ProfileDecorations"] = None
+    #: Every profile has one, empty until its owner puts something on.
+    profile_decorations: "ProfileDecorations" = Field(
+        default_factory=lambda: ProfileDecorations()
+    )
     #: The rung this member holds in the guild this was read under. Absent
     #: where the caller asked outside a guild, which is why it is optional
     #: rather than defaulted to the quietest of them.
@@ -670,12 +668,13 @@ class AccountTimeOutRead(SanitizedBaseModel):
     appeal_task_id: int | None = None
 
 
-class UserRead(UserBase):
+class UserRead(SanitizedBaseModel):
     model_config = ConfigDict(
         from_attributes=True, json_schema_serialization_defaults_required=True
     )
 
     id: int
+    role: UserRole = UserRole.member
     username: str
     discriminator: int
     # Whether this account picked its handle. False routes the SPA to the
@@ -714,7 +713,8 @@ class UserRead(UserBase):
     status: UserStatus
     #: Both resolved from ``user_emails`` by whoever builds this shape (see
     #: ``services.platform.users.to_read``) — the ``users`` row carries neither.
-    email: EmailStr | None = None
+    #: A stored address, or masked in :class:`OperatorUserRead`.
+    email: str | None = None
     email_verified: bool = False
     created_at: datetime
     updated_at: datetime
@@ -827,13 +827,6 @@ class OperatorUserRead(UserRead):
     #: the shape is built, and an assignment that skipped the validator would
     #: put the stored address on the wire.
     model_config = ConfigDict(validate_assignment=True)
-
-    #: Re-declared as a plain ``str``, widening ``UserBase.email``: a masked
-    #: address is not a deliverable one, so typing it ``EmailStr`` would
-    #: describe it wrongly in the OpenAPI schema and make this shape fail to
-    #: re-validate its own output. Empty until the builder resolves it, for the
-    #: reason ``UserRead`` gives.
-    email: str = ""
 
     #: When a deleted account is erased: the moment the deletion was asked for
     #: plus the deployment's window. Null unless ``status`` is ``deleted``, and

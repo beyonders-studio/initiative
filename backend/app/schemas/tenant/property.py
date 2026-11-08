@@ -2,8 +2,8 @@
 properties, and a project's, a collection's or a plug-in's metadata."""
 
 from datetime import datetime
-from enum import Enum
-from typing import Any
+from enum import Enum, StrEnum
+from typing import TYPE_CHECKING, Any
 
 from pydantic import (
     ConfigDict,
@@ -39,8 +39,14 @@ PropertyTarget.__doc__ = (
     "What can carry custom property values: every tool and sub-tool."
 )
 
-CurrencyCode = Enum("CurrencyCode", {code: code for code in CURRENCY_CODES}, type=str)
-CurrencyCode.__doc__ = "The ISO 4217 code a money property's amounts are in."
+if TYPE_CHECKING:
+    # Built below from the ISO list at runtime; to a type checker, a str enum.
+    class CurrencyCode(StrEnum): ...
+else:
+    CurrencyCode = Enum(
+        "CurrencyCode", {code: code for code in CURRENCY_CODES}, type=str
+    )
+    CurrencyCode.__doc__ = "The ISO 4217 code a money property's amounts are in."
 
 
 class PropertyOption(SanitizedBaseModel):

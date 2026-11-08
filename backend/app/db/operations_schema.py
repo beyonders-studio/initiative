@@ -50,7 +50,7 @@ case is theirs.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncGenerator, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
@@ -501,7 +501,7 @@ async def _drop_case_files(conn: AsyncConnection, schema: str) -> list[str]:
 
 
 @asynccontextmanager
-async def choice_turn() -> AsyncIterator[None]:
+async def choice_turn() -> AsyncGenerator[None, None]:
     """The deployment's one turn at the choice of operations community: who
     changes it, and who makes the tables follow it, holds this throughout, so
     neither acts on a choice another has since replaced."""

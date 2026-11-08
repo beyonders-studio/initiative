@@ -13,7 +13,7 @@ A connection always names its model; nothing here picks one.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
@@ -394,7 +394,7 @@ async def _send(
 
 
 @contextmanager
-def _slot(guild_id: int | None) -> Iterator[None]:
+def _slot(guild_id: int | None) -> Generator[None, None, None]:
     """Hold one of the community's open requests, or refuse when it has
     none left."""
     if guild_id is None:
