@@ -26,7 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The arrow keys move through what `[[` offers.** They stayed on the first match; now they step through the list, as they do for `@` and `#`.
 - **Progress bars tell a screen reader how far along they are,** as a percent in your language, where they read as busy with no value.
 
-
 ## [0.78.0] - 2026-11-06
 
 ### Added
