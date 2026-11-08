@@ -616,14 +616,15 @@ export const PictureEditor = ({ session, attached, onDone, onCancel }: PictureEd
             ) : null}
           </div>
         </div>
-        <DialogFooter className="flex-row items-center gap-2 border-t px-4 py-3">
+        {/* Cancel closes the dialog, which puts the picture back as it was left. */}
+        <DialogFooter
+          className="items-center border-t px-4 py-3"
+          submitLabel={attached ? t("common:done") : t("picture.attach")}
+          onSubmit={save}
+          pending={saving}
+          disabled={!size}
+        >
           <span className="min-w-0 flex-1 text-muted-foreground text-xs">{t("picture.who")}</span>
-          <Button variant="ghost" onClick={cancel} disabled={saving}>
-            {t("common:cancel")}
-          </Button>
-          <Button onClick={save} disabled={saving || !size}>
-            {attached ? t("common:done") : t("picture.attach")}
-          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
