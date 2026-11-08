@@ -6,7 +6,8 @@ icon: lucide/map
 
 Nobody reads the tour. You're going to skim this, click something, and work it out by touch like everyone else, which is fine, because the app is built for exactly that. If you'd like the map first, here it is. You'll spend most of your time in two places: the sidebar and the big area in the middle.
 
-!!! screenshot "The whole screen in a community: the rail of community icons on the far left, the sidebar with its Initiatives tab open, an initiative's page in the middle, and the tab bar along the top. Save as docs/en/images/getting-started/tour-overview.png"
+![The whole screen in a community: the community rail, the sidebar with its Initiatives tab open, an initiative's page and the tab bar](../images/getting-started/tour-overview.webp#only-light)
+![The whole screen in a community: the community rail, the sidebar with its Initiatives tab open, an initiative's page and the tab bar](../images/getting-started/tour-overview.dark.webp#only-dark)
 
 ## Switch between your communities
 
@@ -85,7 +86,8 @@ It finds projects, tasks, files, documents, people, comments and tags in the com
 
 It's faster than clicking down the sidebar muttering "it's in here somewhere", and it takes about four days to become muscle memory. Learn it and you have our full written blessing to forget the rest of this page.
 
-![The search box, opened with Ctrl+K, with results for "barovia"](../images/getting-started/search.png)
+![The search box, opened with Ctrl+K, with results for "barovia"](../images/getting-started/search.webp#only-light)
+![The search box, opened with Ctrl+K, with results for "barovia"](../images/getting-started/search.dark.webp#only-dark)
 
 ## Find your way around on a phone
 

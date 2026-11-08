@@ -44,13 +44,10 @@ Renaming `books` doesn't move the tags under it, because they're filed by their 
 - **Browse a list by tag.** On a tool's tab, choose **Tags** under **View**. The tag tree sits beside the list (or along the top, on a phone). Select a tag to see what carries it, and ++ctrl++-click more (++cmd++-click on a Mac) to add them. **Not tagged** shows what has none.
 - **Open the tag's page.** Select **Tags** next to **Initiatives** at the top of the sidebar, then select a tag.
 
-A tag's page shows how many things carry it, with a tab for each kind of tool and how many are in each, like "Projects (3)". Each tab has a table of the tools themselves, which you can search and sort, and below it the things inside them that carry the tag: a tagged task is under **Tasks** on the **Projects** tab, a tagged wiki page under **Pages** on **Wikis**.
+A tag's page shows how many things carry it, with a tab for each kind of tool. A tab counts the tools and the tagged things inside them, so a tag on three projects and eight of their tasks reads "Projects (11)". Each tab has a table of the tools themselves, which you can search and sort, and below it the things inside them that carry the tag: a tagged task is under **Tasks** on the **Projects** tab, a tagged wiki page under **Pages** on **Wikis**.
 
-!!! screenshot "A tag's page"
-    **Show:** a tag's page with its name and "N tagged items", **Edit** and **Delete** at the top right, the tabs for each tool with their counts, and the **Projects** tab open showing its table and a **Tasks** section below.
-
-    Save as `en/images/tags/tag-page.png`, then replace this box with:
-    `![A tag's page, with a tab for each kind of tool](../images/tags/tag-page.png)`
+![A tag's page, with a tab for each kind of tool](../images/tags/tag-page.webp#only-light)
+![A tag's page, with a tab for each kind of tool](../images/tags/tag-page.dark.webp#only-dark)
 
 ## Rename or recolor a tag
 

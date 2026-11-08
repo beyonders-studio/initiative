@@ -48,8 +48,8 @@ You're added as an attendee, and anyone else you added is invited (see [Invite p
 
 To change an event later, open it and change any field on its page. Each saves as you go. To delete one, open it, select **More actions** (the **⋯**) › **Delete Event**, and confirm. It goes to the trash, and attendees who hadn't declined hear that it's canceled.
 
-!!! screenshot "An initiative's calendar"
-    The **Calendar** tab in **Month** view, with **All calendars** as the title, **Filters**, the **Day**/**Week**/**Month**/**Year**/**List** switch, a few events in two calendar colors and some dated tasks, and **Create Event**. Save to `docs/en/images/tools/calendar.png`.
+![An initiative's calendar in Month view, with its events and dated tasks](../images/tools/calendar.webp#only-light)
+![An initiative's calendar in Month view, with its events and dated tasks](../images/tools/calendar.dark.webp#only-dark)
 
 ## Make an event repeat
 

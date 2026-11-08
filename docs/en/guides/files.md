@@ -94,8 +94,8 @@ To delete a version for good (the file's owner can):
 
 Delete the newest one and the one before it becomes the file. The last version left can't be deleted.
 
-!!! screenshot "An uploaded file's page with Version history open"
-    A layered poster (PSD) with **Version history** open, showing three numbered versions and **Upload new version**, beside **Open in new tab** and **Download**. Save to `docs/en/images/files/uploaded-file.png`.
+![An uploaded Photoshop poster with Version history open, listing three versions under Upload new version, beside Open in new tab and Download](../images/files/uploaded-file.webp#only-light)
+![An uploaded Photoshop poster with Version history open, listing three versions under Upload new version, beside Open in new tab and Download](../images/files/uploaded-file.dark.webp#only-dark)
 
 ## Edit an uploaded Word or Excel file here
 

@@ -154,5 +154,5 @@ Pick how **Connections** shows them with the buttons beside its heading:
 
 Each thing remembers the view you picked for it on this device.
 
-!!! screenshot "A task's Connections section"
-    A task's **Connections** in **Tiles**, with cards under **Blocked by**, **Attached** and **Mentioned in**, and **Add link** beside the heading. Save to `docs/en/images/tools/connections.png`.
+![A task's Connections shown as tiles, with cards under Attached, Blocked by, Blocking and Mentioned in, and Add link beside the heading](../images/tools/connections.webp#only-light)
+![A task's Connections shown as tiles, with cards under Attached, Blocked by, Blocking and Mentioned in, and Add link beside the heading](../images/tools/connections.dark.webp#only-dark)

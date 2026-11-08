@@ -55,11 +55,8 @@ New widgets land at the bottom of the canvas.
 | **Stat** | One headline number, with an optional trend against the previous period. |
 | **Table** | Plain rows and columns. |
 
-!!! screenshot "A dashboard"
-    **Show:** a dashboard with four or five widgets (a **Stat**, a **Chart**, a **Progress** bar and a **Gantt**), each with its title and the small line under it saying where it reads from and how many rows.
-
-    Save as `en/images/dashboards/dashboard.png`, then replace this box with:
-    `![A dashboard with a stat, a chart, a progress bar and a Gantt](../images/dashboards/dashboard.png)`
+![A dashboard with two stats, a chart, a progress bar and a Gantt](../images/dashboards/dashboard.webp#only-light)
+![A dashboard with two stats, a chart, a progress bar and a Gantt](../images/dashboards/dashboard.dark.webp#only-dark)
 
 ## Point a widget at your data
 

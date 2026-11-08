@@ -70,11 +70,8 @@ The marketplace only offers plug-ins your server can run. Some need a program ru
 
 Adding a plug-in asks up to four things, and every answer can be changed later from its settings, so you can't get any of it wrong in a way that sticks. A plug-in that asks for nothing just gets a name.
 
-!!! screenshot "Adding a plug-in"
-    **Show:** the **Add** dialog for a plug-in, with **What it can reach**, **Where it works** and **Who can open it there** filled in.
-
-    Save as `en/images/marketplace/add-plugin.png`, then replace this box with:
-    `![Adding a plug-in](../images/marketplace/add-plugin.png)`
+![The Add dialog for the Community calendar plug-in, asking only for its name](../images/marketplace/add-plugin.webp#only-light)
+![The Add dialog for the Community calendar plug-in, asking only for its name](../images/marketplace/add-plugin.dark.webp#only-dark)
 
 | Question | What it decides |
 |---|---|

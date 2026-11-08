@@ -14,11 +14,8 @@ Open them from **My Messages** in your [own sidebar](your-space.md) (select the 
 
 Messaging is for people aged 16 and over, so if Initiative asks, answer with **Confirm my age** under **My Settings → Privacy**. If the page says **Direct messages are off here**, whoever runs your server has switched messaging off, and your conversations are kept for whenever it comes back.
 
-!!! screenshot "My Messages"
-    **Show:** My Messages with a conversation open: the people on the left, a thread on the right, and the encrypted notice under the title.
-
-    Save as `en/images/guides/my-messages.png`, then replace this box with:
-    `![My Messages](../images/guides/my-messages.png)`
+![My Messages with a conversation open: the person on the left, the thread on the right, and the end-to-end encrypted notice under their name](../images/guides/my-messages.webp#only-light)
+![My Messages with a conversation open: the person on the left, the thread on the right, and the end-to-end encrypted notice under their name](../images/guides/my-messages.dark.webp#only-dark)
 
 ## Choose who can ask to message you { #who-can-reach-you }
 

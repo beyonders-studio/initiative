@@ -423,10 +423,15 @@ Grep added lines for `attacker`, `hijack`, `steal`, `exploit`, `takeover`,
   searches the help center by heading.
 - **`!!! screenshot`** marks where an image is still needed, saying what to
   capture and where to save it.
+- **Pictures are taken by script.** Each is a shot in
+  `frontend/e2e/shots/help/` calling `shootHelp`, which saves a light and a
+  dark `.webp`; the page shows both, with `#only-light` and `#only-dark`.
+  `running-a-server/maintaining-these-docs.md` has the details.
 - **A screenshot shows the app as it stands.** One showing a screen, button or
   tool the app no longer has misleads worse than no picture. When you edit a
-  page, check each of its pictures against the app, and retake or remove the
-  ones that differ.
+  page, check each of its pictures against the app; retake the shots
+  (`pnpm screenshots e2e/shots/help`) after a change to the screens they show,
+  and remove a picture whose screen is gone.
 - **No emojis in prose.** They read as trying too hard.
 
 ### Tools are a defined, growing list

@@ -44,8 +44,8 @@ You can share with anybody in the thing's initiative. Somebody outside it has to
 
 Changes save as you make them, and the person can open it straight away. Switching to **Restricted** takes it away from the rest of the initiative, apart from the people and roles you name. To change somebody's level, pick a new one beside their name. To take them off, select the **×** beside it.
 
-!!! screenshot "The Access tab"
-    A project's **Access** tab with **Restricted** chosen, two people under **People** (one **Viewer**, one **Editor**), the owner's row and one role under **Roles**. Save as `docs/en/images/sharing/access-settings.png`.
+![A project's Access tab set to Restricted, with the owner, one Viewer and one Editor under People, and the locked Moderator role and the Project Manager role as Editor under Roles](../images/sharing/access-settings.webp#only-light)
+![A project's Access tab set to Restricted, with the owner, one Viewer and one Editor under People, and the locked Moderator role and the Project Manager role as Editor under Roles](../images/sharing/access-settings.dark.webp#only-dark)
 
 ## Share something with everyone who holds a role
 

@@ -28,7 +28,7 @@ docker compose exec -T db pg_dumpall -U initiative > initiative-$(date +%F).sql
 
 `pg_dumpall` copies the whole `db` container into one file: the database, and the logins and per-community roles Initiative grants it to. It takes a consistent snapshot while Initiative runs, so there's no need to stop anything. The file holds the logins' password hashes, so keep it as safe as `SECRET_KEY`.
 
-On a [native package](native-packages.md), run `pg_dumpall` against the PostgreSQL that holds Initiative, as a user allowed to read its roles.
+On a [native package](native-packages.md), give Initiative a PostgreSQL server of its own, and run `pg_dumpall` against it as a superuser. On a server shared with other apps, `pg_dumpall` copies their databases too.
 
 Run it nightly and keep a couple of weeks. As a crontab line, writing into a `backups` folder you've made beside the compose file, with the `%` escaped the way cron needs:
 

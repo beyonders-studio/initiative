@@ -63,8 +63,8 @@ The initiative's managers (its Project Managers and Moderators) and community ad
 
 Approving adds them on the Member role, and they're told, with a link straight in. Denying keeps them out and tells them so, and they can ask again later.
 
-!!! screenshot "Requests to join"
-    The **Members** tab of Initiative settings with two people under **Requests to join**, each with **Deny** and **Approve**. Save as `docs/en/images/initiatives/join-request-queue.png`.
+![The Members tab of Initiative settings with two people under Requests to join, each with their message and Deny and Approve buttons](../images/initiatives/join-request-queue.webp#only-light)
+![The Members tab of Initiative settings with two people under Requests to join, each with their message and Deny and Approve buttons](../images/initiatives/join-request-queue.dark.webp#only-dark)
 
 ## Add someone to an initiative
 
@@ -113,8 +113,8 @@ It saves as soon as you choose.
 
 A listed initiative shows its name, color, description and member count, and nothing else, to people outside it. Joining puts people on the Member role, and sharing still decides each project and file inside, so opening an initiative up doesn't expose anything that was private within it. It only changes who can walk in.
 
-!!! screenshot "Choosing how people join"
-    The **Joining** card on the **Members** tab, with **By request** chosen and the auto-join switch below. Save as `docs/en/images/initiatives/join-policy.png`.
+![The Joining card with By request chosen, and the switch to add every new community member automatically below it](../images/initiatives/join-policy.webp#only-light)
+![The Joining card with By request chosen, and the switch to add every new community member automatically below it](../images/initiatives/join-policy.dark.webp#only-dark)
 
 ### Add every new community member automatically
 

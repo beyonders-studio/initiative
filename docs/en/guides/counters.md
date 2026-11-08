@@ -45,11 +45,8 @@ The new counter starts at its initial value. Counters take decimals, so a fundra
 
 A progress bar and a segmented clock both need a **Min** and a **Max**, so they stay grayed out until both are set.
 
-!!! screenshot "A counter group"
-    **Show:** a counter group with three or four counters in rows, one of each view mode, and the strip at the top with **Add Counter**, **Sort** and **Reset All**.
-
-    Save as `en/images/counters/counter-group.png`, then replace this box with:
-    `![A counter group with a number, a progress bar and a segmented clock](../images/counters/counter-group.png)`
+![A counter group with progress bars, a number and a segmented clock](../images/counters/counter-group.webp#only-light)
+![A counter group with progress bars, a number and a segmented clock](../images/counters/counter-group.dark.webp#only-dark)
 
 ## Change the count
 
