@@ -24,7 +24,6 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { CommentSection } from "@/components/comments/CommentSection";
 import type { Written } from "@/components/layouts/AddItemDialog";
-import { useFillRequired } from "@/components/layouts/FillRequiredDialog";
 import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import type { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
@@ -41,6 +40,7 @@ import { useActorName } from "@/hooks/useActorName";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { useComments, useCommentsCache, useCommentThreadState } from "@/hooks/useComments";
 import { ItemDraftContext, type ItemEdit } from "@/hooks/useFieldSave";
+import { useFillRequired } from "@/hooks/useFillRequired";
 import { useOwnedDefinitions } from "@/hooks/useProperties";
 import { useSmartTitle, useSmartTitlesOn } from "@/hooks/useSmartTitle";
 import {

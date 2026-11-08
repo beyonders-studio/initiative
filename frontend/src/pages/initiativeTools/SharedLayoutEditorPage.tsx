@@ -14,6 +14,7 @@ import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { SHARED_LAYOUTS } from "@/components/layouts/details";
 import { LayoutEditor } from "@/components/layouts/LayoutEditor";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
+import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import { useRouteId } from "@/hooks/useRouteId";
 import { sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -28,7 +29,11 @@ export const SharedLayoutEditorPage = ({ tool }: { tool: Tool }) => {
   const set = useToolLayouts(target).data;
   const shared = SHARED_LAYOUTS[tool];
   const details = useMemo(() => (id === null || !shared ? [] : [shared.detail(id)]), [id, shared]);
-  const presets = useMemo(() => (id === null ? undefined : shared?.presets?.(id)), [id, shared]);
+  const { data: definitions = NO_DEFINITIONS } = useOwnedDefinitions({
+    initiativeId: id ?? undefined,
+    enabled: id !== null && shared?.presets !== undefined,
+  });
+  const presets = useMemo(() => shared?.presets?.(definitions), [shared, definitions]);
 
   if (!set || !target || id === null) return null;
   if (!set.can_configure) return <SettingsPermissionRequired scope="initiative" />;

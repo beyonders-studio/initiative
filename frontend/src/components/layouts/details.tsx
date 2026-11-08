@@ -424,8 +424,9 @@ export const taskPresets = (project: LayoutProject) =>
   });
 
 /** The initiative calendar's presets: what its tasks are, and the properties
- *  its events and tasks carry, as its page filters them. */
-export const calendarPresets = (initiativeId: number) =>
+ *  its events and tasks carry (the initiative's `definitions`), as its page
+ *  filters them. */
+export const calendarPresets = (definitions: PropertyDefinitionRead[]) =>
   editablePresets<CalendarFilters>({
     kind: CALENDAR_PRESETS,
     empty: EMPTY_CALENDAR_FILTERS,
@@ -440,7 +441,7 @@ export const calendarPresets = (initiativeId: number) =>
         <PropertyFilter
           value={value.properties}
           onChange={(properties) => onChange({ ...value, properties })}
-          initiativeId={initiativeId}
+          definitions={definitions}
         />
       </div>
     ),

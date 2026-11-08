@@ -23,8 +23,9 @@ import type {
   ListWikisParams,
 } from "@/api/generated/initiativeAPI.schemas";
 import { FileKind, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { PropertyFilterParam } from "@/components/properties/PropertyFilter";
+import { PropertyFilter, parsePropertyFilters } from "@/components/properties/PropertyFilter";
 import { TagFilterPicker } from "@/components/tags/TagFilterPicker";
+import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import { toolCamelPlural } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
 import { Input } from "@/ui/input";
@@ -108,6 +109,7 @@ const SearchTagFields = ({
   const { t: translate } = useTranslation([toolCamelPlural(tool) as FlatNamespace, "tags"]);
   const t = translate as TranslateFn;
   const id = useId();
+  const { data: definitions = NO_DEFINITIONS } = useOwnedDefinitions({ initiativeId });
 
   return (
     <>
@@ -140,10 +142,15 @@ const SearchTagFields = ({
         </div>
         {children}
       </div>
-      <PropertyFilterParam
-        value={value.property_filters}
-        onChange={(next) => onChange({ ...value, property_filters: next })}
-        initiativeId={initiativeId}
+      <PropertyFilter
+        value={parsePropertyFilters(value.property_filters)}
+        onChange={(next) =>
+          onChange({
+            ...value,
+            property_filters: next.length > 0 ? JSON.stringify(next) : undefined,
+          })
+        }
+        definitions={definitions}
       />
     </>
   );
