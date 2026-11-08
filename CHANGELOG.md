@@ -28,7 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Progress bars tell a screen reader how far along they are,** as a percent in your language, where they read as busy with no value.
 - **Confirmations, pickers and tables speak your language.** Cancel, Continue, Please wait, a picker's placeholder, a table's filter and the labels a screen reader hears were English in every language.
 
-
 ## [0.78.0] - 2026-11-06
 
 ### Added
