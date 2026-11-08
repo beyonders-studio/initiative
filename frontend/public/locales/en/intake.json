@@ -62,6 +62,8 @@
     "landingStatusDefault": "The project's default",
     "caseTypeLabel": "New cases are",
     "caseTypeDefault": "The project's default type",
+    "ideaTypeLabel": "The type that puts a task on the Ideas page",
+    "ideaTypeNone": "Not chosen: nothing is published",
     "enabledLabel": "Receiving new cases",
     "lastCase": "Last case opened {{when}}.",
     "noCasesYet": "No cases yet.",
@@ -163,6 +165,8 @@
   "case": {
     "filedBy": "Filed by",
     "noFiler": "Opened automatically",
+    "votes_one": "{{count}} vote",
+    "votes_other": "{{count}} votes",
     "noContact": "They chose not to be contacted",
     "theyCalledIt": "Their subject:",
     "noConversation": "This kind of case doesn't open a conversation with whoever filed it.",
@@ -323,15 +327,6 @@
   },
   "moderationTopics": {
     "appeal": "Appeal against your suspension"
-  },
-  "idea": {
-    "title": "Idea",
-    "publish": "Published on the Ideas page",
-    "publishedHelp": "Everybody sees its title, description and status, and can vote for it.",
-    "draftHelp": "Not published: only the team sees it. Its votes stay with it.",
-    "votes_one": "{{count}} vote",
-    "votes_other": "{{count}} votes",
-    "error": "Could not change that. Try again in a moment."
   },
   "ideas": {
     "title": "Ideas",

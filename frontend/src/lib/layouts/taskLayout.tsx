@@ -35,7 +35,6 @@ import { TaskReminderField } from "@/components/tasks/TaskReminderField";
 import { statusTriggerStyle, TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { CasePanel } from "@/components/tickets/CasePanel";
-import { IdeaPanel } from "@/components/tickets/IdeaPanel";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { useComments, useCommentsCache, useCommentThreadState } from "@/hooks/useComments";
@@ -803,19 +802,17 @@ const Notice = () => {
   ) : null;
 };
 
-// The operations panels: how a case was filed, and an Ideas-board task's
-// idea. A task that is neither shows nothing here.
+// The operations case behind the task; a task that is none shows nothing here.
+// Its type can make it a published idea, so the panel asks again when it changes.
 const Case = ({ task }: { task: TaskRead }) => {
-  const canEdit = !useTaskLayout().readOnly;
+  const { readOnly } = useTaskLayout();
   return (
-    <>
-      <CasePanel
-        taskId={task.id}
-        canEdit={canEdit}
-        assigneeIds={task.assignees.map((assignee) => assignee.id)}
-      />
-      <IdeaPanel taskId={task.id} canEdit={canEdit} />
-    </>
+    <CasePanel
+      key={task.task_type_id}
+      taskId={task.id}
+      canEdit={!readOnly}
+      assigneeIds={task.assignees.map((assignee) => assignee.id)}
+    />
   );
 };
 

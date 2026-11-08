@@ -1,5 +1,5 @@
-"""The published ideas: what anybody reads, voting, the team's Idea panel, and
-telling voters when an idea moves."""
+"""The published ideas: what anybody reads, voting, publishing by type, the
+team's case panel, and telling voters when an idea moves."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from app.db.session import set_rls_context
 from app.models.platform.notice_outbox import NoticeOutboxItem
 from app.models.platform.notification import NotificationType
 from app.models.tenant.intake import IdeaVote, IntakeBinding, IntakeCase
-from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
+from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory, TaskType
 from app.services.platform import ticket_notices
 from app.services.platform import users as user_service
 from app.testing import create_project, create_task, get_auth_headers
@@ -27,27 +27,37 @@ operations = tickets_test.operations
 
 @pytest.fixture
 async def board(session, operations, cloud):  # noqa: F811
-    """Initiative Cloud's operations community, its Ideas board bound, with a
-    published idea, a draft, and a feedback case moved onto the board."""
+    """Initiative Cloud's operations community, its Ideas board bound to the
+    board's Idea type, with a published idea, a draft, and a feedback case
+    moved onto the board."""
     project = operations["project"]
-    published = await create_task(
-        session, project, title="Recurring events skip holidays"
-    )
-    published.description = "Pick a holiday calendar for a recurring event."
     draft = await create_task(
         session, project, title="Holiday calendars to subscribe to"
     )
+    draft_type_id = draft.task_type_id
     case = await create_task(session, project, title="Idea: my own words")
     await set_rls_context(session, SystemGuild(operations["guild"].id))
-    session.add(published)
-    session.add(IntakeBinding(stream=IntakeStream.ideas, project_id=project.id))
+    idea_type = (
+        await session.exec(
+            select(TaskType)
+            .where(TaskType.project_id == project.id)
+            .where(TaskType.name == "Idea")
+        )
+    ).one()
+    await set_rls_context(session, Unattributed())
+    published = await create_task(
+        session,
+        project,
+        title="Recurring events skip holidays",
+        task_type_id=idea_type.id,
+        description="Pick a holiday calendar for a recurring event.",
+    )
+    await set_rls_context(session, SystemGuild(operations["guild"].id))
     session.add(
-        IntakeCase(
-            stream=IntakeStream.ideas.value,
-            task_id=published.id,
-            opened_at=published.created_at,
-            last_seen_at=published.created_at,
-            noted_at=published.created_at,
+        IntakeBinding(
+            stream=IntakeStream.ideas,
+            project_id=project.id,
+            task_type_id=idea_type.id,
         )
     )
     session.add(
@@ -65,8 +75,10 @@ async def board(session, operations, cloud):  # noqa: F811
         **operations,
         "staff": get_auth_headers(operations["staff"]),
         "staff_user": operations["staff"],
+        "idea_type": idea_type,
         "published": published,
         "draft": draft,
+        "draft_type_id": draft_type_id,
         "case": case,
     }
 
@@ -151,31 +163,50 @@ async def test_a_closed_idea_keeps_its_votes(client, session, acting_user, board
     assert (await client.get(f"{IDEAS}/{board['published'].id}")).json()["votes"] == 1
 
 
-async def test_the_team_publishes_an_idea_from_its_panel(client, board):
+async def test_the_team_publishes_an_idea_by_its_type(client, board):
+    """Giving a task on the board the Idea type publishes it, and any other
+    type takes it back; its case panel counts its votes."""
     headers = board["staff"]
     base = f"/api/v1/c/{board['guild'].id}/tasks"
+    draft = board["draft"]
 
-    panel = await client.get(f"{base}/{board['draft'].id}/idea", headers=headers)
-    assert panel.status_code == 200, panel.text
-    assert panel.json() == {"published_at": None, "votes": 0}
+    unpublished = await client.get(f"{base}/{draft.id}/case", headers=headers)
+    assert unpublished.status_code == 404
 
-    # A feedback case moved onto the board is its sender's words, not an idea.
-    case = await client.get(f"{base}/{board['case'].id}/idea", headers=headers)
-    assert case.status_code == 404
-
-    published = await client.put(
-        f"{base}/{board['draft'].id}/idea/published", headers=headers
+    changed = await client.patch(
+        f"{base}/{draft.id}",
+        json={"task_type_id": board["idea_type"].id},
+        headers=headers,
     )
-    assert published.json()["published_at"] is not None
+    assert changed.status_code == 200, changed.text
     titles = {i["title"] for i in (await client.get(IDEAS)).json()["items"]}
     assert "Holiday calendars to subscribe to" in titles
+    panel = await client.get(f"{base}/{draft.id}/case", headers=headers)
+    assert panel.status_code == 200, panel.text
+    assert (panel.json()["stream"], panel.json()["votes"]) == ("ideas", 0)
+    assert panel.json()["filer"] is None
 
-    await client.delete(f"{base}/{board['draft'].id}/idea/published", headers=headers)
+    await client.patch(
+        f"{base}/{draft.id}",
+        json={"task_type_id": board["draft_type_id"]},
+        headers=headers,
+    )
     titles = {i["title"] for i in (await client.get(IDEAS)).json()["items"]}
     assert "Holiday calendars to subscribe to" not in titles
 
 
-async def test_a_task_off_the_board_has_no_idea_panel(client, session, board):
+async def test_a_feedback_case_keeps_its_own_panel(client, board):
+    """A feedback case moved onto the board is its sender's words, and its
+    panel is the feedback case's, without votes."""
+    response = await client.get(
+        f"/api/v1/c/{board['guild'].id}/tasks/{board['case'].id}/case",
+        headers=board["staff"],
+    )
+    assert response.status_code == 200, response.text
+    assert (response.json()["stream"], response.json()["votes"]) == ("feedback", None)
+
+
+async def test_unbinding_the_board_publishes_nothing(client, session, board):
     await set_rls_context(session, SystemGuild(board["guild"].id))
     binding = (
         await session.exec(
@@ -188,12 +219,13 @@ async def test_a_task_off_the_board_has_no_idea_panel(client, session, board):
     await session.commit()
     await set_rls_context(session, Unattributed())
 
+    assert (await client.get(IDEAS)).json()["items"] == []
     response = await client.get(
-        f"/api/v1/c/{board['guild'].id}/tasks/{board['draft'].id}/idea",
+        f"/api/v1/c/{board['guild'].id}/tasks/{board['published'].id}/case",
         headers=board["staff"],
     )
     assert response.status_code == 404
-    assert response.json()["detail"] == TaskMessages.NOT_AN_IDEA
+    assert response.json()["detail"] == TaskMessages.NOT_A_CASE
 
 
 async def test_voters_hear_when_an_idea_moves(client, session, acting_user, board):

@@ -62,6 +62,8 @@
     "landingStatusDefault": "El estado por defecto del proyecto",
     "caseTypeLabel": "Los casos nuevos son de tipo",
     "caseTypeDefault": "El tipo por defecto del proyecto",
+    "ideaTypeLabel": "El tipo que lleva una tarea a la página de Ideas",
+    "ideaTypeNone": "Ninguno: no se publica nada",
     "enabledLabel": "Recibiendo casos nuevos",
     "lastCase": "Último caso abierto el {{when}}.",
     "noCasesYet": "Aún no hay casos.",
@@ -163,6 +165,8 @@
   "case": {
     "filedBy": "Enviado por",
     "noFiler": "Abierto automáticamente",
+    "votes_one": "{{count}} voto",
+    "votes_other": "{{count}} votos",
     "noContact": "Prefiere que no le contacten",
     "theyCalledIt": "Su asunto:",
     "noConversation": "Este tipo de caso no abre una conversación con quien lo envió.",
@@ -323,15 +327,6 @@
   },
   "moderationTopics": {
     "appeal": "Apelación contra tu suspensión"
-  },
-  "idea": {
-    "title": "Idea",
-    "publish": "Publicada en la página de ideas",
-    "publishedHelp": "Todos ven su título, su descripción y su estado, y pueden votarla.",
-    "draftHelp": "Sin publicar: solo la ve el equipo. Sus votos se quedan con ella.",
-    "votes_one": "{{count}} voto",
-    "votes_other": "{{count}} votos",
-    "error": "No se pudo cambiar. Inténtalo de nuevo en un momento."
   },
   "ideas": {
     "title": "Ideas",

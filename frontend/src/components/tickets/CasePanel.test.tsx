@@ -91,6 +91,23 @@ describe("CasePanel", () => {
     expect(screen.getByText(/asker/)).toBeInTheDocument();
   });
 
+  it("shows a published idea's votes, with nothing to take or ask access for", async () => {
+    state.found = supportCase({
+      stream: "ideas",
+      filer: null,
+      filer_subject: null,
+      conversation: "none",
+      awaiting_filer_status_id: null,
+      active_status_id: null,
+      votes: 3,
+    });
+    renderRouted(["access.request"]);
+    expect(await screen.findByText(/3 votes/)).toBeInTheDocument();
+    expect(screen.getByText("Ideas")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Take this case" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Request access" })).toBeNull();
+  });
+
   it("lets somebody who works it take it", async () => {
     state.found = supportCase();
     const user = userEvent.setup();
