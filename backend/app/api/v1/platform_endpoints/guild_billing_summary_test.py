@@ -23,6 +23,8 @@ _ANSWER = billing_ping.PlanSummary.model_validate(
         "next_charge": {"total": 1250, "currency": "USD"},
         "scheduled_change": None,
         "payment_failed": False,
+        "can_upgrade": False,
+        "can_cancel": True,
     },
     strict=False,
 )
@@ -78,6 +80,8 @@ async def test_the_seat_gets_billings_answer(
         "next_charge": {"total": 1250, "currency": "USD"},
         "scheduled_change": None,
         "payment_failed": False,
+        "can_upgrade": False,
+        "can_cancel": True,
     }
     assert billing_answers["asked"] == [guild.id]
 
@@ -119,6 +123,8 @@ async def test_billing_without_an_answer_is_unavailable(
         "next_charge": None,
         "scheduled_change": None,
         "payment_failed": False,
+        "can_upgrade": False,
+        "can_cancel": False,
     }
 
 

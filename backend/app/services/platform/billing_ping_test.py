@@ -170,7 +170,13 @@ async def test_plan_summary_sends_only_the_ref_signed(
     seen = _answering(monkeypatch, lambda r: httpx.Response(200, json=_SUMMARY))
     summary = await billing_ping.guild_plan_summary(7)
     assert summary is not None
-    assert summary.model_dump(mode="json") == _SUMMARY
+    # A billing that doesn't say what its portal offers yet reads as the plan
+    # every community starts on: plans above it, nothing to cancel.
+    assert summary.model_dump(mode="json") == {
+        **_SUMMARY,
+        "can_upgrade": True,
+        "can_cancel": False,
+    }
     (request,) = seen
     assert request.method == "POST"
     assert str(request.url) == "https://billing.internal/api/v1/plan-summary"
