@@ -269,7 +269,7 @@ Whoever keeps the member list can set or clear a member's from that person's men
 
 ## Reporting something
 
-Something here that shouldn't be? Comments, notices, pictures, wiki pages, events, profiles and directory listings all carry a small flag: **Report**. Pick what's wrong, add a line if you like, and **Send report**. The report opens beside the page, so what you're reporting stays in view. Its camera takes a picture of the page with the people on it left showing, since a report is usually about someone. It isn't offered on your own things, because you can already edit or delete those. **Illegal** and **Other** need a line saying what's wrong.
+Something here that shouldn't be? Comments, notices, pictures, wiki pages, events, profiles and directory listings all carry a small flag: **Report**. Pick what's wrong, add a line if you like, and **Send report**. The camera in the report's text box takes a picture of the page behind it, with the people on it left showing, since a report is usually about someone. It isn't offered on your own things, because you can already edit or delete those. **Illegal** and **Other** need a line saying what's wrong.
 
 | What you report | Who looks at it |
 |---|---|

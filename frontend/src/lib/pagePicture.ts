@@ -25,8 +25,9 @@ export interface PagePicture {
 }
 
 /**
- * Draw what is on screen, leaving out `leaveOut` (the panel the picture is
- * taken from), the overlay a sheet lays over the page, and any toasts.
+ * Draw what is on screen, leaving out `leaveOut` (the panel or dialog the
+ * picture is taken from), the overlays dialogs and sheets lay over the page,
+ * and any toasts.
  */
 export const pictureThePage = async (leaveOut: Element | null): Promise<PagePicture> => {
   const { domToForeignObjectSvg } = await import("modern-screenshot");
@@ -38,7 +39,10 @@ export const pictureThePage = async (leaveOut: Element | null): Promise<PagePict
     backgroundColor: getComputedStyle(document.body).backgroundColor,
     filter: (node) =>
       !(node instanceof Element) ||
-      (node !== leaveOut && !node.matches('[data-slot="sheet-overlay"], [data-sonner-toaster]')),
+      (node !== leaveOut &&
+        !node.matches(
+          '[data-slot="dialog-overlay"], [data-slot="sheet-overlay"], [data-sonner-toaster]'
+        )),
     features: { restoreScrollPosition: true },
   })) as SVGSVGElement;
   return { svg, width, height };
