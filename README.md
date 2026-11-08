@@ -70,7 +70,7 @@ FastAPI, SQLModel and PostgreSQL on the backend, React, TypeScript and Vite on t
 
 ## Contributing
 
-[CONTRIBUTING.md](CONTRIBUTING.md) explains how to get a dev environment running and how changes get in. Pull requests go to the `dev` branch, and your first one asks you to sign the [Contributor License Agreement](CLA.md).
+To run it from a clone, `bash scripts/dev-pre-launch.sh` starts a dev environment with test data; [CONTRIBUTING.md](CONTRIBUTING.md) lists what it needs and explains how changes get in. Pull requests go to the `dev` branch, and your first one asks you to sign the [Contributor License Agreement](CLA.md).
 
 To report a security problem, follow [SECURITY.md](SECURITY.md) rather than opening an issue.
 

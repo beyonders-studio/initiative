@@ -33,7 +33,20 @@ DEV_MAIN_ROOT="$(git -C "$DEV_PORTS_ROOT" rev-parse --path-format=absolute --git
 DEV_MAIN_ROOT="${DEV_MAIN_ROOT%/.git}"
 [ -d "$DEV_MAIN_ROOT/.git" ] || DEV_MAIN_ROOT="$DEV_PORTS_ROOT"
 export DEV_MAIN_ROOT
-export COMPOSE_FILE="${COMPOSE_FILE:-$DEV_MAIN_ROOT/docker-compose.yml}"
+# The dev database runs from the main checkout's docker-compose.yml when it has
+# one (it is gitignored), and from the committed docker-compose.dev.yml when not.
+if [ -z "${COMPOSE_FILE:-}" ]; then
+    COMPOSE_FILE="$DEV_MAIN_ROOT/docker-compose.yml"
+    [ -f "$COMPOSE_FILE" ] || COMPOSE_FILE="$DEV_MAIN_ROOT/docker-compose.dev.yml"
+fi
+export COMPOSE_FILE
+# It listens on the port backend/.env's DATABASE_URL names. Before there is a
+# .env, POSTGRES_PORT picks it, and scripts/dev-database.sh writes it there.
+if [ -z "${POSTGRES_PORT:-}" ]; then
+    POSTGRES_PORT="$(sed -n 's#^DATABASE_URL=[^@]*@[^:/]*:\([0-9][0-9]*\)/.*#\1#p' \
+        "$DEV_MAIN_ROOT/backend/.env" 2>/dev/null | head -n 1)"
+fi
+export POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 
 # A worktree shares the main checkout's dev database unless its branch changes
 # migrations, committed or not. Then it gets a database of its own on the same

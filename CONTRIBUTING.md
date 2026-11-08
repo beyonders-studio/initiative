@@ -4,22 +4,25 @@ Thanks for your interest in contributing! This guide covers what you need to kno
 
 ## Getting Set Up
 
-### One-Click Dev Environment (Recommended)
+### One Command (Recommended)
 
-The project includes a VS Code launch configuration that starts everything with a single command:
+You need Docker, [uv](https://docs.astral.sh/uv/) and Node.js 26.12.1+ with pnpm (`corepack enable pnpm`). From a clone, run:
 
-1. **Prerequisites**: Docker, [uv](https://docs.astral.sh/uv/) (Python 3.12+), Node.js 26.12.1+ with pnpm
-2. **Configure**: Copy `backend/.env.example` to `backend/.env` and set `DATABASE_URL` / `SECRET_KEY`
-3. **Launch**: Start the **Dev Environment** launch configuration (F5), or run `bash scripts/dev-pre-launch.sh` from a terminal
+```bash
+bash scripts/dev-pre-launch.sh
+```
 
-This will:
-- Start PostgreSQL via Docker
-- Run migrations and create the dev owner (`admin@example.com` / `changeme`)
-- Seed TTRPG-themed test data (campaigns, quests, NPCs, files, tags)
-- Start the backend (uvicorn) and frontend (Vite) dev servers
-- Open the app in your browser
+It says what's missing if anything is, then:
+- Writes `backend/.env` from `backend/.env.example` with a key of its own, the first time
+- Starts PostgreSQL in Docker (`docker-compose.dev.yml`)
+- Runs migrations and creates the dev owner (`admin@example.com` / `changeme`)
+- Seeds TTRPG-themed test data (campaigns, quests, NPCs, files, tags)
+- Starts the backend (uvicorn) and frontend (Vite) dev servers
+- Opens the app in your browser
 
-When you're done, run **`dev:cleanup`** from the task palette to remove all seeded test data. Stopping the debug session (if launched via F5) also triggers cleanup automatically.
+Press Ctrl+C to stop it; that also removes the seeded data. If something else already listens on port 5432, run it the first time as `POSTGRES_PORT=5433 bash scripts/dev-pre-launch.sh`; later runs use the port in `backend/.env`.
+
+In VS Code, the **Dev Environment** launch configuration (F5) starts the same environment under the debugger, and stopping the debug session cleans up the same way.
 
 **Seeded logins** — every account below uses the password **`changeme`**:
 
