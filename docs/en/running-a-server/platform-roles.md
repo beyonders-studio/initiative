@@ -139,7 +139,7 @@ Operators and owners can write **announcements** — notices shown in a dialog t
 
 Questions about somebody's own account — signing in, billing, anything else — don't depend on it. Once support is bound, anybody signed in can ask those from anywhere, inside a community or not: a person locked out of something has no community to ask from. With support not bound, the button gives the support address from [Who to contact](#who-to-contact), or isn't shown at all if there isn't one.
 
-Each support case carries the topic its asker chose, shown on the case beside its stream. A suspension appeal is a moderation case with the topic **Suspension appeal**, which — unlike a report — is a conversation: reply to the requester from the case as you would on support. One account has one appeal open at a time. **Feedback** cases are titled by their kind (an idea, a problem or praise) and carry the app's context in their description, where the sender kept it. Where the sender ticked that you may contact them, their answers open a conversation you can reply to; otherwise their answers are in the description and there's nobody to write to.
+Each support case carries the topic its asker chose, shown on the case beside its stream. A suspension appeal is a moderation case with the topic **Suspension appeal**, which — unlike a report — is a conversation: reply to the requester from the case as you would on support. One account has one appeal open at a time.
 
 ### A community's status
 
@@ -173,7 +173,7 @@ Deleted communities are in that list too, marked with the date everything in the
 
 ## Where operations work lands
 
-Security notes, moderation reports, support requests and feedback each open a case in one community of your choosing: the **operations community**. It's an ordinary community in every respect, and its members work the cases like any other tasks.
+Security notes, moderation reports and support requests each open a case in one community of your choosing: the **operations community**. It's an ordinary community in every respect, and its members work the cases like any other tasks.
 
 It's all one page, **Settings → Platform → Intake**. Pick the community, then say which of its projects each kind lands in, and if you like, which of that project's task types its cases are — or choose **Set this up for me** and get a ready-made project with its own statuses and fields. Pause a kind and it stops receiving; choose no community at all and nothing is routed anywhere.
 
@@ -205,6 +205,12 @@ Each hold opens a moderation case in the operations community, or lands on the c
 
 A hold never expires. Every 30 days it stays in place, its case is reminded.
 
+## Feedback
+
+**Send feedback** goes to the team that makes Initiative, on Initiative Cloud, rather than to you. The app opens Cloud's feedback page in the browser and the person signs in there, so nothing passes through your server. Ideas about the software reach the people who can build them, and your inbox stays yours.
+
+It's on until you switch it off, under **Settings → Platform → Intake**: **Let people send feedback to the Initiative team**. Off, nobody on your server is offered **Send feedback**, which suits a server that shouldn't reach the internet at all.
+
 ## Who to contact
 
 Whenever Initiative tells somebody to get in touch, it names an address. You pick those under **Settings → Platform → Intake**, in **Who to contact**: one general address, then one for each kind of work.
@@ -218,7 +224,7 @@ Whenever Initiative tells somebody to get in touch, it names an address. You pic
 
 Leave a kind blank and it uses the general address. It never borrows another kind's, so a moderation question doesn't turn up in the support inbox wondering why it's there. With neither set, the notice says to contact whoever runs this server, which is true but not very helpful to somebody who doesn't know who that is.
 
-**Security** and **Feedback** have fields too: they're what **Report a security problem** and **Send feedback** give where those aren't bound.
+**Security** has a field too: it's what **Report a security problem** gives where security isn't bound.
 
 ## Related
 
