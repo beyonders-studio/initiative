@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Eye, ImagePlus, Loader2, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Eye, ImagePlus, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -158,7 +158,7 @@ export const AnnouncementEditorDialog = ({
     });
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     // Every field the section carries has to be named here — this rebuilds the
     // object rather than spreading it, so anything left out is silently
     // dropped on save.
@@ -194,9 +194,15 @@ export const AnnouncementEditorDialog = ({
       trigger_route: state.triggerRoute.trim() || null,
     };
 
-    try {
-      if (announcement?.id) {
-        await update.mutateAsync({
+    const saved = {
+      onSuccess: () => {
+        toast.success(t("operator.saved"));
+        onOpenChange(false);
+      },
+    };
+    if (announcement?.id) {
+      update.mutate(
+        {
           id: announcement.id,
           data: {
             ...body,
@@ -204,14 +210,11 @@ export const AnnouncementEditorDialog = ({
             clear_expires_at: !state.expiresAt,
             clear_trigger_route: !state.triggerRoute.trim(),
           },
-        });
-      } else {
-        await create.mutateAsync(body);
-      }
-      toast.success(t("operator.saved"));
-      onOpenChange(false);
-    } catch (error) {
-      toast.error(getErrorMessage(error, "announcements:operator.saveFailed"));
+        },
+        saved
+      );
+    } else {
+      create.mutate(body, saved);
     }
   };
 
@@ -378,10 +381,8 @@ export const AnnouncementEditorDialog = ({
                     {t("operator.fields.timezoneHint", { zone: browserTimezone() })}
                   </p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="announcement-published">{t("operator.fields.publishedAt")}</Label>
+                <Field label={t("operator.fields.publishedAt")}>
                   <DateTimePicker
-                    id="announcement-published"
                     includeTime
                     value={state.publishedAt}
                     placeholder={t("operator.fields.draftPlaceholder")}
@@ -414,7 +415,7 @@ export const AnnouncementEditorDialog = ({
                       </Button>
                     ) : null}
                   </div>
-                </div>
+                </Field>
 
                 <Field
                   label={t("operator.fields.expiresAt")}
@@ -477,7 +478,7 @@ export const AnnouncementEditorDialog = ({
             submitLabel={t("common:save")}
             pending={saving}
             disabled={triggerProblem !== null}
-            onSubmit={() => void handleSave()}
+            onSubmit={handleSave}
           >
             <Button type="button" variant="ghost" onClick={() => setPreviewOpen(true)}>
               <Eye className="h-4 w-4" />
@@ -611,14 +612,10 @@ const SectionEditor = ({
             variant="button"
             buttonSize="sm"
             accept="image/png,image/jpeg,image/webp,image/gif"
-            disabled={upload.isPending}
+            pending={upload.isPending}
             onSelect={handleFile}
           >
-            {upload.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <ImagePlus className="h-4 w-4" />
-            )}
+            <ImagePlus className="h-4 w-4" />
             {section.image_url ? t("operator.replaceImage") : t("operator.addImage")}
           </ImagePicker>
           {section.image_url ? (

@@ -1,4 +1,4 @@
-import { Camera, FolderOpen, ImagePlus, Images, Loader2, Upload, X } from "lucide-react";
+import { Camera, FolderOpen, ImagePlus, Images, Upload, X } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -99,9 +99,9 @@ export const FileFeaturedImage = ({
               variant="ghost"
               size="sm"
               className="text-muted-foreground"
-              disabled={busy}
+              pending={busy}
             >
-              {busy ? <Loader2 className="animate-spin" aria-hidden /> : <ImagePlus aria-hidden />}
+              <ImagePlus aria-hidden />
               {uploading ? t("featuredImage.uploading") : t("featuredImage.add")}
             </Button>
           </DropdownMenuTrigger>
@@ -155,14 +155,10 @@ export const FileFeaturedImage = ({
                 buttonVariant="secondary"
                 buttonSize="icon-sm"
                 accept="image/*"
-                disabled={uploading}
+                pending={uploading}
                 onSelect={onUpload}
               >
-                {uploading ? (
-                  <Loader2 className="animate-spin" aria-hidden />
-                ) : (
-                  <ImagePlus aria-hidden />
-                )}
+                <ImagePlus aria-hidden />
                 <span className="sr-only">{replaceLabel}</span>
               </ImagePicker>
             </Tip>

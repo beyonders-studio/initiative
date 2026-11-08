@@ -35,7 +35,6 @@ import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 import { RegisterPage } from "./RegisterPage";
@@ -382,12 +381,13 @@ const SignInCard = () => {
         <CardContent>
           {challenge ? (
             <form className="space-y-4" onSubmit={handleCodeSubmit}>
-              <div className="space-y-2">
-                <Label htmlFor="second-factor-code">
-                  {useRecoveryCode ? t("secondFactor.recoveryLabel") : t("secondFactor.codeLabel")}
-                </Label>
+              <Field
+                label={
+                  useRecoveryCode ? t("secondFactor.recoveryLabel") : t("secondFactor.codeLabel")
+                }
+                id="second-factor-code"
+              >
                 <Input
-                  id="second-factor-code"
                   name="second-factor-code"
                   // A recovery code carries letters and dashes; a live code
                   // is six digits, and the numeric keypad is what a phone
@@ -409,7 +409,7 @@ const SignInCard = () => {
                   onChange={(event) => setCode(event.target.value)}
                   required
                 />
-              </div>
+              </Field>
               {/* Not held back on an empty `code`: a filled field may not have
                   reached state yet, and `required` stops an empty one. */}
               <Button className="w-full" type="submit" disabled={submitting}>
@@ -460,10 +460,8 @@ const SignInCard = () => {
                       required
                     />
                   </Field>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">{t("login.passwordLabel")}</Label>
+                  <Field label={t("login.passwordLabel")} id="password">
                     <Input
-                      id="password"
                       name="password"
                       type="password"
                       placeholder={t("login.passwordPlaceholder")}
@@ -480,7 +478,7 @@ const SignInCard = () => {
                         {t("login.forgotPassword")}
                       </Link>
                     </div>
-                  </div>
+                  </Field>
                   <Button className="w-full" type="submit" disabled={submitting}>
                     {submitting ? t("login.submitting") : t("login.submit")}
                   </Button>

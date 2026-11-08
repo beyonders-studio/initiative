@@ -30,7 +30,6 @@ import {
 } from "@/ui/dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 
 interface PasswordSectionProps {
   user: UserRead;
@@ -213,16 +212,14 @@ export const PasswordSection = ({ user, refreshUser }: PasswordSectionProps) => 
           }
         >
           {user.has_password ? (
-            <div className="space-y-2 sm:max-w-sm">
-              <Label htmlFor="current-password">{t("profile.currentPasswordLabel")}</Label>
+            <Field label={t("profile.currentPasswordLabel")} className="sm:max-w-sm">
               <Input
-                id="current-password"
                 type="password"
                 autoComplete="current-password"
                 value={currentPassword}
                 onChange={(event) => setCurrentPassword(event.target.value)}
               />
-            </div>
+            </Field>
           ) : null}
 
           <div className="grid grid-cols-pair gap-4">

@@ -33,7 +33,6 @@ import { getUserHandle } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 import { Field } from "@/ui/field";
-import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { WizardDialog } from "@/ui/wizard-dialog";
 
@@ -138,14 +137,16 @@ export const CommunityRestoreWizard = ({
       backLabel={t("common:back")}
       backDisabled={restore.isPending}
     >
-      <div className="space-y-2">
-        <Label htmlFor="community-restore-status">{t("communities.restore.statusLabel")}</Label>
+      <Field
+        label={t("communities.restore.statusLabel")}
+        hint={t("communities.restore.pluginsNote")}
+      >
         <Select
           value={status}
           onValueChange={(value) => setStatus(value as CommunityStatus)}
           disabled={restore.isPending}
         >
-          <SelectTrigger id="community-restore-status" className="w-full">
+          <SelectTrigger className="w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -156,8 +157,7 @@ export const CommunityRestoreWizard = ({
             ))}
           </SelectContent>
         </Select>
-        <p className="text-muted-foreground text-xs">{t("communities.restore.pluginsNote")}</p>
-      </div>
+      </Field>
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={() => onOpenChange(false)} disabled={restore.isPending}>
           {t("common:cancel")}

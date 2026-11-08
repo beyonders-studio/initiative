@@ -27,7 +27,7 @@ import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 import { DataTable } from "@/ui/data-table";
-import { Label } from "@/ui/label";
+import { Field } from "@/ui/field";
 import type { LayoutEnv } from "@/ui/layouts/fields";
 import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
@@ -77,7 +77,7 @@ export const TasksWidget = ({ options, onOptionsChange, onConfigure }: HomeWidge
   const fields = useMemo(() => taskFields(allPropertyDefinitions), [allPropertyDefinitions]);
   // Rows come from every community: each one's links go to its own.
   const { t: viewT } = useTranslation(LAYOUT_NAMESPACES);
-  const env = useMemo<LayoutEnv>(() => {
+  const env = useMemo<LayoutEnv<TaskListRead>>(() => {
     const path = (to: string, task: TaskListRead) => {
       const communityId = task.community_id ?? table.activeCommunityId;
       return communityId ? communityPath(communityId, to) : to;
@@ -314,10 +314,8 @@ export const TasksSettings = ({ options, onChange }: HomeWidgetSettingsProps) =>
   const { addTo: _dropped, ...withoutList } = options;
 
   return (
-    <div className="space-y-2">
-      <Label>{t("widgets.tasks.addTo")}</Label>
+    <Field label={t("widgets.tasks.addTo")}>
       <Combobox
-        aria-label={t("widgets.tasks.addTo")}
         items={lists.map((row) => ({
           value: key(row.communityId, row.id),
           label:
@@ -354,6 +352,6 @@ export const TasksSettings = ({ options, onChange }: HomeWidgetSettingsProps) =>
           {t("widgets.tasks.noList")}
         </Button>
       ) : null}
-    </div>
+    </Field>
   );
 };

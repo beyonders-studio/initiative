@@ -98,10 +98,7 @@
   },
   "assignee": {
     "emptyMessage": "Lade Initiativmitglieder ein, um Aufgaben zuzuweisen.",
-    "searchPlaceholder": "Mitglieder suchen",
-    "removeAssignee": "{{name}} entfernen",
-    "clearAssignees": "Zuständige Personen entfernen",
-    "you": "Du"
+    "searchPlaceholder": "Mitglieder suchen"
   },
   "statuses": {
     "description": "Ordne die Aufgabenspalten dieses Projekts neu an, benenne sie um oder ändere ihre Kategorie.",

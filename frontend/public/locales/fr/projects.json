@@ -98,10 +98,7 @@
   },
   "assignee": {
     "emptyMessage": "Invitez des membres de l'initiative pour assigner des tâches.",
-    "searchPlaceholder": "Rechercher des membres",
-    "removeAssignee": "Retirer {{name}}",
-    "clearAssignees": "Effacer les assignés",
-    "you": "Vous"
+    "searchPlaceholder": "Rechercher des membres"
   },
   "statuses": {
     "description": "Réorganisez, renommez ou changez la catégorie des colonnes de tâches utilisées par ce projet.",

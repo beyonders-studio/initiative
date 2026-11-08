@@ -68,7 +68,6 @@ import {
 } from "@/ui/dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
@@ -353,15 +352,16 @@ export function WidgetConfigDialog({
                 {/* Labelled by the widget itself, so an installed listing names
                     its own options without a locale edit here. */}
                 {(entry?.options ?? []).map((option) => (
-                  <div key={option.key} className="space-y-2">
-                    <Label htmlFor={`widget-option-${option.key}`}>
-                      {localized(meta?.options?.[option.key]?.label, i18n.language) ?? option.key}
-                    </Label>
+                  <Field
+                    key={option.key}
+                    label={
+                      localized(meta?.options?.[option.key]?.label, i18n.language) ?? option.key
+                    }
+                  >
                     {option.kind === "number" || option.kind === "date" ? (
                       // A value of its own, such as a target or its day. Empty
                       // means the widget draws without one.
                       <Input
-                        id={`widget-option-${option.key}`}
                         type={option.kind}
                         value={options[option.key] ?? ""}
                         onChange={(event) => {
@@ -379,7 +379,7 @@ export function WidgetConfigDialog({
                           setOptions((current) => ({ ...current, [option.key]: next }))
                         }
                       >
-                        <SelectTrigger id={`widget-option-${option.key}`}>
+                        <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -394,7 +394,7 @@ export function WidgetConfigDialog({
                         </SelectContent>
                       </Select>
                     )}
-                  </div>
+                  </Field>
                 ))}
               </section>
             )}

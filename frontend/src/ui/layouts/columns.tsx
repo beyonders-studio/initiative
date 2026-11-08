@@ -1,10 +1,12 @@
+import type { RowData } from "@tanstack/react-table";
+
 import type { AppColumnDef } from "@/ui/lib/table";
 import { PropertyColumnHeader } from "@/ui/properties/propertyColumns";
 import { SortHeader } from "@/ui/sort-icon";
 
-import { type FieldDef, fieldRenderer, type LayoutEnv, type LayoutItem } from "./fields";
+import { type FieldDef, fieldRenderer, type LayoutEnv } from "./fields";
 
-export type FieldColumnOptions<T extends LayoutItem> = Pick<
+export type FieldColumnOptions<T extends RowData> = Pick<
   AppColumnDef<T>,
   "sortFn" | "sortUndefined" | "size" | "cell"
 > & {
@@ -18,9 +20,9 @@ export type FieldColumnOptions<T extends LayoutItem> = Pick<
  * A field as a table column: the field's id, its label as the header, and its
  * renderer's cell. It sorts only when given a `sortFn`.
  */
-export const fieldColumn = <T extends LayoutItem>(
-  field: FieldDef,
-  env: LayoutEnv,
+export const fieldColumn = <T extends RowData>(
+  field: FieldDef<T>,
+  env: LayoutEnv<T>,
   { id = field.id, sortBy = field.value, ...column }: FieldColumnOptions<T> = {}
 ): AppColumnDef<T> => {
   const Renderer = fieldRenderer(field);

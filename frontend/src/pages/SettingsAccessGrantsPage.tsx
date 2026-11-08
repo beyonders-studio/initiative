@@ -39,7 +39,6 @@ import { getUserDisplayName } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { minutesLeft } from "@/ui/lib/formatDate";
 import { LoadMore } from "@/ui/load-more";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
@@ -169,23 +168,20 @@ const CaseField = ({
     }
   }
   return (
-    <div className="space-y-1">
-      <Label>{t("accessGrants.caseLabel")}</Label>
+    <Field label={t("accessGrants.caseLabel")} hint={hint} className="space-y-1">
       <CasePicker
-        aria-label={t("accessGrants.caseLabel")}
         cases={choice.items}
         value={choice.caseTaskId}
         onChange={choice.setCaseTaskId}
         optional={optional || !choice.required}
         loading={choice.loading}
       />
-      {hint ? <p className="text-muted-foreground text-xs">{hint}</p> : null}
       {otherCommunity ? (
         <p className="text-warning text-xs">
           {t("accessGrants.caseOtherCommunity", { community: subject })}
         </p>
       ) : null}
-    </div>
+    </Field>
   );
 };
 
@@ -216,10 +212,14 @@ const CommunityNoticeField = ({
   }
   if (chosen?.community_notice !== "optional") return null;
   return (
-    <div className="space-y-1">
-      <Label htmlFor={id}>{t("accessGrants.notice.label")}</Label>
+    <Field
+      label={t("accessGrants.notice.label")}
+      hint={t("accessGrants.notice.help")}
+      id={id}
+      className="space-y-1"
+    >
       <Select value={value} onValueChange={(next) => onChange(next as CommunityNotice)}>
-        <SelectTrigger id={id}>
+        <SelectTrigger>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -228,8 +228,7 @@ const CommunityNoticeField = ({
           <SelectItem value="when_ended">{t("accessGrants.notice.when_ended")}</SelectItem>
         </SelectContent>
       </Select>
-      <p className="text-muted-foreground text-xs">{t("accessGrants.notice.help")}</p>
-    </div>
+    </Field>
   );
 };
 
@@ -436,10 +435,16 @@ const BreakGlassSection = () => {
           />
         </Field>
         {needsCode && (
-          <div className="col-span-full space-y-1">
-            <Label htmlFor="bg-code">{t("accessGrants.breakGlass.codeLabel")}</Label>
+          <Field
+            label={t("accessGrants.breakGlass.codeLabel")}
+            hint={
+              knownUnenrolled
+                ? t("accessGrants.breakGlass.codeNotEnrolled")
+                : t("accessGrants.breakGlass.codeHelp")
+            }
+            className="col-span-full space-y-1"
+          >
             <Input
-              id="bg-code"
               autoComplete="one-time-code"
               autoCapitalize="none"
               autoCorrect="off"
@@ -449,12 +454,7 @@ const BreakGlassSection = () => {
               placeholder={t("accessGrants.breakGlass.codePlaceholder")}
               required
             />
-            <p className="text-muted-foreground text-xs">
-              {knownUnenrolled
-                ? t("accessGrants.breakGlass.codeNotEnrolled")
-                : t("accessGrants.breakGlass.codeHelp")}
-            </p>
-          </div>
+          </Field>
         )}
         <div className="col-span-full flex flex-wrap gap-2">
           <Button
@@ -584,10 +584,13 @@ const RequestSection = () => {
           value={notice}
           onChange={setNotice}
         />
-        <div className="space-y-1">
-          <Label htmlFor="ag-level">{t("accessGrants.purposeContent")}</Label>
+        <Field
+          label={t("accessGrants.purposeContent")}
+          hint={t("accessGrants.purposeContentHelp")}
+          className="space-y-1"
+        >
           <Select value={level} onValueChange={setLevel}>
-            <SelectTrigger id="ag-level">
+            <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -603,8 +606,7 @@ const RequestSection = () => {
               ) : null}
             </SelectContent>
           </Select>
-          <p className="text-muted-foreground text-xs">{t("accessGrants.purposeContentHelp")}</p>
-        </div>
+        </Field>
         {canAskAny ? (
           <Field
             label={t("accessGrants.purposeSettings")}

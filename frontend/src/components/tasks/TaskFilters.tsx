@@ -9,7 +9,6 @@ import type {
   TaskStatusRead,
   TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import { TagPicker } from "@/components/tags/TagPicker";
 import {
   NO_DEFINITIONS,
@@ -17,7 +16,7 @@ import {
   useOwnedDefinitions,
 } from "@/hooks/useProperties";
 import { useTags } from "@/hooks/useTags";
-import { type MemberSearchScope, useSearchMembers } from "@/hooks/useUsers";
+import { useSearchMembers } from "@/hooks/useUsers";
 import {
   ASSIGNEE_ME,
   ASSIGNEE_NONE,
@@ -29,6 +28,7 @@ import { pluginFilterFields, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { PRIORITY_ORDER } from "@/lib/sorting";
 import { Combobox } from "@/ui/combobox";
 import { Label } from "@/ui/label";
+import { MemberPicker, type MemberScope } from "@/ui/member-picker";
 import { PropertyFilter, type PropertyFilterCondition } from "@/ui/properties/PropertyFilter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
@@ -51,7 +51,7 @@ export type TaskFiltersScope =
   | {
       kind: "project";
       /** Whose names the assignee picker offers. */
-      memberScope: MemberSearchScope;
+      memberScope: MemberScope;
       /** The project's statuses; with none, the categories alone are offered. */
       statuses: TaskStatusRead[];
       /** The project's task types; one alone is not offered. */
@@ -151,13 +151,15 @@ export const TaskFilters = ({ scope, value, onChange, stacked = false }: TaskFil
             >
               {t("filters.filterByAssignee")}
             </Label>
-            <MemberMultiSelect
+            <MemberPicker
+              multiple
               id="assignee-filter"
               variant="filter"
+              searchMembers={searchMembers}
               scope={project.memberScope}
-              selectedIds={assigneeIds.map(Number).filter(Number.isFinite)}
+              value={assigneeIds.map(Number).filter(Number.isFinite)}
               onChange={(ids) => setAssignees({ ids: ids.map(String) })}
-              tokens={[
+              extras={[
                 {
                   value: ASSIGNEE_ME,
                   label: t("filters.assignedToMe"),

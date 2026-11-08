@@ -156,13 +156,10 @@ export function CollectionPage() {
   const canEdit = Boolean(collection?.can.edit);
   // The collection's metadata is the collection's to change; a file's own
   // properties are the file's.
-  const stepCounter = useCounterSteps(
+  const stepCounter = useCounterSteps<CollectionFileSummary>(
     PropertyTarget.file,
     useCallback(
-      (item, definition) =>
-        definition.collection_id !== null
-          ? canEdit
-          : (item as unknown as CollectionFileSummary).can.edit,
+      (item, definition) => (definition.collection_id !== null ? canEdit : item.can.edit),
       [canEdit]
     )
   );

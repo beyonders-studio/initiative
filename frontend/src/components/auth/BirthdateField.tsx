@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { PrivacyLink } from "@/components/auth/LegalNotice";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { DateTimePicker } from "@/ui/date-time-picker";
-import { Label } from "@/ui/label";
+import { Field } from "@/ui/field";
 
 /**
  * The question, with a note under it that the answer is not shared and, where
@@ -40,10 +40,22 @@ export const BirthdateField = ({
   const today = new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const earliest = new Date(now.getUTCFullYear() - 120, now.getUTCMonth(), now.getUTCDate());
   return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{t("auth:confirmAge.birthdateLabel")}</Label>
+    <Field
+      label={t("auth:confirmAge.birthdateLabel")}
+      hint={
+        <>
+          {t("auth:confirmAge.privacyNote")}
+          {billing ? (
+            <>
+              {" "}
+              <PrivacyLink />
+            </>
+          ) : null}
+        </>
+      }
+      id={id}
+    >
       <DateTimePicker
-        id={id}
         value={value}
         onChange={onChange}
         disabled={disabled}
@@ -57,15 +69,6 @@ export const BirthdateField = ({
           hidden: { before: earliest, after: today },
         }}
       />
-      <p className="text-muted-foreground text-xs">
-        {t("auth:confirmAge.privacyNote")}
-        {billing ? (
-          <>
-            {" "}
-            <PrivacyLink />
-          </>
-        ) : null}
-      </p>
-    </div>
+    </Field>
   );
 };

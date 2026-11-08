@@ -175,10 +175,8 @@ export function AtlassianConnectStep({ onConnected, onUseExport }: AtlassianConn
           onChange={(event) => setEmail(event.target.value)}
         />
       </Field>
-      <div className="space-y-2">
-        <Label htmlFor="jira-token">{t("wizard.atlassian.connect.tokenLabel")}</Label>
+      <Field label={t("wizard.atlassian.connect.tokenLabel")}>
         <Input
-          id="jira-token"
           type="password"
           value={apiToken}
           autoComplete="off"
@@ -193,7 +191,7 @@ export function AtlassianConnectStep({ onConnected, onUseExport }: AtlassianConn
           {t("wizard.atlassian.connect.tokenLink")}
           <ExternalLink className="h-3 w-3" />
         </a>
-      </div>
+      </Field>
       <p className="text-muted-foreground text-xs">{t("wizard.atlassian.connect.note")}</p>
       {error && <p className="text-destructive text-sm">{error}</p>}
       <Button type="submit" className="w-full" pending={connect.isPending} disabled={!ready}>

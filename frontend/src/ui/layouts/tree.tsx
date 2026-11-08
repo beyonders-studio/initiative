@@ -1,5 +1,6 @@
 import { Fragment, memo, type ReactNode, useMemo } from "react";
 
+import type { PropertySummary } from "@/api/generated/initiativeAPI.schemas";
 import { cn } from "@/ui/lib/utils";
 import { nonEmptyPropertySummaries } from "@/ui/properties/propertyHelpers";
 
@@ -8,7 +9,6 @@ import {
   fieldRenderer,
   isEmptyValue,
   type LayoutEnv,
-  type LayoutItem,
   type LayoutVariant,
   propertyFieldId,
 } from "./fields";
@@ -22,20 +22,24 @@ export type LayoutNode = {
   children?: LayoutNode[];
 };
 
+/** What a tree draws: an item, whose own properties its `properties` part
+ *  shows. */
+export type LayoutItem = { properties: PropertySummary[] };
+
 /** What every item in one view shares. Made once per view, not per item, so
  *  the memoized items skip re-rendering until it changes. */
-export type LayoutContext = {
+export type LayoutContext<I> = {
   /** In order: built-ins, properties in definition order, then those added
    *  beside them. */
-  fields: ReadonlyMap<string, FieldDef>;
+  fields: ReadonlyMap<string, FieldDef<I>>;
   /** Parts its kind adds to those a card is drawn with, by node type. */
-  parts?: Parts<LayoutItem>;
+  parts?: Parts<I>;
   /** A board's card. */
   card?: LayoutNode;
   /** While the view is edited: the path of each part of its tree. */
   editing?: WeakMap<LayoutNode, string>;
   variant: LayoutVariant;
-  env: LayoutEnv;
+  env: LayoutEnv<I>;
   /** Each field and row on one line, nothing wrapping: a card whose height is
    *  reserved from its lines (`cardLines`) rather than measured. */
   oneLine?: boolean;
@@ -47,7 +51,7 @@ export type LayoutContext = {
  * anything that needs one is a component a part returns, as the field
  * renderers are.
  */
-type Part<I> = (node: LayoutNode, item: I, view: LayoutContext, parts: Parts<I>) => ReactNode;
+type Part<I> = (node: LayoutNode, item: I, view: LayoutContext<I>, parts: Parts<I>) => ReactNode;
 
 /** The parts a tree of one kind of item can hold, by node type. */
 export type Parts<I> = Readonly<Record<string, Part<I>>>;
@@ -58,7 +62,7 @@ export type Parts<I> = Readonly<Record<string, Part<I>>>;
 export const renderNode = <I,>(
   node: LayoutNode,
   item: I,
-  view: LayoutContext,
+  view: LayoutContext<I>,
   parts: Parts<I>
 ): ReactNode => {
   const drawn = Object.hasOwn(parts, node.type) ? parts[node.type](node, item, view, parts) : null;
@@ -75,7 +79,7 @@ export const renderNode = <I,>(
 const renderChildren = <I,>(
   node: LayoutNode,
   item: I,
-  view: LayoutContext,
+  view: LayoutContext<I>,
   parts: Parts<I>
 ): ReactNode =>
   node.children?.map((child, index) => (
@@ -83,11 +87,11 @@ const renderChildren = <I,>(
     <Fragment key={index}>{renderNode(child, item, view, parts)}</Fragment>
   ));
 
-const renderField = (
-  field: FieldDef,
+const renderField = <I,>(
+  field: FieldDef<I>,
   value: unknown,
-  item: LayoutItem,
-  view: LayoutContext,
+  item: I,
+  view: LayoutContext<I>,
   key?: number
 ): ReactNode => {
   if (isEmptyValue(value)) return null;
@@ -153,7 +157,7 @@ const stackClassName = ({ direction, gap: given, wrap, align, tone }: StackProps
 
 /** While a tree is edited, a group with nothing in it still takes room, to
  *  drop a part into or add one; readers never see it. */
-const emptyWhileEdited = (node: LayoutNode, view: LayoutContext): ReactNode =>
+const emptyWhileEdited = <I,>(node: LayoutNode, view: LayoutContext<I>): ReactNode =>
   view.editing && !node.children?.length ? (
     <div className="flex min-h-10 w-full items-center justify-center rounded-md border border-dashed px-2 text-center text-muted-foreground text-xs">
       {view.env.t("layouts:emptyGroup")}
@@ -164,7 +168,7 @@ const emptyWhileEdited = (node: LayoutNode, view: LayoutContext): ReactNode =>
 // itself on the layout's grid.
 const region =
   (className: string) =>
-  <I,>(node: LayoutNode, item: I, view: LayoutContext, parts: Parts<I>) => (
+  <I,>(node: LayoutNode, item: I, view: LayoutContext<I>, parts: Parts<I>) => (
     <div className={cn("min-w-0", className)}>
       {renderChildren(node, item, view, parts)}
       {emptyWhileEdited(node, view)}
@@ -189,7 +193,7 @@ const ORDER: Record<number, string> = {
 // that draws nothing takes no room.
 const column =
   (className: string) =>
-  <I,>(node: LayoutNode, item: I, view: LayoutContext, parts: Parts<I>) => (
+  <I,>(node: LayoutNode, item: I, view: LayoutContext<I>, parts: Parts<I>) => (
     <div className={cn("canvas-md:flex contents canvas-md:min-w-0 canvas-md:flex-col", className)}>
       {node.children?.map((child, index) => (
         <div
@@ -206,7 +210,7 @@ const column =
 
 /** Arrangement, for a tree of any kind of item. */
 export const LAYOUT_PARTS = {
-  stack: <I,>(node: LayoutNode, item: I, view: LayoutContext, parts: Parts<I>) => {
+  stack: <I,>(node: LayoutNode, item: I, view: LayoutContext<I>, parts: Parts<I>) => {
     const props = (node.props ?? {}) as StackProps;
     return (
       <div className={stackClassName(view.oneLine ? { ...props, wrap: false } : props)}>
@@ -216,7 +220,7 @@ export const LAYOUT_PARTS = {
     );
   },
   /** An item's layout, which holds its header, main and side regions. */
-  layout: <I,>(node: LayoutNode, item: I, view: LayoutContext, parts: Parts<I>) => (
+  layout: <I,>(node: LayoutNode, item: I, view: LayoutContext<I>, parts: Parts<I>) => (
     <div className="grid canvas-md:grid-cols-[minmax(0,1fr)_20rem] gap-6">
       {renderChildren(node, item, view, parts)}
     </div>
@@ -225,7 +229,7 @@ export const LAYOUT_PARTS = {
   main: column("canvas-md:col-start-1 canvas-md:row-start-2 canvas-md:gap-6"),
   side: column("canvas-md:col-start-2 canvas-md:row-start-2 canvas-md:gap-4"),
   /** A bordered group of parts, titled in the initiative's own words. */
-  section: <I,>(node: LayoutNode, item: I, view: LayoutContext, parts: Parts<I>) => (
+  section: <I,>(node: LayoutNode, item: I, view: LayoutContext<I>, parts: Parts<I>) => (
     <Section
       title={typeof node.props?.title === "string" ? node.props.title : undefined}
       collapsed={node.props?.collapsed === true}
@@ -236,20 +240,21 @@ export const LAYOUT_PARTS = {
   ),
 };
 
-const PARTS: Parts<LayoutItem> = {
+const PARTS = {
   ...LAYOUT_PARTS,
   // The board draws the card's frame, which carries the drag and the measuring;
   // the card lays out what is inside it.
-  card: (node, item, view, parts) => renderChildren(node, item, view, parts),
-  field: (node, item, view) => {
+  card: <I,>(node: LayoutNode, item: I, view: LayoutContext<I>, parts: Parts<I>) =>
+    renderChildren(node, item, view, parts),
+  field: <I,>(node: LayoutNode, item: I, view: LayoutContext<I>) => {
     const field = view.fields.get(String(node.props?.field));
     return field ? renderField(field, field.value(item), item, view) : null;
   },
   // Every property the item carries, in its own order: a shipped tree cannot
   // name them.
-  properties: (_node, item, view) =>
+  properties: <I extends LayoutItem>(_node: LayoutNode, item: I, view: LayoutContext<I>) =>
     nonEmptyPropertySummaries(item.properties).map((summary) =>
-      renderField(
+      renderField<I>(
         view.fields.get(propertyFieldId(summary.property_id)) ?? UNLOADED_PROPERTY,
         summary,
         item,
@@ -264,16 +269,15 @@ export const namesField = (node: LayoutNode, fieldId: string): boolean =>
   (node.type === "field" && node.props?.field === fieldId) ||
   (node.children ?? []).some((child) => namesField(child, fieldId));
 
-/** Draws one item of a collection through a tree. */
-export const LayoutTree = memo(function LayoutTree({
+type TreeProps<I> = { node: LayoutNode; item: I; view: LayoutContext<I> };
+
+/** Draws one item of a collection through a tree. `memo` keeps no type
+ *  parameter, so the tree is typed again by the item it draws. */
+export const LayoutTree = memo(function LayoutTree<I extends LayoutItem>({
   node,
   item,
   view,
-}: {
-  node: LayoutNode;
-  item: LayoutItem;
-  view: LayoutContext;
-}) {
+}: TreeProps<I>) {
   const parts = useMemo(() => (view.parts ? { ...PARTS, ...view.parts } : PARTS), [view.parts]);
   return renderNode(node, item, view, parts);
-});
+}) as <I extends LayoutItem>(props: TreeProps<I>) => ReactNode;

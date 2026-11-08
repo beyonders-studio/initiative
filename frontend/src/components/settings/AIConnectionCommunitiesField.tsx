@@ -14,7 +14,7 @@ import { usePlatformCommunities } from "@/hooks/useSettings";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
-import { Label } from "@/ui/label";
+import { Field } from "@/ui/field";
 
 interface AIConnectionCommunitiesFieldProps {
   communities: AIConnectionCommunity[];
@@ -38,8 +38,14 @@ export const AIConnectionCommunitiesField = ({
     .map((row) => ({ value: String(row.id), label: row.name }));
 
   return (
-    <div className="space-y-2">
-      <Label>{t("aiConnections.communitiesLabel")}</Label>
+    <Field
+      label={t("aiConnections.communitiesLabel")}
+      hint={
+        communities.length > 0
+          ? t("aiConnections.communitiesHelpGiven")
+          : t("aiConnections.communitiesHelpNone")
+      }
+    >
       {communities.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {communities.map((community) => {
@@ -63,7 +69,6 @@ export const AIConnectionCommunitiesField = ({
         </div>
       )}
       <Combobox
-        aria-label={t("aiConnections.communitiesLabel")}
         items={items}
         value={null}
         onValueChange={(value) => {
@@ -77,11 +82,6 @@ export const AIConnectionCommunitiesField = ({
         searchPlaceholder={t("aiConnections.communitiesSearch")}
         emptyMessage={t("aiConnections.communitiesEmpty")}
       />
-      <p className="text-muted-foreground text-xs">
-        {communities.length > 0
-          ? t("aiConnections.communitiesHelpGiven")
-          : t("aiConnections.communitiesHelpNone")}
-      </p>
-    </div>
+    </Field>
   );
 };

@@ -19,7 +19,6 @@ import {
   fieldRenderer,
   isEmptyValue,
   type LayoutEnv,
-  type LayoutItem,
   PROPERTY_FIELD_PREFIX,
 } from "@/ui/layouts/fields";
 import type { LayoutContext } from "@/ui/layouts/tree";
@@ -84,7 +83,7 @@ const FileField = ({
 }: {
   id: string;
   file: CollectionFileSummary;
-  view: LayoutContext;
+  view: LayoutContext<CollectionFileSummary>;
 }) => {
   const t = useTranslation(["files", "common"]).t as TranslateFn;
   if (id.startsWith(PROPERTY_FIELD_PREFIX)) {
@@ -97,8 +96,7 @@ const FileField = ({
     );
   }
   const field = view.fields.get(id);
-  const item = file as unknown as LayoutItem;
-  const value = field?.value(item);
+  const value = field?.value(file);
   if (!field || isEmptyValue(value)) return null;
   if (id === "name") {
     return <h2 className="min-w-0 break-words font-semibold text-lg">{file.name}</h2>;
@@ -106,7 +104,7 @@ const FileField = ({
   const Renderer = fieldRenderer(field);
   return (
     <ReadField label={t(field.label)}>
-      <Renderer value={value} item={item} field={field} variant="cell" env={view.env} />
+      <Renderer value={value} item={file} field={field} variant="cell" env={view.env} />
     </ReadField>
   );
 };

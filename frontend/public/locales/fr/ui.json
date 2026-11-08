@@ -74,7 +74,10 @@
     "close": "Fermer"
   },
   "memberPicker": {
-    "userWithId": "Utilisateur n° {{id}}"
+    "userWithId": "Utilisateur n° {{id}}",
+    "you": "Vous",
+    "remove": "Retirer {{name}}",
+    "clearAll": "Effacer les assignés"
   },
   "multiSelect": {
     "empty": "Aucune option disponible",
