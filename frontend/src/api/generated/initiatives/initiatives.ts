@@ -440,7 +440,9 @@ export function useListInitiativeDirectory<
  * What the community sets for every initiative in it: each initiative's
  * managers see these as set, and may not change them.
  *
- * Declared before ``/{initiative_id}`` so the literal path wins the match.
+ * A community admin, who sets them, also gets which live initiatives have
+ * each one on of their own. Declared before ``/{initiative_id}`` so the
+ * literal path wins the match.
  * @summary Get Initiative Defaults
  */
 export const getInitiativeDefaults = (

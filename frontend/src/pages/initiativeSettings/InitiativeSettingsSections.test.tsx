@@ -256,11 +256,11 @@ describe("initiative settings sections", () => {
 
     renderSection(InitiativeSettingsRolesPage, "roles");
 
-    // Turning view off would take create with it, and create is the
-    // community's.
-    const create = await screen.findByRole("switch", { name: "Create Projects" });
-    await waitFor(() => expect(create).toBeDisabled());
-    expect(screen.getByRole("switch", { name: "View Projects" })).toBeDisabled();
+    // Create is the community's, shown as its value rather than a switch;
+    // turning view off would take create with it, so view is held too.
+    const view = await screen.findByRole("switch", { name: "View Projects" });
+    await waitFor(() => expect(view).toBeDisabled());
+    expect(screen.queryByRole("switch", { name: "Create Projects" })).not.toBeInTheDocument();
     expect(screen.getByText(/sets this for every initiative/)).toBeInTheDocument();
   });
 
