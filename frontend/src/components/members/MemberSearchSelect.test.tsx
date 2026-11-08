@@ -8,7 +8,7 @@ import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 
-import { MemberMultiSelect, MemberSelect } from "./MemberSearchSelect";
+import { MemberMultiSelect } from "./MemberSearchSelect";
 
 const ADA = buildUserSummary({ id: 42, display_name: "Ada Lovelace" });
 const GRACE = buildUserSummary({ id: 43, display_name: "Grace Hopper" });
@@ -85,22 +85,5 @@ describe("MemberMultiSelect", () => {
     );
 
     expect(await screen.findByText(`User #${MISSING_ID}`)).toBeInTheDocument();
-  });
-});
-
-describe("MemberSelect", () => {
-  it("names a value it was given as a bare id", async () => {
-    server.use(memberSearchHandler());
-
-    renderWithProviders(
-      <MemberSelect
-        scope={{ type: "canOpen", tool: Tool.project, id: 7 }}
-        value={GRACE.id}
-        onChange={() => {}}
-      />
-    );
-
-    expect(await screen.findByText("Grace Hopper")).toBeInTheDocument();
-    expect(screen.queryByText(`User #${GRACE.id}`)).not.toBeInTheDocument();
   });
 });

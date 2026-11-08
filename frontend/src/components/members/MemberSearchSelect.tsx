@@ -1,4 +1,4 @@
-import { ChevronsUpDown, Users, X } from "lucide-react";
+import { Users, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -16,7 +16,7 @@ import { Combobox } from "@/ui/combobox";
 import { cn } from "@/ui/lib/utils";
 
 /** The slim user shape these pickers render (the search endpoints' `UserSummary`). */
-export type MemberSummary = Pick<
+type MemberSummary = Pick<
   UserSummary,
   "id" | "username" | "discriminator" | "display_name" | "avatar_url" | "status" | "community_role"
 >;
@@ -285,94 +285,5 @@ export const MemberMultiSelect = ({
         </Button>
       ) : null}
     </div>
-  );
-};
-
-// ── Single-select (user-reference property, owner reassign) ───────────────────
-
-interface MemberSelectProps {
-  scope: MemberSearchScope;
-  value: number | null;
-  /** The id picked, and the member it names, for a caller that shows them. */
-  onChange: (id: number | null, user?: MemberSummary) => void;
-  /** Display info for the current value so the trigger shows a name without a
-   *  search round-trip. */
-  selectedUser?: MemberLike | null;
-  disabled?: boolean;
-  placeholder?: string;
-  emptyMessage?: string;
-  className?: string;
-  "aria-label"?: string;
-}
-
-export const MemberSelect = ({
-  scope,
-  value,
-  onChange,
-  selectedUser,
-  disabled = false,
-  placeholder,
-  emptyMessage,
-  className,
-  "aria-label": ariaLabel,
-}: MemberSelectProps) => {
-  const { t } = useTranslation(["common"]);
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-
-  const searchResult = useMemberSearch(scope, { search: query, enabled: open });
-  const results = useMemo<MemberSummary[]>(
-    () => searchResult.data?.items ?? [],
-    [searchResult.data]
-  );
-  const selectedUsers = useMemo(() => (selectedUser ? [selectedUser] : undefined), [selectedUser]);
-  const selectedIds = useMemo(() => (value != null ? [value] : []), [value]);
-  const seen = useSeenMembers(scope, selectedIds, selectedUsers, results);
-
-  const selected = value != null ? (seen.get(value) ?? selectedUser ?? { id: value }) : null;
-
-  return (
-    <Combobox
-      items={[
-        // Clearing is listed first while there is something to clear: "" is
-        // no member's id.
-        ...(value != null ? [{ value: "", label: t("common:clear"), icon: X }] : []),
-        ...results.map((user) => ({
-          value: String(user.id),
-          label: getUserDisplayName(user),
-          icon: <MemberAvatar user={user} />,
-        })),
-      ]}
-      value={value != null ? String(value) : null}
-      onValueChange={(next) => {
-        const user = results.find((each) => String(each.id) === next);
-        onChange(user ? user.id : null, user);
-      }}
-      onSearchChange={setQuery}
-      onOpenChange={setOpen}
-      loading={searchResult.isFetching && results.length === 0}
-      searchPlaceholder={placeholder}
-      emptyMessage={emptyMessage}
-      disabled={disabled}
-      trigger={
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-label={ariaLabel}
-          disabled={disabled}
-          className={cn("w-full justify-between", !selected && "text-muted-foreground", className)}
-        >
-          <span className="flex min-w-0 items-center gap-2">
-            {selected ? <MemberAvatar user={selected} className="h-5 w-5 text-3xs" /> : null}
-            <span className="truncate">
-              {selected
-                ? getUserDisplayName(selected)
-                : (placeholder ?? t("common:selectAnOption"))}
-            </span>
-          </span>
-          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      }
-    />
   );
 };

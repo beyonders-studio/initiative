@@ -5,9 +5,10 @@ import { useTranslation } from "react-i18next";
 import { MetadataType, type PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import { cn } from "@/ui/lib/utils";
+import type { SearchMembers } from "@/ui/member-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
-import { PropertyInput, type PropertyInputProps, type SearchMembers } from "./PropertyInput";
+import { PropertyInput, type PropertyInputProps } from "./PropertyInput";
 import { iconForPropertyType } from "./propertyTypeIcons";
 
 export interface PropertyFilterCondition {

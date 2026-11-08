@@ -54,7 +54,6 @@
     "selectPlaceholder": "Select…",
     "multiSelectPlaceholder": "Select options",
     "userPlaceholder": "Assign person…",
-    "userWithId": "User #{{id}}",
     "unknownOption": "Unknown option: {{value}}",
     "clear": "Clear",
     "searchOptions": "Search or create option…",
