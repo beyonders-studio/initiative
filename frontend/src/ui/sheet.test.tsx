@@ -14,7 +14,7 @@ describe("SheetContent", () => {
     );
 
     const content = screen.getByRole("dialog");
-    expect(content.parentElement?.className).toContain("bg-black/80");
+    expect(content.parentElement?.className).toContain("bg-black/50");
   });
 
   it("draws with no overlay when the sheet is not modal", () => {

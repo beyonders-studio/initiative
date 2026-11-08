@@ -21,6 +21,27 @@ function DialogClose({ ...props }: React.ComponentProps<typeof DialogPrimitive.C
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
+/** The backdrop behind every modal panel: a dialog's, an alert dialog's and a modal sheet's. */
+const dialogOverlayClassName =
+  "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50 backdrop-blur duration-200 data-[state=closed]:animate-out data-[state=open]:animate-in supports-backdrop-blur:bg-black/60";
+
+/** A panel's own look wherever it sits. A sheet draws it against an edge of the screen. */
+const dialogSurfaceClassName =
+  "z-50 gap-4 bg-background p-6 shadow-lg data-[state=closed]:animate-out data-[state=open]:animate-in";
+
+/**
+ * A panel centred in the viewport, as a dialog and an alert dialog draw it.
+ *
+ * `[&>*]:min-w-0` is load-bearing, not cosmetic. This is a grid, so every
+ * direct child is a grid item with `min-width: auto` — its automatic minimum
+ * is its *content's* minimum, which a nowrap row, a long unbroken word or an
+ * editor toolbar can push past the dialog's own width. The item then
+ * overflows the box rather than shrinking inside it, and on a phone the
+ * right-hand side of every field is simply cut off. Resetting the floor lets
+ * children shrink to the dialog and clip/wrap on their own terms.
+ */
+const dialogContentClassName = `${dialogSurfaceClassName} data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] grid max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] overflow-y-auto rounded-lg border duration-200 sm:max-w-lg [&>*]:min-w-0`;
+
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
@@ -28,10 +49,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     data-slot="dialog-overlay"
-    className={cn(
-      "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50 backdrop-blur duration-200 data-[state=closed]:animate-out data-[state=open]:animate-in supports-backdrop-blur:bg-black/60",
-      className
-    )}
+    className={cn(dialogOverlayClassName, className)}
     {...props}
   />
 ));
@@ -53,18 +71,7 @@ const DialogContent = React.forwardRef<
         <DialogPrimitive.Content
           ref={ref}
           data-slot="dialog-content"
-          className={cn(
-            // `[&>*]:min-w-0` is load-bearing, not cosmetic. This is a grid, so every
-            // direct child is a grid item with `min-width: auto` — its automatic
-            // minimum is its *content's* minimum, which a nowrap row, a long
-            // unbroken word or an editor toolbar can push past the dialog's own
-            // width. The item then overflows the box rather than shrinking inside
-            // it, and on a phone the right-hand side of every field is simply cut
-            // off. Resetting the floor lets children shrink to the dialog and
-            // clip/wrap on their own terms.
-            "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto rounded-lg border bg-background p-6 shadow-lg duration-200 data-[state=closed]:animate-out data-[state=open]:animate-in sm:max-w-lg [&>*]:min-w-0",
-            className
-          )}
+          className={cn(dialogContentClassName, className)}
           {...props}
         >
           {children}
@@ -141,4 +148,7 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
+  dialogContentClassName,
+  dialogOverlayClassName,
+  dialogSurfaceClassName,
 };
