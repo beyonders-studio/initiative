@@ -14,19 +14,9 @@ import {
   toolNavLabelKey,
   toolRouteSegment,
 } from "@/lib/tools";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/ui/alert-dialog";
 import { Button } from "@/ui/button";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Input } from "@/ui/input";
 import { TableSkeleton, TagDetailSkeleton } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
@@ -49,6 +39,7 @@ export const TagDetailPage = () => {
   const updateTagMutation = useUpdateTag();
 
   const [isEditing, setIsEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState("");
 
@@ -174,31 +165,19 @@ export const TagDetailPage = () => {
               <Settings className="h-4 w-4" />
               {t("detail.edit")}
             </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm">
-                  <Trash2 className="h-4 w-4" />
-                  {t("detail.delete")}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>{t("detail.deleteTitle")}</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {t("detail.deleteDescription", { name: tag.name })}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>{t("common:cancel")}</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => void handleDelete()}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    {t("detail.delete")}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button variant="destructive" size="sm" onClick={() => setConfirmingDelete(true)}>
+              <Trash2 className="h-4 w-4" />
+              {t("detail.delete")}
+            </Button>
+            <ConfirmDialog
+              open={confirmingDelete}
+              onOpenChange={setConfirmingDelete}
+              title={t("detail.deleteTitle")}
+              description={t("detail.deleteDescription", { name: tag.name })}
+              confirmLabel={t("detail.delete")}
+              destructive
+              onConfirm={() => void handleDelete()}
+            />
           </div>
         )}
       </div>

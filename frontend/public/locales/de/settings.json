@@ -121,7 +121,6 @@
     "loadingDevices": "Geräte werden geladen…",
     "devicesError": "Geräte konnten nicht geladen werden.",
     "unknownDevice": "Unbekanntes Gerät",
-    "revokeDialogCancel": "Abbrechen",
     "revoking": "Wird widerrufen…",
     "revokeError": "Gerätezugriff konnte nicht widerrufen werden",
     "newKeyTitle": "Neuer API-Schlüssel",

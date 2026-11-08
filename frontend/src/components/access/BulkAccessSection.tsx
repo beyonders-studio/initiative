@@ -15,6 +15,7 @@ import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { toast } from "@/lib/mascotToast";
 import { everyCan } from "@/lib/permissions";
 import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 
 /** The slice of {@link useGridSelection} this section drives. */
 interface GridSelectionLike<T> {
@@ -59,6 +60,7 @@ export function BulkAccessSection<T extends BulkItem>({
   const communityId = useActiveCommunityId();
   const [accessOpen, setAccessOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const items = selection.selectedItems;
   const count = items.length;
   const archived = items.some((item) => item.archived_at);
@@ -120,13 +122,9 @@ export function BulkAccessSection<T extends BulkItem>({
           <Button
             variant="destructive"
             size="sm"
-            onClick={() => {
-              if (confirm(t("common:bulkActions.deleteConfirm", { count }))) {
-                remove.mutate(items.map((item) => item.id));
-              }
-            }}
             disabled={count === 0 || !canDelete || remove.isPending}
             title={count > 0 && !canDelete ? t("common:bulkActions.needDelete") : undefined}
+            onClick={() => setDeleteOpen(true)}
           >
             {remove.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -135,6 +133,14 @@ export function BulkAccessSection<T extends BulkItem>({
             )}
             {t("common:delete")}
           </Button>
+          <ConfirmDialog
+            open={deleteOpen}
+            onOpenChange={setDeleteOpen}
+            title={t("common:bulkActions.deleteConfirm", { count })}
+            confirmLabel={t("common:delete")}
+            destructive
+            onConfirm={() => remove.mutate(items.map((item) => item.id))}
+          />
         </BulkAccessBar>
       ) : null}
       <BulkEditTagsDialog
