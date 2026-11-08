@@ -372,7 +372,10 @@ def snapshot(found: Server, before: Cluster, after: Cluster) -> Snapshot:
     return Snapshot(roles, memberships, extensions, sql)
 
 
-_ENTRY = re.compile(r"^-- (?:Data for )?Name: .*; Owner: (\S*)$", re.MULTILINE)
+_ENTRY = re.compile(
+    r"^-- (?:Data for )?Name: .*; Schema: (\S*); Owner: (\S*)$", re.MULTILINE
+)
+_OWNER_TO = re.compile(r"^ALTER .* OWNER TO (\S+);$", re.MULTILINE)
 _SESSION = re.compile(
     r"^(?:SET \w+ = .*;|SELECT pg_catalog\.set_config\(.*\);|\\\w+.*|"
     r"CREATE SCHEMA public;)$",
@@ -387,10 +390,23 @@ def curate(dump: str, prefixed: list[str]) -> str:
     kept = []
     for start, end in zip(starts, [*starts[1:], len(dump)], strict=True):
         entry = dump[start:end]
-        owner = _ENTRY.match(entry)
-        assert owner
-        if owner.group(1) != OWNER:
-            kept.append(entry)
+        header = _ENTRY.match(entry)
+        assert header
+        schema, owner = header.groups()
+        if owner == OWNER:
+            continue
+        if owner != RUNNER and schema != "-":
+            # Owning an object in a schema takes CREATE on it, which the
+            # migrations lent each such owner for the change; the schema's
+            # own grants, later in the dump, are what it ends with.
+            entry = _OWNER_TO.sub(
+                lambda m, schema=schema: (
+                    f"GRANT CREATE ON SCHEMA {schema} TO {m.group(1)};\n{m.group(0)}\n"
+                    f"REVOKE CREATE ON SCHEMA {schema} FROM {m.group(1)};"
+                ),
+                entry,
+            )
+        kept.append(entry)
     sql = _SESSION.sub("", "".join(kept))
     if prefixed:
         names = "|".join(sorted(map(re.escape, prefixed), key=len, reverse=True))
