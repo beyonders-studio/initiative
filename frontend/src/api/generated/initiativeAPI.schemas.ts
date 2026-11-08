@@ -12691,28 +12691,19 @@ export interface FeedbackContext {
 }
 
 /**
- * What kind of feedback somebody is sending.
- */
-export type FeedbackTopic = (typeof FeedbackTopic)[keyof typeof FeedbackTopic];
-
-export const FeedbackTopic = {
-  idea: "idea",
-  problem: "problem",
-  praise: "praise",
-  other: "other",
-} as const;
-
-/**
- * Telling whoever runs this server what somebody thinks.
+ * How the app is working for somebody: a rating, and what they like and
+ * wish it did where they say.
  */
 export interface FeedbackTicketCreate {
   stream: "feedback";
-  type: FeedbackTopic;
   /**
-   * @minLength 1
-   * @maxLength 5000
+   * @minimum 1
+   * @maximum 5
    */
-  body: string;
+  rating: number;
+  likes?: string | null;
+  wishes?: string | null;
+  contactable?: boolean;
   context?: FeedbackContext | null;
 }
 

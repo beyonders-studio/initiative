@@ -133,13 +133,13 @@
     "replyError": "Could not send your reply. Try again in a moment.",
     "closedNote": "This ticket is closed. If something else comes up, ask for help again.",
     "noConversation": "Thanks for the report. The team looks into every one, but they don't reply to reports here.",
-    "staffFirst": "Thanks for telling us. You can reply here once the team has followed up.",
     "empty": "You haven't filed any tickets. When you ask for help, it shows up here so you can follow it.",
     "loadError": "Could not load your tickets."
   },
   "case": {
     "filedBy": "Filed by",
     "noFiler": "Opened automatically",
+    "noContact": "They chose not to be contacted",
     "theyCalledIt": "Their subject:",
     "noConversation": "This kind of case doesn't open a conversation with whoever filed it.",
     "staffFirst": "They can reply once the team has said something to them.",
@@ -221,9 +221,7 @@
     "heading": "Attached",
     "reveal": "Show {{name}}",
     "view": "View {{name}}",
-    "open": "Open {{name}}",
-    "dropped_one": "Took off {{names}}: this doesn't take it.",
-    "dropped_other": "Took off {{names}}: this doesn't take them."
+    "open": "Open {{name}}"
   },
   "security": {
     "action": "Report a security problem",
@@ -246,28 +244,32 @@
     "error": "Could not send that. Try again in a moment."
   },
   "feedback": {
-    "action": "Send feedback",
-    "title": "Send feedback",
-    "description": "Tell the people who run this server what you think. You can follow it under My Tickets.",
-    "typeLabel": "What kind of feedback is it?",
-    "typePlaceholder": "Choose one",
-    "topics": {
-      "idea": "An idea",
-      "problem": "A problem",
-      "praise": "Praise",
-      "other": "Something else"
+    "title": "How's Initiative working for you?",
+    "ratingLabel": "Your rating",
+    "star_one": "{{count}} star: {{label}}",
+    "star_other": "{{count}} stars: {{label}}",
+    "ratings": {
+      "1": "Not great",
+      "2": "Needs work",
+      "3": "It's okay",
+      "4": "Really good",
+      "5": "Love it"
     },
-    "bodyLabel": "What do you want to tell them?",
-    "bodyPlaceholder": "What you'd like, what got in your way, or what you liked.",
-    "needsAnswer": "I need an answer",
-    "needsAnswerHelp": "Sends this as a help request instead, so somebody writes back.",
-    "submit": "Send feedback",
-    "thanks": "Thanks! The people who run this server will read it.",
-    "error": "Could not send that. Try again in a moment.",
+    "pickStar": "Pick a star to rate it.",
+    "optional": "Optional",
+    "likesLabel": "What do you like most?",
+    "likesPlaceholder": "The part you'd tell a friend about.",
+    "wishesLabel": "What do you wish it did?",
+    "wishesPlaceholder": "A feature you'd love, or something you'd change.",
+    "addPicture": "Add a picture",
+    "contactable": "You can contact me with questions about this",
+    "stuck": "Stuck on something? Ask for help",
     "context": {
-      "title": "Sent with it",
-      "help": "Where the app was, so they can see what you saw. Nothing here names you or anything you opened.",
-      "remove": "Remove",
+      "on": "Includes your app version and which page you're on.",
+      "off": "Leaves out your app version and page.",
+      "switch": "Include your app version and page",
+      "show": "See what",
+      "hide": "Hide",
       "fields": {
         "app_version": "Version",
         "platform": "Platform",
@@ -276,7 +278,13 @@
         "route": "Page",
         "viewport": "Window"
       }
-    }
+    },
+    "discard": "Discard",
+    "submit": "Send feedback",
+    "thanks": "Thanks for the feedback!",
+    "thanksBody": "The team reads every one.",
+    "done": "Done",
+    "error": "Could not send that. Try again in a moment."
   },
   "moderationTopics": {
     "appeal": "Appeal against your suspension"

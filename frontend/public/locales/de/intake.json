@@ -133,13 +133,13 @@
     "replyError": "Deine Antwort konnte nicht gesendet werden. Versuche es gleich noch einmal.",
     "closedNote": "Dieses Ticket ist geschlossen. Wenn etwas anderes ansteht, bitte erneut um Hilfe.",
     "noConversation": "Danke für die Meldung. Das Team sieht sich jede an, antwortet hier aber nicht auf Meldungen.",
-    "staffFirst": "Danke für deine Rückmeldung. Du kannst hier antworten, sobald sich das Team gemeldet hat.",
     "empty": "Du hast noch keine Tickets eingereicht. Wenn du um Hilfe bittest, erscheint sie hier, damit du sie verfolgen kannst.",
     "loadError": "Deine Tickets konnten nicht geladen werden."
   },
   "case": {
     "filedBy": "Eingereicht von",
     "noFiler": "Automatisch eröffnet",
+    "noContact": "Möchte nicht kontaktiert werden",
     "theyCalledIt": "Ihr Betreff:",
     "noConversation": "Diese Art von Fall eröffnet kein Gespräch mit der einreichenden Person.",
     "staffFirst": "Sie kann antworten, sobald das Team ihr etwas geschrieben hat.",
@@ -221,9 +221,7 @@
     "heading": "Angehängt",
     "reveal": "{{name}} anzeigen",
     "view": "{{name}} ansehen",
-    "open": "{{name}} öffnen",
-    "dropped_one": "{{names}} wurde entfernt: Das wird hier nicht angenommen.",
-    "dropped_other": "{{names}} wurden entfernt: Sie werden hier nicht angenommen."
+    "open": "{{name}} öffnen"
   },
   "security": {
     "action": "Sicherheitsproblem melden",
@@ -246,28 +244,32 @@
     "error": "Das konnte nicht gesendet werden. Versuch es gleich noch einmal."
   },
   "feedback": {
-    "action": "Feedback senden",
-    "title": "Feedback senden",
-    "description": "Sag den Leuten, die diesen Server betreiben, was du denkst. Du kannst es unter „Meine Tickets“ verfolgen.",
-    "typeLabel": "Was für Feedback ist es?",
-    "typePlaceholder": "Wähle eins aus",
-    "topics": {
-      "idea": "Eine Idee",
-      "problem": "Ein Problem",
-      "praise": "Lob",
-      "other": "Etwas anderes"
+    "title": "Wie gefällt dir Initiative?",
+    "ratingLabel": "Deine Bewertung",
+    "star_one": "{{count}} Stern: {{label}}",
+    "star_other": "{{count}} Sterne: {{label}}",
+    "ratings": {
+      "1": "Nicht gut",
+      "2": "Ausbaufähig",
+      "3": "Ganz okay",
+      "4": "Richtig gut",
+      "5": "Begeistert"
     },
-    "bodyLabel": "Was möchtest du ihnen sagen?",
-    "bodyPlaceholder": "Was du dir wünschst, was dich gestört hat oder was dir gefallen hat.",
-    "needsAnswer": "Ich brauche eine Antwort",
-    "needsAnswerHelp": "Sendet es stattdessen als Hilfeanfrage, damit dir jemand antwortet.",
-    "submit": "Feedback senden",
-    "thanks": "Danke! Die Leute, die diesen Server betreiben, werden es lesen.",
-    "error": "Das konnte nicht gesendet werden. Versuch es gleich noch einmal.",
+    "pickStar": "Wähle einen Stern, um zu bewerten.",
+    "optional": "Optional",
+    "likesLabel": "Was gefällt dir am meisten?",
+    "likesPlaceholder": "Das, was du weiterempfehlen würdest.",
+    "wishesLabel": "Was sollte es noch können?",
+    "wishesPlaceholder": "Eine Funktion, die du dir wünschst, oder etwas, das du ändern würdest.",
+    "addPicture": "Bild hinzufügen",
+    "contactable": "Ihr dürft mich bei Fragen dazu kontaktieren",
+    "stuck": "Kommst du nicht weiter? Hilfe anfordern",
     "context": {
-      "title": "Wird mitgesendet",
-      "help": "Wo die App gerade war, damit sie sehen, was du gesehen hast. Nichts davon nennt dich oder etwas, das du geöffnet hast.",
-      "remove": "Entfernen",
+      "on": "Enthält deine App-Version und die Seite, auf der du bist.",
+      "off": "Ohne App-Version und Seite.",
+      "switch": "App-Version und Seite mitsenden",
+      "show": "Anzeigen",
+      "hide": "Ausblenden",
       "fields": {
         "app_version": "Version",
         "platform": "Plattform",
@@ -276,7 +278,13 @@
         "route": "Seite",
         "viewport": "Fenster"
       }
-    }
+    },
+    "discard": "Verwerfen",
+    "submit": "Feedback senden",
+    "thanks": "Danke für dein Feedback!",
+    "thanksBody": "Das Team liest jede Rückmeldung.",
+    "done": "Fertig",
+    "error": "Das konnte nicht gesendet werden. Versuch es gleich noch einmal."
   },
   "moderationTopics": {
     "appeal": "Einspruch gegen deine Sperre"
