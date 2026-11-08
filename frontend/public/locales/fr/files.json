@@ -78,9 +78,6 @@
     "notFoundDescription": "Ce fichier a peut-être été supprimé ou vous avez suivi un lien invalide.",
     "noAccess": "Accès refusé",
     "backToFiles": "← Retour aux fichiers",
-    "closePanel": "Fermer le panneau",
-    "openPanel": "Ouvrir le panneau",
-    "togglePanel": "Basculer le panneau latéral",
     "titlePlaceholder": "Titre du fichier",
     "imageFileRequired": "Veuillez sélectionner un fichier image.",
     "imageUploaded": "Image téléchargée.",
@@ -105,10 +102,12 @@
   },
   "featuredImage": {
     "label": "Image à la une",
+    "add": "Ajouter une image à la une",
     "upload": "Téléverser une image",
-    "fromFiles": "Depuis Fichiers",
-    "replace": "Remplacer",
-    "remove": "Retirer",
+    "fromFiles": "Choisir dans Fichiers",
+    "replace": "Téléverser une autre image",
+    "replaceFromFiles": "En choisir une autre dans Fichiers",
+    "remove": "Retirer l’image à la une",
     "uploading": "Téléversement en cours…"
   },
   "imageChooser": {

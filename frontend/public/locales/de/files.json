@@ -78,9 +78,6 @@
     "notFoundDescription": "Diese Datei wurde möglicherweise gelöscht oder du bist einem fehlerhaften Link gefolgt.",
     "noAccess": "Zugriff verweigert",
     "backToFiles": "← Zurück zu den Dateien",
-    "closePanel": "Panel schließen",
-    "openPanel": "Panel öffnen",
-    "togglePanel": "Seitenpanel umschalten",
     "titlePlaceholder": "Dateititel",
     "imageFileRequired": "Bitte wähle eine Bilddatei aus.",
     "imageUploaded": "Bild hochgeladen.",
@@ -105,10 +102,12 @@
   },
   "featuredImage": {
     "label": "Beitragsbild",
+    "add": "Beitragsbild hinzufügen",
     "upload": "Bild hochladen",
-    "fromFiles": "Aus Dateien",
-    "replace": "Ersetzen",
-    "remove": "Entfernen",
+    "fromFiles": "Aus Dateien auswählen",
+    "replace": "Anderes Bild hochladen",
+    "replaceFromFiles": "Anderes aus Dateien auswählen",
+    "remove": "Beitragsbild entfernen",
     "uploading": "Wird hochgeladen…"
   },
   "imageChooser": {

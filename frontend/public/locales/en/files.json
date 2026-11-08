@@ -78,9 +78,6 @@
     "notFoundDescription": "This file may have been deleted or you may have followed a broken link.",
     "noAccess": "Access denied",
     "backToFiles": "← Back to files",
-    "closePanel": "Close panel",
-    "openPanel": "Open panel",
-    "togglePanel": "Toggle side panel",
     "titlePlaceholder": "File title",
     "imageFileRequired": "Please select an image file.",
     "imageUploaded": "Image uploaded.",
@@ -105,10 +102,12 @@
   },
   "featuredImage": {
     "label": "Featured image",
-    "upload": "Upload image",
-    "fromFiles": "From Files",
-    "replace": "Replace",
-    "remove": "Remove",
+    "add": "Add featured image",
+    "upload": "Upload an image",
+    "fromFiles": "Choose from Files",
+    "replace": "Upload a different image",
+    "replaceFromFiles": "Choose a different one from Files",
+    "remove": "Remove the featured image",
     "uploading": "Uploading…"
   },
   "imageChooser": {
