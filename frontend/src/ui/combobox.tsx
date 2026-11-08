@@ -1,5 +1,13 @@
-import { Check, ChevronsUpDown, Loader2, type LucideIcon } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronsUpDown, Loader2, type LucideIcon, Plus } from "lucide-react";
+import {
+  isValidElement,
+  type ReactElement,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import { commandFilter } from "@/ui/lib/fuzzyMatch";
@@ -22,15 +30,17 @@ export interface ComboboxItem {
   value: string;
   label: string;
   /** Drawn before the label, for a list whose rows are not all the same sort
-   *  of thing. */
-  icon?: LucideIcon;
+   *  of thing — or, given as an element, a picture of the row's own: a
+   *  person's avatar, a tag's colour. */
+  icon?: LucideIcon | ReactElement;
   /** Muted text after the label — what kind of thing this row is. */
   hint?: string;
   /**
    * Muted text on a second line — where this row lives. A name is often not
    * enough to tell two rows apart, and unlike {@link hint} this can be long,
    * so it gets a line of its own instead of competing with the label for the
-   * one they would otherwise share.
+   * one they would otherwise share. A search here matches it too, below the
+   * label.
    */
   sublabel?: string;
   /** Listed but not choosable — say why in {@link hint}. */
@@ -51,18 +61,38 @@ export type ComboboxProps = {
    */
   onSearchChange?: (query: string) => void;
   debounceMs?: number;
+  /** Opens and closes the popover from outside, to close it once a form in
+   *  `children` is done. Without it the popover opens and closes itself. */
+  open?: boolean;
   /** Called when the popover opens/closes — gate the query's `enabled` on it. */
   onOpenChange?: (open: boolean) => void;
-  /** Offers what was typed as a choice when no item is named it, e.g.
-   *  `Use "{{value}}"`. Not named for `use`: that prefix reads as a hook to
-   *  the linter, and it is a label. */
+  /**
+   * Offers what was typed as a choice when no item is named it, labelled with
+   * what this returns, e.g. `Use "{{value}}"`. With `onCreate` it is asked
+   * with nothing typed as well: return "" to offer nothing then, or a label to
+   * offer making a new item from scratch. Not named for `use`: that prefix
+   * reads as a hook to the linter, and it is a label.
+   */
   typedLabel?: (typed: string) => string;
+  /** Makes a new item of what was typed when its offer is chosen, in place of
+   *  choosing it. The search is cleared, since what was typed is taken. */
+  onCreate?: (typed: string) => void;
+  /** Opens the popover in place of the field: a button of the caller's own,
+   *  which names itself. `id`, `aria-label`, `placeholder` and `className`
+   *  are the field's, and go unused beside it. */
+  trigger?: ReactElement;
+  /** The trigger's edge the popover lines up with: "end" for one at the end
+   *  of a row. */
+  align?: "start" | "end";
+  /** Shown in the popover in place of the search and the list while given: a
+   *  form that makes a new item, opened from `onCreate`. */
+  children?: ReactNode;
   loading?: boolean;
   loadingLabel?: string;
   placeholder?: string;
   searchPlaceholder?: string;
-  /** Shown when nothing is listed; with `multiple`, in place of the field
-   *  when there is nothing to choose. */
+  /** Shown when nothing is listed; with `multiple` searched here, in place of
+   *  the field when there is nothing to choose. */
   emptyMessage?: string;
   /** Ties the trigger to a `<Label htmlFor>`. A `combobox` takes no accessible
    *  name from its own contents, so without this or `aria-label` the control
@@ -84,7 +114,8 @@ export type ComboboxProps = {
       selectedLabel?: string | null;
     }
   | {
-      /** Picks several, with select-all and clear; the popover stays open. */
+      /** Picks several, with select-all and clear where the list is searched
+       *  here; the popover stays open. */
       multiple: true;
       value: string[];
       onValueChange: (values: string[]) => void;
@@ -107,6 +138,10 @@ export const Combobox = (props: ComboboxProps) => {
     debounceMs = 250,
     onOpenChange,
     typedLabel,
+    onCreate,
+    trigger,
+    align = "start",
+    children,
     loading = false,
     loadingLabel,
     placeholder,
@@ -118,7 +153,8 @@ export const Combobox = (props: ComboboxProps) => {
     "aria-label": ariaLabel,
   } = props;
   const { t } = useTranslation("ui");
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = !disabled && (props.open ?? ownOpen);
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, debounceMs);
 
@@ -139,7 +175,10 @@ export const Combobox = (props: ComboboxProps) => {
       searchedOnServer || !query
         ? items
         : items
-            .map((item) => ({ item, score: commandFilter(item.label, query) }))
+            .map((item) => ({
+              item,
+              score: commandFilter(item.label, query, item.sublabel ? [item.sublabel] : []),
+            }))
             .filter(({ score }) => score > 0)
             .sort((a, b) => b.score - a.score)
             .map(({ item }) => item);
@@ -155,23 +194,24 @@ export const Combobox = (props: ComboboxProps) => {
   const chosen = props.multiple ? props.value : props.value == null ? [] : [props.value];
   const firstChosen = items.find((item) => item.value === chosen[0]);
   let chosenLabel = props.multiple ? undefined : props.selectedLabel || firstChosen?.label;
+  // Searched on the server, `items` is one page of matches, so "all" of it is
+  // not everything, and a lone choice may be missing from it.
   if (props.multiple && chosen.length > 0) {
     chosenLabel =
-      chosen.length === items.length
+      !searchedOnServer && chosen.length === items.length
         ? t("multiSelect.allSelected")
-        : chosen.length === 1
-          ? firstChosen?.label
-          : t("multiSelect.countSelected", { count: chosen.length });
+        : (chosen.length === 1 && firstChosen?.label) ||
+          t("multiSelect.countSelected", { count: chosen.length });
   }
 
-  const typed = query.toLowerCase();
-  const offerTyped =
-    typedLabel !== undefined &&
-    query !== "" &&
-    !items.some((item) => item.label.toLowerCase() === typed);
+  const typed = query.trim();
+  const typedOffer =
+    (typed !== "" || onCreate !== undefined) &&
+    !items.some((item) => item.label.toLowerCase() === typed.toLowerCase()) &&
+    typedLabel?.(typed);
 
   const handleOpenChange = (nextOpen: boolean) => {
-    setOpen(nextOpen);
+    setOwnOpen(nextOpen);
     onOpenChange?.(nextOpen);
     if (!nextOpen) setQuery("");
   };
@@ -187,21 +227,29 @@ export const Combobox = (props: ComboboxProps) => {
     }
   };
 
-  if (props.multiple && items.length === 0) {
+  const takeTyped = () => {
+    if (!onCreate) return choose(typed);
+    onCreate(typed);
+    setQuery("");
+  };
+
+  // Searched here, with nothing loading and nothing to type, an empty list of
+  // several has nothing to choose, which is said in place of the field.
+  if (props.multiple && items.length === 0 && !searchedOnServer && !typedLabel && !loading) {
     return (
       <p className="text-muted-foreground text-sm">{emptyMessage ?? t("multiSelect.empty")}</p>
     );
   }
 
-  return (
-    <div className={cn("w-full", className)}>
-      <Popover open={!disabled && open} onOpenChange={handleOpenChange}>
-        <PopoverTrigger asChild>
+  const popover = (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        {trigger ?? (
           <Button
             id={id}
             variant="outline"
             role="combobox"
-            aria-expanded={!disabled && open}
+            aria-expanded={open}
             aria-label={ariaLabel}
             className={cn(
               "w-full justify-between font-normal",
@@ -214,11 +262,10 @@ export const Combobox = (props: ComboboxProps) => {
             </span>
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
           </Button>
-        </PopoverTrigger>
-        <PopoverContent
-          className="w-[320px] min-w-(--radix-popover-trigger-width) p-0"
-          align="start"
-        >
+        )}
+      </PopoverTrigger>
+      <PopoverContent className="w-[320px] min-w-(--radix-popover-trigger-width) p-0" align={align}>
+        {children || (
           <Command shouldFilter={false}>
             <CommandInput
               placeholder={searchPlaceholder ?? t("combobox.search")}
@@ -228,15 +275,19 @@ export const Combobox = (props: ComboboxProps) => {
             <CommandList>
               {/* Offered whenever what was typed is not itself an item —
                   `role` has to be choosable while `roles` is listed. */}
-              {offerTyped ? (
+              {typedOffer ? (
                 <CommandGroup>
                   <CommandItem
-                    value={`__typed__${query}`}
-                    onSelect={() => choose(query)}
+                    value={`__typed__${typed}`}
+                    onSelect={takeTyped}
                     className="text-muted-foreground"
                   >
-                    <Check className="h-4 w-4 opacity-0" />
-                    {typedLabel(query)}
+                    {onCreate ? (
+                      <Plus className="h-4 w-4" />
+                    ) : (
+                      <Check className="h-4 w-4 opacity-0" />
+                    )}
+                    {typedOffer}
                   </CommandItem>
                 </CommandGroup>
               ) : null}
@@ -247,12 +298,14 @@ export const Combobox = (props: ComboboxProps) => {
                 </div>
               ) : (
                 <>
-                  {/* With `multiple`, the list is empty only when a search
-                      found nothing, which `emptyMessage` doesn't describe. */}
+                  {/* Searched here, a list of several is empty only when a
+                      search found nothing, which `emptyMessage` doesn't
+                      describe. */}
                   <CommandEmpty>
-                    {(!props.multiple && emptyMessage) || t("combobox.noResults")}
+                    {((!props.multiple || searchedOnServer) && emptyMessage) ||
+                      t("combobox.noResults")}
                   </CommandEmpty>
-                  {props.multiple && !query ? (
+                  {props.multiple && !searchedOnServer && !query && items.length > 0 ? (
                     <>
                       <CommandGroup>
                         {/* Every item that can be chosen, keeping any chosen
@@ -302,7 +355,11 @@ export const Combobox = (props: ComboboxProps) => {
                                 chosen.includes(item.value) ? "opacity-100" : "opacity-0"
                               )}
                             />
-                            {item.icon ? (
+                            {isValidElement(item.icon) ? (
+                              // As tall as the label's first line, so an
+                              // avatar or a swatch sits level with it.
+                              <span className="flex h-5 shrink-0 items-center">{item.icon}</span>
+                            ) : item.icon ? (
                               <item.icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                             ) : null}
                             <span className="min-w-0 flex-1">
@@ -331,8 +388,10 @@ export const Combobox = (props: ComboboxProps) => {
               )}
             </CommandList>
           </Command>
-        </PopoverContent>
-      </Popover>
-    </div>
+        )}
+      </PopoverContent>
+    </Popover>
   );
+
+  return trigger ? popover : <div className={cn("w-full", className)}>{popover}</div>;
 };

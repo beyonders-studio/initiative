@@ -1,7 +1,6 @@
 import {
   Archive,
   ArchiveRestore,
-  Check,
   ChevronsUpDown,
   CircleAlert,
   Loader2,
@@ -34,19 +33,9 @@ import { getUserDisplayName } from "@/lib/userDisplay";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/ui/card";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/ui/command";
+import { Combobox } from "@/ui/combobox";
 import { DataTable } from "@/ui/data-table";
 import type { AppColumnDef } from "@/ui/lib/table";
-import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
-import { cn } from "@/ui/lib/utils";
-import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Skeleton } from "@/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
@@ -67,13 +56,12 @@ const InitiativeManagersCell = ({ initiative }: { initiative: InitiativeRead }) 
   const { t } = useTranslation(["initiatives", "common"]);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const debouncedQuery = useDebouncedValue(query, 250);
   const rolesQuery = useInitiativeRoles(initiative.id);
   const managersQuery = useInitiativeManagers(initiative.id);
 
   // Candidates are the community's members matching what was typed, asked of the
   // server once the picker is open.
-  const searchQuery = useUserSearch({ search: debouncedQuery, enabled: open });
+  const searchQuery = useUserSearch({ search: query, enabled: open });
   const results = useMemo(
     () => (searchQuery.data?.items ?? []).filter((candidate) => candidate.status !== "anonymized"),
     [searchQuery.data]
@@ -179,19 +167,33 @@ const InitiativeManagersCell = ({ initiative }: { initiative: InitiativeRead }) 
         : t("manage.managerCount", { count: managerCount });
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) setQuery("");
+    <Combobox
+      multiple
+      items={candidates.map((candidate) => ({
+        value: String(candidate.id),
+        label: getUserDisplayName(candidate),
+        // Unticking waits until the community has said whether this manager is
+        // one of its admins.
+        disabled: pending || (managerIds.has(candidate.id) && !knownManagers.has(candidate.id)),
+      }))}
+      value={managerIdList.map(String)}
+      // One row is ticked or unticked at a time: the one in only one list.
+      onValueChange={(next) => {
+        const changed = [...next, ...managerIdList.map(String)].find(
+          (value) => next.includes(value) !== managerIds.has(Number(value))
+        );
+        if (changed) toggle(Number(changed));
       }}
-    >
-      <PopoverTrigger asChild>
+      onSearchChange={setQuery}
+      onOpenChange={setOpen}
+      loading={searchQuery.isFetching && candidates.length === 0}
+      searchPlaceholder={t("common:search")}
+      emptyMessage={t("manage.noCandidates")}
+      trigger={
         <Button
           variant="outline"
           size="sm"
           role="combobox"
-          aria-expanded={open}
           aria-label={t("manage.managersColumn")}
           className="w-48 justify-between font-normal"
         >
@@ -204,41 +206,8 @@ const InitiativeManagersCell = ({ initiative }: { initiative: InitiativeRead }) 
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
           )}
         </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[280px] p-0">
-        <Command shouldFilter={false}>
-          <CommandInput placeholder={t("common:search")} value={query} onValueChange={setQuery} />
-          <CommandList>
-            {searchQuery.isFetching && candidates.length === 0 ? (
-              <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("common:loading")}
-              </div>
-            ) : (
-              <CommandEmpty>{t("manage.noCandidates")}</CommandEmpty>
-            )}
-            <CommandGroup className="max-h-64 overflow-y-auto">
-              {candidates.map((candidate) => {
-                const isManager = managerIds.has(candidate.id);
-                return (
-                  <CommandItem
-                    key={candidate.id}
-                    value={String(candidate.id)}
-                    // Unticking waits until the community has said whether this
-                    // manager is one of its admins.
-                    disabled={pending || (isManager && !knownManagers.has(candidate.id))}
-                    onSelect={() => toggle(candidate.id)}
-                  >
-                    <Check className={cn("h-4 w-4", isManager ? "opacity-100" : "opacity-0")} />
-                    {getUserDisplayName(candidate)}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+      }
+    />
   );
 };
 

@@ -150,6 +150,64 @@ describe("Combobox", () => {
       expect(screen.queryByText('Use "groups"')).not.toBeInTheDocument();
       expect(screen.getByRole("option", { name: "groups" })).toBeInTheDocument();
     });
+
+    it("matches the line under a name as well as the name", async () => {
+      const user = userEvent.setup();
+      const roles = [
+        { value: "1", label: "Editor", sublabel: "Apollo" },
+        { value: "2", label: "Viewer", sublabel: "Gemini" },
+      ];
+
+      render(<Combobox items={roles} />);
+
+      await user.click(screen.getByRole("combobox"));
+      await user.type(screen.getByPlaceholderText("Search"), "gemini");
+
+      expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+        "ViewerGemini",
+      ]);
+    });
+
+    it("makes a new item in a form of the caller's, from what was typed or from nothing", async () => {
+      const user = userEvent.setup();
+      const onValueChange = vi.fn();
+      const Maker = () => {
+        const [open, setOpen] = useState(false);
+        const [draft, setDraft] = useState<string | null>(null);
+        return (
+          <Combobox
+            items={ITEMS}
+            onValueChange={onValueChange}
+            open={open}
+            onOpenChange={setOpen}
+            typedLabel={() => "New item"}
+            onCreate={setDraft}
+            trigger={<button type="button">Add</button>}
+          >
+            {draft !== null ? (
+              <button type="button" onClick={() => setOpen(false)}>
+                Make "{draft}"
+              </button>
+            ) : null}
+          </Combobox>
+        );
+      };
+
+      render(<Maker />);
+
+      await user.click(screen.getByRole("button", { name: "Add" }));
+      // Offered before anything is typed, since this list makes items from
+      // scratch as well.
+      expect(screen.getByRole("option", { name: "New item" })).toBeInTheDocument();
+
+      await user.type(screen.getByPlaceholderText("Search"), " Gamma ");
+      await user.click(screen.getByRole("option", { name: "New item" }));
+
+      expect(onValueChange).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: 'Make "Gamma"' }));
+      expect(screen.queryByRole("button", { name: 'Make "Gamma"' })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add" })).toHaveAttribute("aria-expanded", "false");
+    });
   });
 
   describe("multiple", () => {
@@ -230,6 +288,36 @@ describe("Combobox", () => {
 
       expect(screen.getByText("No options available")).toBeInTheDocument();
       expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    });
+
+    it("searched on the server, treats the items as one page of matches", async () => {
+      const user = userEvent.setup();
+
+      // The one chosen is not on the page the server returned.
+      const { rerender } = render(
+        <Combobox
+          multiple
+          value={["9"]}
+          onValueChange={vi.fn()}
+          items={[]}
+          onSearchChange={vi.fn()}
+        />
+      );
+      expect(screen.getByRole("combobox")).toHaveTextContent("1 selected");
+
+      rerender(
+        <Combobox
+          multiple
+          value={["1", "2"]}
+          onValueChange={vi.fn()}
+          items={ITEMS}
+          onSearchChange={vi.fn()}
+        />
+      );
+      // Every row of a page is not every match, so neither is offered as "all".
+      expect(screen.getByRole("combobox")).toHaveTextContent("2 selected");
+      await user.click(screen.getByRole("combobox"));
+      expect(screen.queryByRole("option", { name: "Select all" })).not.toBeInTheDocument();
     });
   });
 });

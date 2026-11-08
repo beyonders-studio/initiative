@@ -49,11 +49,7 @@
     "creating": "Creating…",
     "create": "Create",
     "searchPlaceholder": "Search or create tags...",
-    "loading": "Loading…",
-    "existingTags": "Existing tags",
-    "noTagsFound": "No tags found.",
     "createTag": "Create \"{{name}}\"",
-    "selected": "{{count}} selected",
     "filterLabel": "Tags",
     "anyTag": "Any tag"
   },
