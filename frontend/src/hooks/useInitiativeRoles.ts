@@ -1,11 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import type {
-  InitiativeDefaultsRead,
   InitiativeDefaultsUpdate,
   InitiativeRoleCreate,
-  InitiativeRoleRead,
   InitiativeRoleUpdate,
   PermissionKey,
   Tool,
@@ -14,11 +12,11 @@ import {
   createInitiativeRole,
   deleteInitiativeRole,
   getGetInitiativeDefaultsQueryKey,
-  getInitiativeDefaults,
-  getListInitiativeRolesQueryKey,
   listInitiativeRoles,
   updateInitiativeDefaults,
   updateInitiativeRole,
+  useGetInitiativeDefaults,
+  useListInitiativeRoles,
 } from "@/api/generated/initiatives/initiatives";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -28,12 +26,7 @@ import { TOOLS, toolCreatePermission, toolPascalPlural, toolViewPermission } fro
 
 export const useInitiativeRoles = (initiativeId: number | null) => {
   const communityId = useActiveCommunityId();
-  return useQuery<InitiativeRoleRead[]>({
-    queryKey: getListInitiativeRolesQueryKey(communityId, initiativeId!),
-    queryFn: () => listInitiativeRoles(communityId, initiativeId!),
-    enabled: !!initiativeId,
-    staleTime: 30 * 1000,
-  });
+  return useListInitiativeRoles(communityId, initiativeId!, { query: { enabled: !!initiativeId } });
 };
 
 export const useCreateRole = (initiativeId: number) => {
@@ -218,12 +211,7 @@ export const PERMISSION_LABEL_KEYS: Record<PermissionKey, string> = Object.fromE
  *  may add roles. */
 export const useInitiativeDefaults = () => {
   const communityId = useActiveCommunityId();
-  return useQuery<InitiativeDefaultsRead>({
-    queryKey: getGetInitiativeDefaultsQueryKey(communityId),
-    queryFn: () => getInitiativeDefaults(communityId),
-    enabled: communityId > 0,
-    staleTime: 30 * 1000,
-  });
+  return useGetInitiativeDefaults(communityId, { query: { enabled: communityId > 0 } });
 };
 
 /** Change what every initiative uses. The community's admins only. */

@@ -35,6 +35,7 @@ import { TaskReminderField } from "@/components/tasks/TaskReminderField";
 import { statusTriggerStyle, TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { CasePanel } from "@/components/tickets/CasePanel";
+import { IdeaPanel } from "@/components/tickets/IdeaPanel";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { useComments, useCommentsCache, useCommentThreadState } from "@/hooks/useComments";
@@ -802,13 +803,21 @@ const Notice = () => {
   ) : null;
 };
 
-const Case = ({ task }: { task: TaskRead }) => (
-  <CasePanel
-    taskId={task.id}
-    canEdit={!useTaskLayout().readOnly}
-    assigneeIds={task.assignees.map((assignee) => assignee.id)}
-  />
-);
+// The operations panels: how a case was filed, and an Ideas-board task's
+// idea. A task that is neither shows nothing here.
+const Case = ({ task }: { task: TaskRead }) => {
+  const canEdit = !useTaskLayout().readOnly;
+  return (
+    <>
+      <CasePanel
+        taskId={task.id}
+        canEdit={canEdit}
+        assigneeIds={task.assignees.map((assignee) => assignee.id)}
+      />
+      <IdeaPanel taskId={task.id} canEdit={canEdit} />
+    </>
+  );
+};
 
 const Comments = ({ task }: { task: TaskRead }) => {
   const { t } = useTranslation("tasks");

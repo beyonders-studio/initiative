@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type ApiKeyMetadata, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { useCreateApiKey, useMyApiKeys } from "@/hooks/useSecurity";
+import { useListMyApiKeys } from "@/api/generated/users/users";
+import { useCreateApiKey } from "@/hooks/useSecurity";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { buildApiUrl } from "@/lib/wsUrl";
@@ -43,7 +44,7 @@ export const CalendarSubscribeDialog = ({
   calendars,
 }: CalendarSubscribeDialogProps) => {
   const { t } = useTranslation(["calendars", "common"]);
-  const keysQuery = useMyApiKeys();
+  const keysQuery = useListMyApiKeys();
   const linked = new Set(
     (keysQuery.data?.keys ?? [])
       .filter((key) => key.resource_type === Tool.calendar && key.community_id === communityId)

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Ideas, on Initiative Cloud.** The ideas people send through feedback that the team publishes are on the **Ideas** page, which anybody can read. Vote for the ones you want, and you hear each time one moves along. The team keeps each idea as a task on an **Ideas** board, set up from **Settings → Platform → Intake**, and publishes it from the task's **Idea** panel.
 - **Take a picture of the page for Help, feedback or a report.** The camera in the text box draws the page behind it, and the picture opens in an editor before it's attached. A report takes its own picture of what you're reporting as it opens and attaches it, so you never leave the report to get one. In Help and feedback the people on it are already swapped out: names become Person 1, Person 2, you show as You, and avatars, emails and phone numbers are hidden, with one switch to show them again; in a report they stay. Point at a part of the page to hide it or mark it with a number, or drag across any area. Pictures you attach open in the same editor, and attaching draws a fresh copy, so nothing else the file carried goes with it.
 - **Dashboards read plug-ins in SQL.** `plugin('acme.shop', 'orders', range => '30d')` in a statement reads one of a plug-in's endpoints, so its rows join tasks, spreadsheets and other plug-ins. A tile's **Build** tab has **Plug-in data** beside **Spreadsheet**, the SQL box suggests plug-ins and their settings, and tiles that read a plug-in through a statement are rewritten to use it. Plug-in widgets and tiles follow **Run dashboard as**: on **Initiative** they use the community's connection.
 
@@ -46,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The members table no longer offers page sizes that change nothing.** It always shows 25 members a page, and its menu offered 10 to 100.
 - **A collection's grid and timeline, and posts, keep your place as they appear.** Switching to one partway down the page jumped back to the top.
 - **Closing a confirmation puts you back on the button that opened it,** so the keyboard carries on where it left off.
+- **A plug-in's widgets are offered as soon as it is installed.** The dashboard's widget list showed a new or upgraded plug-in's widgets only up to five minutes later.
 - **Confirmations, pickers and tables speak your language.** Cancel, Continue, Please wait, a picker's placeholder, a table's filter and the labels a screen reader hears were English in every language.
 
 ## [0.78.0] - 2026-11-06

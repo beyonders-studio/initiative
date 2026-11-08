@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -6,18 +6,14 @@ import {
   assignCustomRole,
   createCustomRole,
   deleteCustomRole,
-  getListCustomRoleHoldersQueryKey,
-  getListCustomRolesQueryKey,
-  getReadHeldSurfacesQueryKey,
-  listCustomRoleHolders,
-  listCustomRoles,
-  readHeldSurfaces,
   updateCustomRole,
+  useListCustomRoleHolders,
+  useListCustomRoles,
+  useReadHeldSurfaces,
 } from "@/api/generated/custom-roles/custom-roles";
 import {
   AdminSurface,
   type CustomRoleCreate,
-  type CustomRoleHolder,
   type CustomRoleRead,
   type CustomRoleUpdate,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -51,27 +47,19 @@ const SETTINGS_GRANT_SURFACES: readonly AdminSurface[] = [
   AdminSurface.roles,
 ];
 
-const STALE_TIME = 30 * 1000;
-
 /** The community's custom roles. Anybody in it may read them. */
 export const useCustomRoles = (options?: { enabled?: boolean }) => {
   const communityId = useActiveCommunityId();
-  return useQuery<CustomRoleRead[]>({
-    queryKey: getListCustomRolesQueryKey(communityId),
-    queryFn: () => listCustomRoles(communityId),
-    enabled: communityId > 0 && (options?.enabled ?? true),
-    staleTime: STALE_TIME,
+  return useListCustomRoles(communityId, {
+    query: { enabled: communityId > 0 && (options?.enabled ?? true) },
   });
 };
 
 /** Who holds which custom role. */
 export const useCustomRoleHolders = (options?: { enabled?: boolean }) => {
   const communityId = useActiveCommunityId();
-  return useQuery<CustomRoleHolder[]>({
-    queryKey: getListCustomRoleHoldersQueryKey(communityId),
-    queryFn: () => listCustomRoleHolders(communityId),
-    enabled: communityId > 0 && (options?.enabled ?? true),
-    staleTime: STALE_TIME,
+  return useListCustomRoleHolders(communityId, {
+    query: { enabled: communityId > 0 && (options?.enabled ?? true) },
   });
 };
 
@@ -116,13 +104,12 @@ export const useHeldSurfaces = (
   const communityId = entry?.id ?? 0;
   // A community reached only by a grant has no membership to hold a role by.
   const asked = communityId > 0 && entry?.accessType !== "grant" && (options?.enabled ?? true);
-  const query = useQuery({
-    queryKey: getReadHeldSurfacesQueryKey(communityId),
-    queryFn: () => readHeldSurfaces(communityId),
-    enabled: asked,
-    staleTime: STALE_TIME,
-    // Never another community's answer while this one's is on its way.
-    placeholderData: undefined,
+  const query = useReadHeldSurfaces(communityId, {
+    query: {
+      enabled: asked,
+      // Never another community's answer while this one's is on its way.
+      placeholderData: undefined,
+    },
   });
 
   const administers = Boolean(entry?.can.administer);

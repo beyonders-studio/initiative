@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQueryClient } from "@tanstack/react-query";
 
 import {
   extendCommunityGuest,
@@ -27,11 +27,11 @@ import {
   getListMyDecorationsQueryKey,
   getListUsersQueryKey,
   installDecorationPack,
-  listUsers,
   removeDecorationPack,
   updateMe,
   useListDecorationPacks,
   useListMyDecorations,
+  useListUsers,
   useReadUserCommunities,
   useReadUserProfile,
   useSearchUsers,
@@ -57,12 +57,9 @@ export const useUsers = (
   options?: QueryOpts<UserCommunityMemberListResponse>
 ) => {
   const communityId = useActiveCommunityId();
-  return useQuery<UserCommunityMemberListResponse>({
-    queryKey: getListUsersQueryKey(communityId, params),
-    queryFn: () => listUsers(communityId, params),
+  return useListUsers(communityId, params, {
     // Keep the page on screen while the next one (or the next search) loads.
-    placeholderData: keepPreviousData,
-    ...options,
+    query: { placeholderData: keepPreviousData, ...options },
   });
 };
 

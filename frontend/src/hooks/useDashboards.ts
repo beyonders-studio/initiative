@@ -1,13 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
-
 import {
   getReadDashboardQueryKey,
-  getReadInstalledListingsQueryKey,
-  getReadWidgetCatalogQueryKey,
-  readInstalledListings,
-  readWidgetCatalog,
   setViewMode,
   upgradeDashboard,
+  useReadInstalledListings,
+  useReadWidgetCatalog,
 } from "@/api/generated/dashboards/dashboards";
 import type {
   DashboardInstalledListings,
@@ -48,11 +44,8 @@ export const useSetDashboardGrants = dashboards.useSetGrants;
  */
 export const useWidgetCatalog = (options?: QueryOpts<WidgetCatalog>) => {
   const communityId = useActiveCommunityId();
-  return useQuery<WidgetCatalog>({
-    queryKey: getReadWidgetCatalogQueryKey(communityId),
-    queryFn: () => readWidgetCatalog(communityId),
-    staleTime: Number.POSITIVE_INFINITY,
-    ...options,
+  return useReadWidgetCatalog(communityId, {
+    query: { staleTime: Number.POSITIVE_INFINITY, ...options },
   });
 };
 
@@ -65,11 +58,7 @@ export const useWidgetCatalog = (options?: QueryOpts<WidgetCatalog>) => {
  */
 export const useInstalledListings = (options?: QueryOpts<DashboardInstalledListings>) => {
   const communityId = useActiveCommunityId();
-  return useQuery<DashboardInstalledListings>({
-    queryKey: getReadInstalledListingsQueryKey(communityId),
-    queryFn: () => readInstalledListings(communityId),
-    ...options,
-  });
+  return useReadInstalledListings(communityId, { query: options });
 };
 
 // ── Mutations ───────────────────────────────────────────────────────────────

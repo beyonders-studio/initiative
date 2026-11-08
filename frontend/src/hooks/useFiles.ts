@@ -2,7 +2,6 @@ import {
   keepPreviousData,
   useInfiniteQuery,
   useMutation,
-  useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -13,14 +12,13 @@ import {
   deleteFileVersion,
   duplicateFile,
   getListFilesQueryKey,
-  getListFileVersionsQueryKey,
   getReadFileQueryKey,
   listFiles,
-  listFileVersions,
   putVideoThumbnail,
   setFileGrants,
   uploadFile,
   uploadFileVersion,
+  useListFileVersions,
 } from "@/api/generated/files/files";
 import type {
   FileCreate,
@@ -271,11 +269,8 @@ export const useUploadFile = (options?: MutationOpts<FileRead, UploadFileInput>)
 export const useFileVersions = (fileId: number | null, options?: QueryOpts<FileVersionRead[]>) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<FileVersionRead[]>({
-    queryKey: getListFileVersionsQueryKey(communityId, fileId!),
-    queryFn: () => listFileVersions(communityId, fileId!),
-    enabled: fileId !== null && Number.isFinite(fileId) && userEnabled,
-    ...rest,
+  return useListFileVersions(communityId, fileId!, {
+    query: { enabled: fileId !== null && Number.isFinite(fileId) && userEnabled, ...rest },
   });
 };
 

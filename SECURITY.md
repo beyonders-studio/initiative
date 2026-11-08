@@ -27,7 +27,7 @@ Every read or write of guild data passes the same nested checks, outermost first
 
 Two deliberate overrides sit above them:
 
-- **Guild administrators** have full read/write within their own guild.
+- **Guild administrators** have full read/write within their own guild, except content the platform holds.
 - **Privileged access management (PAM)** — platform staff may be granted **time-bound, per-guild, audited** access. Never a standing bypass; see below.
 
 One visible consequence: a guild member who isn't in an initiative receives **404, not 403**, for that initiative's content — row-level security hides the rows rather than reporting their existence.
@@ -47,7 +47,7 @@ Within an initiative, teams decide who sees each individual item:
 - A grant's subject is **a user, an initiative role, or all initiative members** — so access can be handed to a whole role at once.
 - Grants are scoped per resource: access to one project or file never implies access to another.
 
-DAC decides the final level in application code, over grant rows that are themselves protected by the initiative-level policies above. Row-level security guarantees the boundary; DAC decides who sees what inside it.
+The same row-level security policies enforce DAC: each content policy checks the item's grants as well as the initiative boundary.
 
 ### Database roles
 
@@ -59,15 +59,15 @@ Initiative connects through **three PostgreSQL logins**, each least-privilege fo
 | **`app_admin`** | Background jobs, startup seeding, bootstrapping endpoints | Yes — the standard Postgres trusted-batch actor, bounded by enumerated per-table `GRANT`s, and never serving a user request as itself. Entering a guild schema requires `SET ROLE`, which **drops** the bypass |
 | **`app_provisioner`** | Migrations and DDL (`CREATE SCHEMA`, `CREATE ROLE`) | No — `NOSUPERUSER CREATEROLE`, and `FORCE ROW LEVEL SECURITY` keeps it policy-bound for data |
 
-**The application never serves on a Postgres superuser connection.** The database owner's connection is opened at startup to create the three logins above, and closed before the app serves anything. A superuser (or `BYPASSRLS`) provisioning login **stops the boot**: every guarantee above is enforced by row-level security, and the provisioner is held to it. There is no opt-out. The refusal names the way out, which takes about a minute.
+**The application never serves on a Postgres superuser connection.** The database owner's connection is opened at startup to create the three logins above, and closed before the app serves anything. A superuser (or `BYPASSRLS`) provisioning login **stops the boot**: every guarantee above is enforced by row-level security, and the provisioner is held to it. There is no opt-out.
 
 ### No standing bypass, and no superuser account
 
-There is **no superadmin role** in Initiative. The former `app.is_superadmin` session flag and every policy branch that honored it were removed outright — not gated, removed. No user-facing role bypasses row-level security.
+There is **no platform-wide superadmin** in Initiative, and no user-facing role bypasses row-level security.
 
-Platform privileges are a five-rung ladder (`member → support → moderator → operator → owner`), each a real `platform_<tier>` Postgres role, with endpoints gated on **capabilities** rather than role names. Reaching a guild you don't belong to always requires an explicit, expiring, recorded grant:
+Platform privileges are a five-rung ladder (`member → moderator → support → operator → owner`), each a real `platform_<tier>` Postgres role, with endpoints gated on **capabilities** rather than role names. Reaching a guild you don't belong to always requires an explicit, expiring, recorded grant:
 
-- **support / moderator** — request access; an approver grants or denies; it auto-expires. Read-only by default.
+- **moderator / support** — request access; an approver grants or denies; it auto-expires. Read-only by default.
 - **operator / owner** — hold `data.bypass`, which is the right to **self-issue a break-glass grant** (created and self-approved in one step, short TTL, the row being the audit trail), not an ambient bypass. Removing the capability leaves no other route in.
 
 Either way the session is routed through that guild's own roles and PAM context — never through a bypass.
@@ -75,7 +75,7 @@ Either way the session is routed through that guild's own roles and PAM context 
 ### Authentication and secrets
 
 - **HttpOnly `SameSite=Lax` cookie sessions** rather than `localStorage`, so the session isn't readable by scripts in the page. Native (Capacitor) apps store device tokens in secure platform storage.
-- **A second layer under `SameSite` for cookie-authenticated writes.** An unsafe method authenticated by the session cookie must also arrive from an origin this deployment serves — `Sec-Fetch-Site: same-origin`, or an `Origin` on the CORS allowlist. A cross-site form cannot produce either, and it cannot suppress the real one. This matters because a cross-site `multipart/form-data` POST is a *simple* request: no preflight, so CORS never sees it, and this API has multipart routes that write. Callers using an `Authorization` header — bearer tokens, API keys, device tokens — are unaffected, because a browser does not attach that header cross-site.
+- **A second layer under `SameSite` for cookie-authenticated writes.** An unsafe method authenticated by the session cookie must also arrive from an origin this deployment serves — `Sec-Fetch-Site: same-origin`, or an `Origin` on the CORS allowlist. Callers using an `Authorization` header — bearer tokens, API keys, device tokens — are unaffected, because a browser does not attach that header cross-site.
 - **Passwords** are a minimum of 12 characters and are never stored in recoverable form.
 - **OpenID Connect (OIDC) SSO** with PKCE, and optional claim-to-role mapping for guild and initiative membership.
 - **Encryption at rest** for sensitive fields (AI provider keys, OIDC secrets, SMTP passwords, email addresses) using Fernet (AES-128-CBC) with a key derived from `SECRET_KEY`, with support for key rotation.

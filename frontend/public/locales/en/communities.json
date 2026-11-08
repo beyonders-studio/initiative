@@ -401,6 +401,8 @@
     "moderationRemovedLegal": "Something you wrote was taken down for legal reasons",
     "moderationWarned": "A warning from the moderators: {{message}}",
     "feedbackRead": "Your feedback was read",
+    "ideaMoved": "“{{title}}” is now {{status}}",
+    "ideaUnnamed": "An idea you voted for",
     "caseOpened": "New {{stream}} case: {{taskTitle}}",
     "caseReplied": "{{name}} replied on {{taskTitle}}, and nobody has taken it",
     "caseRepliedMany": "{{name}} left {{count}} replies on {{taskTitle}}, and nobody has taken it",

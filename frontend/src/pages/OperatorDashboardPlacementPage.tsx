@@ -6,6 +6,10 @@ import type {
   PlacementProviderRead,
   ProviderPlacementRuleRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import {
+  useListPlacementRequests,
+  useListProviderPlacement,
+} from "@/api/generated/provider-placement/provider-placement";
 import { ProviderMark } from "@/components/auth/ProviderMark";
 import {
   describePlacementMatch,
@@ -18,8 +22,6 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   useAgreePlacementRequest,
   useDeletePlacementRule,
-  usePlacementRequests,
-  useProviderPlacement,
   useSetPlacementEverywhere,
 } from "@/hooks/useProviderPlacement";
 import { getErrorMessage } from "@/lib/errorMessage";
@@ -49,7 +51,7 @@ export const OperatorDashboardPlacementPage = () => {
   const canManageCommunities = hasCapability(user, Capability.communitiesManage);
   const canSetEverywhere = hasCapability(user, Capability.configManage);
 
-  const placementQuery = useProviderPlacement({ enabled: canManageCommunities });
+  const placementQuery = useListProviderPlacement({ query: { enabled: canManageCommunities } });
 
   const [editing, setEditing] = useState<Editing | null>(null);
   const [removing, setRemoving] = useState<ProviderPlacementRuleRead | null>(null);
@@ -286,7 +288,7 @@ const ProviderRulesCard = ({
  */
 const PlacementRequestsCard = () => {
   const { t } = useTranslation("settings");
-  const requests = usePlacementRequests();
+  const requests = useListPlacementRequests();
   const agree = useAgreePlacementRequest();
   const rows = requests.data ?? [];
   if (rows.length === 0) return null;

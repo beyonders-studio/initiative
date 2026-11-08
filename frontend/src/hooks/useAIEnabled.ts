@@ -1,10 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
-
-import {
-  getGetResolvedAiSettingsQueryKey,
-  getResolvedAiSettings,
-} from "@/api/generated/ai-settings/ai-settings";
-import type { ResolvedAISettingsResponse } from "@/api/generated/initiativeAPI.schemas";
+import { useGetResolvedAiSettings } from "@/api/generated/ai-settings/ai-settings";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 
 /**
@@ -19,11 +13,8 @@ import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
  */
 export const useAIEnabled = () => {
   const communityId = useActiveCommunityId();
-  const query = useQuery<ResolvedAISettingsResponse>({
-    queryKey: getGetResolvedAiSettingsQueryKey(communityId),
-    queryFn: () => getResolvedAiSettings(communityId),
-    enabled: communityId > 0,
-    staleTime: 5 * 60 * 1000,
+  const query = useGetResolvedAiSettings(communityId, {
+    query: { enabled: communityId > 0, staleTime: 5 * 60 * 1000 },
   });
 
   return {

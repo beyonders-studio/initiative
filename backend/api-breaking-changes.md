@@ -20,6 +20,34 @@ notification's type may hold it.
 - POST /api/v1/notifications/{notification_id}/read added the new `announcement` enum value to the `type` response property for the response status `200`
 - POST /api/v1/notifications/{notification_id}/unread added the new `announcement` enum value to the `type` response property for the response status `200`
 
+### The Ideas board
+
+`IntakeStream` takes `ideas`: Initiative Cloud's Ideas board is a stream the
+team fills by hand, so every response carrying a case's or a binding's stream
+may hold it. `NotificationType` takes `idea_updated`: a voter is told when an
+idea moves, so every response carrying a notification's type may hold it.
+
+- GET /api/v1/access-grants/cases added the new `ideas` enum value to the `items/items/stream` response property for the response status `200`
+- GET /api/v1/c/{community_id}/tasks/{task_id}/case added the new `ideas` enum value to the `stream` response property for the response status `200`
+- GET /api/v1/me/tickets added the new `ideas` enum value to the `items/items/stream` response property for the response status `200`
+- GET /api/v1/me/tickets/{task_id} added the new `ideas` enum value to the `stream` response property for the response status `200`
+- POST /api/v1/me/tickets/{task_id}/replies added the new `ideas` enum value to the `stream` response property for the response status `201`
+- GET /api/v1/operator/users/{user_id}/cases added the new `ideas` enum value to the `items/stream` response property for the response status `200`
+- GET /api/v1/settings/intake added the new `ideas` enum value to the `bindings/items/stream` response property for the response status `200`
+- GET /api/v1/settings/intake added the new `ideas` enum value to the `contact_emails/propertyNames/` response property for the response status `200`
+- PUT /api/v1/settings/intake/community added the new `ideas` enum value to the `bindings/items/stream` response property for the response status `200`
+- PUT /api/v1/settings/intake/community added the new `ideas` enum value to the `contact_emails/propertyNames/` response property for the response status `200`
+- PUT /api/v1/settings/intake/contact added the new `ideas` enum value to the `bindings/items/stream` response property for the response status `200`
+- PUT /api/v1/settings/intake/contact added the new `ideas` enum value to the `contact_emails/propertyNames/` response property for the response status `200`
+- PUT /api/v1/settings/intake/{stream} added the new `ideas` enum value to the `stream` response property for the response status `200`
+- POST /api/v1/settings/intake/{stream}/blueprint added the new `ideas` enum value to the `stream` response property for the response status `200`
+- PUT /api/v1/settings/intake/{stream}/contact added the new `ideas` enum value to the `bindings/items/stream` response property for the response status `200`
+- PUT /api/v1/settings/intake/{stream}/contact added the new `ideas` enum value to the `contact_emails/propertyNames/` response property for the response status `200`
+- GET /api/v1/notifications/ added the new `idea_updated` enum value to the `notifications/items/type` response property for the response status `200`
+- GET /api/v1/notifications/{notification_id}/alert added the new `idea_updated` enum value to the `notification/type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/read added the new `idea_updated` enum value to the `type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/unread added the new `idea_updated` enum value to the `type` response property for the response status `200`
+
 ### Feedback to Initiative Cloud
 
 `TicketMode` takes `cloud`: Initiative Cloud takes the stream, and people

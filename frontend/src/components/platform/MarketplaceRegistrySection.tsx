@@ -11,10 +11,10 @@ import { type ChangeEvent, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { RegistryRefreshRead } from "@/api/generated/initiativeAPI.schemas";
+import { useReadRegistryStatus } from "@/api/generated/marketplace/marketplace";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import {
   useRefreshRegistry,
-  useRegistryStatus,
   useUpdateRegistrySettings,
   useUploadRegistryBundle,
 } from "@/hooks/useMarketplaceRegistry";
@@ -30,7 +30,7 @@ const BUNDLE_SOURCE = "bundle";
 
 export const MarketplaceRegistrySection = () => {
   const { t } = useTranslation("settings");
-  const status = useRegistryStatus();
+  const status = useReadRegistryStatus();
   const fileInput = useRef<HTMLInputElement>(null);
   const [bundle, setBundle] = useState<File | null>(null);
 

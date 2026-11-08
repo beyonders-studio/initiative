@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 import { addDays, endOfDay, startOfDay } from "date-fns";
 import { useCallback, useEffect, useMemo } from "react";
 
@@ -7,10 +7,9 @@ import type {
   FilterGroup,
   ListMyTasksParams,
   TaskListRead,
-  TaskListResponse,
   TaskPriority,
 } from "@/api/generated/initiativeAPI.schemas";
-import { getListMyTasksQueryKey, listMyTasks } from "@/api/generated/tasks/tasks";
+import { useListMyTasks } from "@/api/generated/tasks/tasks";
 import { useViewPreference } from "@/hooks/useViewPreference";
 import { browserTimezone } from "@/lib/timezones";
 import { useLiveClockValue } from "@/ui/lib/useRelativeTime";
@@ -319,11 +318,8 @@ export function useFocusSummary() {
     [today, prefs.horizons, timezone]
   );
 
-  const ruleQuery = useQuery<TaskListResponse>({
-    queryKey: getListMyTasksQueryKey(ruleParams),
-    queryFn: () => listMyTasks(ruleParams),
-    enabled: isLoaded,
-    placeholderData: keepPreviousData,
+  const ruleQuery = useListMyTasks(ruleParams, {
+    query: { enabled: isLoaded, placeholderData: keepPreviousData },
   });
 
   const pinnedIds = useMemo(
@@ -341,11 +337,8 @@ export function useFocusSummary() {
     [pinnedIds, timezone]
   );
 
-  const pinQuery = useQuery<TaskListResponse>({
-    queryKey: getListMyTasksQueryKey(pinParams),
-    queryFn: () => listMyTasks(pinParams),
-    enabled: isLoaded && pinnedIds.length > 0,
-    placeholderData: keepPreviousData,
+  const pinQuery = useListMyTasks(pinParams, {
+    query: { enabled: isLoaded && pinnedIds.length > 0, placeholderData: keepPreviousData },
   });
 
   const setPreference = useCallback(

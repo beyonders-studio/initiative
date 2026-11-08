@@ -40,6 +40,10 @@
     "feedback": {
       "title": "Feedback",
       "description": "What people have told us they want."
+    },
+    "ideas": {
+      "title": "Ideas",
+      "description": "The ideas everybody can read and vote for, on Initiative Cloud."
     }
   },
   "stream": {
@@ -285,6 +289,7 @@
       }
     },
     "contactable": "You can contact me with questions about this",
+    "seeIdeas": "See what others have asked for",
     "stuck": "Need somebody to sort it out for you? Ask for help",
     "context": {
       "on": "Includes your app version and which page you're on.",
@@ -318,6 +323,36 @@
   },
   "moderationTopics": {
     "appeal": "Appeal against your suspension"
+  },
+  "idea": {
+    "title": "Idea",
+    "publish": "Published on the Ideas page",
+    "publishedHelp": "Everybody sees its title, description and status, and can vote for it.",
+    "draftHelp": "Not published: only the team sees it. Its votes stay with it.",
+    "votes_one": "{{count}} vote",
+    "votes_other": "{{count}} votes",
+    "error": "Could not change that. Try again in a moment."
+  },
+  "ideas": {
+    "title": "Ideas",
+    "lede": "What people have asked for, and where each one stands. Vote for the ones you want.",
+    "search": "Search ideas",
+    "sortLabel": "Order",
+    "sort": {
+      "votes": "Most votes",
+      "newest": "Newest"
+    },
+    "statusLabel": "Status",
+    "allStatuses": "All",
+    "votedByMe": "Voted by me",
+    "none": "No ideas match.",
+    "votes_one": "{{count}} vote",
+    "votes_other": "{{count}} votes",
+    "vote": "Vote",
+    "voted": "Voted",
+    "voteFor": "Vote for {{title}}",
+    "voteError": "Could not save your vote. Try again in a moment.",
+    "all": "All ideas"
   },
   "picture": {
     "take": "Picture this page",

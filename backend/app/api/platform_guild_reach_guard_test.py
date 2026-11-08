@@ -298,7 +298,7 @@ _ALLOWED: dict[tuple[str, str], str] = {
         "checks and writes the initiative a new or changed sign-in rule "
         "places people in, in the community it names"
     ),
-    (f"{_SERVICES}/provider_placement.py", "update_rule"): (
+    (f"{_SERVICES}/provider_placement.py", "rewrite_rule"): (
         "reads a provider placement rule's initiative before a change, and "
         "drops it when the rule no longer names one"
     ),

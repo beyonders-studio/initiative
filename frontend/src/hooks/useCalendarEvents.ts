@@ -1,5 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
-
 import {
   addOccurrence,
   createCalendarEvent,
@@ -10,11 +8,11 @@ import {
   importIcalEvents,
   openOccurrence,
   parseIcalFile,
-  readCalendarEvent,
   restoreOccurrence,
   setAttendees,
   updateCalendarEvent,
   updateRsvp,
+  useReadCalendarEvent,
 } from "@/api/generated/calendar-events/calendar-events";
 import {
   type CalendarEventCreate,
@@ -55,11 +53,8 @@ export const useCalendarEvent = (
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
   const params = occurrence ? { occurrence } : undefined;
-  const query = useQuery<CalendarEventRead>({
-    queryKey: getReadCalendarEventQueryKey(communityId, eventId!, params),
-    queryFn: () => readCalendarEvent(communityId, eventId!, params),
-    enabled: eventId !== null && Number.isFinite(eventId) && userEnabled,
-    ...rest,
+  const query = useReadCalendarEvent(communityId, eventId!, params, {
+    query: { enabled: eventId !== null && Number.isFinite(eventId) && userEnabled, ...rest },
   });
   return useShownWithPending(eventSaves(occurrence), eventId, query);
 };

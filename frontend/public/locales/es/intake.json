@@ -40,6 +40,10 @@
     "feedback": {
       "title": "Comentarios",
       "description": "Lo que la gente nos ha dicho que quiere."
+    },
+    "ideas": {
+      "title": "Ideas",
+      "description": "Las ideas que todos pueden leer y votar, en Initiative Cloud."
     }
   },
   "stream": {
@@ -285,6 +289,7 @@
       }
     },
     "contactable": "Pueden contactarme si tienen preguntas sobre esto",
+    "seeIdeas": "Mira lo que otros han pedido",
     "stuck": "¿Necesitas que alguien lo resuelva por ti? Pedir ayuda",
     "context": {
       "on": "Incluye la versión de la app y la página en la que estás.",
@@ -318,6 +323,36 @@
   },
   "moderationTopics": {
     "appeal": "Apelación contra tu suspensión"
+  },
+  "idea": {
+    "title": "Idea",
+    "publish": "Publicada en la página de ideas",
+    "publishedHelp": "Todos ven su título, su descripción y su estado, y pueden votarla.",
+    "draftHelp": "Sin publicar: solo la ve el equipo. Sus votos se quedan con ella.",
+    "votes_one": "{{count}} voto",
+    "votes_other": "{{count}} votos",
+    "error": "No se pudo cambiar. Inténtalo de nuevo en un momento."
+  },
+  "ideas": {
+    "title": "Ideas",
+    "lede": "Lo que la gente ha pedido y en qué punto está cada cosa. Vota por las que quieras.",
+    "search": "Buscar ideas",
+    "sortLabel": "Orden",
+    "sort": {
+      "votes": "Más votadas",
+      "newest": "Más recientes"
+    },
+    "statusLabel": "Estado",
+    "allStatuses": "Todas",
+    "votedByMe": "Votadas por mí",
+    "none": "Ninguna idea coincide.",
+    "votes_one": "{{count}} voto",
+    "votes_other": "{{count}} votos",
+    "vote": "Votar",
+    "voted": "Votada",
+    "voteFor": "Votar por {{title}}",
+    "voteError": "No se pudo guardar tu voto. Inténtalo de nuevo en un momento.",
+    "all": "Todas las ideas"
   },
   "picture": {
     "take": "Imagen de esta página",

@@ -10,12 +10,10 @@
  * a write says which tool sits at *each* end and refreshes both.
  */
 
-import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import {
   type EndpointRef,
-  type NeighbourhoodRead,
   type RelatedEnd,
   type RelationshipCreate,
   type RelationshipRead,
@@ -24,17 +22,11 @@ import {
   type Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
-  getGetRelationsNeighbourhoodQueryKey,
-  getListRelationshipsQueryKey,
-  getRelationsNeighbourhood,
+  useGetRelationsNeighbourhood,
+  useListRelationships,
 } from "@/api/generated/relationships/relationships";
 import { invalidate, q } from "@/api/query-keys";
-import {
-  createRelationship,
-  listRelated,
-  removeRelationship,
-  setRelated,
-} from "@/api/relationships";
+import { createRelationship, removeRelationship, setRelated } from "@/api/relationships";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { idsByKind, type LinkedRef, sameIds } from "@/lib/relationships";
@@ -55,11 +47,7 @@ export const useRelationshipsFor = (entity: EndpointRef, options?: { enabled?: b
     other_type: null,
     direction: "both" as const,
   };
-  return useQuery<RelationshipRead[]>({
-    queryKey: getListRelationshipsQueryKey(communityId, params),
-    queryFn: () => listRelated(communityId, entity, null, null, "both"),
-    ...options,
-  });
+  return useListRelationships(communityId, params, { query: options });
 };
 
 /** A tool and which one of them — what a cache entry for the shims is keyed by. */
@@ -184,10 +172,8 @@ export const useRelationsNeighbourhood = (
   const near = useRelationshipsFor(entity, { enabled });
 
   const params = { entity: centre, hops, include_tags: includeTags };
-  const far = useQuery<NeighbourhoodRead>({
-    queryKey: getGetRelationsNeighbourhoodQueryKey(communityId, params),
-    queryFn: () => getRelationsNeighbourhood(communityId, params),
-    enabled: enabled && walks,
+  const far = useGetRelationsNeighbourhood(communityId, params, {
+    query: { enabled: enabled && walks },
   });
 
   const walkFailed = walks && far.isError;

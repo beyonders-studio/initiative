@@ -1,27 +1,21 @@
-import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
   GetTagEntitiesParams,
   TagCreate,
-  TagEntityCountsResponse,
-  TaggedEntitiesResponse,
   TagRead,
   TagUpdate,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   createTag,
   deleteTag,
-  getGetTagCountsQueryKey,
-  getGetTagEntitiesQueryKey,
-  getGetTagQueryKey,
-  getListTagsQueryKey,
-  getTag,
-  getTagCounts,
-  getTagEntities,
-  listTags,
   updateTag,
+  useGetTag,
+  useGetTagCounts,
+  useGetTagEntities,
+  useListTags,
 } from "@/api/generated/tags/tags";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -44,11 +38,8 @@ const invalidateTagBearers = () => {
 
 export const useTags = (options?: { enabled?: boolean }) => {
   const communityId = useActiveCommunityId();
-  return useQuery<TagRead[]>({
-    queryKey: getListTagsQueryKey(communityId),
-    queryFn: () => listTags(communityId),
-    staleTime: 60 * 1000,
-    enabled: options?.enabled ?? true,
+  return useListTags(communityId, {
+    query: { staleTime: 60 * 1000, enabled: options?.enabled ?? true },
   });
 };
 
@@ -73,11 +64,8 @@ export const useKnownTagIds = (ids: number[]): number[] => {
 
 export const useTag = (tagId: number | null) => {
   const communityId = useActiveCommunityId();
-  return useQuery<TagRead>({
-    queryKey: getGetTagQueryKey(communityId, tagId!),
-    queryFn: () => getTag(communityId, tagId!),
-    enabled: !!tagId,
-    staleTime: 60 * 1000,
+  return useGetTag(communityId, tagId!, undefined, {
+    query: { enabled: !!tagId, staleTime: 60 * 1000 },
   });
 };
 
@@ -153,22 +141,14 @@ export const useDeleteTag = (
  *  tag page's tabs, before any of their tables is read. */
 export const useTagCounts = (tagId: number | null) => {
   const communityId = useActiveCommunityId();
-  return useQuery<TagEntityCountsResponse>({
-    queryKey: getGetTagCountsQueryKey(communityId, tagId!),
-    queryFn: () => getTagCounts(communityId, tagId!),
-    enabled: !!tagId,
-    staleTime: 30 * 1000,
-  });
+  return useGetTagCounts(communityId, tagId!, { query: { enabled: !!tagId } });
 };
 
 /** One page of the things of one kind carrying the tag. The page in hand stays
  *  up while the next one is read. */
 export const useTagEntities = (tagId: number, params: GetTagEntitiesParams) => {
   const communityId = useActiveCommunityId();
-  return useQuery<TaggedEntitiesResponse>({
-    queryKey: getGetTagEntitiesQueryKey(communityId, tagId, params),
-    queryFn: () => getTagEntities(communityId, tagId, params),
-    staleTime: 30 * 1000,
-    placeholderData: keepPreviousData,
+  return useGetTagEntities(communityId, tagId, params, {
+    query: { placeholderData: keepPreviousData },
   });
 };

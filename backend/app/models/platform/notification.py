@@ -93,6 +93,9 @@ class NotificationType(str, Enum):
     #: waiting on them, in progress or closed. Names the case and its state,
     #: never what was said.
     ticket_updated = "ticket_updated"
+    #: An idea the recipient voted for moved to another status. Names the idea
+    #: and the status, both as everybody reads them.
+    idea_updated = "idea_updated"
     #: A community's moderators took down something the recipient wrote.
     #: Names the kind and the reason, never what it said or who reported it.
     moderation_removal = "moderation_removal"

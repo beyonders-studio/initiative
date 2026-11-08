@@ -7,18 +7,17 @@
  * server-side — so the rows they produce go through the `lib/toolRows` builder.
  */
 
-import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQueries } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { MyToolCountsResponse, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { getGetMyToolCountsQueryKey, getMyToolCounts } from "@/api/generated/my-tools/my-tools";
+import { useGetMyToolCounts } from "@/api/generated/my-tools/my-tools";
 import type { ToolMyListParams } from "@/hooks/toolHooks";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import type { ToolRow } from "@/lib/toolRows";
 import { buildToolRows, oneToolResponse } from "@/lib/toolRows";
 import { TOOLS } from "@/lib/tools";
-import type { QueryOpts } from "@/types/query";
 
 /**
  * What every `/me/{tool}` list takes. The nine endpoints accept the same set —
@@ -26,18 +25,6 @@ import type { QueryOpts } from "@/types/query";
  * params object rather than nine.
  */
 export type MyToolListParams = ToolMyListParams;
-
-/** How much of each tool reaches the reader — which tabs the page draws. */
-export const useMyToolCounts = (
-  params?: { community_ids?: number[]; created_by_me?: boolean },
-  options?: QueryOpts<MyToolCountsResponse>
-) =>
-  useQuery<MyToolCountsResponse>({
-    queryKey: getGetMyToolCountsQueryKey(params),
-    queryFn: () => getMyToolCounts(params),
-    staleTime: 30_000,
-    ...options,
-  });
 
 /** How the My Tools table is narrowed and ordered. */
 export interface MyToolQuery {
@@ -129,7 +116,7 @@ const pagesOf = (results: { data?: unknown; isLoading: boolean; isError: boolean
  */
 export function useRecentlyChangedTools(tools: readonly Tool[], limit: number) {
   const { t } = useTranslation("communityHome");
-  const counts = useMyToolCounts();
+  const counts = useGetMyToolCounts();
   const asked = useMemo(
     () => toolsWithContent(counts.data).filter((tool) => tools.includes(tool)),
     [counts.data, tools]

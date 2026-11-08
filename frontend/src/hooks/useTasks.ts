@@ -40,14 +40,15 @@ import {
   getListColumnLimitsQueryKey,
   getListTasksQueryKey,
   getReadTaskQueryKey,
+  getReadTaskQueryOptions,
   listTasks,
   moveTask,
   promoteChecklistItem,
-  readTask,
   reorderTasks,
   skipTask,
   toggleChecklistItem,
   updateTask,
+  useReadTask,
 } from "@/api/generated/tasks/tasks";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -80,11 +81,8 @@ import type { QueryOpts } from "@/types/query";
 export const useTask = (taskId: number | null, options?: QueryOpts<TaskRead>) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  const query = useQuery<TaskRead>({
-    queryKey: getReadTaskQueryKey(communityId, taskId!),
-    queryFn: () => readTask(communityId, taskId!),
-    enabled: taskId !== null && Number.isFinite(taskId) && userEnabled,
-    ...rest,
+  const query = useReadTask(communityId, taskId!, undefined, {
+    query: { enabled: taskId !== null && Number.isFinite(taskId) && userEnabled, ...rest },
   });
   return useShownWithPending(TASK_SAVES, taskId, query);
 };
@@ -94,11 +92,7 @@ export const useTask = (taskId: number | null, options?: QueryOpts<TaskRead>) =>
 export const useReadTaskNow = () => {
   const communityId = useActiveCommunityId();
   const queryClient = useQueryClient();
-  return (taskId: number) =>
-    queryClient.fetchQuery<TaskRead>({
-      queryKey: getReadTaskQueryKey(communityId, taskId),
-      queryFn: () => readTask(communityId, taskId),
-    });
+  return (taskId: number) => queryClient.fetchQuery(getReadTaskQueryOptions(communityId, taskId));
 };
 
 /** The complete task list for `params`: the one key and fetch every reader of it shares. */
