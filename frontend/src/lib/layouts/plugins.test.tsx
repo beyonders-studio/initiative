@@ -8,8 +8,8 @@ import i18n from "@/__tests__/helpers/i18n-test";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { MetadataType, type TaskListRead } from "@/api/generated/initiativeAPI.schemas";
-import { canRequire } from "@/lib/layouts/draft";
 import {
+  addablePluginParts,
   fieldsInParts,
   pluginFieldId,
   pluginFields,
@@ -18,8 +18,9 @@ import {
   shippedPluginParts,
 } from "@/lib/layouts/plugins";
 import { TASK_LAYOUT, taskFields } from "@/lib/layouts/tasks";
-import { type LayoutNode, LayoutTree } from "@/lib/layouts/tree";
 import type { TranslateFn } from "@/types/i18n";
+import { canRequire } from "@/ui/layouts/draft";
+import { type LayoutNode, LayoutTree } from "@/ui/layouts/tree";
 import { numberFormat } from "@/ui/lib/intl";
 
 const definition = {
@@ -190,6 +191,22 @@ describe("a plug-in on a task's page", () => {
     expect(side(null)?.slice(-more.length)).toEqual(more);
     // A saved side holds what it holds.
     expect(side({ header: [], main: [], side: [] })).toEqual([]);
+  });
+
+  it("offers each of a plug-in's parts once, and none past the server's limit", () => {
+    const parts = ["a", "b", "c", "d"].map((id) => ({ id }));
+    const placing = (...ids: string[]): LayoutNode => ({
+      type: "card",
+      children: ids.map((part) => ({ type: "plugin", props: { plugin: 3, part } })),
+    });
+
+    expect(addablePluginParts(placing("a"), 3, parts).map((part) => part.id)).toEqual([
+      "b",
+      "c",
+      "d",
+    ]);
+    expect(addablePluginParts(placing("a"), 4, parts)).toHaveLength(4);
+    expect(addablePluginParts(placing("a", "b", "c"), 3, parts)).toEqual([]);
   });
 
   it("draws a field once where a part it draws shows it, at any depth", () => {

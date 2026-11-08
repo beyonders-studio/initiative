@@ -29,8 +29,6 @@ import { useRecordOpen } from "@/hooks/usePersonalItems";
 import { useRouteId } from "@/hooks/useRouteId";
 import { detailLayoutOf, sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
-import type { StoredRegions } from "@/lib/layouts/detailLayout";
 import { EVENT_DETAIL } from "@/lib/layouts/eventLayout";
 import { usePluginMenuActions } from "@/lib/layouts/plugins";
 import { toast } from "@/lib/mascotToast";
@@ -44,6 +42,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
+import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
+import type { StoredRegions } from "@/ui/layouts/detailLayout";
 import { DetailPageSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 /**

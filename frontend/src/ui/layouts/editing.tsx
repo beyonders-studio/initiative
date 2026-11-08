@@ -44,6 +44,12 @@ export type ItemEdit<I, P> = { shows: Partial<I> } & (
     }
 );
 
+/** One field's save, and how a change is sent: `undo`, where given, is the
+ *  change that puts it back. Settles true once the change is saved. */
+export interface ItemFieldSave<I, P> extends FieldSave {
+  save: (edit: ItemEdit<I, P>, undo?: ItemEdit<I, P>) => Promise<boolean>;
+}
+
 /**
  * An item being added, which nothing has saved yet: its fields' saves change
  * the copy the dialog holds, and Add makes it whole.
@@ -309,7 +315,7 @@ export const useFieldDraft = <V,>(
 };
 
 const FieldSaveStatus = ({ save }: { save: FieldSave }) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   if (save.state === "error") {
     return (
       <span
@@ -378,7 +384,7 @@ export const FieldFrame = ({
   className?: string;
   children: ReactNode;
 }) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   return (
     <fieldset aria-label={label} className={cn("relative min-w-0 space-y-2", className)} {...keys}>
       {hideLabel ? (

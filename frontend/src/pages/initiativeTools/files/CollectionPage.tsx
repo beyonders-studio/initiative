@@ -77,9 +77,6 @@ import {
   useInstanceLayouts,
 } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
-import { requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
-import { withDisplays } from "@/lib/layouts/fields";
 import { FILE_DETAIL } from "@/lib/layouts/fileLayout";
 import { collectionFileFields } from "@/lib/layouts/files";
 import { toast } from "@/lib/mascotToast";
@@ -91,6 +88,9 @@ import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
 import { DropdownMenuItem } from "@/ui/dropdown-menu";
 import { Label } from "@/ui/label";
+import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
+import { requiredKeys, type StoredRegions } from "@/ui/layouts/detailLayout";
+import { withDisplays } from "@/ui/layouts/fields";
 import { formatPeriod } from "@/ui/lib/formatDate";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { Lightbox, type LightboxItem } from "@/ui/lightbox";

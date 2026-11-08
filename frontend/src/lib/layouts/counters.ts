@@ -1,8 +1,7 @@
 import type { PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
-
-import { at, detailLayoutSpec, type Region } from "./detailLayout";
-import { type FieldDef, type FieldKind, propertyFields } from "./fields";
-import type { LayoutNode } from "./tree";
+import { at, detailLayoutSpec, type Region } from "@/ui/layouts/detailLayout";
+import { type FieldDef, type FieldKind, propertyFields } from "@/ui/layouts/fields";
+import type { LayoutNode } from "@/ui/layouts/tree";
 
 /** A counter's fields, each with its label's key and the kind of value it is.
  *  It is drawn in its detail alone, so no kind draws it anywhere else. */

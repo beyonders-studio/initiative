@@ -7,7 +7,7 @@ import {
   useOwnedDefinitions,
 } from "@/hooks/useProperties";
 import { useSearchMembers } from "@/hooks/useUsers";
-import type { PropertyEnv } from "@/lib/layouts/fieldEditors";
+import type { PropertyEnv } from "@/ui/layouts/fieldEditors";
 import type { MetadataOwner } from "@/ui/properties/propertyHelpers";
 
 /**

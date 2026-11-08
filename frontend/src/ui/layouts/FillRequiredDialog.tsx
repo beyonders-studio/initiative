@@ -1,10 +1,6 @@
 import { useTranslation } from "react-i18next";
 
 import type { PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
-import { type DetailItem, type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
-import { missingRequired, type StoredRegions } from "@/lib/layouts/detailLayout";
-import { ItemDraftContext, useItemDraft, type Written } from "@/lib/layouts/editing";
-import type { LayoutNode } from "@/lib/layouts/tree";
 import { Button } from "@/ui/button";
 import {
   Dialog,
@@ -14,6 +10,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+
+import { type DetailItem, type DetailKind, DetailLayoutView } from "./DetailLayoutView";
+import { missingRequired, type StoredRegions } from "./detailLayout";
+import { ItemDraftContext, useItemDraft, type Written } from "./editing";
+import type { LayoutNode } from "./tree";
 
 type FillProps<I extends DetailItem, C, P> = {
   detail: DetailKind<I, C, P>;
@@ -62,7 +63,7 @@ const Filling = <I extends DetailItem, C, P>({
   onConfirm,
   pending = false,
 }: FillProps<I, C, P>) => {
-  const { t } = useTranslation(["common", "layouts"]);
+  const { t } = useTranslation("layouts");
   const { item, holding, latest, draft, written } = useItemDraft<I, P>(start, {
     onSubmit: () => confirm(),
   });
@@ -93,7 +94,7 @@ const Filling = <I extends DetailItem, C, P>({
     <>
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{t("layouts:required.ask")}</DialogDescription>
+        <DialogDescription>{t("required.ask")}</DialogDescription>
       </DialogHeader>
       <ItemDraftContext.Provider value={draft}>
         <DetailLayoutView detail={detail} item={item} context={context} layout={layout} />
@@ -105,7 +106,7 @@ const Filling = <I extends DetailItem, C, P>({
           disabled={holding.size > 0 || missing.length > 0}
           pending={pending}
         >
-          {t("layouts:required.confirm")}
+          {t("required.confirm")}
         </Button>
       </DialogFooter>
     </>

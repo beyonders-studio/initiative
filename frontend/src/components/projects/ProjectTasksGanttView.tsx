@@ -31,6 +31,7 @@ import { useListTaskEdges } from "@/api/generated/relationships/relationships";
 import { readTask } from "@/api/generated/tasks/tasks";
 import { TaskTypeMark } from "@/components/tasks/TaskTypeOption";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
 import { useOwnedDefinitions } from "@/hooks/useProperties";
 import { useRelate, useUnrelate } from "@/hooks/useRelationships";
@@ -55,8 +56,6 @@ import {
   waitingOn,
   wholesOf,
 } from "@/lib/gantt";
-import { LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
-import { boardBands } from "@/lib/layouts/grouping";
 import { taskFields } from "@/lib/layouts/tasks";
 import { browserTimezone } from "@/lib/timezones";
 import { taskRoute } from "@/lib/tools";
@@ -79,6 +78,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
+import { boardBands } from "@/ui/layouts/grouping";
 import { dateTimeFormat } from "@/ui/lib/intl";
 import { cn } from "@/ui/lib/utils";
 import { Toggle } from "@/ui/toggle";

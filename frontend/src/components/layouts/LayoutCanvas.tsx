@@ -24,10 +24,12 @@ import { ProjectTasksGanttView } from "@/components/projects/ProjectTasksGanttVi
 import { ProjectTasksKanbanView } from "@/components/projects/ProjectTasksKanbanView";
 import { ProjectTasksTableView } from "@/components/projects/ProjectTasksTableView";
 import { columnLimitsOf } from "@/hooks/useColumnLimits";
+import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import type { ProjectTaskTableState } from "@/hooks/useProjectTaskView";
 import { useGroupables, useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useTasks } from "@/hooks/useTasks";
 import { buildTaskListParams, EMPTY_TASK_FILTERS } from "@/lib/filters/taskFilters";
+import type { TranslateFn } from "@/types/i18n";
 import {
   cardOf,
   columnsOf,
@@ -38,10 +40,9 @@ import {
   pathOf,
   type Selection,
   sameSelection,
-} from "@/lib/layouts/draft";
-import { type FieldDef, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
-import { viewGrouping, withGroupShown } from "@/lib/layouts/grouping";
-import type { TranslateFn } from "@/types/i18n";
+} from "@/ui/layouts/draft";
+import type { FieldDef } from "@/ui/layouts/fields";
+import { viewGrouping, withGroupShown } from "@/ui/layouts/grouping";
 import { cn } from "@/ui/lib/utils";
 
 import { CanvasGrouping } from "./LayoutGroupings";

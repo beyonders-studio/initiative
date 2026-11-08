@@ -192,7 +192,10 @@
     },
     "weekOf": "Woche ab {{date}}",
     "quarter": "Q{{quarter}} {{year}}",
-    "bucket": "Wie {{name}} gruppiert wird"
+    "bucket": "Wie {{name}} gruppiert wird",
+    "noValue": "Ohne {{name}}",
+    "checked": "{{name}}: ja",
+    "unchecked": "{{name}}: nein"
   },
   "limits": {
     "heading": "Spaltenlimits",
@@ -305,5 +308,6 @@
     "confirm": "Weiter",
     "retypeTitle": "Was die Seite {{type}} verlangt",
     "moveTitle": "Was {{project}} verlangt"
-  }
+  },
+  "moreOptions": "Weitere Optionen"
 }

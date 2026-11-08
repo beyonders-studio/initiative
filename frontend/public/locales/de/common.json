@@ -47,7 +47,6 @@
   "actions": "Aktionen",
   "adding": "Wird hinzugefügt…",
   "more": "Mehr",
-  "moreOptions": "Weitere Optionen",
   "less": "Weniger",
   "noResults": "Keine Ergebnisse gefunden",
   "tryAgain": "Erneut versuchen",
@@ -302,10 +301,6 @@
     "template": "Vorlage"
   },
   "fieldSave": {
-    "saving": "Wird gespeichert…",
-    "saved": "Gespeichert",
-    "failed": "Nicht gespeichert",
-    "changed": "Das wurde geändert, während du es bearbeitet hast",
     "overwrite": "Überschreiben",
     "keepEditing": "Weiter bearbeiten",
     "discard": "Verwerfen",

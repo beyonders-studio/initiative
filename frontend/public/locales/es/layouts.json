@@ -192,7 +192,10 @@
     },
     "weekOf": "Semana del {{date}}",
     "quarter": "T{{quarter}} {{year}}",
-    "bucket": "Cómo se agrupa {{name}}"
+    "bucket": "Cómo se agrupa {{name}}",
+    "noValue": "Sin {{name}}",
+    "checked": "{{name}}: sí",
+    "unchecked": "{{name}}: no"
   },
   "limits": {
     "heading": "Límites de columna",
@@ -305,5 +308,6 @@
     "confirm": "Continuar",
     "retypeTitle": "Lo que pide la página {{type}}",
     "moveTitle": "Lo que pide {{project}}"
-  }
+  },
+  "moreOptions": "Más opciones"
 }

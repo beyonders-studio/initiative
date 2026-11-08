@@ -7,11 +7,12 @@ import i18n from "@/__tests__/helpers/i18n-test";
 import { renderPage } from "@/__tests__/helpers/render";
 import { parseLayoutKind } from "@/lib/filters/layoutSearch";
 import type { TranslateFn } from "@/types/i18n";
+import { pageParts } from "@/ui/layouts/detailLayout";
+import { groupables } from "@/ui/layouts/grouping";
+import { type LayoutContext, LayoutTree } from "@/ui/layouts/tree";
 
-import { pageParts } from "./detailLayout";
-import { groupables } from "./grouping";
+import { groupingName } from "./taskGroupings";
 import { TASK_LAYOUT, taskFields, taskLayoutFor, taskPageWithFields } from "./tasks";
-import { type LayoutContext, LayoutTree } from "./tree";
 
 const SHAPES = ["plain", "fix", "discussion", "dates", "repeat", "checklist"];
 
@@ -90,7 +91,11 @@ describe("grouping by type", () => {
   it("is named in words, not by its key", async () => {
     await i18n.loadNamespaces(["layouts", "dashboards"]);
     const t = i18n.getFixedT("en") as TranslateFn;
-    const [type] = groupables([{ name: "task_type_id", kind: "task_type" }], taskFields([]), t);
+    const [type] = groupables(
+      [{ name: "task_type_id", kind: "task_type" }],
+      taskFields([]),
+      (field) => groupingName(field, t)
+    );
     expect(type.label).toBe("Type");
   });
 });

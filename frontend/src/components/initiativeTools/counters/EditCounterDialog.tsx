@@ -9,8 +9,6 @@ import { counterSaves, type SteppedCount, useResetCounter } from "@/hooks/useCou
 import { usePendingShown } from "@/hooks/useFieldSave";
 import { detailLayoutOf, instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { COUNTER_DETAIL } from "@/lib/layouts/counterLayout";
-import { DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
-import type { StoredRegions } from "@/lib/layouts/detailLayout";
 import { usePluginMenuActions } from "@/lib/layouts/plugins";
 import type { DialogProps } from "@/types/dialog";
 import { Button } from "@/ui/button";
@@ -22,6 +20,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
+import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
+import type { StoredRegions } from "@/ui/layouts/detailLayout";
 
 type EditCounterDialogProps = DialogProps & {
   groupId: number;

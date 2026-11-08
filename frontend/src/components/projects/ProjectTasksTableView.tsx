@@ -35,16 +35,15 @@ import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import { useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useMoveTaskToGroup } from "@/hooks/useTasks";
 import { useTaskTypeChange } from "@/hooks/useTaskTypeChange";
-import { fieldColumnId } from "@/lib/layouts/columns";
-import { columnsOf } from "@/lib/layouts/draft";
-import { withDisplays } from "@/lib/layouts/fields";
-import { groupRowId, groupRows, NO_GROUP, uniqueItemsFromRows } from "@/lib/layouts/grouping";
 import { pluginFields, usePluginsOnItems } from "@/lib/layouts/plugins";
-import { TASK_LIST_SHAPE, taskFields } from "@/lib/layouts/tasks";
+import { TASK_LIST_SHAPE, taskColumnId, taskFields } from "@/lib/layouts/tasks";
 import { flattenTaskTree, nestTaskRows, type TaskTreeRow, treeParents } from "@/lib/taskTree";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import { DataTable, type DataTableRowWrapperProps } from "@/ui/data-table";
+import { columnsOf } from "@/ui/layouts/draft";
+import { withDisplays } from "@/ui/layouts/fields";
+import { groupRowId, groupRows, NO_GROUP, uniqueItemsFromRows } from "@/ui/layouts/grouping";
 import type { AppColumnDef, AppRow } from "@/ui/lib/table";
 import { cn } from "@/ui/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
@@ -404,7 +403,7 @@ const ProjectTasksTableViewComponent = ({
     () =>
       columnsOf({ columns: viewColumns }, fields, TASK_LIST_SHAPE)
         .filter((id) => fields.has(id))
-        .map(fieldColumnId),
+        .map(taskColumnId),
     [viewColumns, fields]
   );
   const columnVisibility = useMemo(
@@ -412,7 +411,7 @@ const ProjectTasksTableViewComponent = ({
       ...Object.fromEntries(
         [...fields.values()]
           .filter((field) => field.hideable)
-          .map(({ id }) => [fieldColumnId(id), shown.includes(fieldColumnId(id))])
+          .map(({ id }) => [taskColumnId(id), shown.includes(taskColumnId(id))])
       ),
       ...Object.fromEntries(groupings.map(({ column }) => [column, false])),
     }),
@@ -626,7 +625,7 @@ const ProjectTasksTableViewComponent = ({
     );
     if (!editing) return ordered;
     const fieldOf = new Map(
-      [...fields.values()].map((field) => [fieldColumnId(field.id), field.id])
+      [...fields.values()].map((field) => [taskColumnId(field.id), field.id])
     );
     return ordered.map((column): AppColumnDef<TaskTreeRow> => {
       const fieldId = column.id === undefined ? undefined : fieldOf.get(column.id);

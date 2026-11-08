@@ -24,9 +24,9 @@ import { ToolBreadcrumb, type ToolBreadcrumbSegment } from "@/components/tools/T
 import { useListedInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { hexToRgba, resolveInitiativeColor } from "@/lib/initiativeColors";
-import { useFieldDraft } from "@/lib/layouts/editing";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
+import { useFieldDraft } from "@/ui/layouts/editing";
 import { cn } from "@/ui/lib/utils";
 
 const TITLE_CLASS = "font-semibold text-3xl tracking-tight";

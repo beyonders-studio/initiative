@@ -9,9 +9,9 @@ import { useTranslation } from "react-i18next";
 
 import type { TaskListRead, TaskStatusRead } from "@/api/generated/initiativeAPI.schemas";
 import { TASK_CARD } from "@/lib/layouts/tasks";
-import { type LayoutContext, LayoutTree } from "@/lib/layouts/tree";
 import { Button } from "@/ui/button";
 import { Icon } from "@/ui/icon-picker";
+import { type LayoutContext, LayoutTree } from "@/ui/layouts/tree";
 import { cn } from "@/ui/lib/utils";
 
 const VIRTUALIZE_THRESHOLD = 20;

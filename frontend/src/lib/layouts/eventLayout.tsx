@@ -40,6 +40,7 @@ import {
   useOccurrenceAction,
   useUpdateEventRSVP,
 } from "@/hooks/useCalendarEvents";
+import { itemSaves } from "@/hooks/useFieldSave";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import {
@@ -58,6 +59,16 @@ import { Button } from "@/ui/button";
 import { DateTimePicker } from "@/ui/date-time-picker";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { useItemContext } from "@/ui/layouts/DetailLayoutView";
+import { filledBy, hasAny, hasText, sentOr } from "@/ui/layouts/detailLayout";
+import {
+  FieldFrame,
+  ItemDraftContext,
+  sameIds,
+  sameJson,
+  useFieldDraft,
+} from "@/ui/layouts/editing";
+import { TitleField } from "@/ui/layouts/fieldEditors";
 import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
 import { dateTimeFormat } from "@/ui/lib/intl";
 import { hour12Option } from "@/ui/lib/timeFormat";
@@ -65,11 +76,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/ui/switch";
 
 import { DescriptionField } from "./DescriptionField";
-import { useItemContext } from "./DetailLayoutView";
-import { filledBy, hasAny, hasText, sentOr } from "./detailLayout";
-import { FieldFrame, ItemDraftContext, sameIds, sameJson, useFieldDraft } from "./editing";
 import { type EVENT_FIELDS, EVENT_LAYOUT, eventFields } from "./events";
-import { TitleField } from "./fieldEditors";
 import { type InitiativeDetail, useInitiativeExtension } from "./initiativeExtension";
 
 /** What an event's detail shares with its parts, beside the event itself. */
@@ -641,7 +648,7 @@ export const EVENT_DETAIL: InitiativeDetail<CalendarEventRead, EventLayoutContex
     (event) => event.properties
   ),
   home: (event, context) => ({
-    saves: eventSaves(context.occurrence),
+    saves: itemSaves(eventSaves(context.occurrence), event.id),
     readOnly: context.readOnly,
     initiativeId: event.initiative_id,
     canOpen: { tool: Tool.calendar, id: event.calendar_id },

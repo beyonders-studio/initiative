@@ -130,13 +130,13 @@ const DATE_PROPERTIES: ReadonlySet<string> = new Set([MetadataType.date, Metadat
 
 /**
  * What a list's items can be grouped by: the fields the catalog says group,
- * `columns` the one a board's columns are, then the properties that do, in
- * the fields' order.
+ * each named as the kind of item names it (`nameOf`), `columns` the one a
+ * board's columns are, then the properties that do, in the fields' order.
  */
 export const groupables = (
   catalog: GroupingDescription[],
   fields: ReadonlyMap<string, FieldDef>,
-  t: LayoutEnv["t"],
+  nameOf: (field: string) => string,
   columns?: string
 ): Groupable[] => [
   ...catalog.map((entry) => ({
@@ -144,11 +144,7 @@ export const groupables = (
     bucket: entry.bucket ?? false,
     columns: entry.name === columns,
     kind: entry.kind,
-    label: t(`layouts:groupings.fields.${entry.name}`, {
-      defaultValue: t(`dashboards:filterField.${entry.name}`, {
-        defaultValue: entry.name,
-      }),
-    }),
+    label: nameOf(entry.name),
   })),
   ...[...fields.values()].flatMap((field): Groupable[] => {
     const type = field.property?.type;
@@ -277,7 +273,9 @@ export const offeredGroupings = <I extends { id: number; properties: PropertySum
       switch (definition.type) {
         case MetadataType.checkbox:
           return label(
-            t(key === "true" ? "table.checked" : "table.unchecked", { name: field.label })
+            t(key === "true" ? "layouts:groupings.checked" : "layouts:groupings.unchecked", {
+              name: field.label,
+            })
           );
         case MetadataType.select:
         case MetadataType.multi_select:
@@ -310,7 +308,9 @@ export const offeredGroupings = <I extends { id: number; properties: PropertySum
       const drawn = property ? null : own.header(field, key);
       if (typeof drawn === "string") return label(drawn);
       if (drawn != null) return drawn;
-      return key === NO_GROUP ? label(t("table.noValue", { name: field.label })) : named(key);
+      return key === NO_GROUP
+        ? label(t("layouts:groupings.noValue", { name: field.label }))
+        : named(key);
     };
 
     const grouping: ItemGrouping<I, M | PropertyMove> = {

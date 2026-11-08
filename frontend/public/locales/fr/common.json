@@ -46,7 +46,6 @@
   "actions": "Actions",
   "adding": "Ajout…",
   "more": "Plus",
-  "moreOptions": "Plus d’options",
   "less": "Moins",
   "noResults": "Aucun résultat",
   "tryAgain": "Réessayer",
@@ -302,10 +301,6 @@
     "template": "Modèle"
   },
   "fieldSave": {
-    "saving": "Enregistrement…",
-    "saved": "Enregistré",
-    "failed": "Échec de l'enregistrement",
-    "changed": "Cela a changé pendant que vous le modifiiez",
     "overwrite": "Écraser",
     "keepEditing": "Continuer à modifier",
     "discard": "Abandonner",

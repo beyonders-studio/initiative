@@ -38,14 +38,14 @@ import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import { useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useMoveTaskToGroup } from "@/hooks/useTasks";
 import { useTaskTypeChange } from "@/hooks/useTaskTypeChange";
-import { cardOf } from "@/lib/layouts/draft";
-import { withDisplays } from "@/lib/layouts/fields";
-import { boardBands } from "@/lib/layouts/grouping";
 import { pluginFields, pluginParts, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { TASK_LIST_SHAPE, taskFields } from "@/lib/layouts/tasks";
-import { type LayoutContext, type LayoutNode, namesField } from "@/lib/layouts/tree";
 import { Badge } from "@/ui/badge";
 import { GroupBySelect } from "@/ui/data-table";
+import { cardOf } from "@/ui/layouts/draft";
+import { withDisplays } from "@/ui/layouts/fields";
+import { boardBands } from "@/ui/layouts/grouping";
+import { type LayoutContext, type LayoutNode, namesField } from "@/ui/layouts/tree";
 import { formatDateTime } from "@/ui/lib/formatDate";
 import { cn } from "@/ui/lib/utils";
 

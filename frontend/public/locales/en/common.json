@@ -47,7 +47,6 @@
   "actions": "Actions",
   "adding": "Adding…",
   "more": "More",
-  "moreOptions": "More options",
   "less": "Less",
   "noResults": "No results found",
   "tryAgain": "Try again",
@@ -302,10 +301,6 @@
     "template": "Template"
   },
   "fieldSave": {
-    "saving": "Saving…",
-    "saved": "Saved",
-    "failed": "Couldn't save",
-    "changed": "This changed while you were editing",
     "overwrite": "Overwrite",
     "keepEditing": "Keep editing",
     "discard": "Discard",

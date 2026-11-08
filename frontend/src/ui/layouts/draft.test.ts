@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { buildPropertyDefinition } from "@/__tests__/factories";
 import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
+import { TASK_LAYOUT, TASK_LIST_SHAPE, taskFields } from "@/lib/layouts/tasks";
 
 import { pageParts, type StoredRegions, storedLayout } from "./detailLayout";
 import {
   addableFields,
-  addablePluginParts,
   canRequire,
   changeAt,
   dropAt,
@@ -22,7 +22,6 @@ import {
   removable,
   startHistory,
 } from "./draft";
-import { TASK_LAYOUT, TASK_LIST_SHAPE, taskFields } from "./tasks";
 import type { LayoutNode } from "./tree";
 
 const field = (id: string): LayoutNode => ({ type: "field", props: { field: id } });
@@ -134,22 +133,6 @@ describe("what the editor allows", () => {
     expect(can(field("property:13"))).toBe(false);
     expect(can(field("description"), null)).toBe(false);
   });
-
-  it("offers each of a plug-in's parts once, and none past the server's limit", () => {
-    const parts = ["a", "b", "c", "d"].map((id) => ({ id }));
-    const placing = (...ids: string[]): LayoutNode => ({
-      type: "card",
-      children: ids.map((part) => ({ type: "plugin", props: { plugin: 3, part } })),
-    });
-
-    expect(addablePluginParts(placing("a"), 3, parts).map((part) => part.id)).toEqual([
-      "b",
-      "c",
-      "d",
-    ]);
-    expect(addablePluginParts(placing("a"), 4, parts)).toHaveLength(4);
-    expect(addablePluginParts(placing("a", "b", "c"), 3, parts)).toEqual([]);
-  });
 });
 
 describe("a selection as the card changes", () => {
@@ -201,7 +184,7 @@ describe("where a dragged part lands", () => {
 
 describe("a task detail laid out", () => {
   it("reads top to bottom as a phone draws it, for an export of the page", () => {
-    // A plug-in's part after the checklist, which only a browser draws.
+    // A plug-in's part placed after the checklist, named by its kind.
     const stored = storedLayout(
       insertAt(TASK_LAYOUT.root(null), [1], { type: "plugin", props: { plugin: 3, part: "ci" } }, 2)
     );
@@ -221,6 +204,7 @@ describe("a task detail laid out", () => {
       "tags",
       "properties",
       "checklist",
+      "plugin",
       "case",
       "relations",
       "comments",

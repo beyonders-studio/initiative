@@ -18,6 +18,7 @@ import { SmartChipInsertDialog } from "@/components/editor/plugins/smart-chip-in
 import { SMART_CHIP_MENU } from "@/components/editor/plugins/smart-chip-menu";
 import { TaskSortPicker } from "@/components/layouts/TaskSortPicker";
 import { TaskFilters } from "@/components/tasks/TaskFilters";
+import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { useAllProjects, useProjectTaskStatuses } from "@/hooks/useProjects";
 import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import {
@@ -29,7 +30,6 @@ import {
   TASK_MODES,
   type TaskQuery,
 } from "@/lib/embeds";
-import { groupFields, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
 import { pluginFields, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { TASK_COLUMNS, taskFields } from "@/lib/layouts/tasks";
 import { entityIcon } from "@/lib/searchResults";
@@ -38,6 +38,7 @@ import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { groupFields } from "@/ui/layouts/fields";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
