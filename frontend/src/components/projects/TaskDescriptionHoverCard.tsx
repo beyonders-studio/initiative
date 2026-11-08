@@ -4,10 +4,10 @@ import { useState } from "react";
 import type { TaskListRead } from "@/api/generated/initiativeAPI.schemas";
 import { useReadTask } from "@/api/generated/tasks/tasks";
 import { TaskDescription } from "@/components/tasks/TaskDescription";
-import { Button } from "@/components/ui/button";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hover-card";
+import { cn } from "@/ui/lib/utils";
 
 interface TaskDescriptionHoverCardProps {
   task: Pick<TaskListRead, "id" | "community_id" | "has_description" | "description_excerpt">;

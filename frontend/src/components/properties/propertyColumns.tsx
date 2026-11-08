@@ -5,7 +5,7 @@ import type {
   PropertyDefinitionRead,
   PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
-import type { AppColumnDef } from "@/lib/table";
+import type { AppColumnDef } from "@/ui/lib/table";
 
 import { PropertyValueCell } from "./PropertyValueCell";
 import { iconForPropertyType } from "./propertyTypeIcons";

@@ -17,7 +17,7 @@ import { AtSign, Check, MessageSquareText, Share2, ThumbsUp, Users } from "lucid
 import type { ComponentProps } from "react";
 import { useTranslation } from "react-i18next";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 import { reveal, Typed, useRevealOnScroll } from "./effects";
 

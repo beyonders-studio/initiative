@@ -14,29 +14,6 @@ import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
 import { TaskPriorityOption } from "@/components/tasks/TaskPriorityOption";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import {
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { useListedMissingAsType } from "@/lib/layouts/taskLayout";
 import {
@@ -46,6 +23,18 @@ import {
   type TaskRecurrenceValue,
 } from "@/lib/recurrence";
 import { PRIORITY_ORDER } from "@/lib/sorting";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
+import { Button } from "@/ui/button";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import {
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** The type option that takes a picked type back: the tasks keep theirs. */
 const KEEP_TYPE = "keep";

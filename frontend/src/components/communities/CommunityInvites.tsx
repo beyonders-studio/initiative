@@ -3,16 +3,16 @@ import { type FormEvent, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type CommunityInviteRead, SupportTopic } from "@/api/generated/initiativeAPI.schemas";
-import { ListSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
 import { HelpLink } from "@/components/support/HelpLink";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useCommunities } from "@/hooks/useCommunities";
 import type { InviteLinkLimits, useCommunityInvites } from "@/hooks/useCommunityInvites";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 const inviteLinkForCode = (code: string) => {
   const base = import.meta.env.VITE_APP_URL?.trim() || window.location.origin;

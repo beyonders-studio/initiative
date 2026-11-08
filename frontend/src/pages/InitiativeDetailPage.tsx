@@ -6,20 +6,16 @@ import { useTranslation } from "react-i18next";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeMembersPeek } from "@/components/initiatives/InitiativeMembersPeek";
 import { Markdown } from "@/components/Markdown";
-import { StatusMessage } from "@/components/StatusMessage";
-import {
-  PageHeaderSkeleton,
-  SkeletonRegion,
-  ToolListSkeleton,
-} from "@/components/skeletons/PageSkeletons";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { resolveInitiativeColor } from "@/lib/initiativeColors";
 import { initiativeRoute, TOOLS, toolCamelPlural, toolListRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
+import { PageHeaderSkeleton, SkeletonRegion, ToolListSkeleton } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
+import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/ui/tabs";
 
 import { ContactsView } from "./initiativeTools/contacts/ContactsPage";
 import { CounterGroupsView } from "./initiativeTools/counters/CounterGroupsPage";

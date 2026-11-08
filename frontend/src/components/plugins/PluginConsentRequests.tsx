@@ -19,12 +19,12 @@ import {
   ConsentAccess,
   ConsentStatus,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useGrantPluginConsent, useRevokePluginConsent } from "@/hooks/useCommunityPluginDetail";
 import { useInitiatives } from "@/hooks/useInitiatives";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
 
 export interface PluginConsentRequestsProps {
   pluginId: number;

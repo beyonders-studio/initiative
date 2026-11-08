@@ -3,8 +3,8 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/ui/button";
+import { Label } from "@/ui/label";
 
 export const StepField = ({
   id,

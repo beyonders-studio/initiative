@@ -22,15 +22,15 @@ import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { InitiativeRead, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { SortHeader } from "@/components/SortIcon";
 import { TagBadgeList } from "@/components/tags/TagBadge";
-import { DataTable } from "@/components/ui/data-table";
-import { RelativeTime } from "@/components/ui/relative-time";
 import { MentionText } from "@/components/user/MentionText";
 import { communityPath } from "@/lib/communityUrl";
-import type { AppColumn, AppColumnDef } from "@/lib/table";
 import { TOOL_HAS_DETAIL, type ToolRow } from "@/lib/toolRows";
 import { initiativeRoute, toolCamelPlural } from "@/lib/tools";
+import { DataTable } from "@/ui/data-table";
+import type { AppColumn, AppColumnDef } from "@/ui/lib/table";
+import { RelativeTime } from "@/ui/relative-time";
+import { SortHeader } from "@/ui/sort-icon";
 
 /** The leaf keys under `communityHome.columns.detail` — one per tool that has the
  *  column. */

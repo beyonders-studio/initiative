@@ -39,9 +39,9 @@ import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { type FieldSaveKind, heldKey } from "@/hooks/useFieldSave";
-import { nameWithoutExtension } from "@/lib/fileUtils";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
+import { nameWithoutExtension } from "@/ui/lib/fileUtils";
 
 /** How many files a page of a collection's wall brings. */
 const PAGE_SIZE = 60;

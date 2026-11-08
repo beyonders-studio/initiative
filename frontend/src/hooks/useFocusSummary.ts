@@ -11,9 +11,9 @@ import type {
   TaskPriority,
 } from "@/api/generated/initiativeAPI.schemas";
 import { getListMyTasksQueryKey, listMyTasks } from "@/api/generated/tasks/tasks";
-import { useLiveClockValue } from "@/hooks/useRelativeTime";
 import { useViewPreference } from "@/hooks/useViewPreference";
 import { browserTimezone } from "@/lib/timezones";
+import { useLiveClockValue } from "@/ui/lib/useRelativeTime";
 
 /** A pinned task, addressed by community because task ids collide across communities. */
 export type FocusPin = {

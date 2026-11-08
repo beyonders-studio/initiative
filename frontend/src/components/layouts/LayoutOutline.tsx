@@ -35,10 +35,6 @@ import type { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { NewPropertyForm, PROPERTY_TYPES } from "@/components/properties/NewPropertyForm";
 import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { MetadataOwner } from "@/hooks/useProperties";
 import { isRequired, LAYOUT_REGIONS, withRequired } from "@/lib/layouts/detailLayout";
 import {
@@ -69,9 +65,13 @@ import {
 } from "@/lib/layouts/fields";
 import type { PluginOnItems } from "@/lib/layouts/plugins";
 import type { LayoutNode } from "@/lib/layouts/tree";
-import { cn } from "@/lib/utils";
 import { localized } from "@/lib/widgets/widgetMeta";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { cn } from "@/ui/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 import type { EditableDetail } from "./details";
 import type { LayoutEdits } from "./LayoutEditor";

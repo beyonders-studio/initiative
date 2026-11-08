@@ -11,20 +11,7 @@ import { MemberDisplayNameDialog } from "@/components/communities/MemberDisplayN
 import { RemoveCommunityMemberDialog } from "@/components/communities/RemoveCommunityMemberDialog";
 import { ConnectionActionButtons } from "@/components/connections/ConnectionActionButtons";
 import { ConnectionActionsMenu } from "@/components/connections/ConnectionActionsMenu";
-import { StatusMessage } from "@/components/StatusMessage";
 import { UserHandle } from "@/components/UserHandle";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/ui/data-table";
-import {
-  DropdownMenuItem,
-  DropdownMenuPortal,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-} from "@/components/ui/dropdown-menu";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -34,7 +21,6 @@ import {
   useCustomRoles,
   useHeldSurfaces,
 } from "@/hooks/useCustomRoles";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useDmPermissions } from "@/hooks/useDirectMessages";
 import {
   deviceJSON,
@@ -52,8 +38,22 @@ import {
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { assignableCommunityRoles, isAdminRole } from "@/lib/permissions";
-import type { AppColumnDef } from "@/lib/table";
 import { getUrlHandle, getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { DataTable } from "@/ui/data-table";
+import {
+  DropdownMenuItem,
+  DropdownMenuPortal,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+} from "@/ui/dropdown-menu";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { StatusMessage } from "@/ui/status-message";
 
 /**
  * Everyone in this community, and a way to reach them.

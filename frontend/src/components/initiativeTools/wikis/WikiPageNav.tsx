@@ -6,7 +6,7 @@ import { WikiPageKind } from "@/api/generated/initiativeAPI.schemas";
 import { useWikiPages } from "@/hooks/useWikis";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { wikiFileRoute, wikiPageRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 interface WikiPageNavProps {
   wikiId: number;

@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { TabsBar, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SEARCH_CATEGORIES, type SearchCategory } from "@/lib/searchResults";
+import { TabsBar, TabsList, TabsTrigger } from "@/ui/tabs";
 
 /** The palette's tabs: plain labels, the chosen one filled. */
 const STRIP_TRIGGER =

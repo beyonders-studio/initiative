@@ -6,10 +6,10 @@ import {
   SearchEntityType,
   type SearchSuggestion,
 } from "@/api/generated/initiativeAPI.schemas";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
 import type { ItemEndKind } from "@/lib/relationships";
 import { hitIcon } from "@/lib/searchResults";
+import { AsyncCombobox } from "@/ui/async-combobox";
 
 /**
  * The kinds a relation picker offers, derived from the generated enum so a kind

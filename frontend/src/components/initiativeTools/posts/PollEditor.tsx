@@ -2,13 +2,13 @@ import { Plus, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { PollRead, PollWrite } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { fromLocalDateTimeInput, toLocalDateTimeInput } from "@/lib/formatDate";
 import { MAX_POLL_OPTION_CHARS, MAX_POLL_OPTIONS, MIN_POLL_OPTIONS } from "@/lib/posts";
+import { Button } from "@/ui/button";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Switch } from "@/ui/switch";
 
 /**
  * A poll while it is being written.

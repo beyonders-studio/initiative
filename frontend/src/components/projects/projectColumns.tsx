@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ProjectRead } from "@/api/generated/initiativeAPI.schemas";
-import type { AppColumnDef } from "@/lib/table";
+import type { AppColumnDef } from "@/ui/lib/table";
 
 /** What the projects table shows beside the columns every tool's table has:
  *  how much of each project's work is done. */

@@ -14,24 +14,18 @@ import type {
   AtlassianJiraProject,
   DataJobRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { getErrorCode, getErrorMessage, messageForCode } from "@/lib/errorMessage";
-import { formatBytes } from "@/lib/fileUtils";
-import { numberFormat } from "@/lib/intl";
 import { uploadInPieces } from "@/lib/resumableUpload";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { formatBytes } from "@/ui/lib/fileUtils";
+import { numberFormat } from "@/ui/lib/intl";
+import { Progress } from "@/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 /** Where somebody makes the token the connect step asks for. */
 const API_TOKEN_URL = "https://id.atlassian.com/manage-profile/security/api-tokens";

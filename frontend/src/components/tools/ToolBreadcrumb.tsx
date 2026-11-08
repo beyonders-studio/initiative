@@ -11,16 +11,16 @@ import { Fragment, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
+import { useListedInitiative } from "@/hooks/useInitiatives";
+import { useCommunityPath } from "@/lib/communityUrl";
+import { initiativeRoute, toolListRoute, toolNavLabelKey } from "@/lib/tools";
 import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import { useListedInitiative } from "@/hooks/useInitiatives";
-import { useCommunityPath } from "@/lib/communityUrl";
-import { initiativeRoute, toolListRoute, toolNavLabelKey } from "@/lib/tools";
+} from "@/ui/breadcrumb";
 
 export interface ToolBreadcrumbSegment {
   label: ReactNode;

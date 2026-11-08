@@ -3,9 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ProjectRead } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useGlobalProjects } from "@/hooks/useProjects";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
 
 interface ProjectPickerStepProps {
   communityId: number;

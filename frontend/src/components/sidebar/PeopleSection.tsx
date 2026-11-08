@@ -15,9 +15,6 @@ import {
   SidebarMenu,
   SidebarMenuItem,
 } from "@/components/sidebar/sidebar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { UserHoverLink } from "@/components/user/UserHoverLink";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -26,7 +23,10 @@ import { useCommunityRoster } from "@/hooks/useUsers";
 import { isAdminRole } from "@/lib/permissions";
 import { PRESENCE_ORDER, presenceLabelKey } from "@/lib/presence";
 import { getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
+import { Skeleton } from "@/ui/skeleton";
 
 const RosterRow = ({ member }: { member: CommunityRosterMember }) => {
   const { t } = useTranslation("communities");

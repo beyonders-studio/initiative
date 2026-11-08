@@ -2,7 +2,7 @@ import type { Collaborator, SocketId } from "@excalidraw/excalidraw/types";
 import type { ProviderAwareness } from "@lexical/yjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { getUserColorHsl, userColorHashId } from "@/lib/userColor";
+import { getUserColorHsl, userColorHashId } from "@/ui/lib/userColor";
 
 interface WhiteboardUser {
   id: number;

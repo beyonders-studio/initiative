@@ -11,7 +11,7 @@ import {
 } from "@/components/projects/KanbanColumn";
 import type { Band, TaskGrouping } from "@/lib/layouts/grouping";
 import type { LayoutContext } from "@/lib/layouts/tree";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 interface KanbanBandsProps {
   bands: Band[];

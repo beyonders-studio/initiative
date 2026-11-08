@@ -29,18 +29,6 @@ import { InstallPluginDialog } from "@/components/marketplace/InstallPluginDialo
 import { ListingProvenance } from "@/components/marketplace/ListingProvenance";
 import { ProjectListingPreview } from "@/components/marketplace/ProjectListingPreview";
 import { ReportButton } from "@/components/moderation/ReportButton";
-import { StatusMessage } from "@/components/StatusMessage";
-import { Badge } from "@/components/ui/badge";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
@@ -52,6 +40,18 @@ import { listingShownHere } from "@/lib/marketplaceCuration";
 import { listingKindTool } from "@/lib/tools";
 import { resolveArtworkUrl } from "@/lib/uploadUrl";
 import { readConfig, readDefinition } from "@/lib/widgets/definition";
+import { Badge } from "@/ui/badge";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/ui/breadcrumb";
+import { Button } from "@/ui/button";
+import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 
 export function MarketplaceListingPage() {
   const { t } = useTranslation(["marketplace", "plugins"]);

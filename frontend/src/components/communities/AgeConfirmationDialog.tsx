@@ -4,7 +4,8 @@ import { SupportTopic } from "@/api/generated/initiativeAPI.schemas";
 import { BirthdateField } from "@/components/auth/BirthdateField";
 import { useAgeConfirmation } from "@/components/auth/useAgeConfirmation";
 import { HelpLink } from "@/components/support/HelpLink";
-import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -12,8 +13,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useAuth } from "@/hooks/useAuth";
+} from "@/ui/dialog";
 
 /**
  * The age question, asked once, before a directory Join goes through.

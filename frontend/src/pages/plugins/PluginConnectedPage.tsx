@@ -11,7 +11,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { LogoIcon } from "@/components/LogoIcon";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 /**
  * How a vendor flow ended, in the seven ways it can.

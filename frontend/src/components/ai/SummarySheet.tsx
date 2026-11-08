@@ -3,11 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type AIStreamRequest, readAIStream } from "@/api/aiStream";
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
 import { getItem, setItem } from "@/lib/storage";
+import { Button } from "@/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
 
 /** A summary as it has been written so far. */
 export interface AISummary {

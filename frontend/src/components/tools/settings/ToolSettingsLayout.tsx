@@ -26,7 +26,6 @@ import { useTranslation } from "react-i18next";
 
 import type { ResourceGrantSchema, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsTabsNav } from "@/components/settings/SettingsTabsNav";
-import { SettingsPaneSkeleton } from "@/components/skeletons/PageSkeletons";
 import { canUseArchiveCard } from "@/components/tools/settings/ToolArchiveCard";
 import { canUseDuplicateCard } from "@/components/tools/settings/ToolDuplicateCard";
 import {
@@ -44,6 +43,7 @@ import {
   toolDetailRoute,
   toolSettingsSectionRoute,
 } from "@/lib/tools";
+import { SettingsPaneSkeleton } from "@/ui/page-skeletons";
 
 export type { ToolMutation, ToolSettingsEntity };
 

@@ -25,32 +25,32 @@ import { WikiPageNav } from "@/components/initiativeTools/wikis/WikiPageNav";
 import { ModerationMenu } from "@/components/moderation/ModerationMenu";
 import { ReportButton } from "@/components/moderation/ReportButton";
 import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { useCollaboration } from "@/hooks/useCollaboration";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
 import { propertySaves } from "@/hooks/useProperties";
-import { atLeast, useRegionWidthClass } from "@/hooks/useWidthClass";
 import { useAddWikiPage, useUpdateWikiPage, useWiki, useWikiPage } from "@/hooks/useWikis";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { PropertiesField } from "@/lib/layouts/fieldEditors";
 import { toast } from "@/lib/mascotToast";
 import { toolDetailRoute, toolRouteSegment, wikiPageRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Card, CardHeader, CardTitle } from "@/ui/card";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { atLeast, useRegionWidthClass } from "@/ui/lib/useWidthClass";
+import { cn } from "@/ui/lib/utils";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
+import { Skeleton } from "@/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 
 // The editor is the largest thing in the bundle; every other surface that
 // draws one loads it on demand, and a static import here would pull it back
 // into the shared chunk for all of them.
 const Editor = lazy(() =>
-  import("@/components/ui/editor/editor").then((m) => ({ default: m.Editor }))
+  import("@/components/editor/editor").then((m) => ({ default: m.Editor }))
 );
 
 const PageBodySkeleton = () => (

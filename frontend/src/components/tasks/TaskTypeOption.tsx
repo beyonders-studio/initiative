@@ -1,8 +1,8 @@
 import type { IconName } from "lucide-react/dynamic";
 
 import type { TaskTypeRead } from "@/api/generated/initiativeAPI.schemas";
-import { Icon } from "@/components/ui/icon-picker";
-import { cn } from "@/lib/utils";
+import { Icon } from "@/ui/icon-picker";
+import { cn } from "@/ui/lib/utils";
 
 type TypeLike = Pick<TaskTypeRead, "name" | "icon" | "color">;
 

@@ -1,6 +1,6 @@
-import { dateTimeFormat } from "@/lib/intl";
-import { hour12Option } from "@/lib/timeFormat";
 import type { TranslateFn } from "@/types/i18n";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { hour12Option } from "@/ui/lib/timeFormat";
 
 // A bare calendar date (no time, no zone) — how the API sends DATE columns.
 const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;

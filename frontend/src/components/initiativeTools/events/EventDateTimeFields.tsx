@@ -1,17 +1,11 @@
 import { useId, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { formatClockSlot } from "@/lib/timeFormat";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Label } from "@/ui/label";
+import { formatClockSlot } from "@/ui/lib/timeFormat";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 import {
   composeDateTime,

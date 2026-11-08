@@ -17,8 +17,14 @@ import {
   type ToolSettingsEntity,
   useToolSettings,
 } from "@/components/tools/settings/ToolSettingsContext";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useDuplicateTool } from "@/hooks/toolHooks";
+import { useToolCreateAccess } from "@/hooks/useInitiativeAccess";
+import { useInitiative } from "@/hooks/useInitiatives";
+import { useCommunityPath } from "@/lib/communityUrl";
+import { toast } from "@/lib/mascotToast";
+import { toolDetailRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -26,22 +32,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useDuplicateTool } from "@/hooks/toolHooks";
-import { useToolCreateAccess } from "@/hooks/useInitiativeAccess";
-import { useInitiative } from "@/hooks/useInitiatives";
-import { useCommunityPath } from "@/lib/communityUrl";
-import { toast } from "@/lib/mascotToast";
-import { toolDetailRoute } from "@/lib/tools";
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** Whether this viewer may copy it: write on it, or read on a template, which
  *  is made to be copied. Where the copy may go is the dialog's question. A

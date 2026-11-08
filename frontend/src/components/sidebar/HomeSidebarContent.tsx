@@ -20,10 +20,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/sidebar/sidebar";
-import { Badge } from "@/components/ui/badge";
 import { useDirectMessagesEnabled } from "@/hooks/useDirectMessages";
 import { useMessagesWaiting } from "@/hooks/useMyMessages";
 import { useHasFiledTickets } from "@/hooks/useTickets";
+import { Badge } from "@/ui/badge";
 
 export const HomeSidebarContent = () => {
   const { t } = useTranslation("nav");

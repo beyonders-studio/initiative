@@ -18,27 +18,12 @@ import type {
   ShareRequestScope,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { RelativeTime } from "@/components/ui/relative-time";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   type ShareRequestReply,
   useAnswerShareRequests,
   useShareRequests,
 } from "@/hooks/useShareRequests";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { dateTimeFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
 import { entityRefRoute, TOOL_ICONS, toolKebabSingular } from "@/lib/tools";
 import {
@@ -47,6 +32,15 @@ import {
   getUserDisplayName,
   isAnonymizedUser,
 } from "@/lib/userDisplay";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Checkbox } from "@/ui/checkbox";
+import { Label } from "@/ui/label";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { RelativeTime } from "@/ui/relative-time";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 type GiveLevel = Exclude<ResourceAccessLevel, "owner">;
 

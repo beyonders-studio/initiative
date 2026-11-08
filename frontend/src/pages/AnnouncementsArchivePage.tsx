@@ -4,13 +4,13 @@ import { useTranslation } from "react-i18next";
 
 import type { AnnouncementRead } from "@/api/generated/initiativeAPI.schemas";
 import { AnnouncementDialog } from "@/components/announcements/AnnouncementDialog";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAnnouncementArchive } from "@/hooks/useAnnouncements";
 import { formatDate } from "@/lib/formatDate";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Skeleton } from "@/ui/skeleton";
+import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 /**
  * Unread means never acknowledged.

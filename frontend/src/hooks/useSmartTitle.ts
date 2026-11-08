@@ -7,7 +7,6 @@ import { getListTagsQueryKey, listTags } from "@/api/generated/tags/tags";
 import { getListTaskTypesQueryOptions } from "@/api/generated/task-types/task-types";
 import { getSearchUsersQueryOptions } from "@/api/generated/users/users";
 import { useAuth } from "@/hooks/useAuth";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   handlesIn,
   readTitle,
@@ -19,6 +18,7 @@ import {
   WORD_KEYS,
 } from "@/lib/smartTitle";
 import { useWeekStart } from "@/ui/host";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
 

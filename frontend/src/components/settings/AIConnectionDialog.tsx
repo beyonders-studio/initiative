@@ -5,7 +5,8 @@ import type {
   AIProvider,
   ConnectionScope,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
+import { PROVIDER_CONFIGS } from "@/lib/ai-providers";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -13,19 +14,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { SuggestCombobox } from "@/components/ui/suggest-combobox";
-import { Switch } from "@/components/ui/switch";
-import { PROVIDER_CONFIGS } from "@/lib/ai-providers";
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { SuggestCombobox } from "@/ui/suggest-combobox";
+import { Switch } from "@/ui/switch";
 
 import { AIConnectionCommunitiesField } from "./AIConnectionCommunitiesField";
 import type { ConnectionMutations } from "./aiConnection.types";

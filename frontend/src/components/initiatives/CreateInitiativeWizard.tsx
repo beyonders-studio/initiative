@@ -39,20 +39,20 @@ import yonderTalking from "@/assets/yonder/talking.svg";
 import { JoinPolicySection } from "@/components/initiatives/JoinPolicySection";
 import { ToolsSection } from "@/components/initiatives/ToolsToggles";
 import { Markdown } from "@/components/Markdown";
-import { Button } from "@/components/ui/button";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Textarea } from "@/components/ui/textarea";
-import { WizardBackButton, WizardDialog } from "@/components/ui/wizard-dialog";
 import { useGrantToolsToMembers } from "@/hooks/useInitiativeRoles";
 import { useCreateInitiative } from "@/hooks/useInitiatives";
 import { useWizard } from "@/hooks/useWizard";
 import { docsUrl } from "@/lib/links";
 import { toast } from "@/lib/mascotToast";
 import { DEFAULT_ENABLED_TOOLS, TOOLS, toolViewPermission } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { DialogFooter } from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
+import { Textarea } from "@/ui/textarea";
+import { WizardBackButton, WizardDialog } from "@/ui/wizard-dialog";
 
 const DEFAULT_INITIATIVE_COLOR = "#6366F1";
 

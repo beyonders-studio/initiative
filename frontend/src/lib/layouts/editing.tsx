@@ -10,11 +10,11 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { ItemDraftContext } from "@/hooks/useFieldSave";
 import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
 
 /** Where one field's save stands. */
 export type FieldSaveState = "idle" | "saving" | "saved" | "error";

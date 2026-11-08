@@ -2,11 +2,11 @@ import { ExternalLink } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { EmbedFrame, POST_FRAME_CLASS } from "@/components/ui/embed-frame";
-import { sanitizeUrl } from "@/lib/safeUrl";
 import { matchSmartLinkProvider } from "@/lib/smartLinkProviders";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { EmbedFrame, POST_FRAME_CLASS } from "@/ui/embed-frame";
+import { sanitizeUrl } from "@/ui/lib/safeUrl";
+import { cn } from "@/ui/lib/utils";
 
 export interface SmartLinkContent {
   url: string;

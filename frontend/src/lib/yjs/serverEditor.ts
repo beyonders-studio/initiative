@@ -42,10 +42,10 @@ import {
   type Text as YText,
 } from "yjs";
 
-import { documentExtension } from "@/components/ui/editor/document-extension";
-import { MARKDOWN_TRANSFORMERS } from "@/components/ui/editor/extensions/markdown-shortcuts-extension";
-import { COLLAB_EXCLUDED_PROPERTIES } from "@/components/ui/editor/nodes/image-node";
-import { registerLegacyNodes } from "@/components/ui/editor/nodes/legacy-nodes";
+import { documentExtension } from "@/components/editor/document-extension";
+import { MARKDOWN_TRANSFORMERS } from "@/components/editor/extensions/markdown-shortcuts-extension";
+import { COLLAB_EXCLUDED_PROPERTIES } from "@/components/editor/nodes/image-node";
+import { registerLegacyNodes } from "@/components/editor/nodes/legacy-nodes";
 import { readRange } from "@/lib/spreadsheet/range";
 
 /** The id the browser's `CollaborationPlugin` binds under. */

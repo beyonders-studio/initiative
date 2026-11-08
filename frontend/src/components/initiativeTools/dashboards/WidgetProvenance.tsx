@@ -14,15 +14,15 @@ import { AlertTriangle, Info, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { WidgetBinding } from "@/hooks/useWidgetData";
-import { dateTimeFormat } from "@/lib/intl";
-import { cn } from "@/lib/utils";
 import type { DataMeta } from "@/lib/widgets/dataShapes";
 import { queryScope } from "@/lib/widgets/provenance";
 import { sourceDescriptor } from "@/lib/widgets/sources";
 import { localized, type WidgetMeta } from "@/lib/widgets/widgetMeta";
+import { Button } from "@/ui/button";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { cn } from "@/ui/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 export interface WidgetProvenanceProps {
   binding: WidgetBinding;

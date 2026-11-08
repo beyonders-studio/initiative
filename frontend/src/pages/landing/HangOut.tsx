@@ -15,8 +15,8 @@ import { Bell, CalendarDays, Check, Heart, Megaphone, ThumbsUp, Users } from "lu
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
 
 import { DarkBand } from "./DarkBand";
 import { useFrontDoor } from "./useFrontDoor";

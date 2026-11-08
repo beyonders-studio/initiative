@@ -43,10 +43,6 @@ import { SubscribeButton } from "@/components/SubscribeButton";
 import { TagPicker } from "@/components/tags";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { TaskDescription } from "@/components/tasks/TaskDescription";
-import { Button } from "@/components/ui/button";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -64,7 +60,11 @@ import type { MemberSearchScope } from "@/hooks/useUsers";
 import { getHttpStatus } from "@/lib/errorMessage";
 import { currentServerKey } from "@/lib/offlineSession";
 import { getItem, removeItem, setItem } from "@/lib/storage";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { cn } from "@/ui/lib/utils";
+import { Textarea } from "@/ui/textarea";
 
 import { FieldFrame, ReadField, sameJson, useFieldDraft } from "./editing";
 

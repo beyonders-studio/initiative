@@ -35,11 +35,11 @@ import { propertyStubFromDefinition } from "@/components/properties/propertyHelp
 import { TagBadge } from "@/components/tags/TagBadge";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
-import { Badge } from "@/components/ui/badge";
-import { dateTimeFormat } from "@/lib/intl";
 import type { FieldDef } from "@/lib/layouts/fields";
 import { getTaskDateStatusLabel, TASK_DATE_STATUSES } from "@/lib/taskDateStatus";
 import type { TranslateFn } from "@/types/i18n";
+import { Badge } from "@/ui/badge";
+import { dateTimeFormat } from "@/ui/lib/intl";
 
 /** The key of the group a task with no value falls into. */
 export const NO_GROUP = "";

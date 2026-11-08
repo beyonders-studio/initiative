@@ -5,7 +5,12 @@ import { useTranslation } from "react-i18next";
 import type { TaskListRead, TaskStatusRead } from "@/api/generated/initiativeAPI.schemas";
 import { TaskAssigneeStack } from "@/components/projects/TaskAssigneeList";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
-import { Button } from "@/components/ui/button";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useAuth } from "@/hooks/useAuth";
+import { useUpdateTaskInCommunity } from "@/hooks/useTasks";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
 import {
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -15,15 +20,10 @@ import {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-} from "@/components/ui/dropdown-menu";
-import { RowActionsMenu } from "@/components/ui/row-actions-menu";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useAuth } from "@/hooks/useAuth";
-import { useUpdateTaskInCommunity } from "@/hooks/useTasks";
-import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
+} from "@/ui/dropdown-menu";
+import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
+import { RowActionsMenu } from "@/ui/row-actions-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 /** What a board offers its cards' menus: its columns, and moving a task
  *  between them as dropping it in one would. */

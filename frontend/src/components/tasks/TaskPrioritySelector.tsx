@@ -3,17 +3,17 @@ import { useTranslation } from "react-i18next";
 
 import type { TaskListRead, TaskPriority } from "@/api/generated/initiativeAPI.schemas";
 import { priorityVariant } from "@/components/projects/projectTasksConfig";
-import { Badge } from "@/components/ui/badge";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useUpdateTaskInCommunity } from "@/hooks/useTasks";
+import { toast } from "@/lib/mascotToast";
+import { Badge } from "@/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useUpdateTaskInCommunity } from "@/hooks/useTasks";
-import { toast } from "@/lib/mascotToast";
+} from "@/ui/dropdown-menu";
 
 type TaskPrioritySelectorProps = {
   task: TaskListRead;

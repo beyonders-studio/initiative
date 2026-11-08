@@ -4,22 +4,16 @@ import { useTranslation } from "react-i18next";
 
 import type { ICalImportResult, ICalParseResult } from "@/api/generated/initiativeAPI.schemas";
 import { isWritableCalendar } from "@/components/initiativeTools/events/CreateEventDialog";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import { useImportIcalEvents, useParseIcalFile } from "@/hooks/useCalendarEvents";
 import { useCalendarsList } from "@/hooks/useCalendars";
 import { useWizard } from "@/hooks/useWizard";
 import { toast } from "@/lib/mascotToast";
 import { browserTimezone } from "@/lib/timezones";
 import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { WizardDialog } from "@/ui/wizard-dialog";
 
 type Step = "upload" | "result";
 

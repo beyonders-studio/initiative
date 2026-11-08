@@ -4,9 +4,9 @@ import { useTranslation } from "react-i18next";
 import type { CommunityCategory } from "@/api/generated/initiativeAPI.schemas";
 import { PlacePicker } from "@/components/communities/PlacePicker";
 import { ContinueButton, SkipButton } from "@/components/start/stepParts";
-import { Button } from "@/components/ui/button";
 import { COMMUNITY_CATEGORIES, communityCategoryLabel } from "@/lib/communityCategories";
 import type { Place } from "@/lib/directoryNear";
+import { Button } from "@/ui/button";
 
 /** Each shelf's own colour, spread evenly around the wheel. */
 const shelfColour = (index: number): string =>

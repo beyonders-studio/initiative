@@ -11,9 +11,9 @@ import {
 import { type DraftStore, useDraft } from "@/components/files/spreadsheet/draftStore";
 import { FormulaCellInput } from "@/components/files/spreadsheet/FormulaCellInput";
 import type { RefHighlight } from "@/components/files/spreadsheet/useSpreadsheetEditing";
-import { Checkbox } from "@/components/ui/checkbox";
 import type { FormulaRefToken } from "@/lib/spreadsheet/formula-refs";
-import { cn } from "@/lib/utils";
+import { Checkbox } from "@/ui/checkbox";
+import { cn } from "@/ui/lib/utils";
 
 /** A cell's event handlers, keyed by the cell they fire on. */
 export interface CellHandlers {

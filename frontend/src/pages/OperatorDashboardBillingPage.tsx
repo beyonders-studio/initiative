@@ -28,14 +28,14 @@ import {
   createBillingDirectoryHandoff,
   createBillingInsightsHandoff,
 } from "@/api/generated/settings/settings";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { openExternal, reserveTab } from "@/lib/openExternal";
 import { Capability, hasCapability } from "@/lib/permissions";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 type Door = "insights" | "contracts" | "directory" | "control";
 

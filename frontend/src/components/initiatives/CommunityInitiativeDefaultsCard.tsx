@@ -14,16 +14,6 @@ import type {
   PermissionKey,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import {
   EXTRA_PERMISSION_KEYS,
   PERMISSION_LABEL_KEYS,
@@ -36,6 +26,10 @@ import {
   toolCreatePermission,
   toolViewPermission,
 } from "@/lib/tools";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 type Choice = "initiative" | "on" | "off";
 

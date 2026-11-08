@@ -34,21 +34,9 @@ import {
 import { ContactNewTaskDialog } from "@/components/initiativeTools/contacts/ContactNewTaskDialog";
 import { CreateContactDialog } from "@/components/initiativeTools/contacts/CreateContactDialog";
 import { CreateEventDialog } from "@/components/initiativeTools/events/CreateEventDialog";
-import { DetailHeaderSkeleton } from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { ToolChest } from "@/components/tools/ToolChest";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { CopyButton } from "@/components/ui/copy-button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useCanonicalInitiativeId } from "@/hooks/useCanonicalInitiativeId";
 import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import { useContact, useMoveContact, useUpdateContact } from "@/hooks/useContacts";
@@ -69,9 +57,21 @@ import {
   standingOf,
   telHref,
 } from "@/lib/contacts";
-import { dateTimeFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
 import { toolDetailRoute, toolListRoute, toolSettingsRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { CopyButton } from "@/ui/copy-button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { DetailHeaderSkeleton } from "@/ui/page-skeletons";
+import { Skeleton } from "@/ui/skeleton";
 
 /** The icon in front of each kind of detail. */
 const DETAIL_ICONS = { phones: Phone, emails: Mail, addresses: MapPin, websites: Globe };

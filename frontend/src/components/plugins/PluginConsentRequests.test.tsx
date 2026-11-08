@@ -16,7 +16,7 @@ import {
   ConsentAccess,
   ConsentStatus,
 } from "@/api/generated/initiativeAPI.schemas";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/ui/tooltip";
 
 import { PluginConsentRequests } from "./PluginConsentRequests";
 

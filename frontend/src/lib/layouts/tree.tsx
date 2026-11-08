@@ -1,7 +1,7 @@
 import { Fragment, memo, type ReactNode } from "react";
 
 import { nonEmptyPropertySummaries } from "@/components/properties/propertyHelpers";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 import {
   FIELD_RENDERERS,

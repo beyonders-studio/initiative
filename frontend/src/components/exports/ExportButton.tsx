@@ -1,7 +1,8 @@
 import { ChevronDown, FileDown, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
+import { useExportJob } from "@/hooks/useExportJob";
+import { Button } from "@/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,8 +10,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useExportJob } from "@/hooks/useExportJob";
+} from "@/ui/dropdown-menu";
 
 export interface ExportFormatOption {
   /** The ``format`` query value ("pdf", "csv", "xlsx", "md", "json"). */

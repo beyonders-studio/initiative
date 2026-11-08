@@ -3,9 +3,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ImageChooserDialog } from "@/components/files/ImageChooser";
-import { Button } from "@/components/ui/button";
-import { ImagePicker } from "@/components/ui/image-picker";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
+import { Button } from "@/ui/button";
+import { ImagePicker } from "@/ui/image-picker";
 
 interface FileFeaturedImageProps {
   url: string | null;

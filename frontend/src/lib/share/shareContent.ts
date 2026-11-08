@@ -8,7 +8,7 @@ import {
   type SerializedEditorState,
 } from "lexical";
 
-import { $createImageNode, ImageNode } from "@/components/ui/editor/nodes/image-node";
+import { $createImageNode, ImageNode } from "@/components/editor/nodes/image-node";
 import { imageMarkdown } from "@/lib/markdownEditing";
 import { RESERVED_SIGILS } from "@/lib/mentions";
 import type { ReceivedShare } from "@/lib/share/pendingShare";

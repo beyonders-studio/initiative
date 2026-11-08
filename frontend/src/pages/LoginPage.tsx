@@ -13,17 +13,6 @@ import { PasskeyRelayCard } from "@/components/auth/PasskeyRelayCard";
 import { ProviderMark } from "@/components/auth/ProviderMark";
 import { ServerPicker, ServerSubtitle } from "@/components/auth/ServerChoice";
 import { SignInFrame } from "@/components/auth/SignInFrame";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { SecondFactorRequiredError, useAuth } from "@/hooks/useAuth";
 import { useLoginProviders } from "@/hooks/useCommunityAuthPolicy";
@@ -42,6 +31,10 @@ import {
 } from "@/lib/passkeys";
 import { providerSignInHref } from "@/lib/returnPath";
 import { compactCode } from "@/lib/secondFactorAnswer";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 import { RegisterPage } from "./RegisterPage";
 

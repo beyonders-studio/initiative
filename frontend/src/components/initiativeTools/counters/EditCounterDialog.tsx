@@ -4,15 +4,6 @@ import { useTranslation } from "react-i18next";
 
 import { useReadCounter } from "@/api/generated/counters/counters";
 import { type CounterRead, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { counterSaves, type SteppedCount, useResetCounter } from "@/hooks/useCounters";
 import { usePendingShown } from "@/hooks/useFieldSave";
@@ -22,6 +13,15 @@ import { DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
 import type { StoredRegions } from "@/lib/layouts/detailLayout";
 import { usePluginMenuActions } from "@/lib/layouts/plugins";
 import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
 
 type EditCounterDialogProps = DialogProps & {
   groupId: number;

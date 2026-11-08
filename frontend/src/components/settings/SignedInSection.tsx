@@ -21,6 +21,8 @@ import {
   type SignedInSessionInfo,
 } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsSection } from "@/components/settings/SettingsSection";
+import { useEndSignedIn, useMySessions, useRevokeOtherSessions } from "@/hooks/useSecurity";
+import { toast } from "@/lib/mascotToast";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,12 +32,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
-import { useEndSignedIn, useMySessions, useRevokeOtherSessions } from "@/hooks/useSecurity";
-import { toast } from "@/lib/mascotToast";
+} from "@/ui/alert-dialog";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
 
 const KIND_ICONS = {
   [Kind.mobile]: Smartphone,

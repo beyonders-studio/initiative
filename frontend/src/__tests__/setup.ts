@@ -148,8 +148,8 @@ vi.mock("@capacitor/app", () => ({
 // ---------------------------------------------------------------------------
 
 // The breakpoints, which useWidthClass reads from :root. jsdom
-// loads no stylesheet, so they are set here from the one styles.css declares.
-const stylesheet = readFileSync(path.join(import.meta.dirname, "../styles.css"), "utf8");
+// loads no stylesheet, so they are set here from the ones ui/styles.css declares.
+const stylesheet = readFileSync(path.join(import.meta.dirname, "../ui/styles.css"), "utf8");
 for (const [, name, value] of stylesheet.matchAll(/--breakpoint-([a-z-]+):\s*([^;]+);/g)) {
   document.documentElement.style.setProperty(`--breakpoint-${name}`, value);
 }

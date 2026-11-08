@@ -35,22 +35,16 @@ import {
 import type { QueryablePlugin } from "@/api/pluginData";
 import { FilterBuilder, fieldLabel } from "@/components/initiativeTools/dashboards/FilterBuilder";
 import { PluginParamControl } from "@/components/plugins/PluginParamControl";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useFieldCatalog } from "@/hooks/useFieldCatalog";
 import { useFieldCatalogs } from "@/hooks/useQueryVocabulary";
-import { listFormat } from "@/lib/intl";
 import { joinRange, splitRange } from "@/lib/spreadsheet/range";
 import { type FilterLeaf, type FilterNode, toFilterFieldSpec } from "@/lib/widgets/conditions";
 import { withParamAnswer } from "@/lib/widgets/pluginParams";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { listFormat } from "@/ui/lib/intl";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** The datasets a query may name. Read from the generated enum, which is the
  *  backend's own registry — so a dataset declared there is offered here on the

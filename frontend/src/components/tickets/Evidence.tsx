@@ -12,11 +12,11 @@ import { useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { EvidencePolicyRead, EvidenceRead } from "@/api/generated/initiativeAPI.schemas";
-import { Lightbox } from "@/components/shared/Lightbox";
-import { Button } from "@/components/ui/button";
-import { formatBytes } from "@/lib/fileUtils";
 import { resolveHeaderlessApiUrl } from "@/lib/uploadUrl";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { formatBytes } from "@/ui/lib/fileUtils";
+import { cn } from "@/ui/lib/utils";
+import { Lightbox } from "@/ui/lightbox";
 
 /** Pictures the browser shows in place; anything else is a download. */
 const SHOWN_IN_PLACE = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);

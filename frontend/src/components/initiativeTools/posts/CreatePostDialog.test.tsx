@@ -16,7 +16,7 @@ import { renderPage } from "@/__tests__/helpers/render";
 
 import { CreatePostDialog } from "./CreatePostDialog";
 
-vi.mock("@/components/ui/editor/editor", () => ({ Editor: () => null }));
+vi.mock("@/components/editor/editor", () => ({ Editor: () => null }));
 
 const required = (field: string) => ({
   type: "field" as const,

@@ -29,19 +29,6 @@ import { toDateKey, toTimeSlot } from "@/components/initiativeTools/events/event
 import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import type { OccurrenceScope } from "@/components/recurrence/OccurrenceScopeDialog";
 import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import {
   type EventPatch,
@@ -54,7 +41,6 @@ import {
 import { ItemDraftContext } from "@/hooks/useFieldSave";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { formatDate, formatDateTime } from "@/lib/formatDate";
-import { dateTimeFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
 import {
   allDayReference,
@@ -64,10 +50,18 @@ import {
   summarizeStored,
 } from "@/lib/recurrence";
 import { referenceRef } from "@/lib/smartChips";
-import { hour12Option } from "@/lib/timeFormat";
 import { eventRoute } from "@/lib/tools";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import type { TranslateFn } from "@/types/i18n";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { hour12Option } from "@/ui/lib/timeFormat";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 import { type DetailKind, useItemContext } from "./DetailLayoutView";
 import { filledBy, hasAny, hasText, sentOr } from "./detailLayout";

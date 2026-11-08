@@ -57,24 +57,9 @@ import {
   type PropertyFilterCondition,
 } from "@/components/properties/PropertyFilter";
 import { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
-import {
-  CalendarPageSkeleton,
-  CardGridSkeleton,
-  SkeletonRegion,
-} from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { TaskStatusPriorityFilters } from "@/components/tasks/TaskStatusPriorityFilters";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { Button } from "@/components/ui/button";
-import {
-  DateRangeField,
-  dateRangeBounds,
-  isDateRangeSet,
-  type LocalDateRange,
-} from "@/components/ui/date-range-field";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCalendarEntries } from "@/hooks/useCalendarEntries";
 import { useUpdateCalendarEvent } from "@/hooks/useCalendarEvents";
@@ -114,7 +99,18 @@ import { CALENDAR_PRESETS, type Preset, presetName, presetsOf } from "@/lib/layo
 import { getProjectColor } from "@/lib/projectColor";
 import { browserTimezone } from "@/lib/timezones";
 import { eventRoute, taskRoute, toolListRoute, toolSettingsRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import {
+  DateRangeField,
+  dateRangeBounds,
+  isDateRangeSet,
+  type LocalDateRange,
+} from "@/ui/date-range-field";
+import { DropdownMenuItem } from "@/ui/dropdown-menu";
 import { useWeekStart } from "@/ui/host";
+import { Label } from "@/ui/label";
+import { CalendarPageSkeleton, CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { Switch } from "@/ui/switch";
 
 /** Where a calendar page keeps one person's view: the initiative's calendar,
  *  one community calendar, or the community's calendars together. What an

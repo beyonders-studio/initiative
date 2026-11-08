@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CaptchaConfig } from "@/api/generated/initiativeAPI.schemas";
-import { useFrameMessages } from "@/hooks/useFrameMessages";
 import { useServer } from "@/hooks/useServer";
 import { captchaProvider } from "@/lib/captchaProviders";
+import { useFrameMessages } from "@/ui/lib/useFrameMessages";
 
 /**
  * Single captcha widget that swaps between hCaptcha, Cloudflare

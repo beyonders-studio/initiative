@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import type { TagSummary } from "@/api/generated/initiativeAPI.schemas";
 import { TagTreeView, UNTAGGED_PATH } from "@/components/tags/TagTreeView";
 import { getContrastingTextColor } from "@/lib/counter-color";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 interface TagBrowseLayoutProps {
   allTags: TagSummary[];

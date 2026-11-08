@@ -25,9 +25,15 @@ import {
   useRequiredKeys,
   valuesOf,
 } from "@/components/layouts/RequiredValues";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
+import { useCreatePost } from "@/hooks/usePosts";
+import { useProperties } from "@/hooks/useProperties";
+import { sharedTarget } from "@/hooks/useToolLayouts";
+import { fromLocalDateTimeInput } from "@/lib/formatDate";
+import { MAX_POST_TEXT_CHARS } from "@/lib/posts";
+import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { DateTimePicker } from "@/ui/date-time-picker";
 import {
   Dialog,
   DialogContent,
@@ -35,19 +41,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useCreatePost } from "@/hooks/usePosts";
-import { useProperties } from "@/hooks/useProperties";
-import { sharedTarget } from "@/hooks/useToolLayouts";
-import { fromLocalDateTimeInput } from "@/lib/formatDate";
-import { MAX_POST_TEXT_CHARS } from "@/lib/posts";
-import type { DialogProps } from "@/types/dialog";
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Skeleton } from "@/ui/skeleton";
 
 const Editor = lazy(() =>
-  import("@/components/ui/editor/editor").then((m) => ({ default: m.Editor }))
+  import("@/components/editor/editor").then((m) => ({ default: m.Editor }))
 );
 
 type CreatePostDialogProps = DialogProps & {

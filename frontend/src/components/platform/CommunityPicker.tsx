@@ -14,8 +14,8 @@ import {
   CommunityStatus,
   ListPlatformCommunityStorageSortBy,
 } from "@/api/generated/initiativeAPI.schemas";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
 import { usePlatformCommunities } from "@/hooks/useSettings";
+import { AsyncCombobox } from "@/ui/async-combobox";
 
 export interface PickedCommunity {
   id: number;

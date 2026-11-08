@@ -11,13 +11,13 @@ import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { HomeWidgetCard, HomeWidgetNotice } from "@/components/home/HomeWidgetCard";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useMyBookmarks, useToggleBookmark } from "@/hooks/usePersonalItems";
 import { renderRecentIcon } from "@/lib/recentIcon";
 import { recentRoute } from "@/lib/recentRoute";
 import { toolNavLabelKey } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { Skeleton } from "@/ui/skeleton";
 
 import { onlyTool, ToolsSetting, toolsOf } from "./toolFilter";
 import type { HomeWidgetProps, HomeWidgetSettingsProps } from "./types";

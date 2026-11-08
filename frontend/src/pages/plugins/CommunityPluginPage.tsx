@@ -33,13 +33,6 @@ import {
 } from "@/api/generated/plugins/plugins";
 import { ReportButton } from "@/components/moderation/ReportButton";
 import { PluginProviderNotice, pluginNoticeKey } from "@/components/plugins/PluginProviderNotice";
-import {
-  EditorSkeleton,
-  SkeletonPillRow,
-  SkeletonRegion,
-} from "@/components/skeletons/PageSkeletons";
-import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
@@ -52,8 +45,11 @@ import { showsCuratedCatalogueOnly } from "@/lib/marketplaceCuration";
 import { pageAllow, pluginPages } from "@/lib/pluginSurfaces";
 import { getItem, setItem } from "@/lib/storage";
 import { DEFAULT_THEME } from "@/lib/themes";
-import { cn } from "@/lib/utils";
 import { localized } from "@/lib/widgets/widgetMeta";
+import { Button } from "@/ui/button";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { cn } from "@/ui/lib/utils";
+import { EditorSkeleton, SkeletonPillRow, SkeletonRegion } from "@/ui/page-skeletons";
 
 /** The message names a page and this host agree on. */
 const READY = "initiative-plugin:ready";

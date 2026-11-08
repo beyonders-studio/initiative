@@ -16,11 +16,6 @@ import { useTranslation } from "react-i18next";
 
 import type { InitiativeJoinRequestRead } from "@/api/generated/initiativeAPI.schemas";
 import { JoinRequestStatus } from "@/api/generated/initiativeAPI.schemas";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RelativeTime } from "@/components/ui/relative-time";
 import { useInitiativeJoinRequests, useResolveJoinRequest } from "@/hooks/useInitiatives";
 import { toast } from "@/lib/mascotToast";
 import {
@@ -29,6 +24,11 @@ import {
   getUserDisplayName,
   isAnonymizedUser,
 } from "@/lib/userDisplay";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { RelativeTime } from "@/ui/relative-time";
 
 export interface InitiativeJoinRequestQueueProps {
   initiativeId: number;

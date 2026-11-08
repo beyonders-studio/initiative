@@ -9,26 +9,21 @@ import { generateSummary, notifyMentions } from "@/api/generated/files/files";
 import { FileKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { type AISummary, SummarySheet, useSummarySheet } from "@/components/ai/SummarySheet";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
+import { CollaborationStatusBadge } from "@/components/editor/CollaborationStatusBadge";
+import { FeaturedImageProvider } from "@/components/editor/context/featured-image-context";
+import {
+  DocumentOutlinePanel,
+  DocumentOutlineScope,
+  useDocumentOutline,
+} from "@/components/editor/DocumentOutline";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
 import { FileCollections } from "@/components/files/collections/FileCollections";
 import { fileBody } from "@/components/files/detail/fileBodies";
 import { FileFeaturedImage } from "@/components/files/FileFeaturedImage";
 import { clearWhiteboardSceneCache } from "@/components/files/whiteboardSceneCache";
-import { FileDetailSkeleton } from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { ToolChest, ToolChestSegment } from "@/components/tools/ToolChest";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { CollaborationStatusBadge } from "@/components/ui/editor/CollaborationStatusBadge";
-import { FeaturedImageProvider } from "@/components/ui/editor/context/featured-image-context";
-import {
-  DocumentOutlinePanel,
-  DocumentOutlineScope,
-  useDocumentOutline,
-} from "@/components/ui/editor/DocumentOutline";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { useAuth } from "@/hooks/useAuth";
 import { useCanonicalInitiativeId } from "@/hooks/useCanonicalInitiativeId";
@@ -38,15 +33,20 @@ import { useFile, useSetFileCache, useUpdateFile } from "@/hooks/useFiles";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { useServerForm } from "@/hooks/useServerForm";
 import { uploadAttachment } from "@/lib/attachmentUtils";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { findNewMentions } from "@/lib/mentionUtils";
 import { toolListRoute, toolRouteSegment, toolSettingsRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
 import { CollaborationError } from "@/lib/yjs/CollaborationProvider";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { cn } from "@/ui/lib/utils";
+import { FileDetailSkeleton } from "@/ui/page-skeletons";
 
 export const FileDetailPage = () => {
   const { t } = useTranslation(["files", "properties", "common", "editor"]);

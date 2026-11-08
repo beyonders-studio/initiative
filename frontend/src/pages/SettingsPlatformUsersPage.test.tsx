@@ -25,7 +25,7 @@ import type {
   UserAction,
   UserRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { dateTimeFormat } from "@/lib/intl";
+import { dateTimeFormat } from "@/ui/lib/intl";
 
 // The roster the mocked hook serves. Each test sets it, so no test depends on
 // what another left behind.

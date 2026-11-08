@@ -4,14 +4,14 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ToolFilterButton } from "@/components/initiativeTools/shared/ToolFilterPanel";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+} from "@/ui/dropdown-menu";
+import { Tabs, TabsList, TabsTrigger } from "@/ui/tabs";
 
 export type ToolViewOption<V extends string> = {
   value: V;

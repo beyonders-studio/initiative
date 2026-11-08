@@ -11,11 +11,11 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { layoutLook } from "@/components/projects/projectTasksConfig";
 import { TaskTypeDeleteDialog } from "@/components/projects/TaskTypeDeleteDialog";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { useSaveLayouts } from "@/hooks/useToolLayouts";
-import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
 import { formatDateTime } from "@/lib/formatDate";
+import { Button } from "@/ui/button";
+import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
+import { Switch } from "@/ui/switch";
 
 type Layout = ListLayoutRead | DetailLayoutRead;
 

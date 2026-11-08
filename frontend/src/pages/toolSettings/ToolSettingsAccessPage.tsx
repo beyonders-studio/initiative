@@ -14,8 +14,8 @@ import { ShareControl } from "@/components/access/ShareControl";
 import { ShareRequestsCard } from "@/components/access/ShareRequests";
 import { useToolSettings } from "@/components/tools/settings/ToolSettingsContext";
 import { ToolSettingsPermissionRequired } from "@/components/tools/settings/ToolSettingsGuard";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { toast } from "@/lib/mascotToast";
+import { Card, CardContent, CardDescription, CardHeader } from "@/ui/card";
 
 export const ToolSettingsAccessPage = () => {
   const { t } = useTranslation(["common", "access"]);

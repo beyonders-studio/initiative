@@ -14,8 +14,8 @@ import type { LucideIcon } from "lucide-react";
 import { ArrowUpRight, Code2, Layers, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
 import { portalPricingUrl } from "@/hooks/useBillingCatalog";
+import { Button } from "@/ui/button";
 
 import { DarkBand } from "./DarkBand";
 import { LandingShell } from "./LandingShell";

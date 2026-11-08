@@ -17,14 +17,14 @@ import { CommentContent } from "@/components/comments/CommentContent";
 import { CommentReferences } from "@/components/comments/CommentReferences";
 import { FeedCardSkeleton } from "@/components/communityHome/CommunityActivityFeed";
 import { ReactionBar } from "@/components/reactions/ReactionBar";
-import { Card } from "@/components/ui/card";
-import { RelativeTime } from "@/components/ui/relative-time";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { useRecentComments } from "@/hooks/useComments";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { entityRefRoute, TOOLS, taskRoute, toolDetailRoute } from "@/lib/tools";
 import { getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Card } from "@/ui/card";
+import { cn } from "@/ui/lib/utils";
+import { RelativeTime } from "@/ui/relative-time";
 
 const RECENT_COMMENTS_PARAMS = { limit: 10 };
 

@@ -6,24 +6,17 @@ import { getListDataJobsQueryKey, useListDataJobs } from "@/api/generated/data-j
 import { useCancelImportJob } from "@/api/generated/imports/imports";
 import type { DataJobRead } from "@/api/generated/initiativeAPI.schemas";
 import { ImportReport } from "@/components/imports/ImportReport";
-import { SkeletonRegion, TableSkeleton } from "@/components/skeletons/PageSkeletons";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { RelativeTime } from "@/components/ui/relative-time";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { downloadExportArtifact } from "@/lib/exportDownload";
 import { toast } from "@/lib/mascotToast";
 import { queryClient } from "@/lib/queryClient";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { RelativeTime } from "@/ui/relative-time";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
 
 const ACTIVE = new Set(["staged", "fetching", "queued", "running"]);
 const POLL_MS = 5000;

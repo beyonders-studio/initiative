@@ -2,9 +2,9 @@ import { Upload } from "lucide-react";
 import { forwardRef, type ReactNode, useImperativeHandle, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
-import { DropOverlay } from "@/components/ui/file-drop";
-import { useFileDrop } from "@/hooks/useFileDrop";
-import { cn } from "@/lib/utils";
+import { DropOverlay } from "@/ui/file-drop";
+import { useFileDrop } from "@/ui/lib/useFileDrop";
+import { cn } from "@/ui/lib/utils";
 
 export interface CollectionDropzoneHandle {
   /** Open the file dialog — for a button somewhere else on the page. */

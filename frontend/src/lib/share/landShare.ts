@@ -6,11 +6,11 @@ import { createPost } from "@/api/generated/posts/posts";
 import { createTask } from "@/api/generated/tasks/tasks";
 import { uploadAttachment, uploadPastedImage } from "@/lib/attachmentUtils";
 import { communityPath } from "@/lib/communityUrl";
-import { nameWithoutExtension } from "@/lib/fileUtils";
 import { uploadInPieces } from "@/lib/resumableUpload";
 import type { SharedFile } from "@/lib/share/pendingShare";
 import { shareBody, shareMarkdown } from "@/lib/share/shareContent";
 import { taskRoute, toolDetailRoute, toolListRoute } from "@/lib/tools";
+import { nameWithoutExtension } from "@/ui/lib/fileUtils";
 
 /**
  * What a share can become: a task, a document written around it, a post, or

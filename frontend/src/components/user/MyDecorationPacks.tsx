@@ -3,15 +3,15 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { DecorationPack, OwnedDecoration } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
 import { DecorationSwatch } from "@/components/user/DecorationSwatch";
 import { PackContentsDialog, packPieces } from "@/components/user/PackContents";
 import { useDecorationPacks, useRemoveDecorationPack } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { type Decoration, resolveDecoration } from "@/lib/profileDecorations";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Input } from "@/ui/input";
 
 /** Above this many, finding one by eye stops working and the filter appears. */
 const FILTER_THRESHOLD = 8;

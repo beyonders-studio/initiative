@@ -2,12 +2,12 @@ import { Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { Presence, UserSelfUpdate } from "@/api/generated/initiativeAPI.schemas";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { PresenceDot } from "@/components/user/PresenceDot";
 import { useUpdateCurrentUser } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { PRESENCE_ORDER, presenceHelpKey, presenceLabelKey } from "@/lib/presence";
+import { DropdownMenuItem } from "@/ui/dropdown-menu";
 
 interface PresenceMenuItemsProps {
   /** What the account is set to — the choice, not what a reader is shown. */

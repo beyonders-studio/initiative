@@ -9,13 +9,13 @@ import type {
   PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import { AddToCollectionButton } from "@/components/files/collections/AddToCollectionButton";
-import { badgeVariants } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { collectionMetadataSaves, useCollections } from "@/hooks/useCollections";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { PlacedPropertyField } from "@/lib/layouts/fieldEditors";
 import { collectionRoute } from "@/lib/tools";
+import { badgeVariants } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 /**
  * The collections a file is in, each a way to it, and the way to put it in

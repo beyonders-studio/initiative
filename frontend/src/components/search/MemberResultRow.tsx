@@ -2,8 +2,8 @@ import { Link } from "@tanstack/react-router";
 
 import type { UserSummary } from "@/api/generated/initiativeAPI.schemas";
 import { UserHandle } from "@/components/UserHandle";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getAvatarSrc, getInitialsForUser, getUrlHandle } from "@/lib/userDisplay";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
 
 /**
  * One member found.

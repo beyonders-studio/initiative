@@ -5,11 +5,6 @@ import { useTranslation } from "react-i18next";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { ProjectPickerStep } from "@/components/tasks/ProjectPickerStep";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { WizardFrame } from "@/components/ui/wizard-dialog";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { useCommunityInitiativeSteps } from "@/hooks/useCommunityInitiativeSteps";
 import { useServer } from "@/hooks/useServer";
@@ -28,7 +23,12 @@ import { isImage, type ReceivedShare, type SharedFile } from "@/lib/share/pendin
 import { shareNote, shareTitle } from "@/lib/share/shareContent";
 import { getItem, setItem } from "@/lib/storage";
 import { TOOL_ICONS } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
+import { Textarea } from "@/ui/textarea";
+import { WizardFrame } from "@/ui/wizard-dialog";
 
 const STORAGE_KEY = "initiative-last-share-destination";
 

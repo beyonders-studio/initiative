@@ -3,11 +3,11 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
 import { communityPath, isCommunityScopedPath } from "@/lib/communityUrl";
 import { normalizeLegacyTarget } from "@/lib/entityResolver";
+import { Button } from "@/ui/button";
 
 const normalizeTarget = (raw: string): string => {
   const decoded = decodeURIComponent(raw);

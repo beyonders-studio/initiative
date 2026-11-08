@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { CommunityHomeSkeleton } from "@/components/skeletons/PageSkeletons";
 import { validateId } from "@/lib/routeSearch";
 import { CommunityHomePage } from "@/pages/CommunityHomePage";
+import { CommunityHomeSkeleton } from "@/ui/page-skeletons";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communityId/")({
   /** `node` is the rail's open node; comments is the only one. */

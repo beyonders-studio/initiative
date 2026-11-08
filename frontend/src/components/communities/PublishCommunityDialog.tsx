@@ -16,8 +16,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CommunityCategory } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { COMMUNITY_CATEGORIES, communityCategoryLabel } from "@/lib/communityCategories";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -25,10 +26,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { COMMUNITY_CATEGORIES, communityCategoryLabel } from "@/lib/communityCategories";
-import { cn } from "@/lib/utils";
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
 
 /** One key per line of the certification, so a translator sees each claim on
  *  its own rather than one paragraph to keep in sync. */

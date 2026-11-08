@@ -12,11 +12,11 @@ import { useTranslation } from "react-i18next";
 
 import type { ReactionGroup, ReactionTarget } from "@/api/generated/initiativeAPI.schemas";
 import { ReactionPicker } from "@/components/reactions/ReactionPicker";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToggleReaction } from "@/hooks/useReactions";
 import { getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 /** Shared empty list, so "no reactions" keeps a stable identity across renders
  *  and does not read as fresh server data below. */

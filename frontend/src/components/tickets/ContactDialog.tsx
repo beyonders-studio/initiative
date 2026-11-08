@@ -10,8 +10,8 @@
 import { Mail } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { CopyButton } from "@/components/ui/copy-button";
+import { Button } from "@/ui/button";
+import { CopyButton } from "@/ui/copy-button";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +19,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/ui/dialog";
 
 export interface ContactDialogProps {
   open: boolean;

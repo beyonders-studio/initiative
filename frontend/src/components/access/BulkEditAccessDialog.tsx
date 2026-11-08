@@ -19,14 +19,16 @@ import {
   searchInitiativeMembers,
 } from "@/api/generated/initiatives/initiatives";
 import { bulkSetResourceGrants } from "@/api/generated/resource-grants/resource-grants";
-import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useAuth } from "@/hooks/useAuth";
+import { useInitiatives } from "@/hooks/useInitiatives";
+import { USER_ID_LOOKUP_MAX, USER_SEARCH_PAGE_SIZE } from "@/hooks/useUsers";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import { getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
+import type { DialogWithSuccessProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
+import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/ui/command";
 import {
   Dialog,
   DialogContent,
@@ -34,26 +36,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
-import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useAuth } from "@/hooks/useAuth";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { useInitiatives } from "@/hooks/useInitiatives";
-import { USER_ID_LOOKUP_MAX, USER_SEARCH_PAGE_SIZE } from "@/hooks/useUsers";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
-import { getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
-import type { DialogWithSuccessProps } from "@/types/dialog";
+} from "@/ui/dialog";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { cn } from "@/ui/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/ui/tabs";
 
 /** The minimal shape the bulk dialog needs from any tool (project, file, …). */
 export interface BulkAccessItem {

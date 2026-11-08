@@ -23,7 +23,7 @@ import type { ReactNode } from "react";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TOOL_ICONS } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 interface SketchProps {
   /** Whether the tool is ticked — the sketch brightens to match the card. */

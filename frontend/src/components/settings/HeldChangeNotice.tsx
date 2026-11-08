@@ -3,14 +3,14 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useListPasskeys } from "@/api/generated/auth/auth";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useApplyHeldChange, useCancelHeldChange, useHeldChange } from "@/hooks/useHeldChange";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { describePasskeyPromptError, passkeysRunHere } from "@/lib/passkeys";
+import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { Button } from "@/ui/button";
 
 /** What each waiting change will do, by the kind the server names. */
 const CHANGE_KEYS = {

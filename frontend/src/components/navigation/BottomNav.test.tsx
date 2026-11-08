@@ -24,8 +24,8 @@ vi.mock("@/hooks/useMyMessages", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useMessagesWaiting: () => mocks.waiting(),
 }));
-vi.mock("@/hooks/useWidthClass", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/hooks/useWidthClass")>()),
+vi.mock("@/ui/lib/useWidthClass", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/ui/lib/useWidthClass")>()),
   useWidthClass: () => (mocks.mobile() ? "base" : "lg"),
 }));
 vi.mock("@/hooks/useNotifications", () => ({ useNotifications: () => mocks.notifications() }));

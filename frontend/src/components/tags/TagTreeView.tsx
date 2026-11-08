@@ -3,11 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { TagSummary } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { getItem, setItem } from "@/lib/storage";
 import { buildTagTree, countFilesForNode, type TagTreeNode } from "@/lib/tagTree";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
+import { ScrollArea } from "@/ui/scroll-area";
 
 export const UNTAGGED_PATH = "__untagged__";
 

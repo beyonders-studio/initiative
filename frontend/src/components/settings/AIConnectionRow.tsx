@@ -2,12 +2,12 @@ import { Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { AIConnectionResponse } from "@/api/generated/initiativeAPI.schemas";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { PROVIDER_CONFIGS } from "@/lib/ai-providers";
 import { messageForCode } from "@/lib/errorMessage";
-import { dateTimeFormat, listFormat } from "@/lib/intl";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { dateTimeFormat, listFormat } from "@/ui/lib/intl";
+import { Switch } from "@/ui/switch";
 
 interface AIConnectionRowProps {
   connection: AIConnectionResponse;

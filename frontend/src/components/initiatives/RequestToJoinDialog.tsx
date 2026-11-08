@@ -11,7 +11,10 @@ import { Loader2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
+import { useRequestToJoinInitiative } from "@/hooks/useInitiatives";
+import { toast } from "@/lib/mascotToast";
+import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -19,12 +22,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useRequestToJoinInitiative } from "@/hooks/useInitiatives";
-import { toast } from "@/lib/mascotToast";
-import type { DialogProps } from "@/types/dialog";
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { Textarea } from "@/ui/textarea";
 
 /** Mirrors `JOIN_REQUEST_MESSAGE_MAX_LENGTH` in the backend's initiative
  *  schemas, which is the authority — this only stops the typing early so a

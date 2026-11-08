@@ -1,9 +1,9 @@
 import { useId, useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { parseHandle } from "@/hooks/useDirectMessages";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
 
 interface HandleFieldProps {
   label: string;

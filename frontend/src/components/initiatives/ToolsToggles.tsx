@@ -4,8 +4,6 @@ import { useTranslation } from "react-i18next";
 
 import type { InitiativeRoleRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { ToolIconTile, ToolSketch } from "@/components/initiatives/ToolSkeletons";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DEFAULT_ENABLED_TOOLS,
   SIDEBAR_TOOLS,
@@ -13,7 +11,9 @@ import {
   toolRouteSegment,
   toolViewPermission,
 } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { cn } from "@/ui/lib/utils";
 
 /**
  * The roles that can actually see a tool once its master switch is on.

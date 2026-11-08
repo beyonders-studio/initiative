@@ -7,12 +7,12 @@ import type {
   PluginSummaryReturn,
 } from "@/api/generated/initiativeAPI.schemas";
 import { useListPluginSummaries, useReadPluginSummary } from "@/api/generated/plugins/plugins";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { parseDateValue } from "@/lib/formatDate";
-import { dateTimeFormat, numberFormat } from "@/lib/intl";
 import { localized } from "@/lib/widgets/widgetMeta";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { dateTimeFormat, numberFormat } from "@/ui/lib/intl";
+import { Progress } from "@/ui/progress";
 
 type Translate = TFunction<["communities", "common"]>;
 

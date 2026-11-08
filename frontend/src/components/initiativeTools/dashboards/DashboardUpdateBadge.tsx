@@ -14,11 +14,11 @@ import { ArrowUpCircle, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { DashboardRead } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
 import { useUpgradeDashboard } from "@/hooks/useDashboards";
 import { useMarketplaceListingByUid } from "@/hooks/useMarketplace";
 import { listingShownHere } from "@/lib/marketplaceCuration";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
 
 export interface DashboardUpdateBadgeProps {
   dashboard: DashboardRead;

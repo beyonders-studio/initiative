@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 
 import type { ContactGrantRead } from "@/api/generated/initiativeAPI.schemas";
 import { PersonRow } from "@/components/connections/PersonRow";
-import { Button } from "@/components/ui/button";
 import {
   useAcceptConnection,
   useAcceptMessageRequest,
@@ -12,6 +11,7 @@ import {
   useRemoveConnection,
   useRemoveMessageRequest,
 } from "@/hooks/useDirectMessages";
+import { Button } from "@/ui/button";
 
 type Kind = "connection" | "message";
 type PendingRow = ContactGrantRead & { kind: Kind };

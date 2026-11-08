@@ -7,12 +7,12 @@ import { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { EntityPicker } from "@/components/entities/EntityPicker";
 import { CreateFileDialog } from "@/components/files/CreateFileDialog";
 import { ReadOnlyFileBody } from "@/components/files/detail/ReadOnlyFileBody";
-import { Button } from "@/components/ui/button";
 import { useFile } from "@/hooks/useFiles";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { isStoredFileType } from "@/lib/fileTypes";
 import { entityRefRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
 
 import { FileFieldName } from "./PropertyValueCell";
 import type { FileFieldValue } from "./propertyHelpers";

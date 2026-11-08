@@ -11,8 +11,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useToolSettings } from "@/components/tools/settings/ToolSettingsContext";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Switch } from "@/ui/switch";
 
 export const ToolTemplateCard = () => {
   const { t } = useTranslation("common");

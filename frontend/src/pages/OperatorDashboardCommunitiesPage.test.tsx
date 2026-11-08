@@ -10,7 +10,7 @@ import type {
   PlatformCommunityStorageRead,
   UserRole,
 } from "@/api/generated/initiativeAPI.schemas";
-import { dateTimeFormat } from "@/lib/intl";
+import { dateTimeFormat } from "@/ui/lib/intl";
 
 const GIB = 1024 ** 3;
 

@@ -5,16 +5,16 @@ import type {
   CommunityBillingChargeRead,
   CommunityBillingSummaryRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Badge, type BadgeProps } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityBillingSummary } from "@/hooks/useCommunityBillingSummary";
 import { holdsBillingSeat, trialDaysLeft } from "@/lib/billingSummary";
 import { parseDateValue } from "@/lib/formatDate";
-import { dateTimeFormat, numberFormat } from "@/lib/intl";
+import { Badge, type BadgeProps } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { dateTimeFormat, numberFormat } from "@/ui/lib/intl";
+import { Separator } from "@/ui/separator";
 
 /** A charge in minor units as the currency writes it, or null when the
  *  browser does not know the currency. */

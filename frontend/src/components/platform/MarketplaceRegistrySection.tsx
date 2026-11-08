@@ -12,9 +12,6 @@ import { useTranslation } from "react-i18next";
 
 import type { RegistryRefreshRead } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   useRefreshRegistry,
   useRegistryStatus,
@@ -24,6 +21,9 @@ import {
 import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
 import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { Label } from "@/ui/label";
+import { Switch } from "@/ui/switch";
 
 /** What the status row records for an uploaded bundle. */
 const BUNDLE_SOURCE = "bundle";

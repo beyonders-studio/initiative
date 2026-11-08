@@ -6,10 +6,10 @@ import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
 import { AddressManager } from "@/components/settings/AddressManager";
 import { HeldChangeNotice } from "@/components/settings/HeldChangeNotice";
 import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
-import { Button } from "@/components/ui/button";
 import { DeleteAccountDialog } from "@/components/user/DeleteAccountDialog";
 import { useServer } from "@/hooks/useServer";
 import { getUserHandle } from "@/lib/userDisplay";
+import { Button } from "@/ui/button";
 
 interface UserSettingsAccountPageProps {
   user: UserRead;

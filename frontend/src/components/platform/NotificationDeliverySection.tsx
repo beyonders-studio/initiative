@@ -14,11 +14,11 @@
 import { useTranslation } from "react-i18next";
 
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useNotificationSettings, useUpdateNotificationSettings } from "@/hooks/useSettings";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Label } from "@/ui/label";
+import { Switch } from "@/ui/switch";
 
 export const NotificationDeliverySection = () => {
   const { t } = useTranslation("settings");

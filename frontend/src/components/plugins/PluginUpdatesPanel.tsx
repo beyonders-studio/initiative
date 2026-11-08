@@ -34,14 +34,14 @@ import type {
   CommunityPluginDetail,
   CommunityPluginUpgradeAsks,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { useDeclinePluginUpgrade, useUpgradePlugin } from "@/hooks/useCommunityPluginDetail";
 import { useUpdateCommunityPlugin } from "@/hooks/useCommunityPlugins";
 import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { type PluginNames, scopeSentence } from "@/lib/pluginScopes";
 import { localized } from "@/lib/widgets/widgetMeta";
+import { Button } from "@/ui/button";
+import { Switch } from "@/ui/switch";
 
 export function PluginUpdatesPanel({ plugin }: { plugin: CommunityPluginDetail }) {
   const { t } = useTranslation(["plugins", "common"]);

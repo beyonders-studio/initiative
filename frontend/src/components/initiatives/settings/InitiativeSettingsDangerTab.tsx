@@ -1,8 +1,8 @@
 import { Archive, ArchiveRestore, Loader2, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader } from "@/ui/card";
 
 interface InitiativeSettingsDangerTabProps {
   isArchived: boolean;

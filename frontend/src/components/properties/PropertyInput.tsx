@@ -10,8 +10,9 @@ import {
   type Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { type MemberLike, MemberSelect } from "@/components/members/MemberSearchSelect";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { useAppendPropertyOption } from "@/hooks/useProperties";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
 import {
   Command,
   CommandEmpty,
@@ -20,14 +21,13 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "@/components/ui/command";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Slider } from "@/components/ui/slider";
-import { useAppendPropertyOption } from "@/hooks/useProperties";
-import { toPickerValue } from "@/lib/localDateTime";
-import { cn } from "@/lib/utils";
+} from "@/ui/command";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Input } from "@/ui/input";
+import { toPickerValue } from "@/ui/lib/localDateTime";
+import { cn } from "@/ui/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { Slider } from "@/ui/slider";
 
 import { FileFieldInput } from "./FileFieldInput";
 import {

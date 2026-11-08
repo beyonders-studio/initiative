@@ -9,13 +9,8 @@ import {
   ToolFilterButton,
   ToolFilterPanel,
 } from "@/components/initiativeTools/shared/ToolFilterPanel";
-import { SkeletonRegion, TableSkeleton } from "@/components/skeletons/PageSkeletons";
 import { globalTaskColumns } from "@/components/tasks/globalTaskColumns";
 import { TaskFilters } from "@/components/tasks/TaskFilters";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
-import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/ui/data-table";
-import { Label } from "@/components/ui/label";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useFocusPreferences } from "@/hooks/useFocusSummary";
 import { MY_TASKS_VIEW, useGlobalTasksTable } from "@/hooks/useGlobalTasksTable";
@@ -29,6 +24,11 @@ import { LAYOUT_NAMESPACES, type LayoutEnv } from "@/lib/layouts/fields";
 import { taskFields } from "@/lib/layouts/tasks";
 import { entityRefRoute, taskRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
+import { AsyncCombobox } from "@/ui/async-combobox";
+import { Button } from "@/ui/button";
+import { DataTable } from "@/ui/data-table";
+import { Label } from "@/ui/label";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 
 import { QuickAddTask } from "./QuickAddTask";
 import type { HomeWidgetProps, HomeWidgetSettingsProps } from "./types";

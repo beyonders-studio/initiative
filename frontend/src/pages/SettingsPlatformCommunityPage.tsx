@@ -19,19 +19,6 @@ import type { DmPolicy } from "@/api/generated/initiativeAPI.schemas";
 import { DeletedAccountRetentionSection } from "@/components/platform/DeletedAccountRetentionSection";
 import { DeletedCommunityRetentionSection } from "@/components/platform/DeletedCommunityRetentionSection";
 import { OnHoldCommunityDeletionSection } from "@/components/platform/OnHoldCommunityDeletionSection";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useServerForm } from "@/hooks/useServerForm";
@@ -40,6 +27,13 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { readOptionalWholeNumber } from "@/lib/text";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 /** The most days the server takes for the longest guest stay. */
 const MAX_GUEST_DAYS = 3650;

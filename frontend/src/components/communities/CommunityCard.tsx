@@ -23,7 +23,6 @@ import { AgeConfirmationDialog } from "@/components/communities/AgeConfirmationD
 import { CommunityCardFace } from "@/components/communities/CommunityCardFace";
 import { CommunityAvatar } from "@/components/communities/CommunitySidebar";
 import { ReportButton } from "@/components/moderation/ReportButton";
-import { Button } from "@/components/ui/button";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -31,6 +30,7 @@ import { useJoinDirectoryCommunity } from "@/hooks/useCommunityDirectory";
 import { communityPath } from "@/lib/communityUrl";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
 
 export const CommunityCard = ({ community }: { community: DirectoryCommunityRead }) => {
   const { t } = useTranslation(["communities", "common"]);

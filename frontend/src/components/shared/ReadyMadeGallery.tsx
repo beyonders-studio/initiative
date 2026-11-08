@@ -1,7 +1,7 @@
 import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 /** One ready-made thing to start from: its name, what it is for, and a
  *  glimpse of what it brings. */

@@ -10,7 +10,7 @@ import {
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 import type { CalendarEntry, CalendarViewMode } from "../CalendarView";
 import { buildEntriesByDate, dateKey, WEEKDAY_KEYS, type WeekStartsOn } from "./shared";

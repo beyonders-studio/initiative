@@ -1,4 +1,4 @@
-import { cn } from "./utils";
+import { cn } from "../ui/lib/utils";
 
 export const INITIATIVE_COLOR_FALLBACK = "#94a3b8";
 const HEX_COLOR_REGEX = /^#(?:[0-9a-fA-F]{3}){1,2}$/i;

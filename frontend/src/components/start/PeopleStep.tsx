@@ -3,11 +3,11 @@ import { useTranslation } from "react-i18next";
 
 import { createCommunityInvite } from "@/api/generated/communities/communities";
 import { PATH_SCENES, PATH_TINTS, PixelScene } from "@/components/start/PixelScene";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "@/lib/mascotToast";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
 
 /** A burst of confetti for a finished community, for anybody who has not
  *  asked their system for less motion. */

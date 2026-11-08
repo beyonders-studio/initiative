@@ -2,7 +2,10 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
+import { useCreateTool } from "@/hooks/useCreateTool";
+import { useInitiative } from "@/hooks/useInitiatives";
+import { TOOL_ICONS, TOOLS, toolNavLabelKey } from "@/lib/tools";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -10,11 +13,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useCreateTool } from "@/hooks/useCreateTool";
-import { useInitiative } from "@/hooks/useInitiatives";
-import { TOOL_ICONS, TOOLS, toolNavLabelKey } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+} from "@/ui/dialog";
+import { cn } from "@/ui/lib/utils";
 
 /** What a made thing answers with, so the caller can link it. */
 export interface CreatedThing {

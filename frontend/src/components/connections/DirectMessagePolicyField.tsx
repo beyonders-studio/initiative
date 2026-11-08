@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
 
 import type { CommunityDmToggle, DmPolicy } from "@/api/generated/initiativeAPI.schemas";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Switch } from "@/components/ui/switch";
+import { Label } from "@/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
+import { Switch } from "@/ui/switch";
 
 interface DirectMessagePolicyFieldProps {
   policy: DmPolicy;

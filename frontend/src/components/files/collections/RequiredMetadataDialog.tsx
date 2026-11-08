@@ -9,7 +9,8 @@ import {
   RequiredValues,
   valuesOf,
 } from "@/components/layouts/RequiredValues";
-import { Button } from "@/components/ui/button";
+import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -17,8 +18,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import type { DialogProps } from "@/types/dialog";
+} from "@/ui/dialog";
 
 /** Whether files going into the collection need values from whoever puts
  *  them there: its file page requires metadata it still has. */

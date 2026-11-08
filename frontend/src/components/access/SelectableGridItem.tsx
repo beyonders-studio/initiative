@@ -2,7 +2,7 @@ import { Check } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 interface SelectableGridItemProps {
   /** Whether the list is in selection mode. When false, children render as-is. */

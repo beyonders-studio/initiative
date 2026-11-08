@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { DialogFooter } from "@/components/ui/dialog";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { DialogFooter } from "@/ui/dialog";
 
 interface RecoveryCodesPanelProps {
   /** The set, readable here and nowhere else. */

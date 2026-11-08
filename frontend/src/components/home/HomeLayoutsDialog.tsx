@@ -15,16 +15,10 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { HOME_WIDGETS } from "@/components/home/widgets";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { HOME_GRID_COLUMNS, type HomeLayout, type HomeWidget } from "@/lib/home/layout";
 import { HOME_PRESET_IDS, type HomePresetId, presetLayout } from "@/lib/home/presets";
+import { Button } from "@/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
 
 export type HomeLayoutChoice = HomePresetId | "blank";
 

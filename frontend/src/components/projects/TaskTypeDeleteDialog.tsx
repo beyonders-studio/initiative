@@ -10,7 +10,10 @@ import { useTranslation } from "react-i18next";
 
 import type { TaskTypeRead } from "@/api/generated/initiativeAPI.schemas";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
-import { Button } from "@/components/ui/button";
+import { useDeleteTaskType, useProjectTaskTypes } from "@/hooks/useProjects";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -18,18 +21,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useDeleteTaskType, useProjectTaskTypes } from "@/hooks/useProjects";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** Where a deleted type's tasks go unless the reader picks another: the
  *  project's default, or, when the default is the one going, the first type

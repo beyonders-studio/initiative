@@ -67,7 +67,7 @@ import {
   resolveCellStyle,
   styleToCss,
 } from "@/lib/spreadsheet/styles";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 export type { SpreadsheetContent };
 

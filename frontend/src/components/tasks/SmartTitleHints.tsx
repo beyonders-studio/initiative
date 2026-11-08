@@ -3,11 +3,11 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { PART_MARK } from "@/components/tasks/SmartTitleParts";
-import { Button } from "@/components/ui/button";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { useSmartTitlesOn } from "@/hooks/useSmartTitle";
 import type { TitlePartType } from "@/lib/smartTitle";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hover-card";
+import { cn } from "@/ui/lib/utils";
 
 /** What a title can say, each with the mark its words get in the title. */
 export const HINTS: { key: string; type: TitlePartType; note?: boolean }[] = [

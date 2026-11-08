@@ -2,10 +2,10 @@ import { useTranslation } from "react-i18next";
 
 import { PATH_SCENES, PATH_TINTS, PixelScene } from "@/components/start/PixelScene";
 import { ContinueButton } from "@/components/start/stepParts";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { StartPath } from "@/lib/startFlow";
-import { cn } from "@/lib/utils";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 
 /** The paths this deployment offers, as one card each with a picture and an
  *  example of who it suits. */

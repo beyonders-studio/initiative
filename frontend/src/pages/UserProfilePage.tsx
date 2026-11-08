@@ -7,8 +7,6 @@ import { ConnectionActionButtons } from "@/components/connections/ConnectionActi
 import { ConnectionActionsMenu } from "@/components/connections/ConnectionActionsMenu";
 import { ReportButton } from "@/components/moderation/ReportButton";
 import { PageBanner } from "@/components/PageBanner";
-import { StatusMessage } from "@/components/StatusMessage";
-import { ProfilePageSkeleton } from "@/components/skeletons/PageSkeletons";
 import { TRAY_SURFACE } from "@/components/toolBrowser/NodeRail";
 import { UserHandle } from "@/components/UserHandle";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
@@ -19,7 +17,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserCommunities, useUserProfile } from "@/hooks/useUsers";
 import { profileBanner } from "@/lib/profileBanner";
 import { resolveTrophies } from "@/lib/profileDecorations";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
+import { ProfilePageSkeleton } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 /**
  * A person's profile.
