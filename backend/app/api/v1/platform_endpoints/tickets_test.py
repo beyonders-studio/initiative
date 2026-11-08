@@ -33,6 +33,16 @@ from app.db.request_context import SystemGuild, Unattributed
 
 TICKETS = "/api/v1/me/tickets"
 
+#: The device and page a filing was sent from, as a client sends it.
+DEVICE = {
+    "app_version": "0.70.0",
+    "platform": "web",
+    "locale": "en-GB",
+    "theme": "dark",
+    "route": "/c/$communityId/i/$initiativeId",
+    "viewport": "md",
+}
+
 
 async def _ask(client, actor, guild_id, **body):
     payload = {
@@ -375,11 +385,17 @@ async def test_the_case_is_connected_to_who_asked_and_opens_with_their_words(
 ):
     """The asker is recorded as the case's filer, with their subject, and what
     they wrote opens the case under their name, said to them — the start of
-    the conversation with them rather than a description somebody rewrites."""
+    the conversation with them rather than a description somebody rewrites.
+    The device they asked from goes to the team, in the description."""
     member = await acting_user(guild_role=CommunityRole.member)
     await _set_support(session, member.guild.id, True)
     response = await _ask(
-        client, member, member.guild.id, subject="Lost my phone", body="Help."
+        client,
+        member,
+        member.guild.id,
+        subject="Lost my phone",
+        body="Help.",
+        context=DEVICE,
     )
     assert response.status_code == 202, response.text
 
@@ -387,6 +403,9 @@ async def test_the_case_is_connected_to_who_asked_and_opens_with_their_words(
     case = (await session.exec(select(IntakeCase))).one()
     assert case.filer_user_id == member.user.id
     assert case.filer_subject == "Lost my phone"
+    task = (await session.exec(select(Task).where(Task.id == case.task_id))).one()
+    for value in DEVICE.values():
+        assert f"`{value}`" in task.description
     (opening,) = (
         await session.exec(select(Comment).where(Comment.task_id == case.task_id))
     ).all()

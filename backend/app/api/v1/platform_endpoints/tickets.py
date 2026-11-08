@@ -325,6 +325,7 @@ async def _ask_for_help(
             subject=payload.subject,
             body=payload.body,
             topic=payload.type,
+            context=payload.context,
             evidence=attached,
         )
     except support_service.SupportUnavailable as exc:

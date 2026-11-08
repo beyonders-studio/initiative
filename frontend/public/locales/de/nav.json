@@ -26,7 +26,6 @@
   "platformSettings": "Plattformeinstellungen",
   "signOut": "Abmelden",
   "viewDocumentation": "Dokumentation ansehen",
-  "newBadge": "NEU",
   "alphaBadge": "ALPHA",
   "initiativeSettings": "Initiativeneinstellungen",
   "initiativeActions": "Initiativen-Aktionen",
@@ -81,8 +80,6 @@
     "goHome": "Zurück zur Startseite"
   },
   "operatorDashboard": "Operator-Dashboard",
-  "pastAnnouncements": "Frühere Ankündigungen",
-  "documentation": "Dokumentation",
   "requestsWaiting_one": "{{count}} ausstehend",
   "requestsWaiting_other": "{{count}} ausstehend",
   "posts": "Beiträge",

@@ -58,8 +58,9 @@ class NoticeOutboxItem(SQLModel, table=True):
     )
     #: What the worker does with it: ``notice`` writes or joins a bell line,
     #: ``reaction`` rolls a reaction into the line for what was reacted to,
-    #: ``withdraw`` takes one back out, and ``push`` is a push with no line of
-    #: its own — a digest's or a hold summary's. One recipient's rows apply in order.
+    #: ``withdraw`` takes one back out, ``push`` is a push with no line of
+    #: its own — a digest's or a hold summary's — and ``record`` writes a line
+    #: already read, with nothing else. One recipient's rows apply in order.
     kind: str = Field(
         default="notice",
         sa_column=Column(String(16), nullable=False, server_default="notice"),

@@ -1,4 +1,7 @@
 {
+  "appName": "Initiative",
+  "help": "Ayuda",
+  "helpDraft": "Borrador de la solicitud de ayuda",
   "user": "Usuario",
   "userWithId": "Usuario #{{id}}",
   "formerMember": "Exmiembro",
@@ -272,7 +275,13 @@
     "ready": "La versión {{version}} está lista. Recarga para empezar a usarla.",
     "reload": "Recargar",
     "updated": "Actualizado a la versión {{version}}.",
-    "whatsNew": "Novedades"
+    "whatsNew": "Novedades",
+    "update": "Actualizar",
+    "action": {
+      "reload": "Recarga para empezar a usar la nueva versión",
+      "restart": "Reinicia para terminar de actualizar la app",
+      "install": "Consigue la app más reciente que necesita esta versión"
+    }
   },
   "nativeUpdate": {
     "unsigned": "La actualización de este servidor no la publicó Initiative, así que la app se queda en la versión {{version}}.",

@@ -13,7 +13,6 @@ import { describe, expect, it, vi } from "vitest";
 import { buildUser } from "@/__tests__/factories";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
-import { docsUrl } from "@/lib/links";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { SidebarUserFooter } from "./SidebarUserFooter";
@@ -31,10 +30,6 @@ const renderFooter = (overrides: Partial<UserRead> = {}) => {
         user={user}
         canManagePlatformConfig={false}
         canAccessOperatorDashboard={false}
-        currentVersion="0.65.0"
-        latestVersion={null}
-        hasUpdate={false}
-        isLoadingVersion={false}
         onLogout={vi.fn()}
         refreshUser={vi.fn().mockResolvedValue(undefined)}
       />
@@ -49,11 +44,9 @@ const openMenu = async (user: ReturnType<typeof userEvent.setup>) => {
 };
 
 describe("SidebarUserFooter", () => {
-  it("always links to the documentation", async () => {
+  it("keeps Help under the person", async () => {
     renderFooter();
-    const docs = await screen.findByRole("link", { name: "Documentation" });
-    expect(docs).toHaveAttribute("href", docsUrl());
-    expect(docs).toHaveAttribute("target", "_blank");
+    expect(await screen.findByRole("button", { name: "Help" })).toBeInTheDocument();
   });
 
   it("puts the status under the name, in the same row", async () => {
@@ -196,10 +189,6 @@ describe("SidebarUserFooter", () => {
           user={buildUser({ username: "admin", discriminator: 1234, presence: "online" })}
           canManagePlatformConfig
           canAccessOperatorDashboard
-          currentVersion="0.65.0"
-          latestVersion={null}
-          hasUpdate={false}
-          isLoadingVersion={false}
           onLogout={vi.fn()}
           refreshUser={vi.fn().mockResolvedValue(undefined)}
         />

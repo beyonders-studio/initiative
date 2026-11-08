@@ -282,7 +282,9 @@ Reporting something **illegal** asks which law it breaks, and goes to the commun
 
 ## Asking for help
 
-The lifebuoy at the foot of the sidebar is **Ask for help**. Where your server takes help requests, it opens a short form — what it's about, a line to name it, what happened — and it goes to the people who run the server, not to the community's own admins.
+The question mark at the foot of the sidebar, and in the desktop app's title bar, is **Help**. It searches these pages first, from inside the app, and before you type it shows answers for the page you're on. Where your server takes help requests, **Ask the team** sits under the results and starts a request with whatever you searched. Say what happened, pick what it's about, and paste, drop or attach a screenshot if it helps. The request goes to the people who run the server, not to the community's own admins.
+
+Each request carries this device's details: the app's version, the platform, your language and theme, the page you were on (without anything that names what was on it) and the window's size. The line above **Send** shows them, and its switch leaves them out. Close Help halfway through and your draft waits for you as a **Help request draft** button in the corner.
 
 What it's about decides what you can ask:
 
@@ -290,9 +292,9 @@ What it's about decides what you can ask:
 - **This community** — where the server takes help requests from the community you're in.
 - **A copy of this community's data, or deleting it** — for whoever holds the community's seat, where it takes help requests.
 
-Notices that used to say "contact whoever runs this server" — the age question, a read-only or suspended community, running out of seats — have the same **Ask for help** beside them, opened on what the notice is about.
+Notices that used to say "contact whoever runs this server" — the age question, a read-only or suspended community, running out of seats — have **Ask for help** beside them, which opens the same request already set to what the notice is about.
 
-Where the server takes no requests but has said who to write to, the button gives you that address instead. Where there's neither, the button isn't there, and **Documentation**, the question mark beside it, is where to look.
+Where the server takes no requests but has said who to write to, that address sits under the results instead. Where there's neither, the search is all there is, with these pages one click away.
 
 **Send feedback**, in your account menu and the command palette, is where an idea goes, or something that got in your way, or something you love. Pick which it is and write it; a screenshot pasted into the box comes along too. **See what** shows exactly what else gets sent (the app's version, platform, language, theme, the page without anything that names what was on it, and the window's size), and the switch beside it leaves all that out.
 

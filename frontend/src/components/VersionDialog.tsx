@@ -22,7 +22,7 @@ import { cn } from "@/ui/lib/utils";
 import { ScrollArea } from "@/ui/scroll-area";
 
 /**
- * What version this is, and what has changed lately — opened from the sidebar,
+ * What version this is, and what has changed lately — opened from My settings,
  * or from the "updated" toast once a new version is running (see
  * ``components/UpdatedNotice``).
  *

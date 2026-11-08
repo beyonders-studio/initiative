@@ -323,6 +323,7 @@
     "accountSuspended": "Dein Konto wurde gesperrt.",
     "accountSuspendedWithReason": "Dein Konto wurde gesperrt: {{reason}}",
     "accountUnsuspended": "Dein Konto ist nicht mehr gesperrt.",
+    "announcement": "Ankündigung: {{title}}",
     "communityOnHold": "{{community}} ist pausiert. Wende dich an die Betreiber dieses Servers, um das zu klären.",
     "pluginConsentRequested": "{{plugin}} möchte in deinem Namen handeln: „{{label}}“",
     "pluginUpdatePending": "{{plugin}} Version {{version}} fragt nach mehr Zugriff",

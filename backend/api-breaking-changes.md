@@ -7,6 +7,19 @@ message the check printed, under a `## After <release>` heading naming the
 release it breaks from. Once the next release ships, its entries no longer
 matter and can be deleted.
 
+## After 0.78.0
+
+### Announcements in notifications
+
+`NotificationType` takes `announcement`: a dismissed announcement leaves a
+read line in the reader's notifications, so every response carrying a
+notification's type may hold it.
+
+- GET /api/v1/notifications/ added the new `announcement` enum value to the `notifications/items/type` response property for the response status `200`
+- GET /api/v1/notifications/{notification_id}/alert added the new `announcement` enum value to the `notification/type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/read added the new `announcement` enum value to the `type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/unread added the new `announcement` enum value to the `type` response property for the response status `200`
+
 ## After 0.77.1
 
 ### Signature fields

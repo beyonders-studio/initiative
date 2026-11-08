@@ -35,16 +35,7 @@ vi.mock("@/hooks/useTickets", async () => ({
   },
 }));
 
-import { FeedbackHost, openFeedback, routeTemplate } from "./FeedbackSheet";
-
-describe("routeTemplate", () => {
-  it("drops the layout segments and keeps every id as its parameter", () => {
-    expect(routeTemplate("/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/")).toBe(
-      "/c/$communityId/i/$initiativeId"
-    );
-    expect(routeTemplate("/_serverRequired/_authenticated/")).toBe("/");
-  });
-});
+import { FeedbackHost, openFeedback } from "./FeedbackSheet";
 
 describe("FeedbackSheet", () => {
   beforeEach(() => {

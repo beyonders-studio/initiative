@@ -56,9 +56,9 @@ interface EvidencePickerProps {
   disabled?: boolean;
   /** The button's words. "Attach files" when not given. */
   label?: string;
-  /** Where files pasted in are taken as though chosen: the box a screenshot
-   *  is pasted into. */
-  pasteFrom?: RefObject<HTMLElement | null>;
+  /** Where files pasted in or dropped on are taken as though chosen: the box
+   *  a screenshot goes into. */
+  takeFrom?: RefObject<HTMLElement | null>;
 }
 
 /** Choose files to send, held to what the stream takes. */
@@ -68,12 +68,13 @@ export const EvidencePicker = ({
   onChange,
   disabled,
   label,
-  pasteFrom,
+  takeFrom,
 }: EvidencePickerProps) => {
   const { t } = useTranslation("intake");
   const input = useRef<HTMLInputElement>(null);
   const hintId = useId();
   const [refusal, setRefusal] = useState<string | null>(null);
+  const [dropping, setDropping] = useState(false);
   const taking = Boolean(policy && policy.max_files > 0 && !disabled);
 
   const add = (chosen: File[]) => {
@@ -99,9 +100,10 @@ export const EvidencePicker = ({
     if (input.current) input.current.value = "";
   };
 
-  // Bound again each render, so a paste adds to the files as they are now.
+  // Bound again each render, so a paste or a drop adds to the files as they
+  // are now. Only a drag carrying files is taken; dragged text drops as text.
   useEffect(() => {
-    const target = pasteFrom?.current;
+    const target = takeFrom?.current;
     if (!target || !taking) return;
     const onPaste = (event: ClipboardEvent) => {
       const pasted = Array.from(event.clipboardData?.files ?? []);
@@ -109,8 +111,30 @@ export const EvidencePicker = ({
       event.preventDefault();
       add(pasted);
     };
+    const carriesFiles = (event: DragEvent) =>
+      Array.from(event.dataTransfer?.types ?? []).includes("Files");
+    const onDragOver = (event: DragEvent) => {
+      if (!carriesFiles(event)) return;
+      event.preventDefault();
+      setDropping(true);
+    };
+    const onDragLeave = () => setDropping(false);
+    const onDrop = (event: DragEvent) => {
+      if (!carriesFiles(event)) return;
+      event.preventDefault();
+      setDropping(false);
+      add(Array.from(event.dataTransfer?.files ?? []));
+    };
     target.addEventListener("paste", onPaste);
-    return () => target.removeEventListener("paste", onPaste);
+    target.addEventListener("dragover", onDragOver);
+    target.addEventListener("dragleave", onDragLeave);
+    target.addEventListener("drop", onDrop);
+    return () => {
+      target.removeEventListener("paste", onPaste);
+      target.removeEventListener("dragover", onDragOver);
+      target.removeEventListener("dragleave", onDragLeave);
+      target.removeEventListener("drop", onDrop);
+    };
   });
 
   if (!policy || policy.max_files <= 0) return null;
@@ -142,7 +166,9 @@ export const EvidencePicker = ({
           {label ?? t("evidence.attach")}
         </Button>
         <span id={hintId} className="text-muted-foreground text-xs">
-          {t("evidence.limits", { count: policy.max_files, size })}
+          {dropping
+            ? t("evidence.dropHere")
+            : t("evidence.limits", { count: policy.max_files, size })}
         </span>
       </div>
       {files.length > 0 ? (

@@ -1,10 +1,11 @@
 /**
- * Filing a ticket: asking for help, reporting something, or a security
- * problem.
+ * Filing a ticket: reporting something, or a security problem. Help requests
+ * are asked from Help (`components/help/HelpPanel`), and feedback from its
+ * own sheet.
  *
- * One dialog for every kind, opened by whatever surface files one — the
- * sidebar's "Ask for help", a Report flag, a status notice. Each kind brings
- * its own fields; sending, the acknowledgement and the fallback are shared.
+ * One dialog for both, opened by a Report flag or the security report. Each
+ * kind brings its own fields; sending, the acknowledgement and the fallback
+ * are shared.
  *
  * What comes back is an acknowledgement and nothing else. A report in
  * particular never says where it went, whether somebody had already reported
@@ -28,18 +29,16 @@ import type {
   LegalBasis,
   ReportReason,
   SecurityTopic,
-  SupportTopic,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   LegalBasis as Basis,
   ReportReason as Reason,
-  SupportTopic as Support,
   SecurityTopic as Topic,
 } from "@/api/generated/initiativeAPI.schemas";
 import { ContactDialog } from "@/components/tickets/ContactDialog";
 import { EvidencePicker } from "@/components/tickets/Evidence";
 import {
-  FAQ_URL,
+  SUBJECT_MAX,
   type TicketCreate,
   useFileTicket,
   useTicketAvailability,
@@ -61,7 +60,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/ui/textarea";
 
 /** Match the columns behind them, so a field stops where the server would. */
-const SUBJECT_MAX = 200;
 const BODY_MAX = 5000;
 const DETAIL_MAX = 4000;
 
@@ -95,17 +93,8 @@ const SECURITY_TOPICS: SecurityTopic[] = [
   Topic.other,
 ];
 
-/** The help a person asks for about a community, rather than themselves. */
-const COMMUNITY_TOPICS: ReadonlySet<string> = new Set([Support.community, Support.data_request]);
-
 /** What is being filed. */
 export type TicketKind =
-  | {
-      stream: "support";
-      /** The topic to start on, where the surface knows what it is about.
-       *  Falls back to the first one offered here when it is not. */
-      topic?: SupportTopic;
-    }
   | { stream: "security" }
   | {
       stream: "moderation";
@@ -118,8 +107,8 @@ export interface FileTicketDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   ticket: TicketKind;
-  /** The community the reader is standing in, when they are in one. Asking
-   *  for help is always from one; a report may come from nowhere. */
+  /** The community the reader is standing in, when they are in one; a
+   *  report may come from nowhere. */
   communityId: number | null;
 }
 
@@ -135,9 +124,6 @@ export const FileTicketDialog = ({
   const [reason, setReason] = useState<ReportReason | "">("");
   const [basis, setBasis] = useState<LegalBasis | "">("");
   const [topic, setTopic] = useState<SecurityTopic | "">("");
-  const [chosenHelpTopic, setHelpTopic] = useState<SupportTopic | "">(
-    ticket.stream === "support" ? (ticket.topic ?? "") : ""
-  );
   const [files, setFiles] = useState<File[]>([]);
   // Set, to what the server said, when the people who run the deployment had
   // nowhere to receive this. Kept apart from their address, which may still
@@ -145,23 +131,7 @@ export const FileTicketDialog = ({
   // says why it could not send only where there is no address at all.
   const [nowhere, setNowhere] = useState<string | null>(null);
   const availability = useTicketAvailability(communityId, { enabled: open });
-  const supportOffer = availability.data?.support;
-  const helpTopics = (supportOffer?.types ?? []) as SupportTopic[];
-  // The topic asked for where it is offered here. A question about a
-  // community the reader may not ask about from here — it is closed to them,
-  // or takes no help requests — opens on "something else", which they may;
-  // otherwise the first topic that is offered.
-  const helpTopic: SupportTopic | "" =
-    chosenHelpTopic && helpTopics.includes(chosenHelpTopic)
-      ? chosenHelpTopic
-      : chosenHelpTopic &&
-          COMMUNITY_TOPICS.has(chosenHelpTopic) &&
-          helpTopics.includes(Support.other)
-        ? Support.other
-        : (helpTopics[0] ?? "");
-
   const isReport = ticket.stream === "moderation";
-  const isSecurity = ticket.stream === "security";
   const contact = availability.data?.[ticket.stream]?.contact ?? null;
   const evidence = availability.data?.[ticket.stream]?.evidence ?? null;
   const illegal = reason === Reason.illegal;
@@ -175,11 +145,7 @@ export const FileTicketDialog = ({
         ? t("moderation:report.platformContact", { contact: accepted.platform_contact })
         : undefined;
       toast.success(
-        isReport
-          ? t("moderation:report.thanks")
-          : isSecurity
-            ? t("security.thanks")
-            : t("help.thanks"),
+        isReport ? t("moderation:report.thanks") : t("security.thanks"),
         contactLine ? { description: contactLine } : undefined
       );
       onOpenChange(false);
@@ -193,11 +159,7 @@ export const FileTicketDialog = ({
     onError: (err) => {
       const message = getErrorMessage(
         err,
-        isReport
-          ? "moderation:report.error"
-          : isSecurity
-            ? "intake:security.error"
-            : "intake:help.error"
+        isReport ? "moderation:report.error" : "intake:security.error"
       );
       if (getHttpStatus(err) === 503) {
         setNowhere(message);
@@ -241,20 +203,8 @@ export const FileTicketDialog = ({
         community_id: communityId,
       };
     }
-    if (ticket.stream === "security") {
-      if (!topic || !subject.trim() || !body.trim()) return null;
-      return { stream: "security", type: topic, subject: subject.trim(), body: body.trim() };
-    }
-    if (!helpTopic || !subject.trim() || !body.trim()) return null;
-    const aboutCommunity = COMMUNITY_TOPICS.has(helpTopic);
-    if (aboutCommunity && communityId == null) return null;
-    return {
-      stream: "support",
-      type: helpTopic,
-      community_id: aboutCommunity ? communityId : null,
-      subject: subject.trim(),
-      body: body.trim(),
-    };
+    if (!topic || !subject.trim() || !body.trim()) return null;
+    return { stream: "security", type: topic, subject: subject.trim(), body: body.trim() };
   };
   const ready = payload();
 
@@ -262,19 +212,9 @@ export const FileTicketDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            {isReport
-              ? t("moderation:report.title")
-              : isSecurity
-                ? t("security.title")
-                : t("help.title")}
-          </DialogTitle>
+          <DialogTitle>{isReport ? t("moderation:report.title") : t("security.title")}</DialogTitle>
           <DialogDescription>
-            {isReport
-              ? t("moderation:report.description")
-              : isSecurity
-                ? t("security.description")
-                : t("help.description")}
+            {isReport ? t("moderation:report.description") : t("security.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -346,40 +286,21 @@ export const FileTicketDialog = ({
           </div>
         ) : (
           <div className="space-y-4">
-            {!isSecurity && helpTopics.length > 1 && (
-              <div className="space-y-2">
-                <Label htmlFor="ticket-help-topic">{t("help.topicLabel")}</Label>
-                <Select value={helpTopic} onValueChange={(v) => setHelpTopic(v as SupportTopic)}>
-                  <SelectTrigger id="ticket-help-topic">
-                    <SelectValue placeholder={t("help.topicPlaceholder")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {helpTopics.map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {t(`help.topics.${value}`)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {isSecurity && (
-              <div className="space-y-2">
-                <Label htmlFor="ticket-topic">{t("security.topicLabel")}</Label>
-                <Select value={topic} onValueChange={(v) => setTopic(v as SecurityTopic)}>
-                  <SelectTrigger id="ticket-topic">
-                    <SelectValue placeholder={t("security.topicPlaceholder")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SECURITY_TOPICS.map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {t(`intake:security.topics.${value}`)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="ticket-topic">{t("security.topicLabel")}</Label>
+              <Select value={topic} onValueChange={(v) => setTopic(v as SecurityTopic)}>
+                <SelectTrigger id="ticket-topic">
+                  <SelectValue placeholder={t("security.topicPlaceholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {SECURITY_TOPICS.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {t(`intake:security.topics.${value}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="ticket-subject">{t("help.subjectLabel")}</Label>
               <Input
@@ -391,35 +312,19 @@ export const FileTicketDialog = ({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ticket-body">
-                {isSecurity ? t("security.bodyLabel") : t("help.bodyLabel")}
-              </Label>
+              <Label htmlFor="ticket-body">{t("security.bodyLabel")}</Label>
               <Textarea
                 id="ticket-body"
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
-                placeholder={isSecurity ? t("security.bodyPlaceholder") : t("help.bodyPlaceholder")}
+                placeholder={t("security.bodyPlaceholder")}
                 rows={6}
                 maxLength={BODY_MAX}
               />
             </div>
             {/* A report about this server stays here; one about the software
                 itself goes to the project. */}
-            {isSecurity ? (
-              <p className="text-muted-foreground text-xs">{t("security.softwareNote")}</p>
-            ) : null}
-            {/* The FAQ is still the faster answer for most of what gets asked,
-                so it stays one click away from the form. */}
-            <p className="text-muted-foreground text-xs">
-              <a
-                href={FAQ_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-2 hover:text-foreground"
-              >
-                {t("help.browseFaq")}
-              </a>
-            </p>
+            <p className="text-muted-foreground text-xs">{t("security.softwareNote")}</p>
           </div>
         )}
 
@@ -446,11 +351,7 @@ export const FileTicketDialog = ({
             disabled={!ready || file.isPending}
             onClick={() => ready && file.mutate({ ticket: ready, files })}
           >
-            {isReport
-              ? t("moderation:report.submit")
-              : isSecurity
-                ? t("security.submit")
-                : t("help.submit")}
+            {isReport ? t("moderation:report.submit") : t("security.submit")}
           </Button>
         </DialogFooter>
       </DialogContent>

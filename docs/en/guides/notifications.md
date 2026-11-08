@@ -184,7 +184,7 @@ Notifications are about *your* work. An **announcement** is about the app itself
 
 They arrive as a dialog rather than quietly in the bell, because they're the kind of thing genuinely worth stopping you for. Some are a single card; a longer one becomes a few pages you step through with **Next**. **Got it** clears it and it doesn't come back — unless whoever wrote it asked for more than one acknowledgement, in which case the dialog says so up front.
 
-Dismissed one at speed and immediately regretted it? Nothing is lost. The **info icon in the sidebar footer** opens **Past announcements**: everything you've been shown, newest first, read and unread marked, with a filter for the ones you haven't read. Pictures open full size on a click.
+Dismissed one at speed and immediately regretted it? Nothing is lost. Every announcement you close leaves a line in your notifications, already marked read. Click it and the announcement opens again, pictures and all. Like any read notification, the line clears itself after 30 days, and one whose announcement has reached its end date no longer opens.
 
 Run a server and want to write one? See [Announcements](../running-a-server/announcements.md).
 

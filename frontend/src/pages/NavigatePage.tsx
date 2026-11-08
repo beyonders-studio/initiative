@@ -116,7 +116,7 @@ export const NavigatePage = () => {
 
   if (error) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+      <div className="flex min-h-app flex-col items-center justify-center gap-4 px-6 text-center">
         <p className="font-medium text-base text-destructive">{error}</p>
         <Button onClick={() => router.navigate({ to: "/", replace: true })}>
           {t("navigate.goHome")}
@@ -126,7 +126,7 @@ export const NavigatePage = () => {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
+    <div className="flex min-h-app flex-col items-center justify-center gap-3 px-6 text-center">
       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       <p className="text-muted-foreground text-sm">
         {isProcessing ? t("navigate.redirecting") : t("navigate.finalizing")}

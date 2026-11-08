@@ -20,21 +20,11 @@ from app.models.platform.user import User
 from app.services.platform.intake import CaseFiler, CaseRefs, open_case
 
 if TYPE_CHECKING:
-    from app.schemas.platform.ticket import FeedbackContext
+    from app.schemas.platform.ticket import DeviceContext
     from app.services.platform.evidence import PreparedEvidence
 
 #: How much of what they wrote names the case on the team's board.
 TITLE_LENGTH = 80
-
-#: The context's fields, in the order the team reads them, with their labels.
-_CONTEXT_LABELS = (
-    ("app_version", "App version"),
-    ("platform", "Platform"),
-    ("locale", "Language"),
-    ("theme", "Theme"),
-    ("route", "Page"),
-    ("viewport", "Window"),
-)
 
 
 class NowhereToSend(Exception):
@@ -47,7 +37,7 @@ async def send(
     topic: FeedbackTopic,
     body: str,
     contactable: bool,
-    context: Optional["FeedbackContext"] = None,
+    context: Optional["DeviceContext"] = None,
     evidence: Sequence["PreparedEvidence"] = (),
     now: Optional[datetime] = None,
 ) -> None:
@@ -69,14 +59,6 @@ async def send(
     ]
     if not contactable:
         lines += ["", body]
-    if context is not None:
-        sent = [
-            f"- {label}: `{value}`"
-            for name, label in _CONTEXT_LABELS
-            if (value := getattr(context, name))
-        ]
-        if sent:
-            lines += ["", "Where the app was:", *sent]
 
     outcome = await open_case(
         IntakeStream.feedback,
@@ -92,6 +74,7 @@ async def send(
         evidence=evidence,
         evidence_by=sender.id,
         topic=topic.value,
+        device=context,
     )
     if outcome is None:
         raise NowhereToSend

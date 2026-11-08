@@ -1,4 +1,7 @@
 {
+  "appName": "Initiative",
+  "help": "Help",
+  "helpDraft": "Help request draft",
   "deletedUserName": "Deleted user #{{id}}",
   "user": "User",
   "userWithId": "User #{{id}}",
@@ -272,7 +275,13 @@
     "ready": "Version {{version}} is ready. Reload to start using it.",
     "reload": "Reload",
     "updated": "Updated to version {{version}}.",
-    "whatsNew": "What's new"
+    "whatsNew": "What's new",
+    "update": "Update",
+    "action": {
+      "reload": "Reload to start using the new version",
+      "restart": "Restart to finish updating the app",
+      "install": "Get the newer app this version needs"
+    }
   },
   "nativeUpdate": {
     "unsigned": "This server's update isn't one Initiative published, so the app stays on version {{version}}.",

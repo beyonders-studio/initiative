@@ -1,4 +1,7 @@
 {
+  "appName": "Initiative",
+  "help": "Hilfe",
+  "helpDraft": "Entwurf der Hilfeanfrage",
   "deletedUserName": "Gelöschter Benutzer #{{id}}",
   "user": "Benutzer",
   "userWithId": "Benutzer #{{id}}",
@@ -272,7 +275,13 @@
     "ready": "Version {{version}} ist bereit. Lade neu, um sie zu verwenden.",
     "reload": "Neu laden",
     "updated": "Auf Version {{version}} aktualisiert.",
-    "whatsNew": "Was ist neu"
+    "whatsNew": "Was ist neu",
+    "update": "Aktualisieren",
+    "action": {
+      "reload": "Lade neu, um die neue Version zu verwenden",
+      "restart": "Starte neu, um das Update der App abzuschließen",
+      "install": "Hol dir die neuere App, die diese Version braucht"
+    }
   },
   "nativeUpdate": {
     "unsigned": "Das Update dieses Servers wurde nicht von Initiative veröffentlicht, deshalb bleibt die App auf Version {{version}}.",

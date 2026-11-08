@@ -22,7 +22,7 @@ export const ConfirmBirthdate = () => {
   const { birthdate, setBirthdate, submitting, error, confirm } = useAgeConfirmation();
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="flex min-h-app items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>{t("auth:confirmAge.title")}</CardTitle>

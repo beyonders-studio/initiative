@@ -292,6 +292,9 @@ Grep added lines for `attacker`, `hijack`, `steal`, `exploit`, `takeover`,
 - **Frontmatter** is an `icon:` line (Lucide, e.g. `lucide/rocket`).
 - **`??? techspec`** holds detail for technical readers, usually collapsed, so
   it never interrupts the plain-language flow.
+- **An FAQ question is a `###` heading** under its topic's `##`, its answer
+  plain paragraphs beneath, never a collapsible block: the app's Help panel
+  searches the help center by heading.
 - **`!!! screenshot`** marks where an image is still needed, saying what to
   capture and where to save it.
 ### Tools are a defined, growing list, so treat them as one

@@ -18,26 +18,20 @@
  * address; where there is neither, nothing offers it.
  */
 
-import { Capacitor } from "@capacitor/core";
-import { useMatches } from "@tanstack/react-router";
 import { CircleAlert, Heart, Lightbulb, type LucideIcon } from "lucide-react";
 import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  type FeedbackContext,
-  FeedbackTopic,
-  SupportTopic,
-} from "@/api/generated/initiativeAPI.schemas";
+import { FeedbackTopic, SupportTopic } from "@/api/generated/initiativeAPI.schemas";
 import proudSvg from "@/assets/yonder/proud.svg";
 import talkingSvg from "@/assets/yonder/talking.svg";
 import { HelpLink } from "@/components/support/HelpLink";
 import { ContactDialog } from "@/components/tickets/ContactDialog";
+import { DeviceContextSwitch, useDeviceContext } from "@/components/tickets/DeviceContext";
 import { EvidencePicker } from "@/components/tickets/Evidence";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useServer } from "@/hooks/useServer";
-import { useTheme } from "@/hooks/useTheme";
 import { useFileTicket, useTicketAvailability } from "@/hooks/useTickets";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
@@ -47,7 +41,6 @@ import { Label } from "@/ui/label";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import { cn } from "@/ui/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/ui/sheet";
-import { Switch } from "@/ui/switch";
 import { Textarea } from "@/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
@@ -60,9 +53,6 @@ const KINDS: [FeedbackTopic, LucideIcon][] = [
   [FeedbackTopic.problem, CircleAlert],
   [FeedbackTopic.praise, Heart],
 ];
-
-/** The context's fields, in the order they are shown. */
-const CONTEXT_FIELDS = ["app_version", "platform", "locale", "theme", "route", "viewport"] as const;
 
 interface Draft {
   kind: FeedbackTopic;
@@ -106,28 +96,6 @@ export const useFeedbackOffered = () => {
   return mode === "form" || (mode === "email" && Boolean(data?.feedback.contact));
 };
 
-/** A route id as a template: the pathless layout segments dropped, every id
- *  left as the parameter that names it. */
-export const routeTemplate = (routeId: string): string => {
-  const kept = routeId.split("/").filter((segment) => segment && !segment.startsWith("_"));
-  return `/${kept.join("/")}`;
-};
-
-const useFeedbackContext = (): FeedbackContext => {
-  const { i18n } = useTranslation();
-  const { theme } = useTheme();
-  const width = useWidthClass();
-  const route = useMatches({ select: (matches) => matches.at(-1)?.routeId ?? "" });
-  return {
-    app_version: __APP_VERSION__,
-    platform: Capacitor.getPlatform(),
-    locale: i18n.language,
-    theme,
-    route: routeTemplate(route),
-    viewport: width,
-  };
-};
-
 /** The sheet, drawn once by the app shell. */
 export const FeedbackHost = () => {
   const open = useSyncExternalStore(subscribe, () => sheetOpen);
@@ -143,14 +111,13 @@ export const FeedbackHost = () => {
 const FeedbackSheet = () => {
   const { t } = useTranslation("intake");
   const communityId = useActiveCommunityId();
-  const context = useFeedbackContext();
+  const context = useDeviceContext();
   const { data } = useTicketAvailability(communityId);
   const wide = atLeast(useWidthClass(), "sm");
   const { user } = useAuth();
   const { serverUrl } = useServer();
   const owner = `${serverUrl ?? ""} ${user?.id ?? ""}`;
   const [form, setForm] = useState(draft?.owner === owner ? draft.form : EMPTY_DRAFT);
-  const [seeing, setSeeing] = useState(false);
   const [sent, setSent] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
   const thanks = useRef<HTMLHeadingElement>(null);
@@ -284,7 +251,7 @@ const FeedbackSheet = () => {
                 onChange={(files) => change({ files })}
                 disabled={pending}
                 label={t("feedback.addPicture")}
-                pasteFrom={box}
+                takeFrom={box}
               />
               <div className="flex items-center gap-2">
                 <Checkbox
@@ -308,44 +275,12 @@ const FeedbackSheet = () => {
             </div>
 
             <div className="space-y-2 border-t px-4 py-3">
-              <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                <Switch
-                  checked={form.withContext}
-                  onCheckedChange={(withContext) => change({ withContext })}
-                  aria-label={t("feedback.context.switch")}
-                  disabled={pending}
-                />
-                <span className="min-w-0 flex-1">
-                  {form.withContext ? t("feedback.context.on") : t("feedback.context.off")}
-                </span>
-                <Button
-                  type="button"
-                  variant="link"
-                  size="sm"
-                  className="h-auto p-0 text-muted-foreground text-xs"
-                  aria-expanded={seeing}
-                  onClick={() => setSeeing(!seeing)}
-                >
-                  {seeing ? t("feedback.context.hide") : t("feedback.context.show")}
-                </Button>
-              </div>
-              {seeing ? (
-                <dl
-                  className={cn(
-                    "grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 rounded-md bg-muted p-2 text-xs",
-                    !form.withContext && "line-through opacity-50"
-                  )}
-                >
-                  {CONTEXT_FIELDS.filter((field) => context[field]).map((field) => (
-                    <div key={field} className="contents">
-                      <dt className="text-muted-foreground">
-                        {t(`feedback.context.fields.${field}`)}
-                      </dt>
-                      <dd className="break-all font-mono">{context[field]}</dd>
-                    </div>
-                  ))}
-                </dl>
-              ) : null}
+              <DeviceContextSwitch
+                context={context}
+                included={form.withContext}
+                onIncludedChange={(withContext) => change({ withContext })}
+                disabled={pending}
+              />
               <div className="flex items-center gap-2">
                 {written || form.files.length ? (
                   <Button

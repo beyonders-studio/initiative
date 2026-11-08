@@ -47,8 +47,10 @@ from app.models.platform.announcement import (
     db_announcement_key,
 )
 from app.models.platform.guild import GUILD_ADMIN_ROLES, GuildMembership
+from app.models.platform.notification import NotificationType
 from app.models.platform.user import User, UserRole
 from app.services.platform import app_settings as app_settings_service
+from app.services.platform import notice_outbox
 from app.schemas.platform.announcement import (
     IMAGE_PATH_PREFIX,
     AnnouncementOperatorRead,
@@ -252,9 +254,10 @@ async def list_for_user(
     """Every live announcement this person is in the audience for.
 
     Newest first, so a queue that shows one at a time leads with the news
-    rather than with the backlog. ``include_dismissed`` is what the archive
-    page turns on: a notice already dealt with is still one this reader was
-    told and may want to re-read. An *expired* one is not — an end date
+    rather than with the backlog. ``include_dismissed`` is what opening a
+    notice again from its bell line turns on: a notice already dealt with is
+    still one this reader was told and may want to re-read. An *expired* one is
+    not — an end date
     retires a notice everywhere, and the row is unreadable on this path once
     it passes.
     """
@@ -330,11 +333,17 @@ async def announcement_exists(session: AsyncSession, *, key: str) -> bool:
     mean nothing. Draft and expired rows count: a reader who was shown a
     notice may still dismiss it after it stops being live.
     """
+    return await _find(session, key=key) is not None
+
+
+async def _find(
+    session: AsyncSession, *, key: str
+) -> BuiltinAnnouncement | Announcement | None:
+    """The built-in or authored announcement ``key`` names, if there is one."""
     for builtin in BUILTIN_ANNOUNCEMENTS:
         if builtin.key == key:
-            return True
-    announcement = await _load_by_key(session, key=key)
-    return announcement is not None
+            return builtin
+    return await _load_by_key(session, key=key)
 
 
 async def _load_by_key(session: AsyncSession, *, key: str) -> Optional[Announcement]:
@@ -372,7 +381,8 @@ async def record_receipt(
     cap inside the same statement that does the increment.
     """
     now = now or datetime.now(timezone.utc)
-    required = await dismissals_required_for(session, key=key)
+    announcement = await _find(session, key=key)
+    required = announcement.dismissals_required if announcement is not None else 1
 
     values = {
         "user_id": user_id,
@@ -415,16 +425,33 @@ async def record_receipt(
     # It wrote behind the identity map's back; read the row as the database
     # now has it.
     await session.refresh(receipt)
+
+    # The first dismissal leaves a read line in the person's notifications,
+    # which opens the notice again. A later dismissal, or one that lost a race
+    # with another tab, moves neither the count to 1 nor the stamp to ``now``.
+    if (
+        dismissed
+        and announcement is not None
+        and receipt.dismiss_count == 1
+        and receipt.dismissed_at == now
+    ):
+        await notice_outbox.enqueue(
+            session,
+            [
+                notice_outbox.row(
+                    user_id,
+                    None,
+                    NotificationType.announcement,
+                    {
+                        "announcement_key": key,
+                        "title": announcement.title,
+                        "target_path": "/",
+                    },
+                    kind="record",
+                )
+            ],
+        )
     return receipt
-
-
-async def dismissals_required_for(session: AsyncSession, *, key: str) -> int:
-    """How many acknowledgements the notice behind ``key`` asks for."""
-    for builtin in BUILTIN_ANNOUNCEMENTS:
-        if builtin.key == key:
-            return builtin.dismissals_required
-    announcement = await _load_by_key(session, key=key)
-    return announcement.dismissals_required if announcement is not None else 1
 
 
 # --- authoring ---------------------------------------------------------------

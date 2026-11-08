@@ -1,7 +1,6 @@
 [
   "/",
   "/account/not-me",
-  "/announcements",
   "/c/$communityId",
   "/c/$communityId/",
   "/c/$communityId/billing",

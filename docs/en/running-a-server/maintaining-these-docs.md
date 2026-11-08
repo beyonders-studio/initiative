@@ -83,6 +83,20 @@ Detail aimed at technical readers goes in a **techspec** callout, usually collap
 
 It renders as a teal box with a wrench icon. Use `???` for collapsed and `!!!` for always-open.
 
+### Questions in the FAQ
+
+Each question is a `###` heading under its topic's `##` heading, with the answer beneath it as ordinary paragraphs:
+
+```markdown
+## Getting in
+
+### My invite link doesn't work
+
+Links can expire, run out of uses, or be switched off by an admin.
+```
+
+Search in the app's **Help** panel finds pages by their headings, so a question written as a heading turns up there on its own. One tucked inside a collapsible block doesn't.
+
 ## Adding another language
 
 The content is deliberately kept under `docs/en/` so more languages can be added without moving anything. To add, say, Spanish:
@@ -97,5 +111,7 @@ The content is deliberately kept under `docs/en/` so more languages can be added
 ## Publishing
 
 A GitHub Actions workflow (`.github/workflows/docs.yml`) builds the site and deploys it to **GitHub Pages** when documentation files change on `main`. To use it, enable Pages for the repository (**Settings → Pages → Source: GitHub Actions**). Don't want to publish from CI? Delete that workflow and host the contents of `site/` anywhere that serves static files.
+
+The app's image builds these pages too, for the search in its **Help** panel: `backend/scripts/build_help_index.py` trims the build's `search.json` to a title, a breadcrumb, an address and a snippet per heading, and the server hands that out. The workflow and the image's `help-deps` stage in the `Dockerfile` install the same pinned Zensical version, so change the two together. If a new version writes `search.json` in a shape the script doesn't recognize, the image build stops with an error rather than shipping an empty search.
 
 Before publishing for real, set `site_url` in `zensical.toml` to the final address — it powers search, the sitemap, and link previews.
