@@ -48,18 +48,21 @@ const seed = (task: Partial<TaskListRead>) => {
   );
 };
 
+/** The section inside the app's scroller, which its table measures against. */
 const project = ({ layout, canEdit = true }: { layout: "table" | "board"; canEdit?: boolean }) => {
   server.use(communityHttp.get("/layouts/", () => HttpResponse.json(buildToolLayoutSet())));
   return renderPage(
     () => (
-      <ProjectTasksSection
-        projectId={1}
-        initiativeId={1}
-        taskStatuses={STATUSES}
-        canEditTaskDetails={canEdit}
-        projectIsArchived={false}
-        taskHref={(taskId) => `/tasks/${taskId}`}
-      />
+      <main data-app-scroll="">
+        <ProjectTasksSection
+          projectId={1}
+          initiativeId={1}
+          taskStatuses={STATUSES}
+          canEditTaskDetails={canEdit}
+          projectIsArchived={false}
+          taskHref={(taskId) => `/tasks/${taskId}`}
+        />
+      </main>
     ),
     { routerSearch: { layout }, auth: { user: ME } }
   );
