@@ -1,45 +1,24 @@
-import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import {
-  $getSelection,
-  $onUpdate,
-  type BaseSelection,
-  COMMAND_PRIORITY_CRITICAL,
-  SELECTION_CHANGE_COMMAND,
-} from "lexical";
-import { useEffect } from "react";
+import { $getSelection, type BaseSelection } from "lexical";
+import { useEffect, useEffectEvent } from "react";
 
 import { useToolbarContext } from "@/components/editor/context/toolbar-context";
 
+/**
+ * Calls `callback` with the selection when the toolbar opens on an editor and
+ * after each update to it: a moved caret, and a change that leaves the caret
+ * where it was, such as a new alignment. Registered once per editor.
+ */
 export function useUpdateToolbarHandler(callback: (selection: BaseSelection) => void) {
-  const [editor] = useLexicalComposerContext();
   const { activeEditor } = useToolbarContext();
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-register only when the lexical editor itself or the callback changes
-  useEffect(() => {
-    return activeEditor.registerCommand(
-      SELECTION_CHANGE_COMMAND,
-      () => {
-        // The handler runs before the DOM is reconciled; read once it is.
-        $onUpdate(() =>
-          activeEditor.read("latest", () => {
-            const selection = $getSelection();
-            if (selection) {
-              callback(selection);
-            }
-          })
-        );
-        return false;
-      },
-      COMMAND_PRIORITY_CRITICAL
-    );
-  }, [editor, callback]);
+  const onSelection = useEffectEvent(callback);
 
   useEffect(() => {
-    activeEditor.getEditorState().read(() => {
-      const selection = $getSelection();
-      if (selection) {
-        callback(selection);
-      }
-    });
-  }, [activeEditor, callback]);
+    const read = () =>
+      activeEditor.read(() => {
+        const selection = $getSelection();
+        if (selection) onSelection(selection);
+      });
+    read();
+    return activeEditor.registerUpdateListener(read);
+  }, [activeEditor]);
 }

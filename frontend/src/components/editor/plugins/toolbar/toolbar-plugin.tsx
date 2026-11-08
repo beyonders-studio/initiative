@@ -17,8 +17,6 @@ export function ToolbarPlugin({
 
   const [modal, showModal] = useEditorModal();
 
-  const $updateToolbar = () => {};
-
   useEffect(() => {
     return activeEditor.registerCommand(
       SELECTION_CHANGE_COMMAND,
@@ -33,7 +31,6 @@ export function ToolbarPlugin({
   return (
     <ToolbarContext
       activeEditor={activeEditor}
-      $updateToolbar={$updateToolbar}
       blockType={blockType}
       setBlockType={setBlockType}
       showModal={showModal}
