@@ -9,7 +9,6 @@
     "delete": "Delete",
     "deleteTitle": "Delete tag?",
     "deleteDescription": "The tag \"{{name}}\" will be sent to the trash and hidden from all tasks, projects, and files that use it. You can restore it from Settings → Trash before the retention period ends.",
-    "deleted": "Tag deleted",
     "saving": "Saving…",
     "save": "Save",
     "toolTab": "{{tool}} ({{count}})",

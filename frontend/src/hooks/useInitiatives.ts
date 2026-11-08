@@ -1,4 +1,4 @@
-import { keepPreviousData, useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -37,7 +37,6 @@ import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { useCommunities } from "@/hooks/useCommunities";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
@@ -236,27 +235,19 @@ const invalidateInitiativeMembersAndList = (initiativeId: number) =>
 
 export const useCreateInitiative = (options?: MutationOpts<InitiativeRead, InitiativeCreate>) => {
   const { t } = useTranslation("initiatives");
-  const communityId = useActiveCommunityId();
-  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
-
-  return useMutation({
-    ...rest,
-    // The generated InitiativeCreate carries one `{plural}_enabled` field per
-    // toggleable tool — no hand-maintained field list to drift.
-    mutationFn: async (data: InitiativeCreate) => {
-      return createInitiative(communityId, data);
+  return useCommunityMutation<InitiativeRead, InitiativeCreate>(
+    {
+      // The generated InitiativeCreate carries one `{plural}_enabled` field per
+      // toggleable tool — no hand-maintained field list to drift.
+      mutationFn: (communityId, data) => createInitiative(communityId, data),
+      invalidate: (initiative) => {
+        toast.success(t("createDialog.created", { name: initiative.name }));
+        return invalidate(q.allInitiatives());
+      },
+      errorKey: "initiatives:createDialog.createError",
     },
-    onSuccess: (...args) => {
-      toast.success(t("createDialog.created", { name: args[0].name }));
-      void invalidate(q.allInitiatives());
-      onSuccess?.(...args);
-    },
-    onError: (...args) => {
-      toast.error(getErrorMessage(args[0], "initiatives:createDialog.createError"));
-      onError?.(...args);
-    },
-    onSettled,
-  });
+    options
+  );
 };
 
 export const useUpdateInitiative = (

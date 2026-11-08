@@ -8,7 +8,6 @@ import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useUpdateTaskInCommunity } from "@/hooks/useTasks";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import {
@@ -45,11 +44,7 @@ const useAssignMe = (task: TaskListRead) => {
   const { t } = useTranslation("projects");
   const { user } = useAuth();
   const activeCommunityId = useActiveCommunityId();
-  const update = useUpdateTaskInCommunity({
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "projects:quickActions.assignError"));
-    },
-  });
+  const update = useUpdateTaskInCommunity(undefined, "projects:quickActions.assignError");
   const assigned = user ? task.assignees.some((assignee) => assignee.id === user.id) : false;
   const change = (assign: boolean) => {
     if (!user) return;

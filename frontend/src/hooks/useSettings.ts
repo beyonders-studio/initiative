@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 
 import {
   clearProviderDefault,
@@ -82,6 +82,7 @@ import {
 import { useGetChangelog } from "@/api/generated/version/version";
 import { invalidate, q } from "@/api/query-keys";
 import { useApiMutation } from "@/hooks/useApiMutation";
+import { queryClient } from "@/lib/queryClient";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
@@ -464,27 +465,19 @@ export const useProviderDefault = (
   });
 };
 
-const useInvalidateProviderDefault = (providerId: number) => {
-  const queryClient = useQueryClient();
-  return () => {
-    void queryClient.invalidateQueries({
-      queryKey: getGetProviderDefaultQueryKey(providerId),
-    });
-  };
-};
+const invalidateProviderDefault = (providerId: number) =>
+  queryClient.invalidateQueries({ queryKey: getGetProviderDefaultQueryKey(providerId) });
 
-export const useSetProviderDefault = (providerId: number) => {
-  const invalidate = useInvalidateProviderDefault(providerId);
-  return useMutation({
+export const useSetProviderDefault = (providerId: number) =>
+  useApiMutation({
     mutationFn: (data: PlatformProviderDefaultUpdate) => setProviderDefault(providerId, data),
-    onSuccess: invalidate,
+    invalidate: () => invalidateProviderDefault(providerId),
+    errorKey: "settings:providerDefaults.saveError",
   });
-};
 
-export const useClearProviderDefault = (providerId: number) => {
-  const invalidate = useInvalidateProviderDefault(providerId);
-  return useMutation({
+export const useClearProviderDefault = (providerId: number) =>
+  useApiMutation({
     mutationFn: () => clearProviderDefault(providerId),
-    onSuccess: invalidate,
+    invalidate: () => invalidateProviderDefault(providerId),
+    errorKey: "settings:providerDefaults.saveError",
   });
-};

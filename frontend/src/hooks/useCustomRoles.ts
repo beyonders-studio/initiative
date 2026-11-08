@@ -1,4 +1,3 @@
-import { useMutation } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -19,8 +18,8 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { type CommunityEntry, useCommunities } from "@/hooks/useCommunities";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 
 /** Every part of running a community, in the order the editor lists them. */
@@ -153,64 +152,57 @@ export const useHeldSurfaces = (
 
 export const useCreateCustomRole = () => {
   const { t } = useTranslation("settings");
-  const communityId = useActiveCommunityId();
-  return useMutation({
-    mutationFn: (data: CustomRoleCreate) => createCustomRole(communityId, data),
-    onSuccess: () => {
+  return useCommunityMutation({
+    mutationFn: (communityId: number, data: CustomRoleCreate) =>
+      createCustomRole(communityId, data),
+    invalidate: () => {
       toast.success(t("customRoles.created"));
-      void invalidate(q.customRoles());
+      return invalidate(q.customRoles());
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "settings:customRoles.createError"));
-    },
+    errorKey: "settings:customRoles.createError",
   });
 };
 
 export const useUpdateCustomRole = () => {
   const { t } = useTranslation("settings");
-  const communityId = useActiveCommunityId();
-  return useMutation({
-    mutationFn: ({ roleId, data }: { roleId: number; data: CustomRoleUpdate }) =>
-      updateCustomRole(communityId, roleId, data),
-    onSuccess: () => {
+  return useCommunityMutation({
+    mutationFn: (
+      communityId: number,
+      { roleId, data }: { roleId: number; data: CustomRoleUpdate }
+    ) => updateCustomRole(communityId, roleId, data),
+    invalidate: () => {
       toast.success(t("customRoles.updated"));
       // The reader may hold the role they changed.
-      void invalidate(q.customRoles());
+      return invalidate(q.customRoles());
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "settings:customRoles.updateError"));
-    },
+    errorKey: "settings:customRoles.updateError",
   });
 };
 
 export const useDeleteCustomRole = () => {
   const { t } = useTranslation("settings");
-  const communityId = useActiveCommunityId();
-  return useMutation({
-    mutationFn: (roleId: number) => deleteCustomRole(communityId, roleId),
-    onSuccess: () => {
+  return useCommunityMutation({
+    mutationFn: (communityId: number, roleId: number) => deleteCustomRole(communityId, roleId),
+    invalidate: () => {
       toast.success(t("customRoles.deleted"));
-      void invalidate(q.customRoles());
+      return invalidate(q.customRoles());
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "settings:customRoles.deleteError"));
-    },
+    errorKey: "settings:customRoles.deleteError",
   });
 };
 
 /** Give a member a custom role in place of theirs, or take theirs off (`null`). */
 export const useAssignCustomRole = () => {
   const { t } = useTranslation("settings");
-  const communityId = useActiveCommunityId();
-  return useMutation({
-    mutationFn: ({ userId, roleId }: { userId: number; roleId: number | null }) =>
-      assignCustomRole(communityId, userId, { role_id: roleId }),
-    onSuccess: () => {
+  return useCommunityMutation({
+    mutationFn: (
+      communityId: number,
+      { userId, roleId }: { userId: number; roleId: number | null }
+    ) => assignCustomRole(communityId, userId, { role_id: roleId }),
+    invalidate: () => {
       toast.success(t("customRoles.assigned"));
-      void invalidate(q.customRoles());
+      return invalidate(q.customRoles());
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "settings:customRoles.assignError"));
-    },
+    errorKey: "settings:customRoles.assignError",
   });
 };

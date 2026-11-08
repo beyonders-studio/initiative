@@ -48,6 +48,7 @@ import {
   type CommunityRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsSection } from "@/components/settings/SettingsSection";
+import { useApiMutation } from "@/hooks/useApiMutation";
 import { useCommunities } from "@/hooks/useCommunities";
 import { renderableBanner } from "@/lib/banner";
 import { DARK_TEXT, LIGHT_TEXT, readableTextColor, readableTextShadow } from "@/lib/contrastColor";
@@ -64,8 +65,6 @@ import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { Field } from "@/ui/field";
 import { ImagePicker } from "@/ui/image-picker";
 import { Label } from "@/ui/label";
-
-type Busy = "icon" | "banner" | "look" | null;
 
 /**
  * How much of the preview each fade eats, as a share of its height.
@@ -85,7 +84,26 @@ const PREVIEW_FADE: Record<CommunityBannerRead["fade"], string | undefined> = {
 export const CommunityArtworkPanel = ({ community }: { community: CommunityRead }) => {
   const { t } = useTranslation(["communities", "common"]);
   const { refreshCommunities, updateCommunityInState } = useCommunities();
-  const [busy, setBusy] = useState<Busy>(null);
+  /** Every write here answers with the whole community, so state is replaced, not patched. */
+  const save = useApiMutation(
+    {
+      mutationFn: async (write: () => Promise<CommunityRead>) => {
+        updateCommunityInState(await write());
+        await refreshCommunities();
+      },
+    },
+    {
+      onSuccess: () => toast.success(t("communities:settings.artwork.saved")),
+      // A picture the browser could not make sense of never reached the
+      // server, so it has its own message rather than an API code.
+      onError: (error) =>
+        toast.error(
+          error instanceof ImageRenditionError
+            ? t(`communities:settings.artwork.${error.code}`)
+            : getErrorMessage(error, "communities:settings.artwork.failed")
+        ),
+    }
+  );
   // The banner as this panel is showing it, which is what the pickers below
   // draft against and what a save sends — the whole of it, since the endpoint
   // replaces the banner rather than merging into it.
@@ -118,7 +136,7 @@ export const CommunityArtworkPanel = ({ community }: { community: CommunityRead 
   const commitLook = (change: Partial<CommunityBannerWrite> | null) => {
     const banner = change && { ...draft, ...change };
     if (banner) setDraft(banner);
-    void run("look", async () =>
+    save.mutate(() =>
       // The endpoint answers with the whole community; the cast is the generated
       // client's, which types a PATCH body as unknown.
       updateCommunity(community.id, {
@@ -135,41 +153,14 @@ export const CommunityArtworkPanel = ({ community }: { community: CommunityRead 
     text_color: readableTextColor(color),
   });
 
-  /** Every write here answers with the whole community, so state is replaced, not patched. */
-  const applied = async (updated: CommunityRead) => {
-    updateCommunityInState(updated);
-    await refreshCommunities();
-  };
-
-  const run = async (kind: Exclude<Busy, null>, work: () => Promise<CommunityRead>) => {
-    setBusy(kind);
-    try {
-      await applied(await work());
-      toast.success(t("communities:settings.artwork.saved"));
-    } catch (error) {
-      console.error(error);
-      // A picture the browser could not make sense of never reached the
-      // server, so it has its own message rather than an API code.
-      toast.error(
-        error instanceof ImageRenditionError
-          ? t(`communities:settings.artwork.${error.code}`)
-          : getErrorMessage(error, "communities:settings.artwork.failed")
-      );
-    } finally {
-      setBusy(null);
-    }
-  };
-
   const pickIcon = (file: File) => {
-    void run("icon", async () =>
+    save.mutate(async () =>
       setCommunityIcon(community.id, { icon: await renderCommunityIcon(file) })
     );
   };
 
   const pickBanner = (file: File) => {
-    void run("banner", async () =>
-      setCommunityBanner(community.id, await renderCommunityBanner(file))
-    );
+    save.mutate(async () => setCommunityBanner(community.id, await renderCommunityBanner(file)));
   };
 
   const iconUrl = community.icon_url ? resolveHeaderlessApiUrl(community.icon_url) : null;
@@ -195,8 +186,8 @@ export const CommunityArtworkPanel = ({ community }: { community: CommunityRead 
             <Button
               type="button"
               variant="outline"
-              disabled={busy !== null}
-              onClick={() => void run("icon", () => clearCommunityIcon(community.id))}
+              disabled={save.isPending}
+              onClick={() => save.mutate(() => clearCommunityIcon(community.id))}
             >
               {t("communities:settings.removeIcon")}
             </Button>
@@ -205,7 +196,7 @@ export const CommunityArtworkPanel = ({ community }: { community: CommunityRead 
         <ImagePicker
           id="community-icon"
           accept="image/*"
-          disabled={busy !== null}
+          disabled={save.isPending}
           onSelect={pickIcon}
         />
         <p className="text-muted-foreground text-sm">
@@ -256,7 +247,7 @@ export const CommunityArtworkPanel = ({ community }: { community: CommunityRead 
             <ImagePicker
               id="community-banner"
               accept="image/*"
-              disabled={busy !== null}
+              disabled={save.isPending}
               onSelect={pickBanner}
             />
             <p className="text-muted-foreground text-sm">
@@ -272,8 +263,8 @@ export const CommunityArtworkPanel = ({ community }: { community: CommunityRead 
           <Button
             type="button"
             variant="outline"
-            disabled={busy !== null}
-            onClick={() => void run("banner", () => clearCommunityBanner(community.id))}
+            disabled={save.isPending}
+            onClick={() => save.mutate(() => clearCommunityBanner(community.id))}
           >
             {t("communities:settings.artwork.removeBanner")}
           </Button>
@@ -285,13 +276,13 @@ export const CommunityArtworkPanel = ({ community }: { community: CommunityRead 
           <Field label={t("communities:settings.artwork.bannerColorLabel")}>
             <ColorPickerPopover
               value={draft.color}
-              disabled={busy !== null}
+              disabled={save.isPending}
               onChange={(next) => draftLook(withReadableText(next))}
               onChangeComplete={(next) => commitLook(withReadableText(next))}
               triggerLabel={t("communities:settings.artwork.bannerColorLabel")}
             />
           </Field>
-          <fieldset className="space-y-2" disabled={busy !== null}>
+          <fieldset className="space-y-2" disabled={save.isPending}>
             <legend className="pb-2 font-medium text-sm">
               {t("communities:settings.artwork.bannerTextColorLabel")}
             </legend>
@@ -313,7 +304,7 @@ export const CommunityArtworkPanel = ({ community }: { community: CommunityRead 
               ))}
             </div>
           </fieldset>
-          <fieldset className="space-y-2" disabled={busy !== null}>
+          <fieldset className="space-y-2" disabled={save.isPending}>
             <legend className="pb-2 font-medium text-sm">
               {t("communities:settings.artwork.bannerAlignLabel")}
             </legend>
@@ -341,7 +332,7 @@ export const CommunityArtworkPanel = ({ community }: { community: CommunityRead 
               ))}
             </div>
           </fieldset>
-          <fieldset className="space-y-2" disabled={busy !== null}>
+          <fieldset className="space-y-2" disabled={save.isPending}>
             <legend className="pb-2 font-medium text-sm">
               {t("communities:settings.artwork.bannerFadeLabel")}
             </legend>
@@ -372,7 +363,7 @@ export const CommunityArtworkPanel = ({ community }: { community: CommunityRead 
           type="button"
           variant="ghost"
           size="sm"
-          disabled={busy !== null}
+          disabled={save.isPending}
           onClick={() => commitLook(null)}
         >
           {t("communities:settings.artwork.resetColor")}

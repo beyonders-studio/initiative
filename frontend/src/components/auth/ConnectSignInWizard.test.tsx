@@ -119,9 +119,10 @@ describe("ConnectSignInWizard", () => {
       claim_value: "eng-platform",
       community_role: "member",
     });
-    expect(updatePolicy).toHaveBeenCalledWith({
-      auth_policy: { policy: "required", provider_id: 11, require_methods: [] },
-    });
+    expect(updatePolicy).toHaveBeenCalledWith(
+      { auth_policy: { policy: "required", provider_id: 11, require_methods: [] } },
+      expect.anything()
+    );
   });
 
   it("will not connect without saying who on the provider counts", async () => {

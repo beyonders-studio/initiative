@@ -88,12 +88,15 @@
     "loadingRecent": "Loading recent items…",
     "closeItem": "Close {{name}}",
     "closeOthers": "Close others",
-    "closeAll": "Close all"
+    "closeAll": "Close all",
+    "closeError": "Couldn't close the tab.",
+    "closeSomeError": "Some tabs couldn't be closed."
   },
   "pin": {
     "pinned": "Pinned project",
     "unpin": "Unpin project",
-    "pin": "Pin project"
+    "pin": "Pin project",
+    "error": "Couldn't pin or unpin the project."
   },
   "taskComposer": {
     "createTask": "Create task"
@@ -402,7 +405,8 @@
     "updated": "Updated {{date}}",
     "tasksDone": "{{completed}}/{{total}} done",
     "archivedOn": "Archived {{date}}",
-    "reorder": "Reorder project"
+    "reorder": "Reorder project",
+    "reorderError": "Couldn't move the project."
   },
   "presets": {
     "label": "Presets",

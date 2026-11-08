@@ -25,7 +25,6 @@ import {
   usePlacementTargets,
   useUpdatePlacementRule,
 } from "@/hooks/useProviderPlacement";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Combobox } from "@/ui/combobox";
 import {
@@ -153,8 +152,6 @@ export const ProviderPlacementRuleDialog = ({
             toast.success(t("providerPlacement.saved"));
             onClose();
           },
-          onError: (error) =>
-            toast.error(getErrorMessage(error, "settings:providerPlacement.saveError")),
         }
       );
       return;
@@ -166,8 +163,6 @@ export const ProviderPlacementRuleDialog = ({
           toast.success(t("providerPlacement.added"));
           onClose();
         },
-        onError: (error) =>
-          toast.error(getErrorMessage(error, "settings:providerPlacement.addError")),
       }
     );
   };

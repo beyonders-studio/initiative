@@ -11,7 +11,6 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { useServerForm } from "@/hooks/useServerForm";
 import { PROVIDER_CONFIGS } from "@/lib/ai-providers";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 
 import type { ConnectionMutations } from "./aiConnection.types";
@@ -138,8 +137,6 @@ export const useAIConnectionForm = ({
             if (updated.model) onClose();
             else onNeedsModel(updated);
           },
-          onError: (error) =>
-            toast.error(getErrorMessage(error, "settings:aiConnections.saveError")),
         }
       );
       return;
@@ -161,7 +158,6 @@ export const useAIConnectionForm = ({
         if (created.model) onClose();
         else onNeedsModel(created);
       },
-      onError: (error) => toast.error(getErrorMessage(error, "settings:aiConnections.saveError")),
     });
   };
 

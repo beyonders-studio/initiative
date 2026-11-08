@@ -29,11 +29,12 @@ import { useTranslation } from "react-i18next";
 import { updateCommunity } from "@/api/generated/communities/communities";
 import {
   type CommunityCategory,
-  type CommunityRead,
+  type CommunityUpdate,
   SupportTopic,
 } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { HelpLink } from "@/components/support/HelpLink";
+import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
 import { COMMUNITY_CATEGORIES, communityCategoryLabel } from "@/lib/communityCategories";
@@ -53,9 +54,24 @@ export const CommunityDiscoveryPanel = () => {
   const { activeCommunity, refreshCommunities, updateCommunityInState } = useCommunities();
   const { communityDirectoryEnabled } = useAppConfig();
   const [publishing, setPublishing] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const save = useCommunityMutation(
+    {
+      mutationFn: async (communityId, updates: CommunityUpdate) => {
+        updateCommunityInState(await updateCommunity(communityId, updates));
+        await refreshCommunities();
+      },
+    },
+    {
+      onMutate: () => {
+        setError(null);
+        setMessage(null);
+      },
+      onSuccess: () => setMessage(t("communities:settings.updatedSuccessfully")),
+      onError: (err) => setError(getErrorMessage(err, "communities:settings.unableToUpdate")),
+    }
+  );
 
   const [prevCommunity, setPrevCommunity] = useState(activeCommunity);
   if (prevCommunity !== activeCommunity) {
@@ -74,28 +90,6 @@ export const CommunityDiscoveryPanel = () => {
   const seatLimited =
     activeCommunity.max_users != null && activeCommunity.max_users < MIN_COMMUNITY_SEATS;
 
-  const save = async (updates: Partial<CommunityRead>) => {
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const result = (await updateCommunity(
-        activeCommunity.id,
-        updates as Parameters<typeof updateCommunity>[1]
-      )) as unknown as CommunityRead;
-      updateCommunityInState(result);
-      await refreshCommunities();
-      setMessage(t("communities:settings.updatedSuccessfully"));
-      return true;
-    } catch (err) {
-      console.error(err);
-      setError(getErrorMessage(err, "communities:settings.unableToUpdate"));
-      return false;
-    } finally {
-      setSaving(false);
-    }
-  };
-
   // Listing is a publication, so it goes through the dialog that collects the
   // categories and the certification. Un-listing publishes nothing and asks
   // nothing — it takes effect on the click.
@@ -104,14 +98,14 @@ export const CommunityDiscoveryPanel = () => {
       setPublishing(true);
       return;
     }
-    void save({ is_community: false });
+    save.mutate({ is_community: false });
   };
 
   const toggleCategory = (category: CommunityCategory) => {
     const next = activeCommunity.categories.includes(category)
       ? activeCommunity.categories.filter((value) => value !== category)
       : [...activeCommunity.categories, category];
-    void save({ categories: next });
+    save.mutate({ categories: next });
   };
 
   return (
@@ -157,7 +151,7 @@ export const CommunityDiscoveryPanel = () => {
                           type="button"
                           onClick={() => toggleCategory(category)}
                           aria-pressed={selected}
-                          disabled={saving}
+                          disabled={save.isPending}
                           className={cn(
                             "rounded-full border px-3 py-1 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
                             selected
@@ -177,7 +171,7 @@ export const CommunityDiscoveryPanel = () => {
         >
           <Switch
             checked={listed}
-            disabled={saving || (!listed && seatLimited)}
+            disabled={save.isPending || (!listed && seatLimited)}
             onCheckedChange={handleToggle}
           />
         </SettingsRow>
@@ -188,19 +182,21 @@ export const CommunityDiscoveryPanel = () => {
 
       <PublishCommunityDialog
         open={publishing}
-        saving={saving}
+        saving={save.isPending}
         initialCategories={activeCommunity.categories}
         onCancel={() => setPublishing(false)}
-        onConfirm={async (categories) => {
-          const ok = await save({
-            is_community: true,
-            categories,
-            // Ticking the certification is what answers the 18+ question — the
-            // only path to "no", from unanswered or from a previous "yes".
-            has_adult_content: false,
-          });
-          if (ok) setPublishing(false);
-        }}
+        onConfirm={(categories) =>
+          save.mutate(
+            {
+              is_community: true,
+              categories,
+              // Ticking the certification is what answers the 18+ question — the
+              // only path to "no", from unanswered or from a previous "yes".
+              has_adult_content: false,
+            },
+            { onSuccess: () => setPublishing(false) }
+          )
+        }
       />
     </>
   );

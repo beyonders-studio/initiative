@@ -24,7 +24,6 @@ import {
   useDeletePlacementRule,
   useSetPlacementEverywhere,
 } from "@/hooks/useProviderPlacement";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { Button } from "@/ui/button";
@@ -69,8 +68,6 @@ export const OperatorDashboardPlacementPage = () => {
             ? t("providerPlacement.everywhere.enabled")
             : t("providerPlacement.everywhere.disabled")
         ),
-      onError: (error) =>
-        toast.error(getErrorMessage(error, "settings:providerPlacement.everywhere.error")),
       // Close the confirm dialog only once the save settles, so its in-flight
       // state shows while it runs.
       onSettled: () => setConfirmEverywhere(false),
@@ -79,8 +76,6 @@ export const OperatorDashboardPlacementPage = () => {
   const removeRule = (rule: ProviderPlacementRuleRead) =>
     deleteRule.mutate(rule.id, {
       onSuccess: () => toast.success(t("providerPlacement.removed")),
-      onError: (error) =>
-        toast.error(getErrorMessage(error, "settings:providerPlacement.removeError")),
       onSettled: () => setRemoving(null),
     });
 
@@ -322,10 +317,6 @@ const PlacementRequestsCard = () => {
                     onSuccess: () =>
                       toast.success(
                         t("providerPlacement.requests.agreed", { community: row.community_name })
-                      ),
-                    onError: (err: unknown) =>
-                      toast.error(
-                        getErrorMessage(err, "settings:communities.sheet.narrowings.error")
                       ),
                   }
                 )

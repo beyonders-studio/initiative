@@ -140,10 +140,7 @@ describe("CommunityAuthProvidersSection", () => {
     expect(screen.getByRole("menuitem", { name: "Disconnect" })).toBeInTheDocument();
     await user.click(screen.getByRole("menuitem", { name: "Turn off" }));
 
-    expect(updateConnection).toHaveBeenCalledWith(
-      { connectionId: 5, data: { enabled: false } },
-      expect.anything()
-    );
+    expect(updateConnection).toHaveBeenCalledWith({ connectionId: 5, data: { enabled: false } });
   });
 
   it("lets a connection of its own accept the server's placement rules", async () => {
@@ -156,10 +153,10 @@ describe("CommunityAuthProvidersSection", () => {
     expect(accepts).not.toBeChecked();
     await user.click(accepts);
 
-    expect(updateConnection).toHaveBeenCalledWith(
-      { connectionId: 5, data: { accepts_provider_placement: true } },
-      expect.anything()
-    );
+    expect(updateConnection).toHaveBeenCalledWith({
+      connectionId: 5,
+      data: { accepts_provider_placement: true },
+    });
   });
 
   it("still offers a provider it only inherits in the picker", () => {

@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -20,7 +20,6 @@ import {
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import type { MutationOpts } from "@/types/mutation";
 
@@ -82,27 +81,19 @@ export const useCreateTag = (options?: MutationOpts<TagRead, TagCreate>) =>
 export const useUpdateTag = (
   options?: MutationOpts<TagRead, { tagId: number; data: TagUpdate }>
 ) => {
-  const communityId = useActiveCommunityId();
   const { t } = useTranslation("tags");
-  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
-
-  return useMutation({
-    ...rest,
-    mutationFn: async ({ tagId, data }: { tagId: number; data: TagUpdate }) => {
-      return updateTag(communityId, tagId, data);
+  return useCommunityMutation<TagRead, { tagId: number; data: TagUpdate }>(
+    {
+      mutationFn: (communityId, { tagId, data }) => updateTag(communityId, tagId, data),
+      invalidate: () => {
+        toast.success(t("updated"));
+        void invalidate(q.allTags());
+        invalidateTagBearers();
+      },
+      errorKey: "tags:updateError",
     },
-    onSuccess: (...args) => {
-      toast.success(t("updated"));
-      void invalidate(q.allTags());
-      invalidateTagBearers();
-      onSuccess?.(...args);
-    },
-    onError: (...args) => {
-      toast.error(getErrorMessage(args[0], "tags:updateError"));
-      onError?.(...args);
-    },
-    onSettled,
-  });
+    options
+  );
 };
 
 export const useDeleteTag = (
@@ -112,29 +103,24 @@ export const useDeleteTag = (
     silent?: boolean;
   }
 ) => {
-  const communityId = useActiveCommunityId();
   const { t } = useTranslation("tags");
-  const { onSuccess, onError, onSettled, silent, ...rest } = options ?? {};
-
-  return useMutation({
-    ...rest,
-    mutationFn: async (tagId: number) => {
-      await deleteTag(communityId, tagId);
+  const { silent, ...rest } = options ?? {};
+  return useCommunityMutation<void, number>(
+    {
+      mutationFn: async (communityId, tagId) => {
+        await deleteTag(communityId, tagId);
+      },
+      invalidate: () => {
+        if (!silent) {
+          toast.success(t("deleted"));
+        }
+        void invalidate(q.allTags());
+        invalidateTagBearers();
+      },
+      errorKey: "tags:deleteError",
     },
-    onSuccess: (...args) => {
-      if (!silent) {
-        toast.success(t("deleted"));
-      }
-      void invalidate(q.allTags());
-      invalidateTagBearers();
-      onSuccess?.(...args);
-    },
-    onError: (...args) => {
-      toast.error(getErrorMessage(args[0], "tags:deleteError"));
-      onError?.(...args);
-    },
-    onSettled,
-  });
+    rest
+  );
 };
 
 /** How many things of each taggable kind carry the tag, keyed by kind — the

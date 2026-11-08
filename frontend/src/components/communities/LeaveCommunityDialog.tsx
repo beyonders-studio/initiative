@@ -7,6 +7,7 @@ import type {
   CommunityRead,
   LeaveCommunityEligibilityResponse,
 } from "@/api/generated/initiativeAPI.schemas";
+import { useApiMutation } from "@/hooks/useApiMutation";
 import { useCommunities } from "@/hooks/useCommunities";
 import { toast } from "@/lib/mascotToast";
 import type { DialogProps } from "@/types/dialog";
@@ -31,7 +32,6 @@ export const LeaveCommunityDialog = ({
   const { t } = useTranslation(["communities", "common"]);
   const { communities, refreshCommunities, switchCommunity, activeCommunityId } = useCommunities();
   const [loading, setLoading] = useState(true);
-  const [leaving, setLeaving] = useState(false);
   const [eligibility, setEligibility] = useState<LeaveCommunityEligibilityResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,29 +64,30 @@ export const LeaveCommunityDialog = ({
 
   const hasHardBlocker = !!eligibility && eligibility.is_last_superadmin;
 
-  const handleLeave = async () => {
-    setLeaving(true);
-    try {
-      await leaveCommunity(community.id);
+  const leave = useApiMutation(
+    {
+      mutationFn: async () => {
+        await leaveCommunity(community.id);
 
-      // Switch to another community if leaving the active one
-      if (activeCommunityId === community.id) {
-        const otherCommunity = communities.find((g) => g.id !== community.id);
-        if (otherCommunity) {
-          await switchCommunity(otherCommunity.id);
+        // Switch to another community if leaving the active one
+        if (activeCommunityId === community.id) {
+          const otherCommunity = communities.find((g) => g.id !== community.id);
+          if (otherCommunity) {
+            await switchCommunity(otherCommunity.id);
+          }
         }
-      }
 
-      await refreshCommunities();
-      toast.success(t("leave.leftCommunity", { name: community.name }));
-      onOpenChange(false);
-    } catch (err) {
-      console.error("Failed to leave community", err);
-      toast.error(t("leave.failedToLeave"));
-    } finally {
-      setLeaving(false);
+        await refreshCommunities();
+      },
+      errorKey: "communities:leave.failedToLeave",
+    },
+    {
+      onSuccess: () => {
+        toast.success(t("leave.leftCommunity", { name: community.name }));
+        onOpenChange(false);
+      },
     }
-  };
+  );
 
   const renderContent = () => {
     if (loading) {
@@ -147,9 +148,9 @@ export const LeaveCommunityDialog = ({
       }
       confirmLabel={t("leave.leaveButton")}
       loadingLabel={t("leave.leaving")}
-      isLoading={leaving}
+      isLoading={leave.isPending}
       destructive
-      onConfirm={canShowLeaveButton ? handleLeave : undefined}
+      onConfirm={canShowLeaveButton ? () => leave.mutate() : undefined}
     >
       {renderContent()}
     </ConfirmDialog>

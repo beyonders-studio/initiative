@@ -229,16 +229,21 @@ export const ConnectSignInWizard = ({
         });
       }
       if (insist) {
-        await updatePolicy.mutateAsync({
-          auth_policy: { policy: "required", provider_id: providerId, require_methods: [] },
-        });
+        await updatePolicy.mutateAsync(
+          { auth_policy: { policy: "required", provider_id: providerId, require_methods: [] } },
+          {
+            onError: (error) =>
+              toast.error(
+                getErrorMessage(error, "settings:communityAuth.connections.connectError")
+              ),
+          }
+        );
       }
       toast.success(t("settings:communityAuth.connections.connected"));
       closeWizard();
-    } catch (error) {
+    } catch {
       // The answers stay on screen: whichever call failed, the step somebody
-      // is standing on is the one to try again from.
-      toast.error(getErrorMessage(error, "settings:communityAuth.connections.connectError"));
+      // is standing on is the one to try again from. Each call says why it failed.
       setSaving(false);
     }
   };
