@@ -355,6 +355,7 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
   );
   const statuses = bound?.statuses ?? [];
   const types = bound?.task_types ?? [];
+  const ideas = stream === "ideas";
 
   const busy = !settled || importBlueprint.isPending || upsert.isPending || remove.isPending;
 
@@ -511,9 +512,10 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
               </Select>
             </Field>
 
-            {/* A project with one type has nothing to choose. */}
-            {types.length > 1 || binding.task_type_id ? (
-              <Field label={t("stream.caseTypeLabel")}>
+            {/* A project with one type has nothing to choose, except on the
+                Ideas board, where the type is what publishes an idea. */}
+            {types.length > 1 || binding.task_type_id || ideas ? (
+              <Field label={t(ideas ? "stream.ideaTypeLabel" : "stream.caseTypeLabel")}>
                 <Select
                   value={statusOption(binding.task_type_id)}
                   disabled={busy}
@@ -523,7 +525,9 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NONE}>{t("stream.caseTypeDefault")}</SelectItem>
+                    <SelectItem value={NONE}>
+                      {t(ideas ? "stream.ideaTypeNone" : "stream.caseTypeDefault")}
+                    </SelectItem>
                     {/* One the project no longer offers names itself, or the
                         control would render blank. */}
                     {binding.task_type_id &&

@@ -420,7 +420,6 @@ class TaskMessages:
     INVALID_RECURRENCE_LIMIT = "INVALID_RECURRENCE_LIMIT"
     #: The task was not opened by an intake stream.
     NOT_A_CASE = "TASK_NOT_A_CASE"
-    NOT_AN_IDEA = "TASK_NOT_AN_IDEA"
     #: The board column it would go into holds as many tasks as it takes.
     STATUS_AT_LIMIT = "TASK_STATUS_AT_LIMIT"
     ALREADY_IN_PROJECT = "TASK_ALREADY_IN_PROJECT"

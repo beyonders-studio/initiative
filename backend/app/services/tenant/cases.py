@@ -21,13 +21,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from sqlalchemy.orm import selectinload
 
-from app.core.intake import (
-    Conversation,
-    IntakeStream,
-    Source,
-    conversation_for,
-    meta,
-)
+from app.core.intake import Conversation, IntakeStream, conversation_for
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.evidence import Evidence
@@ -57,6 +51,8 @@ class CaseView:
     resource_id: Optional[int] = None
     #: What it is about within its stream, as its filer chose.
     topic: Optional[str] = None
+    #: How many voted for it, on a published idea; ``None`` on any other case.
+    votes: Optional[int] = None
 
 
 async def holds_cases(session: AsyncSession) -> bool:
@@ -73,19 +69,17 @@ async def holds_cases(session: AsyncSession) -> bool:
 
 
 async def read_case(session: AsyncSession, task_id: int) -> Optional[CaseView]:
-    """The case behind ``task_id``, or ``None`` where the task is not one, or
-    is one nobody filed: a published idea is its board's case, with no filing
-    to show."""
+    """The case behind ``task_id``, or ``None`` where the task is not one. A
+    published idea is the ``ideas`` stream's case, which nobody filed: its
+    type on the Ideas board is what makes it one."""
     if not await holds_cases(session):
         return None
     case = (
         await session.exec(select(IntakeCase).where(IntakeCase.task_id == task_id))
     ).first()
     if case is None:
-        return None
+        return await _idea(session, task_id)
     stream = IntakeStream(case.stream)
-    if Source.submitted not in meta(stream).sources:
-        return None
     binding = (
         await session.exec(
             select(
@@ -129,6 +123,29 @@ async def read_case(session: AsyncSession, task_id: int) -> Optional[CaseView]:
         ),
         evidence=attached.get(("case", task_id), []),
         **await _subject(session, task_id),
+    )
+
+
+async def _idea(session: AsyncSession, task_id: int) -> Optional[CaseView]:
+    """``task_id`` as the ``ideas`` stream's case, where it is a published
+    idea."""
+    from app.services.platform import ideas as ideas_service
+
+    found = await ideas_service.published(session, task_id)
+    if found is None:
+        return None
+    opened_at, votes = found
+    return CaseView(
+        stream=IntakeStream.ideas,
+        opened_at=opened_at,
+        filer=None,
+        filer_subject=None,
+        conversation=Conversation.none,
+        awaiting_filer_status_id=None,
+        active_status_id=None,
+        messages=[],
+        evidence=[],
+        votes=votes,
     )
 
 

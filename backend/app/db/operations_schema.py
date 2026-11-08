@@ -153,14 +153,14 @@ FILER_ROWS: dict[str, str] = {
     "evidence": f"created_by = {_UID} AND case_task_id = ANY ({_CASES})",
 }
 
-#: What anybody reads of the published ideas: which tasks are published; each
-#: one's title, description and status, never its assignees, properties or
-#: tags; the Ideas board's statuses; and the votes, as counts.
+#: What anybody reads of the published ideas: each one's title, description
+#: and status, never its assignees, properties or tags; the Ideas board's
+#: statuses; and the votes, as counts.
 IDEAS_TABLE_ACCESS: dict[str, tuple[str, ...]] = {
-    "intake_cases": ("id", "task_id", "stream", "opened_at"),
     "tasks": (
         "id",
         "project_id",
+        "task_type_id",
         "title",
         "description",
         "task_status_id",
@@ -170,24 +170,28 @@ IDEAS_TABLE_ACCESS: dict[str, tuple[str, ...]] = {
         "deleted_at",
     ),
     "task_statuses": ("id", "project_id", "name", "color", "category", "position"),
-    "intake_bindings": ("id", "stream", "project_id"),
+    "intake_bindings": ("id", "stream", "project_id", "task_type_id"),
     "idea_votes": ("task_id", "user_id"),
 }
 
-_IDEAS = gucs.IDEA_TASKS.once
 IDEAS_ROWS: dict[str, str] = {
-    # A published idea is an ``ideas`` case. The one read of which they are:
-    # the seam takes their tasks from here into ``app.idea_tasks``, which the
-    # rows below read instead of ``intake_cases``, whose own policy reads
-    # ``tasks``.
-    "intake_cases": "stream = 'ideas'",
-    "tasks": f"id = ANY ({_IDEAS})",
+    # A published idea: a task on the board bound to ``ideas``, of the type
+    # that binding names, and neither archived nor trashed. Every holdable
+    # table's ``held_restrict`` already keeps a held one out.
+    "tasks": (
+        'EXISTS (SELECT 1 FROM "{s}".intake_bindings b'
+        " WHERE b.stream = 'ideas' AND b.project_id = tasks.project_id"
+        " AND b.task_type_id = tasks.task_type_id)"
+        " AND archived_at IS NULL AND deleted_at IS NULL"
+    ),
     "task_statuses": (
         'project_id IN (SELECT b.project_id FROM "{s}".intake_bindings b'
         " WHERE b.stream = 'ideas')"
     ),
     "intake_bindings": "stream = 'ideas'",
-    "idea_votes": f"task_id = ANY ({_IDEAS})",
+    "idea_votes": (
+        'EXISTS (SELECT 1 FROM "{s}".tasks t WHERE t.id = idea_votes.task_id)'
+    ),
 }
 
 

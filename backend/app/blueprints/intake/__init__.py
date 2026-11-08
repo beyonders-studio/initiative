@@ -28,6 +28,12 @@ BLUEPRINT_DIR = Path(__file__).parent
 WAITING_ON_REQUESTER = "Waiting on requester"
 REQUESTER_REPLIED = "Requester replied"
 
+#: The type the Ideas blueprint gives a published idea. Setting the board up
+#: names it on the binding, so a task of any other type there is a draft. No
+#: project starts with a type of this name, so a task moved onto the board,
+#: which keeps a type of the same name, lands as a draft.
+PUBLISHED_TYPE = "Published"
+
 
 @lru_cache(maxsize=None)
 def blueprint_for(stream: IntakeStream) -> ProjectExportEnvelope:

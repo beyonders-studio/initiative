@@ -327,18 +327,32 @@ async def _ensure_isolation(
         )
 
 
-async def _blueprint_status_roles(
+async def _blueprint_roles(
     session: AsyncSession, stream: IntakeStream, project_id: int
 ) -> dict[str, Optional[int]]:
-    """The statuses a project set up from ``stream``'s blueprint plays each
-    role with. None for a stream with no conversation, where nobody is ever
-    waited on."""
-    from app.blueprints.intake import REQUESTER_REPLIED, WAITING_ON_REQUESTER
+    """The statuses and type a project set up from ``stream``'s blueprint
+    plays each role with. No statuses for a stream with no conversation, where
+    nobody is ever waited on; a type only for the Ideas board, whose type is
+    what publishes an idea."""
+    from app.blueprints.intake import (
+        PUBLISHED_TYPE,
+        REQUESTER_REPLIED,
+        WAITING_ON_REQUESTER,
+    )
 
     roles: dict[str, Optional[int]] = {
         "awaiting_filer_status_id": None,
         "active_status_id": None,
+        "task_type_id": None,
     }
+    if stream is IntakeStream.ideas:
+        roles["task_type_id"] = (
+            await session.exec(
+                select(TaskType.id)
+                .where(TaskType.project_id == project_id)
+                .where(TaskType.name == PUBLISHED_TYPE)
+            )
+        ).first()
     if meta(stream).conversation is Conversation.none:
         return roles
     rows = (
@@ -587,7 +601,7 @@ async def provision_from_blueprint(
             project=project,
             project_id=result.entity_id,
             default_status_id=None,
-            **await _blueprint_status_roles(routed, stream, result.entity_id),
+            **await _blueprint_roles(routed, stream, result.entity_id),
             enabled=True,
         )
         await routed.commit()
