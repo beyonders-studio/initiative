@@ -1,77 +1,36 @@
 import { Link } from "@tanstack/react-router";
-import { CornerLeftUp, type LucideIcon } from "lucide-react";
-import { type ComponentType, memo, useCallback, useMemo } from "react";
-import { useTranslation } from "react-i18next";
+import type { LucideIcon } from "lucide-react";
+import { type ComponentType, memo, type ReactNode } from "react";
 
-import type {
-  ChecklistProgress,
-  FileSummary,
-  PropertyDefinitionRead,
-  PropertySummary,
-  TagSummary,
-  TaskAssigneeSummary,
-  TaskListRead,
-  TaskParentSummary,
-  TaskPriority,
-  TaskTypeRead,
+import {
+  MetadataType,
+  type PropertyDefinitionRead,
+  type PropertySummary,
+  type TaskListRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { MetadataType, type PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
-import { FileTypeBadge } from "@/components/files/fileColumns";
-import { UnreadDot } from "@/components/notifications/UnreadDot";
-import { priorityVariant } from "@/components/projects/projectTasksConfig";
-import { TaskAssigneeList, TaskAssigneeStack } from "@/components/projects/TaskAssigneeList";
-import { TaskBlockersHoverCard } from "@/components/projects/TaskBlockersHoverCard";
-import { TaskDescriptionHoverCard } from "@/components/projects/TaskDescriptionHoverCard";
-import { TaskSubtasksHoverCard } from "@/components/projects/TaskSubtasksHoverCard";
-import { TagBadge } from "@/components/tags";
-import { TagBadgeList } from "@/components/tags/TagBadge";
-import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
-import { DateCell } from "@/components/tasks/TaskDateCell";
-import { TaskTypeMark, TaskTypeOption } from "@/components/tasks/TaskTypeOption";
-import { MentionText } from "@/components/user/MentionText";
-import { useStepCounter } from "@/hooks/useProperties";
-import { useUnreadTree } from "@/hooks/useUnreadTree";
-import { useCommunityPath } from "@/lib/communityUrl";
-import { summarizeStored } from "@/lib/recurrence";
-import { truncateText } from "@/lib/text";
-import { entityRefRoute } from "@/lib/tools";
-import type { TranslateFn } from "@/types/i18n";
 import { Badge } from "@/ui/badge";
-import { formatBytes } from "@/ui/lib/fileUtils";
+import { DateCell } from "@/ui/date-cell";
 import { formatDateTime } from "@/ui/lib/formatDate";
 import { cn } from "@/ui/lib/utils";
 import { PropertyValueCell } from "@/ui/properties/PropertyValueCell";
+import { namePropertyColumns } from "@/ui/properties/propertyColumns";
 import type { FieldDisplay } from "@/ui/properties/propertyHelpers";
+import { iconForPropertyType } from "@/ui/properties/propertyTypeIcons";
 
 import type { PropertyEnv } from "./fieldEditors";
 import { PluginField, type PluginFieldDecl, type PluginOnItems } from "./plugins";
 
 /** What a view draws: tasks, and a collection's files, which its own fields
- *  (`lib/layouts/files.ts`) read. */
+ *  (`lib/layouts/files.tsx`) read. */
 export type LayoutItem = TaskListRead;
 
-/** Where a field is drawn. On a detail it is its editor, which the
- *  detail parts draw (`taskLayout.tsx`). */
+/** Where a field is drawn. On a detail it is its editor, which the kind of
+ *  item's detail parts draw. */
 export type LayoutVariant = "card" | "cell" | "detail";
 
-export type FieldKind =
-  | "title"
-  | "excerpt"
-  | "people"
-  | "date"
-  | "recurrence"
-  | "checklist"
-  | "subtasks"
-  | "parent"
-  | "priority"
-  | "count"
-  | "tags"
-  | "taskType"
-  | "property"
-  | "plugin"
-  | "fileName"
-  | "fileType"
-  | "fileSize";
+/** The kinds of field drawn here. A kind of item draws its own fields
+ *  ({@link FieldDef}'s `render`). */
+export type FieldKind = "title" | "excerpt" | "date" | "count" | "property" | "plugin";
 
 /** A property's field, by its definition id: what a view stores, so renaming
  *  the property keeps every view that shows it. */
@@ -137,7 +96,11 @@ export const groupFields = (fields: readonly FieldDef[]): FieldGroup[] => {
 /** Anything a view can show about an item. */
 export type FieldDef = {
   id: string;
-  kind: FieldKind;
+  /** The kind of value it holds, drawn as {@link FIELD_RENDERERS} draws that
+   *  kind. Left out where `render` draws it, or nothing does. */
+  kind?: FieldKind;
+  /** How the kind of item draws a field of its own, in place of its kind's. */
+  render?: ComponentType<FieldRendererProps>;
   source: "builtin" | "property" | "plugin";
   /** Built-in: an i18n key, in `projects` unless it names its namespace.
    *  Property or plug-in field: its own name, untranslated. */
@@ -145,9 +108,6 @@ export type FieldDef = {
   /** What the field holds for an item. Nothing (null, "", []) draws nothing on
    *  a card; a cell says so. */
   value: (item: LayoutItem) => unknown;
-  /** A title's: the item's type, drawn by its name in a cell, or null where
-   *  there is none to tell apart. */
-  typeOf?: (item: LayoutItem) => TaskTypeRead | null;
   /** A title cannot be hidden: a card with no title is not a card. */
   hideable: boolean;
   /** Whether an item's page can require it: a value a person fills in that
@@ -161,17 +121,19 @@ export type FieldDef = {
   property?: PropertyDefinitionRead;
   /** How a scale or a counter is drawn where the list showing it says. */
   display?: FieldDisplay;
-  /** A property drawn on a card as its value alone, not named: a
-   *  collection's card under a picture, which reads as a caption or a price
-   *  rather than a row of labelled chips. */
+  /** A property drawn on a card as its value alone, not named: a card under
+   *  a picture, which reads as a caption or a price rather than a row of
+   *  labelled chips. */
   plain?: boolean;
   /** The sentence the value sits in, as an i18n key ("Due: {{date}}"). */
   phrase?: string;
   icon?: LucideIcon;
   tone?: "warning";
   /** How a cell marks a date that has passed: as begun, or as overdue until
-   *  the item is done. */
+   *  the item is `done`. */
   past?: "primary" | "destructive";
+  /** Whether the item is done, past which none of its dates is overdue. */
+  done?: (item: LayoutItem) => boolean;
 };
 
 /** What renderers share across a view. It changes with the language, the
@@ -179,10 +141,11 @@ export type FieldDef = {
  *  whose value is unchanged skips redrawing when the Fields menu changes. */
 export type LayoutEnv = {
   /** Reads `projects`, and the other {@link LAYOUT_NAMESPACES} by prefix. */
-  t: TranslateFn;
+  t: (key: string, options?: Record<string, unknown>) => string;
   /** A community-relative path, made absolute in the item's community. */
   communityPath: (path: string, item: LayoutItem) => string;
-  taskHref: (task: LayoutItem) => string;
+  /** The page an item's title opens. */
+  itemHref: (item: LayoutItem) => string;
   /** What can be done with an item from where it is drawn, beside its title
    *  on a card: a board its reader may change. */
   itemActions?: ComponentType<{ item: LayoutItem }>;
@@ -212,31 +175,6 @@ export const LAYOUT_NAMESPACES = [
   "calendars",
 ] as const;
 
-/** How a list of `target`s steps its counters: an item's, where `may` says
- *  its reader may change that counter on it from the list. `may` is kept
- *  between renders by its caller. */
-export const useCounterSteps = (
-  target: PropertyTarget,
-  may: (item: LayoutItem, definition: PropertyDefinitionRead) => boolean
-): NonNullable<LayoutEnv["stepCounter"]> => {
-  const { mutateAsync } = useStepCounter(target);
-  return useCallback(
-    (item, definition) =>
-      may(item, definition) ? (up) => mutateAsync({ itemId: item.id, definition, up }) : null,
-    [may, mutateAsync]
-  );
-};
-
-/** The env of a project's views: one community, and its tasks' pages. */
-export const useProjectLayoutEnv = (taskHref: (taskId: number) => string): LayoutEnv => {
-  const { t } = useTranslation(LAYOUT_NAMESPACES);
-  const communityPath = useCommunityPath();
-  return useMemo(
-    () => ({ t: t as TranslateFn, communityPath, taskHref: (task) => taskHref(task.id) }),
-    [t, communityPath, taskHref]
-  );
-};
-
 export type FieldRendererProps = {
   value: unknown;
   item: LayoutItem;
@@ -251,84 +189,46 @@ export type FieldRendererProps = {
 export const isEmptyValue = (value: unknown): boolean =>
   value == null || value === "" || (Array.isArray(value) && value.length === 0);
 
-// A table's title cell carries what the card shows as fields of their own,
-// where the table has no column for it.
-const TitleCell = ({
-  title,
-  task,
-  type,
-  unread,
-  env,
-}: {
-  title: string;
-  task: LayoutItem;
-  type: TaskTypeRead | null;
-  unread: boolean;
-  env: LayoutEnv;
-}) => {
-  const recurrence = task.recurrence
-    ? summarizeStored(
-        task.recurrence,
-        task.due_date || task.start_date,
-        {
-          strategy: task.recurrence_strategy,
-          shift: task.recurrence_shift,
-          limit: task.recurrence_limit,
-        },
-        env.t
-      )
-    : null;
-  return (
-    <div className="flex w-full min-w-60 items-center gap-2">
-      <div className="flex min-w-0 flex-1 flex-col items-start text-left">
-        <div className="flex items-start gap-1.5">
-          {/* One line of the title tall, so it sits on the first line's middle. */}
-          {type ? <TaskTypeMark type={type} className="h-lh" /> : null}
-          <Link
-            to={env.taskHref(task)}
-            draggable={false}
-            className="flex items-center gap-2 rounded-sm font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            {title}
-            {unread ? <UnreadDot /> : null}
-          </Link>
-        </div>
-        {recurrence ? (
-          <p className="text-muted-foreground text-xs">{truncateText(recurrence, 100)}</p>
-        ) : null}
-        <TaskChecklistProgress progress={task.checklist_progress} className="mt-2 max-w-[200px]" />
-      </div>
-      <TaskSubtasksHoverCard task={task} />
-      <TaskBlockersHoverCard task={task} />
-      <TaskDescriptionHoverCard task={task} />
-    </div>
-  );
-};
+/** One field per property the initiative defines, two that share a name told
+ *  apart in their labels; `read` reads one's value off an item. */
+export const propertyFields = (
+  definitions: PropertyDefinitionRead[],
+  read: (item: LayoutItem, definition: PropertyDefinitionRead) => unknown
+): FieldDef[] =>
+  namePropertyColumns(definitions).map(({ definition, label }) => ({
+    id: propertyFieldId(definition.id),
+    kind: "property",
+    source: "property",
+    label,
+    hideable: true,
+    // A checkbox is always on or off, so never empty.
+    requireable: definition.type !== MetadataType.checkbox,
+    icon: iconForPropertyType(definition.type),
+    value: (item) => read(item, definition),
+    property: definition,
+  }));
 
-// Only the title opens the task: the rest of the card is the card, and a real
-// link means middle-click and "open in new tab" work.
-const TitleField = ({ value, item, field, variant, env }: FieldRendererProps) => {
-  const unread = useUnreadTree().hasSubject(item.community_id, "task", item.id);
-  if (variant === "cell") {
-    return (
-      <TitleCell
-        title={value as string}
-        task={item}
-        type={field.typeOf?.(item) ?? null}
-        unread={unread}
-        env={env}
-      />
-    );
-  }
+/**
+ * An item's title, as a link to its page. Only the title opens the item: the
+ * rest of the card is the card, and a real link means middle-click and "open
+ * in new tab" work. A kind of item may mark it (`mark`), inside the link.
+ */
+export const TitleField = ({
+  value,
+  item,
+  variant,
+  env,
+  mark,
+}: FieldRendererProps & { mark?: ReactNode }) => {
   const Actions = variant === "card" ? env.itemActions : undefined;
   const link = (
     <Link
-      to={env.taskHref(item)}
+      to={env.itemHref(item)}
       draggable={false}
       className="wrap-break-word w-full min-w-0 rounded-sm font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
     >
       {value as string}
-      {unread ? <UnreadDot className="ml-2 inline-block align-middle" /> : null}
+      {mark}
     </Link>
   );
   if (!Actions) return link;
@@ -340,24 +240,16 @@ const TitleField = ({ value, item, field, variant, env }: FieldRendererProps) =>
   );
 };
 
-// Two lines of words, not a picture that fills the card.
-const ExcerptField = ({ value }: FieldRendererProps) => (
+/** Two lines of words, not a picture that fills the card. A kind of item may
+ *  draw the words its own way (`children`). */
+export const ExcerptField = ({
+  value,
+  children,
+}: FieldRendererProps & { children?: ReactNode }) => (
   <p className="wrap-break-word line-clamp-2 w-full min-w-0 text-muted-foreground text-sm">
-    <MentionText text={value as string} />
+    {children ?? (value as string)}
   </p>
 );
-
-const PeopleField = ({ value, variant }: FieldRendererProps) => {
-  const people = value as TaskAssigneeSummary[];
-  if (variant === "cell") {
-    return people.length > 0 ? (
-      <TaskAssigneeStack assignees={people} />
-    ) : (
-      <span className="text-muted-foreground text-sm">&mdash;</span>
-    );
-  }
-  return <TaskAssigneeList assignees={people} className="text-xs" />;
-};
 
 // `formatDateTime`, as every timestamp in the app: it honours the reader's
 // 12/24-hour choice. A cell says how far off the date is instead.
@@ -367,76 +259,13 @@ const DateField = ({ value, item, field, variant, env }: FieldRendererProps) => 
       <DateCell
         date={value as string | null}
         isPastVariant={field.past}
-        isDone={item.task_status?.category === "done"}
+        isDone={field.done?.(item)}
       />
     );
   }
   const date = formatDateTime(value as string);
   if (!date) return null;
   return <p>{field.phrase ? env.t(field.phrase, { date }) : date}</p>;
-};
-
-const RecurrenceField = ({ value, item, env }: FieldRendererProps) => {
-  const summary = summarizeStored(
-    value as string,
-    item.due_date || item.start_date,
-    {
-      strategy: item.recurrence_strategy,
-      shift: item.recurrence_shift,
-      limit: item.recurrence_limit,
-    },
-    env.t
-  );
-  return summary ? <p>{truncateText(summary, 80)}</p> : null;
-};
-
-const ChecklistField = ({ value }: FieldRendererProps) => (
-  <TaskChecklistProgress progress={value as ChecklistProgress} className="w-full pt-1" />
-);
-
-const SubtasksField = ({ value }: FieldRendererProps) => (
-  <TaskChecklistProgress
-    of="subtasks"
-    progress={value as ChecklistProgress}
-    className="w-full min-w-24 pt-1"
-  />
-);
-
-// The task this one is part of, as a link to it: on a card a line above what
-// the card says, in a cell its name.
-const ParentField = ({ value, item, variant, env }: FieldRendererProps) => {
-  const parent = value as TaskParentSummary | null;
-  if (!parent) {
-    return variant === "cell" ? (
-      <span className="text-muted-foreground text-sm">&mdash;</span>
-    ) : null;
-  }
-  return (
-    <Link
-      // By the task alone: a parent may be in another of the initiative's
-      // projects, which a project's own task links would name wrongly.
-      to={env.communityPath(entityRefRoute("task", parent.id), item)}
-      draggable={false}
-      title={env.t("tasks:subtasks.partOf", { title: parent.title })}
-      className={cn(
-        "flex min-w-0 max-w-full items-center gap-1 rounded-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-1 focus-visible:ring-ring",
-        variant === "cell" ? "text-sm" : "text-xs"
-      )}
-    >
-      <CornerLeftUp className="h-3 w-3 shrink-0" aria-hidden="true" />
-      <span className="truncate">{parent.title}</span>
-    </Link>
-  );
-};
-
-const PriorityField = ({ value, field, env }: FieldRendererProps) => {
-  const priority = value as TaskPriority;
-  const text = priority.replace("_", " ");
-  return (
-    <Badge variant={priorityVariant[priority]}>
-      {field.phrase ? env.t(field.phrase, { priority: text }) : text}
-    </Badge>
-  );
 };
 
 const CountField = ({ value, field, variant, env }: FieldRendererProps) => {
@@ -465,33 +294,6 @@ const CountField = ({ value, field, variant, env }: FieldRendererProps) => {
       {count}
     </Badge>
   );
-};
-
-const TagsField = ({ value, item, variant, env }: FieldRendererProps) => {
-  const tags = value as TagSummary[];
-  const tagHref = (tag: TagSummary) => env.communityPath(`/tags/${tag.id}`, item);
-  if (variant === "cell") {
-    return tags.length > 0 ? (
-      <TagBadgeList tags={tags} tagHref={tagHref} />
-    ) : (
-      <span className="text-muted-foreground text-sm">&mdash;</span>
-    );
-  }
-  return tags.map((tag) => <TagBadge key={tag.id} tag={tag} size="sm" to={tagHref(tag)} />);
-};
-
-// A card shows a type by its icon alone, beside the title and named on hover;
-// a cell names it.
-const TaskTypeField = ({ value, variant }: FieldRendererProps) => {
-  const type = value as TaskTypeRead | null;
-  if (!type) {
-    return variant === "cell" ? (
-      <span className="text-muted-foreground text-sm">&mdash;</span>
-    ) : null;
-  }
-  if (variant === "cell") return <TaskTypeOption type={type} className="text-sm" />;
-  // One line of the title tall, so the icon sits on the first line's middle.
-  return <TaskTypeMark type={type} className="h-lh" iconClassName="h-4 w-4" />;
 };
 
 const PropertyField = ({ value, item, field, variant, env, oneLine }: FieldRendererProps) => {
@@ -525,50 +327,19 @@ export const withDisplays = <F extends Pick<FieldDef, "display">>(
       )
     : fields;
 
-// A file's own fields hold the file, or its size, as their value.
-const FileNameField = ({ value, variant }: FieldRendererProps) => (
-  <p className={cn("min-w-0 truncate", variant === "card" ? "font-medium text-sm" : "text-sm")}>
-    {(value as FileSummary).name}
-  </p>
-);
-
-const FileTypeField = ({ value }: FieldRendererProps) => (
-  <FileTypeBadge file={value as FileSummary} />
-);
-
-// A file of the app's own has no size; a cell says so.
-const FileSizeField = ({ value, variant }: FieldRendererProps) =>
-  typeof value === "number" ? (
-    <span
-      className={cn(
-        "tabular-nums",
-        variant === "card" ? "text-muted-foreground text-xs" : "text-sm"
-      )}
-    >
-      {formatBytes(value)}
-    </span>
-  ) : variant === "cell" ? (
-    <span className="text-muted-foreground text-sm">&mdash;</span>
-  ) : null;
-
 /** One renderer per kind of field, each skipping a redraw its props don't call
  *  for. */
-export const FIELD_RENDERERS: Record<FieldKind, ComponentType<FieldRendererProps>> = {
+const FIELD_RENDERERS: Record<FieldKind, ComponentType<FieldRendererProps>> = {
   title: memo(TitleField),
   excerpt: memo(ExcerptField),
-  people: memo(PeopleField),
   date: memo(DateField),
-  recurrence: memo(RecurrenceField),
-  checklist: memo(ChecklistField),
-  subtasks: memo(SubtasksField),
-  parent: memo(ParentField),
-  priority: memo(PriorityField),
   count: memo(CountField),
-  tags: memo(TagsField),
-  taskType: memo(TaskTypeField),
   property: memo(PropertyField),
   plugin: memo(PluginField),
-  fileName: memo(FileNameField),
-  fileType: memo(FileTypeField),
-  fileSize: memo(FileSizeField),
 };
+
+const NOTHING = () => null;
+
+/** What draws a field: its own renderer, else its kind's; nothing for neither. */
+export const fieldRenderer = (field: FieldDef): ComponentType<FieldRendererProps> =>
+  field.render ?? (field.kind ? FIELD_RENDERERS[field.kind] : NOTHING);

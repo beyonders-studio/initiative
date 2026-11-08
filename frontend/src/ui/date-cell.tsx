@@ -15,7 +15,7 @@ type DateCellProps = {
 };
 
 /**
- * Memoized date cell for task tables. The relative label and its past-due
+ * Memoized date cell for tables. The relative label and its past-due
  * styling both refresh in place as time passes (via the shared clock in
  * `useLiveClockValue`) without a page reload, while the absolute tooltip date is
  * memoized since it never changes.

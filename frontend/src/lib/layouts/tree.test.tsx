@@ -31,7 +31,7 @@ const viewOf = (
   env: {
     t: i18n.getFixedT(null, ["projects", "dates", "relations"]) as TranslateFn,
     communityPath: (path) => path,
-    taskHref: (task) => `/tasks/${task.id}`,
+    itemHref: (task) => `/tasks/${task.id}`,
   },
 });
 

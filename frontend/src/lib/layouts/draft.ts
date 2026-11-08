@@ -12,26 +12,18 @@ import type {
 
 import type { FieldDef } from "./fields";
 import { MAX_PLUGIN_PARTS } from "./plugins";
-import { TASK_CARD, TASK_COLUMNS } from "./tasks";
 import type { LayoutNode } from "./tree";
 
-/** What a target's lists draw until they are changed: a card's parts and a
- *  table's columns, and the built-in fields a table can draw as a column. */
+/** What a kind of item's lists draw until they are changed: a card's parts
+ *  and a table's columns, and the built-in fields a table can draw as a
+ *  column. */
 export type ListShape = {
   card: LayoutNode;
   columns: readonly string[];
   columnFields: ReadonlySet<string>;
 };
 
-/** A project's lists, of its tasks. */
-export const TASK_LIST_SHAPE: ListShape = {
-  card: TASK_CARD,
-  columns: TASK_COLUMNS,
-  columnFields: new Set(TASK_COLUMNS),
-};
-
-/** The lists that draw each item as a card: a project's board, and a
- *  collection's walls of files. */
+/** The lists that draw each item as a card: a board, and the walls. */
 export const CARD_LISTS: ReadonlySet<ListLayoutReadKind> = new Set([
   "board",
   "masonry",
@@ -40,14 +32,14 @@ export const CARD_LISTS: ReadonlySet<ListLayoutReadKind> = new Set([
 ]);
 
 /** A list layout as the editor changes it: which list it is, how it draws what
- *  it lists, and what it draws as shipped where that is not a project's. */
+ *  it lists, and what it draws as shipped. */
 export type ListLayout = {
   kind: ListLayoutReadKind;
   definition: ListLayoutDefinitionInput;
-  shape?: ListShape;
+  shape: ListShape;
 };
 
-/** The fields of the plug-ins placed on the tasks, which a list as shipped
+/** The fields of the plug-ins placed on the items, which a list as shipped
  *  shows after its own: a plug-in shows as it arrives. */
 const pluginFieldIds = (fields: ReadonlyMap<string, FieldDef>): string[] =>
   [...fields.values()].filter((field) => field.source === "plugin").map((field) => field.id);
@@ -56,7 +48,7 @@ const pluginFieldIds = (fields: ReadonlyMap<string, FieldDef>): string[] =>
 export const cardOf = (
   definition: ListLayoutDefinitionInput,
   fields: ReadonlyMap<string, FieldDef>,
-  { card: shipped }: ListShape = TASK_LIST_SHAPE
+  { card: shipped }: ListShape
 ): LayoutNode => {
   const own = definition.card as LayoutNode | null | undefined;
   if (own) return own;
@@ -82,7 +74,7 @@ export const withCard = (
 export const columnsOf = (
   definition: ListLayoutDefinitionInput,
   fields: ReadonlyMap<string, FieldDef>,
-  { columns: shipped }: ListShape = TASK_LIST_SHAPE
+  { columns: shipped }: ListShape
 ): string[] => definition.columns ?? [...shipped, ...pluginFieldIds(fields)];
 
 /** Where a node is in a tree: the child it is at each level below the root. */
@@ -151,7 +143,7 @@ const nodesIn = (node: LayoutNode): LayoutNode[] => [
 ];
 
 /** Whether a part can be taken off the card: not one that is, or holds, a
- *  field every card shows (its title, which opens the task). */
+ *  field every card shows (its title, which opens the item). */
 export const removable = (node: LayoutNode, fields: ReadonlyMap<string, FieldDef>): boolean =>
   !nodesIn(node).some(
     (each) => each.type === "field" && fields.get(String(each.props?.field))?.hideable === false
@@ -174,7 +166,7 @@ export const canRequire = (
  *  property alone where it shows them all), a table's not among its columns
  *  and drawn as one. */
 export const addableFields = (
-  { kind, definition, shape = TASK_LIST_SHAPE }: ListLayout,
+  { kind, definition, shape }: ListLayout,
   fields: ReadonlyMap<string, FieldDef>
 ): FieldDef[] => {
   const all = [...fields.values()];
@@ -299,7 +291,7 @@ export const namedFields = (tree: LayoutNode): Set<string> =>
 
 /** Every node of a tree by its path key, for the canvas to find the part a
  *  click landed on. Keyed by the node itself, so a tree drawn twice (a card
- *  on every task) names each part once. */
+ *  on every item) names each part once. */
 export const indexPaths = (root: LayoutNode): WeakMap<LayoutNode, string> => {
   const paths = new WeakMap<LayoutNode, string>();
   const walk = (node: LayoutNode, path: number[]) => {

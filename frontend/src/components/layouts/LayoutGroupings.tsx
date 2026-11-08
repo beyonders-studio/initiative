@@ -3,7 +3,11 @@ import { ArrowDown, ArrowUp, Eye, EyeClosed } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { DateBucket, LayoutGrouping } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  DateBucket,
+  LayoutGrouping,
+  TaskListRead,
+} from "@/api/generated/initiativeAPI.schemas";
 import { useGroupables } from "@/hooks/useTaskGroupings";
 import type { ListLayout } from "@/lib/layouts/draft";
 import { type FieldDef, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
@@ -15,6 +19,7 @@ import {
   MAX_HIDDEN_GROUPS,
   type OfferedGrouping,
 } from "@/lib/layouts/grouping";
+import type { GroupMove } from "@/lib/layouts/taskGroupings";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
@@ -195,9 +200,9 @@ export const CanvasGrouping = ({
   disabled,
   onToggle,
 }: {
-  offered: OfferedGrouping[];
+  offered: OfferedGrouping<TaskListRead, GroupMove>[];
   /** The grouping picked, once its groups are in. */
-  active?: OfferedGrouping;
+  active?: OfferedGrouping<TaskListRead, GroupMove>;
   grouping: GroupingState;
   onGroupingChange: (next: GroupingState) => void;
   /** A save is under way, and nothing changes until it answers. */

@@ -244,7 +244,7 @@ export function globalTaskColumns({
           <div className="flex min-w-60 flex-col text-left">
             <div className="flex">
               <Link
-                to={env.taskHref(task)}
+                to={env.itemHref(task)}
                 className="flex w-full items-center gap-2 font-medium text-foreground hover:underline"
               >
                 {task.title}

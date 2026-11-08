@@ -4,8 +4,8 @@ import { cn } from "@/ui/lib/utils";
 import { nonEmptyPropertySummaries } from "@/ui/properties/propertyHelpers";
 
 import {
-  FIELD_RENDERERS,
   type FieldDef,
+  fieldRenderer,
   isEmptyValue,
   type LayoutEnv,
   type LayoutItem,
@@ -91,7 +91,7 @@ const renderField = (
   key?: number
 ): ReactNode => {
   if (isEmptyValue(value)) return null;
-  const Renderer = FIELD_RENDERERS[field.kind];
+  const Renderer = fieldRenderer(field);
   return (
     <Renderer
       key={key}

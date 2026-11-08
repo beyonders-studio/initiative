@@ -12,6 +12,7 @@ import { EntityLinkField } from "@/components/entities/EntityLinkField";
 import type { RelationsLayout } from "@/components/entities/RelationsSection";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useProjectLayoutEnv } from "@/hooks/useLayoutEnv";
 import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 import type { LinkedRef } from "@/lib/relationships";
 import type { ToolRelationEntity } from "@/lib/tools";
@@ -24,7 +25,7 @@ import {
   useItemHome,
 } from "./DetailLayoutView";
 import { ItemDraftContext } from "./editing";
-import { type FieldDef, useProjectLayoutEnv } from "./fields";
+import type { FieldDef } from "./fields";
 import {
   FieldsInParts,
   fieldsInParts,

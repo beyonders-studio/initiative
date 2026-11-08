@@ -519,12 +519,12 @@ export const LayoutCanvas = ({
   onGroupingsChange: (groupings: LayoutGrouping[]) => void;
 }) => {
   const { t } = useTranslation(LAYOUT_NAMESPACES);
-  const { definition, kind: layout } = open;
+  const { definition, kind: layout, shape } = open;
   // Every task, in the project's order: filters and sorts are each person's.
   const params = useMemo(() => buildTaskListParams(EMPTY_TASK_FILTERS, { projectId }), [projectId]);
   const tasks = useTasks(params).data?.items ?? NO_TASKS;
 
-  const card = cardOf(definition, fields);
+  const card = cardOf(definition, fields, shape);
   const paths = useMemo(() => indexPaths(card), [card]);
   const groupedTasks = useMemo(() => {
     const groups: Record<number, TaskListRead[]> = {};
@@ -641,7 +641,7 @@ export const LayoutCanvas = ({
           onStatusChange={noop}
           taskHref={taskHref}
           tableState={tableState}
-          viewColumns={columnsOf(definition, fields)}
+          viewColumns={columnsOf(definition, fields, shape)}
           displays={definition.displays}
           viewGroupings={definition.groupings}
           editing

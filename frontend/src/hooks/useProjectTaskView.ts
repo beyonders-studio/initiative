@@ -50,7 +50,8 @@ import { columnsOf } from "@/lib/layouts/draft";
 import { catalogChoices, viewGrouping } from "@/lib/layouts/grouping";
 import { pluginFields, shippedPluginParts, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { type Preset, presetsOf } from "@/lib/layouts/presets";
-import { TASK_PRESETS, taskLayoutFor } from "@/lib/layouts/tasks";
+import { BOARD_COLUMNS } from "@/lib/layouts/taskGroupings";
+import { TASK_LIST_SHAPE, TASK_PRESETS, taskLayoutFor } from "@/lib/layouts/tasks";
 
 const readTaskFilters = (raw: unknown) => specFromStored(raw as StoredTaskFilters);
 const TASK_DEFAULTS = { filters: EMPTY_TASK_FILTERS, ...NO_PART_VIEW };
@@ -159,7 +160,11 @@ export function useProjectTaskView({
     const table = lists.find((each) => each.kind === "table");
     const fields = new Map(pluginFields(plugins, i18n.language).map((field) => [field.id, field]));
     return {
-      columns: columnsOf((table?.definition ?? {}) as ListLayoutDefinitionInput, fields),
+      columns: columnsOf(
+        (table?.definition ?? {}) as ListLayoutDefinitionInput,
+        fields,
+        TASK_LIST_SHAPE
+      ),
       detail: pageParts(
         taskLayoutFor(defaultType?.layout_preset).tree(
           detailLayoutOf(layoutsQuery.data, "task", defaultType?.id) as StoredRegions | null,
@@ -219,7 +224,12 @@ export function useProjectTaskView({
   const { groupings: catalog } = useFieldCatalog("tasks");
   const grouping = useMemo(
     () =>
-      viewGrouping(layout?.definition, kind, groupingKept ? kept : null, catalogChoices(catalog)),
+      viewGrouping(
+        layout?.definition,
+        kind,
+        groupingKept ? kept : null,
+        catalogChoices(catalog, BOARD_COLUMNS)
+      ),
     [layout, kind, kept, groupingKept, catalog]
   );
 

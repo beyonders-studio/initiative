@@ -32,16 +32,17 @@ import { resolveKanbanDropTarget } from "@/components/projects/taskOrdering";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
 import { MentionText } from "@/components/user/MentionText";
 import { type ColumnLimits, NO_COLUMN_LIMITS } from "@/hooks/useColumnLimits";
+import { useCounterSteps, useProjectLayoutEnv } from "@/hooks/useLayoutEnv";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
 import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import { useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useMoveTaskToGroup } from "@/hooks/useTasks";
 import { useTaskTypeChange } from "@/hooks/useTaskTypeChange";
 import { cardOf } from "@/lib/layouts/draft";
-import { useCounterSteps, useProjectLayoutEnv, withDisplays } from "@/lib/layouts/fields";
+import { withDisplays } from "@/lib/layouts/fields";
 import { boardBands } from "@/lib/layouts/grouping";
 import { pluginFields, pluginParts, usePluginsOnItems } from "@/lib/layouts/plugins";
-import { taskFields } from "@/lib/layouts/tasks";
+import { TASK_LIST_SHAPE, taskFields } from "@/lib/layouts/tasks";
 import { type LayoutContext, type LayoutNode, namesField } from "@/lib/layouts/tree";
 import { Badge } from "@/ui/badge";
 import { GroupBySelect } from "@/ui/data-table";
@@ -202,7 +203,7 @@ export const ProjectTasksKanbanView = ({
     [propertyDefinitions, plugins, i18n.language, typed, displays]
   );
   const card = useMemo(
-    () => cardOf({ card: ownCard as CardPartInput | null | undefined }, fields),
+    () => cardOf({ card: ownCard as CardPartInput | null | undefined }, fields, TASK_LIST_SHAPE),
     [ownCard, fields]
   );
   const view = useMemo<LayoutContext>(

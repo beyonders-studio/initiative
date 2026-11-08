@@ -1,13 +1,17 @@
+import { cleanup } from "@testing-library/react";
+import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 
 import { buildTask, buildTaskType } from "@/__tests__/factories";
 import i18n from "@/__tests__/helpers/i18n-test";
+import { renderPage } from "@/__tests__/helpers/render";
 import { parseLayoutKind } from "@/lib/filters/layoutSearch";
 import type { TranslateFn } from "@/types/i18n";
 
 import { pageParts } from "./detailLayout";
 import { groupables } from "./grouping";
 import { TASK_LAYOUT, taskFields, taskLayoutFor, taskPageWithFields } from "./tasks";
+import { type LayoutContext, LayoutTree } from "./tree";
 
 const SHAPES = ["plain", "fix", "discussion", "dates", "repeat", "checklist"];
 
@@ -51,11 +55,34 @@ describe("a task's type as a field", () => {
     expect(taskFields([], [], { typed: false }).get("type")?.value(task)).toBeNull();
   });
 
-  it("is drawn by the title in a table, which has no icon of its own for it", () => {
+  it("is drawn by the title in a table, which has no icon of its own for it", async () => {
     const type = buildTaskType({ name: "Bug", icon: "bug" });
-    const task = buildTask({ task_type_id: type.id, task_type: type });
-    expect(taskFields([]).get("title")?.typeOf?.(task)).toEqual(type);
-    expect(taskFields([], [], { typed: false }).get("title")?.typeOf?.(task)).toBeNull();
+    const task = buildTask({ title: "Fix the door", task_type_id: type.id, task_type: type });
+    // The cell links to the task, so it is drawn inside a router.
+    const cell = (typed: boolean) => {
+      const view: LayoutContext = {
+        fields: taskFields([], [], { typed }),
+        variant: "cell",
+        env: {
+          t: i18n.getFixedT(null, ["projects", "tasks"]) as TranslateFn,
+          communityPath: (path) => path,
+          itemHref: (each) => `/tasks/${each.id}`,
+        },
+      };
+      return renderPage(() =>
+        createElement(LayoutTree, {
+          node: { type: "field", props: { field: "title" } },
+          item: task,
+          view,
+        })
+      );
+    };
+
+    expect(await cell(true).findByText("Bug")).toBeInTheDocument();
+    cleanup();
+    const untyped = cell(false);
+    expect(await untyped.findByText("Fix the door")).toBeInTheDocument();
+    expect(untyped.queryByText("Bug")).not.toBeInTheDocument();
   });
 });
 

@@ -85,7 +85,7 @@ export const TasksWidget = ({ options, onOptionsChange, onConfigure }: HomeWidge
       t: viewT as TranslateFn,
       communityPath: path,
       // A row without an initiative resolves through /go.
-      taskHref: (task) =>
+      itemHref: (task) =>
         path(
           task.initiative_id != null
             ? taskRoute(task.initiative_id, task.project_id, task.id)

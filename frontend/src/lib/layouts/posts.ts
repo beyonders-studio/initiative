@@ -1,16 +1,15 @@
 import type { PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
 
 import { at, detailLayoutSpec, type Region } from "./detailLayout";
-import type { FieldDef, FieldKind } from "./fields";
-import { propertyFields } from "./tasks";
+import { type FieldDef, propertyFields } from "./fields";
 import type { LayoutNode } from "./tree";
 
-/** A notice's fields, each with its label's key and the kind of value it is.
- *  Its title, tags and properties are changed in its tool's header; here its
- *  tags are drawn where the layout puts them. */
+/** A notice's fields, each with its label's key. Its title, tags and
+ *  properties are changed in its tool's header; here its tags are drawn where
+ *  the layout puts them. */
 export const POST_FIELDS = {
-  tags: { label: "common:toolSettings.tags", kind: "tags" },
-} as const satisfies Record<string, { label: string; kind: FieldKind }>;
+  tags: { label: "common:toolSettings.tags" },
+} as const satisfies Record<string, { label: string }>;
 
 /** A notice's fields as the editor names them, then the initiative's
  *  properties, then the plug-ins'. */
@@ -21,9 +20,8 @@ export const postFields = (
   new Map(
     [
       ...Object.entries(POST_FIELDS).map(
-        ([id, { label, kind }]): FieldDef => ({
+        ([id, { label }]): FieldDef => ({
           id,
-          kind,
           label,
           source: "builtin",
           hideable: true,

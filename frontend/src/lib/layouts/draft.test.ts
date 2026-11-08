@@ -22,7 +22,7 @@ import {
   removable,
   startHistory,
 } from "./draft";
-import { TASK_LAYOUT, taskFields } from "./tasks";
+import { TASK_LAYOUT, TASK_LIST_SHAPE, taskFields } from "./tasks";
 import type { LayoutNode } from "./tree";
 
 const field = (id: string): LayoutNode => ({ type: "field", props: { field: id } });
@@ -93,9 +93,10 @@ describe("what the editor allows", () => {
 
   it("offers a card what it does not show, and no property alone where it shows them all", () => {
     const ids = (card: LayoutNode) =>
-      addableFields({ kind: "board", definition: { card: card as never } }, fields).map(
-        (each) => each.id
-      );
+      addableFields(
+        { kind: "board", definition: { card: card as never }, shape: TASK_LIST_SHAPE },
+        fields
+      ).map((each) => each.id);
 
     expect(ids(CARD)).not.toContain("tags");
     expect(ids(CARD)).toContain("property:12");
@@ -106,7 +107,7 @@ describe("what the editor allows", () => {
 
   it("offers a table the fields it draws as columns and has not", () => {
     const ids = addableFields(
-      { kind: "table", definition: { columns: ["title", "dueDate"] } },
+      { kind: "table", definition: { columns: ["title", "dueDate"] }, shape: TASK_LIST_SHAPE },
       fields
     ).map((each) => each.id);
 

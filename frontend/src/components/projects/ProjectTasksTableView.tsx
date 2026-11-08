@@ -28,6 +28,7 @@ import { TaskAssigneesCell } from "@/components/projects/TaskQuickActions";
 import { sharedTaskColumns } from "@/components/tasks/globalTaskColumns";
 import { statusTriggerStyle, TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { type ColumnLimits, NO_COLUMN_LIMITS } from "@/hooks/useColumnLimits";
+import { useCounterSteps, useProjectLayoutEnv } from "@/hooks/useLayoutEnv";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
 import type { useProjectTaskTableState } from "@/hooks/useProjectTaskView";
 import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
@@ -36,10 +37,10 @@ import { useMoveTaskToGroup } from "@/hooks/useTasks";
 import { useTaskTypeChange } from "@/hooks/useTaskTypeChange";
 import { fieldColumnId } from "@/lib/layouts/columns";
 import { columnsOf } from "@/lib/layouts/draft";
-import { useCounterSteps, useProjectLayoutEnv, withDisplays } from "@/lib/layouts/fields";
-import { groupRowId, groupRows, NO_GROUP, uniqueTasksFromRows } from "@/lib/layouts/grouping";
+import { withDisplays } from "@/lib/layouts/fields";
+import { groupRowId, groupRows, NO_GROUP, uniqueItemsFromRows } from "@/lib/layouts/grouping";
 import { pluginFields, usePluginsOnItems } from "@/lib/layouts/plugins";
-import { taskFields } from "@/lib/layouts/tasks";
+import { TASK_LIST_SHAPE, taskFields } from "@/lib/layouts/tasks";
 import { flattenTaskTree, nestTaskRows, type TaskTreeRow, treeParents } from "@/lib/taskTree";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
@@ -401,7 +402,7 @@ const ProjectTasksTableViewComponent = ({
   // What the view leaves out is hidden, as are the columns that only group.
   const shown = useMemo(
     () =>
-      columnsOf({ columns: viewColumns }, fields)
+      columnsOf({ columns: viewColumns }, fields, TASK_LIST_SHAPE)
         .filter((id) => fields.has(id))
         .map(fieldColumnId),
     [viewColumns, fields]
@@ -672,7 +673,7 @@ const ProjectTasksTableViewComponent = ({
   const tasksById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
   const handleSelectionChange = useCallback(
     (selectedRows: TaskTreeRow[]) =>
-      onTaskSelectionChange?.(uniqueTasksFromRows(selectedRows, tasksById)),
+      onTaskSelectionChange?.(uniqueItemsFromRows(selectedRows, tasksById)),
     [onTaskSelectionChange, tasksById]
   );
 

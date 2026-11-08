@@ -217,7 +217,7 @@ const TagTasksTable = ({ tagId }: { tagId: number }) => {
     () => ({
       t: viewT as TranslateFn,
       communityPath: (to: string) => communityPath(to),
-      taskHref: (task: TaskListRead) =>
+      itemHref: (task: TaskListRead) =>
         communityPath(
           task.initiative_id != null
             ? taskRoute(task.initiative_id, task.project_id, task.id)
