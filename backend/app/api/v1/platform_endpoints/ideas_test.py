@@ -125,9 +125,9 @@ async def test_anybody_reads_the_published_ideas_and_nothing_else(client, board)
         response = await client.get(f"{IDEAS}/{hidden.id}")
         assert response.status_code == 404, hidden.title
 
-    searched = await client.get(IDEAS, params={"q": "HOLIDAY"})
+    searched = await client.get(IDEAS, params={"search": "HOLIDAY"})
     assert [i["task_id"] for i in searched.json()["items"]] == [board["published"].id]
-    assert (await client.get(IDEAS, params={"q": "holidy"})).json()["items"] == []
+    assert (await client.get(IDEAS, params={"search": "holidy"})).json()["items"] == []
 
 
 async def test_a_vote_counts_once_and_can_be_taken_back(client, acting_user, board):

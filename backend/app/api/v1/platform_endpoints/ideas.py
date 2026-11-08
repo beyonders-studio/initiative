@@ -12,6 +12,7 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.deps import get_current_active_user, get_current_user_optional
+from app.db.query import build_paginated_response
 from app.core.messages import AuthMessages, IdeaMessages
 from app.models.platform.user import User
 from app.schemas.platform.idea import IdeaListRead, IdeaRead, IdeaStatusRead
@@ -52,19 +53,19 @@ def _read(idea: ideas_service.IdeaRead) -> IdeaRead:
 @router.get("", response_model=IdeaListRead)
 async def list_ideas(
     reader: OptionalReader,
-    q: Annotated[Optional[str], Query(max_length=200)] = None,
+    search: Annotated[Optional[str], Query(max_length=200)] = None,
     status_id: Optional[int] = None,
     voted: bool = False,
     sort: ideas_service.IdeaSort = ideas_service.IdeaSort.votes,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> IdeaListRead:
-    """The published ideas: those whose title holds ``q``, in ``status_id``,
+    """The published ideas: those whose title holds ``search``, in ``status_id``,
     or that the reader voted for, as asked; most voted or newest first."""
     try:
         found = await ideas_service.list_ideas(
             reader,
-            q=q,
+            search=search,
             status_id=status_id,
             voted_only=voted and reader is not None,
             sort=sort,
@@ -74,9 +75,13 @@ async def list_ideas(
     except ideas_service.IdeaNotFound:
         raise _not_found() from None
     return IdeaListRead(
-        items=[_read(idea) for idea in found.items],
-        total=found.total,
-        statuses=[_status_read(s) for s in found.statuses],
+        **build_paginated_response(
+            [_read(idea) for idea in found.items],
+            found.total,
+            page,
+            page_size,
+            statuses=[_status_read(s) for s in found.statuses],
+        )
     )
 
 
