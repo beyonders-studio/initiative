@@ -1,4 +1,4 @@
-import { Pencil, PlugZap, Trash2 } from "lucide-react";
+import { Loader2, Pencil, PlugZap, Trash2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -42,6 +42,8 @@ interface RegistryMutation<TVariables, TResult = unknown> {
     options?: { onSuccess?: (data: TResult) => void; onError?: (error: unknown) => void }
   ) => void;
   isPending: boolean;
+  /** Which row a shared mutation is currently busy with. */
+  variables?: TVariables;
 }
 
 export interface ProviderRegistrySectionProps {
@@ -129,6 +131,12 @@ export const ProviderRegistrySection = ({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">{provider.display_name}</span>
                   <code className="rounded bg-muted px-1 py-0.5 text-xs">{provider.slug}</code>
+                  {testProvider.isPending && testProvider.variables === provider.id ? (
+                    <Badge variant="secondary" className="gap-1.5">
+                      <Loader2 className="size-3 animate-spin" aria-hidden="true" />
+                      {t("authProviders.testing")}
+                    </Badge>
+                  ) : null}
                   {provider.enabled ? (
                     <Badge variant="outline" className="gap-1.5">
                       <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
@@ -156,7 +164,7 @@ export const ProviderRegistrySection = ({
                 </div>
               </div>
               <RowActionsMenu subject={provider.display_name}>
-                <DropdownMenuItem onSelect={() => test(provider)}>
+                <DropdownMenuItem disabled={testProvider.isPending} onSelect={() => test(provider)}>
                   <PlugZap className="h-4 w-4" />
                   {t("authProviders.test")}
                 </DropdownMenuItem>

@@ -1746,6 +1746,7 @@
     "claimPathPlaceholder": "groups",
     "claimPathHelp": "Where this provider puts a person's groups in the token. Keycloak nests them at realm_access.roles; most others use groups or roles. Each community's rules read it.",
     "test": "Test",
+    "testing": "Testing…",
     "verify": "Verify",
     "verifying": "Checking…",
     "verifyError": "Could not check that address",

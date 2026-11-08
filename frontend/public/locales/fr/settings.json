@@ -1746,6 +1746,7 @@
     "claimPathPlaceholder": "groups",
     "claimPathHelp": "Où ce fournisseur place les groupes d'une personne dans le jeton. Keycloak les imbrique sous realm_access.roles ; la plupart utilisent groups ou roles. Les règles de chaque communauté le lisent.",
     "test": "Tester",
+    "testing": "Test en cours…",
     "verify": "Vérifier",
     "verifying": "Vérification…",
     "verifyError": "Impossible de vérifier cette adresse",
