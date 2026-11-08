@@ -226,7 +226,7 @@ Short answers to what people actually ask, with a pointer to the longer version 
 
 Look at the bottom of the sidebar. The question mark opens these pages, and where there's somebody to ask — a server that takes help requests, or one with an address to write to — the lifebuoy beside it is **Ask for help**.
 
-To tell the people who run the server how it's going, with a rating and the feature you wish it had, choose **Send feedback** in your account menu or the command palette.
+To share an idea, something that got in your way, or something you love with the people who run the server, choose **Send feedback** in your account menu or the command palette.
 
 If it looks like the software rather than your account, see [Reporting a problem](security/reporting-a-problem.md).
 
