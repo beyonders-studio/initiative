@@ -1,16 +1,26 @@
+import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 
 import { cn } from "@/ui/lib/utils";
 
-const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn("rounded-xl border bg-card text-card-foreground shadow-sm", className)}
-      {...props}
-    />
-  )
-);
+const cardVariants = cva("border bg-card text-card-foreground shadow-sm", {
+  variants: {
+    variant: {
+      default: "rounded-xl",
+      /** One of a grid of cards that each open something: it lifts under the
+       *  pointer, and is the `group` its contents' hover styles follow. */
+      tile: "group block w-full overflow-hidden rounded-2xl transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg",
+    },
+  },
+  defaultVariants: { variant: "default" },
+});
+
+const Card = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement> & VariantProps<typeof cardVariants>
+>(({ className, variant, ...props }, ref) => (
+  <div ref={ref} className={cn(cardVariants({ variant }), className)} {...props} />
+));
 Card.displayName = "Card";
 
 const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
@@ -52,4 +62,4 @@ const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
 );
 CardFooter.displayName = "CardFooter";
 
-export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle };
+export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle, cardVariants };

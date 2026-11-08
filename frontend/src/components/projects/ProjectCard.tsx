@@ -43,7 +43,7 @@ export const ProjectCard = ({ project }: { project: ProjectRead }) => {
         to={gp(toolDetailRoute(Tool.project, project.initiative_id, project.id))}
         className="block"
       >
-        <Card className="overflow-hidden">
+        <Card variant="tile">
           <CardHeader className="pr-34">
             <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
               {project.icon ? <span className="text-2xl leading-none">{project.icon}</span> : null}

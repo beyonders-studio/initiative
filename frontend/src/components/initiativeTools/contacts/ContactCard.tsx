@@ -1,10 +1,8 @@
-import { Link } from "@tanstack/react-router";
 import { Building2, Mail, Phone, UserRound } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { type ContactSummary, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { TagBadgeList } from "@/components/tags/TagBadge";
-import { useCommunityPath } from "@/lib/communityUrl";
+import { ToolCard } from "@/components/tools/ToolCard";
 import { getInitials } from "@/lib/initials";
 import { toolDetailRoute } from "@/lib/tools";
 import { Avatar, AvatarFallback } from "@/ui/avatar";
@@ -47,49 +45,35 @@ export const ContactMark = ({ contact }: { contact: ContactKind }) => {
  */
 export const ContactCard = ({ contact }: { contact: ContactSummary }) => {
   const { t } = useTranslation("contacts");
-  const gp = useCommunityPath();
   const phone = contact.phones[0]?.value;
   const email = contact.emails[0]?.value;
 
   return (
-    <Link
-      to={gp(toolDetailRoute(Tool.contact, contact.initiative_id, contact.id))}
-      className="group block w-full overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg"
+    <ToolCard
+      to={toolDetailRoute(Tool.contact, contact.initiative_id, contact.id)}
+      name={contact.name}
+      tags={contact.tags}
+      mark={<ContactAvatar contact={contact} />}
     >
-      {/* Short of the bookmark the list puts on the card's corner. */}
-      <div className="flex items-start gap-3 p-4 pr-14">
-        <ContactAvatar contact={contact} />
-        <div className="min-w-0 flex-1 space-y-1">
-          <h3 className="line-clamp-1 font-semibold text-card-foreground text-lg leading-tight">
-            {contact.name}
-          </h3>
-          <p className="text-muted-foreground text-xs">
-            {t(contact.is_organization ? "organization" : "person")}
-          </p>
-          {phone || email ? (
-            <div className="space-y-0.5 pt-1 text-sm">
-              {phone ? (
-                <p className="flex items-center gap-1.5 truncate">
-                  <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  {phone}
-                </p>
-              ) : null}
-              {email ? (
-                <p className="flex items-center gap-1.5 truncate">
-                  <Mail className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="truncate">{email}</span>
-                </p>
-              ) : null}
-            </div>
+      <p className="text-muted-foreground text-xs">
+        {t(contact.is_organization ? "organization" : "person")}
+      </p>
+      {phone || email ? (
+        <div className="space-y-0.5 pt-1 text-sm">
+          {phone ? (
+            <p className="flex items-center gap-1.5 truncate">
+              <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              {phone}
+            </p>
           ) : null}
-          <TagBadgeList
-            tags={contact.tags}
-            tagHref={(tag) => gp(`/tags/${tag.id}`)}
-            nested
-            className="pt-1"
-          />
+          {email ? (
+            <p className="flex items-center gap-1.5 truncate">
+              <Mail className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="truncate">{email}</span>
+            </p>
+          ) : null}
         </div>
-      </div>
-    </Link>
+      ) : null}
+    </ToolCard>
   );
 };
