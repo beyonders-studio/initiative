@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 
 import type { ListLayoutReadKind, SortField } from "@/api/generated/initiativeAPI.schemas";
 import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
-import { tableSortFields, taskTableSorting } from "@/lib/filters/taskFilters";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import {
@@ -30,16 +29,25 @@ import {
 } from "@/ui/layouts/presets";
 
 import type { LayoutEdits } from "./LayoutEditor";
-import { TaskSortPicker } from "./TaskSortPicker";
+
+/** The control that picks the one field a preset sorts `list` by, naming
+ *  the fields as the list does; nothing where a preset does not sort it. */
+type SortControls = (
+  list: ListLayoutReadKind,
+  value: SortField | null,
+  onChange: (next: SortField | null) => void,
+  fields: ReadonlyMap<string, FieldDef>
+) => ReactNode;
 
 /** A tool's presets, as the editor changes them: the presets it reads, what
- *  one that narrows nothing holds, its list's own filter controls, and which
- *  of its lists a preset can sort (a table, which a person sorts). */
+ *  one that narrows nothing holds, its list's own filter controls, and, where
+ *  a preset can sort its list (a table, which a person sorts), the control
+ *  that picks the sort. */
 export type EditablePresets = {
   kind: PresetKind<unknown>;
   empty: unknown;
   controls: (value: unknown, onChange: (next: unknown) => void) => ReactNode;
-  sortable: (kind: ListLayoutReadKind) => boolean;
+  sortControls?: SortControls;
 };
 
 /** `presets` as the editor takes them, whatever filters they hold. */
@@ -47,7 +55,7 @@ export const editablePresets = <F,>(presets: {
   kind: PresetKind<F>;
   empty: F;
   controls: (value: F, onChange: (next: F) => void) => ReactNode;
-  sortable: (kind: ListLayoutReadKind) => boolean;
+  sortControls?: SortControls;
 }): EditablePresets => presets as unknown as EditablePresets;
 
 /**
@@ -161,7 +169,7 @@ export const LayoutPresets = ({
       {open ? (
         <PresetDialog
           preset={open.index === null ? null : presets[open.index]}
-          sortable={of.sortable(layout.kind)}
+          list={layout.kind}
           of={of}
           fields={fields}
           onClose={() => setOpen(null)}
@@ -198,7 +206,7 @@ export const LayoutPresets = ({
 /** A preset's name, filters and, on a table, sort, changed together. */
 const PresetDialog = ({
   preset,
-  sortable,
+  list,
   of,
   fields,
   onClose,
@@ -206,8 +214,8 @@ const PresetDialog = ({
 }: {
   /** The preset changed, or null for a new one. */
   preset: Preset<unknown> | null;
-  /** The list is a table, which a preset can sort. */
-  sortable: boolean;
+  /** The list it is offered on. */
+  list: ListLayoutReadKind;
   of: EditablePresets;
   fields: ReadonlyMap<string, FieldDef>;
   onClose: () => void;
@@ -218,7 +226,7 @@ const PresetDialog = ({
   const [name, setName] = useState(preset ? presetName(preset, translate) : "");
   const [filters, setFilters] = useState(preset ? preset.filters : of.empty);
   const [sort, setSort] = useState<SortField | null>(
-    tableSortFields(preset?.sorting ?? [])[0] ?? null
+    of.kind.sorting?.stored(preset?.sorting ?? [])[0] ?? null
   );
   const trimmed = name.trim();
 
@@ -229,7 +237,7 @@ const PresetDialog = ({
           onSubmit={(event) => {
             event.preventDefault();
             if (!trimmed) return;
-            onSubmit(trimmed, filters, sort ? taskTableSorting([sort]) : []);
+            onSubmit(trimmed, filters, sort ? (of.kind.sorting?.read([sort]) ?? []) : []);
           }}
           className="space-y-4"
         >
@@ -248,7 +256,7 @@ const PresetDialog = ({
             />
           </Field>
           {of.controls(filters, setFilters)}
-          {sortable ? <TaskSortPicker value={sort} onChange={setSort} fields={fields} /> : null}
+          {of.sortControls?.(list, sort, setSort, fields)}
           <DialogFooter submitLabel={translate("common:done")} disabled={!trimmed} />
         </form>
       </DialogContent>
