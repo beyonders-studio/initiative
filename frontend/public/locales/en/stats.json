@@ -3,7 +3,6 @@
     "title": "My Stats",
     "communityFilterPlaceholder": "Select community",
     "allCommunities": "All Communities",
-    "loading": "Loading stats\u2026",
     "error": "Failed to load stats. Please try again later."
   },
   "metrics": {

@@ -112,7 +112,7 @@ describe("DashboardCanvas", () => {
     // swapping the whole page for a spinner is what made an ordinary load look
     // like a reload.
     const onLayoutChange = render(withStat(), true, vi.fn(), true);
-    expect(screen.getByText(/loading dashboard/i)).toBeInTheDocument();
+    expect(screen.getByText("Loading…")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /options for/i })).toBeNull();
     expect(onLayoutChange).not.toHaveBeenCalled();
   });

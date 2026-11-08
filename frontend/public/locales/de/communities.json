@@ -169,7 +169,6 @@
       "superadmin": "All das, plus wie Leute hereinkommen: Anmeldung, KI und Plug-ins. Nur ein Superadmin kann einen weiteren ernennen.",
       "guest": "Für eine festgelegte Anzahl von Tagen hier und sieht nur, was die Einladung gegeben hat."
     },
-    "loadingSettings": "Einstellungen werden geladen…",
     "invitesTitle": "Community-Einladungen",
     "invitesDescription": "Generiere Links, um neue Mitglieder einzuladen.",
     "refreshInvites": "Einladungen aktualisieren",
@@ -177,7 +176,6 @@
     "expiresDaysLabel": "Läuft ab in (Tagen)",
     "generateInvite": "Einladung generieren",
     "generatingInvite": "Wird erstellt…",
-    "loadingInvites": "Einladungen werden geladen…",
     "noActiveInvites": "Keine aktiven Einladungen.",
     "unableToLoadInvites": "Einladungen konnten nicht geladen werden.",
     "unableToCreateInvite": "Einladung konnte nicht erstellt werden.",
@@ -665,7 +663,6 @@
     "givesItems_other": "{{count}} Elemente",
     "listTitle": "Gäste",
     "listDescription": "Personen, die für eine festgelegte Anzahl von Tagen hier sind. Ein Gast belegt keinen Platz und sieht nur, was ihm seine Einladung gegeben hat.",
-    "loading": "Gäste werden geladen…",
     "noGuests": "Derzeit keine Gäste.",
     "endsColumn": "Zeit endet",
     "extend": "Verlängern",

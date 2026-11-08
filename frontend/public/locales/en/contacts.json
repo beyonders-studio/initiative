@@ -52,7 +52,6 @@
   "noContacts": "No contacts yet",
   "noContactsDescription": "Keep the people and businesses this work is for or with: the client, the venue, the supplier. Link them to the tasks, events and files they're part of.",
   "createFirst": "Add the First Contact",
-  "loading": "Loading contacts...",
   "error": "Something went wrong",
   "notFound": "Contact not found",
   "notFoundDescription": "The contact you're looking for does not exist or has been removed.",

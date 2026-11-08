@@ -507,7 +507,7 @@ export const FileDetailPage = () => {
   };
 
   if (fileQuery.isLoading) {
-    return <FileDetailSkeleton label={t("detail.loading")} />;
+    return <FileDetailSkeleton />;
   }
 
   if (fileId === null || fileQuery.isError || !file) {

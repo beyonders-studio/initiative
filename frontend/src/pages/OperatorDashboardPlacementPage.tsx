@@ -85,7 +85,7 @@ export const OperatorDashboardPlacementPage = () => {
 
   if (placementQuery.isLoading) {
     return (
-      <SkeletonRegion label={t("providerPlacement.loading")}>
+      <SkeletonRegion>
         <TableSkeleton rows={4} columns={3} />
       </SkeletonRegion>
     );

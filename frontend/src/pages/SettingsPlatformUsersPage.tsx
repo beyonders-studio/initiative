@@ -91,7 +91,7 @@ export const SettingsPlatformUsersPage = () => {
 
   if (usersQuery.isLoading) {
     return (
-      <SkeletonRegion label={t("platformUsers.loading")}>
+      <SkeletonRegion>
         <TableSkeleton rows={8} columns={5} />
       </SkeletonRegion>
     );

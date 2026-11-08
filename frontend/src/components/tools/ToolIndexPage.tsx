@@ -957,7 +957,7 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
       </ToolFilterPanel>
 
       {list.isLoading ? (
-        <SkeletonRegion label={t("loading")}>
+        <SkeletonRegion>
           <CardGridSkeleton />
         </SkeletonRegion>
       ) : list.isError ? (

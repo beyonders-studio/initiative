@@ -46,7 +46,6 @@
   "updating": "Mise à jour…",
   "projectFallback": "Projet n° {{id}}",
   "edit": {
-    "loadingTask": "Chargement de la tâche…",
     "notFound": "Tâche introuvable",
     "notFoundDescription": "Cette tâche a peut-être été supprimée, ou le lien que vous avez suivi est rompu.",
     "noAccess": "Accès refusé",

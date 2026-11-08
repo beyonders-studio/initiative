@@ -124,7 +124,7 @@ export function EventDetailPage() {
 
   if (eventQuery.isLoading || layoutsQuery.isLoading) {
     return (
-      <SkeletonRegion label={t("loadingEvent")}>
+      <SkeletonRegion>
         <DetailPageSkeleton actions={2} />
       </SkeletonRegion>
     );

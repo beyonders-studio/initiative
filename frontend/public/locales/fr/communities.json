@@ -169,7 +169,6 @@
       "superadmin": "Tout cela, plus la façon dont les gens entrent : connexion, IA et plug-ins. Seul un superadmin peut en nommer un autre.",
       "guest": "Présent pour un nombre de jours défini, et ne voit que ce que son invitation lui a donné."
     },
-    "loadingSettings": "Chargement des paramètres…",
     "invitesTitle": "Invitations de la communauté",
     "invitesDescription": "Générez des liens pour inviter de nouveaux membres.",
     "refreshInvites": "Actualiser les invitations",
@@ -177,7 +176,6 @@
     "expiresDaysLabel": "Expire dans (jours)",
     "generateInvite": "Générer une invitation",
     "generatingInvite": "Création en cours…",
-    "loadingInvites": "Chargement des invitations…",
     "noActiveInvites": "Aucune invitation active.",
     "unableToLoadInvites": "Impossible de charger les invitations.",
     "unableToCreateInvite": "Impossible de créer l'invitation.",
@@ -665,7 +663,6 @@
     "givesItems_other": "{{count}} éléments",
     "listTitle": "Invités",
     "listDescription": "Des personnes présentes pour un nombre de jours défini. Un invité n'occupe pas de place et ne voit que ce que son invitation lui a donné.",
-    "loading": "Chargement des invités…",
     "noGuests": "Aucun invité pour le moment.",
     "endsColumn": "Fin du séjour",
     "extend": "Prolonger",

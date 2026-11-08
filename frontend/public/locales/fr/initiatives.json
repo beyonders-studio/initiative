@@ -69,7 +69,6 @@
     "createError": "Impossible de créer l'initiative pour le moment."
   },
   "detail": {
-    "loadingInitiative": "Chargement de l'initiative…",
     "backToInitiatives": "← Retour à Mes initiatives",
     "notFound": "Initiative introuvable",
     "notFoundDescription": "L'initiative que vous cherchez n'existe pas, ou vous n'y avez plus accès.",
@@ -92,7 +91,6 @@
   "settings": {
     "title": "Paramètres de l'initiative",
     "breadcrumbSettings": "Paramètres",
-    "loadingInitiative": "Chargement de l'initiative…",
     "backToInitiatives": "← Retour à Mes initiatives",
     "backToInitiative": "← Retour à l'initiative",
     "notFound": "Initiative introuvable",

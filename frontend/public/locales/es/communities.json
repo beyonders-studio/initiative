@@ -169,7 +169,6 @@
       "superadmin": "Todo eso, y además cómo entra la gente: inicio de sesión, IA y complementos. Solo un superadministrador puede nombrar a otro.",
       "guest": "Está aquí durante un número fijo de días y solo ve lo que le dio su invitación."
     },
-    "loadingSettings": "Cargando configuración…",
     "invitesTitle": "Invitaciones de la comunidad",
     "invitesDescription": "Genera enlaces para invitar nuevos miembros.",
     "refreshInvites": "Actualizar invitaciones",
@@ -177,7 +176,6 @@
     "expiresDaysLabel": "Expira en (días)",
     "generateInvite": "Generar invitación",
     "generatingInvite": "Creando…",
-    "loadingInvites": "Cargando invitaciones…",
     "noActiveInvites": "No hay invitaciones activas.",
     "unableToLoadInvites": "No se pudieron cargar las invitaciones.",
     "unableToCreateInvite": "No se pudo crear la invitación.",
@@ -665,7 +663,6 @@
     "givesItems_other": "{{count}} elementos",
     "listTitle": "Invitados",
     "listDescription": "Personas que están aquí durante un número fijo de días. Un invitado no ocupa plaza y solo ve lo que le dio su invitación.",
-    "loading": "Cargando invitados…",
     "noGuests": "No hay invitados ahora mismo.",
     "endsColumn": "Fin del tiempo",
     "extend": "Ampliar",

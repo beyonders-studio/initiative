@@ -46,7 +46,6 @@
   "updating": "Actualizando…",
   "projectFallback": "Proyecto #{{id}}",
   "edit": {
-    "loadingTask": "Cargando tarea…",
     "notFound": "Tarea no encontrada",
     "notFoundDescription": "Esta tarea puede haber sido eliminada o el enlace está roto.",
     "noAccess": "Acceso denegado",

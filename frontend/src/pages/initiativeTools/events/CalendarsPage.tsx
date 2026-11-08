@@ -874,7 +874,7 @@ export const CalendarsView = ({
       ) : null}
 
       {isLoading ? (
-        <SkeletonRegion label={t("loading")}>
+        <SkeletonRegion>
           <CardGridSkeleton />
         </SkeletonRegion>
       ) : communityScope && calendars.length === 0 ? (

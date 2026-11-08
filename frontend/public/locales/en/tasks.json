@@ -46,7 +46,6 @@
   "updating": "Updating…",
   "projectFallback": "Project #{{id}}",
   "edit": {
-    "loadingTask": "Loading task…",
     "notFound": "Task not found",
     "notFoundDescription": "This task may have been deleted or you may have followed a broken link.",
     "noAccess": "Access denied",

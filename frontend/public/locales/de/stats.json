@@ -3,7 +3,6 @@
     "title": "Meine Statistiken",
     "communityFilterPlaceholder": "Community auswählen",
     "allCommunities": "Alle Communitys",
-    "loading": "Statistiken werden geladen…",
     "error": "Statistiken konnten nicht geladen werden. Bitte versuche es später erneut."
   },
   "metrics": {

@@ -380,7 +380,7 @@ export const SettingsCommunityGuestsPage = () => {
 
       <SettingsSection title={t("guests.listTitle")} description={t("guests.listDescription")}>
         {guestsQuery.isLoading ? (
-          <SkeletonRegion label={t("guests.loading")}>
+          <SkeletonRegion>
             <TableSkeleton rows={3} columns={3} />
           </SkeletonRegion>
         ) : guestsQuery.isError ? (

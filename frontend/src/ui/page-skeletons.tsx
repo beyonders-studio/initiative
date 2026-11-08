@@ -34,14 +34,12 @@ const CELL_WIDTHS = ["w-40", "w-24", "w-32", "w-20", "w-28", "w-16"] as const;
 const cellWidth = (index: number) => CELL_WIDTHS[index % CELL_WIDTHS.length];
 
 export interface SkeletonRegionProps {
-  /** Announced to assistive tech. Defaults to the shared "Loading…". */
-  label?: string;
   className?: string;
   children: ReactNode;
 }
 
 /** The accessible wrapper every placeholder below renders into. */
-export const SkeletonRegion = ({ label, className, children }: SkeletonRegionProps) => {
+export const SkeletonRegion = ({ className, children }: SkeletonRegionProps) => {
   const { t } = useTranslation("ui");
   return (
     <div role="status" aria-busy="true" data-testid="skeleton-region">
@@ -49,7 +47,7 @@ export const SkeletonRegion = ({ label, className, children }: SkeletonRegionPro
       <div aria-hidden="true" className={className}>
         {children}
       </div>
-      <span className="sr-only">{label ?? t("loading")}</span>
+      <span className="sr-only">{t("loading")}</span>
     </div>
   );
 };
@@ -409,8 +407,8 @@ export const ToolListSkeleton = ({
 
 /** A whole page with nothing known about it yet — the router's stand-in while
  *  a route's data is on its way. Title, then a block of content. */
-export const PageSkeleton = ({ label, className }: { label?: string; className?: string }) => (
-  <SkeletonRegion label={label} className={className}>
+export const PageSkeleton = ({ className }: { className?: string }) => (
+  <SkeletonRegion className={className}>
     <div className="space-y-6">
       <PageHeaderSkeleton />
       <CardGridSkeleton count={3} />
@@ -469,14 +467,9 @@ export const CalendarGridSkeleton = ({ className }: { className?: string }) => (
   </div>
 );
 
-interface LabelledSkeletonProps {
-  /** Announced to assistive tech. Defaults to the shared "Loading…". */
-  label?: string;
-}
-
 /** A calendar's page: breadcrumb, controls, and the month grid. */
-export const CalendarPageSkeleton = ({ label }: LabelledSkeletonProps) => (
-  <SkeletonRegion label={label}>
+export const CalendarPageSkeleton = () => (
+  <SkeletonRegion>
     <DetailPageSkeleton actions={2} description={false}>
       <CalendarGridSkeleton />
     </DetailPageSkeleton>
@@ -484,8 +477,8 @@ export const CalendarPageSkeleton = ({ label }: LabelledSkeletonProps) => (
 );
 
 /** A project's page: breadcrumb, the overview card, and its task table. */
-export const ProjectDetailSkeleton = ({ label }: LabelledSkeletonProps) => (
-  <SkeletonRegion label={label}>
+export const ProjectDetailSkeleton = () => (
+  <SkeletonRegion>
     <DetailPageSkeleton actions={1} description={false}>
       <ContentCardSkeleton lines={3} />
       <ToolbarSkeleton />
@@ -495,8 +488,8 @@ export const ProjectDetailSkeleton = ({ label }: LabelledSkeletonProps) => (
 );
 
 /** A file's page: breadcrumb, toolbar, title, and the editor. */
-export const FileDetailSkeleton = ({ label }: LabelledSkeletonProps) => (
-  <SkeletonRegion label={label}>
+export const FileDetailSkeleton = () => (
+  <SkeletonRegion>
     <DetailPageSkeleton actions={3} description={false}>
       <EditorSkeleton lines={14} />
     </DetailPageSkeleton>
@@ -504,8 +497,8 @@ export const FileDetailSkeleton = ({ label }: LabelledSkeletonProps) => (
 );
 
 /** A task's page: breadcrumb, title, the description, and the detail rail. */
-export const TaskEditSkeleton = ({ label }: LabelledSkeletonProps) => (
-  <SkeletonRegion label={label}>
+export const TaskEditSkeleton = () => (
+  <SkeletonRegion>
     <DetailPageSkeleton actions={2} description={false}>
       <div className="grid canvas-md:grid-cols-[minmax(0,1fr)_20rem] gap-6">
         <EditorSkeleton lines={8} />
@@ -516,8 +509,8 @@ export const TaskEditSkeleton = ({ label }: LabelledSkeletonProps) => (
 );
 
 /** A tag's page: its name and counts, then everything that carries it. */
-export const TagDetailSkeleton = ({ label }: LabelledSkeletonProps) => (
-  <SkeletonRegion label={label} className="space-y-6">
+export const TagDetailSkeleton = () => (
+  <SkeletonRegion className="space-y-6">
     <PageHeaderSkeleton dot meta action />
     <ToolbarSkeleton />
     <TableSkeleton rows={6} columns={5} toolbar={false} />
@@ -525,8 +518,8 @@ export const TagDetailSkeleton = ({ label }: LabelledSkeletonProps) => (
 );
 
 /** A person's profile: the picture, their name, and the tray under it. */
-export const ProfilePageSkeleton = ({ label }: LabelledSkeletonProps) => (
-  <SkeletonRegion label={label} className="space-y-6">
+export const ProfilePageSkeleton = () => (
+  <SkeletonRegion className="space-y-6">
     <div className="flex flex-wrap items-end gap-4">
       <Skeleton className="size-24 shrink-0 rounded-full sm:size-28" />
       <Skeleton className="mb-1 h-8 w-56" />
@@ -537,8 +530,8 @@ export const ProfilePageSkeleton = ({ label }: LabelledSkeletonProps) => (
 );
 
 /** A counter in focus mode: its name, the big number, and its controls. */
-export const CounterFocusSkeleton = ({ label }: LabelledSkeletonProps) => (
-  <SkeletonRegion label={label} className="flex w-full max-w-sm flex-col items-center gap-8 p-6">
+export const CounterFocusSkeleton = () => (
+  <SkeletonRegion className="flex w-full max-w-sm flex-col items-center gap-8 p-6">
     <Skeleton className="h-8 w-48" />
     <Skeleton className="size-40 rounded-full" />
     <SkeletonPillRow count={3} pillClassName="h-12 w-20" className="justify-center" />
@@ -547,8 +540,8 @@ export const CounterFocusSkeleton = ({ label }: LabelledSkeletonProps) => (
 
 /** A settings pane while its route is still arriving: the layout keeps its
  *  own title and tab strip, and only the pane under them is drawn in. */
-export const SettingsPaneSkeleton = ({ label }: LabelledSkeletonProps) => (
-  <SkeletonRegion label={label}>
+export const SettingsPaneSkeleton = () => (
+  <SkeletonRegion>
     <FormSkeleton />
   </SkeletonRegion>
 );
@@ -556,8 +549,8 @@ export const SettingsPaneSkeleton = ({ label }: LabelledSkeletonProps) => (
 /** The community front page: its banner, the comments circle rising out of
  *  the tray with the comments in it, the initiative directory, and what is
  *  coming up. */
-export const CommunityHomeSkeleton = ({ label }: LabelledSkeletonProps) => (
-  <SkeletonRegion label={label} className="space-y-6">
+export const CommunityHomeSkeleton = () => (
+  <SkeletonRegion className="space-y-6">
     {/* Full-bleed like the banner it stands in for. */}
     <div className="-mx-4 -mt-4 md:-mx-8 md:-mt-8">
       <div className="flex h-56 flex-col items-center justify-center gap-3 bg-accent px-6 sm:h-64">

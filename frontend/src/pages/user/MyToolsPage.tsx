@@ -174,7 +174,7 @@ export function MyToolsPage() {
       </div>
 
       {countsQuery.isLoading ? (
-        <SkeletonRegion label={t("loading")}>
+        <SkeletonRegion>
           <TableSkeleton rows={5} columns={5} pagination />
         </SkeletonRegion>
       ) : tools.length === 0 ? (
@@ -203,7 +203,7 @@ export function MyToolsPage() {
                 that found nothing is in its toolbar, and taking it away would
                 leave no way to unsay the search. */}
             {isLoading ? (
-              <SkeletonRegion label={t("loading")}>
+              <SkeletonRegion>
                 <TableSkeleton rows={5} columns={5} pagination />
               </SkeletonRegion>
             ) : isError ? (
