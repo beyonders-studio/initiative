@@ -98,7 +98,7 @@ describe("Command", () => {
   it("sizes to its content rather than its container", () => {
     // Asserted against the source rather than a rendered box, because jsdom
     // does no layout — which is exactly why nothing caught this.
-    const source = fs.readFileSync(path.resolve(__dirname, "../../../ui/command.tsx"), "utf-8");
+    const source = fs.readFileSync(path.resolve(__dirname, "../../../../ui/command.tsx"), "utf-8");
     const base = /"flex[^"]*rounded-md bg-popover[^"]*"/.exec(source)?.[0];
 
     expect(base, "the Command base class list moved").toBeTruthy();
