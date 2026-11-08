@@ -49,6 +49,7 @@ function typoScore(text: string, search: string): number {
   for (const token of search.split(/\s+/).filter(Boolean)) {
     if (text.includes(token)) continue;
     const allowed = typosAllowed(token.length);
+    if (allowed === 0) return 0;
     let best = allowed + 1;
     for (const word of words) {
       const longest = Math.min(word.length, token.length + allowed);
