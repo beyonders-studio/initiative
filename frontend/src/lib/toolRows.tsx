@@ -145,7 +145,12 @@ export function buildToolRows(
           updatedAt: project.updated_at,
           detail: (
             <span className="flex items-center gap-2">
-              <Progress variant="ring" value={percent} className="size-6 shrink-0" />
+              <Progress
+                variant="ring"
+                value={percent}
+                className="size-6 shrink-0"
+                aria-label={t("detail.projectProgress")}
+              />
               {t("detail.tasksDone", { completed, total })}
             </span>
           ),
