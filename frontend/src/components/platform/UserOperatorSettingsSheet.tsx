@@ -65,7 +65,7 @@ import { useServerForm } from "@/hooks/useServerForm";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasAnyCapability } from "@/lib/permissions";
-import { getUserHandle } from "@/lib/userDisplay";
+import { getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -806,7 +806,7 @@ export const UserOperatorSettingsSheet = ({
         onOpenChange={(next) => !next && setRoleConfirm(null)}
         title={t("platformUsers.changeRoleTitle")}
         description={t("platformUsers.changeRoleDescription", {
-          email: user.email,
+          email: getUserDisplayName(user),
           role: roleConfirm ? platformRoleLabel(roleConfirm, t as TranslateFn) : "",
         })}
         confirmLabel={t("common:confirm")}

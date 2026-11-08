@@ -192,8 +192,10 @@ export const ProjectTasksKanbanView = ({
   };
   const { i18n } = useTranslation();
   const plugins = usePluginsOnItems(initiativeId, !givenDefinitions);
-  // A project with one type shows none: it tells no task apart.
-  const typed = (useProjectTaskTypes(projectId).data?.length ?? 0) > 1;
+  // A project with one type shows none: it tells no task apart. A board given
+  // its definitions (a listing's preview) has no project to ask.
+  const types = useProjectTaskTypes(projectId, { enabled: !givenDefinitions }).data;
+  const typed = !givenDefinitions && (types?.length ?? 0) > 1;
   const fields = useMemo(
     () =>
       withDisplays(

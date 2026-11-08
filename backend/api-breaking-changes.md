@@ -9,6 +9,33 @@ matter and can be deleted.
 
 ## After 0.78.0
 
+### An account's email address as it is stored
+
+The backend's type cleanup reads an account's `email` as the string it is
+stored as rather than validating it as an address on the way out, so a read's
+`email` no longer carries `format: email`. The operator's user reads say an
+account with no address has `null` rather than `""`, as every other read of an
+account already does.
+
+- POST /api/v1/auth/register the `email/anyOf[subschema #1]/` response's property `format` changed from `email` to `none` for status `201`
+- GET /api/v1/me the `email/anyOf[subschema #1]/` response's property `format` changed from `email` to `none` for status `200`
+- PATCH /api/v1/me the `email/anyOf[subschema #1]/` response's property `format` changed from `email` to `none` for status `200`
+- POST /api/v1/me/age-confirmation the `email/anyOf[subschema #1]/` response's property `format` changed from `email` to `none` for status `200`
+- PUT /api/v1/me/avatar the `email/anyOf[subschema #1]/` response's property `format` changed from `email` to `none` for status `200`
+- POST /api/v1/me/legal-acceptance the `email/anyOf[subschema #1]/` response's property `format` changed from `email` to `none` for status `200`
+- PATCH /api/v1/me/username the `email/anyOf[subschema #1]/` response's property `format` changed from `email` to `none` for status `200`
+- GET /api/v1/operator/users response property `items/items/email` list-of-types was widened by adding types `null` to media type `application/json` of response `200`
+- DELETE /api/v1/operator/users/{user_id}/age-block response property `email` list-of-types was widened by adding types `null` to media type `application/json` of response `200`
+- DELETE /api/v1/operator/users/{user_id}/api-keys response property `email` list-of-types was widened by adding types `null` to media type `application/json` of response `200`
+- PATCH /api/v1/operator/users/{user_id}/platform-role response property `email` list-of-types was widened by adding types `null` to media type `application/json` of response `200`
+- DELETE /api/v1/operator/users/{user_id}/profile/{field} response property `email` list-of-types was widened by adding types `null` to media type `application/json` of response `200`
+- POST /api/v1/operator/users/{user_id}/reactivate response property `email` list-of-types was widened by adding types `null` to media type `application/json` of response `200`
+- POST /api/v1/operator/users/{user_id}/restore response property `email` list-of-types was widened by adding types `null` to media type `application/json` of response `200`
+- DELETE /api/v1/operator/users/{user_id}/sessions response property `email` list-of-types was widened by adding types `null` to media type `application/json` of response `200`
+- DELETE /api/v1/operator/users/{user_id}/sign-in-lock response property `email` list-of-types was widened by adding types `null` to media type `application/json` of response `200`
+- POST /api/v1/operator/users/{user_id}/suspension response property `email` list-of-types was widened by adding types `null` to media type `application/json` of response `200`
+- PATCH /api/v1/operator/users/{user_id}/username response property `email` list-of-types was widened by adding types `null` to media type `application/json` of response `200`
+
 ### Announcements in notifications
 
 `NotificationType` takes `announcement`: a dismissed announcement leaves a
