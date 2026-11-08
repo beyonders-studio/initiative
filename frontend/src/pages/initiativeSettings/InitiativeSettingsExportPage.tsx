@@ -10,7 +10,7 @@
 import { useTranslation } from "react-i18next";
 
 import { InitiativeSettingsExportTab } from "@/components/initiatives/settings/InitiativeSettingsExportTab";
-import { InitiativeSettingsPermissionRequired } from "@/components/initiatives/settings/InitiativeSettingsGuard";
+import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
 import { useUpdateInitiative } from "@/hooks/useInitiatives";
 import { toast } from "@/lib/mascotToast";
@@ -23,7 +23,7 @@ export const InitiativeSettingsExportPage = () => {
   });
 
   if (!canManageMembers) {
-    return <InitiativeSettingsPermissionRequired />;
+    return <SettingsPermissionRequired scope="initiative" />;
   }
 
   return (

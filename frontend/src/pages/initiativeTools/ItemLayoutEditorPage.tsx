@@ -13,7 +13,7 @@ import { useMemo } from "react";
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { ITEM_DETAILS } from "@/components/layouts/details";
 import { LayoutEditor } from "@/components/layouts/LayoutEditor";
-import { ToolSettingsPermissionRequired } from "@/components/tools/settings/ToolSettingsGuard";
+import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { instanceTarget, useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -38,7 +38,7 @@ export const ItemLayoutEditorPage = ({ tool }: { tool: Tool }) => {
   );
 
   if (!set || id === null || initiativeId === null) return null;
-  if (!set.can_configure) return <ToolSettingsPermissionRequired />;
+  if (!set.can_configure) return <SettingsPermissionRequired scope="tool" />;
   return (
     <LayoutEditor
       // Another instance's editor starts afresh: a draft, and the question

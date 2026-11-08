@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import {
   ChevronLeft,
   ChevronRight,
+  CircleQuestionMark,
   CircleUserRound,
   House,
   LogOut,
@@ -14,12 +15,14 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
-import { AppLinks } from "@/components/AppLinks";
+import { useTitleBarHeight } from "@/components/DesktopTitleBar";
+import { openHelp } from "@/components/help/helpStore";
 import { ThoughtBubble } from "@/components/icons/ThoughtBubble";
 import { AppearanceMenuItems, ThemeIcon } from "@/components/ModeToggle";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { SidebarFooter } from "@/components/sidebar/sidebar";
 import { useFeedback } from "@/components/tickets/FeedbackSheet";
+import { UpdateButton } from "@/components/UpdateButton";
 import { UserHandle } from "@/components/UserHandle";
 import { PresenceDot } from "@/components/user/PresenceDot";
 import { PresenceMenuItems } from "@/components/user/PresenceMenuItems";
@@ -63,6 +66,8 @@ export const SidebarUserFooter = ({
 }: SidebarUserFooterProps) => {
   const { t } = useTranslation(["nav", "profiles", "common"]);
   const feedback = useFeedback();
+  // The desktop app's title bar carries the update while it is drawn.
+  const titleBarShown = useTitleBarHeight() > 0;
   // A fly-out needs a hover to open it and room beside the menu to land in.
   // A phone has neither — the sidebar is already a sheet against the edge — so
   // there the choices behind one are drilled into: the menu becomes that list,
@@ -299,6 +304,9 @@ export const SidebarUserFooter = ({
                           <UserCog className="h-4 w-4" /> {t("mySettings")}
                         </Link>
                       </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => openHelp()}>
+                        <CircleQuestionMark className="h-4 w-4" /> {t("common:help")}
+                      </DropdownMenuItem>
                       {feedback.offered ? (
                         <DropdownMenuItem onSelect={feedback.open}>
                           <MessageSquareHeart className="h-4 w-4" /> {t("sendFeedback")}
@@ -363,12 +371,13 @@ export const SidebarUserFooter = ({
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Only the bell rides out here: it is the one thing in this
-                  corner worth a glance without opening anything. The theme
-                  went into the menu — it is set once and left, and the width
-                  it was holding is the width the status line reads in. */}
+              {/* Only what is worth a glance without opening anything rides
+                  out here: the bell, and an update while one waits. The theme
+                  and Help went into the menu, and the width they were holding
+                  is the width the status line reads in. */}
               {user ? (
-                <div className="shrink-0">
+                <div className="flex shrink-0 items-center gap-1">
+                  {titleBarShown ? null : <UpdateButton />}
                   <NotificationBell />
                 </div>
               ) : null}
@@ -384,9 +393,6 @@ export const SidebarUserFooter = ({
             </PopoverContent>
           ) : null}
         </Popover>
-        <div className="flex justify-end border-t px-3 py-2">
-          <AppLinks />
-        </div>
       </div>
     </SidebarFooter>
   );

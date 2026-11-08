@@ -301,7 +301,7 @@ export const TOOL_SETTINGS_SECTIONS = ["details", "access", "advanced"] as const
 export type ToolSettingsSection = (typeof TOOL_SETTINGS_SECTIONS)[number];
 
 /** The section a tool's settings open on, addressed as `/settings` itself. */
-export const TOOL_SETTINGS_DEFAULT_SECTION: ToolSettingsSection = "details";
+const TOOL_SETTINGS_DEFAULT_SECTION: ToolSettingsSection = "details";
 
 /** Community-relative route for one section of a tool's settings, e.g.
  *  "/i/12/counter-groups/3/settings/access". */
