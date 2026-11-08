@@ -28,6 +28,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.intake import (
     STREAMS,
     Conversation,
+    FeedbackTopic,
     IntakeStream,
     SecurityTopic,
     conversation_for,
@@ -135,14 +136,13 @@ async def availability(
                 contact,
                 tuple(t.value for t in support_service.offered_topics(community)),
             )
-        elif stream is IntakeStream.security:
-            # Anybody signed in may tell the server about a security problem.
-            offered[stream] = StreamAvailability(
-                TicketMode.form, contact, tuple(t.value for t in SecurityTopic)
-            )
         else:
-            # Or how it is working for them.
-            offered[stream] = StreamAvailability(TicketMode.form, contact)
+            # Anybody signed in may tell the server about a security problem,
+            # or what they think.
+            topics = SecurityTopic if stream is IntakeStream.security else FeedbackTopic
+            offered[stream] = StreamAvailability(
+                TicketMode.form, contact, tuple(t.value for t in topics)
+            )
     return offered
 
 

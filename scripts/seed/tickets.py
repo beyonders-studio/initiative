@@ -17,7 +17,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import establish_guild_access
-from app.core.intake import SecurityTopic, SupportTopic
+from app.core.intake import FeedbackTopic, SecurityTopic, SupportTopic
 from app.core.moderation import HoldReason, LegalBasis, ReportReason
 from app.core.search import SearchEntityType
 from app.db import cohorts
@@ -76,9 +76,8 @@ async def seed(session: AsyncSession, users: dict[str, User], primary: Guild) ->
     )
     await feedback.send(
         sender=filer,
-        rating=4,
-        likes="The board. Everyone finally knows what's next.",
-        wishes="It would help to pin a comment to the top of a task.",
+        topic=FeedbackTopic.idea,
+        body="It would help to pin a comment to the top of a task.",
         contactable=True,
     )
     opened += 3

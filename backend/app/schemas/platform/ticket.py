@@ -18,6 +18,7 @@ from app.core.intake import (
     APPEAL,
     COMMUNITY_SUPPORT_TOPICS,
     Conversation,
+    FeedbackTopic,
     IntakeStream,
     SecurityTopic,
     SupportTopic,
@@ -42,11 +43,6 @@ def _said_something(value: str) -> str:
     if not trimmed:
         raise ValueError("must not be blank")
     return trimmed
-
-
-def _said_or_none(value: Optional[str]) -> Optional[str]:
-    """Trim; an answer left blank was not given."""
-    return (value or "").strip() or None
 
 
 class SupportTicketCreate(SanitizedBaseModel):
@@ -143,19 +139,14 @@ class FeedbackContext(SanitizedBaseModel):
 
 
 class FeedbackTicketCreate(SanitizedBaseModel):
-    """How the app is working for somebody: a rating, and what they like and
-    wish it did where they say."""
+    """Telling the team what somebody thinks: an idea, something that got in
+    their way, or what they love."""
 
     stream: Literal["feedback"]
-    #: Out of five.
-    rating: int = PydanticField(ge=1, le=5)
-    #: What they like most, in their own words.
-    likes: Annotated[Optional[str], AfterValidator(_said_or_none)] = PydanticField(
-        default=None, max_length=BODY_LENGTH
-    )
-    #: What they wish it did.
-    wishes: Annotated[Optional[str], AfterValidator(_said_or_none)] = PydanticField(
-        default=None, max_length=BODY_LENGTH
+    type: FeedbackTopic
+    #: What they think, in their own words.
+    body: Annotated[str, AfterValidator(_said_something)] = PydanticField(
+        min_length=1, max_length=BODY_LENGTH
     )
     #: Whether the team may write to them about it. Theirs to offer; off unless
     #: they tick it.

@@ -35,7 +35,7 @@ async def feedback_desk(session, operations):
 
 
 async def _send(client, actor, **body):
-    payload = {"stream": "feedback", "rating": 4, "wishes": "Dark mode for print."}
+    payload = {"stream": "feedback", "type": "idea", "body": "Dark mode for print."}
     payload.update(body)
     return await client.post(
         TICKETS, data={"payload": json.dumps(payload)}, headers=actor.headers
@@ -48,77 +48,57 @@ async def test_the_form_is_offered_wherever_feedback_is_taken(
     sender = await acting_user()
     offered = (await tickets_test._offered(client, sender))["feedback"]
     assert offered["mode"] == "form"
-    assert offered["types"] == []
+    assert offered["types"] == ["idea", "problem", "praise"]
 
 
-async def test_feedback_is_a_rated_case_its_sender_may_be_contacted_about(
+async def test_feedback_is_a_case_its_sender_may_be_contacted_about(
     client, session, acting_user, feedback_desk
 ):
-    """The board names a case by its stars and how the wish begins, and holds
-    the rating on the case's rating field. A sender who may be contacted is the
-    case's filer, and their answers open the conversation with them; any other
-    sender's answers are the description, with nobody to write to."""
-    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
-
+    """The board names a case by its kind and how it begins. A sender who may
+    be contacted is the case's filer, and their words open the conversation
+    with them; any other sender's words are the description, with nobody to
+    write to."""
     sender = await acting_user()
-    answers = {
-        "likes": "The board.",
-        "wishes": "Export drops the last row.\nEvery time.",
-    }
-    quiet = await _send(client, sender, rating=2, **answers)
+    words = "Export drops the last row.\nEvery time."
+    quiet = await _send(client, sender, type="problem", body=words)
     assert quiet.status_code == 202, quiet.text
-    open_to_contact = await _send(
-        client, sender, rating=5, likes="  ", wishes="Print view.", contactable=True
-    )
+    open_to_contact = await _send(client, sender, body="Print view.", contactable=True)
     assert open_to_contact.status_code == 202, open_to_contact.text
 
     await set_rls_context(session, SystemGuild(feedback_desk["guild"].id))
-    cases = (await session.exec(select(IntakeCase).order_by(IntakeCase.id))).all()
+    quiet_case, contact_case = (
+        await session.exec(select(IntakeCase).order_by(IntakeCase.id))
+    ).all()
     tasks = {
         task.id: task
         for task in await session.exec(
-            select(Task).where(Task.id.in_([case.task_id for case in cases]))  # type: ignore[union-attr]
+            select(Task).where(
+                Task.id.in_([quiet_case.task_id, contact_case.task_id])  # type: ignore[union-attr]
+            )
         )
     }
-    ratings = dict(
-        (
-            await session.exec(
-                select(MetadataValue.entity_id, MetadataValue.value_number)
-                .join(
-                    MetadataDefinition,
-                    MetadataDefinition.id == MetadataValue.property_id,
-                )
-                .where(MetadataDefinition.name == "rating")
-            )
-        ).all()
-    )
     comments = (await session.exec(select(Comment))).all()
 
-    quiet_case, contact_case = cases
-    assert quiet_case.filer_user_id is None and quiet_case.topic is None
+    assert quiet_case.filer_user_id is None and quiet_case.topic == "problem"
     quiet_task = tasks[quiet_case.task_id]
-    assert quiet_task.title == "★★☆☆☆ Export drops the last row."
+    assert quiet_task.title == "Problem: Export drops the last row."
     assert "did not offer to be contacted" in quiet_task.description
-    assert "**What do you like most?**\nThe board." in quiet_task.description
-    assert ratings[quiet_case.task_id] == 40
+    assert words in quiet_task.description
 
     assert contact_case.filer_user_id == sender.user.id
-    assert contact_case.filer_subject is None
-    assert tasks[contact_case.task_id].title == "★★★★★ Print view."
-    assert ratings[contact_case.task_id] == 100
+    assert contact_case.filer_subject is None and contact_case.topic == "idea"
+    assert tasks[contact_case.task_id].title == "Idea: Print view."
     (opening,) = comments
     assert opening.task_id == contact_case.task_id
     assert opening.audience == CommentAudience.filer
-    assert (
-        opening.content == "★★★★★ (5 of 5)\n\n**What do you wish it did?**\nPrint view."
-    )
+    assert opening.content == "Print view."
     await set_rls_context(session, Unattributed())
 
 
-@pytest.mark.parametrize("rating", [0, 6])
-async def test_a_rating_is_out_of_five(client, acting_user, feedback_desk, rating):
+@pytest.mark.parametrize("kind", ["other", "rating"])
+async def test_feedback_is_one_of_three_kinds(client, acting_user, feedback_desk, kind):
     sender = await acting_user()
-    assert (await _send(client, sender, rating=rating)).status_code == 422
+    assert (await _send(client, sender, type=kind)).status_code == 422
 
 
 async def test_the_app_context_goes_to_the_team_where_it_was_sent(
@@ -184,7 +164,9 @@ async def test_it_takes_pictures_and_no_more_of_them_than_the_stream_allows(
     sender = await acting_user()
     response = await client.post(
         TICKETS,
-        data={"payload": json.dumps({"stream": "feedback", "rating": 3})},
+        data={
+            "payload": json.dumps({"stream": "feedback", "type": "idea", "body": "x"})
+        },
         files=[("files", (f"{n}.txt", b"words", "text/plain")) for n in range(4)],
         headers=sender.headers,
     )

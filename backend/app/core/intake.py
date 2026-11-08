@@ -97,6 +97,14 @@ COMMUNITY_SUPPORT_TOPICS = frozenset(
 )
 
 
+class FeedbackTopic(str, Enum):
+    """What kind of feedback somebody is sending."""
+
+    idea = "idea"
+    problem = "problem"
+    praise = "praise"
+
+
 #: The one moderation case a person files about themselves: asking for their
 #: account's suspension to be lifted. Unlike a report it is a conversation.
 APPEAL = "appeal"
@@ -307,9 +315,6 @@ class CaseField(str, Enum):
     tracker_key = "tracker_key"
     #: The law an ``illegal`` report or hold names (``LegalBasis``).
     legal_basis = "legal_basis"
-    #: How it is working for whoever sent feedback: a scale, a fifth for each
-    #: of the stars they gave it.
-    rating = "rating"
     #: A link that opens what the case is about, in the community it is in,
     #: built from ``subject_guild``, ``resource_type`` and ``resource_id``. It
     #: opens only for somebody who can read it there: a grant still decides.
@@ -330,7 +335,6 @@ CASE_FIELD_TYPES: dict[CaseField, str] = {
     CaseField.tracker_key: "text",
     CaseField.legal_basis: "text",
     CaseField.subject_link: "url",
-    CaseField.rating: "scale",
 }
 
 #: Which fields each stream's blueprint defines. ``tracker_key`` is security's
@@ -364,6 +368,5 @@ STREAM_FIELDS: dict[IntakeStream, tuple[CaseField, ...]] = {
         CaseField.subject_user,
         CaseField.subject_guild,
         CaseField.reported_at,
-        CaseField.rating,
     ),
 }

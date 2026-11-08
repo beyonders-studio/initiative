@@ -246,9 +246,8 @@ async def _send_feedback(
     try:
         await feedback_service.send(
             sender=sender,
-            rating=payload.rating,
-            likes=payload.likes,
-            wishes=payload.wishes,
+            topic=payload.type,
+            body=payload.body,
             contactable=payload.contactable,
             context=payload.context,
             evidence=attached,

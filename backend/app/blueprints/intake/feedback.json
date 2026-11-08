@@ -8,7 +8,7 @@
   "project": {
     "name": "Feedback",
     "icon": "\ud83d\udcac",
-    "description": "How the app is working for people. Each case is one piece of feedback: a rating out of five, what they like most and what they wish it did. Read it, decide what it means, and close it.",
+    "description": "What people tell us: ideas, what got in their way and what they love. Each case is one piece of feedback: read it, decide what it means, and close it.",
     "is_template": false,
     "archived_at": null,
     "start_date": null,
@@ -78,19 +78,12 @@
       "position": 2.0,
       "color": "#F59E0B",
       "options": null
-    },
-    {
-      "name": "rating",
-      "type": "scale",
-      "position": 3.0,
-      "color": "#EAB308",
-      "options": null
     }
   ],
   "tasks": [
     {
       "title": "How this project is fed",
-      "description": "Cases arrive here when somebody tells us how the app is working for them. Each one carries their rating, on the **rating** field, and what they like most and wish it did, where they said.\n\n**Closing a case** means it has been read and a decision made about what it means. That decision can be 'not now'.\n\nWhere somebody ticked that we may contact them, write to them from the panel above its comments. **Send and wait for them** moves it to **Waiting on requester**; when they answer, it moves to **Requester replied** so the board shows it is back with us. Where they didn't tick it, what they said is in the description and there is nobody to write to.\n\nYou can restructure this project however you like. The binding only names the project.",
+      "description": "Cases arrive here when somebody shares an idea, something that got in their way, or something they love. The title starts with which it is.\n\n**Closing a case** means it has been read and a decision made about what it means. That decision can be 'not now'.\n\nWhere somebody ticked that we may contact them, write to them from the panel above its comments. **Send and wait for them** moves it to **Waiting on requester**; when they answer, it moves to **Requester replied** so the board shows it is back with us. Where they didn't tick it, what they said is in the description and there is nobody to write to.\n\nYou can restructure this project however you like. The binding only names the project.",
       "priority": "medium",
       "start_date": null,
       "due_date": null,
