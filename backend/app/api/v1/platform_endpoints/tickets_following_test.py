@@ -91,7 +91,9 @@ async def desk(session, acting_user):
     await operations_schema.deprovision_operations(guild_id)
 
 
-async def _file(user, stream=IntakeStream.support, subject="Lost my phone") -> int:
+async def _file(
+    user, stream=IntakeStream.support, subject: str | None = "Lost my phone"
+) -> int:
     outcome = await open_case(
         stream,
         title=f"Staff title for {subject}",
@@ -249,20 +251,31 @@ async def test_a_closed_case_takes_no_answer(client, session, acting_user, desk)
     assert response.json()["detail"] == TicketMessages.REPLY_NOT_TAKEN
 
 
-async def test_feedback_waits_for_the_team_to_speak_first(client, acting_user, desk):
+async def test_feedback_reaches_its_sender_once_the_team_writes(
+    client, session, acting_user, desk
+):
+    """Feedback whose sender may be contacted is the team's to take up: until
+    somebody writes to them it is not among their tickets and moving it tells
+    them nothing. Once the team has written, it is theirs to read and answer."""
     filer = await acting_user("member")
-    task_id = await _file(filer.user, IntakeStream.feedback, subject="Dark mode")
+    task_id = await _file(filer.user, IntakeStream.feedback, subject=None)
 
-    detail = (await client.get(f"{TICKETS}/{task_id}", headers=filer.headers)).json()
-    assert detail["conversation"] == "staff_first"
-    assert detail["can_reply"] is False
-    refused = await client.post(
-        f"{TICKETS}/{task_id}/replies", data={"body": "Also..."}, headers=filer.headers
-    )
-    assert refused.status_code == 409
+    assert (await client.get(TICKETS, headers=filer.headers)).json()["items"] == []
+    hidden = await client.get(f"{TICKETS}/{task_id}", headers=filer.headers)
+    assert hidden.status_code == 404
+    await notify_filers()
+    await _move(session, desk, task_id, desk["active"])
+    await notify_filers()
+    assert await _notices(session, filer.user.id) == []
 
     assert (await _say(client, desk, task_id, "Which screens?")).status_code == 201
+    await notify_filers()
+    (told,) = await _notices(session, filer.user.id)
+    assert told["task_id"] == task_id and told["replied"] is True
+    (listed,) = (await client.get(TICKETS, headers=filer.headers)).json()["items"]
+    assert listed["task_id"] == task_id
     detail = (await client.get(f"{TICKETS}/{task_id}", headers=filer.headers)).json()
+    assert detail["conversation"] == "staff_first"
     assert detail["can_reply"] is True
 
 

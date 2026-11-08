@@ -147,9 +147,8 @@ async def request_help(
             reported_at=moment,
         ),
         now=moment,
-        filer=CaseFiler(
-            user_id=requester.id, subject=subject, words=body, device=context
-        ),
+        filer=CaseFiler(user_id=requester.id, subject=subject, words=body),
+        device=context,
         evidence=evidence,
         topic=topic.value,
     )

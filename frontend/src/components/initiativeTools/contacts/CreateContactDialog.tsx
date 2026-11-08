@@ -17,8 +17,8 @@ import { useContactsList, useCreateContact } from "@/hooks/useContacts";
 import { useRelate } from "@/hooks/useRelationships";
 import { type ContactDetails, filledDetails, NO_DETAILS } from "@/lib/contacts";
 import type { DialogProps } from "@/types/dialog";
-import { AsyncCombobox } from "@/ui/async-combobox";
 import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -62,7 +62,7 @@ const OrganizationPicker = ({
   ];
 
   return (
-    <AsyncCombobox
+    <Combobox
       aria-label={t("partOf")}
       items={[
         { value: "", label: t("noOrganization") },

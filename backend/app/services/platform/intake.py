@@ -154,9 +154,6 @@ class CaseFiler:
     #: the stream's own name stands for it.
     subject: Optional[str]
     words: str
-    #: The device and page they sent it from, where they chose to send it.
-    #: Listed under the description, for the people working the case.
-    device: Optional["DeviceContext"] = None
 
 
 #: A device context's fields, in the order the team reads them, with their
@@ -511,6 +508,7 @@ async def open_case(
     evidence: Sequence["PreparedEvidence"] = (),
     evidence_by: Optional[int] = None,
     topic: Optional[str] = None,
+    device: Optional["DeviceContext"] = None,
 ) -> Optional[CaseOutcome]:
     """File ``stream``'s work as a task in the project bound to it.
 
@@ -521,9 +519,10 @@ async def open_case(
     background and handles that itself.
 
     ``filer`` names the person filing, when a person is. A new case records
-    them and opens with their words, said to them, and lists the device they
-    sent it from under its description; a repeat that lands in a case already
-    open says what was new on the case instead. The stream's cap on one
+    them and opens with their words, said to them; a repeat that lands in a
+    case already open says what was new on the case instead. ``device`` is
+    the device and page a person sent it from, where they chose to send it,
+    listed under a new case's description for the people working it. The stream's cap on one
     filer's open cases is checked under a lock on that filer, in the
     transaction that opens the case, and ``CaseCapReached`` is raised past it.
 
@@ -651,7 +650,7 @@ async def open_case(
 
         # A case starts as its type starts a task, under the body it came with.
         task_type = await _case_type(session, binding, project)
-        description = _with_device(body, filer.device if filer is not None else None)
+        description = _with_device(body, device)
         fields: dict[str, object] = {"title": title, "description": description}
         lines = task_creation_service.start_from_type(
             task_type,

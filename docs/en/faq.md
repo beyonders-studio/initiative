@@ -272,7 +272,7 @@ Yes — Initiative speaks OIDC, including mapping your provider's groups to comm
 
 Look at the bottom of the sidebar, or the title bar in the desktop app. The question mark is **Help**: it links to these pages and searches them without leaving the app. Where there's somebody to ask — a server that takes help requests, or one with an address to write to — the way to ask sits under the search results.
 
-To tell the people who run the server what you think — an idea, something that got in your way, or praise — choose **Send feedback** in your account menu or the command palette.
+To share an idea, something that got in your way, or something you love with the people who run the server, choose **Send feedback** in your account menu or the command palette.
 
 If it looks like the software rather than your account, see [Reporting a problem](security/reporting-a-problem.md).
 

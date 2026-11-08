@@ -1,11 +1,11 @@
 /**
- * Filing a ticket: reporting something, a security problem, or feedback.
- * Help requests are asked from the Help panel (`components/help/HelpPanel`);
- * a feedback problem that needs an answer is sent as one from here.
+ * Filing a ticket: reporting something, or a security problem. Help requests
+ * are asked from Help (`components/help/HelpPanel`), and feedback from its
+ * own sheet.
  *
- * One dialog for these kinds, opened by whatever surface files one — a Report
- * flag, the security report, the feedback sheet. Each kind brings its own
- * fields; sending, the acknowledgement and the fallback are shared.
+ * One dialog for both, opened by a Report flag or the security report. Each
+ * kind brings its own fields; sending, the acknowledgement and the fallback
+ * are shared.
  *
  * What comes back is an acknowledgement and nothing else. A report in
  * particular never says where it went, whether somebody had already reported
@@ -22,30 +22,22 @@
  * report carries no files: it says where the material is, and it stays there.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
-  DeviceContext,
-  FeedbackTopic,
   LegalBasis,
   ReportReason,
   SecurityTopic,
-  SupportTopic,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   LegalBasis as Basis,
-  FeedbackTopic as Feedback,
   ReportReason as Reason,
-  SupportTopic as Support,
   SecurityTopic as Topic,
 } from "@/api/generated/initiativeAPI.schemas";
 import { ContactDialog } from "@/components/tickets/ContactDialog";
-import { DeviceContextPreview } from "@/components/tickets/DeviceContext";
-import { EvidencePicker, fitToPolicy } from "@/components/tickets/Evidence";
+import { EvidencePicker } from "@/components/tickets/Evidence";
 import {
-  COMMUNITY_TOPICS,
-  firstLine,
   SUBJECT_MAX,
   type TicketCreate,
   useFileTicket,
@@ -54,7 +46,6 @@ import {
 import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
-import { Checkbox } from "@/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -65,7 +56,6 @@ import {
 } from "@/ui/dialog";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
-import { listFormat } from "@/ui/lib/intl";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Textarea } from "@/ui/textarea";
 
@@ -103,22 +93,9 @@ const SECURITY_TOPICS: SecurityTopic[] = [
   Topic.other,
 ];
 
-/** What feedback can be, in the order it is offered. */
-const FEEDBACK_TOPICS: FeedbackTopic[] = [
-  Feedback.idea,
-  Feedback.problem,
-  Feedback.praise,
-  Feedback.other,
-];
-
 /** What is being filed. */
 export type TicketKind =
   | { stream: "security" }
-  | {
-      stream: "feedback";
-      /** Where the app was, shown before sending and removable. */
-      context?: DeviceContext;
-    }
   | {
       stream: "moderation";
       /** A `SearchEntityType` or a `PlatformReportTarget` value. */
@@ -130,8 +107,8 @@ export interface FileTicketDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   ticket: TicketKind;
-  /** The community the reader is standing in, when they are in one. Asking
-   *  for help is always from one; a report may come from nowhere. */
+  /** The community the reader is standing in, when they are in one; a
+   *  report may come from nowhere. */
   communityId: number | null;
 }
 
@@ -147,44 +124,16 @@ export const FileTicketDialog = ({
   const [reason, setReason] = useState<ReportReason | "">("");
   const [basis, setBasis] = useState<LegalBasis | "">("");
   const [topic, setTopic] = useState<SecurityTopic | "">("");
-  const [feedbackType, setFeedbackType] = useState<FeedbackTopic | "">("");
-  const [needsAnswer, setNeedsAnswer] = useState(false);
-  const [context, setContext] = useState<DeviceContext | null>(
-    ticket.stream === "feedback" ? (ticket.context ?? null) : null
-  );
   const [files, setFiles] = useState<File[]>([]);
-  // What was taken back off because the form stopped taking it.
-  const [dropped, setDropped] = useState<string[]>([]);
   // Set, to what the server said, when the people who run the deployment had
   // nowhere to receive this. Kept apart from their address, which may still
   // be on its way: the dialog turns into the address whenever it arrives, and
   // says why it could not send only where there is no address at all.
   const [nowhere, setNowhere] = useState<string | null>(null);
   const availability = useTicketAvailability(communityId, { enabled: open });
-  const supportOffer = availability.data?.support;
-  const helpTopics = (supportOffer?.types ?? []) as SupportTopic[];
-
   const isReport = ticket.stream === "moderation";
-  const isSecurity = ticket.stream === "security";
-  const isFeedback = ticket.stream === "feedback";
-  // A problem that needs an answer is a help request, not feedback: sent to
-  // support instead, where somebody writes back.
-  const canAskInstead = isFeedback && supportOffer?.mode === "form" && helpTopics.length > 0;
-  const askingInstead = canAskInstead && feedbackType === Feedback.problem && needsAnswer;
-  const sentAs = askingInstead ? "support" : ticket.stream;
-  const contact = availability.data?.[sentAs]?.contact ?? null;
-  const evidence = availability.data?.[sentAs]?.evidence ?? null;
-
-  // A feedback sent as a help request takes support's files; unticking that
-  // puts feedback's back, and whatever it does not take comes off, said so,
-  // rather than refusing the whole send.
-  useEffect(() => {
-    if (!evidence) return;
-    const { kept, dropped: off } = fitToPolicy(files, evidence);
-    if (off.length === 0) return;
-    setFiles(kept);
-    setDropped(off.map((file) => file.name));
-  }, [evidence, files]);
+  const contact = availability.data?.[ticket.stream]?.contact ?? null;
+  const evidence = availability.data?.[ticket.stream]?.evidence ?? null;
   const illegal = reason === Reason.illegal;
   // An illegal or "something else" report has to say what is wrong.
   const detailRequired = illegal || reason === Reason.other;
@@ -196,13 +145,7 @@ export const FileTicketDialog = ({
         ? t("moderation:report.platformContact", { contact: accepted.platform_contact })
         : undefined;
       toast.success(
-        isReport
-          ? t("moderation:report.thanks")
-          : isSecurity
-            ? t("security.thanks")
-            : isFeedback && !askingInstead
-              ? t("feedback.thanks")
-              : t("help.thanks"),
+        isReport ? t("moderation:report.thanks") : t("security.thanks"),
         contactLine ? { description: contactLine } : undefined
       );
       onOpenChange(false);
@@ -211,20 +154,12 @@ export const FileTicketDialog = ({
       setReason("");
       setBasis("");
       setTopic("");
-      setFeedbackType("");
-      setNeedsAnswer(false);
       setFiles([]);
     },
     onError: (err) => {
       const message = getErrorMessage(
         err,
-        isReport
-          ? "moderation:report.error"
-          : isSecurity
-            ? "intake:security.error"
-            : isFeedback && !askingInstead
-              ? "intake:feedback.error"
-              : "intake:help.error"
+        isReport ? "moderation:report.error" : "intake:security.error"
       );
       if (getHttpStatus(err) === 503) {
         setNowhere(message);
@@ -247,14 +182,7 @@ export const FileTicketDialog = ({
               .filter(Boolean)
               .join("\n\n"),
           }
-        : ticket.stream === "feedback"
-          ? {
-              subject: feedbackType
-                ? `${t("feedback.title")}: ${t(`feedback.topics.${feedbackType}`)}`
-                : t("feedback.title"),
-              body: body.trim(),
-            }
-          : { subject: subject.trim(), body: body.trim() };
+        : { subject: subject.trim(), body: body.trim() };
     return (
       <ContactDialog open={open} onOpenChange={onOpenChange} contact={contact} draft={draft} />
     );
@@ -275,37 +203,8 @@ export const FileTicketDialog = ({
         community_id: communityId,
       };
     }
-    if (ticket.stream === "security") {
-      if (!topic || !subject.trim() || !body.trim()) return null;
-      return { stream: "security", type: topic, subject: subject.trim(), body: body.trim() };
-    }
-    if (ticket.stream === "feedback") {
-      if (!feedbackType || !body.trim()) return null;
-      if (askingInstead) {
-        // About the community it was sent from where that is a question the
-        // reader may ask here; about themselves otherwise.
-        const about =
-          communityId != null && helpTopics.includes(Support.community)
-            ? Support.community
-            : helpTopics.includes(Support.account)
-              ? Support.account
-              : (helpTopics[0] ?? Support.account);
-        return {
-          stream: "support",
-          type: about,
-          community_id: COMMUNITY_TOPICS.has(about) ? communityId : null,
-          subject: firstLine(body),
-          body: body.trim(),
-        };
-      }
-      return {
-        stream: "feedback",
-        type: feedbackType,
-        body: body.trim(),
-        context,
-      };
-    }
-    return null;
+    if (!topic || !subject.trim() || !body.trim()) return null;
+    return { stream: "security", type: topic, subject: subject.trim(), body: body.trim() };
   };
   const ready = payload();
 
@@ -313,19 +212,9 @@ export const FileTicketDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            {isReport
-              ? t("moderation:report.title")
-              : isSecurity
-                ? t("security.title")
-                : t("feedback.title")}
-          </DialogTitle>
+          <DialogTitle>{isReport ? t("moderation:report.title") : t("security.title")}</DialogTitle>
           <DialogDescription>
-            {isReport
-              ? t("moderation:report.description")
-              : isSecurity
-                ? t("security.description")
-                : t("feedback.description")}
+            {isReport ? t("moderation:report.description") : t("security.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -395,54 +284,6 @@ export const FileTicketDialog = ({
               />
             </div>
           </div>
-        ) : isFeedback ? (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="ticket-feedback-type">{t("feedback.typeLabel")}</Label>
-              <Select
-                value={feedbackType}
-                onValueChange={(v) => setFeedbackType(v as FeedbackTopic)}
-              >
-                <SelectTrigger id="ticket-feedback-type">
-                  <SelectValue placeholder={t("feedback.typePlaceholder")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {FEEDBACK_TOPICS.map((value) => (
-                    <SelectItem key={value} value={value}>
-                      {t(`feedback.topics.${value}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ticket-body">{t("feedback.bodyLabel")}</Label>
-              <Textarea
-                id="ticket-body"
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder={t("feedback.bodyPlaceholder")}
-                rows={6}
-                maxLength={BODY_MAX}
-              />
-            </div>
-            {canAskInstead && feedbackType === Feedback.problem ? (
-              <div className="flex items-start gap-2">
-                <Checkbox
-                  id="ticket-needs-answer"
-                  checked={needsAnswer}
-                  onCheckedChange={(checked) => setNeedsAnswer(checked === true)}
-                />
-                <div className="space-y-1">
-                  <Label htmlFor="ticket-needs-answer">{t("feedback.needsAnswer")}</Label>
-                  <p className="text-muted-foreground text-xs">{t("feedback.needsAnswerHelp")}</p>
-                </div>
-              </div>
-            ) : null}
-            {context && !askingInstead ? (
-              <DeviceContextPreview context={context} onRemove={() => setContext(null)} />
-            ) : null}
-          </div>
         ) : (
           <div className="space-y-4">
             <div className="space-y-2">
@@ -496,15 +337,6 @@ export const FileTicketDialog = ({
           />
         )}
 
-        {dropped.length > 0 && (
-          <p className="text-muted-foreground text-sm" role="status">
-            {t("evidence.dropped", {
-              count: dropped.length,
-              names: listFormat(undefined, { type: "conjunction" }).format(dropped),
-            })}
-          </p>
-        )}
-
         {nowhere && !availability.isPending && (
           <p className="text-destructive text-sm" role="alert">
             {nowhere}
@@ -519,13 +351,7 @@ export const FileTicketDialog = ({
             disabled={!ready || file.isPending}
             onClick={() => ready && file.mutate({ ticket: ready, files })}
           >
-            {isReport
-              ? t("moderation:report.submit")
-              : isSecurity
-                ? t("security.submit")
-                : isFeedback && !askingInstead
-                  ? t("feedback.submit")
-                  : t("help.submit")}
+            {isReport ? t("moderation:report.submit") : t("security.submit")}
           </Button>
         </DialogFooter>
       </DialogContent>

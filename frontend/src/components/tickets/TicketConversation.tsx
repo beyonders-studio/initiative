@@ -55,10 +55,9 @@ const Message = ({ message, taskId }: { message: TicketMessageRead; taskId: numb
 const replyNote = (
   conversation: Conversation,
   state: FilerState
-): "tickets.closedNote" | "tickets.noConversation" | "tickets.staffFirst" | null => {
+): "tickets.closedNote" | "tickets.noConversation" | null => {
   if (state === FilerState.closed) return "tickets.closedNote";
   if (conversation === Conversation.none) return "tickets.noConversation";
-  if (conversation === Conversation.staff_first) return "tickets.staffFirst";
   return null;
 };
 

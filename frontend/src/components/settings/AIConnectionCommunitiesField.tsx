@@ -11,9 +11,9 @@ import { useTranslation } from "react-i18next";
 
 import type { AIConnectionCommunity } from "@/api/generated/initiativeAPI.schemas";
 import { usePlatformCommunities } from "@/hooks/useSettings";
-import { AsyncCombobox } from "@/ui/async-combobox";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
 import { Label } from "@/ui/label";
 
 interface AIConnectionCommunitiesFieldProps {
@@ -62,7 +62,7 @@ export const AIConnectionCommunitiesField = ({
           })}
         </div>
       )}
-      <AsyncCombobox
+      <Combobox
         aria-label={t("aiConnections.communitiesLabel")}
         items={items}
         value={null}

@@ -102,12 +102,6 @@
       "openRequests_other": "{{count}} offene Anfragen",
       "askTeam": "Das Team fragen",
       "writeTo": "Keine Antwort dabei? Schreib den Leuten, die diesen Server betreiben:",
-      "drop": "Zum Anhängen ablegen",
-      "sendsContext": "Sendet die Angaben zu diesem Gerät",
-      "sendsNoContext": "Sendet keine Angaben zum Gerät",
-      "showContext": "Anzeigen",
-      "hideContext": "Ausblenden",
-      "contextSwitch": "Angaben zu diesem Gerät senden",
       "needsText": "Schreib, worum es geht, um zu senden.",
       "needsTopic": "Wähl ein Thema, um zu senden.",
       "sendShortcut": "Strg+Enter sendet",
@@ -159,13 +153,13 @@
     "replyError": "Deine Antwort konnte nicht gesendet werden. Versuche es gleich noch einmal.",
     "closedNote": "Dieses Ticket ist geschlossen. Wenn etwas anderes ansteht, bitte erneut um Hilfe.",
     "noConversation": "Danke für die Meldung. Das Team sieht sich jede an, antwortet hier aber nicht auf Meldungen.",
-    "staffFirst": "Danke für deine Rückmeldung. Du kannst hier antworten, sobald sich das Team gemeldet hat.",
     "empty": "Du hast noch keine Tickets eingereicht. Wenn du um Hilfe bittest, erscheint sie hier, damit du sie verfolgen kannst.",
     "loadError": "Deine Tickets konnten nicht geladen werden."
   },
   "case": {
     "filedBy": "Eingereicht von",
     "noFiler": "Automatisch eröffnet",
+    "noContact": "Möchte nicht kontaktiert werden",
     "theyCalledIt": "Ihr Betreff:",
     "noConversation": "Diese Art von Fall eröffnet kein Gespräch mit der einreichenden Person.",
     "staffFirst": "Sie kann antworten, sobald das Team ihr etwas geschrieben hat.",
@@ -237,6 +231,7 @@
   },
   "evidence": {
     "attach": "Dateien anhängen",
+    "dropHere": "Zum Anhängen ablegen",
     "limits_one": "Bis zu {{count}} Datei, höchstens {{size}}.",
     "limits_other": "Bis zu {{count}} Dateien, je höchstens {{size}}.",
     "remove": "{{name}} entfernen",
@@ -247,9 +242,7 @@
     "heading": "Angehängt",
     "reveal": "{{name}} anzeigen",
     "view": "{{name}} ansehen",
-    "open": "{{name}} öffnen",
-    "dropped_one": "{{names}} wurde entfernt: Das wird hier nicht angenommen.",
-    "dropped_other": "{{names}} wurden entfernt: Sie werden hier nicht angenommen."
+    "open": "{{name}} öffnen"
   },
   "security": {
     "action": "Sicherheitsproblem melden",
@@ -272,28 +265,34 @@
     "error": "Das konnte nicht gesendet werden. Versuch es gleich noch einmal."
   },
   "feedback": {
-    "action": "Feedback senden",
-    "title": "Feedback senden",
-    "description": "Sag den Leuten, die diesen Server betreiben, was du denkst. Du kannst es unter „Meine Tickets“ verfolgen.",
-    "typeLabel": "Was für Feedback ist es?",
-    "typePlaceholder": "Wähle eins aus",
-    "topics": {
-      "idea": "Eine Idee",
-      "problem": "Ein Problem",
-      "praise": "Lob",
-      "other": "Etwas anderes"
+    "title": "Sag uns, was du denkst",
+    "kindLabel": "Art des Feedbacks",
+    "kinds": {
+      "idea": {
+        "label": "Idee vorschlagen",
+        "question": "Was soll Initiative können?",
+        "placeholder": "Die Idee, und wobei sie dir helfen würde."
+      },
+      "problem": {
+        "label": "Etwas stimmt nicht",
+        "question": "Was war dir im Weg?",
+        "placeholder": "Was du gerade gemacht hast, und was passiert ist."
+      },
+      "praise": {
+        "label": "Ein Lob aussprechen",
+        "question": "Was gefällt dir daran?",
+        "placeholder": "Das, was du weiterempfehlen würdest."
+      }
     },
-    "bodyLabel": "Was möchtest du ihnen sagen?",
-    "bodyPlaceholder": "Was du dir wünschst, was dich gestört hat oder was dir gefallen hat.",
-    "needsAnswer": "Ich brauche eine Antwort",
-    "needsAnswerHelp": "Sendet es stattdessen als Hilfeanfrage, damit dir jemand antwortet.",
-    "submit": "Feedback senden",
-    "thanks": "Danke! Die Leute, die diesen Server betreiben, werden es lesen.",
-    "error": "Das konnte nicht gesendet werden. Versuch es gleich noch einmal.",
+    "addPicture": "Bild hinzufügen",
+    "contactable": "Ihr dürft mich bei Fragen dazu kontaktieren",
+    "stuck": "Soll sich jemand darum kümmern? Hilfe anfordern",
     "context": {
-      "title": "Wird mitgesendet",
-      "help": "Wo die App gerade war, damit sie sehen, was du gesehen hast. Nichts davon nennt dich oder etwas, das du geöffnet hast.",
-      "remove": "Entfernen",
+      "on": "Enthält deine App-Version und die Seite, auf der du bist.",
+      "off": "Ohne App-Version und Seite.",
+      "switch": "App-Version und Seite mitsenden",
+      "show": "Anzeigen",
+      "hide": "Ausblenden",
       "fields": {
         "app_version": "Version",
         "platform": "Plattform",
@@ -302,7 +301,14 @@
         "route": "Seite",
         "viewport": "Fenster"
       }
-    }
+    },
+    "discard": "Verwerfen",
+    "writeSomething": "Schreib etwas, um es zu senden.",
+    "submit": "Feedback senden",
+    "thanks": "Danke für dein Feedback!",
+    "thanksBody": "Das Team liest jede Rückmeldung.",
+    "done": "Fertig",
+    "error": "Das konnte nicht gesendet werden. Versuch es gleich noch einmal."
   },
   "moderationTopics": {
     "appeal": "Einspruch gegen deine Sperre"

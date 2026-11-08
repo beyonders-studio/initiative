@@ -296,7 +296,9 @@ Notices that used to say "contact whoever runs this server" — the age question
 
 Where the server takes no requests but has said who to write to, that address sits under the results instead. Where there's neither, the search is all there is, with these pages one click away.
 
-**Send feedback**, in your account menu and the command palette, tells the people who run the server what you think: an idea, a problem, praise or something else, with screenshots if they help. It shows you where the app was — its version, platform, language, theme, the page (without anything that names what was on it) and the window's size — and sends that with it unless you remove it. A problem you need an answer to has **I need an answer**, which sends it as a help request instead. Feedback lands in **My Tickets** too; the team writes first if they write at all, and you're told when it's been read.
+**Send feedback**, in your account menu and the command palette, is where an idea goes, or something that got in your way, or something you love. Pick which it is and write it; a screenshot pasted into the box comes along too. **See what** shows exactly what else gets sent (the app's version, platform, language, theme, the page without anything that names what was on it, and the window's size), and the switch beside it leaves all that out.
+
+Feedback goes one way unless you tick **You can contact me with questions about this**. Then the team can write to you about it, and it shows up in **My Tickets** when they do. Anything you need sorted out for you belongs in **Ask for help**, which **Something's not right** points you to.
 
 Every request you send lands in **My Tickets**, in the sidebar: where each one stands (**Received**, **In progress**, **Waiting on you**, **Closed**), what the team said, and your replies. You get a notification when it moves, so there's no need to keep checking. A report is listed there too, though the team looks into reports without replying to them.
 

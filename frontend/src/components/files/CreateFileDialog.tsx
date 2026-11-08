@@ -24,8 +24,8 @@ import type { EditorFileType } from "@/lib/fileTypes";
 import { toast } from "@/lib/mascotToast";
 import { matchSmartLinkProvider, SUPPORTED_PROVIDER_BADGES } from "@/lib/smartLinkProviders";
 import type { DialogProps } from "@/types/dialog";
-import { AsyncCombobox } from "@/ui/async-combobox";
 import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -274,7 +274,7 @@ export const CreateFileDialog = ({
                   </Button>
                 )}
               </div>
-              <AsyncCombobox
+              <Combobox
                 items={templateItems}
                 value={selectedTemplateId || null}
                 selectedLabel={selectedTemplateLabel}

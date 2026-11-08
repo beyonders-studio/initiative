@@ -31,8 +31,8 @@ import { OPERATOR_SETTABLE_STATUSES } from "@/lib/communityStatus";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { getUserHandle } from "@/lib/userDisplay";
-import { AsyncCombobox } from "@/ui/async-combobox";
 import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
 import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { WizardDialog } from "@/ui/wizard-dialog";
@@ -102,7 +102,7 @@ export const CommunityRestoreWizard = ({
       >
         <div className="space-y-2">
           <Label htmlFor="community-restore-seat">{t("communities.restore.seatLabel")}</Label>
-          <AsyncCombobox
+          <Combobox
             className="w-full"
             value={seatUserId || null}
             selectedLabel={seatLabel}

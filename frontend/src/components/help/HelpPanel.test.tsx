@@ -2,7 +2,7 @@
  * Help: the user guide searched first, and the team asked where it did not
  * answer.
  */
-import { act, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -188,13 +188,23 @@ describe("Help", () => {
     });
   });
 
+  it("attaches a picture dropped on what is being written", async () => {
+    await openPanel();
+    await userEvent.click(screen.getByRole("button", { name: "Ask the team" }));
+    const shot = new File(["x"], "shot.png", { type: "image/png" });
+    fireEvent.drop(screen.getByRole("textbox", { name: "What happened?" }), {
+      dataTransfer: { types: ["Files"], files: [shot] },
+    });
+    expect(await screen.findByText("shot.png")).toBeInTheDocument();
+  });
+
   it("names no community about the account, and leaves the device out when asked", async () => {
     await openPanel();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Ask the team" }));
     await user.type(screen.getByRole("textbox", { name: "What happened?" }), "Change my email");
     await user.click(screen.getByRole("radio", { name: "My account" }));
-    await user.click(screen.getByRole("switch", { name: "Send this device's details" }));
+    await user.click(screen.getByRole("switch", { name: "Include your app version and page" }));
     await user.click(screen.getByRole("button", { name: "Send" }));
 
     expect(fileMutate).toHaveBeenCalledWith(

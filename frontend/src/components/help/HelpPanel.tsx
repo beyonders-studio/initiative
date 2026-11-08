@@ -16,7 +16,7 @@
 
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Check, ExternalLink } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useReadHelpIndex } from "@/api/generated/help/help";
@@ -33,11 +33,11 @@ import {
   updateHelp,
 } from "@/components/help/helpStore";
 import {
-  DeviceContextFields,
+  DeviceContextSwitch,
   useDeviceContext,
   useRouteTemplate,
 } from "@/components/tickets/DeviceContext";
-import { EvidencePicker, fitToPolicy } from "@/components/tickets/Evidence";
+import { EvidencePicker } from "@/components/tickets/Evidence";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -71,12 +71,9 @@ import {
   EmptyTitle,
 } from "@/ui/empty";
 import { commandFilter } from "@/ui/lib/fuzzyMatch";
-import { listFormat } from "@/ui/lib/intl";
-import { useFileDrop } from "@/ui/lib/useFileDrop";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import { cn } from "@/ui/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
-import { Switch } from "@/ui/switch";
 import { Textarea } from "@/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
@@ -101,15 +98,15 @@ export const HelpPanel = ({ help }: { help: HelpState }) => {
   return (
     <Sheet open modal={phone} onOpenChange={(open) => !open && close()}>
       <SheetContent
-        side={phone ? "bottom" : "right"}
+        side={phone ? "bottom" : "bottom-right"}
         aria-describedby={undefined}
-        // On a computer the page beside Help stays usable while it is open.
+        // Docked beside the page, it stays open while the page is used.
         onInteractOutside={(event) => !phone && event.preventDefault()}
         className={cn(
           "flex flex-col gap-0 p-0",
           phone
-            ? "h-[88dvh] rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
-            : "top-[var(--title-bar-height,0px)] h-auto sm:max-w-md"
+            ? "h-[85dvh] rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
+            : "h-[min(36rem,calc(100dvh-var(--title-bar-height,0px)-2rem))]"
         )}
       >
         {view === "search" ? (
@@ -312,7 +309,6 @@ const AskView = ({
 }) => {
   const { t } = useTranslation(["intake", "common"]);
   const context = useDeviceContext();
-  const [showContext, setShowContext] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   // A community's own topics are asked from inside it.
   const offered = topics.filter((topic) => communityId != null || !COMMUNITY_TOPICS.has(topic));
@@ -322,20 +318,8 @@ const AskView = ({
       ? offered[0]
       : "";
 
-  const take = (incoming: File[]) => {
-    if (!policy || incoming.length === 0) return;
-    const { kept, dropped } = fitToPolicy([...draft.files, ...incoming], policy);
-    setHelpDraft({ files: kept });
-    if (dropped.length > 0) {
-      toast.info(
-        t("evidence.dropped", {
-          count: dropped.length,
-          names: listFormat(undefined, { type: "conjunction" }).format(dropped.map((f) => f.name)),
-        })
-      );
-    }
-  };
-  const { dragging, handlers } = useFileDrop(Boolean(policy?.max_files), take);
+  // A screenshot pasted into what is being written is attached, as though chosen.
+  const box = useRef<HTMLTextAreaElement>(null);
 
   const file = useFileTicket({
     onSuccess: () =>
@@ -370,16 +354,9 @@ const AskView = ({
   return (
     <>
       <PanelHeader title={t("help.panel.askTeam")} onBack={() => updateHelp({ view: "search" })} />
-      <div
-        {...handlers}
-        className="relative grid min-h-0 flex-1 content-start gap-3 overflow-y-auto px-4 pb-3"
-      >
-        {dragging ? (
-          <div className="pointer-events-none absolute inset-1 z-10 grid place-items-center rounded-xl border-2 border-primary border-dashed bg-background/85 font-medium text-sm">
-            {t("help.panel.drop")}
-          </div>
-        ) : null}
+      <div className="grid min-h-0 flex-1 content-start gap-3 overflow-y-auto px-4 pb-3">
         <Textarea
+          ref={box}
           autoFocus
           value={draft.text}
           onChange={(event) => setHelpDraft({ text: event.target.value })}
@@ -387,13 +364,6 @@ const AskView = ({
             if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
               event.preventDefault();
               send();
-            }
-          }}
-          onPaste={(event) => {
-            const pasted = Array.from(event.clipboardData.files);
-            if (pasted.length > 0) {
-              event.preventDefault();
-              take(pasted);
             }
           }}
           aria-label={t("help.bodyLabel")}
@@ -406,6 +376,7 @@ const AskView = ({
           files={draft.files}
           onChange={(files) => setHelpDraft({ files })}
           disabled={file.isPending}
+          takeFrom={box}
         />
         {offered.length > 1 ? (
           <div className="grid gap-2">
@@ -436,34 +407,12 @@ const AskView = ({
         ) : null}
       </div>
       <div className="grid gap-2 border-t py-3 pr-3 pl-4">
-        <div className="flex items-center gap-2 text-muted-foreground text-xs">
-          <span className="min-w-0 flex-1">
-            {draft.sendContext ? t("help.panel.sendsContext") : t("help.panel.sendsNoContext")}
-          </span>
-          <Button
-            variant="link"
-            size="sm"
-            className="h-auto p-0 text-muted-foreground text-xs"
-            onClick={() => setShowContext((shown) => !shown)}
-            aria-expanded={showContext}
-          >
-            {showContext ? t("help.panel.hideContext") : t("help.panel.showContext")}
-          </Button>
-          <Switch
-            checked={draft.sendContext}
-            onCheckedChange={(checked) => setHelpDraft({ sendContext: checked })}
-            aria-label={t("help.panel.contextSwitch")}
-          />
-        </div>
-        {showContext ? (
-          <DeviceContextFields
-            context={context}
-            className={cn(
-              "rounded-md bg-muted p-2",
-              !draft.sendContext && "line-through opacity-50"
-            )}
-          />
-        ) : null}
+        <DeviceContextSwitch
+          context={context}
+          included={draft.sendContext}
+          onIncludedChange={(sendContext) => setHelpDraft({ sendContext })}
+          disabled={file.isPending}
+        />
         <div className="flex items-center gap-2">
           <span className="min-w-0 flex-1 text-muted-foreground text-xs">
             {held ?? t("help.panel.sendShortcut")}

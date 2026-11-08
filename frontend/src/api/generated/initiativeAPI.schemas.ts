@@ -12718,11 +12718,11 @@ export const FeedbackTopic = {
   idea: "idea",
   problem: "problem",
   praise: "praise",
-  other: "other",
 } as const;
 
 /**
- * Telling whoever runs this server what somebody thinks.
+ * Telling the team what somebody thinks: an idea, something that got in
+ * their way, or what they love.
  */
 export interface FeedbackTicketCreate {
   stream: "feedback";
@@ -12732,6 +12732,7 @@ export interface FeedbackTicketCreate {
    * @maxLength 5000
    */
   body: string;
+  contactable?: boolean;
   context?: DeviceContext | null;
 }
 

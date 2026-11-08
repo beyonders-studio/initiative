@@ -7,7 +7,7 @@
 
 import { Capacitor } from "@capacitor/core";
 import { useMatches } from "@tanstack/react-router";
-import { X } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { DeviceContext } from "@/api/generated/initiativeAPI.schemas";
@@ -15,6 +15,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Button } from "@/ui/button";
 import { useWidthClass } from "@/ui/lib/useWidthClass";
 import { cn } from "@/ui/lib/utils";
+import { Switch } from "@/ui/switch";
 
 /** The fields, in the order they are shown. */
 const FIELDS = ["app_version", "platform", "locale", "theme", "route", "viewport"] as const;
@@ -46,48 +47,61 @@ export const useDeviceContext = (): DeviceContext => {
   };
 };
 
-/** The fields as a list, each labelled. */
-export const DeviceContextFields = ({
+/**
+ * One line saying whether the device's details go with it, a switch to leave
+ * them out, and a look at what they are.
+ */
+export const DeviceContextSwitch = ({
   context,
-  className,
+  included,
+  onIncludedChange,
+  disabled,
 }: {
   context: DeviceContext;
-  className?: string;
+  included: boolean;
+  onIncludedChange: (included: boolean) => void;
+  disabled?: boolean;
 }) => {
   const { t } = useTranslation("intake");
-  const shown = FIELDS.filter((field) => context[field]);
+  const [seeing, setSeeing] = useState(false);
   return (
-    <dl className={cn("grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs", className)}>
-      {shown.map((field) => (
-        <div key={field} className="contents">
-          <dt className="text-muted-foreground">{t(`feedback.context.fields.${field}`)}</dt>
-          <dd className="break-all font-mono">{context[field]}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-};
-
-export interface DeviceContextPreviewProps {
-  context: DeviceContext;
-  onRemove: () => void;
-}
-
-/** What will be sent, in a box of its own, removed with one click. */
-export const DeviceContextPreview = ({ context, onRemove }: DeviceContextPreviewProps) => {
-  const { t } = useTranslation("intake");
-  if (!FIELDS.some((field) => context[field])) return null;
-  return (
-    <div className="space-y-2 rounded-md border p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="font-medium text-sm">{t("feedback.context.title")}</p>
-        <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
-          <X className="h-4 w-4" aria-hidden="true" />
-          {t("feedback.context.remove")}
+    <>
+      <div className="flex items-center gap-2 text-muted-foreground text-xs">
+        <Switch
+          checked={included}
+          onCheckedChange={onIncludedChange}
+          aria-label={t("feedback.context.switch")}
+          disabled={disabled}
+        />
+        <span className="min-w-0 flex-1">
+          {included ? t("feedback.context.on") : t("feedback.context.off")}
+        </span>
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="h-auto p-0 text-muted-foreground text-xs"
+          aria-expanded={seeing}
+          onClick={() => setSeeing(!seeing)}
+        >
+          {seeing ? t("feedback.context.hide") : t("feedback.context.show")}
         </Button>
       </div>
-      <p className="text-muted-foreground text-xs">{t("feedback.context.help")}</p>
-      <DeviceContextFields context={context} />
-    </div>
+      {seeing ? (
+        <dl
+          className={cn(
+            "grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 rounded-md bg-muted p-2 text-xs",
+            !included && "line-through opacity-50"
+          )}
+        >
+          {FIELDS.filter((field) => context[field]).map((field) => (
+            <div key={field} className="contents">
+              <dt className="text-muted-foreground">{t(`feedback.context.fields.${field}`)}</dt>
+              <dd className="break-all font-mono">{context[field]}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+    </>
   );
 };
