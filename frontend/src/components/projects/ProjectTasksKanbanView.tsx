@@ -41,7 +41,7 @@ import { useTaskTypeChange } from "@/hooks/useTaskTypeChange";
 import { cardOf } from "@/lib/layouts/draft";
 import { withDisplays } from "@/lib/layouts/fields";
 import { boardBands } from "@/lib/layouts/grouping";
-import { pluginFields, usePluginsOnItems } from "@/lib/layouts/plugins";
+import { pluginFields, pluginParts, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { TASK_LIST_SHAPE, taskFields } from "@/lib/layouts/tasks";
 import { type LayoutContext, type LayoutNode, namesField } from "@/lib/layouts/tree";
 import { Badge } from "@/ui/badge";
@@ -209,7 +209,7 @@ export const ProjectTasksKanbanView = ({
   const view = useMemo<LayoutContext>(
     () => ({
       fields,
-      plugins,
+      parts: pluginParts(plugins),
       card,
       variant: "card",
       env,

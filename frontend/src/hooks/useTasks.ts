@@ -57,12 +57,12 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   type FieldSaveKind,
   type FieldSaveOptions,
-  type ItemEdit,
   useItemFieldSave,
   useShownWithPending,
 } from "@/hooks/useFieldSave";
 import { chipKey } from "@/hooks/useSmartChips";
 import { fetchAllPages } from "@/lib/fetchAllPages";
+import type { ItemEdit } from "@/lib/layouts/editing";
 import type { GroupMove } from "@/lib/layouts/taskGroupings";
 import { withZone } from "@/lib/recurrence";
 import { chipRef } from "@/lib/smartChips";

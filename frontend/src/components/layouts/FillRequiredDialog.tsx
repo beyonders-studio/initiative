@@ -1,14 +1,10 @@
 import { useTranslation } from "react-i18next";
 
-import type {
-  PropertyDefinitionRead,
-  PropertySummary,
-} from "@/api/generated/initiativeAPI.schemas";
-import { ItemDraftContext } from "@/hooks/useFieldSave";
-import { type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
+import type { PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
+import { type DetailItem, type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
 import { missingRequired, type StoredRegions } from "@/lib/layouts/detailLayout";
+import { ItemDraftContext, useItemDraft, type Written } from "@/lib/layouts/editing";
 import type { LayoutNode } from "@/lib/layouts/tree";
-import type { DialogProps } from "@/types/dialog";
 import { Button } from "@/ui/button";
 import {
   Dialog,
@@ -19,11 +15,7 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 
-import { useItemDraft, type Written } from "./AddItemDialog";
-
-type Item = { id: number; properties: PropertySummary[] };
-
-type FillProps<I extends Item, C, P> = {
+type FillProps<I extends DetailItem, C, P> = {
   detail: DetailKind<I, C, P>;
   /** The item as the change would leave it: of its new type, or in its new
    *  project. */
@@ -47,11 +39,11 @@ type FillProps<I extends Item, C, P> = {
  * page requires that it leaves empty, each drawn with its own editor and
  * nothing saved, then handed to `onConfirm` to send with the change.
  */
-export const FillRequiredDialog = <I extends Item, C, P>({
+export const FillRequiredDialog = <I extends DetailItem, C, P>({
   open,
   onOpenChange,
   ...props
-}: DialogProps & FillProps<I, C, P>) => (
+}: { open: boolean; onOpenChange: (open: boolean) => void } & FillProps<I, C, P>) => (
   <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="@container sm:max-w-2xl">
       <Filling {...props} />
@@ -60,7 +52,7 @@ export const FillRequiredDialog = <I extends Item, C, P>({
 );
 
 // Drawn only while the dialog is open, so each opening starts afresh.
-const Filling = <I extends Item, C, P>({
+const Filling = <I extends DetailItem, C, P>({
   detail,
   item: start,
   context,

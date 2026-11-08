@@ -98,7 +98,8 @@ import {
   carriedCalendarView,
   EMPTY_CALENDAR_VIEW_FILTERS,
 } from "@/lib/filters/calendarFilters";
-import { CALENDAR_PRESETS, type Preset, presetName, presetsOf } from "@/lib/layouts/presets";
+import { CALENDAR_PRESETS } from "@/lib/layouts/events";
+import { type Preset, presetName, presetsOf } from "@/lib/layouts/presets";
 import { getProjectColor } from "@/lib/projectColor";
 import { browserTimezone } from "@/lib/timezones";
 import { eventRoute, taskRoute, toolListRoute, toolSettingsRoute } from "@/lib/tools";

@@ -1,18 +1,14 @@
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  GetLayoutsParams,
-  PropertySummary,
-  PropertyValueInput,
-} from "@/api/generated/initiativeAPI.schemas";
-import { type ItemDraft, ItemDraftContext, type ItemEdit } from "@/hooks/useFieldSave";
+import type { GetLayoutsParams } from "@/api/generated/initiativeAPI.schemas";
 import { useOwnedDefinitions } from "@/hooks/useProperties";
 import { useSetItemLinks } from "@/hooks/useRelationships";
 import { detailLayoutOf, useToolLayouts } from "@/hooks/useToolLayouts";
-import { AddingLinks, type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
+import { type DetailItem, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
 import { missingRequired, requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
-import type { PluginItem } from "@/lib/layouts/plugins";
+import { ItemDraftContext, useItemDraft, type Written } from "@/lib/layouts/editing";
+import { AddingLinks, type InitiativeDetail } from "@/lib/layouts/initiativeExtension";
 import type { LinkedRef } from "@/lib/relationships";
 import type { DialogProps } from "@/types/dialog";
 import { Button } from "@/ui/button";
@@ -26,96 +22,8 @@ import {
 } from "@/ui/dialog";
 import { cn } from "@/ui/lib/utils";
 
-type Item = PluginItem & { properties: PropertySummary[] };
-
-/** An item being added as Add found it: as it is drawn, the fields changed
- *  on it as they are sent, and the properties it is given. */
-export interface Written<I, P> {
-  item: I;
-  fields: Partial<P>;
-  properties: PropertyValueInput[];
-}
-
-/** What a draft holds as its last change left it: read by a handler that can
- *  run in the same event as the change it follows (leaving a field, or Enter
- *  in it), before the render that shows it. */
-interface Held<I, P> {
-  item: I;
-  fields: Partial<P>;
-  values: Map<number, unknown>;
-  holding: Set<string>;
-}
-
-/**
- * An item changed field by field with nothing saved: an item being added, or
- * the fields a change of one asks for. Its fields' saves write into `draft`
- * (as `ItemDraftContext`); `written()` is what it holds, as it is sent.
- */
-export const useItemDraft = <I extends Item, P>(
-  blank: I,
-  { onEdit, onSubmit }: { onEdit?: () => void; onSubmit: () => void }
-) => {
-  const [item, setItem] = useState(blank);
-  // The fields showing a value they cannot take, which sending waits for.
-  const [holding, setHolding] = useState<ReadonlySet<string>>(new Set());
-  const latest = useRef<Held<I, P>>({
-    item,
-    fields: {},
-    values: new Map(),
-    holding: new Set(),
-  });
-  const handlers = useRef({ onEdit, onSubmit });
-  handlers.current = { onEdit, onSubmit };
-  const draft = useMemo<ItemDraft>(
-    () => ({
-      edit: (edit: ItemEdit<unknown, unknown>) => {
-        handlers.current.onEdit?.();
-        const held = latest.current;
-        held.item = { ...held.item, ...(edit.shows as Partial<I>) };
-        if ("patch" in edit) {
-          held.fields = { ...held.fields, ...(edit.patch as Partial<P>) };
-        } else {
-          for (const { property_id, value } of edit.properties.values) {
-            held.values.set(property_id, value);
-          }
-          // A property taken off shows as gone: nothing reads it back.
-          const removed = edit.properties.removed ?? [];
-          for (const id of removed) held.values.delete(id);
-          held.item = {
-            ...held.item,
-            properties: held.item.properties.filter((each) => !removed.includes(each.property_id)),
-          };
-        }
-        setItem(held.item);
-      },
-      submit: () => handlers.current.onSubmit(),
-      hold: (id: string, holds: boolean) => {
-        const held = latest.current.holding;
-        if (held.has(id) === holds) return;
-        if (holds) held.add(id);
-        else held.delete(id);
-        setHolding(new Set(held));
-      },
-      sent: () => latest.current.fields as Record<string, unknown>,
-    }),
-    []
-  );
-  /** What it holds now, as it is sent. A description is named with what it
-   *  was written over, so a change of an item that exists is refused where
-   *  somebody else wrote it meanwhile. */
-  const written = (): Written<I, P> => {
-    const { item: now, fields, values } = latest.current;
-    return {
-      item: now,
-      fields,
-      properties: [...values].map(([property_id, value]) => ({ property_id, value })),
-    };
-  };
-  return { item, holding, latest, draft, written };
-};
-
-type AddItemProps<I extends Item, C, P, R extends { id: number }> = {
-  detail: DetailKind<I, C, P>;
+type AddItemProps<I extends DetailItem, C, P, R extends { id: number }> = {
+  detail: InitiativeDetail<I, C, P>;
   /** The item as it starts, before anything is changed. */
   blank: I;
   context: C;
@@ -141,7 +49,7 @@ type AddItemProps<I extends Item, C, P, R extends { id: number }> = {
  * editor. Nothing is saved until Add, which makes it from everything changed
  * and then writes the links picked; closing the dialog drops it all.
  */
-export const AddItemDialog = <I extends Item, C, P, R extends { id: number }>({
+export const AddItemDialog = <I extends DetailItem, C, P, R extends { id: number }>({
   open,
   onOpenChange,
   ...props
@@ -177,7 +85,7 @@ export const AddItemDialog = <I extends Item, C, P, R extends { id: number }>({
 };
 
 // Drawn only while the dialog is open, so each opening starts blank.
-const Adding = <I extends Item, C, P, R extends { id: number }>({
+const Adding = <I extends DetailItem, C, P, R extends { id: number }>({
   detail,
   blank,
   context,

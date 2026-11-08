@@ -71,7 +71,8 @@ export const LayoutPresets = ({
   // The preset open in the dialog, by its place; null adds one.
   const [open, setOpen] = useState<{ index: number | null } | null>(null);
 
-  const change = (next: Preset<unknown>[]) => edits.changePresets(next.map(storedPreset));
+  const change = (next: Preset<unknown>[]) =>
+    edits.changePresets(next.map((preset) => storedPreset(preset, of.kind)));
   const move = (index: number, by: number) => {
     const next = [...presets];
     const [moved] = next.splice(index, 1);
@@ -209,7 +210,7 @@ const PresetDialog = ({
   of: EditablePresets;
   fields: ReadonlyMap<string, FieldDef>;
   onClose: () => void;
-  onSubmit: (name: string, filters: unknown, sorting: Preset["sorting"]) => void;
+  onSubmit: (name: string, filters: unknown, sorting: Preset<unknown>["sorting"]) => void;
 }) => {
   const { t } = useTranslation([...LAYOUT_NAMESPACES, "common"]);
   const translate = t as TranslateFn;

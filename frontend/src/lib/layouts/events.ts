@@ -1,7 +1,9 @@
 import type { PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
+import { type CalendarFilters, calendarFiltersFromStored } from "@/lib/filters/calendarFilters";
 
 import { at, detailLayoutSpec, type Region } from "./detailLayout";
 import { type FieldDef, type FieldKind, propertyFields } from "./fields";
+import type { PresetKind } from "./presets";
 import type { LayoutNode } from "./tree";
 
 /** An event's fields, each with its label's key and, where it is one, the
@@ -90,3 +92,9 @@ export const EVENT_LAYOUT = detailLayoutSpec({
   // Its dates are never empty.
   requiredParts: [],
 });
+
+/** The initiative calendar's presets, which ships none. */
+export const CALENDAR_PRESETS: PresetKind<CalendarFilters> = {
+  shipped: [],
+  read: calendarFiltersFromStored,
+};

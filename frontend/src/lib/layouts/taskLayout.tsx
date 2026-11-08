@@ -24,7 +24,6 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { CommentSection } from "@/components/comments/CommentSection";
 import { usePersonMention } from "@/components/comments/usePersonMention";
-import type { Written } from "@/components/layouts/AddItemDialog";
 import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import type { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
@@ -41,7 +40,6 @@ import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useActorName } from "@/hooks/useActorName";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { useComments, useCommentsCache, useCommentThreadState } from "@/hooks/useComments";
-import { ItemDraftContext, type ItemEdit } from "@/hooks/useFieldSave";
 import { useFillRequired } from "@/hooks/useFillRequired";
 import { useOwnedDefinitions } from "@/hooks/useProperties";
 import { useSmartTitle, useSmartTitlesOn } from "@/hooks/useSmartTitle";
@@ -67,7 +65,6 @@ import { referenceRef } from "@/lib/smartChips";
 import { type Applied, NOTHING_APPLIED, readingEdit } from "@/lib/smartTaskTitle";
 import { PRIORITY_ORDER } from "@/lib/sorting";
 import { startedFrom, startsWith } from "@/lib/taskTypeStart";
-import { taskRoute } from "@/lib/tools";
 import {
   getAvatarSrc,
   getInitialsForUser,
@@ -85,7 +82,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 import { DescriptionField } from "./DescriptionField";
-import { type DetailKind, useItemContext } from "./DetailLayoutView";
+import { useItemContext } from "./DetailLayoutView";
 import {
   filledBy,
   hasAny,
@@ -95,9 +92,18 @@ import {
   type StoredRegions,
   sentOr,
 } from "./detailLayout";
-import { FieldFrame, sameIds, sameJson, useFieldDraft } from "./editing";
+import {
+  FieldFrame,
+  ItemDraftContext,
+  type ItemEdit,
+  sameIds,
+  sameJson,
+  useFieldDraft,
+  type Written,
+} from "./editing";
 import { TitleField, type TypeaheadField } from "./fieldEditors";
 import { PROPERTY_FIELD_PREFIX } from "./fields";
+import { type InitiativeDetail, useInitiativeExtension } from "./initiativeExtension";
 import { TASK_LAYOUT, taskFields, taskLayoutFor } from "./tasks";
 
 /** What the task's detail shares with its parts, beside the task itself. */
@@ -853,7 +859,7 @@ const Comments = ({ task }: { task: TaskRead }) => {
 
 /** A task's detail: its fields, its own parts and where it lives. A task is
  *  addressed inside its project, so that is the tool its links refresh. */
-export const TASK_DETAIL: DetailKind<TaskRead, TaskLayoutContext, TaskUpdate> = {
+export const TASK_DETAIL: InitiativeDetail<TaskRead, TaskLayoutContext, TaskUpdate> = {
   spec: TASK_LAYOUT,
   // Each type of task has its own page, drawn as its shape until it is changed.
   typed: {
@@ -894,7 +900,7 @@ export const TASK_DETAIL: DetailKind<TaskRead, TaskLayoutContext, TaskUpdate> = 
     },
     actions: context.actions,
   }),
-  taskRoute: (task, context, taskId) => taskRoute(context.initiativeId, task.project_id, taskId),
+  useExtension: useInitiativeExtension,
   Shell: TaskShell,
   addingParts: ["status", "dates"],
   // The type picks the page the rest is laid out as.

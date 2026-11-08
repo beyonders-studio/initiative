@@ -49,9 +49,9 @@ import { pageParts, type StoredRegions } from "@/lib/layouts/detailLayout";
 import { columnsOf } from "@/lib/layouts/draft";
 import { catalogChoices, viewGrouping } from "@/lib/layouts/grouping";
 import { pluginFields, shippedPluginParts, usePluginsOnItems } from "@/lib/layouts/plugins";
-import { type Preset, presetsOf, TASK_PRESETS } from "@/lib/layouts/presets";
+import { type Preset, presetsOf } from "@/lib/layouts/presets";
 import { BOARD_COLUMNS } from "@/lib/layouts/taskGroupings";
-import { TASK_LIST_SHAPE, taskLayoutFor } from "@/lib/layouts/tasks";
+import { TASK_LIST_SHAPE, TASK_PRESETS, taskLayoutFor } from "@/lib/layouts/tasks";
 
 const readTaskFilters = (raw: unknown) => specFromStored(raw as StoredTaskFilters);
 const TASK_DEFAULTS = { filters: EMPTY_TASK_FILTERS, ...NO_PART_VIEW };
@@ -200,7 +200,7 @@ export function useProjectTaskView({
    *  screen. Which layout they come back to is theirs to pick: a link that
    *  names one does not change it. */
   const applyPreset = useCallback(
-    (next: Preset) => apply({ filters: next.filters, sorting: next.sorting }),
+    (next: Preset<TaskFilterSpec>) => apply({ filters: next.filters, sorting: next.sorting }),
     [apply]
   );
   const { preset, pick: pickPreset } = usePresetLink({
@@ -210,7 +210,7 @@ export function useProjectTaskView({
     scope: `${projectId}:${kind}`,
     apply: applyPreset,
     same: useCallback(
-      (each: Preset) =>
+      (each: Preset<TaskFilterSpec>) =>
         taskFiltersEqual(view.filters, each.filters) && sameSorting(view.sorting, each.sorting),
       [view.filters, view.sorting]
     ),

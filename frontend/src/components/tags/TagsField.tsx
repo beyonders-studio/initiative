@@ -1,6 +1,6 @@
 import type { TagSummary } from "@/api/generated/initiativeAPI.schemas";
-import type { ItemEdit, ItemFieldSave } from "@/hooks/useFieldSave";
-import { FieldFrame } from "@/lib/layouts/editing";
+import type { ItemFieldSave } from "@/hooks/useFieldSave";
+import { FieldFrame, type ItemEdit } from "@/lib/layouts/editing";
 
 import { TagBadgeList } from "./TagBadge";
 import { TagPicker } from "./TagPicker";

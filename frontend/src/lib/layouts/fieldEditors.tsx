@@ -22,7 +22,7 @@ import {
   type PropertySummary,
   type Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { ItemDraftContext, type ItemEdit, type ItemFieldSave } from "@/hooks/useFieldSave";
+import type { ItemFieldSave } from "@/hooks/useFieldSave";
 import { Button } from "@/ui/button";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { host } from "@/ui/host";
@@ -48,7 +48,14 @@ import {
 import { iconForPropertyType } from "@/ui/properties/propertyTypeIcons";
 import { Textarea } from "@/ui/textarea";
 
-import { FieldFrame, ReadField, sameJson, useFieldDraft } from "./editing";
+import {
+  FieldFrame,
+  ItemDraftContext,
+  type ItemEdit,
+  ReadField,
+  sameJson,
+  useFieldDraft,
+} from "./editing";
 
 /**
  * What property editors read and change through, from the page around them

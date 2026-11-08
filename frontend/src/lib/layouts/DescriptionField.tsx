@@ -7,12 +7,7 @@ import { MentionComposer } from "@/components/markdown/MentionComposer";
 import { TaskDescription } from "@/components/tasks/TaskDescription";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  type FieldSaveKind,
-  type FieldSaveOptions,
-  ItemDraftContext,
-  useItemFieldSave,
-} from "@/hooks/useFieldSave";
+import { type FieldSaveKind, type FieldSaveOptions, useItemFieldSave } from "@/hooks/useFieldSave";
 import { usePastedImages } from "@/hooks/usePastedImages";
 import { getHttpStatus } from "@/lib/errorMessage";
 import { currentServerKey } from "@/lib/offlineSession";
@@ -20,7 +15,7 @@ import { getItem, removeItem, setItem } from "@/lib/storage";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 
-import { FieldFrame } from "./editing";
+import { FieldFrame, ItemDraftContext } from "./editing";
 
 /** A description being written, and the one it was written over. */
 interface DescriptionDraft {

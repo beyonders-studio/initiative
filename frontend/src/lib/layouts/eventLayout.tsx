@@ -40,7 +40,6 @@ import {
   useOccurrenceAction,
   useUpdateEventRSVP,
 } from "@/hooks/useCalendarEvents";
-import { ItemDraftContext } from "@/hooks/useFieldSave";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import {
@@ -66,11 +65,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/ui/switch";
 
 import { DescriptionField } from "./DescriptionField";
-import { type DetailKind, useItemContext } from "./DetailLayoutView";
+import { useItemContext } from "./DetailLayoutView";
 import { filledBy, hasAny, hasText, sentOr } from "./detailLayout";
-import { FieldFrame, sameIds, sameJson, useFieldDraft } from "./editing";
+import { FieldFrame, ItemDraftContext, sameIds, sameJson, useFieldDraft } from "./editing";
 import { type EVENT_FIELDS, EVENT_LAYOUT, eventFields } from "./events";
 import { TitleField } from "./fieldEditors";
+import { type InitiativeDetail, useInitiativeExtension } from "./initiativeExtension";
 
 /** What an event's detail shares with its parts, beside the event itself. */
 export interface EventLayoutContext {
@@ -613,7 +613,7 @@ const TagsEditor = ({ item: event, label }: EditorProps) => {
 };
 
 /** An event's detail: its fields, its own parts and where it lives. */
-export const EVENT_DETAIL: DetailKind<CalendarEventRead, EventLayoutContext, EventPatch> = {
+export const EVENT_DETAIL: InitiativeDetail<CalendarEventRead, EventLayoutContext, EventPatch> = {
   spec: EVENT_LAYOUT,
   fields: eventFields,
   namespaces: ["calendars", "common"],
@@ -652,6 +652,7 @@ export const EVENT_DETAIL: DetailKind<CalendarEventRead, EventLayoutContext, Eve
     },
     actions: context.actions,
   }),
+  useExtension: useInitiativeExtension,
 };
 
 /** An event not yet added to `calendar`, over `range`, as its detail draws it

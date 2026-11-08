@@ -24,6 +24,15 @@ import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress"
 import { TaskTypeMark, TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { MentionText } from "@/components/user/MentionText";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
+import {
+  ASSIGNEE_ME,
+  ASSIGNEE_NONE,
+  type StoredTaskFilters,
+  specFromStored,
+  type TaskFilterSpec,
+  tableSortFields,
+  taskTableSorting,
+} from "@/lib/filters/taskFilters";
 import { summarizeStored } from "@/lib/recurrence";
 import { truncateText } from "@/lib/text";
 import { entityRefRoute } from "@/lib/tools";
@@ -43,6 +52,7 @@ import {
   propertyFields,
   TitleField,
 } from "./fields";
+import type { PresetKind } from "./presets";
 import type { LayoutNode } from "./tree";
 
 // A table's title cell carries what the card shows as fields of their own,
@@ -637,4 +647,20 @@ export const taskPageWithFields = (
     side[index] = { ...side[index], children: [...(side[index].children ?? []), ...fields] };
   }
   return { ...stored, side } as DetailLayoutDefinitionInput;
+};
+
+/** A project's lists' presets, which ship three; one a table keeps also
+ *  sorts it. */
+export const TASK_PRESETS: PresetKind<TaskFilterSpec> = {
+  shipped: [
+    {
+      slug: "incomplete",
+      nameKey: "presets.incomplete",
+      filters: { status_categories: ["backlog", "todo", "in_progress"] },
+    },
+    { slug: "unassigned", nameKey: "presets.unassigned", filters: { assignees: [ASSIGNEE_NONE] } },
+    { slug: "mine", nameKey: "presets.mine", filters: { assignees: [ASSIGNEE_ME] } },
+  ],
+  read: (raw) => specFromStored(raw as StoredTaskFilters | undefined),
+  sorting: { read: taskTableSorting, stored: tableSortFields },
 };

@@ -19,9 +19,10 @@ import { Input } from "@/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 import { type COUNTER_FIELDS, COUNTER_LAYOUT, counterFields } from "./counters";
-import { type DetailKind, useItemContext } from "./DetailLayoutView";
+import { useItemContext } from "./DetailLayoutView";
 import { FieldFrame, ReadField, useFieldDraft } from "./editing";
 import { ColorField, TitleField } from "./fieldEditors";
+import { type InitiativeDetail, useInitiativeExtension } from "./initiativeExtension";
 
 /** What a counter's detail shares with its parts, beside the counter itself. */
 export interface CounterLayoutContext {
@@ -221,7 +222,7 @@ const Count = ({ counter }: { counter: CounterRead }) => {
 };
 
 /** A counter's detail: its fields, its count and where it lives. */
-export const COUNTER_DETAIL: DetailKind<CounterRead, CounterLayoutContext, CounterUpdate> = {
+export const COUNTER_DETAIL: InitiativeDetail<CounterRead, CounterLayoutContext, CounterUpdate> = {
   spec: COUNTER_LAYOUT,
   fields: counterFields,
   namespaces: ["counterGroups", "common"],
@@ -247,6 +248,7 @@ export const COUNTER_DETAIL: DetailKind<CounterRead, CounterLayoutContext, Count
     },
     actions: context.actions,
   }),
+  useExtension: useInitiativeExtension,
 };
 
 /** A counter not yet added, in `color`, as its detail draws it while it is. */

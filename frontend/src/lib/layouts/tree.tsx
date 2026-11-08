@@ -1,4 +1,4 @@
-import { Fragment, memo, type ReactNode } from "react";
+import { Fragment, memo, type ReactNode, useMemo } from "react";
 
 import { cn } from "@/ui/lib/utils";
 import { nonEmptyPropertySummaries } from "@/ui/properties/propertyHelpers";
@@ -12,7 +12,6 @@ import {
   type LayoutVariant,
   propertyFieldId,
 } from "./fields";
-import { type PluginItem, type PluginOnItems, PluginPartView } from "./plugins";
 import { Section } from "./section";
 
 /** A view as data: a registered part, its props, and what it holds. The same
@@ -26,10 +25,11 @@ export type LayoutNode = {
 /** What every item in one view shares. Made once per view, not per item, so
  *  the memoized items skip re-rendering until it changes. */
 export type LayoutContext = {
-  /** In order: built-ins, properties in definition order, then plug-ins'. */
+  /** In order: built-ins, properties in definition order, then those added
+   *  beside them. */
   fields: ReadonlyMap<string, FieldDef>;
-  /** The plug-ins whose parts a tree may place, by install. */
-  plugins?: ReadonlyMap<number, PluginOnItems>;
+  /** Parts its kind adds to those a card is drawn with, by node type. */
+  parts?: Parts<LayoutItem>;
   /** A board's card. */
   card?: LayoutNode;
   /** While the view is edited: the path of each part of its tree. */
@@ -224,16 +224,6 @@ export const LAYOUT_PARTS = {
   header: region("space-y-2 canvas-md:col-span-2"),
   main: column("canvas-md:col-start-1 canvas-md:row-start-2 canvas-md:gap-6"),
   side: column("canvas-md:col-start-2 canvas-md:row-start-2 canvas-md:gap-4"),
-  /** One of a plug-in's parts, on whatever kind of item the plug-ins were
-   *  read for. */
-  plugin: <I,>(node: LayoutNode, item: I, view: LayoutContext) => (
-    <PluginPartView
-      plugins={view.plugins}
-      pluginId={Number(node.props?.plugin)}
-      partId={String(node.props?.part)}
-      item={item as PluginItem}
-    />
-  ),
   /** A bordered group of parts, titled in the initiative's own words. */
   section: <I,>(node: LayoutNode, item: I, view: LayoutContext, parts: Parts<I>) => (
     <Section
@@ -284,5 +274,6 @@ export const LayoutTree = memo(function LayoutTree({
   item: LayoutItem;
   view: LayoutContext;
 }) {
-  return renderNode(node, item, view, PARTS);
+  const parts = useMemo(() => (view.parts ? { ...PARTS, ...view.parts } : PARTS), [view.parts]);
+  return renderNode(node, item, view, parts);
 });
