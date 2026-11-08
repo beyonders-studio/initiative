@@ -9,7 +9,11 @@ const mutate = vi.hoisted(() => vi.fn());
 const listed = vi.hoisted(() => ({
   pages: [
     {
-      total: 1,
+      total_count: 1,
+      page: 1,
+      page_size: 50,
+      has_next: false,
+      has_prev: false,
       statuses: [
         { id: 1, name: "Under consideration", color: "#F59E0B", category: "todo" },
         { id: 2, name: "Shipped", color: "#10B981", category: "done" },

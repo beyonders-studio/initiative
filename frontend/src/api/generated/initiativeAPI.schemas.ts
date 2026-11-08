@@ -7216,8 +7216,12 @@ export interface IdeaRead {
  * A page of the published ideas, and every status of the board.
  */
 export interface IdeaListRead {
+  total_count: number;
+  page: number;
+  page_size: number;
+  has_next: boolean;
+  has_prev: boolean;
   items: IdeaRead[];
-  total: number;
   statuses: IdeaStatusRead[];
 }
 
@@ -12926,7 +12930,7 @@ export type GetChangelogParams = {
 export type GetBundleManifest200 = { [key: string]: unknown };
 
 export type ListIdeasParams = {
-  q?: string | null;
+  search?: string | null;
   status_id?: number | null;
   voted?: boolean;
   sort?: IdeaSort;

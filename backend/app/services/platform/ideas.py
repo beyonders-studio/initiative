@@ -211,23 +211,23 @@ def _escape_like(text: str) -> str:
 async def list_ideas(
     user: Optional[User],
     *,
-    q: Optional[str] = None,
+    search: Optional[str] = None,
     status_id: Optional[int] = None,
     voted_only: bool = False,
     sort: IdeaSort = IdeaSort.votes,
     page: int = 1,
     page_size: int = 50,
 ) -> IdeaPage:
-    """The published ideas: the ones whose title holds ``q`` (case aside), in
+    """The published ideas: the ones whose title holds ``search`` (case aside), in
     ``status_id``, or that the reader voted for, as asked; most voted or newest
     first."""
     async with _as_reader(user) as session:
         if session is None:
             raise IdeaNotFound
         query, votes, voted = _ideas_query(user)
-        if q and q.strip():
+        if search and search.strip():
             query = query.where(
-                Task.title.ilike(f"%{_escape_like(q.strip())}%", escape="\\")  # type: ignore[attr-defined]
+                Task.title.ilike(f"%{_escape_like(search.strip())}%", escape="\\")  # type: ignore[attr-defined]
             )
         if status_id is not None:
             query = query.where(Task.task_status_id == status_id)

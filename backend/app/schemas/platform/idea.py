@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from app.schemas.base import SanitizedBaseModel
+from app.schemas.query import PageMeta
 
 
 class IdeaStatusRead(SanitizedBaseModel):
@@ -35,9 +36,8 @@ class IdeaRead(SanitizedBaseModel):
     description: Optional[str] = None
 
 
-class IdeaListRead(SanitizedBaseModel):
+class IdeaListRead(PageMeta):
     """A page of the published ideas, and every status of the board."""
 
     items: List[IdeaRead]
-    total: int
     statuses: List[IdeaStatusRead]
