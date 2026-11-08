@@ -150,7 +150,6 @@
       "daysOption_other": "Die nächsten {{count}} Tage",
       "empty_one": "Heute steht nichts an.",
       "empty_other": "In den nächsten {{count}} Tagen steht nichts an.",
-      "loadError": "Was demnächst ansteht, konnte nicht geladen werden.",
       "openCalendar": "Meinen Kalender öffnen"
     },
     "calendar": {
@@ -168,7 +167,6 @@
       "toolsHint": "Beide Listen auf diese Arten von Tools beschränken. Leer lassen für alle.",
       "emptyViewed": "Noch nichts geöffnet. Projekte, Dateien und alles andere erscheinen hier, sobald du sie angesehen hast.",
       "emptyChanged": "Zuletzt hat sich nichts geändert.",
-      "loadError": "Konnte nicht geladen werden.",
       "openTools": "Meine Tools öffnen"
     },
     "bookmarks": {
@@ -176,8 +174,7 @@
       "titleIn": "Lesezeichen: {{tool}}",
       "description": "Alles, wofür du ein Lesezeichen gesetzt hast, aus jeder Community, nur einen Klick entfernt.",
       "toolsHint": "Nur diese Arten von Tools anzeigen. Leer lassen für alle.",
-      "empty": "Noch keine Lesezeichen. Setze auf der Seite eines Projekts, einer Datei oder von etwas anderem ein Lesezeichen, dann wartet es hier auf dich.",
-      "loadError": "Deine Lesezeichen konnten nicht geladen werden."
+      "empty": "Noch keine Lesezeichen. Setze auf der Seite eines Projekts, einer Datei oder von etwas anderem ein Lesezeichen, dann wartet es hier auf dich."
     },
     "activity": {
       "title": "Aktivität",
@@ -196,7 +193,6 @@
     "progress": {
       "title": "Mein Fortschritt",
       "description": "Deine Serie, deine Woche und wie viel pünktlich fertig wird.",
-      "loadError": "Dein Fortschritt konnte nicht geladen werden.",
       "streak_one": "{{count}} Tag",
       "streak_other": "{{count}} Tage",
       "firstTask": "Erledige deine erste Aufgabe, um eine Serie zu beginnen."
@@ -258,7 +254,6 @@
   "marketplace": {
     "browse": "Marktplatz durchstöbern",
     "by": "von {{publisher}}",
-    "loadError": "Die Layouts aus dem Marktplatz konnten nicht geladen werden.",
     "empty": "Im Marktplatz gibt es noch keine Layouts."
   },
   "store": {
@@ -273,7 +268,6 @@
     "description": "Jedes Banner, das du hast, kann oben in dieser Ansicht stehen, und jede Ansicht kann ein anderes tragen.",
     "useProfile": "Mein Profilbanner verwenden",
     "none": "Kein Banner",
-    "more": "Mehr Banner holen",
-    "loadError": "Deine Banner konnten nicht geladen werden."
+    "more": "Mehr Banner holen"
   }
 }

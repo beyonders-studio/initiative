@@ -53,7 +53,6 @@
   "noContactsDescription": "Gardez les personnes et entreprises pour qui ou avec qui vous travaillez : le client, le lieu, le fournisseur. Liez-les aux tâches, événements et fichiers dont ils font partie.",
   "createFirst": "Ajouter le premier contact",
   "loading": "Chargement des contacts...",
-  "loadError": "Impossible de charger les contacts.",
   "error": "Une erreur s’est produite",
   "notFound": "Contact introuvable",
   "notFoundDescription": "Le contact que vous cherchez n’existe pas ou a été supprimé.",

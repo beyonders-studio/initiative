@@ -26,7 +26,7 @@
  */
 
 import { useNavigate } from "@tanstack/react-router";
-import { Download, Loader2 } from "lucide-react";
+import { Download } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -53,6 +53,7 @@ import {
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 
 export interface InstallPluginDialogProps extends DialogProps {
@@ -309,10 +310,9 @@ function InitiativePicker({
 
   if (initiatives.isLoading) {
     return (
-      <div className="flex items-center gap-2 border-l pl-4 text-muted-foreground text-sm">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        {t("common:loading")}
-      </div>
+      <SkeletonRegion className="border-l pl-4">
+        <SkeletonLines lines={3} />
+      </SkeletonRegion>
     );
   }
 

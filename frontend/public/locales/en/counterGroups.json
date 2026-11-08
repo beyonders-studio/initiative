@@ -39,7 +39,6 @@
   "more": "More actions",
   "error": "Something went wrong",
   "loading": "Loading counters...",
-  "loadError": "Failed to load counters.",
   "loadingGroup": "Loading counter group...",
   "creating": "Creating...",
   "saving": "Saving...",

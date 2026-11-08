@@ -41,8 +41,6 @@
     "expand": "Expand activity sidebar",
     "collapse": "Collapse activity sidebar"
   },
-  "loading": "Loading…",
-  "loadError": "Failed to load this tool. Please try again later.",
   "communityWide": "Community-wide",
   "searchPlaceholder": "Search by name…",
   "empty": {
@@ -81,8 +79,7 @@
       "open": "Open to all community members",
       "request": "Joins by request",
       "private": "Invite only"
-    },
-    "loadError": "We couldn't load what this community has on offer. Please try again later."
+    }
   },
   "columns": {
     "name": "Name",
@@ -128,7 +125,6 @@
   },
   "recentComments": {
     "noComments": "No comments yet",
-    "loadError": "Failed to load recent comments. Please try again later.",
     "unknownAuthor": "Unknown",
     "onEntity": "on {{entityName}}",
     "inProject": "in {{projectName}}",
@@ -139,7 +135,6 @@
     "title": "Coming up",
     "description": "Everything in the community with a date in the next seven days.",
     "empty": "Nothing coming up this week",
-    "loadError": "Failed to load what's coming up. Please try again later.",
     "today": "Today",
     "tomorrow": "Tomorrow",
     "kind": {

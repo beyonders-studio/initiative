@@ -2,18 +2,12 @@
  * `/settings/task-statuses` — the columns this project's tasks move through.
  */
 
-import { useParams } from "@tanstack/react-router";
-
 import { ProjectTaskStatusesManager } from "@/components/projects/ProjectTaskStatusesManager";
 import { useProject } from "@/hooks/useProjects";
+import { useRouteId } from "@/hooks/useRouteId";
 
 export const ProjectSettingsTaskStatusesPage = () => {
-  const { projectId } = useParams({ strict: false }) as { projectId?: string };
-  const parsedId = projectId ? Number(projectId) : Number.NaN;
-  const isValidId = Number.isFinite(parsedId);
-
-  const projectQuery = useProject(isValidId ? parsedId : null);
-  const project = projectQuery.data;
+  const project = useProject(useRouteId("projectId")).data;
 
   if (!project) return null;
 

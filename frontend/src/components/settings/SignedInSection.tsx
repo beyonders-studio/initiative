@@ -27,6 +27,8 @@ import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 const KIND_ICONS = {
   [Kind.mobile]: Smartphone,
@@ -133,9 +135,11 @@ export const SignedInSection = () => {
       description={t("security.signedInDescription")}
     >
       {sessionsQuery.isLoading ? (
-        <p className="text-muted-foreground text-sm">{t("security.loadingDevices")}</p>
+        <SkeletonRegion>
+          <ListSkeleton rows={2} />
+        </SkeletonRegion>
       ) : sessionsQuery.isError ? (
-        <p className="text-destructive text-sm">{t("security.devicesError")}</p>
+        <StatusMessage onRetry={sessionsQuery.refetch} />
       ) : sessions.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-6 text-center text-muted-foreground">
           <MonitorSmartphone className="h-10 w-10 opacity-50" />

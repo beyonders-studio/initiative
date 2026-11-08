@@ -26,6 +26,7 @@ import { Button } from "@/ui/button";
 import { Card, CardHeader, CardTitle } from "@/ui/card";
 import { atLeast, useRegionWidthClass } from "@/ui/lib/useWidthClass";
 import { cn } from "@/ui/lib/utils";
+import { EditorSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
 import { Skeleton } from "@/ui/skeleton";
 
@@ -93,7 +94,11 @@ export const WikiFileView = () => {
   }
 
   if (!wiki) {
-    return <p className="p-6 text-muted-foreground text-sm">{t("pages.loading")}</p>;
+    return (
+      <SkeletonRegion className="p-6">
+        <EditorSkeleton />
+      </SkeletonRegion>
+    );
   }
 
   const fileRef = { type: SearchEntityType.file, id: fileId };

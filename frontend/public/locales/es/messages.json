@@ -56,7 +56,6 @@
   "recipientHasNoDevice": "{{name}} todavía no ha configurado los mensajes cifrados, así que no se pudo entregar.",
   "peerDevicesChanged": "Los dispositivos de {{name}} han cambiado",
   "deviceFailed": "No se pudieron configurar los mensajes cifrados en este dispositivo.",
-  "loading": "Cargando…",
   "unsupportedBrowser": "Los mensajes cifrados necesitan una conexión segura y un navegador capaz de ejecutarlos. Comprueba que la dirección empiece por https (o sea localhost), o prueba con la aplicación.",
   "start": {
     "waiting": "Esperando a que acepten. Cuando lo hagan, podréis escribiros.",

@@ -40,8 +40,10 @@ import {
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { StatusMessage } from "@/ui/status-message";
 
 /** The dialog's answers, as its fields hold them. A rule being edited keeps
  *  its id; a new one has none. */
@@ -158,14 +160,11 @@ export const CustomRoleClaimRulesSection = ({ communityId }: { communityId: numb
         <p className="text-muted-foreground text-sm">{t("customRoleRules.closed")}</p>
       ) : null}
       {rulesQuery.isLoading ? (
-        <p className="text-muted-foreground text-sm">{t("customRoleRules.loading")}</p>
+        <SkeletonRegion>
+          <ListSkeleton rows={3} avatar={false} />
+        </SkeletonRegion>
       ) : rulesQuery.isError ? (
-        <div className="flex flex-wrap items-center gap-3">
-          <p className="text-destructive text-sm">{t("customRoleRules.loadError")}</p>
-          <Button type="button" variant="outline" size="sm" onClick={() => rulesQuery.refetch()}>
-            {t("customRoleRules.retry")}
-          </Button>
-        </div>
+        <StatusMessage onRetry={rulesQuery.refetch} />
       ) : rules.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("customRoleRules.empty")}</p>
       ) : (

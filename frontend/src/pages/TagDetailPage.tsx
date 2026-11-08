@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { TagLoadError, TagToolTab, toolTabCount } from "@/components/tags/TagToolTab";
+import { TagToolTab, toolTabCount } from "@/components/tags/TagToolTab";
 import { useRouteId } from "@/hooks/useRouteId";
 import { useDeleteTag, useTag, useTagCounts, useUpdateTag } from "@/hooks/useTags";
 import { toast } from "@/lib/mascotToast";
@@ -181,7 +181,7 @@ export const TagDetailPage = () => {
       </div>
 
       {!tagCounts && countsFailed ? (
-        <TagLoadError onRetry={() => void refetchCounts()} />
+        <StatusMessage onRetry={refetchCounts} />
       ) : !tagCounts ? (
         <TableSkeleton rows={6} columns={5} />
       ) : selected === null ? (

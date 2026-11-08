@@ -83,11 +83,6 @@
     "sharesIsolated": "Ein anderer Kanal landet ebenfalls in dieser Initiative. Sicherheits- und Moderationsfälle sollten eine eigene Initiative haben, damit nur die Bearbeitenden sie lesen können.",
     "sharesWithIsolated": "Diese Initiative enthält auch Sicherheits- oder Moderationsfälle, die eine eigene Initiative haben sollten. Leite einen der Kanäle woandershin."
   },
-  "loadFailed": {
-    "title": "Diese Einstellungen konnten nicht geladen werden",
-    "description": "Es wurde nichts geändert. Versuche es erneut; wenn es weiter fehlschlägt, steht der Grund im Server-Log.",
-    "retry": "Erneut versuchen"
-  },
   "help": {
     "action": "Hilfe anfordern",
     "panel": {
@@ -157,8 +152,7 @@
     "replyError": "Deine Antwort konnte nicht gesendet werden. Versuche es gleich noch einmal.",
     "closedNote": "Dieses Ticket ist geschlossen. Wenn etwas anderes ansteht, bitte erneut um Hilfe.",
     "noConversation": "Danke für die Meldung. Das Team sieht sich jede an, antwortet hier aber nicht auf Meldungen.",
-    "empty": "Du hast noch keine Tickets eingereicht. Wenn du um Hilfe bittest, erscheint sie hier, damit du sie verfolgen kannst.",
-    "loadError": "Deine Tickets konnten nicht geladen werden."
+    "empty": "Du hast noch keine Tickets eingereicht. Wenn du um Hilfe bittest, erscheint sie hier, damit du sie verfolgen kannst."
   },
   "case": {
     "filedBy": "Eingereicht von",

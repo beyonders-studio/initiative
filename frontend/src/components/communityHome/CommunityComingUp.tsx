@@ -27,6 +27,7 @@ import { dateTimeFormat } from "@/ui/lib/intl";
 import { formatCompactTime } from "@/ui/lib/timeFormat";
 import { cn } from "@/ui/lib/utils";
 import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 
 const DAYS_AHEAD = 7;
 
@@ -189,7 +190,7 @@ export const CommunityComingUp = () => {
             ))}
           </div>
         ) : entriesQuery.isError ? (
-          <p className="text-destructive text-sm">{t("comingUp.loadError")}</p>
+          <StatusMessage onRetry={entriesQuery.refetch} />
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground text-sm">
             <CalendarClock className="h-8 w-8 opacity-50" />

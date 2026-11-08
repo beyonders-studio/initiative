@@ -3,7 +3,6 @@
   "description": "Tout ce à quoi ceci est relié, et comment.",
   "untitled": "Sans titre",
   "empty": "Rien n'est encore lié.",
-  "loadFailed": "Les liens ne répondent pas. Réessaie dans un instant.",
   "add": "Ajouter un lien",
   "graph": {
     "alt": "{{title}} et les {{count}} choses auxquelles il est relié",
@@ -95,7 +94,6 @@
       "option": "est étiqueté"
     }
   },
-  "loading": "Chargement…",
   "empty_task": "Rien n'est encore lié. Lie le fichier qui décrit cette tâche, ou la tâche qui la bloque.",
   "empty_file": "Rien n'est encore lié. Lie le projet que ceci explique, ou la tâche dont il est issu.",
   "empty_project": "Rien n'est encore lié. Joins les fichiers sur lesquels ce projet s'appuie.",

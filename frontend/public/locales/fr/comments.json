@@ -20,7 +20,6 @@
   "formattingSyntax": "Mise en forme",
   "insertEntityMention": "Lier n’importe quoi dans cette initiative",
   "insertUserMention": "Mentionner un membre",
-  "loadError": "Impossible de charger les commentaires pour l'instant.",
   "loadOlder": "Charger les commentaires plus anciens",
   "loading": "Chargement des commentaires...",
   "markdownHint": "Le Markdown est pris en charge : **gras**, *italique*, `code`, listes et liens.",

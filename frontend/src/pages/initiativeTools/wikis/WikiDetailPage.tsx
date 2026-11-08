@@ -13,6 +13,7 @@ import { useCommunityPath } from "@/lib/communityUrl";
 import { toolListRoute, wikiPageRoute } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { EditorSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 /**
  * A wiki, opened.
@@ -56,7 +57,11 @@ export const WikiDetailPage = () => {
   }
 
   if (wikiQuery.isLoading || pagesQuery.isLoading) {
-    return <p className="p-6 text-muted-foreground text-sm">{t("loading")}</p>;
+    return (
+      <SkeletonRegion className="p-6">
+        <EditorSkeleton />
+      </SkeletonRegion>
+    );
   }
 
   // The home page if one was nominated, else the first page in reading order.

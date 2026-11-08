@@ -226,7 +226,7 @@ describe("SettingsIntakePage", () => {
     state.operationsCommunityId = 3;
     renderPage();
 
-    expect(screen.getByText("Could not load these settings")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Community" })).not.toBeInTheDocument();
     expect(
       screen.queryByText("Choose a community above, then say where each stream lands.")
@@ -252,7 +252,7 @@ describe("SettingsIntakePage", () => {
     state.operationsCommunityId = 3;
     renderPage();
 
-    expect(screen.getByText("Could not load these settings")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Community" })).not.toBeInTheDocument();
   });
 

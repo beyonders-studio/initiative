@@ -40,6 +40,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
+import { StatusMessage } from "@/ui/status-message";
 
 // Self-host the PDF.js worker as a same-origin app asset rather than loading it
 // from a CDN. A cross-origin worker URL forces pdf.js to import() it from inside a
@@ -356,11 +357,7 @@ export const UploadedFileViewer = ({
     baseWidth !== null && maxPageWidth !== null ? ((baseWidth - 32) * scale) / maxPageWidth : null;
 
   if (!resolvedUrl || !inlineUrl) {
-    return (
-      <div className="flex items-center justify-center rounded-lg border p-8 text-muted-foreground">
-        <p>{t("viewer.loadError")}</p>
-      </div>
-    );
+    return <StatusMessage />;
   }
 
   // A file shown only as a card is drawn by its kind's mark.

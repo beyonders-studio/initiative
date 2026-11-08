@@ -1,5 +1,7 @@
 {
   "loading": "Loading…",
+  "loadError": "Couldn't load this.",
+  "tryAgain": "Try again",
   "loadMore": "Show more",
   "clear": "Clear",
   "next": "Next",
