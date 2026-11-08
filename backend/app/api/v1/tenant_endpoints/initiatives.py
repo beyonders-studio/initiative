@@ -372,9 +372,13 @@ async def get_initiative_defaults(
     """What the community sets for every initiative in it: each initiative's
     managers see these as set, and may not change them.
 
-    Declared before ``/{initiative_id}`` so the literal path wins the match.
+    A community admin, who sets them, also gets which live initiatives have
+    each one on of their own. Declared before ``/{initiative_id}`` so the
+    literal path wins the match.
     """
-    return await initiatives_service.community_defaults(session)
+    return await initiatives_service.community_defaults(
+        session, with_own=guild_context.is_admin
+    )
 
 
 @router.patch("/defaults", response_model=InitiativeDefaultsRead)

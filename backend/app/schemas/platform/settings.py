@@ -333,6 +333,16 @@ class CommunityClaimRuleCreate(SanitizedBaseModel):
     initiative_role_id: Optional[int] = None
 
 
+class CommunityClaimRuleUpdate(SanitizedBaseModel):
+    """Change what a community's rule matches or where it lands. Its provider
+    is not editable: a rule pointed elsewhere is a different rule."""
+
+    claim_value: Optional[str] = Field(default=None, max_length=500)
+    community_role: Optional[str] = None
+    initiative_id: Optional[int] = None
+    initiative_role_id: Optional[int] = None
+
+
 class CommunityClaimRulesResponse(SanitizedBaseModel):
     """The rules, and whether the providers behind them report groups at all.
 
@@ -403,16 +413,12 @@ class ProviderPlacementRuleCreate(SanitizedBaseModel):
     initiative_role_id: Optional[int] = None
 
 
-class ProviderPlacementRuleUpdate(SanitizedBaseModel):
-    """Change what a rule matches or where it lands. Its provider and its
-    community are not editable: a rule pointed elsewhere is a different rule."""
+class ProviderPlacementRuleUpdate(CommunityClaimRuleUpdate):
+    """Change what a platform rule matches or where it lands, a directory as
+    well as a group. Its community is not editable either."""
 
-    claim_value: Optional[str] = Field(default=None, max_length=500)
     scope_claim: Optional[str] = Field(default=None, max_length=64)
     scope_value: Optional[str] = Field(default=None, max_length=256)
-    community_role: Optional[str] = None
-    initiative_id: Optional[int] = None
-    initiative_role_id: Optional[int] = None
 
 
 CommunityClaimRulesResponse.model_rebuild()

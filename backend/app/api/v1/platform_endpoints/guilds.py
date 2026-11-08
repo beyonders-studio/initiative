@@ -111,6 +111,7 @@ from app.schemas.platform.guild import (
 from app.models.platform.auth_provider import AuthProvider
 from app.core.rules import COMMUNITY_RULES, OPTION_RULES, SignInRequirement
 from app.core.guild_auth_options import CommunityAuthOption
+from app.services.auth import guild_provider_connections as provider_connections
 from app.services.platform import auth_posture
 from app.services.platform import rules
 from app.services.platform import billing_ping
@@ -1199,10 +1200,28 @@ async def _auth_settings_response(
     community = (await rules.community_values(seat_session, [guild_id], applied=False))[
         guild_id
     ]
+    auth_options = sorted(
+        option for option, key in OPTION_RULES.items() if community[key]
+    )
+    # The providers a requirement can name, as the page offers them.
+    provider_ids = (
+        [
+            row.provider_id
+            for row in await provider_connections.list_connections(
+                system_session, guild_id=guild_id
+            )
+            if row.enabled and row.login_ready
+        ]
+        if CommunityAuthOption.providers in auth_options
+        else []
+    )
+    member_figures, guest_figures = await auth_posture.community_figures(
+        system_session, guild_id=guild_id, provider_ids=provider_ids
+    )
     return CommunityAuthSettingsRead(
-        auth_options=sorted(
-            option for option, key in OPTION_RULES.items() if community[key]
-        ),
+        auth_options=auth_options,
+        member_figures=member_figures,
+        guest_figures=guest_figures,
         auth_policy=await _auth_policy_response(system_session, guild_id),
         guest_auth_policy=await _auth_policy_response(
             system_session, guild_id, guest=True

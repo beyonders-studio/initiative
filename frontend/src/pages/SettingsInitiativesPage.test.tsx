@@ -1,9 +1,10 @@
 /**
- * The project-manager picker on Settings › Initiatives.
+ * Settings › Initiatives: the roster and its project-manager picker, and the
+ * rules the community sets for every initiative.
  *
- * This table is a community admin's way into an initiative they have not joined:
- * their sidebar lists only their own memberships, so taking the project manager
- * role here is what brings one into it.
+ * The roster is a community admin's way into an initiative they have not
+ * joined: their sidebar lists only their own memberships, so taking the
+ * project manager role here is what brings one into it.
  */
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -120,7 +121,7 @@ describe("SettingsInitiativesPage project managers", () => {
     render();
 
     expect(await screen.findByRole("combobox", { name: "Project managers" })).toHaveTextContent(
-      "None"
+      "No manager"
     );
     // The headcount is the row's own, not a roster read per row.
     expect(screen.getByText("3 members")).toBeInTheDocument();
@@ -150,7 +151,7 @@ describe("SettingsInitiativesPage project managers", () => {
     render();
 
     expect(await screen.findByRole("combobox", { name: "Project managers" })).toHaveTextContent(
-      "2 managers"
+      "Ada Lovelace and Bo Diddley"
     );
     expect(asked).toEqual([1, 2, 2]);
   });
@@ -209,5 +210,66 @@ describe("SettingsInitiativesPage project managers", () => {
 
     await waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0]).toMatchObject({ method: "DELETE", url: String(ADMIN_ID) });
+  });
+});
+
+describe("SettingsInitiativesPage roster and rules", () => {
+  it("keeps archived initiatives in a view of their own", async () => {
+    stubTable([]);
+    server.use(
+      communityHttp.get("/initiatives/", () =>
+        HttpResponse.json([
+          buildInitiative({ id: INITIATIVE_ID, name: "Apollo" }),
+          buildInitiative({ id: 8, name: "Gemini", archived_at: "2026-01-01T00:00:00Z" }),
+        ])
+      )
+    );
+    const user = userEvent.setup();
+    render();
+
+    expect(await screen.findByText("Apollo")).toBeInTheDocument();
+    expect(screen.queryByText("Gemini")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: /Archived/ }));
+    expect(await screen.findByText("Gemini")).toBeInTheDocument();
+    expect(screen.queryByText("Apollo")).not.toBeInTheDocument();
+  });
+
+  it("lists the community's rules as sentences, and names who a new one changes", async () => {
+    stubTable([]);
+    let saved: unknown;
+    server.use(
+      communityHttp.get("/initiatives/defaults", () =>
+        HttpResponse.json({
+          tools: { contact: false },
+          member_permissions: { create_posts: false },
+          custom_roles: true,
+          own_tools: { calendar: [INITIATIVE_ID] },
+          own_member_permissions: {},
+        })
+      ),
+      communityHttp.patch("/initiatives/defaults", async ({ request }) => {
+        saved = await request.json();
+        return HttpResponse.json({});
+      })
+    );
+    const user = userEvent.setup();
+    render();
+
+    expect(await screen.findByText("Turned off in every initiative.")).toBeInTheDocument();
+    expect(screen.getByText("Members can't create posts.")).toBeInTheDocument();
+
+    // Calendar is the first tool with no rule, in sidebar order.
+    await user.click(screen.getByRole("button", { name: "Add a rule" }));
+    await user.click(await screen.findByRole("radio", { name: "Off in every initiative" }));
+    expect(
+      screen.getByText("Turns Calendar off in Apollo. Nothing in it is deleted.")
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save rule" }));
+    await waitFor(() =>
+      expect(saved).toEqual({
+        tools: { calendar: false },
+        member_permissions: { calendars_enabled: null, create_calendars: null },
+      })
+    );
   });
 });

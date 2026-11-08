@@ -3205,6 +3205,32 @@ export interface CommunityAuthPolicyUpdate {
 }
 
 /**
+ * How many people in one part of a community have never signed in through
+ * one of its providers.
+ */
+export interface CommunityProviderReach {
+  provider_id: number;
+  count: number;
+}
+
+/**
+ * How many people one part of a community holds, and how many of them
+ * hold nothing yet that answers each kind of sign-in rule. Counts only,
+ * never who.
+ *
+ * ``never_through`` counts accounts with no link to a provider at all. A link
+ * the community's narrowing would refuse is not seen here, so each figure is
+ * the fewest a rule naming that provider would ask.
+ */
+export interface CommunityPeopleFigures {
+  total: number;
+  without_factor: number;
+  without_passkey: number;
+  never_through_any: number;
+  never_through: CommunityProviderReach[];
+}
+
+/**
  * Every control on the superadmin seat's Security page, and what the
  * deployment already asks beside them.
  */
@@ -3227,6 +3253,8 @@ export interface CommunityAuthSettingsRead {
   guest_max_days: number | null;
   guest_max_days_by_platform: number;
   set_by_deployment: string[];
+  member_figures: CommunityPeopleFigures;
+  guest_figures: CommunityPeopleFigures;
 }
 
 /**
@@ -3411,6 +3439,17 @@ export interface CommunityClaimRuleRead {
   initiative_name: string | null;
   initiative_role_id: number | null;
   initiative_role_name: string | null;
+}
+
+/**
+ * Change what a community's rule matches or where it lands. Its provider
+ * is not editable: a rule pointed elsewhere is a different rule.
+ */
+export interface CommunityClaimRuleUpdate {
+  claim_value?: string | null;
+  community_role?: string | null;
+  initiative_id?: number | null;
+  initiative_role_id?: number | null;
 }
 
 /**
@@ -5190,6 +5229,15 @@ export interface CustomRoleClaimRuleRead {
   claim_value: string;
   role_id: number;
   position: number;
+}
+
+/**
+ * Change the group a rule reads or the role it gives. Its provider and
+ * its place in the order are not changed here.
+ */
+export interface CustomRoleClaimRuleUpdate {
+  claim_value?: string | null;
+  role_id?: number | null;
 }
 
 export interface CustomRoleCreate {
@@ -7301,6 +7349,8 @@ export interface InitiativeDefaultsRead {
   tools: Partial<Record<Tool, boolean>>;
   member_permissions: Partial<Record<PermissionKey, boolean>>;
   custom_roles: boolean;
+  own_tools: Partial<Record<Tool, number[]>>;
+  own_member_permissions: Partial<Record<PermissionKey, number[]>>;
 }
 
 /**
@@ -10414,16 +10464,16 @@ export interface ProviderPlacementRuleCreate {
 }
 
 /**
- * Change what a rule matches or where it lands. Its provider and its
- * community are not editable: a rule pointed elsewhere is a different rule.
+ * Change what a platform rule matches or where it lands, a directory as
+ * well as a group. Its community is not editable either.
  */
 export interface ProviderPlacementRuleUpdate {
   claim_value?: string | null;
-  scope_claim?: string | null;
-  scope_value?: string | null;
   community_role?: string | null;
   initiative_id?: number | null;
   initiative_role_id?: number | null;
+  scope_claim?: string | null;
+  scope_value?: string | null;
 }
 
 /**

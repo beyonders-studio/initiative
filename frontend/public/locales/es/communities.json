@@ -216,7 +216,6 @@
     "handleColumn": "Identificador",
     "apiAccessColumn": "Acceso por API",
     "apiAccessLabel": "Claves de API personales de {{name}}",
-    "apiAccessHelp": "Si las claves de API personales de esta persona alcanzan esta comunidad. Desactivarlo detiene tanto las claves ya creadas como las nuevas.",
     "apiAccessSaved": "Acceso por API guardado",
     "apiAccessError": "No se pudo guardar el acceso por API"
   },

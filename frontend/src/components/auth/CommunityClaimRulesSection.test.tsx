@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -7,6 +7,7 @@ import { renderWithProviders } from "@/__tests__/helpers/render";
 import type { ProviderPlacementRuleRead } from "@/api/generated/initiativeAPI.schemas";
 
 const createRule = vi.fn();
+const updateRule = vi.fn();
 const deleteRule = vi.fn();
 
 const connection = (providerId: number, name: string) => ({
@@ -23,6 +24,18 @@ const connection = (providerId: number, name: string) => ({
 });
 
 let rules: unknown[] = [];
+const ownRule = {
+  id: 3,
+  provider_id: 11,
+  provider_display_name: "Entra",
+  provider_icon: null,
+  claim_value: "eng-platform",
+  community_role: "member",
+  initiative_id: null,
+  initiative_name: null,
+  initiative_role_id: null,
+  initiative_role_name: null,
+};
 let reportingIds: number[] = [];
 let providerRules: ProviderPlacementRuleRead[] = [];
 let placementEverywhere = false;
@@ -41,7 +54,7 @@ vi.mock("@/hooks/useCommunityAuthPolicy", () => ({
   useCommunityProviderConnections: () => ({ data: connections, isLoading: false }),
   useCreateClaimRule: () => ({ mutate: createRule, isPending: false }),
   useDeleteClaimRule: () => ({ mutate: deleteRule, isPending: false }),
-  useUpdateClaimRule: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateClaimRule: () => ({ mutate: updateRule, isPending: false }),
 }));
 
 vi.mock("@/hooks/useInitiatives", () => ({
@@ -69,6 +82,7 @@ describe("CommunityClaimRulesSection", () => {
     providerRules = [];
     placementEverywhere = false;
     createRule.mockReset();
+    updateRule.mockReset();
     deleteRule.mockReset();
   });
 
@@ -107,30 +121,49 @@ describe("CommunityClaimRulesSection", () => {
 
   it("says when a provider reports no groups, rather than hiding it", async () => {
     reportingIds = [];
-    rules = [
-      {
-        id: 3,
-        provider_id: 11,
-        provider_display_name: "Entra",
-        provider_icon: null,
-        claim_value: "eng-platform",
-        community_role: "member",
-        initiative_id: null,
-        initiative_name: null,
-        initiative_role_id: null,
-        initiative_role_name: null,
-      },
-    ];
+    rules = [ownRule];
     render();
 
     expect(screen.getByText("eng-platform")).toBeInTheDocument();
     expect(screen.getByText(/no groups reported/i)).toBeInTheDocument();
   });
 
-  it("lists the deployment's rules read-only, marking one that is not applying", () => {
-    // Nothing connected: the community cannot write rules of its own, and the
-    // deployment's rules for it are still listed.
-    connections = [];
+  it("edits a rule in the dialog it was added in, its provider shown rather than offered", async () => {
+    const user = userEvent.setup();
+    rules = [ownRule];
+    render();
+
+    await user.click(screen.getByRole("button", { name: "Actions for eng-platform" }));
+    await user.click(screen.getByRole("menuitem", { name: "Edit" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Edit rule")).toBeInTheDocument();
+    expect(within(dialog).getByText("Entra")).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText(/^provider$/i)).not.toBeInTheDocument();
+    const group = within(dialog).getByLabelText(/^group$/i);
+    expect(group).toHaveValue("eng-platform");
+
+    await user.clear(group);
+    await user.type(group, "eng-core");
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    expect(updateRule).toHaveBeenCalledWith(
+      {
+        ruleId: 3,
+        data: {
+          claim_value: "eng-core",
+          community_role: "member",
+          initiative_id: null,
+          initiative_role_id: null,
+        },
+      },
+      expect.anything()
+    );
+    expect(createRule).not.toHaveBeenCalled();
+  });
+
+  it("folds the deployment's rules under their count, marking one that is not applying", async () => {
+    const user = userEvent.setup();
     providerRules = [
       {
         id: 40,
@@ -152,16 +185,19 @@ describe("CommunityClaimRulesSection", () => {
     ];
     render();
 
-    expect(screen.getByText(/set by the deployment/i)).toBeInTheDocument();
+    expect(screen.queryByText("Group eng in idp = acme-adfs")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "1 rule from your server" }));
+
     expect(screen.getByText("Group eng in idp = acme-adfs")).toBeInTheDocument();
-    expect(screen.getByText(/arriving through keycloak/i)).toBeInTheDocument();
+    expect(screen.getByText(/through keycloak/i)).toBeInTheDocument();
     expect(screen.getByText("Not applying")).toBeInTheDocument();
-    // Read-only: the only remove button would be for the community's own rules.
-    expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
+    // Shown, not changed: the only menus are on the community's own rules.
+    expect(screen.queryByRole("button", { name: /actions for/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/applies its placement rules to every community/i)).toBeNull();
   });
 
-  it("says when the deployment applies its rules to every community", () => {
+  it("says when the deployment applies its rules to every community", async () => {
+    const user = userEvent.setup();
     placementEverywhere = true;
     providerRules = [
       {
@@ -183,17 +219,10 @@ describe("CommunityClaimRulesSection", () => {
       },
     ];
     render();
+    await user.click(screen.getByRole("button", { name: "1 rule from your server" }));
 
     expect(screen.getByText("Everybody from idp = acme-adfs")).toBeInTheDocument();
     expect(screen.getByText(/applies its placement rules to every community/i)).toBeInTheDocument();
     expect(screen.queryByText("Not applying")).not.toBeInTheDocument();
-  });
-
-  it("points at the connection when there is nothing to write a rule against", () => {
-    connections = [];
-    render();
-
-    expect(screen.getByText(/connect a provider first/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /add a rule/i })).toBeDisabled();
   });
 });

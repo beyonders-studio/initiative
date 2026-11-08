@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -10,60 +10,80 @@ import type {
   CommunityAuthPolicyRead,
   CommunityAuthPolicyUpdate,
   CommunityAuthSettingsRead,
+  CommunityPeopleFigures,
 } from "@/api/generated/initiativeAPI.schemas";
-import { CommunityAISwitchSection } from "@/components/auth/CommunityAISwitchSection";
 import { CommunityAuthProvidersSection } from "@/components/auth/CommunityAuthProvidersSection";
 import { CommunityClaimRulesSection } from "@/components/auth/CommunityClaimRulesSection";
-import { CommunityEngagementRankingSection } from "@/components/auth/CommunityEngagementRankingSection";
-import { CommunityNotificationPolicySection } from "@/components/auth/CommunityNotificationPolicySection";
-import { ConnectSignInWizard } from "@/components/auth/ConnectSignInWizard";
+import { CommunityPrivacySection } from "@/components/auth/CommunityPrivacySection";
 import { CustomRoleClaimRulesSection } from "@/components/auth/CustomRoleClaimRulesSection";
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
 import {
   useCommunityAuthSettings,
+  useCommunityClaimRules,
   useCommunityLoginProviders,
   useCommunityProviderConnections,
+  useCustomRoleClaimRules,
   useUpdateCommunityAuthSettings,
 } from "@/hooks/useCommunityAuthPolicy";
-import { useServer } from "@/hooks/useServer";
 import { useServerForm } from "@/hooks/useServerForm";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { providerSignInHref } from "@/lib/returnPath";
 import { readOptionalWholeNumber } from "@/lib/text";
-import { Alert, AlertDescription } from "@/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { Checkbox } from "@/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
-import { Switch } from "@/ui/switch";
 
 /**
- * Community sign-in configuration (Settings → Security), in two halves.
+ * Community sign-in configuration (Settings → Security), in four sections.
  *
- * "Who gets in" is the community's own identity provider registry, what the
- * claims arriving on it mean, and the sign-in requirement set against them —
- * sessions reach this community only after signing in through one specific
- * provider; `open` (the default) admits any signed-in session. "On what
- * terms" is what a session is allowed once it is here: how long it lasts and
- * whether a personal API key may be used against the community.
+ * Sign-in rules are what somebody needs before they can open the community:
+ * the members' and the guests' requirement — sessions reach this community
+ * only after signing in through one specific provider, or any of its own;
+ * `open` (the default) admits any signed-in session — a second factor, how
+ * often members sign in again, and how long a guest may stay. Each row states
+ * its current value and changes in a dialog that says who the change reaches.
+ * Then the providers the community counts as its own, what the groups they
+ * report mean here, and what leaves the community.
  */
+
 /** The select's value for "any of ours" — a requirement that names no single
  * provider. Not a number, so it can never collide with a provider id. */
 const ANY_PROVIDER = "any";
 
+/** The rules a Sign-in rules row changes, by the setting each one writes. */
+type SignInRule =
+  | "auth_policy"
+  | "require_second_factor"
+  | "enforce_compliance_session"
+  | "guest_auth_policy"
+  | "guest_max_days";
+
+type EligibleProvider = { id: number; slug: string; display_name: string };
+
 /**
- * What this admin's own session is missing, when saving a requirement is
- * refused because it does not meet the requirement itself. The server names
- * it; a provider is answered by signing in again, a factor of the account's
- * own by presenting it here.
+ * What this admin's own session is missing, when saving a rule is refused
+ * because it does not meet the rule itself. The server names it; a provider is
+ * answered by signing in again, a factor of the account's own by presenting it
+ * here.
  */
-type Unmet = { kind: "provider"; slug: string } | { kind: CommunityFactorKind };
+type Unmet = { kind: "provider"; slug: string; name: string } | { kind: CommunityFactorKind };
 
 /** The two lines each factor needs: what to do, and the button that does it. */
 const FACTOR_COPY = {
@@ -77,71 +97,138 @@ const FACTOR_COPY = {
   },
 } as const;
 
-/** The method the server named on a refusal. Axios lower-cases header keys. */
-const unmetMethod = (error: unknown): string | null => {
-  const named = (error as { response?: { headers?: Record<string, unknown> } }).response?.headers?.[
-    "x-auth-policy-unmet"
-  ];
-  return typeof named === "string" ? named : null;
+/**
+ * What a refused save says this session is missing, or null when the refusal
+ * is about something else. A provider (or "any of ours") is answered by
+ * `provider`; a server that names no method, or a provider this page has no
+ * name for, leaves the refusal its own line to stand on.
+ */
+const readUnmet = (err: unknown, provider?: EligibleProvider): Unmet | null => {
+  const response = (
+    err as {
+      response?: { data?: { detail?: string }; headers?: Record<string, unknown> };
+    }
+  ).response;
+  if (response?.data?.detail !== "AUTH_RULE_SELF_UNSATISFIED") return null;
+  // Axios lower-cases header keys.
+  const method = response.headers?.["x-auth-policy-unmet"];
+  if (method === "totp" || method === "passkey") return { kind: method };
+  if ((method === "provider" || method === "sso") && provider) {
+    return { kind: "provider", slug: provider.slug, name: provider.display_name };
+  }
+  return null;
 };
 
-/**
- * The state behind a switch that saves as it is flipped rather than waiting
- * for a button. The draft is what the switch shows until the saved answer
- * comes back; a failed save drops it and keeps a message.
- */
-const useFlipToSave = (saved: boolean, communityId: number) => {
-  const [state, setState] = useState<{
-    communityId: number;
-    draft: boolean | null;
-    error: string | null;
-  }>({ communityId, draft: null, error: null });
-  const current =
-    state.communityId === communityId ? state : { communityId, draft: null, error: null };
-  return {
-    value: current.draft ?? saved,
-    error: current.error,
-    begin: (next: boolean) => {
-      setState({ communityId, draft: next, error: null });
-    },
-    settle: () => {
-      setState((previous) =>
-        previous.communityId === communityId ? { communityId, draft: null, error: null } : previous
+/** The way to meet a refused rule from here: sign in through the provider it
+ *  names, or present a factor without leaving the page. */
+const UnmetAlert = ({ communityId, unmet }: { communityId: number; unmet: Unmet }) => {
+  const { t } = useTranslation("settings");
+  // The public listing carries the community-addressed login URLs.
+  const loginProviders = useCommunityLoginProviders(communityId, {
+    enabled: communityId > 0 && unmet.kind === "provider",
+  });
+
+  let line: string;
+  let action: ReactNode = null;
+  if (unmet.kind === "provider") {
+    line = t("communityAuth.policy.selfUnsatisfied", { providerName: unmet.name });
+    const entry = loginProviders.data?.providers.find((row) => row.slug === unmet.slug);
+    if (entry) {
+      // Completing the provider's sign-in adds it to this session, after
+      // which saving the rule succeeds.
+      action = (
+        <Button
+          size="sm"
+          onClick={() => {
+            window.location.href = providerSignInHref(
+              entry.login_url,
+              `${window.location.pathname}${window.location.search}`
+            );
+          }}
+        >
+          {t("communityAuth.policy.signInWith", { providerName: unmet.name })}
+        </Button>
       );
-    },
-    fail: (message: string) => {
-      setState((previous) =>
-        previous.communityId === communityId
-          ? { communityId, draft: null, error: message }
-          : previous
-      );
-    },
-  };
+    }
+  } else {
+    const kind = unmet.kind;
+    line = t(FACTOR_COPY[kind].line);
+    // The same dialog every refused request opens, asked for here so a
+    // factor is presented without leaving the rule being written.
+    action = (
+      <Button
+        size="sm"
+        onClick={() =>
+          window.dispatchEvent(
+            new CustomEvent<FactorChallengeDetail>(AUTH_FACTOR_REQUIRED_EVENT, {
+              detail: { communityId, kind },
+            })
+          )
+        }
+      >
+        {t(FACTOR_COPY[kind].button)}
+      </Button>
+    );
+  }
+
+  return (
+    <Alert>
+      <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+        <span>{line}</span>
+        {action}
+      </AlertDescription>
+    </Alert>
+  );
+};
+
+/** What a change reaches once it saves. Nothing to say, nothing shown. */
+const WhenYouSave = ({ lines }: { lines: (string | false | null | undefined)[] }) => {
+  const { t } = useTranslation("settings");
+  const said = lines.filter((line): line is string => Boolean(line));
+  if (said.length === 0) return null;
+  return (
+    <Alert role="note" className="border-transparent bg-muted">
+      <AlertTitle>{t("communityAuth.whenYouSave")}</AlertTitle>
+      <AlertDescription>
+        <ul className="list-disc space-y-1 pl-4">
+          {said.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </AlertDescription>
+    </Alert>
+  );
 };
 
 /**
  * One sign-in requirement: the members' or, with `guest`, the guests'. The two
  * are set the same way; only the members' is asked of whoever saves it.
  */
-const SignInRequirementCard = ({
+const SignInRequirementDialog = ({
   communityId,
+  communityName,
+  open,
+  onOpenChange,
   savedPolicy,
   eligibleProviders,
-  mayConfigureProviders,
+  figures,
   guest = false,
 }: {
   communityId: number;
-  savedPolicy: CommunityAuthPolicyRead | undefined;
-  eligibleProviders: { id: number; slug: string; display_name: string }[];
-  mayConfigureProviders: boolean;
+  communityName: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  savedPolicy: CommunityAuthPolicyRead;
+  eligibleProviders: EligibleProvider[];
+  figures: CommunityPeopleFigures;
   guest?: boolean;
 }) => {
   const { t } = useTranslation(["settings", "common"]);
   const copy = guest ? "communityAuth.guestPolicy" : "communityAuth.policy";
   const idPrefix = guest ? "guest-auth" : "community-auth";
 
-  // Chosen here, saved by the button below — a refetch in between must not
-  // undo the choice.
+  // Chosen here, saved by the footer — a refetch in between must not undo the
+  // choice. Each opening starts from what is saved.
   const form = useServerForm(
     savedPolicy,
     (loaded) => ({
@@ -151,41 +238,45 @@ const SignInRequirementCard = ({
       // single sign-on is the "any of ours" choice below.
       anyProvider: loaded?.provider_id == null && (loaded?.require_methods ?? []).includes("sso"),
       // Orthogonal to the provider choice: a community may ask for its own
-      // sign-in, for a second factor, for a passkey, or for any combination.
+      // sign-in, for a passkey, or for both.
       requirePasskey: (loaded?.require_methods ?? []).includes("passkey"),
     }),
-    communityId
+    [open, communityId]
   );
   const { policy, providerId, anyProvider, requirePasskey } = form.values;
-  const setPolicy = (next: "open" | "required") => form.set({ policy: next });
   const [error, setError] = useState<string | null>(null);
   const [unmet, setUnmet] = useState<Unmet | null>(null);
-
-  // One mutation per control, so each keeps its own pending state and its own
-  // callbacks when two are changed in quick succession.
   const updatePolicy = useUpdateCommunityAuthSettings(communityId);
+
+  const close = () => {
+    onOpenChange(false);
+    setError(null);
+    setUnmet(null);
+  };
 
   const selectedProvider = eligibleProviders.find((entry) => entry.id === providerId);
   const savedAnyProvider =
-    savedPolicy != null &&
-    savedPolicy.provider_id == null &&
-    (savedPolicy.require_methods ?? []).includes("sso");
-  const savedRequirePasskey =
-    savedPolicy != null && (savedPolicy.require_methods ?? []).includes("passkey");
+    savedPolicy.provider_id == null && savedPolicy.require_methods.includes("sso");
+  const savedRequirePasskey = savedPolicy.require_methods.includes("passkey");
   const isDirty =
-    savedPolicy != null &&
-    (policy !== savedPolicy.policy ||
-      (policy === "required" &&
-        (anyProvider !== savedAnyProvider ||
-          requirePasskey !== savedRequirePasskey ||
-          (!anyProvider && providerId !== (savedPolicy.provider_id ?? null)))));
-  // A rule has to ask for something. Any one of the four will do.
+    policy !== savedPolicy.policy ||
+    (policy === "required" &&
+      (anyProvider !== savedAnyProvider ||
+        requirePasskey !== savedRequirePasskey ||
+        (!anyProvider && providerId !== (savedPolicy.provider_id ?? null))));
+  // A rule has to ask for something. Any one of the three will do.
   const canSave = policy === "open" || anyProvider || requirePasskey || providerId != null;
 
+  // The self-unsatisfied challenge is bound to the selection that produced
+  // it: any change invalidates it (otherwise the alert's button could name
+  // one provider while targeting another).
+  const change = (patch: Partial<typeof form.values>) => {
+    form.set(patch);
+    setUnmet(null);
+    setError(null);
+  };
+
   const save = () => {
-    // What is being sent, so a choice changed while this is in flight is not
-    // counted as saved by it.
-    const sent = form.values;
     const rule: CommunityAuthPolicyUpdate =
       policy === "open"
         ? { policy: "open" }
@@ -199,238 +290,273 @@ const SignInRequirementCard = ({
           };
     updatePolicy.mutate(guest ? { guest_auth_policy: rule } : { auth_policy: rule }, {
       onSuccess: () => {
-        setError(null);
-        setUnmet(null);
-        form.settle(sent);
         toast.success(t(`${copy}.saved`));
+        close();
       },
       onError: (err: unknown) => {
-        const detail = (err as { response?: { data?: { detail?: string } } }).response?.data
-          ?.detail;
-        const method = unmetMethod(err);
         // The guests' rule is not asked of its writer, so only the members'
-        // can be refused for this.
-        if (!guest && detail === "AUTH_RULE_SELF_UNSATISFIED") {
-          // A factor of the account's own is presented against the session
-          // already open, so the prompt for it belongs here rather than at
-          // a provider's sign-in page.
-          if (method === "totp" || method === "passkey") {
-            setUnmet({ kind: method });
-            setError(null);
-            return;
-          }
-          if (method === "provider" || method === "sso") {
-            // "Any of ours" is satisfied by any of them, so offer the first.
-            const chosen = anyProvider
-              ? eligibleProviders[0]
-              : eligibleProviders.find((entry) => entry.id === providerId);
-            if (chosen) {
-              setUnmet({ kind: "provider", slug: chosen.slug });
-              setError(null);
-              return;
-            }
-          }
-          // A server that names no method, or a provider this page has no
-          // name for: the refusal still gets its own line to stand on.
-        }
-        setUnmet(null);
-        setError(getErrorMessage(err, `settings:${copy}.error`));
+        // can be refused for this. "Any of ours" is met by any of them, so
+        // the first is offered.
+        const found = guest
+          ? null
+          : readUnmet(err, anyProvider ? eligibleProviders[0] : selectedProvider);
+        setUnmet(found);
+        setError(found ? null : getErrorMessage(err, `settings:${copy}.error`));
       },
     });
   };
 
-  // The self-unsatisfied challenge is bound to the selection that produced
-  // it: any change of policy or provider invalidates it (otherwise the
-  // alert's button could name one provider while targeting another).
-  const changePolicy = (value: "open" | "required") => {
-    setPolicy(value);
-    setUnmet(null);
-    setError(null);
-  };
-  const changeProvider = (value: string) => {
-    form.set(
-      value === ANY_PROVIDER
-        ? { anyProvider: true, providerId: null }
-        : { anyProvider: false, providerId: Number(value) }
-    );
-    setUnmet(null);
-    setError(null);
-  };
-  const changeRequirement = (patch: { requirePasskey?: boolean }) => {
-    form.set(patch);
-    setUnmet(null);
-    setError(null);
-  };
-
-  // The public listing carries the community-addressed login URLs the
-  // self-unsatisfied prompt sends the admin through.
-  const loginProvidersQuery = useCommunityLoginProviders(communityId, {
-    enabled: communityId > 0 && mayConfigureProviders && !guest,
-  });
-
-  const unmetProviderSlug = unmet?.kind === "provider" ? unmet.slug : null;
-  const unmetFactor = unmet != null && unmet.kind !== "provider" ? unmet.kind : null;
-
-  // Completing the required provider's sign-in updates this admin session's
-  // satisfied set, after which saving the requirement succeeds.
-  const signInWithRequiredProvider = () => {
-    const entry = loginProvidersQuery.data?.providers.find((e) => e.slug === unmetProviderSlug);
-    if (!entry) {
-      return;
-    }
-    window.location.href = providerSignInHref(
-      entry.login_url,
-      `${window.location.pathname}${window.location.search}`
-    );
-  };
-  const canSignInWithRequired =
-    unmetProviderSlug != null &&
-    loginProvidersQuery.data?.providers.some((e) => e.slug === unmetProviderSlug);
-
-  // The same dialog every refused request opens, asked for here so a factor
-  // is presented without leaving the page the requirement is being written on.
-  const presentFactor = (kind: CommunityFactorKind) => {
-    window.dispatchEvent(
-      new CustomEvent<FactorChallengeDetail>(AUTH_FACTOR_REQUIRED_EVENT, {
-        detail: { communityId, kind },
-      })
-    );
-  };
+  // Who the rule reaches, read off the counts of people who have never met it.
+  const neverThrough = anyProvider
+    ? figures.never_through_any
+    : (figures.never_through.find((row) => row.provider_id === providerId)?.count ?? 0);
+  const provider = selectedProvider?.display_name ?? "";
+  const impact =
+    policy === "required" && canSave
+      ? [
+          selectedProvider
+            ? t(`${copy}.impact.provider`, { provider, community: communityName })
+            : anyProvider
+              ? t(`${copy}.impact.anyProvider`, { community: communityName })
+              : t(`${copy}.impact.passkey`, { community: communityName }),
+          !guest &&
+            (selectedProvider
+              ? t("communityAuth.policy.impact.selfProvider", { provider })
+              : t("communityAuth.policy.impact.selfOther")),
+          neverThrough > 0 &&
+            (anyProvider
+              ? t(`${copy}.impact.neverThroughAny`, {
+                  count: neverThrough,
+                  total: figures.total,
+                })
+              : selectedProvider &&
+                t(`${copy}.impact.neverThrough`, {
+                  count: neverThrough,
+                  total: figures.total,
+                  provider,
+                })),
+          requirePasskey &&
+            figures.without_passkey > 0 &&
+            t(`${copy}.impact.noPasskey`, {
+              count: figures.without_passkey,
+              total: figures.total,
+            }),
+        ]
+      : [];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t(`${copy}.title`)}</CardTitle>
-        <CardDescription>{t(`${copy}.description`)}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <RadioGroup
-          value={policy}
-          onValueChange={(value) => changePolicy(value as "open" | "required")}
-          className="gap-3"
-        >
-          <div className="flex items-start gap-3 rounded-md border px-4 py-3">
-            <RadioGroupItem id={`${idPrefix}-open`} value="open" className="mt-1" />
-            <div>
-              <Label htmlFor={`${idPrefix}-open`} className="font-medium text-base">
-                {t("communityAuth.policy.openLabel")}
-              </Label>
-              <p className="text-muted-foreground text-sm">{t(`${copy}.openHelp`)}</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3 rounded-md border px-4 py-3">
-            <RadioGroupItem
-              id={`${idPrefix}-required`}
-              value="required"
-              disabled={eligibleProviders.length === 0}
-              className="mt-1"
-            />
-            <div className="min-w-0 flex-1 space-y-2">
-              <Label htmlFor={`${idPrefix}-required`} className="font-medium text-base">
-                {t("communityAuth.policy.requiredLabel")}
-              </Label>
-              <p className="text-muted-foreground text-sm">{t(`${copy}.requiredHelp`)}</p>
-              {eligibleProviders.length === 0 ? (
-                <p className="text-muted-foreground text-sm italic">
-                  {t("communityAuth.policy.noProviders")}
-                </p>
-              ) : (
-                policy === "required" && (
-                  <Select
-                    value={
-                      anyProvider
-                        ? ANY_PROVIDER
-                        : providerId != null
-                          ? String(providerId)
-                          : undefined
-                    }
-                    onValueChange={changeProvider}
-                  >
-                    <SelectTrigger className="w-full max-w-72">
-                      <SelectValue placeholder={t("communityAuth.policy.providerPlaceholder")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={ANY_PROVIDER}>
-                        {t("communityAuth.policy.anyProvider")}
-                      </SelectItem>
-                      {eligibleProviders.map((entry) => (
-                        <SelectItem key={entry.id} value={String(entry.id)}>
-                          {entry.display_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )
-              )}
-              {policy === "required" && anyProvider && (
-                <p className="text-muted-foreground text-sm">{t(`${copy}.anyProviderHelp`)}</p>
-              )}
-            </div>
-          </div>
-        </RadioGroup>
-
-        {policy === "required" && (
-          <div className="flex items-start gap-3">
-            <Checkbox
-              id={`${idPrefix}-require-passkey`}
-              checked={requirePasskey}
-              onCheckedChange={(checked) => changeRequirement({ requirePasskey: Boolean(checked) })}
-            />
-            <div className="space-y-1">
-              <Label htmlFor={`${idPrefix}-require-passkey`} className="font-medium">
-                {t("communityAuth.policy.requirePasskey")}
-              </Label>
-              <p className="text-muted-foreground text-sm">{t(`${copy}.requirePasskeyHelp`)}</p>
-            </div>
-          </div>
-        )}
-
-        {unmetProviderSlug && (
-          <Alert>
-            <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-              <span>
-                {t("communityAuth.policy.selfUnsatisfied", {
-                  providerName: selectedProvider?.display_name ?? unmetProviderSlug,
-                })}
-              </span>
-              {canSignInWithRequired && (
-                <Button size="sm" onClick={signInWithRequiredProvider}>
-                  {t("communityAuth.policy.signInWith", {
-                    providerName: selectedProvider?.display_name ?? unmetProviderSlug,
-                  })}
-                </Button>
-              )}
-            </AlertDescription>
-          </Alert>
-        )}
-        {unmetFactor && (
-          <Alert>
-            <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-              <span>{t(FACTOR_COPY[unmetFactor].line)}</span>
-              <Button size="sm" onClick={() => presentFactor(unmetFactor)}>
-                {t(FACTOR_COPY[unmetFactor].button)}
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        <div className="flex justify-end">
-          <Button
-            onClick={save}
-            disabled={!isDirty || !canSave || updatePolicy.isPending}
-            // Two of these sit on the page, so the guests' one says which it saves.
-            aria-label={guest ? t("communityAuth.guestPolicy.save") : undefined}
+    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{t(`${copy}.title`)}</DialogTitle>
+          <DialogDescription>
+            {t(`${copy}.description`, { community: communityName })}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <RadioGroup
+            value={policy}
+            onValueChange={(value) => change({ policy: value as "open" | "required" })}
+            className="gap-3"
           >
-            {updatePolicy.isPending ? t("common:submitting") : t("common:save")}
-          </Button>
+            <div className="flex items-start gap-3 rounded-md border px-4 py-3">
+              <RadioGroupItem id={`${idPrefix}-open`} value="open" className="mt-1" />
+              <div>
+                <Label htmlFor={`${idPrefix}-open`} className="font-medium text-base">
+                  {t("communityAuth.policy.openLabel")}
+                </Label>
+                <p className="text-muted-foreground text-sm">{t(`${copy}.openHelp`)}</p>
+              </div>
+            </div>
+            {eligibleProviders.length > 0 && (
+              <div className="flex items-start gap-3 rounded-md border px-4 py-3">
+                <RadioGroupItem id={`${idPrefix}-required`} value="required" className="mt-1" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Label htmlFor={`${idPrefix}-required`} className="font-medium text-base">
+                    {t("communityAuth.policy.requiredLabel")}
+                  </Label>
+                  <p className="text-muted-foreground text-sm">
+                    {t("communityAuth.policy.requiredHelp")}
+                  </p>
+                  {policy === "required" && (
+                    <Select
+                      value={
+                        anyProvider
+                          ? ANY_PROVIDER
+                          : providerId != null
+                            ? String(providerId)
+                            : undefined
+                      }
+                      onValueChange={(value) =>
+                        change(
+                          value === ANY_PROVIDER
+                            ? { anyProvider: true, providerId: null }
+                            : { anyProvider: false, providerId: Number(value) }
+                        )
+                      }
+                    >
+                      <SelectTrigger className="w-full max-w-72">
+                        <SelectValue placeholder={t("communityAuth.policy.providerPlaceholder")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={ANY_PROVIDER}>
+                          {t("communityAuth.policy.anyProvider")}
+                        </SelectItem>
+                        {eligibleProviders.map((entry) => (
+                          <SelectItem key={entry.id} value={String(entry.id)}>
+                            {entry.display_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {policy === "required" && anyProvider && (
+                    <p className="text-muted-foreground text-sm">{t(`${copy}.anyProviderHelp`)}</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </RadioGroup>
+          {eligibleProviders.length === 0 && (
+            <p className="text-muted-foreground text-sm">{t("communityAuth.policy.noProviders")}</p>
+          )}
+
+          {policy === "required" && (
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id={`${idPrefix}-require-passkey`}
+                checked={requirePasskey}
+                onCheckedChange={(checked) => change({ requirePasskey: Boolean(checked) })}
+              />
+              <div className="space-y-1">
+                <Label htmlFor={`${idPrefix}-require-passkey`} className="font-medium">
+                  {t("communityAuth.policy.requirePasskey")}
+                </Label>
+                <p className="text-muted-foreground text-sm">{t(`${copy}.requirePasskeyHelp`)}</p>
+              </div>
+            </div>
+          )}
+
+          <WhenYouSave lines={impact} />
+          {unmet && <UnmetAlert communityId={communityId} unmet={unmet} />}
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
         </div>
-      </CardContent>
-    </Card>
+        <DialogFooter
+          submitLabel={t("communityAuth.policy.save")}
+          pending={updatePolicy.isPending}
+          disabled={!isDirty || !canSave}
+          onSubmit={save}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+/**
+ * A rule that is on or off: the second factor, or signing in again every
+ * twelve hours. Turning one on says who it reaches before it saves.
+ */
+const OnOffRuleDialog = ({
+  communityId,
+  rule,
+  saved,
+  impact,
+  open,
+  onOpenChange,
+}: {
+  communityId: number;
+  rule: "require_second_factor" | "enforce_compliance_session";
+  saved: boolean;
+  /** What turning it on reaches, a line each. */
+  impact: (string | false)[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) => {
+  const { t } = useTranslation(["settings", "common"]);
+  const { activeCommunity, refreshCommunities } = useCommunities();
+  const copy =
+    rule === "require_second_factor" ? "communityAuth.secondFactor" : "communityAuth.sessionLimit";
+  const form = useServerForm(saved, (loaded) => ({ on: loaded ?? false }), [open, communityId]);
+  const [error, setError] = useState<string | null>(null);
+  const [unmet, setUnmet] = useState<Unmet | null>(null);
+  const update = useUpdateCommunityAuthSettings(communityId);
+
+  const close = () => {
+    onOpenChange(false);
+    setError(null);
+    setUnmet(null);
+  };
+
+  const save = () =>
+    update.mutate(
+      rule === "require_second_factor"
+        ? { require_second_factor: form.values.on }
+        : { enforce_compliance_session: form.values.on },
+      {
+        onSuccess: async () => {
+          // A member's community list carries these too, for the pages that
+          // read them there.
+          if (activeCommunity?.grantSettingsLevel !== "superadmin") await refreshCommunities();
+          toast.success(t(`${copy}.saved`));
+          close();
+        },
+        onError: (err: unknown) => {
+          const found = readUnmet(err);
+          setUnmet(found);
+          setError(found ? null : getErrorMessage(err, `settings:${copy}.error`));
+        },
+      }
+    );
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{t(`${copy}.title`)}</DialogTitle>
+          <DialogDescription>
+            {t(`${copy}.description`, { community: activeCommunity?.name ?? "" })}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <RadioGroup
+            value={form.values.on ? "on" : "off"}
+            onValueChange={(value) => {
+              form.set({ on: value === "on" });
+              setUnmet(null);
+              setError(null);
+            }}
+            className="gap-3"
+          >
+            {(["off", "on"] as const).map((value) => (
+              <div key={value} className="flex items-center gap-3 rounded-md border px-4 py-3">
+                <RadioGroupItem id={`${rule}-${value}`} value={value} />
+                <Label htmlFor={`${rule}-${value}`} className="font-medium text-base">
+                  {value === "on" ? t(`${copy}.onLabel`) : t(`${copy}.offLabel`)}
+                </Label>
+              </div>
+            ))}
+          </RadioGroup>
+          {/* Only turning a rule on reaches anybody; turning it off just saves. */}
+          <WhenYouSave lines={form.values.on && !saved ? impact : []} />
+          {unmet && <UnmetAlert communityId={communityId} unmet={unmet} />}
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </div>
+        <DialogFooter
+          submitLabel={t("common:save")}
+          pending={update.isPending}
+          disabled={form.values.on === saved}
+          onSubmit={save}
+        />
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -438,51 +564,50 @@ const SignInRequirementCard = ({
  * The longest a guest may stay. Blank leaves only the server's limit, which
  * also caps whatever is set here.
  */
-const GuestStayCard = ({
+const GuestStayDialog = ({
   communityId,
   authSettings,
+  open,
+  onOpenChange,
 }: {
   communityId: number;
   authSettings: CommunityAuthSettingsRead;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) => {
   const { t } = useTranslation(["settings", "common"]);
   const ceiling = authSettings.guest_max_days_by_platform;
   const form = useServerForm(
     authSettings,
     (loaded) => ({ days: loaded?.guest_max_days == null ? "" : String(loaded.guest_max_days) }),
-    communityId
+    [open, communityId]
   );
   const update = useUpdateCommunityAuthSettings(communityId);
   const { value: days, valid } = readOptionalWholeNumber(form.values.days, 1, ceiling);
-  const changed = days !== authSettings.guest_max_days;
-  // Set for this community by whoever runs the server.
-  const fixed = authSettings.set_by_deployment.includes("guest_max_days");
 
-  const save = () => {
-    const sent = form.values;
+  const save = () =>
     update.mutate(
       { guest_max_days: days },
       {
         onSuccess: () => {
-          form.settle(sent);
           toast.success(t("communityAuth.guestStay.saved"));
+          onOpenChange(false);
         },
         onError: (err: unknown) => {
           toast.error(getErrorMessage(err, "settings:communityAuth.guestStay.error"));
         },
       }
     );
-  };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("communityAuth.guestStay.title")}</CardTitle>
-        <CardDescription>{t("communityAuth.guestStay.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <Label htmlFor="community-guest-max-days">{t("communityAuth.guestStay.label")}</Label>
-        <div className="flex flex-wrap items-center gap-3">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("communityAuth.guestStay.title")}</DialogTitle>
+          <DialogDescription>{t("communityAuth.guestStay.description")}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="community-guest-max-days">{t("communityAuth.guestStay.label")}</Label>
           <Input
             id="community-guest-max-days"
             type="number"
@@ -491,24 +616,20 @@ const GuestStayCard = ({
             className="w-40"
             value={form.values.days}
             placeholder={String(ceiling)}
-            disabled={fixed}
             onChange={(event) => form.set({ days: event.target.value })}
           />
-          <Button
-            onClick={save}
-            disabled={fixed || !valid || !changed || update.isPending}
-            aria-label={t("communityAuth.guestStay.save")}
-          >
-            {update.isPending ? t("common:submitting") : t("common:save")}
-          </Button>
+          <p className="text-muted-foreground text-sm">
+            {t("communityAuth.guestStay.hint", { count: ceiling })}
+          </p>
         </div>
-        <p className="text-muted-foreground text-sm">
-          {fixed
-            ? t("communityAuth.setByDeployment")
-            : t("communityAuth.guestStay.hint", { count: ceiling })}
-        </p>
-      </CardContent>
-    </Card>
+        <DialogFooter
+          submitLabel={t("common:save")}
+          pending={update.isPending}
+          disabled={!valid || days === authSettings.guest_max_days}
+          onSubmit={save}
+        />
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -516,13 +637,12 @@ export const SettingsCommunitySecurityPage = () => {
   const { t } = useTranslation(["settings", "common"]);
   const communityId = useActiveCommunityId();
 
-  // What the operator has granted this community. The two halves of the page hang
-  // off their own grant and are independent of each other: who gets in needs
-  // ``providers``, the terms of a session need ``restrictions``. Outside both
-  // the tab is hidden and a direct URL renders nothing (fail closed while
-  // still loading).
-  const { activeCommunity, refreshCommunities } = useCommunities();
-  const hasGrantedSeat = activeCommunity?.grantSettingsLevel === "superadmin";
+  // What the operator has granted this community. The sections hang off their
+  // own grant and are independent of each other: the providers, the groups
+  // and the requirements naming them need ``providers``, the other rules and
+  // privacy need ``restrictions``. Outside both the tab is hidden and a direct
+  // URL renders nothing (fail closed while still loading).
+  const { activeCommunity } = useCommunities();
   // The seat above admin holds a community's sign-in configuration, and this
   // page is all of it — so it is theirs to reach, not only theirs to write.
   // The tab is gated the same way; this is the direct-URL half.
@@ -534,15 +654,29 @@ export const SettingsCommunitySecurityPage = () => {
   const grantedOptions = authSettings?.auth_options ?? [];
   const mayConfigureProviders = grantedOptions.includes("providers");
   const mayConfigureRestrictions = grantedOptions.includes("restrictions");
-  const savedPolicy = authSettings?.auth_policy;
   // Where the deployment allows guests and the community takes them.
-  const { guestsEnabled } = useAppConfig();
+  const { guestsEnabled, secondFactorAvailable } = useAppConfig();
   const takesGuests = guestsEnabled && activeCommunity?.max_guests !== 0;
   // A requirement names a provider this community connects to, so the picker
-  // reads the same list the registry below it edits.
+  // reads the same list the providers section edits.
   const connectionsQuery = useCommunityProviderConnections(communityId, {
     enabled: communityId > 0 && mayConfigureProviders,
   });
+  const connections = connectionsQuery.data ?? [];
+  // A group rule names a provider, so until one is connected there is nothing
+  // to write one against; rules already written stay readable regardless,
+  // and so do the server's, which can apply with no connection.
+  const claimRules = useCommunityClaimRules(communityId, {
+    enabled: communityId > 0 && mayConfigureProviders,
+  }).data;
+  const roleRules = useCustomRoleClaimRules(communityId, {
+    enabled: communityId > 0 && mayConfigureProviders,
+  }).data;
+  const showsGroupRules =
+    connections.length > 0 ||
+    Boolean(claimRules?.rules.length) ||
+    Boolean(claimRules?.provider_rules.length) ||
+    Boolean(roleRules?.length);
   // Only a live connection can be required. A disconnected or switched-off
   // one cannot serve a sign-in, and neither can one whose provider the
   // operator has since withdrawn.
@@ -557,84 +691,7 @@ export const SettingsCommunitySecurityPage = () => {
         })),
     [connectionsQuery.data]
   );
-  const [wizardOpen, setWizardOpen] = useState(false);
-  // Set when the wizard is opened to take over a provider the deployment
-  // answered for, so it opens on that one rather than on the picker.
-  const [wizardStartOn, setWizardStartOn] = useState<number | null>(null);
-
-  // Each of these is one boolean, so each saves as it is switched.
-  const updateSessionLimit = useUpdateCommunityAuthSettings(communityId);
-  const sessionLimit = useFlipToSave(
-    authSettings?.enforce_compliance_session ?? false,
-    communityId
-  );
-
-  const { secondFactorAvailable } = useAppConfig();
-  const updateSecondFactor = useUpdateCommunityAuthSettings(communityId);
-  const secondFactor = useFlipToSave(authSettings?.require_second_factor ?? false, communityId);
-
-  const changeSecondFactor = (next: boolean) => {
-    secondFactor.begin(next);
-    updateSecondFactor.mutate(
-      { require_second_factor: next },
-      {
-        onSuccess: async () => {
-          // A member's community list carries these too, for the pages that read
-          // them there.
-          if (!hasGrantedSeat) await refreshCommunities();
-          secondFactor.settle();
-          toast.success(t("communityAuth.secondFactor.saved"));
-        },
-        onError: (err: unknown) => {
-          secondFactor.fail(getErrorMessage(err, "settings:communityAuth.secondFactor.error"));
-        },
-      }
-    );
-  };
-
-  const changeSessionLimit = (next: boolean) => {
-    sessionLimit.begin(next);
-    updateSessionLimit.mutate(
-      { enforce_compliance_session: next },
-      {
-        onSuccess: async () => {
-          // A member's community list carries these too, for the pages that read
-          // them there.
-          if (!hasGrantedSeat) await refreshCommunities();
-          sessionLimit.settle();
-          toast.success(t("communityAuth.sessionLimit.saved"));
-        },
-        onError: (err: unknown) => {
-          sessionLimit.fail(getErrorMessage(err, "settings:communityAuth.sessionLimit.error"));
-        },
-      }
-    );
-  };
-
-  // Where the deployment already asks everybody for a second factor, this
-  // community's own box has nothing to add, so it is not offered. A rule
-  // already written stays on the row and comes back into force if the
-  // deployment lowers its answer.
-  // Where the deployment already asks everybody, this community's switch has
-  // nothing to add, so it says so rather than offering the same answer twice.
-  const factorAskedByPlatform = savedPolicy?.factor_required_by_platform === true;
-  // What whoever runs the server sets for this community is shown, not offered.
-  const setByDeployment = new Set(authSettings?.set_by_deployment ?? []);
-  const factorFixed = setByDeployment.has("require_second_factor");
-  const sessionLimitFixed = setByDeployment.has("enforce_compliance_session");
-  // The community's shareable sign-in URL, built on the server's origin (which is
-  // the app's own origin on web, or the configured server on native).
-  const { getServerOrigin } = useServer();
-  const urlBase = getServerOrigin() ?? window.location.origin;
-  const memberLoginUrl = `${urlBase}/community/${communityId}/login`;
-  const copyMemberLoginUrl = async () => {
-    try {
-      await navigator.clipboard.writeText(memberLoginUrl);
-      toast.success(t("communityAuth.shareUrl.copied"));
-    } catch (error) {
-      console.error(error);
-    }
-  };
+  const [changing, setChanging] = useState<SignInRule | null>(null);
 
   // The page waits for its settings rather than reading "granted nothing" off
   // an answer that has not come back yet.
@@ -646,155 +703,199 @@ export const SettingsCommunitySecurityPage = () => {
     return null;
   }
 
+  const communityName = activeCommunity?.name ?? "";
+  // What whoever runs the server sets for this community is shown, not offered.
+  const setByDeployment = new Set(authSettings.set_by_deployment);
+  // Where the deployment already asks everybody for a second factor, this
+  // community's rule has nothing to add. A rule already written stays and
+  // comes back into force if the deployment lowers its answer.
+  const factorAskedByPlatform = authSettings.auth_policy.factor_required_by_platform;
+  const factorRequired = authSettings.require_second_factor || factorAskedByPlatform;
+  const sessionLimit = authSettings.enforce_compliance_session;
+  const ceiling = authSettings.guest_max_days_by_platform;
+
+  const describePolicy = (policy: CommunityAuthPolicyRead): string => {
+    if (policy.policy === "open") return t("communityAuth.policy.openLabel");
+    const passkey = policy.require_methods.includes("passkey");
+    const provider = policy.provider_display_name ?? policy.provider_slug;
+    if (provider) {
+      return passkey
+        ? t("communityAuth.policy.value.throughWithPasskey", { provider })
+        : t("communityAuth.policy.value.through", { provider });
+    }
+    if (policy.require_methods.includes("sso")) {
+      return passkey
+        ? t("communityAuth.policy.value.anyWithPasskey")
+        : t("communityAuth.policy.value.any");
+    }
+    return t("communityAuth.policy.value.passkey");
+  };
+
+  const rules: {
+    key: SignInRule;
+    shown: boolean;
+    label: string;
+    value: string;
+    detail?: string | null;
+    fixed?: boolean;
+  }[] = [
+    {
+      key: "auth_policy",
+      shown: mayConfigureProviders,
+      label: t("communityAuth.signInRules.members"),
+      value: describePolicy(authSettings.auth_policy),
+    },
+    {
+      key: "require_second_factor",
+      shown: mayConfigureRestrictions && secondFactorAvailable,
+      label: t("communityAuth.secondFactor.title"),
+      value: factorRequired
+        ? t("communityAuth.secondFactor.onLabel")
+        : t("communityAuth.secondFactor.offLabel"),
+      detail: factorRequired && takesGuests ? t("communityAuth.secondFactor.guestsToo") : null,
+      fixed: factorAskedByPlatform,
+    },
+    {
+      key: "enforce_compliance_session",
+      shown: mayConfigureRestrictions,
+      label: t("communityAuth.sessionLimit.title"),
+      value: sessionLimit ? t("communityAuth.on") : t("communityAuth.off"),
+      detail: sessionLimit
+        ? t("communityAuth.sessionLimit.onDetail")
+        : t("communityAuth.sessionLimit.offDetail"),
+    },
+    {
+      key: "guest_auth_policy",
+      shown: mayConfigureProviders && takesGuests,
+      label: t("communityAuth.signInRules.guests"),
+      value: describePolicy(authSettings.guest_auth_policy),
+    },
+    {
+      key: "guest_max_days",
+      shown: mayConfigureRestrictions && takesGuests,
+      label: t("communityAuth.guestStay.title"),
+      value: t("communityAuth.guestStay.value", { count: authSettings.guest_max_days ?? ceiling }),
+      detail:
+        authSettings.guest_max_days == null
+          ? t("communityAuth.guestStay.defaultDetail")
+          : t("communityAuth.guestStay.ceilingDetail", { days: ceiling }),
+    },
+  ];
+
+  // Everybody who opens the community, guests included, is asked for a factor.
+  const withoutFactor =
+    authSettings.member_figures.without_factor + authSettings.guest_figures.without_factor;
+  const people = authSettings.member_figures.total + authSettings.guest_figures.total;
+  const closeDialog = (open: boolean) => {
+    if (!open) setChanging(null);
+  };
+
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
+      <p className="text-muted-foreground text-sm">
+        {t("communityAuth.intro", { community: communityName })}
+      </p>
+
+      <SettingsSection
+        title={t("communityAuth.signInRules.title")}
+        description={t("communityAuth.signInRules.description", { community: communityName })}
+      >
+        {rules
+          .filter((rule) => rule.shown)
+          .map((rule) => (
+            <SettingsRow
+              key={rule.key}
+              label={rule.label}
+              description={
+                <>
+                  <span className="text-foreground">{rule.value}</span>
+                  {rule.detail ? ` · ${rule.detail}` : null}
+                </>
+              }
+            >
+              {rule.fixed || setByDeployment.has(rule.key) ? (
+                <Badge variant="secondary">{t("communityAuth.setByServer")}</Badge>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-label={t("communityAuth.changeRule", { rule: rule.label })}
+                  onClick={() => setChanging(rule.key)}
+                >
+                  {t("communityAuth.change")}
+                </Button>
+              )}
+            </SettingsRow>
+          ))}
+      </SettingsSection>
+
+      <SignInRequirementDialog
+        communityId={communityId}
+        communityName={communityName}
+        open={changing === "auth_policy"}
+        onOpenChange={closeDialog}
+        savedPolicy={authSettings.auth_policy}
+        eligibleProviders={eligibleProviders}
+        figures={authSettings.member_figures}
+      />
+      <SignInRequirementDialog
+        communityId={communityId}
+        communityName={communityName}
+        open={changing === "guest_auth_policy"}
+        onOpenChange={closeDialog}
+        savedPolicy={authSettings.guest_auth_policy}
+        eligibleProviders={eligibleProviders}
+        figures={authSettings.guest_figures}
+        guest
+      />
+      <OnOffRuleDialog
+        communityId={communityId}
+        rule="require_second_factor"
+        saved={authSettings.require_second_factor}
+        impact={[
+          t("communityAuth.secondFactor.impact", { community: communityName }),
+          withoutFactor > 0 &&
+            t("communityAuth.secondFactor.withoutFactor", { count: withoutFactor, total: people }),
+        ]}
+        open={changing === "require_second_factor"}
+        onOpenChange={closeDialog}
+      />
+      <OnOffRuleDialog
+        communityId={communityId}
+        rule="enforce_compliance_session"
+        saved={sessionLimit}
+        impact={[t("communityAuth.sessionLimit.impact")]}
+        open={changing === "enforce_compliance_session"}
+        onOpenChange={closeDialog}
+      />
+      <GuestStayDialog
+        communityId={communityId}
+        authSettings={authSettings}
+        open={changing === "guest_max_days"}
+        onOpenChange={closeDialog}
+      />
+
       {mayConfigureProviders ? (
-        <section className="space-y-6">
-          <h2 className="font-semibold text-xl tracking-tight">
-            {t("communityAuth.sections.whoGetsIn")}
-          </h2>
+        <CommunityAuthProvidersSection communityId={communityId} communityName={communityName} />
+      ) : null}
 
-          <ConnectSignInWizard
-            communityId={communityId}
-            open={wizardOpen}
-            onOpenChange={setWizardOpen}
-            canRequire={mayConfigureProviders}
-            startOn={wizardStartOn}
-          />
-
-          <CommunityAuthProvidersSection
-            communityId={communityId}
-            onConnect={(providerId) => {
-              setWizardStartOn(providerId ?? null);
-              setWizardOpen(true);
-            }}
-          />
-
+      {mayConfigureProviders && showsGroupRules ? (
+        <SettingsSection
+          title={t("communityAuth.groupRules.title")}
+          description={t("communityAuth.groupRules.description")}
+        >
           <CommunityClaimRulesSection communityId={communityId} />
-
           <CustomRoleClaimRulesSection communityId={communityId} />
-
-          <SignInRequirementCard
-            communityId={communityId}
-            savedPolicy={savedPolicy}
-            eligibleProviders={eligibleProviders}
-            mayConfigureProviders={mayConfigureProviders}
-          />
-          {takesGuests ? (
-            <SignInRequirementCard
-              communityId={communityId}
-              savedPolicy={authSettings.guest_auth_policy}
-              eligibleProviders={eligibleProviders}
-              mayConfigureProviders={mayConfigureProviders}
-              guest
-            />
-          ) : null}
-
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("communityAuth.shareUrl.title")}</CardTitle>
-              <CardDescription>{t("communityAuth.shareUrl.description")}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1.5 text-sm">
-                {memberLoginUrl}
-              </code>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => void copyMemberLoginUrl()}
-              >
-                {t("communityAuth.shareUrl.copy")}
-              </Button>
-            </CardContent>
-          </Card>
-        </section>
+        </SettingsSection>
       ) : null}
 
       {mayConfigureRestrictions ? (
-        <section className="space-y-6">
-          <h2 className="font-semibold text-xl tracking-tight">
-            {t("communityAuth.sections.onWhatTerms")}
-          </h2>
-
-          {secondFactorAvailable && (
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("communityAuth.secondFactor.title")}</CardTitle>
-                <CardDescription>{t("communityAuth.secondFactor.description")}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <Label htmlFor="community-second-factor" className="font-medium">
-                      {t("communityAuth.secondFactor.allowLabel")}
-                    </Label>
-                    <p className="text-muted-foreground text-sm">
-                      {factorAskedByPlatform
-                        ? t("communityAuth.secondFactor.askedByPlatform")
-                        : factorFixed
-                          ? t("communityAuth.setByDeployment")
-                          : t("communityAuth.secondFactor.help")}
-                    </p>
-                  </div>
-                  <Switch
-                    id="community-second-factor"
-                    checked={secondFactor.value || factorAskedByPlatform}
-                    onCheckedChange={changeSecondFactor}
-                    disabled={updateSecondFactor.isPending || factorAskedByPlatform || factorFixed}
-                  />
-                </div>
-                {secondFactor.error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{secondFactor.error}</AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("communityAuth.sessionLimit.title")}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="community-session-limit" className="font-medium">
-                    {t("communityAuth.sessionLimit.allowLabel")}
-                  </Label>
-                  <p className="text-muted-foreground text-sm">
-                    {sessionLimitFixed
-                      ? t("communityAuth.setByDeployment")
-                      : t("communityAuth.sessionLimit.help")}
-                  </p>
-                </div>
-                <Switch
-                  id="community-session-limit"
-                  checked={sessionLimit.value}
-                  onCheckedChange={changeSessionLimit}
-                  disabled={updateSessionLimit.isPending || sessionLimitFixed}
-                />
-              </div>
-              {sessionLimit.error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{sessionLimit.error}</AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-
-          <CommunityNotificationPolicySection communityId={communityId} />
-
-          <CommunityEngagementRankingSection communityId={communityId} />
-
-          <CommunityAISwitchSection communityId={communityId} />
-
-          {takesGuests ? (
-            <GuestStayCard communityId={communityId} authSettings={authSettings} />
-          ) : null}
-        </section>
+        <CommunityPrivacySection
+          communityId={communityId}
+          communityName={communityName}
+          settings={authSettings}
+        />
       ) : null}
     </div>
   );

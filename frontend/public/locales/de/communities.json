@@ -216,7 +216,6 @@
     "handleColumn": "Handle",
     "apiAccessColumn": "API-Zugriff",
     "apiAccessLabel": "Persönliche API-Schlüssel für {{name}}",
-    "apiAccessHelp": "Ob die persönlichen API-Schlüssel dieser Person diese Community erreichen. Ausschalten stoppt bereits erstellte Schlüssel ebenso wie neue.",
     "apiAccessSaved": "API-Zugriff gespeichert",
     "apiAccessError": "API-Zugriff konnte nicht gespeichert werden"
   },

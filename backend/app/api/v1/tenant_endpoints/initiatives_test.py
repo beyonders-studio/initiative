@@ -2459,7 +2459,8 @@ async def test_a_communitys_defaults_stand_over_every_initiative(
 ):
     """What a community's admins set for every initiative wins over each
     initiative's own, reaches its members' standing, is refused to its
-    managers, and hands back the initiative's own value when cleared."""
+    managers, and hands back the initiative's own value when cleared. Only an
+    admin reads which initiatives have each one on of their own."""
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     initiative_id = admin.initiative.id
     pm = await acting_user(
@@ -2515,11 +2516,12 @@ async def test_a_communitys_defaults_stand_over_every_initiative(
         "member_permissions": {"posts_enabled": True},
         "custom_roles": False,
     }
+    no_own = {"own_tools": {}, "own_member_permissions": {}}
     made = await client.patch(defaults_url, headers=admin.headers, json=set_)
     assert made.status_code == 200, made.text
-    assert made.json() == set_
+    assert made.json() == {**set_, **no_own}
     read = await client.get(member.g("/initiatives/defaults"), headers=member.headers)
-    assert read.json() == set_
+    assert read.json() == {**set_, **no_own}
     seen = await members_view()
     assert seen["posts_enabled"] is True
     assert Tool.post.value in seen["can"]["view"]
@@ -2572,7 +2574,13 @@ async def test_a_communitys_defaults_stand_over_every_initiative(
         "tools": {},
         "member_permissions": {},
         "custom_roles": True,
+        **no_own,
     }
+    own_read = (await client.get(defaults_url, headers=admin.headers)).json()
+    assert initiative_id not in own_read["own_tools"][Tool.post.value]
+    assert initiative_id in own_read["own_tools"][Tool.project.value]
+    assert initiative_id not in own_read["own_member_permissions"]["posts_enabled"]
+    assert initiative_id in own_read["own_member_permissions"]["create_files"]
     seen = await members_view()
     assert seen["posts_enabled"] is False
     assert Tool.post.value not in seen["can"]["view"]
