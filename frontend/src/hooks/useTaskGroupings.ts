@@ -7,7 +7,7 @@
  * tasks `params` lists, by the field and bucket the layout offers.
  */
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 import type { GroupingState } from "@tanstack/react-table";
 import { useMemo } from "react";
 
@@ -19,7 +19,7 @@ import type {
   TaskListRead,
   TaskStatusRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { getListTaskGroupsQueryKey, listTaskGroups } from "@/api/generated/tasks/tasks";
+import { useListTaskGroups } from "@/api/generated/tasks/tasks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useFieldCatalog } from "@/hooks/useFieldCatalog";
 import type { FieldDef } from "@/lib/layouts/fields";
@@ -75,17 +75,17 @@ export function useTaskGroupings({
         : undefined,
     [entry, params]
   );
-  const served = useQuery({
-    queryKey: getListTaskGroupsQueryKey(communityId, groupParams),
-    queryFn: () => listTaskGroups(communityId, groupParams as ListTaskGroupsParams),
-    enabled: groupParams !== undefined,
-    // A task moved between groups, or a filter changed, keeps the list grouped
-    // by the same field while it refreshes; another field waits for its own.
-    placeholderData: (previous, query) => {
-      const was = query?.queryKey[1] as ListTaskGroupsParams | undefined;
-      return was?.group_by === groupParams?.group_by && was?.bucket === groupParams?.bucket
-        ? keepPreviousData(previous)
-        : undefined;
+  const served = useListTaskGroups(communityId, groupParams as ListTaskGroupsParams, {
+    query: {
+      enabled: groupParams !== undefined,
+      // A task moved between groups, or a filter changed, keeps the list grouped
+      // by the same field while it refreshes; another field waits for its own.
+      placeholderData: (previous, query) => {
+        const was = query?.queryKey[1] as ListTaskGroupsParams | undefined;
+        return was?.group_by === groupParams?.group_by && was?.bucket === groupParams?.bucket
+          ? keepPreviousData(previous)
+          : undefined;
+      },
     },
   });
   const data = groupParams && served.data ? served.data : undefined;

@@ -40,11 +40,6 @@ export type {
   PluginWidgetRead,
 };
 
-export const getPluginWidgetCatalog = (communityId: number) =>
-  apiClient
-    .get<PluginWidgetCatalogResponse>(`/c/${communityId}/plugins/widget-catalog`)
-    .then((r) => r.data);
-
 export interface PluginDataRequest {
   communityId: number;
   pluginId: number;

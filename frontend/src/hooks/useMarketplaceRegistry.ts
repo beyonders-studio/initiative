@@ -7,22 +7,16 @@
  * and every community's marketplace listings.
  */
 
-import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
 
-import type {
-  RegistryRefreshRead,
-  RegistrySettings,
-  RegistryStatusRead,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { RegistryRefreshRead, RegistrySettings } from "@/api/generated/initiativeAPI.schemas";
 import {
   getReadRegistryStatusQueryKey,
-  readRegistryStatus,
   refreshRegistryNow,
   updateRegistrySettings,
   uploadRegistryBundle,
 } from "@/api/generated/marketplace/marketplace";
 import type { MutationOpts } from "@/types/mutation";
-import type { QueryOpts } from "@/types/query";
 
 const invalidateRegistry = (queryClient: QueryClient) => {
   void queryClient.invalidateQueries({
@@ -34,13 +28,6 @@ const invalidateRegistry = (queryClient: QueryClient) => {
       typeof query.queryKey[0] === "string" && query.queryKey[0].includes("/marketplace/"),
   });
 };
-
-export const useRegistryStatus = (options?: QueryOpts<RegistryStatusRead>) =>
-  useQuery<RegistryStatusRead>({
-    queryKey: getReadRegistryStatusQueryKey(),
-    queryFn: () => readRegistryStatus(),
-    ...options,
-  });
 
 export const useUpdateRegistrySettings = (
   options?: MutationOpts<RegistrySettings, RegistrySettings>

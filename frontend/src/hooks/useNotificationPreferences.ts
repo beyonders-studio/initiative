@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 
 import type {
   NotificationPreferencesRead,
@@ -6,25 +6,10 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   getReadMyNotificationPreferencesQueryKey,
-  readMyNotificationPreferences,
   updateMyNotificationPreferences,
 } from "@/api/generated/notifications/notifications";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import type { MutationOpts } from "@/types/mutation";
-
-/**
- * The settings page's whole state: the category registry, this account's
- * overrides, its quiet hours, and each community's level.
- *
- * The registry travels with the response, so the page renders the categories
- * this build has rather than carrying a copy of the list.
- */
-export const useNotificationPreferences = (options?: { enabled?: boolean }) =>
-  useQuery<NotificationPreferencesRead>({
-    queryKey: getReadMyNotificationPreferencesQueryKey(),
-    queryFn: () => readMyNotificationPreferences(),
-    enabled: options?.enabled,
-  });
 
 /**
  * Move some switches.

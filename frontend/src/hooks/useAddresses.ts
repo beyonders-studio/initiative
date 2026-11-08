@@ -1,5 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
-
 import type {
   HeldChangeRead,
   UserEmailListResponse,
@@ -9,9 +7,9 @@ import type {
 import {
   addMyAddress,
   getListMyAddressesQueryKey,
-  listMyAddresses,
   makeMyAddressPrimary,
   removeMyAddress,
+  useListMyAddresses,
 } from "@/api/generated/users/users";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { queryClient } from "@/lib/queryClient";
@@ -26,11 +24,7 @@ const refresh = () => queryClient.invalidateQueries({ queryKey: ADDRESSES_QUERY_
 // ── Queries ─────────────────────────────────────────────────────────────────
 
 /** Every address this account holds, proven or not. */
-export const useMyAddresses = () =>
-  useQuery<UserEmailListResponse>({
-    queryKey: ADDRESSES_QUERY_KEY,
-    queryFn: () => listMyAddresses(),
-  });
+export const useMyAddresses = () => useListMyAddresses();
 
 // ── Mutations ───────────────────────────────────────────────────────────────
 

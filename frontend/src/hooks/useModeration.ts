@@ -8,8 +8,6 @@
  * offered.
  */
 
-import { useQuery } from "@tanstack/react-query";
-
 import type {
   InitiativeSharingRead,
   ModerationActCreate,
@@ -20,15 +18,12 @@ import type {
   ReportSettle,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
-  getListReportsQueryKey,
-  getReadInitiativeSharingQueryKey,
-  getReadModerationLogQueryKey,
-  listReports,
   moderate,
-  readInitiativeSharing,
-  readModerationLog,
   restoreRemoval,
   settleReport,
+  useListReports,
+  useReadInitiativeSharing,
+  useReadModerationLog,
 } from "@/api/generated/moderation/moderation";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { refreshAfterHolding } from "@/hooks/useHolds";
@@ -49,20 +44,12 @@ export const useModerationReports = (
   { communityId, initiativeId, settled = false, page = 1 }: ReportsParams,
   options?: QueryOpts<ModerationReportList>
 ) =>
-  useQuery<ModerationReportList>({
-    queryKey: getListReportsQueryKey(communityId, initiativeId, {
-      settled,
-      page,
-      page_size: REPORTS_PAGE_SIZE,
-    }),
-    queryFn: () =>
-      listReports(communityId, initiativeId, {
-        settled,
-        page,
-        page_size: REPORTS_PAGE_SIZE,
-      }),
-    ...options,
-  });
+  useListReports(
+    communityId,
+    initiativeId,
+    { settled, page, page_size: REPORTS_PAGE_SIZE },
+    { query: options }
+  );
 
 export const useSettleReport = (
   communityId: number,
@@ -90,12 +77,7 @@ export const useInitiativeSharing = (
   communityId: number,
   initiativeId: number,
   options?: QueryOpts<InitiativeSharingRead>
-) =>
-  useQuery<InitiativeSharingRead>({
-    queryKey: getReadInitiativeSharingQueryKey(communityId, initiativeId),
-    queryFn: () => readInitiativeSharing(communityId, initiativeId),
-    ...options,
-  });
+) => useReadInitiativeSharing(communityId, initiativeId, { query: options });
 
 /**
  * A moderator acting on something directly: taking it down, locking its
@@ -141,11 +123,9 @@ export const useModerationLog = (
   }: { communityId: number; initiativeId: number; page?: number },
   options?: QueryOpts<ModerationLogList>
 ) =>
-  useQuery<ModerationLogList>({
-    queryKey: getReadModerationLogQueryKey(communityId, initiativeId, {
-      page,
-      page_size: LOG_PAGE_SIZE,
-    }),
-    queryFn: () => readModerationLog(communityId, initiativeId, { page, page_size: LOG_PAGE_SIZE }),
-    ...options,
-  });
+  useReadModerationLog(
+    communityId,
+    initiativeId,
+    { page, page_size: LOG_PAGE_SIZE },
+    { query: options }
+  );

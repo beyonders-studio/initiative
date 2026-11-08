@@ -20,14 +20,12 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { InitiativeRead } from "@/api/generated/initiativeAPI.schemas";
-import {
-  getListInitiativesQueryKey,
-  listInitiatives,
-} from "@/api/generated/initiatives/initiatives";
+import { getListInitiativesQueryOptions } from "@/api/generated/initiatives/initiatives";
+import { useGetMyToolCounts } from "@/api/generated/my-tools/my-tools";
 import { NodeRail, TRAY_SURFACE } from "@/components/toolBrowser/NodeRail";
 import { CROSS_COMMUNITY_TOOL_SORT_FIELDS, ToolTable } from "@/components/toolBrowser/ToolTable";
 import { useCommunities } from "@/hooks/useCommunities";
-import { toolsWithContent, useMyToolCounts, useMyToolRows } from "@/hooks/useMyTools";
+import { toolsWithContent, useMyToolRows } from "@/hooks/useMyTools";
 import { useToolBrowserSearch } from "@/hooks/useToolBrowserSearch";
 import { TOOL_ICONS, toolNavLabelKey, toolRouteSegment } from "@/lib/tools";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/ui/card";
@@ -67,7 +65,7 @@ export function MyToolsPage() {
   // tool you have never authored is empty, and a tab onto an empty table is
   // the thing this page is meant to avoid — but not the community filter:
   // narrowing the table should not make the reader's tools come and go.
-  const countsQuery = useMyToolCounts({ created_by_me: createdByMe || undefined });
+  const countsQuery = useGetMyToolCounts({ created_by_me: createdByMe || undefined });
   const tools = useMemo(() => toolsWithContent(countsQuery.data), [countsQuery.data]);
 
   const selected = selectTool(tools);
@@ -108,11 +106,9 @@ export function MyToolsPage() {
     [rows]
   );
   const initiatives = useQueries({
-    queries: rowCommunityIds.map((communityId) => ({
-      queryKey: getListInitiativesQueryKey(communityId),
-      queryFn: () => listInitiatives(communityId),
-      staleTime: 60_000,
-    })),
+    queries: rowCommunityIds.map((communityId) =>
+      getListInitiativesQueryOptions(communityId, undefined, { query: { staleTime: 60_000 } })
+    ),
     // `combine` rather than a `useMemo` over the results: the results array is
     // a fresh identity every render, so a memo keyed on it would never hit and
     // the table's columns would rebuild under it each time.

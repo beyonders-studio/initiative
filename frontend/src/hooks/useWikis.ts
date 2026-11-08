@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 
 import type {
@@ -14,14 +13,12 @@ import {
   createWikiPage,
   deleteWikiPage,
   duplicateWikiPage,
-  getListWikiPagesQueryKey,
-  getReadWikiPageQueryKey,
-  listWikiPages,
   moveWikiFile,
   moveWikiPage,
-  readWikiPage,
   removeFileFromWiki,
   updateWikiPage,
+  useListWikiPages,
+  useReadWikiPage,
 } from "@/api/generated/wikis/wikis";
 import { invalidate, q } from "@/api/query-keys";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
@@ -54,11 +51,8 @@ export const useSetWikiGrants = wikis.useSetGrants;
 export const useWikiPages = (wikiId: number | null, options?: QueryOpts<WikiPageTree>) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<WikiPageTree>({
-    queryKey: getListWikiPagesQueryKey(communityId, wikiId!),
-    queryFn: () => listWikiPages(communityId, wikiId!),
-    enabled: wikiId !== null && Number.isFinite(wikiId) && userEnabled,
-    ...rest,
+  return useListWikiPages(communityId, wikiId!, {
+    query: { enabled: wikiId !== null && Number.isFinite(wikiId) && userEnabled, ...rest },
   });
 };
 
@@ -66,11 +60,8 @@ export const useWikiPage = (pageId: number | null, options?: QueryOpts<WikiPageR
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
   const ready = pageId !== null && Number.isFinite(pageId);
-  return useQuery<WikiPageRead>({
-    queryKey: getReadWikiPageQueryKey(communityId, pageId!),
-    queryFn: () => readWikiPage(communityId, pageId!),
-    enabled: ready && userEnabled,
-    ...rest,
+  return useReadWikiPage(communityId, pageId!, {
+    query: { enabled: ready && userEnabled, ...rest },
   });
 };
 

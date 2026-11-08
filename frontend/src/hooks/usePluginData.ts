@@ -20,13 +20,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 
+import { useReadPluginWidgetCatalog } from "@/api/generated/plugins/plugins";
 import {
   getPluginData,
   getPluginParamOptions,
-  getPluginWidgetCatalog,
   type PluginDataResponse,
   type PluginParamOptionsResponse,
-  type PluginWidgetCatalogResponse,
 } from "@/api/pluginData";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -35,9 +34,6 @@ import { useCommunities } from "@/hooks/useCommunities";
  *  Mirrors the proxy's `MAX_CACHE_TTL_SECONDS`; both exist because a listing
  *  must not be the thing that decides. */
 export const MAX_PLUGIN_STALE_SECONDS = 300;
-
-export const pluginWidgetCatalogKey = (communityId: number) =>
-  ["plugin-widget-catalog", communityId] as const;
 
 export const pluginDataKey = (
   communityId: number,
@@ -64,13 +60,14 @@ export const usePluginWidgetCatalog = (enabled = true) => {
   const communityId = useActiveCommunityId();
   // A guest reaches no plug-in of the community's.
   const communityWide = Boolean(useCommunities().activeCommunity?.can.community_wide);
-  return useQuery<PluginWidgetCatalogResponse>({
-    queryKey: pluginWidgetCatalogKey(communityId),
-    queryFn: () => getPluginWidgetCatalog(communityId),
-    enabled: enabled && communityWide && Number.isFinite(communityId) && communityId > 0,
-    // Installing or upgrading a plug-in invalidates this explicitly; between those
-    // it is effectively static for the page's lifetime.
-    staleTime: 5 * 60_000,
+  return useReadPluginWidgetCatalog(communityId, {
+    query: {
+      enabled: enabled && communityWide && Number.isFinite(communityId) && communityId > 0,
+      // Keyed under the plug-ins' path, so installing or upgrading one
+      // refreshes it; between those it is effectively static for the page's
+      // lifetime.
+      staleTime: 5 * 60_000,
+    },
   });
 };
 

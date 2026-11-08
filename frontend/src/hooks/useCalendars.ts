@@ -1,10 +1,11 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 
 import type {
   CalendarListResponse,
   ListMyCalendarsParams,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
+import { useListMyCalendars } from "@/api/generated/my-tools/my-tools";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import type { QueryOpts } from "@/types/query";
 
@@ -28,9 +29,5 @@ export const useMyCalendars = (
   params?: ListMyCalendarsParams,
   options?: QueryOpts<CalendarListResponse>
 ) => {
-  return useQuery<CalendarListResponse>({
-    ...calendars.myListQuery(params),
-    placeholderData: keepPreviousData,
-    ...options,
-  });
+  return useListMyCalendars(params, { query: { placeholderData: keepPreviousData, ...options } });
 };

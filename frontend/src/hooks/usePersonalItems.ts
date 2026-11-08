@@ -9,7 +9,7 @@
  * `/c/{id}/personal-items/{kind}/{id}`, since a subscription can be on anything.
  */
 
-import { type UseQueryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type UseQueryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef } from "react";
 
@@ -28,14 +28,14 @@ import {
   getListMyPersonalItemsQueryKey,
   getListPersonalItemsQueryKey,
   getReadPersonalItemQueryKey,
-  listMyPersonalItems,
-  listPersonalItems,
-  readPersonalItem,
   recordView,
   setTaskReminder,
   subscribeItem,
   unbookmarkItem,
   unsubscribeItem,
+  useListMyPersonalItems,
+  useListPersonalItems,
+  useReadPersonalItem,
 } from "@/api/generated/personal-items/personal-items";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -50,12 +50,7 @@ const BOOKMARKS = { mark: ListedMark.bookmark };
  * many as they keep, newest first, with what draws each one's icon.
  */
 export const useRecents = (options?: QueryOpts<PersonalItemRead[]>) => {
-  return useQuery<PersonalItemRead[]>({
-    queryKey: getListMyPersonalItemsQueryKey(TABS),
-    queryFn: () => listMyPersonalItems(TABS),
-    staleTime: 30 * 1000,
-    ...options,
-  });
+  return useListMyPersonalItems(TABS, { query: options });
 };
 
 const TAB_KINDS = new Set<string>(Object.values(Tool));
@@ -226,23 +221,14 @@ export const useCommunityBookmarks = (
 ) => {
   const active = useActiveCommunityId();
   const id = communityId ?? active;
-  return useQuery<PersonalItemRead[]>({
-    queryKey: getListPersonalItemsQueryKey(id, BOOKMARKS),
-    queryFn: () => listPersonalItems(id, BOOKMARKS),
-    staleTime: 30 * 1000,
-    ...options,
-    enabled: Boolean(id) && (options?.enabled ?? true),
+  return useListPersonalItems(id, BOOKMARKS, {
+    query: { ...options, enabled: Boolean(id) && (options?.enabled ?? true) },
   });
 };
 
 /** The reader's bookmarks in every community they are in, newest first. */
 export const useMyBookmarks = (options?: QueryOpts<PersonalItemRead[]>) =>
-  useQuery<PersonalItemRead[]>({
-    queryKey: getListMyPersonalItemsQueryKey(BOOKMARKS),
-    queryFn: () => listMyPersonalItems(BOOKMARKS),
-    staleTime: 30 * 1000,
-    ...options,
-  });
+  useListMyPersonalItems(BOOKMARKS, { query: options });
 
 /** Whether the reader bookmarked this tool, in its community (the active one
  *  unless named). */
@@ -328,11 +314,8 @@ export const useToggleBookmark = () => {
 export const useItemState = (kind: ContentKind, entityId: number, communityId?: number) => {
   const active = useActiveCommunityId();
   const id = communityId ?? active;
-  return useQuery<PersonalItemState>({
-    queryKey: getReadPersonalItemQueryKey(id, kind, entityId),
-    queryFn: () => readPersonalItem(id, kind, entityId),
-    staleTime: 30 * 1000,
-    enabled: Boolean(id) && entityId > 0,
+  return useReadPersonalItem(id, kind, entityId, {
+    query: { enabled: Boolean(id) && entityId > 0 },
   });
 };
 

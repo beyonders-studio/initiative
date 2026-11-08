@@ -1,9 +1,6 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
-import {
-  getListInitiativesQueryKey,
-  listInitiatives,
-} from "@/api/generated/initiatives/initiatives";
+import { getListInitiativesQueryOptions } from "@/api/generated/initiatives/initiatives";
 
 /**
  * Layout for everything addressed inside one initiative — the initiative page,
@@ -24,11 +21,7 @@ export const Route = createFileRoute(
     // Warm the cache without holding the navigation on it: the page draws
     // its placeholder at once and the list lands into it. A failed prefetch
     // is swallowed here; the page fetches for itself and reports the error.
-    void queryClient.prefetchQuery({
-      queryKey: getListInitiativesQueryKey(communityId),
-      queryFn: () => listInitiatives(communityId),
-      staleTime: 30_000,
-    });
+    void queryClient.prefetchQuery(getListInitiativesQueryOptions(communityId));
   },
   component: Outlet,
 });

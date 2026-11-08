@@ -2,9 +2,10 @@ import { Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useListAllAnnouncements } from "@/api/generated/announcements/announcements";
 import type { AnnouncementOperatorRead } from "@/api/generated/initiativeAPI.schemas";
 import { AnnouncementEditorDialog } from "@/components/announcements/AnnouncementEditorDialog";
-import { useDeleteAnnouncement, usePlatformAnnouncements } from "@/hooks/usePlatformAnnouncements";
+import { useDeleteAnnouncement } from "@/hooks/usePlatformAnnouncements";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
@@ -40,7 +41,7 @@ const STATUS_VARIANT: Record<Status, "default" | "secondary" | "outline"> = {
  */
 export const SettingsPlatformAnnouncementsPage = () => {
   const { t } = useTranslation(["announcements", "common"]);
-  const { data, isLoading } = usePlatformAnnouncements();
+  const { data, isLoading } = useListAllAnnouncements();
   const remove = useDeleteAnnouncement();
 
   const [editing, setEditing] = useState<AnnouncementOperatorRead | null>(null);

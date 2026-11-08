@@ -107,23 +107,23 @@ vi.mock(import("@/hooks/useAccessGrants"), async (importOriginal) => ({
   useMyAccessGrants: () => noPages(),
   useAccessGrantQueue: ((status?: string) =>
     status === "pending" ? pendingQueue : noPages()) as never,
-  useAccessGrantLimits: () => answered({ max_duration_minutes: requestCeiling }),
-  useGrantCases: (options?: { search?: string }) =>
+  useAccessGrantLimits: (() => answered({ max_duration_minutes: requestCeiling })) as never,
+  useGrantCases: ((options?: { search?: string }) =>
     answered(
       options?.search
         ? (searchedCases[options.search] ?? { items: [], required: false })
         : grantCases
-    ),
+    )) as never,
   useCreateAccessRequest: () => idle(createRequest),
   useCancelAccessRequest: () => idle(),
   useBreakGlass: () => idle(breakGlass),
-  useBreakGlassRequirements: () =>
+  useBreakGlassRequirements: (() =>
     answered({
       second_factor_required: false,
       max_duration_minutes: 240,
       totp_enrolled: true,
       passkey_enrolled: false,
-    }),
+    })) as never,
   useApproveAccessGrant: () => idle(),
   useDenyAccessGrant: () => idle(),
   useRevokeAccessGrant: () => idle(),

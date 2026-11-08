@@ -1,42 +1,26 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type {
-  CommunityNarrowingPending,
   PlacementCommunityRead,
   PlacementInitiativeRead,
-  ProviderPlacementResponse,
   ProviderPlacementRuleCreate,
   ProviderPlacementRuleUpdate,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   createProviderPlacementRule,
   deleteProviderPlacementRule,
-  getListPlacementCommunitiesQueryKey,
   getListPlacementRequestsQueryKey,
-  getListPlacementTargetsQueryKey,
   getListProviderPlacementQueryKey,
-  listPlacementCommunities,
-  listPlacementRequests,
-  listPlacementTargets,
-  listProviderPlacement,
   setProviderPlacementEverywhere,
   updateProviderPlacementRule,
+  useListPlacementCommunities,
+  useListPlacementTargets,
 } from "@/api/generated/provider-placement/provider-placement";
 import {
   agreeCommunityNarrowing,
   getReadCommunityNarrowingsQueryKey,
 } from "@/api/generated/settings/settings";
 import type { QueryOpts } from "@/types/query";
-
-/** Every provider, the placement rules written on it, and whether they apply
- *  to every community. */
-export const useProviderPlacement = (options?: QueryOpts<ProviderPlacementResponse>) => {
-  return useQuery<ProviderPlacementResponse>({
-    queryKey: getListProviderPlacementQueryKey(),
-    queryFn: () => listProviderPlacement(),
-    ...options,
-  });
-};
 
 /** Communities a rule for this provider may name, searched by name. */
 export const usePlacementCommunities = (
@@ -45,11 +29,7 @@ export const usePlacementCommunities = (
   options?: QueryOpts<PlacementCommunityRead[]>
 ) => {
   const params = { provider_id: providerId, search: query.trim() || undefined };
-  return useQuery<PlacementCommunityRead[]>({
-    queryKey: getListPlacementCommunitiesQueryKey(params),
-    queryFn: () => listPlacementCommunities(params),
-    ...options,
-  });
+  return useListPlacementCommunities(params, { query: options });
 };
 
 /** The initiatives, and their roles, a rule naming this community may place
@@ -59,14 +39,14 @@ export const usePlacementTargets = (
   communityId: number | null,
   options?: QueryOpts<PlacementInitiativeRead[]>
 ) => {
-  return useQuery<PlacementInitiativeRead[]>({
-    queryKey: getListPlacementTargetsQueryKey(providerId, communityId ?? 0),
-    queryFn: () => listPlacementTargets(providerId, communityId ?? 0),
-    enabled: communityId !== null,
-    // A community this provider's rules do not reach answers 404; asking
-    // again would not change that.
-    retry: false,
-    ...options,
+  return useListPlacementTargets(providerId, communityId ?? 0, {
+    query: {
+      enabled: communityId !== null,
+      // A community this provider's rules do not reach answers 404; asking
+      // again would not change that.
+      retry: false,
+      ...options,
+    },
   });
 };
 
@@ -110,15 +90,6 @@ export const useDeletePlacementRule = () => {
   return useMutation({
     mutationFn: (ruleId: number) => deleteProviderPlacementRule(ruleId),
     onSuccess: invalidate,
-  });
-};
-
-/** Every community whose claim to a domain or tenant is waiting for an answer. */
-export const usePlacementRequests = (options?: QueryOpts<CommunityNarrowingPending[]>) => {
-  return useQuery<CommunityNarrowingPending[]>({
-    queryKey: getListPlacementRequestsQueryKey(),
-    queryFn: () => listPlacementRequests(),
-    ...options,
   });
 };
 
