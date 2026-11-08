@@ -93,7 +93,6 @@ vi.mock("@/hooks/useIntakeSettings", () => ({
   useUpsertIntakeBinding: () => ({ mutate: upsertMutate, isPending: false }),
   useImportIntakeBlueprint: () => ({ mutate: importMutate, isPending: false }),
   useDeleteIntakeBinding: () => ({ mutate: deleteMutate, isPending: false }),
-  useUpdateFeedbackSwitch: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateIntakeGeneralContact: () => ({ mutateAsync: generalContactMutate, isPending: false }),
   useUpdateIntakeStreamContact: () => ({ mutateAsync: streamContactMutate, isPending: false }),
   useUpdateFeedbackSwitch: () => ({ mutate: vi.fn(), isPending: false }),
