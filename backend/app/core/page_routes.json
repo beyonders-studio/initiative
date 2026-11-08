@@ -120,6 +120,7 @@
   "/community/$communityId/login",
   "/demo",
   "/download",
+  "/feedback",
   "/forgot-password",
   "/invite/$code",
   "/legal/$slug",
