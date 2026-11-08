@@ -86,7 +86,7 @@ describe("DialogContent", () => {
   it("no dialog restates the kit's surface or column", () => {
     const restated =
       /^(?:flex|flex-col|grid|block|w-full|overflow-.+|max-h-.+|bg-.+|rounded.*|shadow.*|border.*)$/;
-    const offenders = sources(SRC)
+    const offenders = sources(path.join(SRC, "src"))
       .filter(({ file }) => !file.startsWith(path.join("src", "ui", path.sep)))
       .flatMap(({ file, source }) =>
         [
