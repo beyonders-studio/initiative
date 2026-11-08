@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { TaskTypeRead } from "@/api/generated/initiativeAPI.schemas";
+import { byPosition } from "@/components/projects/DefinitionTable";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { useDeleteTaskType, useProjectTaskTypes } from "@/hooks/useProjects";
 import { getErrorMessage } from "@/lib/errorMessage";
@@ -43,10 +44,7 @@ export const TaskTypeDeleteDialog = ({
   const types = useProjectTaskTypes(projectId, { enabled: typeId !== null }).data;
   const target = types?.find((type) => type.id === typeId);
   const others = useMemo(
-    () =>
-      (types ?? [])
-        .filter((type) => type.id !== typeId)
-        .sort((a, b) => a.position - b.position || a.id - b.id),
+    () => byPosition((types ?? []).filter((type) => type.id !== typeId)),
     [types, typeId]
   );
   // The reader's pick holds for the type it was made for.
