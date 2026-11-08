@@ -52,6 +52,7 @@ from app.core.messages import (
 )
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.pending_upload import PendingUpload
 from app.services.storage import STAGING_PREFIX, get_guild_storage
 from app.services.tenant import attachments
@@ -267,7 +268,10 @@ async def create(
     live = await session.scalar(
         select(func.count())
         .select_from(PendingUpload)
-        .where(PendingUpload.created_by == user.id)
+        .where(
+            PendingUpload.created_by_kind == ActorKind.member,
+            PendingUpload.created_by == user.id,
+        )
     )
     if (live or 0) >= MAX_LIVE_PER_PERSON:
         raise _refuse(status.HTTP_429_TOO_MANY_REQUESTS, ResumableMessages.TOO_MANY)

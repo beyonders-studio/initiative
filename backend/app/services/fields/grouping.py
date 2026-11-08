@@ -159,7 +159,7 @@ def _how(ds: Dataset, spec: FieldSpec) -> _How | None:
     if spec.kind is ControlKind.tag:
         return _How.tag
     if spec.column is not None:
-        if _referenced_dataset(spec) is not None:
+        if _referenced_dataset(ds, spec) is not None:
             return _How.reference
         if spec.kind is ControlKind.date:
             return _How.date
@@ -222,7 +222,7 @@ async def group_rows(
         assert bucket is not None
         held = await _by_date(session, ds, spec, ids, bucket, tz)
     elif how is _How.reference:
-        referenced = _referenced_dataset(spec)
+        referenced = _referenced_dataset(ds, spec)
         assert referenced is not None
         held = await _by_reference(session, ds, spec, referenced, ids)
     elif how is _How.value:
@@ -305,8 +305,10 @@ def _dataset_for_table(table: str) -> Dataset | None:
     return None
 
 
-def _referenced_dataset(spec: FieldSpec) -> Dataset | None:
-    for fk in getattr(spec.column, "foreign_keys", ()):
+def _referenced_dataset(ds: Dataset, spec: FieldSpec) -> Dataset | None:
+    # The stored column's key: a field's expression may wrap it, as
+    # ``created_by`` is read only where its kind is ``member``.
+    for fk in getattr(ds.model.__table__.columns.get(spec.name), "foreign_keys", ()):
         return _dataset_for_table(fk.target_fullname.split(".")[0])
     return None
 

@@ -10,6 +10,7 @@ from typing import Any
 
 from pydantic import AliasChoices, ConfigDict, Field, computed_field
 
+from app.core.identity_boundary import PersonId
 from app.models.tenant.data_job import (
     HOLDS_FILE,
     DataJob,
@@ -27,7 +28,7 @@ class DataJobRead(SanitizedBaseModel):
     id: int
     community_id: int = Field(validation_alias=AliasChoices("community_id", "guild_id"))
     direction: DataJobDirection
-    created_by: int
+    created_by: PersonId
     source: str
     params: dict[str, Any]
     status: DataJobStatus

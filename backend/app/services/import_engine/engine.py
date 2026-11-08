@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -419,6 +420,7 @@ async def count_active_jobs_locked(session: AsyncSession, *, user: User) -> None
             .select_from(DataJob)
             .where(
                 DataJob.direction == DataJobDirection.import_,
+                DataJob.created_by_kind == ActorKind.member,
                 DataJob.created_by == user.id,
                 col(DataJob.status).in_(_ACTIVE_STATUSES),
             )
@@ -469,11 +471,11 @@ def _spool_to_file(source: BinaryIO, max_bytes: int) -> Path:
     ``IMPORT_TOO_LARGE`` once it passes ``max_bytes``."""
     import tempfile
 
-    with tempfile.NamedTemporaryFile(
-        prefix="import-upload-", suffix=".zip", delete=False
-    ) as handle:
-        path = Path(handle.name)
-        try:
+    fd, name = tempfile.mkstemp(prefix="import-upload-", suffix=".zip")
+    path = Path(name)
+    # Closing flushes, so it fails like a write does and is cleaned up the same.
+    try:
+        with os.fdopen(fd, "wb") as handle:
             total = 0
             while True:
                 chunk = source.read(min(_SPOOL_CHUNK_BYTES, max_bytes + 1 - total))
@@ -485,9 +487,9 @@ def _spool_to_file(source: BinaryIO, max_bytes: int) -> Path:
                         ImportEngineMessages.IMPORT_TOO_LARGE, status_code=413
                     )
                 handle.write(chunk)
-        except BaseException:
-            path.unlink(missing_ok=True)
-            raise
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
     return path
 
 
@@ -522,14 +524,15 @@ def _spool_payload(guild_id: int, payload_ref: str) -> tuple[Path, bool] | None:
         return Path(blob.path), False
     if blob.stream is None:
         return None
-    with tempfile.NamedTemporaryFile(prefix="import-payload-", delete=False) as handle:
-        path = Path(handle.name)
-        try:
+    fd, name = tempfile.mkstemp(prefix="import-payload-")
+    path = Path(name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
             for chunk in blob.stream:
                 handle.write(chunk)
-        except BaseException:
-            path.unlink(missing_ok=True)
-            raise
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
     return path, True
 
 

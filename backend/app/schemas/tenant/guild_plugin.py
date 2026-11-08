@@ -21,6 +21,7 @@ from typing import (
 
 from pydantic import AliasChoices, ConfigDict, Field
 
+from app.core.identity_boundary import PersonId
 from app.models.tenant.plugin_member_consent import ConsentAccess, ConsentStatus
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.platform.marketplace import ListingSource
@@ -328,7 +329,7 @@ class CommunityPluginRead(SanitizedBaseModel):
     #: service plug-in whose registration is missing or switched off — the install
     #: stays where it is and says why it is doing nothing.
     available: bool = True
-    created_by: int
+    created_by: PersonId
     created_at: datetime
     updated_at: datetime
 
