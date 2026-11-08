@@ -124,12 +124,6 @@ LEVELS_BY_PURPOSE: dict[str, tuple[str, ...]] = {
     "billing": (AccessLevel.read.value,),
     "settings": SETTINGS_LEVELS,
 }
-ACCESS_GRANT_STATUSES: tuple[str, ...] = tuple(
-    status.value for status in AccessGrantStatus
-)
-ACCESS_GRANT_PURPOSES: tuple[str, ...] = tuple(
-    purpose.value for purpose in AccessGrantPurpose
-)
 
 
 class AccessGrant(SQLModel, table=True):

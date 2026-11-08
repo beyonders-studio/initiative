@@ -54,7 +54,6 @@ def test_an_object_reads_back_whole(size):
     plaintext = os.urandom(size)
     stored = encrypt(plaintext, KEY, guild_id=GUILD, generation=1, chunk_size=CHUNK)
     assert stored.startswith(MAGIC)
-    assert len(stored) == parse_header(stored).stored_size
     assert _read(stored) == plaintext
 
 

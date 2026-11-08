@@ -243,7 +243,6 @@
   "QUERY_QUALIFIED_RELATION": "Name the table on its own, without a schema.",
   "QUERY_MISSING_RELATION": "A query has to read from something.",
   "QUERY_UNKNOWN_FIELD": "That field does not exist here.",
-  "QUERY_UNGROUPED_FIELD": "Read beside a total, that column needs grouping.",
   "QUERY_FIELD_NOT_SELECTABLE": "That field can be filtered on but not selected.",
   "QUERY_AMBIGUOUS_FIELD": "Say which table this field belongs to.",
   "QUERY_DUPLICATE_ALIAS": "Two tables share the same alias. Give each its own.",

@@ -666,18 +666,6 @@ def _task_target_path(task_id: int | None, project_id: int | None) -> str:
     return "/"
 
 
-def _initiative_target_path(initiative_id: int | None) -> str:
-    """An initiative is addressed directly rather than through the resolver: it
-    is the thing tool references resolve INTO, so it has a stable address of its
-    own."""
-    if initiative_id is None:
-        # No one initiative to open, so land on the guild's front page — which
-        # is where the initiative list lives now that the standalone page is
-        # gone. "/i" would only redirect here anyway.
-        return "/"
-    return f"/i/{initiative_id}"
-
-
 def _recipient_locale(user: User) -> str:
     return getattr(user, "locale", None) or "en"
 

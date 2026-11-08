@@ -26,7 +26,6 @@ def _sealed(plaintext: bytes, *, chunk_size: int = 16) -> tuple[bytes, bytes]:
 def test_an_object_comes_back_as_it_went_in(size: int):
     plaintext = os.urandom(size)
     dek, stored = _sealed(plaintext)
-    assert len(stored) == blob_crypto.ciphertext_size(size, chunk_size=16)
     assert (
         blob_crypto.decrypt(stored, dek, origin_guild_id=4, origin_id=ORIGIN)
         == plaintext

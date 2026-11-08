@@ -2298,11 +2298,6 @@ def _fields_on(declared: Any, kind: Optional[str] = None) -> list[dict[str, Any]
     ]
 
 
-def shown_keys(definition: Any, kind: str) -> frozenset[str]:
-    """The keys a pinned definition declares as fields on ``kind``."""
-    return frozenset(field["key"] for field in _fields_on(definition, kind))
-
-
 def _declared(field: Optional[Mapping[str, Any]], key: str) -> Dict[str, Any]:
     """What a definition of ``key`` is under the pinned ``field`` declaring
     it, or under none."""

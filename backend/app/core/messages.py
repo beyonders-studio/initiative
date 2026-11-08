@@ -1117,9 +1117,6 @@ class QueryMessages:
     #: A field that exists but is computed rather than stored, so there is no
     #: column for a query to name yet.
     FIELD_NOT_SELECTABLE = "QUERY_FIELD_NOT_SELECTABLE"
-    #: A column read beside an aggregate without being grouped, so there is no
-    #: one value of it per row of the answer.
-    UNGROUPED_FIELD = "QUERY_UNGROUPED_FIELD"
     #: An unqualified column that more than one relation in scope could mean.
     AMBIGUOUS_FIELD = "QUERY_AMBIGUOUS_FIELD"
     #: The same alias used for two relations.

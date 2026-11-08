@@ -1849,10 +1849,11 @@ async def test_joining_flips_content_visibility(
         assert body["resolved_by"] == manager.user.id
         assert body["resolved_at"] is not None
 
-    membership = await initiatives_service.get_initiative_membership_with_role(
+    membership = await initiatives_service.get_initiative_membership(
         session, initiative_id=initiative.id, user_id=member.user.id
     )
     assert membership is not None
+    await session.refresh(membership, ["role_ref"])
     assert membership.role_ref.name == "member"
     assert membership.role_ref.is_manager is False
     assert membership.oidc_provider_id is None

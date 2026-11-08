@@ -968,7 +968,7 @@ async def _run_import_worker(monkeypatch, role_session):
     monkeypatch.setattr(
         import_worker, "_open_user_session", lambda _guild_id: user_session
     )
-    await import_worker.process_import_jobs()
+    await import_worker.jobs.process()
 
 
 async def test_backup_import_end_to_end_with_assets(
@@ -6683,7 +6683,7 @@ async def test_a_community_runs_one_import_at_a_time(
     assert await _status(client, a, first) == DataJobStatus.done.value
     assert await _status(client, a, second) == DataJobStatus.queued.value
 
-    await import_worker.process_import_jobs()
+    await import_worker.jobs.process()
     assert await _status(client, a, second) == DataJobStatus.done.value
 
 
@@ -6708,7 +6708,7 @@ async def test_a_process_starts_no_more_than_its_slots(
 
     assert len(started) == 1
     await asyncio.gather(*started)
-    await import_worker.process_import_jobs()
+    await import_worker.jobs.process()
 
 
 async def test_the_sweep_leaves_a_job_this_process_is_running(

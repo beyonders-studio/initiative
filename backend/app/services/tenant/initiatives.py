@@ -295,46 +295,6 @@ async def get_initiative_membership(
     return result.one_or_none()
 
 
-async def initiative_roster(
-    session: AsyncSession, initiative_id: int, *, with_users: bool = False
-) -> list[InitiativeMember]:
-    """The initiative's members, for a caller whose question is the roster
-    itself: who to notify, whose access to copy, whom to offer in a picker.
-
-    A read of a resource does not carry it; what a reader may do with a row is
-    the database's answer, and the roster is read here, where it is the point.
-    """
-    stmt = select(InitiativeMember).where(
-        InitiativeMember.initiative_id == initiative_id
-    )
-    if with_users:
-        stmt = stmt.options(selectinload(InitiativeMember.user))
-    return list((await session.exec(stmt)).all())
-
-
-async def get_initiative_membership_with_role(
-    session: AsyncSession,
-    *,
-    initiative_id: int,
-    user_id: int,
-) -> InitiativeMember | None:
-    """Get membership with role eagerly loaded."""
-    stmt = (
-        select(InitiativeMember)
-        .options(
-            selectinload(InitiativeMember.role_ref).selectinload(
-                InitiativeRoleModel.permissions
-            )
-        )
-        .where(
-            InitiativeMember.initiative_id == initiative_id,
-            InitiativeMember.user_id == user_id,
-        )
-    )
-    result = await session.exec(stmt)
-    return result.one_or_none()
-
-
 async def ensure_managers_remain(
     session: AsyncSession,
     *,

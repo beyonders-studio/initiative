@@ -243,7 +243,6 @@
   "QUERY_QUALIFIED_RELATION": "Nenne die Tabelle allein, ohne Schema.",
   "QUERY_MISSING_RELATION": "Eine Abfrage muss aus etwas lesen.",
   "QUERY_UNKNOWN_FIELD": "Dieses Feld gibt es hier nicht.",
-  "QUERY_UNGROUPED_FIELD": "Neben einer Summe gelesen, muss diese Spalte gruppiert werden.",
   "QUERY_FIELD_NOT_SELECTABLE": "Nach diesem Feld kann gefiltert, es kann aber nicht ausgewählt werden.",
   "QUERY_AMBIGUOUS_FIELD": "Gib an, zu welcher Tabelle dieses Feld gehört.",
   "QUERY_DUPLICATE_ALIAS": "Zwei Tabellen teilen sich denselben Alias. Gib jeder einen eigenen.",
