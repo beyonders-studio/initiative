@@ -333,6 +333,7 @@ class Snapshot:
     memberships: list[tuple]
     extensions: list[tuple[str, str]]
     sql: str
+    opclasses: list[str]
 
 
 def snapshot(found: Server, before: Cluster, after: Cluster) -> Snapshot:
@@ -365,7 +366,7 @@ def snapshot(found: Server, before: Cluster, after: Cluster) -> Snapshot:
             raise SystemExit(f"Unexpected membership {granted}")
     roles = [(name, attrs[1]) for name, attrs in sorted(made.items())]
     extensions = sorted(after.extensions - before.extensions)
-    sql = curate(
+    sql, opclasses = curate(
         found.dump(
             "--inserts",
             "--schema=public",
@@ -374,11 +375,12 @@ def snapshot(found: Server, before: Cluster, after: Cluster) -> Snapshot:
         ),
         [name for name in after.roles if _prefixed(name)],
     )
-    return Snapshot(roles, memberships, extensions, sql)
+    return Snapshot(roles, memberships, extensions, sql, opclasses)
 
 
 _ENTRY = re.compile(
-    r"^-- (?:Data for )?Name: .*; Schema: (\S*); Owner: (\S*)$", re.MULTILINE
+    r"^-- (?:Data for )?Name: (.*); Type: (.*); Schema: (\S*); Owner: (\S*)$",
+    re.MULTILINE,
 )
 _OWNER_TO = re.compile(r"^ALTER .* OWNER TO (\S+);$", re.MULTILINE)
 _SESSION = re.compile(
@@ -388,17 +390,28 @@ _SESSION = re.compile(
 )
 
 
-def curate(dump: str, prefixed: list[str]) -> str:
+def curate(dump: str, prefixed: list[str]) -> tuple[str, list[str]]:
     """The dump less its session settings and the entries bootstrap owns
-    (the superuser's search operator), with prefixed role names marked."""
+    (the superuser's search operator), with prefixed role names marked; and
+    the operator classes of bootstrap's that it still names.
+
+    Bootstrap installs those only as a superuser, so an index built on one is
+    built on the default class where it is missing, as the revision that
+    first built it did."""
     starts = [m.start() for m in _ENTRY.finditer(dump)]
     kept = []
+    opclasses: set[str] = set()
+    others: set[str] = set()
     for start, end in zip(starts, [*starts[1:], len(dump)], strict=True):
         entry = dump[start:end]
         header = _ENTRY.match(entry)
         assert header
-        schema, owner = header.groups()
+        name, kind, schema, owner = header.groups()
         if owner == OWNER:
+            if kind in ("OPERATOR CLASS", "OPERATOR FAMILY"):
+                opclasses.add(name.split()[0])
+            elif kind != "ACL":
+                others.add(f"{schema}.{name.split('(')[0].strip()}")
             continue
         if owner != RUNNER and schema != "-":
             # Owning an object in a schema takes CREATE on it, which the
@@ -417,7 +430,10 @@ def curate(dump: str, prefixed: list[str]) -> str:
         names = "|".join(sorted(map(re.escape, prefixed), key=len, reverse=True))
         sql = re.sub(rf"\b(?:{names})\b", lambda m: PREFIX_MARK + m.group(0), sql)
     sql = re.sub(r"\n{3,}", "\n\n", sql)
-    return sql.strip() + "\n"
+    if named := sorted(name for name in others if name in sql):
+        raise SystemExit(f"The snapshot uses what bootstrap installs: {named}")
+    used = sorted(name for name in opclasses if f"public.{name}" in sql)
+    return sql.strip() + "\n", used
 
 
 def write_baseline(tag: str, cut: str, shot: Snapshot) -> list[Path]:
@@ -448,6 +464,7 @@ def write_baseline(tag: str, cut: str, shot: Snapshot) -> list[Path]:
             roles=_literal(shot.roles),
             memberships=_literal(shot.memberships),
             extensions=_literal(shot.extensions),
+            opclasses=repr(tuple(shot.opclasses)),
         )
     )
     return [py_path, sql_path]
@@ -495,6 +512,10 @@ _MEMBERSHIPS = {memberships}
 #: Each extension and its schema.
 _EXTENSIONS = {extensions}
 
+#: Operator classes ``app.db.bootstrap`` installs when it runs as a superuser.
+#: An index built on one that is missing is built on the default class.
+_BOOTSTRAP_OPCLASSES = {opclasses}
+
 
 def _prefix() -> str:
     from app.core.config import settings
@@ -532,8 +553,22 @@ def upgrade() -> None:
         bind.execute(
             text(f'CREATE EXTENSION IF NOT EXISTS "{{extension}}" WITH SCHEMA "{{schema}}"')
         )
+    missing = [
+        name
+        for name in _BOOTSTRAP_OPCLASSES
+        if not bind.execute(
+            text(
+                "SELECT 1 FROM pg_opclass c JOIN pg_namespace n "
+                "ON n.oid = c.opcnamespace "
+                "WHERE n.nspname = 'public' AND c.opcname = :name"
+            ),
+            {{"name": name}},
+        ).scalar()
+    ]
     bind.execute(text("SET LOCAL check_function_bodies = false"))
     sql = _SQL.read_text().replace(_MARK, _prefix())
+    for name in missing:
+        sql = sql.replace(f" public.{{name}})", ")")
     for statement in split_sql_statements(sql):
         # Raw, so a colon in a function body is not read as a parameter.
         bind.exec_driver_sql(statement)
