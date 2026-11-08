@@ -23,8 +23,6 @@ import type { CommunityPluginDetail } from "@/api/generated/initiativeAPI.schema
 import { useSetPluginPlacementRoles, useUpdateCommunityPlugin } from "@/hooks/useCommunityPlugins";
 import { useInitiativeRoles } from "@/hooks/useInitiativeRoles";
 import { useCommunityInitiatives } from "@/hooks/useInitiatives";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
 import { declaredPages, hasInitiativeSurfaces } from "@/lib/pluginSurfaces";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
@@ -95,9 +93,8 @@ export function PluginPlacementPanel({ plugin }: PluginPlacementPanelProps) {
         await update.mutateAsync({ placed_initiative_ids: live });
         settled.current = live;
       })
-      .catch((error) => {
-        toast.error(getErrorMessage(error, "plugins:error"));
-      })
+      // The update says when it fails; the queue only has to carry on.
+      .catch(() => undefined)
       .finally(() => {
         outstanding.current -= 1;
         // Nothing else is coming, so the panel now shows what the server took:
