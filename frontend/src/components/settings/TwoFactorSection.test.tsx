@@ -209,7 +209,7 @@ describe("TwoFactorSection", () => {
     renderWithProviders(<TwoFactorSection />);
 
     expect(screen.queryByRole("button", { name: /set up/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/couldn't check/i)).toBeInTheDocument();
+    expect(screen.getByText(/couldn't load this/i)).toBeInTheDocument();
   });
 
   it("starts at the code to scan where the account holds no password", async () => {
