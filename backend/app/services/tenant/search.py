@@ -25,7 +25,7 @@ from sqlalchemy import (
     text,
     union,
 )
-from sqlalchemy.dialects.postgresql import TSQUERY
+from sqlalchemy.dialects.postgresql import TSQUERY, distinct_on
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -389,7 +389,7 @@ def _best_chunk(clause: ColumnElement[bool], parsed) -> Select:
             rank,
         )
         .where(clause)
-        .distinct(SearchEntry.entity_type, SearchEntry.entity_id)
+        .ext(distinct_on(SearchEntry.entity_type, SearchEntry.entity_id))
         .order_by(SearchEntry.entity_type, SearchEntry.entity_id, rank.desc())
         .subquery()
     )
