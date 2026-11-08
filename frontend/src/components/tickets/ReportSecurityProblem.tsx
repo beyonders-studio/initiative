@@ -12,7 +12,7 @@ import { Suspense } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ContactDialog } from "@/components/tickets/ContactDialog";
-import { FileTicketSheet } from "@/components/tickets/FileTicketSheet";
+import { FileTicketDialog } from "@/components/tickets/FileTicketDialog";
 import { useTicketAvailability } from "@/hooks/useTickets";
 import { Button } from "@/ui/button";
 
@@ -39,7 +39,7 @@ export const SecurityReportDialog = ({ open, onOpenChange }: SecurityReportDialo
     // Its own boundary: the first opening loads the dialog's translations.
     <Suspense fallback={null}>
       {form ? (
-        <FileTicketSheet
+        <FileTicketDialog
           open={open}
           onOpenChange={onOpenChange}
           ticket={{ stream: "security" }}
