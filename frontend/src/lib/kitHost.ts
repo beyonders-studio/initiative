@@ -8,10 +8,14 @@ import { openExternal } from "@/lib/openExternal";
 import { getItem, setItem } from "@/lib/storage";
 import { type HostLinkProps, setHost } from "@/ui/host";
 
+// Hunspell's English dictionary, served by jsDelivr.
+const DICTIONARY = "https://cdn.jsdelivr.net/npm/dictionary-en@3.2.0/index";
+
 /**
  * Hand the UI kit what it takes from Initiative: the mascot's toasts, the
  * phone's camera, the router's links, the phone's browser sheet, the device's
- * storage, the emoji data this app serves and the origins that are its own.
+ * storage, the emoji data this app serves, the spelling dictionary and the
+ * origins that are its own.
  *
  * Each is called through when the kit uses it rather than read here, so the
  * host holds nothing a module would have to hand over at boot.
@@ -30,5 +34,15 @@ export const connectKit = (): void =>
     openExternal: (url) => openExternal(url),
     storage: { getItem: (key) => getItem(key), setItem: (key, value) => setItem(key, value) },
     emojibaseUrl: __EMOJIBASE_URL__,
+    spellCheckDictionary: async () => {
+      const [aff, dic] = await Promise.all(
+        ["aff", "dic"].map(async (extension) => {
+          const response = await fetch(`${DICTIONARY}.${extension}`);
+          if (!response.ok) throw new Error("Failed to fetch dictionary files");
+          return response.text();
+        })
+      );
+      return { aff, dic };
+    },
     isOwnOrigin: (url) => isOwnOrigin(url),
   });

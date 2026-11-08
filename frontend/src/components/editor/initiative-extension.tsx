@@ -38,6 +38,9 @@ export const InitiativeExtension = defineExtension({
           <InsertImageDialog activeEditor={editor} onClose={onClose} />
         )),
       resolveSrc: (src) => resolveUploadUrl(src) ?? src,
+      // Only a file stored in the community can be featured: the shape the
+      // server holds `featured_image_url` to (`UPLOAD_PATH_SHAPE`).
+      canBeFeatured: (src) => /^\/uploads\/\d+\/[\w.-]+$/.test(src),
     }),
   ],
 });

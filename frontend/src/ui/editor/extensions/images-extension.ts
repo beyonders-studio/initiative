@@ -48,6 +48,9 @@ export interface ImagesConfig {
   insert: ((editor: LexicalEditor, showModal: ShowModal) => void) | null;
   /** The address a stored picture is drawn from. */
   resolveSrc: (src: string) => string;
+  /** Whether a picture may become the document's featured image, where the
+   *  page offers one (`FeaturedImageProvider`). */
+  canBeFeatured: (src: string) => boolean;
 }
 
 const getDOMSelection = (targetWindow: Window | null): Selection | null =>
@@ -177,7 +180,11 @@ function $onDrop(event: DragEvent, editor: LexicalEditor): boolean {
 export const ImagesExtension = defineExtension({
   name: "@initiative/images",
   nodes: [ImageNode],
-  config: safeCast<ImagesConfig>({ insert: null, resolveSrc: (src) => src }),
+  config: safeCast<ImagesConfig>({
+    insert: null,
+    resolveSrc: (src) => src,
+    canBeFeatured: () => true,
+  }),
   register: (editor) =>
     mergeRegister(
       editor.registerCommand<InsertImagePayload>(

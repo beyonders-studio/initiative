@@ -2,6 +2,7 @@ import { calculateZoomLevel } from "@lexical/utils";
 import type { LexicalEditor } from "lexical";
 import type * as React from "react";
 import { type JSX, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/ui/button";
 
@@ -35,6 +36,7 @@ export function ImageResizer({
   showCaption: boolean;
   captionsEnabled: boolean;
 }): JSX.Element {
+  const { t } = useTranslation("editor");
   const controlWrapperRef = useRef<HTMLDivElement>(null);
   const userSelect = useRef({
     priority: "",
@@ -215,7 +217,7 @@ export function ImageResizer({
             setShowCaption(!showCaption);
           }}
         >
-          Add Caption
+          {t("caption.add")}
         </Button>
       )}
       <div

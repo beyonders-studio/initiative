@@ -60,6 +60,8 @@
     "failed": "Cette photo n'a pas pu être lue. Réessayez."
   },
   "lightbox": {
+    "open": "Voir cette image en taille réelle",
+    "openNamed": "Voir {{name}} en taille réelle",
     "title": "Image",
     "description": "Utilisez les flèches ou faites glisser pour passer d’une image à l’autre.",
     "position": "{{current}} / {{total}}",

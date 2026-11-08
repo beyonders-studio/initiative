@@ -2,6 +2,7 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 import { TreeView } from "@lexical/react/LexicalTreeView";
 import { NotebookPenIcon } from "lucide-react";
 import type { JSX } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/ui/dialog";
@@ -9,6 +10,7 @@ import { ScrollArea, ScrollBar } from "@/ui/scroll-area";
 
 export function TreeViewPlugin(): JSX.Element {
   const [editor] = useLexicalComposerContext();
+  const { t } = useTranslation("editor");
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -18,7 +20,7 @@ export function TreeViewPlugin(): JSX.Element {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Tree View</DialogTitle>
+          <DialogTitle>{t("actions.treeView")}</DialogTitle>
         </DialogHeader>
         <ScrollArea className="h-96 overflow-hidden rounded-lg bg-foreground p-2 text-background">
           <TreeView

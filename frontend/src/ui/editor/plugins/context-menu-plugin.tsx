@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import type { JSX } from "react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   checkWord,
@@ -85,6 +86,7 @@ const MAX_SUGGESTIONS = 5;
 
 export function ContextMenuPlugin(): JSX.Element {
   const [editor] = useLexicalComposerContext();
+  const { t } = useTranslation("editor");
 
   // Use refs to store spell data so it's available synchronously in $showOn
   const spellDataRef = useRef<{
@@ -204,7 +206,7 @@ export function ContextMenuPlugin(): JSX.Element {
     );
 
     const baseItems = [
-      new NodeContextMenuOption(`Remove Link`, {
+      new NodeContextMenuOption(t("contextMenu.removeLink"), {
         $onSelect: () => {
           editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
         },
@@ -215,21 +217,21 @@ export function ContextMenuPlugin(): JSX.Element {
       new NodeContextMenuSeparator({
         $showOn: (node: LexicalNode) => $isLinkNode(node.getParent()),
       }),
-      new NodeContextMenuOption(`Cut`, {
+      new NodeContextMenuOption(t("contextMenu.cut"), {
         $onSelect: () => {
           editor.dispatchCommand(CUT_COMMAND, null);
         },
         disabled: false,
         icon: <Scissors className="h-4 w-4" />,
       }),
-      new NodeContextMenuOption(`Copy`, {
+      new NodeContextMenuOption(t("contextMenu.copy"), {
         $onSelect: () => {
           editor.dispatchCommand(COPY_COMMAND, null);
         },
         disabled: false,
         icon: <Copy className="h-4 w-4" />,
       }),
-      new NodeContextMenuOption(`Paste`, {
+      new NodeContextMenuOption(t("contextMenu.paste"), {
         $onSelect: () => {
           navigator.clipboard.read().then(async () => {
             const data = new DataTransfer();
@@ -242,7 +244,7 @@ export function ContextMenuPlugin(): JSX.Element {
               name: "clipboard-read",
             });
             if (permission.state === "denied") {
-              alert("Not allowed to paste from clipboard.");
+              alert(t("contextMenu.pasteNotAllowed"));
               return;
             }
 
@@ -261,7 +263,7 @@ export function ContextMenuPlugin(): JSX.Element {
         disabled: false,
         icon: <Clipboard className="h-4 w-4" />,
       }),
-      new NodeContextMenuOption(`Paste as Plain Text`, {
+      new NodeContextMenuOption(t("contextMenu.pasteAsPlainText"), {
         $onSelect: () => {
           navigator.clipboard.read().then(async () => {
             const permission = await navigator.permissions.query({
@@ -270,7 +272,7 @@ export function ContextMenuPlugin(): JSX.Element {
             });
 
             if (permission.state === "denied") {
-              alert("Not allowed to paste from clipboard.");
+              alert(t("contextMenu.pasteNotAllowed"));
               return;
             }
 
@@ -288,7 +290,7 @@ export function ContextMenuPlugin(): JSX.Element {
         icon: <ClipboardType className="h-4 w-4" />,
       }),
       new NodeContextMenuSeparator(),
-      new NodeContextMenuOption(`Delete Node`, {
+      new NodeContextMenuOption(t("contextMenu.deleteNode"), {
         $onSelect: () => {
           const decorator = decoratorKeyRef.current && $getNodeByKey(decoratorKeyRef.current);
           if (decorator) {
@@ -316,7 +318,7 @@ export function ContextMenuPlugin(): JSX.Element {
     ];
 
     return [...spellItems, ...baseItems];
-  }, [editor]);
+  }, [editor, t]);
 
   return (
     <NodeContextMenuPlugin

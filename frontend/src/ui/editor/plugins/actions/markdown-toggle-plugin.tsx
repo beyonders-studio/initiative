@@ -8,6 +8,7 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 import { $createTextNode, $getRoot } from "lexical";
 import { FileTextIcon } from "lucide-react";
 import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/ui/button";
 
@@ -27,6 +28,7 @@ const PRESERVE_NEWLINES_ON_EXPORT = false;
 
 export function MarkdownTogglePlugin({ transformers }: { transformers: Array<Transformer> }) {
   const [editor] = useLexicalComposerContext();
+  const { t } = useTranslation("editor");
 
   const handleMarkdownToggle = useCallback(() => {
     editor.update(() => {
@@ -64,8 +66,8 @@ export function MarkdownTogglePlugin({ transformers }: { transformers: Array<Tra
     <Button
       variant={"ghost"}
       onClick={handleMarkdownToggle}
-      title="Convert From Markdown"
-      aria-label="Convert from markdown"
+      title={t("actions.markdownTitle")}
+      aria-label={t("actions.markdownLabel")}
       size={"sm"}
       className="p-2"
     >

@@ -239,5 +239,77 @@
     "changed": "Der Text wurde während des Schreibens geändert. Füge dies stattdessen darunter ein oder verwirf es.",
     "cannotKeep": "Die Schreibhilfe kann diese Auswahl nicht unverändert zurücksetzen: Sie reicht über Listenpunkte oder eine Überschrift oder enthält etwa ein Bild. Wähle stattdessen Text innerhalb eines davon aus.",
     "error": "Das konnte nicht geschrieben werden. Bitte versuche es erneut."
+  },
+  "syncing": "Dokument wird synchronisiert...",
+  "placeholder": "Drücke / für Befehle...",
+  "brokenImage": "Defekt",
+  "copyCode": "kopieren",
+  "caption": {
+    "add": "Bildunterschrift hinzufügen",
+    "placeholder": "Bildunterschrift eingeben..."
+  },
+  "picker": {
+    "bulletedList": "Aufzählungsliste",
+    "checkList": "Checkliste",
+    "code": "Code",
+    "divider": "Trennlinie",
+    "numberedList": "Nummerierte Liste",
+    "quote": "Zitat",
+    "alignLeft": "Linksbündig ausrichten",
+    "alignCenter": "Zentriert ausrichten",
+    "alignRight": "Rechtsbündig ausrichten",
+    "alignJustify": "Im Blocksatz ausrichten",
+    "tableOfSize": "{{rows}}x{{columns}}-Tabelle"
+  },
+  "tableDialog": {
+    "rows": "Anzahl der Zeilen",
+    "rowsPlaceholder": "Anzahl Zeilen (1-500)",
+    "columns": "Anzahl der Spalten",
+    "columnsPlaceholder": "Anzahl Spalten (1-50)",
+    "confirm": "Bestätigen"
+  },
+  "columnLayouts": {
+    "twoEqual": "2 Spalten (gleich breit)",
+    "twoQuarterLeft": "2 Spalten (25 % - 75 %)",
+    "threeEqual": "3 Spalten (gleich breit)",
+    "threeWideMiddle": "3 Spalten (25 % - 50 % - 25 %)",
+    "fourEqual": "4 Spalten (gleich breit)"
+  },
+  "contextMenu": {
+    "removeLink": "Link entfernen",
+    "cut": "Ausschneiden",
+    "copy": "Kopieren",
+    "paste": "Einfügen",
+    "pasteAsPlainText": "Als reinen Text einfügen",
+    "deleteNode": "Block löschen",
+    "pasteNotAllowed": "Einfügen aus der Zwischenablage ist nicht erlaubt."
+  },
+  "selectionFormat": {
+    "bold": "Fett umschalten",
+    "italic": "Kursiv umschalten",
+    "underline": "Unterstrichen umschalten",
+    "strikethrough": "Durchgestrichen umschalten",
+    "code": "Code umschalten",
+    "link": "Link umschalten",
+    "subscript": "Tiefgestellt umschalten",
+    "superscript": "Hochgestellt umschalten"
+  },
+  "actions": {
+    "importTitle": "Importieren",
+    "importLabel": "Editorinhalt aus JSON importieren",
+    "importTooltip": "Inhalt importieren",
+    "speechToText": "Spracheingabe",
+    "enableSpeechToText": "Spracheingabe einschalten",
+    "disableSpeechToText": "Spracheingabe ausschalten",
+    "markdownTitle": "Aus Markdown umwandeln",
+    "markdownLabel": "Aus Markdown umwandeln",
+    "readOnlyMode": "Nur-Lese-Modus",
+    "lockReadOnly": "Nur-Lese-Modus einschalten",
+    "unlockReadOnly": "Nur-Lese-Modus ausschalten",
+    "viewOnlyMode": "Nur ansehen",
+    "editMode": "Bearbeiten",
+    "clearEditor": "Editor leeren",
+    "clearEditorConfirm": "Möchtest du den Editor wirklich leeren?",
+    "treeView": "Baumansicht"
   }
 }

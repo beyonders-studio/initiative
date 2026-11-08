@@ -1,37 +1,32 @@
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { UploadIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
-import { FileType } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 
-// Export moved to the file header's engine-backed Export menu; the toolbar
-// keeps only the import side. Import accepts EVERY file shape the app has ever
-// exported: the generic initiative-file envelope (current engine export,
-// editor state under `content`, discriminated by `type` — or `kind`, the
-// field's name in early exports), the same envelope under its earlier
-// initiative-document name, and the legacy @lexical/file .lexical shape
-// (editor state under `editorState`).
-function extractEditorState(parsed: unknown): unknown | null {
-  if (typeof parsed !== "object" || parsed === null) {
+/** Finds the editor state in a file of the host's own format, or nothing. */
+export type ReadImport = (file: Record<string, unknown>) => unknown;
+
+const isObject = (value: unknown): value is object => typeof value === "object" && value !== null;
+
+// A file the host reads, then the `@lexical/file` `.lexical` shape (the editor
+// state under `editorState`).
+function extractEditorState(parsed: unknown, readImport?: ReadImport): unknown | null {
+  if (!isObject(parsed)) {
     return null;
   }
   const record = parsed as Record<string, unknown>;
-  const isEnvelope = (name: string): boolean => record.type === name || record.kind === name;
-  const lexical =
-    (isEnvelope("initiative-file") && record.file_type === FileType.lexical) ||
-    (isEnvelope("initiative-document") && record.document_type === "native");
-  if (lexical && typeof record.content === "object" && record.content !== null) {
-    return record.content;
+  const hosted = readImport?.(record);
+  if (isObject(hosted)) {
+    return hosted;
   }
-  if (typeof record.editorState === "object" && record.editorState !== null) {
-    return record.editorState;
-  }
-  return null;
+  return isObject(record.editorState) ? record.editorState : null;
 }
 
-export function ImportExportPlugin() {
+export function ImportExportPlugin({ readImport }: { readImport?: ReadImport }) {
   const [editor] = useLexicalComposerContext();
+  const { t } = useTranslation("editor");
 
   const handleImport = () => {
     const input = document.createElement("input");
@@ -43,7 +38,7 @@ export function ImportExportPlugin() {
         return;
       }
       try {
-        const editorState = extractEditorState(JSON.parse(await file.text()));
+        const editorState = extractEditorState(JSON.parse(await file.text()), readImport);
         if (!editorState) {
           return;
         }
@@ -61,15 +56,15 @@ export function ImportExportPlugin() {
         <Button
           variant={"ghost"}
           onClick={handleImport}
-          title="Import"
-          aria-label="Import editor state from JSON"
+          title={t("actions.importTitle")}
+          aria-label={t("actions.importLabel")}
           size={"sm"}
           className="p-2"
         >
           <UploadIcon className="size-4" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent>Import Content</TooltipContent>
+      <TooltipContent>{t("actions.importTooltip")}</TooltipContent>
     </Tooltip>
   );
 }

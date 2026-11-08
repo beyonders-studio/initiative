@@ -8,6 +8,7 @@ import type { Provider } from "@lexical/yjs";
 import type { AnyLexicalExtension, EditorState, SerializedEditorState } from "lexical";
 import { Loader2 } from "lucide-react";
 import { type ComponentProps, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import type * as Y from "yjs";
 
 import { DocumentOutlineTracker } from "@/ui/editor/DocumentOutline";
@@ -36,7 +37,7 @@ export interface EditorCollaboration {
 export interface EditorProps
   extends Pick<
     ComponentProps<typeof Plugins>,
-    "plugins" | "pickerOptions" | "insertActions" | "selectionActions"
+    "plugins" | "pickerOptions" | "insertActions" | "selectionActions" | "readImport"
   > {
   editorState?: EditorState;
   editorSerializedState?: SerializedEditorState;
@@ -76,7 +77,9 @@ export function Editor({
   pickerOptions,
   insertActions,
   selectionActions,
+  readImport,
 }: EditorProps) {
+  const { t } = useTranslation("editor");
   const cursorsContainerRef = useRef<HTMLDivElement>(null!);
 
   const useCollaborativeMode = collaboration !== null;
@@ -125,7 +128,7 @@ export function Editor({
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
-            <span>Syncing document...</span>
+            <span>{t("syncing")}</span>
           </div>
         </div>
       )}
@@ -147,6 +150,7 @@ export function Editor({
               pickerOptions={pickerOptions}
               insertActions={insertActions}
               selectionActions={selectionActions}
+              readImport={readImport}
             />
 
             {/* Publishes the headings to a `DocumentOutlineScope`, where the

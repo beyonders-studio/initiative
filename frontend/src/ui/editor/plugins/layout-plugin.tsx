@@ -1,16 +1,17 @@
 import { createCommand, type LexicalCommand, type LexicalEditor, type NodeKey } from "lexical";
 import { type JSX, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 const LAYOUTS = [
-  { label: "2 columns (equal width)", value: "1fr 1fr" },
-  { label: "2 columns (25% - 75%)", value: "1fr 3fr" },
-  { label: "3 columns (equal width)", value: "1fr 1fr 1fr" },
-  { label: "3 columns (25% - 50% - 25%)", value: "1fr 2fr 1fr" },
-  { label: "4 columns (equal width)", value: "1fr 1fr 1fr 1fr" },
-];
+  { label: "columnLayouts.twoEqual", value: "1fr 1fr" },
+  { label: "columnLayouts.twoQuarterLeft", value: "1fr 3fr" },
+  { label: "columnLayouts.threeEqual", value: "1fr 1fr 1fr" },
+  { label: "columnLayouts.threeWideMiddle", value: "1fr 2fr 1fr" },
+  { label: "columnLayouts.fourEqual", value: "1fr 1fr 1fr 1fr" },
+] as const;
 
 export function InsertLayoutDialog({
   activeEditor,
@@ -19,7 +20,8 @@ export function InsertLayoutDialog({
   activeEditor: LexicalEditor;
   onClose: () => void;
 }): JSX.Element {
-  const [layout, setLayout] = useState(LAYOUTS[0].value);
+  const { t } = useTranslation("editor");
+  const [layout, setLayout] = useState<string>(LAYOUTS[0].value);
   const buttonLabel = LAYOUTS.find((item) => item.value === layout)?.label;
 
   const onClick = () => {
@@ -31,17 +33,17 @@ export function InsertLayoutDialog({
     <>
       <Select onValueChange={setLayout} defaultValue={layout}>
         <SelectTrigger className="w-full">
-          <SelectValue placeholder={buttonLabel} />
+          <SelectValue placeholder={buttonLabel && t(buttonLabel)} />
         </SelectTrigger>
         <SelectContent className="w-full">
           {LAYOUTS.map(({ label, value }) => (
             <SelectItem key={value} value={value}>
-              {label}
+              {t(label)}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
-      <Button onClick={onClick}>Insert</Button>
+      <Button onClick={onClick}>{t("insert")}</Button>
     </>
   );
 }

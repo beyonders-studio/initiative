@@ -1,18 +1,17 @@
 import Typo from "typo-js";
 
-// CDN URLs for English dictionary files
-const AFF_URL = "https://cdn.jsdelivr.net/npm/dictionary-en@3.2.0/index.aff";
-const DIC_URL = "https://cdn.jsdelivr.net/npm/dictionary-en@3.2.0/index.dic";
+import { host } from "@/ui/host";
 
 let dictionary: Typo | null = null;
 let initPromise: Promise<void> | null = null;
 
 /**
- * Initialize the spell checker by loading dictionary files from CDN.
- * This is lazy-loaded on first use and cached for the session.
+ * Initialize the spell checker with the dictionary the host supplies, loaded on
+ * first use and kept for the session. Without one the checker stays off.
  */
 export async function initSpellCheck(): Promise<void> {
-  if (dictionary) return;
+  const load = host.spellCheckDictionary;
+  if (dictionary || !load) return;
 
   if (initPromise) {
     return initPromise;
@@ -20,15 +19,8 @@ export async function initSpellCheck(): Promise<void> {
 
   initPromise = (async () => {
     try {
-      const [affResponse, dicResponse] = await Promise.all([fetch(AFF_URL), fetch(DIC_URL)]);
-
-      if (!affResponse.ok || !dicResponse.ok) {
-        throw new Error("Failed to fetch dictionary files");
-      }
-
-      const [affData, dicData] = await Promise.all([affResponse.text(), dicResponse.text()]);
-
-      dictionary = new Typo("en_US", affData, dicData);
+      const { aff, dic } = await load();
+      dictionary = new Typo("en_US", aff, dic);
     } catch (error) {
       console.error("Failed to initialize spell checker:", error);
       initPromise = null;

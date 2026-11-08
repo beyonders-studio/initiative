@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import type * as Y from "yjs";
 
 import { writeWithAi } from "@/api/generated/ai/ai";
-import type { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
+import { FileType, type SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import { EditorInitiativeContext } from "@/components/editor/context/editor-initiative-context";
 import { InitiativeExtension } from "@/components/editor/initiative-extension";
 import { AIWritingMenu, AIWritingPlugin } from "@/components/editor/plugins/ai-writing-plugin";
@@ -36,6 +36,7 @@ export interface EditorProps
     | "pickerOptions"
     | "insertActions"
     | "selectionActions"
+    | "readImport"
   > {
   collaborative?: boolean;
   providerFactory?: ((id: string, yjsDocMap: Map<string, Y.Doc>) => CollaborationProvider) | null;
@@ -58,6 +59,19 @@ export interface EditorProps
     onCreated: (entityType: SearchEntityType, entityId: number, name: string) => void
   ) => void;
 }
+
+/**
+ * The editor state in a file Initiative exported: the `initiative-file`
+ * envelope (discriminated by `type`, or `kind`, the field's name in early
+ * exports), and the same envelope under its earlier `initiative-document` name.
+ */
+const readExport = (file: Record<string, unknown>): unknown => {
+  const isEnvelope = (name: string): boolean => file.type === name || file.kind === name;
+  const lexical =
+    (isEnvelope("initiative-file") && file.file_type === FileType.lexical) ||
+    (isEnvelope("initiative-document") && file.document_type === "native");
+  return lexical ? file.content : null;
+};
 
 /**
  * Initiative's document editor: the core with Initiative's extension, and
@@ -163,6 +177,7 @@ export function Editor({
         ]}
         insertActions={insertActions}
         selectionActions={aiWriting ? <AIWritingMenu /> : null}
+        readImport={readExport}
       />
     </EditorInitiativeContext.Provider>
   );

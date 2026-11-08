@@ -239,5 +239,77 @@
     "changed": "Le texte a changé pendant l'écriture. Insérez ceci en dessous ou ignorez-le.",
     "cannotKeep": "L'aide à la rédaction ne peut pas remettre cette sélection telle quelle : elle couvre plusieurs éléments de liste ou un titre, ou contient par exemple une image. Sélectionnez plutôt du texte à l'intérieur de l'un d'eux.",
     "error": "Impossible d'écrire cela. Veuillez réessayer."
+  },
+  "syncing": "Synchronisation du document...",
+  "placeholder": "Appuyez sur / pour les commandes...",
+  "brokenImage": "Image cassée",
+  "copyCode": "copier",
+  "caption": {
+    "add": "Ajouter une légende",
+    "placeholder": "Saisissez une légende..."
+  },
+  "picker": {
+    "bulletedList": "Liste à puces",
+    "checkList": "Liste de contrôle",
+    "code": "Code",
+    "divider": "Séparateur",
+    "numberedList": "Liste numérotée",
+    "quote": "Citation",
+    "alignLeft": "Aligner à gauche",
+    "alignCenter": "Centrer",
+    "alignRight": "Aligner à droite",
+    "alignJustify": "Justifier",
+    "tableOfSize": "Tableau {{rows}}x{{columns}}"
+  },
+  "tableDialog": {
+    "rows": "Nombre de lignes",
+    "rowsPlaceholder": "Nb de lignes (1-500)",
+    "columns": "Nombre de colonnes",
+    "columnsPlaceholder": "Nb de colonnes (1-50)",
+    "confirm": "Confirmer"
+  },
+  "columnLayouts": {
+    "twoEqual": "2 colonnes (largeur égale)",
+    "twoQuarterLeft": "2 colonnes (25 % - 75 %)",
+    "threeEqual": "3 colonnes (largeur égale)",
+    "threeWideMiddle": "3 colonnes (25 % - 50 % - 25 %)",
+    "fourEqual": "4 colonnes (largeur égale)"
+  },
+  "contextMenu": {
+    "removeLink": "Supprimer le lien",
+    "cut": "Couper",
+    "copy": "Copier",
+    "paste": "Coller",
+    "pasteAsPlainText": "Coller en texte brut",
+    "deleteNode": "Supprimer le bloc",
+    "pasteNotAllowed": "Le collage depuis le presse-papiers n'est pas autorisé."
+  },
+  "selectionFormat": {
+    "bold": "Activer ou désactiver le gras",
+    "italic": "Activer ou désactiver l'italique",
+    "underline": "Activer ou désactiver le soulignement",
+    "strikethrough": "Activer ou désactiver le barré",
+    "code": "Activer ou désactiver le code",
+    "link": "Activer ou désactiver le lien",
+    "subscript": "Activer ou désactiver l'indice",
+    "superscript": "Activer ou désactiver l'exposant"
+  },
+  "actions": {
+    "importTitle": "Importer",
+    "importLabel": "Importer le contenu de l'éditeur depuis un JSON",
+    "importTooltip": "Importer du contenu",
+    "speechToText": "Dictée vocale",
+    "enableSpeechToText": "Activer la dictée vocale",
+    "disableSpeechToText": "Désactiver la dictée vocale",
+    "markdownTitle": "Convertir depuis Markdown",
+    "markdownLabel": "Convertir depuis Markdown",
+    "readOnlyMode": "Mode lecture seule",
+    "lockReadOnly": "Activer le mode lecture seule",
+    "unlockReadOnly": "Désactiver le mode lecture seule",
+    "viewOnlyMode": "Mode consultation",
+    "editMode": "Mode édition",
+    "clearEditor": "Vider l'éditeur",
+    "clearEditorConfirm": "Voulez-vous vraiment vider l'éditeur ?",
+    "treeView": "Vue arborescente"
   }
 }

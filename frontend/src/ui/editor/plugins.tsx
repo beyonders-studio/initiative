@@ -13,7 +13,10 @@ import { CharacterLimitPlugin } from "@/ui/editor/plugins/actions/character-limi
 import { ClearEditorActionPlugin } from "@/ui/editor/plugins/actions/clear-editor-plugin";
 import { CounterCharacterPlugin } from "@/ui/editor/plugins/actions/counter-character-plugin";
 import { EditModeTogglePlugin } from "@/ui/editor/plugins/actions/edit-mode-toggle-plugin";
-import { ImportExportPlugin } from "@/ui/editor/plugins/actions/import-export-plugin";
+import {
+  ImportExportPlugin,
+  type ReadImport,
+} from "@/ui/editor/plugins/actions/import-export-plugin";
 import { MarkdownTogglePlugin } from "@/ui/editor/plugins/actions/markdown-toggle-plugin";
 import { SpeechToTextPlugin } from "@/ui/editor/plugins/actions/speech-to-text-plugin";
 import { TreeViewPlugin } from "@/ui/editor/plugins/actions/tree-view-plugin";
@@ -89,8 +92,6 @@ import { ToolbarPlugin } from "@/ui/editor/plugins/toolbar/toolbar-plugin";
 import type { EditorVariant } from "@/ui/editor/variant";
 import { cn } from "@/ui/lib/utils";
 import { OverflowToolbar, type OverflowToolbarItem } from "@/ui/overflow-toolbar";
-
-const placeholder = "Press / for commands...";
 
 /** The block types a document offers — everything but the deeper headings. */
 const DOCUMENT_BLOCK_TYPES: readonly BlockFormatType[] = BLOCK_FORMAT_ORDER;
@@ -244,6 +245,7 @@ export function Plugins({
   pickerOptions = [],
   insertActions = [],
   selectionActions,
+  readImport,
 }: {
   showToolbar?: boolean;
   readOnly?: boolean;
@@ -272,6 +274,9 @@ export function Plugins({
   insertActions?: readonly InsertAction[];
   /** What the host adds to the toolbar over a selection. */
   selectionActions?: ReactNode;
+  /** Finds the editor state in a file of the host's own format, which the
+   *  import button reads ahead of a `.lexical` file. */
+  readImport?: ReadImport;
 }) {
   const { t } = useTranslation("editor");
   const [editor] = useLexicalComposerContext();
@@ -329,7 +334,7 @@ export function Plugins({
               a post in a card on the board — takes none of its own. */}
           <div className={cn(compact ? "px-0" : "px-8")} ref={onRef}>
             <ContentEditable
-              placeholder={placeholder}
+              placeholder={t("placeholder")}
               className={cn(
                 "ContentEditable__root relative block focus:outline-none",
                 // A writing surface reserves a page to write on. A notice being
@@ -373,32 +378,32 @@ export function Plugins({
         {!readOnly && (
           <ComponentPickerMenuPlugin
             baseOptions={[
-              ParagraphPickerPlugin(),
-              HeadingPickerPlugin({ n: 1 }),
-              HeadingPickerPlugin({ n: 2 }),
-              HeadingPickerPlugin({ n: 3 }),
-              TablePickerPlugin(),
-              CheckListPickerPlugin(),
-              NumberedListPickerPlugin(),
-              BulletedListPickerPlugin(),
-              QuotePickerPlugin(),
+              ParagraphPickerPlugin(t),
+              HeadingPickerPlugin({ n: 1, t }),
+              HeadingPickerPlugin({ n: 2, t }),
+              HeadingPickerPlugin({ n: 3, t }),
+              TablePickerPlugin(t),
+              CheckListPickerPlugin(t),
+              NumberedListPickerPlugin(t),
+              BulletedListPickerPlugin(t),
+              QuotePickerPlugin(t),
               ...CalloutPickerPlugins(t),
-              CodePickerPlugin(),
-              DividerPickerPlugin(),
+              CodePickerPlugin(t),
+              DividerPickerPlugin(t),
               EmbedsPickerPlugin({ embed: "tweet" }),
               EmbedsPickerPlugin({ embed: "youtube-video" }),
-              ...(insertImage ? [ImagePickerPlugin(insertImage)] : []),
+              ...(insertImage ? [ImagePickerPlugin(insertImage, t)] : []),
               DrawingPickerPlugin(t),
               DiagramPickerPlugin(t),
               StatusPickerPlugin(t),
               ...pickerOptions,
               ColumnsLayoutPickerPlugin(),
-              AlignmentPickerPlugin({ alignment: "left" }),
-              AlignmentPickerPlugin({ alignment: "center" }),
-              AlignmentPickerPlugin({ alignment: "right" }),
-              AlignmentPickerPlugin({ alignment: "justify" }),
+              AlignmentPickerPlugin({ alignment: "left", t }),
+              AlignmentPickerPlugin({ alignment: "center", t }),
+              AlignmentPickerPlugin({ alignment: "right", t }),
+              AlignmentPickerPlugin({ alignment: "justify", t }),
             ]}
-            dynamicOptionsFn={DynamicTablePickerPlugin}
+            dynamicOptionsFn={({ queryString }) => DynamicTablePickerPlugin({ queryString, t })}
           />
         )}
 
@@ -439,7 +444,7 @@ export function Plugins({
               {rich && (
                 <>
                   <SpeechToTextPlugin />
-                  <ImportExportPlugin />
+                  <ImportExportPlugin readImport={readImport} />
                   <MarkdownTogglePlugin transformers={transformers} />
                   <EditModeTogglePlugin forceReadOnly={readOnly} />
                   <ClearEditorActionPlugin />

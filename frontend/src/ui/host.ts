@@ -9,8 +9,8 @@ import { BLOCKED_URL, sanitizeUrl } from "@/ui/lib/safeUrl";
  * needs from that app arrives here. The reader's clock and week start change
  * while the app runs: the app writes them and components subscribe. The rest
  * is set once, at boot, with `setHost`: how to show a notice, take a picture,
- * link to a page, open another site, keep a preference, find the emoji data
- * and recognise the app's own origin.
+ * link to a page, open another site, keep a preference, find the emoji data,
+ * load the spelling dictionary and recognise the app's own origin.
  */
 
 export type TimeFormatPreference = "system" | "12" | "24";
@@ -67,6 +67,9 @@ export interface Host {
   };
   /** Where the emoji picker reads its data; the picker's own source when unset. */
   emojibaseUrl?: string;
+  /** The English dictionary the editor suggests spellings from, as Hunspell's
+   *  `.aff` and `.dic` texts; the editor suggests none when unset. */
+  spellCheckDictionary?: () => Promise<{ aff: string; dic: string }>;
   /** Whether an address is served from the app's own origin. */
   isOwnOrigin: (url: string) => boolean;
 }

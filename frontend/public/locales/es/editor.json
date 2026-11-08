@@ -239,5 +239,77 @@
     "changed": "El texto cambió mientras se escribía. Insértalo debajo o descártalo.",
     "cannotKeep": "La ayuda de escritura no puede devolver esta selección entera: abarca elementos de una lista o un título, o contiene algo como una imagen. Selecciona texto dentro de uno de ellos.",
     "error": "No se pudo escribir. Por favor intenta de nuevo."
+  },
+  "syncing": "Sincronizando documento...",
+  "placeholder": "Pulsa / para ver los comandos...",
+  "brokenImage": "Rota",
+  "copyCode": "copiar",
+  "caption": {
+    "add": "Añadir pie de foto",
+    "placeholder": "Escribe un pie de foto..."
+  },
+  "picker": {
+    "bulletedList": "Lista con viñetas",
+    "checkList": "Lista de verificación",
+    "code": "Código",
+    "divider": "Separador",
+    "numberedList": "Lista numerada",
+    "quote": "Cita",
+    "alignLeft": "Alinear a la izquierda",
+    "alignCenter": "Centrar",
+    "alignRight": "Alinear a la derecha",
+    "alignJustify": "Justificar",
+    "tableOfSize": "Tabla de {{rows}}x{{columns}}"
+  },
+  "tableDialog": {
+    "rows": "Número de filas",
+    "rowsPlaceholder": "N.º de filas (1-500)",
+    "columns": "Número de columnas",
+    "columnsPlaceholder": "N.º de columnas (1-50)",
+    "confirm": "Confirmar"
+  },
+  "columnLayouts": {
+    "twoEqual": "2 columnas (mismo ancho)",
+    "twoQuarterLeft": "2 columnas (25 % - 75 %)",
+    "threeEqual": "3 columnas (mismo ancho)",
+    "threeWideMiddle": "3 columnas (25 % - 50 % - 25 %)",
+    "fourEqual": "4 columnas (mismo ancho)"
+  },
+  "contextMenu": {
+    "removeLink": "Quitar enlace",
+    "cut": "Cortar",
+    "copy": "Copiar",
+    "paste": "Pegar",
+    "pasteAsPlainText": "Pegar como texto sin formato",
+    "deleteNode": "Eliminar bloque",
+    "pasteNotAllowed": "No se permite pegar desde el portapapeles."
+  },
+  "selectionFormat": {
+    "bold": "Alternar negrita",
+    "italic": "Alternar cursiva",
+    "underline": "Alternar subrayado",
+    "strikethrough": "Alternar tachado",
+    "code": "Alternar código",
+    "link": "Alternar enlace",
+    "subscript": "Alternar subíndice",
+    "superscript": "Alternar superíndice"
+  },
+  "actions": {
+    "importTitle": "Importar",
+    "importLabel": "Importar el contenido del editor desde JSON",
+    "importTooltip": "Importar contenido",
+    "speechToText": "Voz a texto",
+    "enableSpeechToText": "Activar voz a texto",
+    "disableSpeechToText": "Desactivar voz a texto",
+    "markdownTitle": "Convertir desde Markdown",
+    "markdownLabel": "Convertir desde Markdown",
+    "readOnlyMode": "Modo de solo lectura",
+    "lockReadOnly": "Activar el modo de solo lectura",
+    "unlockReadOnly": "Desactivar el modo de solo lectura",
+    "viewOnlyMode": "Modo de solo vista",
+    "editMode": "Modo de edición",
+    "clearEditor": "Vaciar el editor",
+    "clearEditorConfirm": "¿Seguro que quieres vaciar el editor?",
+    "treeView": "Vista de árbol"
   }
 }

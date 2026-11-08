@@ -34,6 +34,8 @@ const ARCHIVE = "https://codeload.github.com/beyonders-studio/initiative/tar.gz"
 const KIT = "src/ui";
 const SCHEMAS = "src/api/generated/initiativeAPI.schemas.ts";
 const LOCALES = "public/locales";
+// The namespaces the kit reads its words from.
+const NAMESPACES = ["ui", "editor"];
 // Which Initiative revision the copy came from. Not part of the copy itself.
 const STAMP = `${KIT}/.initiative-ref`;
 
@@ -48,7 +50,9 @@ const walk = (root, dir = root) =>
 /** The kit's words in each language a frontend folder has. */
 const wordsOf = (frontend) =>
   (existsSync(path.join(frontend, LOCALES)) ? readdirSync(path.join(frontend, LOCALES)) : [])
-    .map((language) => `${LOCALES}/${language}/ui.json`)
+    .flatMap((language) =>
+      NAMESPACES.map((namespace) => `${LOCALES}/${language}/${namespace}.json`)
+    )
     .filter((name) => existsSync(path.join(frontend, name)));
 
 /** The files that make up the kit, keyed by their path in a frontend folder. */

@@ -19,6 +19,7 @@ import {
 } from "lexical";
 import { MicIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/ui/button";
 import { useReport } from "@/ui/editor/editor-hooks/use-report";
@@ -140,6 +141,7 @@ export const SUPPORT_SPEECH_RECOGNITION: boolean =
 
 function SpeechToTextPluginImpl() {
   const [editor] = useLexicalComposerContext();
+  const { t } = useTranslation("editor");
   const [isEnabled, setIsEnabled] = useState<boolean>(false);
   const [isSpeechToText, setIsSpeechToText] = useState<boolean>(false);
   const SpeechRecognition =
@@ -220,15 +222,17 @@ function SpeechToTextPluginImpl() {
             setIsSpeechToText(!isSpeechToText);
           }}
           variant={isSpeechToText ? "secondary" : "ghost"}
-          title="Speech To Text"
-          aria-label={`${isSpeechToText ? "Enable" : "Disable"} speech to text`}
+          title={t("actions.speechToText")}
+          aria-label={t(
+            isSpeechToText ? "actions.enableSpeechToText" : "actions.disableSpeechToText"
+          )}
           className="p-2"
           size={"sm"}
         >
           <MicIcon className="size-4" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent>Speech To Text</TooltipContent>
+      <TooltipContent>{t("actions.speechToText")}</TooltipContent>
     </Tooltip>
   );
 }

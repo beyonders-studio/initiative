@@ -32,9 +32,8 @@ import { Maximize2, Star } from "lucide-react";
 import { type JSX, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-// import brokenImage from '@/ui/editor/images/image-broken.svg';
 import { Button } from "@/ui/button";
-import { canBeFeatured, useFeaturedImage } from "@/ui/editor/context/featured-image-context";
+import { useFeaturedImage } from "@/ui/editor/context/featured-image-context";
 import { ContentEditable } from "@/ui/editor/editor-ui/content-editable";
 import { ImageResizer } from "@/ui/editor/editor-ui/image-resizer";
 import { ImagesExtension } from "@/ui/editor/extensions/images-extension";
@@ -104,6 +103,7 @@ function LazyImage({
 }
 
 function BrokenImage(): JSX.Element {
+  const { t } = useTranslation("editor");
   return (
     <img
       src={""}
@@ -113,7 +113,7 @@ function BrokenImage(): JSX.Element {
         width: 200,
       }}
       draggable="false"
-      alt="Broken"
+      alt={t("brokenImage")}
     />
   );
 }
@@ -139,7 +139,8 @@ export default function ImageComponent({
   width: "inherit" | number;
   captionsEnabled: boolean;
 }): JSX.Element {
-  const resolvedSrc = useExtensionDependency(ImagesExtension).config.resolveSrc(src);
+  const images = useExtensionDependency(ImagesExtension).config;
+  const resolvedSrc = images.resolveSrc(src);
   const imageRef = useRef<null | HTMLImageElement>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const [isSelected, setSelected, clearSelection] = useLexicalNodeSelection(nodeKey);
@@ -150,7 +151,7 @@ export default function ImageComponent({
   const activeEditorRef = useRef<LexicalEditor | null>(null);
   const [isLoadError, setIsLoadError] = useState<boolean>(false);
   const isEditable = useLexicalEditable();
-  const { t } = useTranslation(["editor", "common"]);
+  const { t } = useTranslation(["editor", "ui"]);
   // A picture opens full size, paging with the others in the document. Being
   // read, a click opens it; being written, a click selects it to resize, so it
   // opens from a button on the selected picture or a double click instead.
@@ -167,9 +168,7 @@ export default function ImageComponent({
   const openFullSize = () => {
     if (lightboxTarget) lightbox?.open(lightboxTarget);
   };
-  const openLabel = altText
-    ? t("common:lightbox.openNamed", { name: altText })
-    : t("common:lightbox.open");
+  const openLabel = altText ? t("ui:lightbox.openNamed", { name: altText }) : t("ui:lightbox.open");
   const featured = useFeaturedImage();
   // The caption last shown or written from here, so the echo of an edit is
   // not shown again over what has been typed since.
@@ -385,7 +384,7 @@ export default function ImageComponent({
 
   const draggable = isSelected && $isNodeSelection(selection) && !isResizing;
   const isFocused = (isSelected || isResizing) && isEditable;
-  const offersFeatured = featured !== null && isFocused && !isResizing && canBeFeatured(src);
+  const offersFeatured = featured !== null && isFocused && !isResizing && images.canBeFeatured(src);
   const isFeatured = featured?.url === src;
   return (
     <Suspense fallback={null}>
@@ -444,7 +443,7 @@ export default function ImageComponent({
                   <ContentEditable
                     className="ImageNode__contentEditable user-select-text word-break-break-word relative block min-h-5 w-[calc(100%-20px)] cursor-text resize-none whitespace-pre-wrap border-0 p-2.5 text-sm caret-primary outline-none"
                     placeholderClassName="ImageNode__placeholder text-sm text-muted-foreground overflow-hidden absolute top-2.5 left-2.5 pointer-events-none text-ellipsis user-select-none whitespace-nowrap inline-block"
-                    placeholder="Enter a caption..."
+                    placeholder={t("caption.placeholder")}
                   />
                 }
                 ErrorBoundary={LexicalErrorBoundary}
