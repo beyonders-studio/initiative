@@ -5,7 +5,7 @@
  * a component rather than a line repeated five times: you cannot report your
  * own work, and a signed-out reader is offered nothing.
  */
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -56,7 +56,7 @@ describe("ReportButton", () => {
     expect(screen.queryByRole("button", { name: "Report" })).not.toBeInTheDocument();
   });
 
-  it("opens one report at a time, a new one for each thing reported", async () => {
+  it("starts a new report for each thing reported", async () => {
     renderWithProviders(
       <>
         <ReportButton targetType="post" targetId={1} />
@@ -71,9 +71,12 @@ describe("ReportButton", () => {
     await user.click(first);
     expect(await screen.findByRole("dialog", { name: "Report this" })).toBeInTheDocument();
     await user.type(screen.getByLabelText("Anything else?"), "About the first post.");
+    // The dialog holds the page still, so the second flag is reached after it closes.
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
     await user.click(second);
-    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(await screen.findAllByRole("dialog")).toHaveLength(1);
     expect(screen.getByLabelText("Anything else?")).toHaveValue("");
   });
 });
