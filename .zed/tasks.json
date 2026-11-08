@@ -1,7 +1,7 @@
 [
   {
     "label": "dev:db-start",
-    "command": ". scripts/dev-ports.sh && docker compose up db -d --wait",
+    "command": "bash -c '. scripts/dev-ports.sh && docker compose up db -d --wait'",
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": false,
