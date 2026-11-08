@@ -8,6 +8,7 @@ import type {
   PropertyDefinitionRead,
   TagSummary,
   TaskAssigneeSummary,
+  TaskListRead,
   TaskParentSummary,
   TaskPriority,
   TaskTypeRead,
@@ -44,7 +45,6 @@ import {
   type FieldDef,
   type FieldRendererProps,
   type LayoutEnv,
-  type LayoutItem,
   propertyFieldId,
   propertyFields,
   TitleField,
@@ -64,10 +64,10 @@ const TitleCell = ({
   env,
 }: {
   title: string;
-  task: LayoutItem;
+  task: TaskListRead;
   type: TaskTypeRead | null;
   unread: boolean;
-  env: LayoutEnv;
+  env: LayoutEnv<TaskListRead>;
 }) => {
   const recurrence = task.recurrence
     ? summarizeStored(
@@ -110,7 +110,7 @@ const TitleCell = ({
 
 // A task's title, marked while it is unread. A project with one type draws
 // none in its cells: the type tells nothing apart.
-const TaskTitle = ({ typed, ...props }: FieldRendererProps & { typed: boolean }) => {
+const TaskTitle = ({ typed, ...props }: FieldRendererProps<TaskListRead> & { typed: boolean }) => {
   const { value, item, variant, env } = props;
   const unread = useUnreadTree().hasSubject(item.community_id, "task", item.id);
   if (variant === "cell") {
@@ -132,11 +132,11 @@ const TaskTitle = ({ typed, ...props }: FieldRendererProps & { typed: boolean })
   );
 };
 
-const TypedTitle = memo(function TypedTitle(props: FieldRendererProps) {
+const TypedTitle = memo(function TypedTitle(props: FieldRendererProps<TaskListRead>) {
   return <TaskTitle {...props} typed />;
 });
 
-const UntypedTitle = memo(function UntypedTitle(props: FieldRendererProps) {
+const UntypedTitle = memo(function UntypedTitle(props: FieldRendererProps<TaskListRead>) {
   return <TaskTitle {...props} typed={false} />;
 });
 
@@ -161,7 +161,11 @@ const AssigneesField = memo(function AssigneesField({ value, variant }: FieldRen
   return <TaskAssigneeList assignees={people} className="text-xs" />;
 });
 
-const RecurrenceField = memo(function RecurrenceField({ value, item, env }: FieldRendererProps) {
+const RecurrenceField = memo(function RecurrenceField({
+  value,
+  item,
+  env,
+}: FieldRendererProps<TaskListRead>) {
   const summary = summarizeStored(
     value as string,
     item.due_date || item.start_date,
@@ -254,8 +258,9 @@ const TaskTypeField = memo(function TaskTypeField({ value, variant }: FieldRende
 });
 
 const builtin = (
-  field: Omit<FieldDef, "source" | "label" | "hideable" | "requireable"> & Partial<FieldDef>
-): FieldDef => ({
+  field: Omit<FieldDef<TaskListRead>, "source" | "label" | "hideable" | "requireable"> &
+    Partial<FieldDef<TaskListRead>>
+): FieldDef<TaskListRead> => ({
   source: "builtin",
   label: `kanban.fields.${field.id}`,
   hideable: true,
@@ -271,10 +276,10 @@ const builtin = (
  */
 export const taskFields = (
   definitions: PropertyDefinitionRead[],
-  plugins: FieldDef[] = [],
+  plugins: FieldDef<TaskListRead>[] = [],
   { typed = true }: { typed?: boolean } = {}
-): Map<string, FieldDef> => {
-  const fields: FieldDef[] = [
+): Map<string, FieldDef<TaskListRead>> => {
+  const fields: FieldDef<TaskListRead>[] = [
     builtin({
       id: "title",
       kind: "title",
@@ -360,7 +365,9 @@ export const taskFields = (
       value: (task) => task.blocked_by_open_count || null,
     }),
     builtin({ id: "tags", render: TagsField, requireable: true, value: (task) => task.tags }),
-    ...propertyFields(definitions, (task, definition) => listedValue(task.properties, definition)),
+    ...propertyFields<TaskListRead>(definitions, (task, definition) =>
+      listedValue(task.properties, definition)
+    ),
     ...plugins,
   ];
   return new Map(fields.map((field) => [field.id, field]));

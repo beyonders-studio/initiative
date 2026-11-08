@@ -23,12 +23,9 @@ import {
 
 const field = (id: string): LayoutNode => ({ type: "field", props: { field: id } });
 
-const viewOf = (
-  definitions: PropertyDefinitionRead[] = [],
-  variant: LayoutContext["variant"] = "card"
-): LayoutContext => ({
+const viewOf = (definitions: PropertyDefinitionRead[] = []): LayoutContext<TaskListRead> => ({
   fields: taskFields(definitions),
-  variant,
+  variant: "card",
   env: {
     t: i18n.getFixedT(null, ["projects", "dates", "relations"]) as TranslateFn,
     communityPath: (path) => path,
@@ -143,6 +140,17 @@ describe("LayoutTree", () => {
 });
 
 describe("renderNode", () => {
+  // A detail's view with no fields, for an item of any kind.
+  const detailOf = <I,>(): LayoutContext<I> => ({
+    fields: new Map(),
+    variant: "detail",
+    env: {
+      t: i18n.getFixedT(null, "projects") as TranslateFn,
+      communityPath: (path) => path,
+      itemHref: () => "",
+    },
+  });
+
   it("draws a detail through the parts it is given", () => {
     // The page's regions are layout any kind of item shares; what fills them
     // is the item's own.
@@ -156,9 +164,7 @@ describe("renderNode", () => {
       ],
     };
 
-    const { container } = renderWithProviders(
-      <>{renderNode(page, "Ada", viewOf([], "detail"), parts)}</>
-    );
+    const { container } = renderWithProviders(<>{renderNode(page, "Ada", detailOf(), parts)}</>);
 
     expect(container.textContent).toBe("AdaAda");
   });
@@ -177,7 +183,7 @@ describe("renderNode", () => {
     };
 
     const { container } = renderWithProviders(
-      <>{renderNode(TASK_DETAIL, null, viewOf([], "detail"), parts)}</>
+      <>{renderNode(TASK_DETAIL, null, detailOf(), parts)}</>
     );
 
     // Each part of a column carries where it falls on the one column.
