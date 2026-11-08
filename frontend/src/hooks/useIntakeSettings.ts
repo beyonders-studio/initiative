@@ -10,6 +10,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import type {
+  FeedbackSwitchUpdate,
   IntakeBindingRead,
   IntakeBindingUpsert,
   IntakeContactUpdate,
@@ -25,6 +26,7 @@ import {
   importBlueprint,
   readIntakeOptions,
   readIntakeSettings,
+  updateFeedbackSwitch,
   updateGeneralContact,
   updateOperationsCommunity,
   updateStreamContact,
@@ -104,6 +106,18 @@ export const useDeleteIntakeBinding = (options?: MutationOpts<void, IntakeStream
   );
 
 /** The deployment's catch-all contact address; `null` clears it. */
+/** Let people here send feedback to the Initiative team, or stop. */
+export const useUpdateFeedbackSwitch = (
+  options?: MutationOpts<IntakeSettingsRead, FeedbackSwitchUpdate>
+) =>
+  useApiMutation<IntakeSettingsRead, FeedbackSwitchUpdate>(
+    {
+      mutationFn: (data) => updateFeedbackSwitch(data),
+      invalidate: refreshIntake,
+    },
+    options
+  );
+
 export const useUpdateIntakeGeneralContact = (
   options?: MutationOpts<IntakeSettingsRead, IntakeContactUpdate>
 ) =>

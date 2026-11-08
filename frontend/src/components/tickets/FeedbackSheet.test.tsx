@@ -10,6 +10,8 @@ const fileOptions = vi.hoisted(() => ({
   current: undefined as { onSuccess?: () => void } | undefined,
   pending: false,
 }));
+const feedbackMode = vi.hoisted(() => ({ current: "form" }));
+const openExternal = vi.hoisted(() => vi.fn());
 
 vi.mock("@tanstack/react-router", async () => ({
   ...(await vi.importActual<typeof import("@tanstack/react-router")>("@tanstack/react-router")),
@@ -21,7 +23,7 @@ vi.mock("@/hooks/useTickets", async () => ({
   useTicketAvailability: () => ({
     data: {
       feedback: {
-        mode: "form",
+        mode: feedbackMode.current,
         contact: null,
         evidence: { max_files: 3, max_bytes: 1024, types: ["image/png"] },
         types: ["idea", "problem", "praise"],
@@ -35,20 +37,58 @@ vi.mock("@/hooks/useTickets", async () => ({
   },
 }));
 
-import { FeedbackHost, openFeedback } from "./FeedbackSheet";
+vi.mock("@/lib/openExternal", () => ({ openExternal }));
+vi.mock("@/lib/cloud", async () => ({
+  ...(await vi.importActual<typeof import("@/lib/cloud")>("@/lib/cloud")),
+  CLOUD_OPEN: true,
+}));
+
+import { CLOUD_ORIGIN } from "@/lib/cloud";
+
+import { FeedbackHost, useFeedback } from "./FeedbackSheet";
+
+/** The account menu's item, and the sheet the app shell draws. */
+const Menu = () => {
+  const feedback = useFeedback();
+  return (
+    <>
+      {feedback.offered ? (
+        <button type="button" onClick={feedback.open}>
+          Open feedback
+        </button>
+      ) : null}
+      <FeedbackHost />
+    </>
+  );
+};
 
 describe("FeedbackSheet", () => {
   beforeEach(() => {
     fileMutate.mockClear();
+    openExternal.mockClear();
     fileOptions.pending = false;
+    feedbackMode.current = "form";
   });
+
+  const openAgain = () => act(() => screen.getByRole("button", { name: "Open feedback" }).click());
 
   // Each test signs in somebody new, whose draft starts empty.
   const open = (user = buildUser()) => {
-    const view = renderWithProviders(<FeedbackHost />, { auth: { user } });
-    act(() => openFeedback());
+    const view = renderWithProviders(<Menu />, { auth: { user } });
+    openAgain();
     return { ...view, user: userEvent.setup() };
   };
+
+  it("opens Initiative Cloud's page from any other server, with where the app was", () => {
+    feedbackMode.current = "cloud";
+    open();
+    const link = new URL(openExternal.mock.calls[0][0]);
+    expect(link.origin + link.pathname).toBe(`${CLOUD_ORIGIN}/feedback`);
+    const sent = new URLSearchParams(link.hash.slice(1));
+    expect(sent.get("app_version")).toBe("0.0.0-test");
+    expect(sent.get("route")).toBe("/c/$communityId");
+    expect(screen.queryByLabelText("What would you like Initiative to do?")).toBeNull();
+  });
 
   it("starts on an idea and sends what was written, the contact choice and where the app was", async () => {
     const { user } = open();
@@ -90,7 +130,7 @@ describe("FeedbackSheet", () => {
 
     await user.keyboard("{Escape}");
     expect(screen.queryByLabelText("What got in your way?")).toBeNull();
-    act(() => openFeedback());
+    openAgain();
     expect(await screen.findByLabelText("What got in your way?")).toHaveValue(
       "Export drops a row."
     );

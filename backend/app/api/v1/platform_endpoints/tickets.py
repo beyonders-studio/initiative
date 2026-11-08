@@ -34,6 +34,7 @@ from fastapi import (
 )
 from fastapi.exceptions import RequestValidationError
 from pydantic import TypeAdapter, ValidationError
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
     TicketHolder,
@@ -216,7 +217,7 @@ async def file_ticket(
     elif isinstance(ticket, SecurityTicketCreate):
         accepted = await _report_security_problem(current_user, ticket, attached)
     elif isinstance(ticket, FeedbackTicketCreate):
-        accepted = await _send_feedback(current_user, ticket, attached)
+        accepted = await _send_feedback(session, current_user, ticket, attached)
     elif isinstance(ticket, AppealTicketCreate):
         accepted = await _appeal(current_user, ticket, attached)
     else:
@@ -239,10 +240,16 @@ async def file_ticket(
 
 
 async def _send_feedback(
+    session: AsyncSession,
     sender: User,
     payload: FeedbackTicketCreate,
     attached: list[evidence_service.PreparedEvidence],
 ) -> TicketAccepted:
+    if await tickets_service.feedback_goes(session) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=FeedbackMessages.NOWHERE_TO_SEND,
+        )
     try:
         await feedback_service.send(
             sender=sender,

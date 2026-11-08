@@ -739,6 +739,11 @@ async def marketplace_members_publish_directly(session: AsyncSession) -> bool:
     ]
 
 
+async def feedback_enabled(session: AsyncSession) -> bool:
+    """Whether people here may send feedback to the Initiative team."""
+    return (await rules.platform_values(session))["feedback_enabled"]
+
+
 async def marketplace_registry_enabled(session: AsyncSession) -> bool:
     """Whether this deployment follows the marketplace registry.
 

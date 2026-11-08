@@ -18,7 +18,14 @@ import { cn } from "@/ui/lib/utils";
 import { Switch } from "@/ui/switch";
 
 /** The fields, in the order they are shown. */
-const FIELDS = ["app_version", "platform", "locale", "theme", "route", "viewport"] as const;
+export const CONTEXT_FIELDS = [
+  "app_version",
+  "platform",
+  "locale",
+  "theme",
+  "route",
+  "viewport",
+] as const;
 
 /** A route id as a template: the pathless layout segments dropped, every id
  *  left as the parameter that names it. */
@@ -94,7 +101,7 @@ export const DeviceContextSwitch = ({
             !included && "line-through opacity-50"
           )}
         >
-          {FIELDS.filter((field) => context[field]).map((field) => (
+          {CONTEXT_FIELDS.filter((field) => context[field]).map((field) => (
             <div key={field} className="contents">
               <dt className="text-muted-foreground">{t(`feedback.context.fields.${field}`)}</dt>
               <dd className="break-all font-mono">{context[field]}</dd>

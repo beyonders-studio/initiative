@@ -1,8 +1,9 @@
 /**
  * Where this deployment's operations work lands (platform settings → Intake).
  *
- * Who to contact comes first, and stands on its own: a deployment that routes
- * nothing anywhere still tells people whom to write to.
+ * Whether people may send feedback to the Initiative team comes first, then
+ * who to contact. Both stand on their own: a deployment that routes nothing
+ * anywhere still sends feedback to the team, and tells people whom to write to.
  *
  * Then two levels of decision, in the order an owner makes them: name the
  * community that receives operations work, then say which project each stream
@@ -31,6 +32,7 @@ import {
   useImportIntakeBlueprint,
   useIntakeOptions,
   useIntakeSettings,
+  useUpdateFeedbackSwitch,
   useUpdateIntakeGeneralContact,
   useUpdateIntakeStreamContact,
   useUpdateOperationsCommunity,
@@ -126,6 +128,7 @@ export const SettingsIntakePage = () => {
 
   return (
     <div className="space-y-6">
+      {settings ? <FeedbackCard enabled={settings.feedback_enabled} settled={settled} /> : null}
       {settings ? <ContactsCard settings={settings} settled={settled} /> : null}
 
       <Card>
@@ -194,6 +197,31 @@ export const SettingsIntakePage = () => {
         onConfirm={() => updateCommunity.mutate({ community_id: null })}
       />
     </div>
+  );
+};
+
+/** Whether people here may send feedback to the Initiative team. */
+const FeedbackCard = ({ enabled, settled }: { enabled: boolean; settled: boolean }) => {
+  const { t } = useTranslation("intake");
+  const update = useUpdateFeedbackSwitch({
+    onError: (err) => toast.error(getErrorMessage(err, "intake:feedbackSwitch.error")),
+  });
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("feedbackSwitch.title")}</CardTitle>
+        <CardDescription>{t("feedbackSwitch.description")}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex items-center gap-3">
+        <Switch
+          id="feedback-enabled"
+          checked={enabled}
+          disabled={!settled || update.isPending}
+          onCheckedChange={(checked) => update.mutate({ enabled: checked })}
+        />
+        <Label htmlFor="feedback-enabled">{t("feedbackSwitch.label")}</Label>
+      </CardContent>
+    </Card>
   );
 };
 
