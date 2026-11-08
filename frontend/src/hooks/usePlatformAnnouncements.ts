@@ -17,18 +17,21 @@ export const useCreateAnnouncement = () =>
   useApiMutation<AnnouncementOperatorRead, AnnouncementWrite>({
     mutationFn: (data) => createAnnouncement(data),
     invalidate: () => invalidate(q.announcements()),
+    errorKey: "announcements:operator.saveFailed",
   });
 
 export const useUpdateAnnouncement = () =>
   useApiMutation<AnnouncementOperatorRead, { id: number; data: AnnouncementUpdate }>({
     mutationFn: ({ id, data }) => updateAnnouncement(id, data),
     invalidate: () => invalidate(q.announcements()),
+    errorKey: "announcements:operator.saveFailed",
   });
 
 export const useDeleteAnnouncement = () =>
   useApiMutation<void, number>({
     mutationFn: (id) => deleteAnnouncement(id),
     invalidate: () => invalidate(q.announcements()),
+    errorKey: "announcements:operator.deleteFailed",
   });
 
 /** Store one picture and get back the URL a section should point at. */

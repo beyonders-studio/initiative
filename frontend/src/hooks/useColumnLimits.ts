@@ -1,4 +1,4 @@
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import {
@@ -9,7 +9,7 @@ import {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { getListTaskStatusesQueryOptions } from "@/api/generated/task-statuses/task-statuses";
-import { getListColumnLimitsQueryOptions } from "@/api/generated/tasks/tasks";
+import { getListColumnLimitsQueryOptions, useListColumnLimits } from "@/api/generated/tasks/tasks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { listLayouts } from "@/ui/layouts/layoutSet";
@@ -71,10 +71,11 @@ export const useColumnLimits = (projectId: number | null): ColumnLimits => {
   const limited = listLayouts(layouts).some(
     (layout) => layout.kind === "board" && (layout.definition.limits?.length ?? 0) > 0
   );
-  const fills = useQuery({
-    ...getListColumnLimitsQueryOptions(communityId, { project_id: [projectId ?? 0] }),
-    enabled: projectId !== null && limited,
-  }).data;
+  const fills = useListColumnLimits(
+    communityId,
+    { project_id: [projectId ?? 0] },
+    { query: { enabled: projectId !== null && limited } }
+  ).data;
   return useMemo(() => (limited ? columnLimitsOf(fills) : NO_COLUMN_LIMITS), [limited, fills]);
 };
 

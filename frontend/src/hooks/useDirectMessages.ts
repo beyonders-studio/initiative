@@ -101,7 +101,6 @@ export const useDmPermission = (userId: number | undefined) => {
     // Your own account is left out of the answer: every action on it is refused.
     select: (data): DirectMessagePermissionRead =>
       data.permissions[String(userId)] ?? { permission: "denied", may_connect: false },
-    staleTime: 30_000,
     enabled: dmEnabled && typeof userId === "number",
   });
 };
@@ -163,7 +162,6 @@ export const useDmPermissions = (userIds: number[]) => {
     queries: batches.map((ids) => ({
       queryKey: ["dm", "permissions", ids],
       queryFn: () => readDmPermissions({ user_ids: ids }),
-      staleTime: 30_000,
       enabled: dmEnabled,
     })),
     combine: mergePermissions,

@@ -93,6 +93,8 @@ interface ImagePickerProps {
   /** Same meaning as the attribute it replaces. */
   accept?: string;
   disabled?: boolean;
+  /** The button's work is under way: `Button`'s `pending`. */
+  pending?: boolean;
   /** Lands on whichever control is rendered, so a `<Label htmlFor>` still points at it. */
   id?: string;
   className?: string;
@@ -113,6 +115,7 @@ export const ImagePicker = ({
   onSelect,
   accept = "image/*",
   disabled = false,
+  pending,
   id,
   className,
   variant = "input",
@@ -168,6 +171,7 @@ export const ImagePicker = ({
           variant={buttonVariant}
           size={buttonSize}
           disabled={disabled}
+          pending={pending}
           className={className}
           onClick={() => inputRef.current?.click()}
         >
@@ -188,6 +192,7 @@ export const ImagePicker = ({
             variant={buttonVariant}
             size={buttonSize}
             disabled={disabled || capturing}
+            pending={pending}
             className={className}
             data-test-id={dataTestId ? `${dataTestId}-menu` : undefined}
           >

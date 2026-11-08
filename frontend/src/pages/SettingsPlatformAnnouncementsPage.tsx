@@ -7,7 +7,6 @@ import type { AnnouncementOperatorRead } from "@/api/generated/initiativeAPI.sch
 import { AnnouncementEditorDialog } from "@/components/announcements/AnnouncementEditorDialog";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useDeleteAnnouncement } from "@/hooks/usePlatformAnnouncements";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -51,16 +50,12 @@ export const SettingsPlatformAnnouncementsPage = () => {
   const items = data?.items ?? [];
   const now = Date.now();
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!pendingDelete?.id) return;
-    try {
-      await remove.mutateAsync(pendingDelete.id);
-      toast.success(t("operator.deleted"));
-    } catch (error) {
-      toast.error(getErrorMessage(error, "announcements:operator.deleteFailed"));
-    } finally {
-      setPendingDelete(null);
-    }
+    remove.mutate(pendingDelete.id, {
+      onSuccess: () => toast.success(t("operator.deleted")),
+      onSettled: () => setPendingDelete(null),
+    });
   };
 
   return (
@@ -168,7 +163,7 @@ export const SettingsPlatformAnnouncementsPage = () => {
         title={t("operator.deleteTitle")}
         description={t("operator.deleteDescription", { title: pendingDelete?.title ?? "" })}
         confirmLabel={t("common:delete")}
-        onConfirm={() => void handleDelete()}
+        onConfirm={handleDelete}
       />
     </div>
   );
