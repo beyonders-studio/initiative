@@ -34,10 +34,10 @@ import {
   type ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { instanceTarget, sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
-import { MAX_PRESETS } from "@/lib/layouts/presets";
 import { TASK_COLUMNS } from "@/lib/layouts/tasks";
-import type { LayoutNode } from "@/lib/layouts/tree";
 import { CollectionLayoutEditorPage } from "@/pages/initiativeTools/files/CollectionLayoutEditorPage";
+import { MAX_PRESETS } from "@/ui/layouts/presets";
+import type { LayoutNode } from "@/ui/layouts/tree";
 
 import { calendarPresets, eventDetail, taskDetails, taskPresets } from "./details";
 import { LayoutEditor } from "./LayoutEditor";

@@ -17,14 +17,14 @@ import { usePost, useUpdatePost } from "@/hooks/usePosts";
 import { useRouteId } from "@/hooks/useRouteId";
 import { detailLayoutOf, sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
-import type { StoredRegions } from "@/lib/layouts/detailLayout";
 import { usePluginMenuActions } from "@/lib/layouts/plugins";
 import { POST_DETAIL } from "@/lib/layouts/postLayout";
 import { toast } from "@/lib/mascotToast";
 import { toolListRoute, toolSettingsRoute } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdown-menu";
+import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
+import type { StoredRegions } from "@/ui/layouts/detailLayout";
 import { DetailHeaderSkeleton } from "@/ui/page-skeletons";
 import { Skeleton } from "@/ui/skeleton";
 

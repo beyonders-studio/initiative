@@ -14,8 +14,6 @@ import { TaskPrioritySelector } from "@/components/tasks/TaskPrioritySelector";
 import { TaskStatusSelector } from "@/components/tasks/TaskStatusSelector";
 import { NO_TASK_COLUMN_LIMITS, type TaskColumnLimits } from "@/hooks/useColumnLimits";
 import { InitiativeColorDot } from "@/lib/initiativeColors";
-import { type FieldColumnOptions, fieldColumn } from "@/lib/layouts/columns";
-import type { FieldDef, LayoutEnv } from "@/lib/layouts/fields";
 import { summarizeStored } from "@/lib/recurrence";
 import {
   dateSortingFn,
@@ -30,6 +28,8 @@ import { getUserDisplayName } from "@/lib/userDisplay";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
+import { type FieldColumnOptions, fieldColumn } from "@/ui/layouts/columns";
+import type { FieldDef, LayoutEnv } from "@/ui/layouts/fields";
 import type { AppColumnDef } from "@/ui/lib/table";
 import { SortHeader } from "@/ui/sort-icon";
 

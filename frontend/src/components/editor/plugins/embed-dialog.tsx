@@ -29,7 +29,6 @@ import {
   TASK_MODES,
   type TaskQuery,
 } from "@/lib/embeds";
-import { groupFields, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
 import { pluginFields, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { TASK_COLUMNS, taskFields } from "@/lib/layouts/tasks";
 import { entityIcon } from "@/lib/searchResults";
@@ -38,6 +37,7 @@ import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { groupFields, LAYOUT_NAMESPACES } from "@/ui/layouts/fields";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";

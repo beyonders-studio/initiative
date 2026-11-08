@@ -40,6 +40,7 @@ import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useActorName } from "@/hooks/useActorName";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { useComments, useCommentsCache, useCommentThreadState } from "@/hooks/useComments";
+import { itemSaves } from "@/hooks/useFieldSave";
 import { useFillRequired } from "@/hooks/useFillRequired";
 import { useOwnedDefinitions } from "@/hooks/useProperties";
 import { useSmartTitle, useSmartTitlesOn } from "@/hooks/useSmartTitle";
@@ -74,15 +75,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
 import { DateTimePicker } from "@/ui/date-time-picker";
 import { Label } from "@/ui/label";
-import { fromPickerValue, toPickerValue } from "@/ui/lib/localDateTime";
-import { dateTimePattern } from "@/ui/lib/timeFormat";
-import { useDateLocale } from "@/ui/lib/useDateLocale";
-import { useRelativeTime } from "@/ui/lib/useRelativeTime";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
-
-import { DescriptionField } from "./DescriptionField";
-import { useItemContext } from "./DetailLayoutView";
+import { useItemContext } from "@/ui/layouts/DetailLayoutView";
 import {
   filledBy,
   hasAny,
@@ -91,7 +84,7 @@ import {
   requiredKeys,
   type StoredRegions,
   sentOr,
-} from "./detailLayout";
+} from "@/ui/layouts/detailLayout";
 import {
   FieldFrame,
   ItemDraftContext,
@@ -100,9 +93,17 @@ import {
   sameJson,
   useFieldDraft,
   type Written,
-} from "./editing";
-import { TitleField, type TypeaheadField } from "./fieldEditors";
-import { PROPERTY_FIELD_PREFIX } from "./fields";
+} from "@/ui/layouts/editing";
+import { TitleField, type TypeaheadField } from "@/ui/layouts/fieldEditors";
+import { PROPERTY_FIELD_PREFIX } from "@/ui/layouts/fields";
+import { fromPickerValue, toPickerValue } from "@/ui/lib/localDateTime";
+import { dateTimePattern } from "@/ui/lib/timeFormat";
+import { useDateLocale } from "@/ui/lib/useDateLocale";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
+
+import { DescriptionField } from "./DescriptionField";
 import { type InitiativeDetail, useInitiativeExtension } from "./initiativeExtension";
 import { TASK_LAYOUT, taskFields, taskLayoutFor } from "./tasks";
 
@@ -887,7 +888,7 @@ export const TASK_DETAIL: InitiativeDetail<TaskRead, TaskLayoutContext, TaskUpda
     comments: (_node, task) => <Comments task={task} />,
   },
   home: (task, context) => ({
-    saves: TASK_SAVES,
+    saves: itemSaves(TASK_SAVES, task.id),
     readOnly: context.readOnly,
     initiativeId: context.initiativeId,
     canOpen: { tool: Tool.project, id: task.project_id },

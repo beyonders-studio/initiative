@@ -20,7 +20,6 @@ import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { getTaskDateStatusLabel, TASK_DATE_STATUSES } from "@/lib/taskDateStatus";
 import type { TranslateFn } from "@/types/i18n";
 import { Badge } from "@/ui/badge";
-
 import {
   type GroupRow,
   type ItemGrouping,
@@ -28,7 +27,7 @@ import {
   type OwnGroups,
   type PropertyMove,
   swap,
-} from "./grouping";
+} from "@/ui/layouts/grouping";
 
 /** A board's columns are its statuses already, so its bands never are. */
 export const BOARD_COLUMNS = "task_status_id";

@@ -1,10 +1,10 @@
 import { useTranslation } from "react-i18next";
 
 import type { SortField } from "@/api/generated/initiativeAPI.schemas";
-import { type FieldDef, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
 import type { TranslateFn } from "@/types/i18n";
 import { Field } from "@/ui/field";
 import { Label } from "@/ui/label";
+import { type FieldDef, LAYOUT_NAMESPACES } from "@/ui/layouts/fields";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 

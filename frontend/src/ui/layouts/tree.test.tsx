@@ -10,6 +10,8 @@ import { TASK_LAYOUT, taskFields } from "@/lib/layouts/tasks";
 /** The page as shipped. */
 const TASK_DETAIL = TASK_LAYOUT.tree(undefined);
 
+import type { TranslateFn } from "@/types/i18n";
+
 import {
   LAYOUT_PARTS,
   type LayoutContext,
@@ -17,8 +19,7 @@ import {
   LayoutTree,
   type Parts,
   renderNode,
-} from "@/lib/layouts/tree";
-import type { TranslateFn } from "@/types/i18n";
+} from "./tree";
 
 const field = (id: string): LayoutNode => ({ type: "field", props: { field: id } });
 

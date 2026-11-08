@@ -55,8 +55,6 @@ import {
   waitingOn,
   wholesOf,
 } from "@/lib/gantt";
-import { LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
-import { boardBands } from "@/lib/layouts/grouping";
 import { taskFields } from "@/lib/layouts/tasks";
 import { browserTimezone } from "@/lib/timezones";
 import { taskRoute } from "@/lib/tools";
@@ -79,6 +77,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
+import { LAYOUT_NAMESPACES } from "@/ui/layouts/fields";
+import { boardBands } from "@/ui/layouts/grouping";
 import { dateTimeFormat } from "@/ui/lib/intl";
 import { cn } from "@/ui/lib/utils";
 import { Toggle } from "@/ui/toggle";

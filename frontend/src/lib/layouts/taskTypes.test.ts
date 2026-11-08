@@ -7,11 +7,11 @@ import i18n from "@/__tests__/helpers/i18n-test";
 import { renderPage } from "@/__tests__/helpers/render";
 import { parseLayoutKind } from "@/lib/filters/layoutSearch";
 import type { TranslateFn } from "@/types/i18n";
+import { pageParts } from "@/ui/layouts/detailLayout";
+import { groupables } from "@/ui/layouts/grouping";
+import { type LayoutContext, LayoutTree } from "@/ui/layouts/tree";
 
-import { pageParts } from "./detailLayout";
-import { groupables } from "./grouping";
 import { TASK_LAYOUT, taskFields, taskLayoutFor, taskPageWithFields } from "./tasks";
-import { type LayoutContext, LayoutTree } from "./tree";
 
 const SHAPES = ["plain", "fix", "discussion", "dates", "repeat", "checklist"];
 

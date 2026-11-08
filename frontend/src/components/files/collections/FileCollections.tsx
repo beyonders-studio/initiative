@@ -13,10 +13,10 @@ import { collectionMetadataSaves, useCollections } from "@/hooks/useCollections"
 import { itemSaves } from "@/hooks/useFieldSave";
 import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { PlacedPropertyField } from "@/lib/layouts/fieldEditors";
 import { collectionRoute } from "@/lib/tools";
 import { badgeVariants } from "@/ui/badge";
 import { Button } from "@/ui/button";
+import { PlacedPropertyField } from "@/ui/layouts/fieldEditors";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 /**

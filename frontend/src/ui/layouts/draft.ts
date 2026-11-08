@@ -11,7 +11,6 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 
 import type { FieldDef } from "./fields";
-import { MAX_PLUGIN_PARTS } from "./plugins";
 import type { LayoutNode } from "./tree";
 
 /** What a kind of item's lists draw until they are changed: a card's parts
@@ -263,21 +262,6 @@ export const HOLDERS = new Set(["card", "stack", "section", "header", "main", "s
 
 /** How long a section's title may be, as the server allows. */
 export const MAX_TITLE_LENGTH = 100;
-
-/** The parts of an install a tree can still place: each once, and none past
- *  {@link MAX_PLUGIN_PARTS}. */
-export const addablePluginParts = <P extends { id: string }>(
-  tree: LayoutNode,
-  install: number,
-  parts: P[]
-): P[] => {
-  const placed = nodesIn(tree).flatMap((node) =>
-    node.type === "plugin" && Number(node.props?.plugin) === install
-      ? [String(node.props?.part)]
-      : []
-  );
-  return placed.length >= MAX_PLUGIN_PARTS ? [] : parts.filter((part) => !placed.includes(part.id));
-};
 
 /** Whether a tree holds a part of the type. */
 export const holdsPart = (tree: LayoutNode, type: string): boolean =>

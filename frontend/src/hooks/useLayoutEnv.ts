@@ -9,8 +9,8 @@ import { useTranslation } from "react-i18next";
 import type { PropertyDefinitionRead, PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
 import { useStepCounter } from "@/hooks/useProperties";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { LAYOUT_NAMESPACES, type LayoutEnv, type LayoutItem } from "@/lib/layouts/fields";
 import type { TranslateFn } from "@/types/i18n";
+import { LAYOUT_NAMESPACES, type LayoutEnv, type LayoutItem } from "@/ui/layouts/fields";
 
 /** How a list of `target`s steps its counters: an item's, where `may` says
  *  its reader may change that counter on it from the list. `may` is kept

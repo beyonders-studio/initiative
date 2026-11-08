@@ -1,9 +1,9 @@
 import { useState } from "react";
 
-import { FillRequiredDialog } from "@/components/layouts/FillRequiredDialog";
 import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
-import type { DetailItem, DetailKind } from "@/lib/layouts/DetailLayoutView";
-import type { Written } from "@/lib/layouts/editing";
+import type { DetailItem, DetailKind } from "@/ui/layouts/DetailLayoutView";
+import type { Written } from "@/ui/layouts/editing";
+import { FillRequiredDialog } from "@/ui/layouts/FillRequiredDialog";
 
 /** A change waiting on what its item's new page requires. */
 export interface Asking<I, C, P> {

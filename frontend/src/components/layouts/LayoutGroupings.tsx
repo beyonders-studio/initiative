@@ -9,8 +9,14 @@ import type {
   TaskListRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { useGroupables } from "@/hooks/useTaskGroupings";
-import type { ListLayout } from "@/lib/layouts/draft";
-import { type FieldDef, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
+import type { GroupMove } from "@/lib/layouts/taskGroupings";
+import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { Field } from "@/ui/field";
+import { Label } from "@/ui/label";
+import type { ListLayout } from "@/ui/layouts/draft";
+import { type FieldDef, LAYOUT_NAMESPACES } from "@/ui/layouts/fields";
 import {
   DATE_BUCKETS,
   groupingsFor,
@@ -18,13 +24,7 @@ import {
   MAX_GROUPINGS,
   MAX_HIDDEN_GROUPS,
   type OfferedGrouping,
-} from "@/lib/layouts/grouping";
-import type { GroupMove } from "@/lib/layouts/taskGroupings";
-import type { TranslateFn } from "@/types/i18n";
-import { Button } from "@/ui/button";
-import { Checkbox } from "@/ui/checkbox";
-import { Field } from "@/ui/field";
-import { Label } from "@/ui/label";
+} from "@/ui/layouts/grouping";
 import { cn } from "@/ui/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 

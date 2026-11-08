@@ -45,13 +45,13 @@ import {
   taskFiltersEqual,
   taskSortFields,
 } from "@/lib/filters/taskFilters";
-import { pageParts, type StoredRegions } from "@/lib/layouts/detailLayout";
-import { columnsOf } from "@/lib/layouts/draft";
-import { catalogChoices, viewGrouping } from "@/lib/layouts/grouping";
 import { pluginFields, shippedPluginParts, usePluginsOnItems } from "@/lib/layouts/plugins";
-import { type Preset, presetsOf } from "@/lib/layouts/presets";
 import { BOARD_COLUMNS } from "@/lib/layouts/taskGroupings";
 import { TASK_LIST_SHAPE, TASK_PRESETS, taskLayoutFor } from "@/lib/layouts/tasks";
+import { pageParts, type StoredRegions } from "@/ui/layouts/detailLayout";
+import { columnsOf } from "@/ui/layouts/draft";
+import { catalogChoices, viewGrouping } from "@/ui/layouts/grouping";
+import { type Preset, presetsOf } from "@/ui/layouts/presets";
 
 const readTaskFilters = (raw: unknown) => specFromStored(raw as StoredTaskFilters);
 const TASK_DEFAULTS = { filters: EMPTY_TASK_FILTERS, ...NO_PART_VIEW };

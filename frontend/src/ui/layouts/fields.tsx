@@ -18,7 +18,6 @@ import type { FieldDisplay } from "@/ui/properties/propertyHelpers";
 import { iconForPropertyType } from "@/ui/properties/propertyTypeIcons";
 
 import type { PropertyEnv } from "./fieldEditors";
-import { PluginField, type PluginFieldDecl, type PluginOnItems } from "./plugins";
 
 /** What a view draws: tasks, and a collection's files, which its own fields
  *  (`lib/layouts/files.tsx`) read. */
@@ -30,7 +29,7 @@ export type LayoutVariant = "card" | "cell" | "detail";
 
 /** The kinds of field drawn here. A kind of item draws its own fields
  *  ({@link FieldDef}'s `render`). */
-export type FieldKind = "title" | "excerpt" | "date" | "count" | "property" | "plugin";
+export type FieldKind = "title" | "excerpt" | "date" | "count" | "property";
 
 /** A property's field, by its definition id: what a view stores, so renaming
  *  the property keeps every view that shows it. */
@@ -73,10 +72,10 @@ export const groupFields = (fields: readonly FieldDef[]): FieldGroup[] => {
   const installs = new Map<number, FieldGroup>();
   for (const field of fields) {
     if (!field.plugin) continue;
-    const { install, on } = field.plugin;
+    const { install, name } = field.plugin;
     const group = installs.get(install) ?? {
       key: `plugin:${install}`,
-      heading: on.name,
+      heading: name,
       plugin: install,
       fields: [],
     };
@@ -114,9 +113,9 @@ export type FieldDef = {
    *  can be left empty. A title is always required; what is never empty, what
    *  a plug-in fills and what nobody fills cannot be. */
   requireable: boolean;
-  /** A plug-in field's install and declaration, and the install as the
-   *  reader meets it on this kind of item. */
-  plugin?: { install: number; field: PluginFieldDecl; on: PluginOnItems };
+  /** A plug-in field's install, and what the community calls it: a list of
+   *  fields groups the install's under that name. */
+  plugin?: { install: number; name: string };
   /** A property field's definition. */
   property?: PropertyDefinitionRead;
   /** How a scale or a counter is drawn where the list showing it says. */
@@ -335,7 +334,6 @@ const FIELD_RENDERERS: Record<FieldKind, ComponentType<FieldRendererProps>> = {
   date: memo(DateField),
   count: memo(CountField),
   property: memo(PropertyField),
-  plugin: memo(PluginField),
 };
 
 const NOTHING = () => null;

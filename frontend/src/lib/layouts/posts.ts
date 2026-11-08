@@ -1,8 +1,7 @@
 import type { PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
-
-import { at, detailLayoutSpec, type Region } from "./detailLayout";
-import { type FieldDef, propertyFields } from "./fields";
-import type { LayoutNode } from "./tree";
+import { at, detailLayoutSpec, type Region } from "@/ui/layouts/detailLayout";
+import { type FieldDef, propertyFields } from "@/ui/layouts/fields";
+import type { LayoutNode } from "@/ui/layouts/tree";
 
 /** A notice's fields, each with its label's key. Its title, tags and
  *  properties are changed in its tool's header; here its tags are drawn where

@@ -14,8 +14,7 @@ import { currentServerKey } from "@/lib/offlineSession";
 import { getItem, removeItem, setItem } from "@/lib/storage";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
-
-import { FieldFrame, ItemDraftContext } from "./editing";
+import { FieldFrame, ItemDraftContext } from "@/ui/layouts/editing";
 
 /** A description being written, and the one it was written over. */
 interface DescriptionDraft {

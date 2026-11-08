@@ -44,6 +44,12 @@ export type ItemEdit<I, P> = { shows: Partial<I> } & (
     }
 );
 
+/** One field's save, and how a change is sent: `undo`, where given, is the
+ *  change that puts it back. Settles true once the change is saved. */
+export interface ItemFieldSave<I, P> extends FieldSave {
+  save: (edit: ItemEdit<I, P>, undo?: ItemEdit<I, P>) => Promise<boolean>;
+}
+
 /**
  * An item being added, which nothing has saved yet: its fields' saves change
  * the copy the dialog holds, and Add makes it whole.

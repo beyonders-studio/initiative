@@ -16,16 +16,15 @@ import { useProjectLayoutEnv } from "@/hooks/useLayoutEnv";
 import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 import type { LinkedRef } from "@/lib/relationships";
 import type { ToolRelationEntity } from "@/lib/tools";
-
 import {
   type DetailExtension,
   type DetailItem,
   type DetailKind,
   type ItemHome,
   useItemHome,
-} from "./DetailLayoutView";
-import { ItemDraftContext } from "./editing";
-import type { FieldDef } from "./fields";
+} from "@/ui/layouts/DetailLayoutView";
+import { ItemDraftContext } from "@/ui/layouts/editing";
+
 import {
   FieldsInParts,
   fieldsInParts,
@@ -99,10 +98,6 @@ const LINKS_TO_MAKE = { relations: () => <LinksToMake /> };
 // Nothing on a detail opens a task through its fields' links.
 const NO_TASK = () => "";
 
-/** A plug-in's field, whose value is the plug-in's to change. */
-const pluginField = (field: FieldDef, item: DetailItem) =>
-  field.plugin ? <PluginFieldOnDetail field={field} item={item} /> : null;
-
 /**
  * Initiative's extension of an item's detail, which each of its kinds draws
  * with. One being added draws what needs nothing saved: the links to make,
@@ -136,7 +131,9 @@ export const useInitiativeExtension = <I extends DetailItem>(
     fields,
     more,
     parts,
-    field: pluginField,
+    // A plug-in's field, whose value is the plug-in's to change.
+    field: (field, item) =>
+      field.plugin ? <PluginFieldOnDetail plugins={plugins} field={field} item={item} /> : null,
     wrap: (tree, children) => (
       // An item of another community is another item, though its id is the
       // same: it starts afresh, with none of this one's drafts.

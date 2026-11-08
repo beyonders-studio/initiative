@@ -12,20 +12,19 @@ import type {
   PropertyDefinitionRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { FileTypeBadge } from "@/components/files/fileColumns";
-import { formatBytes } from "@/ui/lib/fileUtils";
-import { cn } from "@/ui/lib/utils";
-import { listedValue, nonEmptyPropertySummaries } from "@/ui/properties/propertyHelpers";
-
-import { at, detailLayoutSpec, type Region } from "./detailLayout";
-import type { ListShape } from "./draft";
+import { at, detailLayoutSpec, type Region } from "@/ui/layouts/detailLayout";
+import type { ListShape } from "@/ui/layouts/draft";
 import {
   type FieldDef,
   type FieldRendererProps,
   isEmptyValue,
   type LayoutItem,
   propertyFields,
-} from "./fields";
-import type { LayoutNode } from "./tree";
+} from "@/ui/layouts/fields";
+import type { LayoutNode } from "@/ui/layouts/tree";
+import { formatBytes } from "@/ui/lib/fileUtils";
+import { cn } from "@/ui/lib/utils";
+import { listedValue, nonEmptyPropertySummaries } from "@/ui/properties/propertyHelpers";
 
 /** The file a collection's list draws, which its fields are read from. */
 const fileOf = (item: LayoutItem) => item as unknown as CollectionFileSummary;

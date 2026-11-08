@@ -22,7 +22,6 @@ import {
   type PropertySummary,
   type Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import type { ItemFieldSave } from "@/hooks/useFieldSave";
 import { Button } from "@/ui/button";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { host } from "@/ui/host";
@@ -52,6 +51,7 @@ import {
   FieldFrame,
   ItemDraftContext,
   type ItemEdit,
+  type ItemFieldSave,
   ReadField,
   sameJson,
   useFieldDraft,

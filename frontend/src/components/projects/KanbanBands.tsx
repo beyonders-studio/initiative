@@ -9,9 +9,9 @@ import {
   ExpandedHeader,
   KanbanCards,
 } from "@/components/projects/KanbanColumn";
-import type { Band } from "@/lib/layouts/grouping";
 import type { TaskGrouping } from "@/lib/layouts/taskGroupings";
-import type { LayoutContext } from "@/lib/layouts/tree";
+import type { Band } from "@/ui/layouts/grouping";
+import type { LayoutContext } from "@/ui/layouts/tree";
 import { cn } from "@/ui/lib/utils";
 
 interface KanbanBandsProps {

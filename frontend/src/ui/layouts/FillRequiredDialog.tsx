@@ -1,10 +1,6 @@
 import { useTranslation } from "react-i18next";
 
 import type { PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
-import { type DetailItem, type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
-import { missingRequired, type StoredRegions } from "@/lib/layouts/detailLayout";
-import { ItemDraftContext, useItemDraft, type Written } from "@/lib/layouts/editing";
-import type { LayoutNode } from "@/lib/layouts/tree";
 import { Button } from "@/ui/button";
 import {
   Dialog,
@@ -14,6 +10,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+
+import { type DetailItem, type DetailKind, DetailLayoutView } from "./DetailLayoutView";
+import { missingRequired, type StoredRegions } from "./detailLayout";
+import { ItemDraftContext, useItemDraft, type Written } from "./editing";
+import type { LayoutNode } from "./tree";
 
 type FillProps<I extends DetailItem, C, P> = {
   detail: DetailKind<I, C, P>;

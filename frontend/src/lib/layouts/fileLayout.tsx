@@ -11,22 +11,22 @@ import { collectionMetadataSaves } from "@/hooks/useCollections";
 import { itemSaves } from "@/hooks/useFieldSave";
 import { propertySaves } from "@/hooks/useProperties";
 import type { TranslateFn } from "@/types/i18n";
-import { nonEmptyPropertySummaries } from "@/ui/properties/propertyHelpers";
-
-import { useItemContext } from "./DetailLayoutView";
-import { filledBy, PlacedProperties } from "./detailLayout";
-import { ReadField } from "./editing";
-import { PlacedPropertyField } from "./fieldEditors";
+import { useItemContext } from "@/ui/layouts/DetailLayoutView";
+import { filledBy, PlacedProperties } from "@/ui/layouts/detailLayout";
+import { ReadField } from "@/ui/layouts/editing";
+import { PlacedPropertyField } from "@/ui/layouts/fieldEditors";
 import {
   fieldRenderer,
   isEmptyValue,
   type LayoutEnv,
   type LayoutItem,
   PROPERTY_FIELD_PREFIX,
-} from "./fields";
+} from "@/ui/layouts/fields";
+import type { LayoutContext } from "@/ui/layouts/tree";
+import { nonEmptyPropertySummaries } from "@/ui/properties/propertyHelpers";
+
 import { collectionFileFields, FILE_LAYOUT } from "./files";
 import { type InitiativeDetail, useInitiativeExtension } from "./initiativeExtension";
-import type { LayoutContext } from "./tree";
 
 /** What a file's detail shares with its parts, beside the file itself. */
 export interface FileLayoutContext {
@@ -142,7 +142,7 @@ export const FILE_DETAIL: InitiativeDetail<CollectionFileSummary, FileLayoutCont
     properties: (_node, file, view) => <FileProperties file={file} env={view.env} />,
   },
   home: (file, { collection }) => ({
-    saves: collectionMetadataSaves(collection.id),
+    saves: itemSaves(collectionMetadataSaves(collection.id), file.id),
     readOnly: !collection.can.edit,
     initiativeId: collection.initiative_id,
     canOpen: { tool: Tool.file, id: file.id },

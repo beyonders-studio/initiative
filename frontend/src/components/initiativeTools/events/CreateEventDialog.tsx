@@ -13,7 +13,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCreateCalendarEvent } from "@/hooks/useCalendarEvents";
 import { useCalendar, useCalendarsList } from "@/hooks/useCalendars";
 import { sharedTarget } from "@/hooks/useToolLayouts";
-import { ItemDraftContext } from "@/lib/layouts/editing";
 import { blankEvent, EVENT_DETAIL } from "@/lib/layouts/eventLayout";
 import { getItem, setItem } from "@/lib/storage";
 import type { DialogProps } from "@/types/dialog";
@@ -27,6 +26,7 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { Field } from "@/ui/field";
+import { ItemDraftContext } from "@/ui/layouts/editing";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 import { eventRange } from "./EventDateTimeFields";

@@ -20,7 +20,6 @@ import { useProperties } from "@/hooks/useProperties";
 import { useTaskListName } from "@/hooks/useTaskListName";
 import { communityPath } from "@/lib/communityUrl";
 import type { HomeTaskList } from "@/lib/home/firstHome";
-import { LAYOUT_NAMESPACES, type LayoutEnv } from "@/lib/layouts/fields";
 import { taskFields } from "@/lib/layouts/tasks";
 import { entityRefRoute, taskRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
@@ -28,6 +27,7 @@ import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 import { DataTable } from "@/ui/data-table";
 import { Label } from "@/ui/label";
+import { LAYOUT_NAMESPACES, type LayoutEnv } from "@/ui/layouts/fields";
 import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
 

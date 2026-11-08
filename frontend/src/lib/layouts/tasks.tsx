@@ -37,11 +37,8 @@ import { summarizeStored } from "@/lib/recurrence";
 import { truncateText } from "@/lib/text";
 import { entityRefRoute } from "@/lib/tools";
 import { Badge } from "@/ui/badge";
-import { cn } from "@/ui/lib/utils";
-import { listedValue } from "@/ui/properties/propertyHelpers";
-
-import { at, detailLayoutSpec, type Region, storedLayout } from "./detailLayout";
-import type { ListShape } from "./draft";
+import { at, detailLayoutSpec, type Region, storedLayout } from "@/ui/layouts/detailLayout";
+import type { ListShape } from "@/ui/layouts/draft";
 import {
   ExcerptField,
   type FieldDef,
@@ -51,9 +48,11 @@ import {
   propertyFieldId,
   propertyFields,
   TitleField,
-} from "./fields";
-import type { PresetKind } from "./presets";
-import type { LayoutNode } from "./tree";
+} from "@/ui/layouts/fields";
+import type { PresetKind } from "@/ui/layouts/presets";
+import type { LayoutNode } from "@/ui/layouts/tree";
+import { cn } from "@/ui/lib/utils";
+import { listedValue } from "@/ui/properties/propertyHelpers";
 
 // A table's title cell carries what the card shows as fields of their own,
 // where the table has no column for it.

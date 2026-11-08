@@ -16,7 +16,11 @@ import {
   MetadataType,
   type TaskListRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { propertyFieldId } from "@/lib/layouts/fields";
+import { BOARD_COLUMNS, taskGroups } from "@/lib/layouts/taskGroupings";
+import { taskFields } from "@/lib/layouts/tasks";
+import type { TranslateFn } from "@/types/i18n";
+
+import { propertyFieldId } from "./fields";
 import {
   boardBands,
   catalogChoices,
@@ -29,10 +33,7 @@ import {
   uniqueItemsFromRows,
   viewGrouping,
   withGroupShown,
-} from "@/lib/layouts/grouping";
-import { BOARD_COLUMNS, taskGroups } from "@/lib/layouts/taskGroupings";
-import { taskFields } from "@/lib/layouts/tasks";
-import type { TranslateFn } from "@/types/i18n";
+} from "./grouping";
 
 const t = ((key: string, options?: { defaultValue?: string }) =>
   options?.defaultValue ?? key) as TranslateFn;

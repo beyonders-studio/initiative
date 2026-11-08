@@ -6,10 +6,10 @@ import {
   buildPropertySummary,
 } from "@/__tests__/factories";
 import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
+import type { LayoutItem } from "@/ui/layouts/fields";
+import type { LayoutNode } from "@/ui/layouts/tree";
 
-import type { LayoutItem } from "./fields";
 import { cardLines, collectionFileFields } from "./files";
-import type { LayoutNode } from "./tree";
 
 const caption = buildPropertyDefinition({ id: 21, name: "Caption", collection_id: 5 });
 const price = buildPropertyDefinition({ id: 22, name: "Price", type: MetadataType.currency });

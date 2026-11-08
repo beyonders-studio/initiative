@@ -17,7 +17,6 @@ import type {
   PropertySummary,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { type FieldSaveKind, itemSaves } from "@/hooks/useFieldSave";
 import { Button } from "@/ui/button";
 import { cn } from "@/ui/lib/utils";
 import { type MetadataOwner, ownProperties } from "@/ui/properties/propertyHelpers";
@@ -34,7 +33,7 @@ import {
 } from "./detailLayout";
 import { indexPaths } from "./draft";
 import { ItemDraftContext } from "./editing";
-import { PlacedPropertyField, PropertiesField } from "./fieldEditors";
+import { type ItemSaves, PlacedPropertyField, PropertiesField } from "./fieldEditors";
 import { type FieldDef, type LayoutEnv, PROPERTY_FIELD_PREFIX } from "./fields";
 import { LAYOUT_PARTS, type LayoutContext, type LayoutNode, type Parts, renderNode } from "./tree";
 
@@ -43,8 +42,8 @@ export type DetailItem = { id: number; properties: PropertySummary[]; updated_at
 
 /** Where one item lives, which the parts every item's detail has read. */
 export interface ItemHome<I, P> {
-  /** How its fields and properties are saved. */
-  saves: FieldSaveKind<I, P>;
+  /** How its properties are saved, each on its own. */
+  saves: ItemSaves<I, P>;
   /** The server says the reader cannot change it. */
   readOnly: boolean;
   /** Its initiative, which holds its properties' definitions; none for a
@@ -150,7 +149,7 @@ const propertiesOf = (
   home: ItemHome<DetailItem, unknown>,
   view: LayoutContext
 ) => ({
-  saves: itemSaves(home.saves, item.id),
+  saves: home.saves,
   env: view.env.properties,
   id: item.id,
   properties: item.properties,

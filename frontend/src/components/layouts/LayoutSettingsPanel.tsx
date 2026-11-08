@@ -13,7 +13,13 @@ import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { MAX_COLUMN_LIMIT } from "@/hooks/useColumnLimits";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { LAYOUT_REGIONS } from "@/lib/layouts/detailLayout";
+import { initiativeRoute } from "@/lib/tools";
+import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { LAYOUT_REGIONS } from "@/ui/layouts/detailLayout";
 import {
   cardOf,
   type ListLayout,
@@ -22,15 +28,9 @@ import {
   nodeAt,
   removable,
   type Selection,
-} from "@/lib/layouts/draft";
-import { type FieldDef, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
-import type { LayoutNode } from "@/lib/layouts/tree";
-import { initiativeRoute } from "@/lib/tools";
-import type { TranslateFn } from "@/types/i18n";
-import { Button } from "@/ui/button";
-import { Field } from "@/ui/field";
-import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
+} from "@/ui/layouts/draft";
+import { type FieldDef, LAYOUT_NAMESPACES } from "@/ui/layouts/fields";
+import type { LayoutNode } from "@/ui/layouts/tree";
 import { listFormat } from "@/ui/lib/intl";
 import {
   COUNTER_DISPLAYS,

@@ -32,8 +32,6 @@ import { useTagEntities } from "@/hooks/useTags";
 import { useTasks } from "@/hooks/useTasks";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { taskSortFields } from "@/lib/filters/taskFilters";
-import { fieldColumn } from "@/lib/layouts/columns";
-import { LAYOUT_NAMESPACES, type LayoutEnv } from "@/lib/layouts/fields";
 import { taskFields } from "@/lib/layouts/tasks";
 import { hitIcon, searchHitPath } from "@/lib/searchResults";
 import {
@@ -48,6 +46,8 @@ import {
 } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
 import { DataTable } from "@/ui/data-table";
+import { fieldColumn } from "@/ui/layouts/columns";
+import { LAYOUT_NAMESPACES, type LayoutEnv } from "@/ui/layouts/fields";
 import type { AppColumnDef } from "@/ui/lib/table";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { TableSkeleton } from "@/ui/page-skeletons";
