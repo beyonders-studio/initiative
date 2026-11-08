@@ -19,6 +19,7 @@ from app.db.errors import dbapi_sqlstate
 from app.db.frozen import FROZEN_SQLSTATE
 from app.db.session import raise_flag
 from app.models.platform.guild import CommunityRole
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.project import Project
 from app.services.tenant import archive as archive_service
 from app.services.tenant.soft_delete import soft_delete_entity
@@ -646,6 +647,7 @@ class TestTrashedRowsAreOutOfSight:
         user, guild, _i, _p, task = workspace
         task.deleted_at = datetime.now(UTC)
         task.deleted_by = user.id
+        task.deleted_by_kind = ActorKind.member
         session.add(task)
         await session.commit()
 
@@ -664,6 +666,7 @@ class TestTrashedRowsAreOutOfSight:
         user, guild, _i, _p, task = workspace
         task.deleted_at = datetime.now(UTC)
         task.deleted_by = user.id
+        task.deleted_by_kind = ActorKind.member
         session.add(task)
         await session.commit()
 
@@ -682,6 +685,7 @@ class TestTrashedRowsAreOutOfSight:
         user, guild, _i, _p, task = workspace
         task.deleted_at = datetime.now(UTC)
         task.deleted_by = user.id
+        task.deleted_by_kind = ActorKind.member
         session.add(task)
         await session.commit()
 
@@ -703,6 +707,7 @@ class TestTrashedRowsAreOutOfSight:
         user, guild, _i, _p, task = workspace
         task.deleted_at = datetime.now(UTC)
         task.deleted_by = user.id
+        task.deleted_by_kind = ActorKind.member
         session.add(task)
         await session.commit()
 

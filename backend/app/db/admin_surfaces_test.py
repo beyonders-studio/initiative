@@ -5,6 +5,7 @@ reads the surface, not the admin fact."""
 from sqlalchemy import text
 
 from app.models.platform.guild import AdminSurface, CommunityRole, GuildInvite
+from app.models.tenant._mixins import ActorKind
 from app.testing import create_initiative, route_as
 
 EVERY_SURFACE = {surface.value for surface in AdminSurface}
@@ -32,7 +33,10 @@ async def test_a_surface_policy_reads_the_surface_not_the_admin_fact(
     await create_initiative(session, admin.guild, manager.user)
     session.add(
         GuildInvite(
-            code_hash="a" * 64, guild_id=admin.guild.id, created_by=admin.user.id
+            code_hash="a" * 64,
+            guild_id=admin.guild.id,
+            created_by=admin.user.id,
+            created_by_kind=ActorKind.member,
         )
     )
     await session.commit()

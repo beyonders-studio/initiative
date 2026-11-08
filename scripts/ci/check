@@ -51,20 +51,30 @@ check_tsc() { frontend typecheck; }
 
 check_migrations() {
   # A revision already on the base branch is fixed; edit, rename or delete
-  # one and this fails. --no-renames reports a rename as the old path deleted,
-  # so the merged name is checked.
-  local edited
+  # one and this fails, unless a commit on the branch names it in an
+  # Edits-merged-migration trailer (an edit the owner ruled). --no-renames
+  # reports a rename as the old path deleted, so the merged name is checked.
+  local edited named unnamed=()
   if ! git rev-parse --verify --quiet "$BASE_REF^{commit}" >/dev/null; then
     error "Cannot compare against $BASE_REF: it does not exist here. Run 'git fetch origin dev', or set BASE_REF."
     return 1
   fi
   edited=$(git diff --name-only --no-renames --diff-filter=MDT "$BASE_REF...HEAD" -- backend/alembic/versions)
-  if [[ -n "$edited" ]]; then
-    error "Edited, renamed or removed a merged migration: $(tr '\n' ' ' <<<"$edited")"
+  named=$(git log --format='%(trailers:key=Edits-merged-migration,valueonly)' "$BASE_REF..HEAD")
+  while IFS= read -r file; do
+    [[ -z "$file" ]] && continue
+    if grep -qxF "$(basename "$file")" <<<"$named"; then
+      echo "Merged migration edited, named in a commit: $file"
+    else
+      unnamed+=("$file")
+    fi
+  done <<<"$edited"
+  if ((${#unnamed[@]})); then
+    error "Edited, renamed or removed a merged migration: ${unnamed[*]}"
     echo "Add a new revision instead (AGENTS.md, \"Never edit a migration\")."
     return 1
   fi
-  echo "No merged migration edited."
+  [[ -z "$edited" ]] && echo "No merged migration edited."
 
   # get_current_head() raises when the revisions have more than one head.
   backend python -c "

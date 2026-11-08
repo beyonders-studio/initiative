@@ -1,7 +1,7 @@
 """every author table stamps its author
 
 ``created_by_kind`` is NOT NULL on every table that names an author, and
-``public.fn_set_created_by`` fills it for a write that names no author. These
+``public.fn_set_author`` fills it for a write that names no author. These
 tables carry the column without the trigger, so such a write is refused.
 
 Revision ID: 20261109_0592
@@ -49,7 +49,7 @@ def _upgrade() -> None:
     for table in _present():
         op.execute(
             f"CREATE OR REPLACE TRIGGER tr_{table}_set_created_by BEFORE INSERT "
-            f"ON {table} FOR EACH ROW EXECUTE FUNCTION public.fn_set_created_by()"
+            f"ON {table} FOR EACH ROW EXECUTE FUNCTION public.fn_set_author()"
         )
 
 

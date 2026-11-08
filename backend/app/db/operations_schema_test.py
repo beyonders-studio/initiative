@@ -21,6 +21,7 @@ from app.db import operations_schema
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.db.tenancy import OPERATIONS_TABLES
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.evidence import Evidence
 from app.models.tenant.intake import IntakeBinding, IntakeCase
@@ -66,13 +67,19 @@ async def operations(session):
 
     await set_rls_context(session, SystemGuild(guild.id))
     session.add(
-        Comment(task_id=mine.task_id, content="Staff only.", created_by=staff.id)
+        Comment(
+            task_id=mine.task_id,
+            content="Staff only.",
+            created_by=staff.id,
+            created_by_kind=ActorKind.member,
+        )
     )
     session.add(
         Comment(
             task_id=mine.task_id,
             content="Have you tried a recovery code?",
             created_by=staff.id,
+            created_by_kind=ActorKind.member,
             audience=CommentAudience.filer,
         )
     )
@@ -90,6 +97,7 @@ async def operations(session):
             wrapped_dek=b"sealed",
             kek_version=1,
             created_by=by,
+            created_by_kind=ActorKind.member,
         )
 
     session.add(attached(mine.task_id, asker.id, "mine.txt"))

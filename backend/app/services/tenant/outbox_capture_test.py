@@ -654,7 +654,9 @@ async def test_a_facet_carries_its_owner_chain(session, acting_user):
     assert _chain(tagged[-1]) == [("projects", a.project.id)]
 
 
-async def test_a_reaction_borrows_the_chain_of_what_it_is_on(session, acting_user):
+async def test_a_reaction_borrows_the_chain_of_what_it_is_on(
+    session, acting_user, reading_as
+):
     """Polymorphic borrow: a reaction reports as its target, so it carries the
     target's parents — a comment's task and project, not the reaction's own."""
     from app.core.reactions import ReactionTarget
@@ -666,15 +668,17 @@ async def test_a_reaction_borrows_the_chain_of_what_it_is_on(session, acting_use
     comment = await create_comment(session, a.user, task=task)
 
     before = len(await _outbox(session, a.guild.id))
+    # Reacting as a request does, so the database names the member who reacted.
+    reacting = await reading_as(a.user.id, a.guild.id)
     await reactions_service.toggle_reaction(
-        session,
+        reacting,
         target=ReactionTarget.comment,
         target_id=comment.id,
         emoji="👍",
         user=a.user,
         guild_id=a.guild.id,
     )
-    await session.commit()
+    await reacting.commit()
 
     reacted = [
         r

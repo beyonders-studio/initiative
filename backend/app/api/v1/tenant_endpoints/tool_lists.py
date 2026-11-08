@@ -43,7 +43,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, ValidationError, create_model
-from sqlalchemy import and_, func, literal, select, union_all
+from sqlalchemy import and_, any_, func, literal, select, union_all
 from sqlmodel import col
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -546,7 +546,7 @@ async def _project_conditions(spec: ToolListSpec, req: ListRequest) -> list:
         initiative_id=values.get("initiative_id"),
     )
     if values.get("writable"):
-        conditions.append(Project.actions.any(Action.edit.value))
+        conditions.append(Action.edit.value == any_(Project.actions))
     return conditions
 
 

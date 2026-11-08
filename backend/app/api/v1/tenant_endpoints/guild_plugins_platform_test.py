@@ -46,6 +46,7 @@ from app.core.messages import (
 )
 from app.models.platform.guild import CommunityRole
 from app.models.platform.publisher import Publisher
+from app.models.tenant._mixins import ActorKind
 from app.services.marketplace.plugin_refs import (
     ensure_plugin_guild_ref,
     ensure_plugin_ref,
@@ -1529,6 +1530,7 @@ class TestUninstallStopsDeliveries:
         theirs = WebhookSubscription(
             initiative_id=a.initiative.id,
             created_by=a.user.id,
+            created_by_kind=ActorKind.member,
             plugin_install_id=plugin.id,
             target_url="https://widgetco.example/in",
             hmac_secret="s" * 40,
@@ -1542,6 +1544,7 @@ class TestUninstallStopsDeliveries:
         mine = WebhookSubscription(
             initiative_id=a.initiative.id,
             created_by=a.user.id,
+            created_by_kind=ActorKind.member,
             plugin_install_id=None,
             target_url="https://mine.example/in",
             hmac_secret="m" * 40,
@@ -1586,6 +1589,7 @@ class TestUninstallStopsDeliveries:
         sub = WebhookSubscription(
             initiative_id=a.initiative.id,
             created_by=a.user.id,
+            created_by_kind=ActorKind.member,
             plugin_install_id=plugin.id,
             target_url="https://widgetco.example/staged",
             hmac_secret="s" * 40,

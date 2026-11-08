@@ -28,7 +28,7 @@ from datetime import UTC, date, datetime
 
 import pytest
 from httpx2 import AsyncClient
-from sqlalchemy import delete, update
+from sqlalchemy import any_, delete, literal, update
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import selectinload
 from sqlmodel import col, select
@@ -1696,7 +1696,9 @@ class TestShownValues:
             await route_session_to_guild(session, installed.guild.id)
             session.expunge_all()
             rows = await session.exec(
-                select(EventOutbox).where(EventOutbox.changed.any("plugin_values"))
+                select(EventOutbox).where(
+                    literal("plugin_values") == any_(EventOutbox.changed)
+                )
             )
             return [
                 (e.resource_type, e.resource_id, e.action, e.actor_install_id)

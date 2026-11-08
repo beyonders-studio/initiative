@@ -44,6 +44,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.relationships import EndpointKind, RelationshipType
 from app.models.platform.guild import CommunityRole
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.models.tenant.comment import Comment
 from app.models.tenant.event_reminder_dispatch import EventReminderDispatch
@@ -208,6 +209,7 @@ async def _seed(session: AsyncSession) -> SimpleNamespace:
         "webhook": WebhookSubscription(
             initiative_id=initiative.id,
             created_by=victim.id,
+            created_by_kind=ActorKind.member,
             target_url="https://example.test/hook",
             hmac_secret=secrets.token_hex(16),
             event_types=["task.created"],

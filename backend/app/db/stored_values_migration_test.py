@@ -301,8 +301,9 @@ async def test_plug_in_values_are_respelled(session) -> None:
             bind.execute(
                 text(
                     f'INSERT INTO "{schema}".webhook_subscriptions '
-                    "(plugin_install_id, target_url, hmac_secret, event_types, active, "
-                    "created_at, updated_at) VALUES (:i, 'https://hooks.test/x', 's', "
+                    "(plugin_install_id, created_by, created_by_kind, target_url, "
+                    "hmac_secret, event_types, active, created_at, updated_at) "
+                    "VALUES (:i, :i, 'plugin', 'https://hooks.test/x', 's', "
                     ":e, true, now(), now())"
                 ),
                 {

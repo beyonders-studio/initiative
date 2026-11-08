@@ -8,9 +8,12 @@ pair together, so NULL means Initiative and nothing else. The four tables only
 a person writes keep their author required as a CHECK on the kind rather than
 ``NOT NULL`` on the column.
 
-``public.fn_set_created_by`` stamps an unnamed author from the request: a user
+``public.fn_set_author`` stamps an unnamed author from the request: a user
 makes a member, an install alone a plug-in, neither the system. A caller that
-names an author names its kind too; one that names only the id is refused.
+names an author names its kind too; one that names only the id is refused. The
+author tables' ``tr_<t>_set_created_by`` triggers call it; the older
+``public.fn_set_created_by``, which knows no kind, is left as it was for
+whatever still calls it.
 
 Existing rows: a named author is a member. An unnamed one is a plug-in's
 where something says which: its create event still in the community's
@@ -24,8 +27,8 @@ same terms, stamped as a row goes to the trash and cleared as it comes back
 trashed row that names who binned it was binned by a member; one that names
 nobody, by the system. A live row keeps no ``deleted_by``.
 
-The downgrade puts the old function back, clears the plug-in authors to NULL
-and drops the kind.
+The downgrade points the triggers back at ``fn_set_created_by``, clears the
+plug-in authors to NULL and drops the kind and ``fn_set_author``.
 
 Revision ID: 20261109_0591
 Revises: 20261109_0590
@@ -127,7 +130,7 @@ _TOOLS = (
 _MEMBER_ONLY = ("data_jobs", "guild_plugins", "pending_uploads", "reactions")
 
 _STAMP_FUNCTION = """
-CREATE OR REPLACE FUNCTION public.fn_set_created_by() RETURNS trigger
+CREATE OR REPLACE FUNCTION public.fn_set_author() RETURNS trigger
     LANGUAGE plpgsql AS $stamp$
 BEGIN
     IF NEW.created_by_kind IS NULL THEN
@@ -152,18 +155,69 @@ END;
 $stamp$;
 """
 
-_PREVIOUS_STAMP_FUNCTION = """
-CREATE OR REPLACE FUNCTION public.fn_set_created_by() RETURNS trigger
-    LANGUAGE plpgsql AS $stamp$
+#: Points the schema's author triggers from one stamp function to another.
+_REPOINT = """
+DO $$
+DECLARE found record;
 BEGIN
-    IF NEW.created_by IS NULL THEN
-        NEW.created_by := NULLIF(
-            current_setting('app.current_user_id', true), ''
-        )::integer;
+  FOR found IN
+    SELECT t.tgrelid, pg_get_triggerdef(t.oid) AS def
+    FROM pg_trigger t
+    JOIN pg_class c ON c.oid = t.tgrelid
+    WHERE c.relnamespace = current_schema()::regnamespace
+      AND t.tgfoid = 'public.{old}'::regproc
+      AND EXISTS (
+        SELECT 1 FROM pg_attribute a
+        WHERE a.attrelid = t.tgrelid AND a.attname = 'created_by_kind'
+          AND NOT a.attisdropped
+      )
+  LOOP
+    EXECUTE regexp_replace(
+      regexp_replace(found.def, 'CREATE TRIGGER', 'CREATE OR REPLACE TRIGGER'),
+      'EXECUTE FUNCTION \\S*{old}\\(\\)', 'EXECUTE FUNCTION public.{new}()'
+    );
+  END LOOP;
+END $$;
+"""
+
+
+#: The schema's policies and triggers that read ``created_by_kind`` or
+#: ``deleted_by_kind``, and the triggers whose own function in the schema does.
+_UNREAD_KINDS = """
+DO $$
+DECLARE found record;
+BEGIN
+  FOR found IN
+    SELECT DISTINCT d.classid, d.objid
+    FROM pg_depend d
+    JOIN pg_attribute a ON a.attrelid = d.refobjid AND a.attnum = d.refobjsubid
+    JOIN pg_class c ON c.oid = d.refobjid
+    WHERE c.relnamespace = current_schema()::regnamespace
+      AND a.attname IN ('created_by_kind', 'deleted_by_kind')
+      AND d.classid IN ('pg_policy'::regclass, 'pg_trigger'::regclass)
+  LOOP
+    IF found.classid = 'pg_policy'::regclass THEN
+      EXECUTE (SELECT format('DROP POLICY %I ON %s', polname, polrelid::regclass)
+               FROM pg_policy WHERE oid = found.objid);
+    ELSE
+      EXECUTE (SELECT format('DROP TRIGGER %I ON %s', tgname, tgrelid::regclass)
+               FROM pg_trigger WHERE oid = found.objid);
     END IF;
-    RETURN NEW;
-END;
-$stamp$;
+  END LOOP;
+  FOR found IN
+    SELECT t.tgname, t.tgrelid
+    FROM pg_trigger t
+    JOIN pg_class c ON c.oid = t.tgrelid
+    JOIN pg_proc f ON f.oid = t.tgfoid
+    WHERE c.relnamespace = current_schema()::regnamespace
+      AND f.pronamespace = current_schema()::regnamespace
+      AND NOT t.tgisinternal
+      AND (strpos(f.prosrc, 'created_by_kind') > 0
+           OR strpos(f.prosrc, 'deleted_by_kind') > 0)
+  LOOP
+    EXECUTE format('DROP TRIGGER %I ON %s', found.tgname, found.tgrelid::regclass);
+  END LOOP;
+END $$;
 """
 
 
@@ -260,6 +314,7 @@ def _upgrade() -> None:
             " CHECK ((created_by_kind = 'system') = (created_by IS NULL))"
         )
     _upgrade_deleted_by(bind)
+    op.execute(_REPOINT.format(old="fn_set_created_by", new="fn_set_author"))
     for table in _present(bind, _MEMBER_ONLY):
         op.execute(f"ALTER TABLE {table} ALTER COLUMN created_by DROP NOT NULL")
         op.execute(
@@ -301,6 +356,11 @@ def _downgrade() -> None:
     bind = op.get_bind()
     tables = _present(bind, _AUTHOR_TABLES)
     trashable = _present(bind, _TRASHABLE_TABLES)
+    # The rendered policies, triggers and trigger functions that read the
+    # kinds come off first: the columns cannot be dropped from under them,
+    # and the release this goes back to renders its own at boot.
+    op.execute(_UNREAD_KINDS)
+    op.execute(_REPOINT.format(old="fn_set_author", new="fn_set_created_by"))
     for table in trashable:
         op.execute(f"DROP TRIGGER IF EXISTS tr_{table}_stamp_deleted_by ON {table}")
         op.execute(
@@ -346,5 +406,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     run_for_each_guild_schema(op.get_bind(), _downgrade)
-    op.execute(_PREVIOUS_STAMP_FUNCTION)
+    op.execute("DROP FUNCTION IF EXISTS public.fn_set_author()")
     op.execute("DROP FUNCTION IF EXISTS public.fn_stamp_deleted_by()")

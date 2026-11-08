@@ -11,6 +11,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
+from app.models.tenant._mixins import ActorKind
 from app.testing.factories import (
     create_access_grant,
     create_calendar,
@@ -329,6 +330,7 @@ async def test_an_upload_is_not_served_to_a_key_the_guild_declines(
         Upload(
             filename="note.txt",
             created_by=admin.id,
+            created_by_kind=ActorKind.member,
             size_bytes=5,
         )
     )

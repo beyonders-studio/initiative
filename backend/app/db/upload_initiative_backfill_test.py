@@ -109,10 +109,12 @@ async def test_the_backfill_places_copies_and_leaves_alone(
     await session.commit()
 
     await route_session_to_guild(session, guild.id)
+    # The schema is still back before the authorship revision, so only the
+    # columns this reads are asked for.
     kept = {
-        u.filename: (u.initiative_id, u.claimed_at is not None)
-        for u in await session.exec(
-            select(Upload).execution_options(populate_existing=True)
+        filename: (initiative_id, claimed_at is not None)
+        for filename, initiative_id, claimed_at in await session.exec(
+            select(Upload.filename, Upload.initiative_id, Upload.claimed_at)
         )
     }
     [copy] = set(kept) - {"one.png", "shared.png", "guild.png", "nothing.png"}

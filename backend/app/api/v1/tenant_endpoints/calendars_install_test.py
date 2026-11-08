@@ -17,6 +17,7 @@ from app.core.messages import CalendarMessages, PluginMessages
 from app.db import cohorts
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification, NotificationType
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
@@ -225,9 +226,15 @@ async def test_what_it_creates_is_its_own_and_names_nobody(
         (ResourceAccessLevel.owner, installed.plugin.id, None)
     ]
     stored_calendar = await session.get(Calendar, calendar["id"])
-    assert stored_calendar is not None and stored_calendar.created_by is None
+    assert stored_calendar is not None and (
+        stored_calendar.created_by,
+        stored_calendar.created_by_kind,
+    ) == (installed.plugin.id, ActorKind.plugin)
     stored_event = await session.get(CalendarEvent, event["id"])
-    assert stored_event is not None and stored_event.created_by is None
+    assert stored_event is not None and (
+        stored_event.created_by,
+        stored_event.created_by_kind,
+    ) == (installed.plugin.id, ActorKind.plugin)
 
 
 async def test_it_shares_nothing_and_makes_no_community_calendar(

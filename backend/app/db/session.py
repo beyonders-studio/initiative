@@ -10,9 +10,9 @@ from typing import Any
 
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from asyncpg.exceptions import InvalidCatalogNameError
 from sqlalchemy import event, text
 from sqlalchemy.engine import make_url
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
     AsyncEngine,
@@ -749,6 +749,12 @@ def migration_chain() -> tuple[frozenset[str], str | None]:
         return frozenset(), None
 
 
+def _names_no_database(exc: DBAPIError) -> bool:
+    """Whether a connection was refused because its database does not exist
+    (SQLSTATE ``3D000``)."""
+    return getattr(exc.orig, "sqlstate", None) == "3D000"
+
+
 def _missing_database_error() -> RuntimeError:
     """What to raise when DATABASE_URL names a database that is not there.
 
@@ -791,8 +797,10 @@ async def migration_lock() -> AsyncGenerator[AsyncConnection, None]:
     )
     try:
         conn = await lock_engine.connect()
-    except InvalidCatalogNameError as exc:
+    except DBAPIError as exc:
         await lock_engine.dispose()
+        if not _names_no_database(exc):
+            raise
         raise _missing_database_error() from exc
     try:
         if not await advisory_lock(
@@ -817,5 +825,7 @@ async def run_migrations() -> None:
     config = _get_alembic_config()
     try:
         await asyncio.to_thread(command.upgrade, config, "head")
-    except InvalidCatalogNameError as exc:
+    except DBAPIError as exc:
+        if not _names_no_database(exc):
+            raise
         raise _missing_database_error() from exc

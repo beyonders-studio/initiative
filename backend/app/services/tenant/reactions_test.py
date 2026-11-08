@@ -6,6 +6,7 @@ import pytest
 
 from app.core.emoji import MAX_EMOJI_CODEPOINTS, validate_emoji
 from app.core.reactions import ReactionTarget
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.reaction import Reaction
 from app.schemas.tenant.reaction import SUGGESTED_EMOJI
 from app.services.tenant.reactions import (
@@ -23,6 +24,7 @@ def _row(emoji: str, user_id: int) -> Reaction:
         target_id=1,
         emoji=emoji,
         created_by=user_id,
+        created_by_kind=ActorKind.member,
     )
 
 

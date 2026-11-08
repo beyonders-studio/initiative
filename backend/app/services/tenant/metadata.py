@@ -61,11 +61,13 @@ from sqlalchemy import (
     insert,
     literal,
     literal_column,
+    not_,
     or_,
     true,
     tuple_,
     values,
 )
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import aliased, selectinload
 from sqlmodel import SQLModel, col, delete, select
@@ -1096,7 +1098,7 @@ async def promote(
             table.c.created_at,
         )
         .where(table.c.property_id.in_(ids))
-        .distinct(table.c.entity_type, table.c.entity_id, table.c.ref)
+        .ext(distinct_on(table.c.entity_type, table.c.entity_id, table.c.ref))
         .order_by(
             table.c.entity_type,
             table.c.entity_id,
@@ -1446,7 +1448,7 @@ async def count_orphaned_values(
     stmt_json = select(func.count()).where(
         MetadataValue.property_id == defn_id,
         MetadataValue.value_json.is_not(None),
-        ~MetadataValue.value_json.op("<@")(valid_list),
+        not_(MetadataValue.value_json.contained_by(valid_list)),
     )
     return (await session.exec(stmt_text)).one() + (await session.exec(stmt_json)).one()
 

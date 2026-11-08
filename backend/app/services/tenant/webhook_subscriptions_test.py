@@ -23,6 +23,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.webhook_subscription import WebhookSubscription
 from app.testing.schema_harness import route_session_to_guild
 
@@ -36,6 +37,7 @@ async def _subscribe(
         WebhookSubscription(
             initiative_id=initiative_id,
             created_by=user_id,
+            created_by_kind=ActorKind.member,
             target_url="https://example.test/hook",
             hmac_secret="secret",
             event_types=["tasks.created"],
@@ -313,7 +315,10 @@ async def test_an_install_registers_a_subscription_naming_no_person(
     )
     row = await _install_subscribes(role_session, install)
     assert row.plugin_install_id == install.plugin.id
-    assert row.created_by is None
+    assert (row.created_by, row.created_by_kind) == (
+        install.plugin.id,
+        ActorKind.plugin,
+    )
     assert row.initiative_id is None
 
 

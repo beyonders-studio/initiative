@@ -177,7 +177,7 @@ class EntityRelationship(CreatedByMixin, table=True):
     )
 
     #: ``created_by`` comes from the mixin: nullable, and filled by the
-    #: ``fn_set_created_by`` trigger from the request's user. A row copied in by
+    #: ``fn_set_author`` trigger from the request's user. A row copied in by
     #: a migration has nobody to name and keeps NULL, which is the honest answer
     #: — the junctions it came from recorded no attributor either.
     created_at: datetime = Field(

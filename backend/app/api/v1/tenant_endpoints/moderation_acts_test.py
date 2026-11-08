@@ -212,7 +212,8 @@ async def test_the_database_keeps_a_tombstone_and_the_log_as_they_are(
         asking = await reading_as(scene[who].user.id, scene["guild"].id)
         with pytest.raises(Exception) as refused:
             await asking.exec(text(statement), params=params)
-        assert "ObjectNotInPrerequisiteState" in str(refused.value), statement
+        # object_not_in_prerequisite_state
+        assert getattr(refused.value.orig, "sqlstate", None) == "55000", statement
         await asking.rollback()
 
 

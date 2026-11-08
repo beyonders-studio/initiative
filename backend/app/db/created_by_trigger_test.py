@@ -1,6 +1,6 @@
 """The database fills in who made a row.
 
-``public.fn_set_created_by`` is a BEFORE INSERT trigger on every guild-content
+``public.fn_set_author`` is a BEFORE INSERT trigger on every guild-content
 table, reading ``app.current_user_id`` — the GUC the request already sets for
 RLS. Doing it here rather than in the ORM is what makes it unconditional: the
 same shape as the ``fn_*_set_guild_id`` triggers beside it, and it covers writes
@@ -186,7 +186,7 @@ async def test_every_author_table_has_the_trigger(session: AsyncSession):
                 WHERE c.relkind = 'r' AND NOT EXISTS (
                     SELECT 1 FROM pg_trigger t
                     WHERE t.tgrelid = c.oid
-                      AND t.tgfoid = 'public.fn_set_created_by'::regproc
+                      AND t.tgfoid = 'public.fn_set_author'::regproc
                 )
                 ORDER BY 1
                 """

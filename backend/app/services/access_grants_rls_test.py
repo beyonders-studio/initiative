@@ -17,6 +17,7 @@ from app.db.request_context import ContentGrantee, Platform
 from app.db.schema_provisioning import guild_schema_name
 from app.db.session import set_rls_context
 from app.models.platform.user import UserRole
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.counter import CounterGroup
 from app.models.tenant.file import File
 from app.services.platform import app_settings as app_settings_service
@@ -54,6 +55,7 @@ async def test_pam_read_grant_sees_only_granted_guild(
         name="Alpha Doc",
         content={},
         created_by=owner.id,
+        created_by_kind=ActorKind.member,
     )
     session.add(doc_a)
     await session.commit()
@@ -186,6 +188,7 @@ async def test_pam_read_grant_does_not_fault_legacy_isolation_tables(
         initiative_id=init.id,
         name="Stats",
         created_by=owner.id,
+        created_by_kind=ActorKind.member,
     )
     session.add(cg)
     await session.commit()
