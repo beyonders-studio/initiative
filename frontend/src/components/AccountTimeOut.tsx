@@ -140,7 +140,7 @@ export const AccountTimeOut = () => {
   const canAppeal = Boolean(data?.can_appeal) && !nowhere && !appealOpen;
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="flex min-h-app items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted">

@@ -71,6 +71,10 @@ class NotificationType(str, Enum):
     #: A community made for this account, by them or by staff on their behalf.
     #: Written once, where billing sets plans, inviting them to set up its plan.
     community_welcome = "community_welcome"
+    #: An announcement the recipient was shown and dismissed. Written read, once
+    #: per announcement, naming its key and title; opening it shows the notice
+    #: again.
+    announcement = "announcement"
     connection_requested = "connection_requested"
     connection_accepted = "connection_accepted"
     message_request_received = "message_request_received"

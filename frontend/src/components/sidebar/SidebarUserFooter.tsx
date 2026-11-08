@@ -1,9 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import {
-  BadgeInfo,
   ChevronLeft,
   ChevronRight,
-  CircleQuestionMark,
   CircleUserRound,
   House,
   LogOut,
@@ -16,13 +14,13 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
+import { AppLinks } from "@/components/AppLinks";
+import { useTitleBarHeight } from "@/components/DesktopTitleBar";
 import { ThoughtBubble } from "@/components/icons/ThoughtBubble";
 import { AppearanceMenuItems, ThemeIcon } from "@/components/ModeToggle";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
-import { AskForHelpButton } from "@/components/support/AskForHelpButton";
 import { openFeedback, useFeedbackOffered } from "@/components/tickets/FeedbackSheet";
 import { UserHandle } from "@/components/UserHandle";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -38,14 +36,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { SidebarFooter } from "@/components/ui/sidebar";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PresenceDot } from "@/components/user/PresenceDot";
 import { PresenceMenuItems } from "@/components/user/PresenceMenuItems";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { isStatusEmpty, StatusBubble, StatusEditor } from "@/components/user/ProfileStatus";
-import { VersionDialog } from "@/components/VersionDialog";
 import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
-import { docsUrl } from "@/lib/links";
 import { presenceLabelKey } from "@/lib/presence";
 import { decorationSrc, resolveDecoration } from "@/lib/profileDecorations";
 import { getUrlHandle, getUserDisplayName } from "@/lib/userDisplay";
@@ -55,10 +50,6 @@ export interface SidebarUserFooterProps {
   user: UserRead | null;
   canManagePlatformConfig: boolean;
   canAccessOperatorDashboard: boolean;
-  currentVersion: string;
-  latestVersion: string | null;
-  hasUpdate: boolean;
-  isLoadingVersion: boolean;
   onLogout: () => void;
   /** Re-read the account after the status or the presence is set from here. */
   refreshUser: () => Promise<void>;
@@ -68,15 +59,13 @@ export const SidebarUserFooter = ({
   user,
   canManagePlatformConfig,
   canAccessOperatorDashboard,
-  currentVersion,
-  latestVersion,
-  hasUpdate,
-  isLoadingVersion,
   onLogout,
   refreshUser,
 }: SidebarUserFooterProps) => {
   const { t } = useTranslation(["nav", "profiles", "common"]);
   const feedbackOffered = useFeedbackOffered();
+  // The desktop app's title bar carries the app's corner instead.
+  const inTitleBar = useTitleBarHeight() > 0;
   // A fly-out needs a hover to open it and room beside the menu to land in.
   // A phone has neither — the sidebar is already a sheet against the edge — so
   // there the choices behind one are drilled into: the menu becomes that list,
@@ -398,69 +387,11 @@ export const SidebarUserFooter = ({
             </PopoverContent>
           ) : null}
         </Popover>
-        <div className="border-t">
-          <div className="flex items-center justify-between px-3 py-2">
-            <VersionDialog
-              currentVersion={currentVersion}
-              latestVersion={latestVersion}
-              hasUpdate={hasUpdate}
-              isLoadingVersion={isLoadingVersion}
-            >
-              <button type="button" className="flex cursor-pointer items-center gap-1.5">
-                <span className="text-muted-foreground text-xs transition-colors hover:text-foreground">
-                  v{currentVersion}
-                </span>
-                {hasUpdate && (
-                  <Badge variant="default" className="h-4 px-1.5 text-3xs">
-                    {t("newBadge")}
-                  </Badge>
-                )}
-              </button>
-            </VersionDialog>
-
-            {/* The icons are one group at the right edge, not things spread
-                across the row by justify-between. */}
-            <div className="flex items-center gap-3">
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <Link
-                    to="/announcements"
-                    className="text-muted-foreground transition-colors hover:text-foreground"
-                    aria-label={t("pastAnnouncements")}
-                  >
-                    <BadgeInfo className="h-4 w-4" />
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p>{t("pastAnnouncements")}</p>
-                </TooltipContent>
-              </Tooltip>
-
-              {/* The documentation, always: what most questions want, and
-                  never standing in for somebody to ask. */}
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <a
-                    href={docsUrl()}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-muted-foreground transition-colors hover:text-foreground"
-                    aria-label={t("documentation")}
-                  >
-                    <CircleQuestionMark className="h-4 w-4" />
-                  </a>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p>{t("documentation")}</p>
-                </TooltipContent>
-              </Tooltip>
-
-              {/* Somebody to ask, where there is: the form in a community that
-                  takes help requests, else the address the deployment gave. */}
-              <AskForHelpButton />
-            </div>
+        {inTitleBar ? null : (
+          <div className="flex justify-end border-t px-3 py-2">
+            <AppLinks />
           </div>
-        </div>
+        )}
       </div>
     </SidebarFooter>
   );

@@ -25,7 +25,7 @@ export const LegalDocumentPage = () => {
   const document = useLegalDocument(enabled && !isLoading && !elsewhere ? slug : undefined);
 
   return (
-    <div className="flex min-h-screen flex-col items-center bg-muted/60 px-4 py-10">
+    <div className="flex min-h-app flex-col items-center bg-muted/60 px-4 py-10">
       <Link
         // The app packages have no front page; sign-in is where they start.
         to={__IS_CAPACITOR__ ? "/login" : "/welcome"}

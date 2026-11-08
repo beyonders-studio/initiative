@@ -1,5 +1,5 @@
 /**
- * The one dialog every ticket is filed through.
+ * The dialog reports, security problems and feedback are filed through.
  *
  * What it must not do is as important as what it does: a report never says
  * where it went, and tells the reporter nothing about what happens next.
@@ -244,100 +244,6 @@ describe("FileTicketDialog", () => {
       );
 
       expect(await screen.findByText("trust@example.org")).toBeInTheDocument();
-    });
-  });
-
-  describe("asking for help", () => {
-    const ask = (
-      topic?: "community" | "account" | "data_request",
-      communityId: number | null = 3
-    ) =>
-      renderWithProviders(
-        <FileTicketDialog
-          open
-          onOpenChange={() => {}}
-          ticket={{ stream: "support", topic }}
-          communityId={communityId}
-        />,
-        { auth: { user: buildUser() } }
-      );
-
-    const write = async (user: ReturnType<typeof userEvent.setup>) => {
-      await user.type(screen.getByLabelText("Title"), " Lost my phone ");
-      await user.type(screen.getByLabelText("What happened?"), "I can't sign in.");
-    };
-
-    it("sends the subject and words, trimmed, about the community", async () => {
-      ask("community");
-      const user = userEvent.setup();
-
-      const send = screen.getByRole("button", { name: "Send" });
-      expect(send).toBeDisabled();
-      await write(user);
-      await user.click(send);
-
-      expect(fileMutate).toHaveBeenCalledWith({
-        ticket: {
-          stream: "support",
-          type: "community",
-          community_id: 3,
-          subject: "Lost my phone",
-          body: "I can't sign in.",
-        },
-        files: [],
-      });
-    });
-
-    it("names no community in a question about the reader's own account", async () => {
-      ask("community");
-      const user = userEvent.setup();
-
-      await user.click(screen.getByRole("combobox", { name: "What is it about?" }));
-      await user.click(await screen.findByRole("option", { name: "My account" }));
-      await write(user);
-      await user.click(screen.getByRole("button", { name: "Send" }));
-
-      expect(fileMutate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          ticket: expect.objectContaining({ type: "account", community_id: null }),
-        })
-      );
-    });
-
-    it("asks about the account from outside any community", async () => {
-      offered.support = ["account", "billing", "other"];
-      ask(undefined, null);
-      const user = userEvent.setup();
-      await write(user);
-      await user.click(screen.getByRole("button", { name: "Send" }));
-
-      expect(fileMutate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          ticket: expect.objectContaining({ type: "account", community_id: null }),
-        })
-      );
-    });
-
-    it("opens a community question it may not ask here on something else", async () => {
-      // The community takes no help requests, or it is closed to the reader.
-      offered.support = ["account", "billing", "other"];
-      ask("community");
-      const user = userEvent.setup();
-      await write(user);
-      await user.click(screen.getByRole("button", { name: "Send" }));
-
-      expect(fileMutate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          ticket: expect.objectContaining({ type: "other", community_id: null }),
-        })
-      );
-    });
-
-    it("offers a data request only where the server offers it", () => {
-      ask("data_request");
-      expect(screen.getByRole("combobox", { name: "What is it about?" })).not.toHaveTextContent(
-        /data/
-      );
     });
   });
 

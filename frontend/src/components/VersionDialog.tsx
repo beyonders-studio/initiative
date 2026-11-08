@@ -22,7 +22,7 @@ import { CHANGELOG_URL, RELEASES_URL } from "@/lib/links";
 import { cn } from "@/lib/utils";
 
 /**
- * What version this is, and what has changed lately — opened from the sidebar,
+ * What version this is, and what has changed lately — opened from My settings,
  * or from the "updated" toast once a new version is running (see
  * ``components/UpdatedNotice``).
  *

@@ -14,7 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Each AI connection has its own on/off switch** on its row under **Integrations**, in place of the Enabled field in its dialog. A community's **Allow AI features** switch moved to the **Security** tab, beside its other restrictions. When AI goes off, whether the community or the server turns it off, the community's connections go off with it, and none can be turned on again until AI is back on.
-- **The desktop app on Windows and Linux hides its menu bar.** The File, Edit, View and Window row no longer takes space under the title bar; press Alt to show it. Zoom, reload and full screen keep their shortcuts.
+- **The desktop app has its own title bar.** It holds the app's name, **Help**, and an **Update** button when a new app is ready, in place of the row under your name in the sidebar. It still drags the window, a double click still maximizes it, and the window's own buttons stay at its end. The File, Edit, View and Window menu row no longer takes space under it.
+- **An Update button stays until you update.** When a newer version is waiting, **Update** sits under your name in the sidebar after its first prompt is closed: it reloads on the web and phones, and in the desktop app it restarts into the new app or says where to get it. The version number and **What's new** moved to the foot of **My Settings**.
+- **Help leads with the user guide.** The question mark under your name opens a Help panel that links the user guide first and searches it from inside the app, with answers for the page you're on before you type and each FAQ question as its own answer. Where your server takes help requests, **Ask the team** under the results starts one with your search: write first, pick a topic, paste or drop screenshots, and close it whenever you like, as the draft waits. Requests now carry the device details feedback already sends, with a switch to leave them out. **Ask for help** on notices opens the same request. The separate documentation and lifebuoy icons are gone.
+- **Announcements you close stay in your notifications.** Each one leaves a line, already read, that opens it again. It replaces the **Past announcements** page.
 
 ### Fixed
 

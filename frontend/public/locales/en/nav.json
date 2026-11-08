@@ -26,7 +26,6 @@
   "platformSettings": "Platform Settings",
   "signOut": "Sign out",
   "viewDocumentation": "View documentation",
-  "newBadge": "NEW",
   "alphaBadge": "ALPHA",
   "initiativeSettings": "Initiative Settings",
   "initiativeActions": "Initiative actions",
@@ -81,8 +80,6 @@
     "goHome": "Go back home"
   },
   "operatorDashboard": "Operator Dashboard",
-  "pastAnnouncements": "Past announcements",
-  "documentation": "Documentation",
   "requestsWaiting_one": "{{count}} waiting",
   "requestsWaiting_other": "{{count}} waiting",
   "posts": "Posts",

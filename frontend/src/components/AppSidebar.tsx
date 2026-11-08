@@ -51,7 +51,6 @@ import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { liveInitiatives } from "@/hooks/useInitiativeAccess";
 import { useInitiativeDirectory, useInitiatives } from "@/hooks/useInitiatives";
-import { compareVersions, useLatestVersion } from "@/hooks/useLatestVersion";
 import { useCommunityBookmarks } from "@/hooks/usePersonalItems";
 import { useProjects } from "@/hooks/useProjects";
 import { useTags } from "@/hooks/useTags";
@@ -300,15 +299,9 @@ export const AppSidebar = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- storage-backed, re-read per collapse action
   }, [tagCollapseKey]);
 
-  // Fetch the latest released version
-  const { data: latestVersion, isLoading: isLoadingVersion } = useLatestVersion();
-  const currentVersion = __APP_VERSION__;
-  const hasUpdate =
-    latestVersion && currentVersion && compareVersions(latestVersion, currentVersion) > 0;
-
   return (
     <Sidebar
-      className="sticky top-0 h-dvh"
+      className="sticky top-0 h-app"
       variant="sidebar"
       collapsible={isMobile ? "offcanvas" : "none"}
     >
@@ -608,10 +601,6 @@ export const AppSidebar = () => {
           user={user}
           canManagePlatformConfig={showPlatformSettings}
           canAccessOperatorDashboard={showOperatorDashboard}
-          currentVersion={currentVersion}
-          latestVersion={latestVersion ?? null}
-          hasUpdate={Boolean(hasUpdate)}
-          isLoadingVersion={isLoadingVersion}
           onLogout={logout}
           refreshUser={refreshUser}
         />

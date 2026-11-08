@@ -21,6 +21,7 @@ import type {
   TicketAccepted,
   TicketAvailability,
 } from "@/api/generated/initiativeAPI.schemas";
+import { SupportTopic } from "@/api/generated/initiativeAPI.schemas";
 import { getReadTaskCaseQueryKey, readTaskCase, takeTaskCase } from "@/api/generated/tasks/tasks";
 import {
   fileTicket,
@@ -42,6 +43,21 @@ import type { QueryOpts } from "@/types/query";
 
 /** Where somebody is sent when there is neither a form nor an address. */
 export const FAQ_URL = docsUrl("faq/");
+
+/** A ticket's one line at most this long, as the column behind it. */
+export const SUBJECT_MAX = 200;
+
+/** The help a person asks for about a community, rather than themselves. */
+export const COMMUNITY_TOPICS: ReadonlySet<string> = new Set([
+  SupportTopic.community,
+  SupportTopic.data_request,
+]);
+
+/** A help request's one line, from the start of what somebody wrote. */
+export const firstLine = (text: string) => {
+  const line = text.trim().split("\n")[0]?.trim() ?? "";
+  return line.length > SUBJECT_MAX ? `${line.slice(0, SUBJECT_MAX - 1)}…` : line;
+};
 
 /** One filing, told apart by its stream, and an appeal by its type. */
 export type TicketCreate =

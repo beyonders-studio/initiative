@@ -8,13 +8,18 @@
  * These notices belong to the person rather than to any community, so the
  * server sends no community with them.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { buildNotification } from "@/__tests__/factories/notification.factory";
 import { asPhoneThatMayNotSell } from "@/__tests__/helpers/storeSelling";
 import type { NotificationType } from "@/api/generated/initiativeAPI.schemas";
 
-import { notificationLink, notificationText } from "./notificationLine";
+import { notificationLink, notificationText, openNotification } from "./notificationLine";
+
+const announcements = vi.hoisted(() => ({ open: vi.fn() }));
+vi.mock("@/components/announcements/AnnouncementCenter", () => ({
+  openAnnouncement: announcements.open,
+}));
 
 // The real strings are asserted through i18n keys rather than English, so a
 // reworded translation doesn't fail this; what matters is that a key was
@@ -222,6 +227,27 @@ describe("notificationText — mentions", () => {
 
     expect(notificationText(mention, t)).toContain("Flight plan");
     expect(notificationLink(mention)).toBe("/go/file/9");
+  });
+});
+
+describe("an announcement the reader dismissed", () => {
+  const line = notice("announcement", {
+    announcement_key: "builtin:settings-moved",
+    title: "Settings have moved",
+    target_path: "/",
+  });
+
+  it("names the announcement", () => {
+    expect(notificationText(line, t)).toBe(
+      `notifications.announcement(${JSON.stringify({ title: "Settings have moved" })})`
+    );
+  });
+
+  it("opens the announcement again rather than a page", () => {
+    const navigate = vi.fn();
+    expect(openNotification(line, { markRead: vi.fn(), navigate, t })).toBe(true);
+    expect(announcements.open).toHaveBeenCalledWith("builtin:settings-moved");
+    expect(navigate).not.toHaveBeenCalled();
   });
 });
 

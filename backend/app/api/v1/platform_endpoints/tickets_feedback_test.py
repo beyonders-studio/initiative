@@ -83,21 +83,13 @@ async def test_the_app_context_goes_to_the_team_where_it_was_sent(
     client, session, acting_user, feedback_desk
 ):
     sender = await acting_user()
-    context = {
-        "app_version": "0.70.0",
-        "platform": "web",
-        "locale": "en-GB",
-        "theme": "dark",
-        "route": "/c/$communityId/i/$initiativeId",
-        "viewport": "md",
-    }
-    response = await _send(client, sender, context=context)
+    response = await _send(client, sender, context=tickets_test.DEVICE)
     assert response.status_code == 202, response.text
 
     await set_rls_context(session, SystemGuild(feedback_desk["guild"].id))
     case = (await session.exec(select(IntakeCase))).one()
     task = (await session.exec(select(Task).where(Task.id == case.task_id))).one()
-    for value in context.values():
+    for value in tickets_test.DEVICE.values():
         assert f"`{value}`" in task.description
     await set_rls_context(session, Unattributed())
 

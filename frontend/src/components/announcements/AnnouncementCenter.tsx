@@ -1,11 +1,30 @@
+import { useEffect, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AnnouncementDialog } from "@/components/announcements/AnnouncementDialog";
 import { Button } from "@/components/ui/button";
-import { useAnnouncements } from "@/hooks/useAnnouncements";
+import { useAnnouncementArchive, useAnnouncements } from "@/hooks/useAnnouncements";
+import { toast } from "@/lib/mascotToast";
+
+// The notice a bell line asked to show again, kept outside React so the line
+// opens the dialog this center draws.
+let requested: string | null = null;
+const listeners = new Set<() => void>();
+const setRequested = (key: string | null) => {
+  requested = key;
+  for (const listener of listeners) listener();
+};
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
+
+/** Show an announcement again: what its line in the notifications does. */
+export const openAnnouncement = (key: string) => setRequested(key);
 
 /**
- * Shows the announcements queued for the signed-in reader, one at a time.
+ * Shows the announcements queued for the signed-in reader, one at a time, and
+ * one asked for again from its line in the notifications.
  *
  * Mounted once in the authenticated layout: the notices follow the account,
  * not the page, so this has no community, project or route of its own — though a
@@ -14,6 +33,37 @@ import { useAnnouncements } from "@/hooks/useAnnouncements";
 export const AnnouncementCenter = ({ enabled = true }: { enabled?: boolean }) => {
   const { t } = useTranslation("announcements");
   const { current, remaining, dismiss } = useAnnouncements(enabled);
+  const requestedKey = useSyncExternalStore(
+    subscribe,
+    () => requested,
+    () => null
+  );
+  const archive = useAnnouncementArchive(requestedKey !== null);
+  const again = archive.data?.items?.find((item) => item.key === requestedKey) ?? null;
+
+  // A notice that has ended or been deleted since its line was written opens
+  // nothing, and says so.
+  const gone = requestedKey !== null && archive.isFetched && !archive.isFetching && !again;
+  useEffect(() => {
+    if (!gone) return;
+    toast.info(t("dialog.gone"));
+    setRequested(null);
+  }, [gone, t]);
+
+  if (again) {
+    return (
+      <AnnouncementDialog
+        open
+        title={again.title}
+        category={again.category}
+        sections={again.sections ?? []}
+        onOpenChange={(open) => {
+          if (!open) setRequested(null);
+        }}
+        footer={<Button onClick={() => setRequested(null)}>{t("dialog.gotIt")}</Button>}
+      />
+    );
+  }
 
   if (!current) {
     return null;

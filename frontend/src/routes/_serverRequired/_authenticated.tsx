@@ -78,7 +78,7 @@ const PageLoader = () => <PageSkeleton />;
  * Full-screen loading state shown while auth is being determined.
  */
 const FullScreenLoader = () => (
-  <div className="flex min-h-screen items-center justify-center">
+  <div className="flex min-h-app items-center justify-center">
     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
   </div>
 );
@@ -305,7 +305,7 @@ function AppLayout() {
           applies to descendants whose containing-block chain runs through it;
           the rest are laid out against the document, and it is the document
           that grows to fit them. */}
-      <div className="relative flex h-dvh flex-col overflow-clip bg-background">
+      <div className="relative flex h-app flex-col overflow-clip bg-background">
         <DeviceVerificationDialog />
         <div className="flex min-h-0 flex-1">
           {/* The live editor's headings, shared by the page that hosts the
@@ -549,7 +549,7 @@ function CommunitiesUnavailable({
     }
   };
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-app bg-background">
       <Empty>
         <EmptyHeader>
           <EmptyMedia variant="icon">
@@ -583,7 +583,7 @@ function CommunitiesUnavailable({
 function NoCommunitySettingsShell({ logout }: { logout: () => void }) {
   const { t } = useTranslation("communities");
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-app flex-col bg-background">
       <div
         className="sticky top-0 z-50 flex flex-col border-b bg-card/70 backdrop-blur supports-backdrop-filter:bg-card/60"
         style={{ paddingTop: "var(--safe-area-inset-top)" }}

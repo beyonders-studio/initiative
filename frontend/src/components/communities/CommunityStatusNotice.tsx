@@ -2,8 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CommunityStatus, SupportTopic } from "@/api/generated/initiativeAPI.schemas";
-import { ContactDialog } from "@/components/tickets/ContactDialog";
-import { FileTicketDialog } from "@/components/tickets/FileTicketDialog";
+import { openHelp } from "@/components/help/helpStore";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,7 +31,7 @@ export const communityStatusNoticeApplies = (community: CommunityEntry): boolean
   community.can.seat &&
   community.status === CommunityStatus.read_only;
 
-type Stage = "notice" | "help" | "closed";
+type Stage = "notice" | "closed";
 
 export const CommunityStatusNotice = ({ community }: { community: CommunityEntry }) => {
   const { t } = useTranslation(["communities", "common"]);
@@ -49,7 +48,7 @@ export const CommunityStatusNotice = ({ community }: { community: CommunityEntry
 
   const askSupport = noticeOpen && (!askBilling || issue.isFetched) && !paymentFailed;
   const support = useTicketAvailability(community.id, {
-    enabled: askSupport || stage === "help",
+    enabled: askSupport,
     retry: false,
   });
   const offered = support.data?.support;
@@ -59,20 +58,6 @@ export const CommunityStatusNotice = ({ community }: { community: CommunityEntry
   const canAskForHelp = askSupport && (offered?.mode === "form" || contact != null);
 
   if (stage === "closed") return null;
-
-  if (stage === "help") {
-    const close = (open: boolean) => !open && setStage("closed");
-    return contact ? (
-      <ContactDialog open onOpenChange={close} contact={contact} />
-    ) : (
-      <FileTicketDialog
-        open
-        onOpenChange={close}
-        ticket={{ stream: "support", topic: SupportTopic.community }}
-        communityId={community.id}
-      />
-    );
-  }
 
   if ((askBilling && issue.isPending) || (askSupport && support.isPending)) return null;
 
@@ -116,10 +101,13 @@ export const CommunityStatusNotice = ({ community }: { community: CommunityEntry
             <>
               <AlertDialogCancel onClick={dismiss}>{t("common:ok")}</AlertDialogCancel>
               <AlertDialogAction
-                onClick={(event) => {
-                  event.preventDefault();
+                onClick={() => {
                   markSeenThisSession(seenKey);
-                  setStage("help");
+                  setStage("closed");
+                  // Asked about this community where it takes requests; its
+                  // address, at the foot of Help's search, where it gave one.
+                  if (contact) openHelp();
+                  else openHelp({ topic: SupportTopic.community, communityId: community.id });
                 }}
               >
                 {t("statusNotice.contactSupport")}

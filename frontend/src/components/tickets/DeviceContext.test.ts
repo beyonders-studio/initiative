@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { routeTemplate } from "@/components/tickets/FeedbackSheet";
+import { routeTemplate } from "@/components/tickets/DeviceContext";
 
 describe("routeTemplate", () => {
   it("drops the layout segments and keeps every id as its parameter", () => {

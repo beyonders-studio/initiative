@@ -12,18 +12,13 @@
  * address; where there is neither, nothing offers it.
  */
 
-import { Capacitor } from "@capacitor/core";
-import { useMatches } from "@tanstack/react-router";
 import { Suspense, useSyncExternalStore } from "react";
-import { useTranslation } from "react-i18next";
 
-import type { FeedbackContext } from "@/api/generated/initiativeAPI.schemas";
 import { ContactDialog } from "@/components/tickets/ContactDialog";
+import { useDeviceContext } from "@/components/tickets/DeviceContext";
 import { FileTicketDialog } from "@/components/tickets/FileTicketDialog";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useTheme } from "@/hooks/useTheme";
 import { useTicketAvailability } from "@/hooks/useTickets";
-import { useWidthClass } from "@/hooks/useWidthClass";
 
 // Whether the sheet is open, kept outside React so a menu item and the
 // command palette can open the one drawn by the shell.
@@ -48,28 +43,6 @@ export const useFeedbackOffered = () => {
   return mode === "form" || (mode === "email" && Boolean(data?.feedback.contact));
 };
 
-/** A route id as a template: the pathless layout segments dropped, every id
- *  left as the parameter that names it. */
-export const routeTemplate = (routeId: string): string => {
-  const kept = routeId.split("/").filter((segment) => segment && !segment.startsWith("_"));
-  return `/${kept.join("/")}`;
-};
-
-const useFeedbackContext = (): FeedbackContext => {
-  const { i18n } = useTranslation();
-  const { theme } = useTheme();
-  const width = useWidthClass();
-  const route = useMatches({ select: (matches) => matches.at(-1)?.routeId ?? "" });
-  return {
-    app_version: __APP_VERSION__,
-    platform: Capacitor.getPlatform(),
-    locale: i18n.language,
-    theme,
-    route: routeTemplate(route),
-    viewport: width,
-  };
-};
-
 /** The sheet, drawn once by the app shell. */
 export const FeedbackHost = () => {
   const open = useSyncExternalStore(subscribe, () => sheetOpen);
@@ -85,7 +58,7 @@ export const FeedbackHost = () => {
 const FeedbackSheet = () => {
   const communityId = useActiveCommunityId();
   // Read as the sheet opens, so the page is the one it was opened on.
-  const context = useFeedbackContext();
+  const context = useDeviceContext();
   const { data } = useTicketAvailability(communityId);
   const feedback = data?.feedback;
   if (feedback?.mode === "form") {

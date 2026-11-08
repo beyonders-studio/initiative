@@ -103,6 +103,21 @@
   grid-template-columns: repeat(auto-fit, minmax(max(min(16rem, 100%), 40%), 1fr));
 }
 
+/* The window's height under the desktop app's title bar, which
+   `DesktopTitleBar` sets as `--title-bar-height`, and the whole window
+   everywhere else. A page that fills the window uses these in place of
+   `h-dvh`, `min-h-screen` and `max-h-dvh`, which would run a bar's height
+   past its foot. */
+@utility h-app {
+  height: calc(100dvh - var(--title-bar-height, 0px));
+}
+@utility min-h-app {
+  min-height: calc(100vh - var(--title-bar-height, 0px));
+}
+@utility max-h-app {
+  max-height: calc(100dvh - var(--title-bar-height, 0px));
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

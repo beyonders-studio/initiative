@@ -22,21 +22,11 @@ from app.models.platform.user import User
 from app.services.platform.intake import CaseFiler, CaseRefs, open_case
 
 if TYPE_CHECKING:
-    from app.schemas.platform.ticket import FeedbackContext
+    from app.schemas.platform.ticket import DeviceContext
     from app.services.platform.evidence import PreparedEvidence
 
 #: How much of what they wrote names the case on the team's board.
 TITLE_LENGTH = 80
-
-#: The context's fields, in the order the team reads them, with their labels.
-_CONTEXT_LABELS = (
-    ("app_version", "App version"),
-    ("platform", "Platform"),
-    ("locale", "Language"),
-    ("theme", "Theme"),
-    ("route", "Page"),
-    ("viewport", "Window"),
-)
 
 
 class NowhereToSend(Exception):
@@ -52,27 +42,12 @@ def _title(topic: FeedbackTopic, body: str) -> str:
     return f"{topic.value.capitalize()}: {first}"
 
 
-def _description(
-    filer: User, topic: FeedbackTopic, context: Optional["FeedbackContext"]
-) -> str:
-    lines = [f"Feedback ({topic.value}) from account {filer.id}."]
-    if context is not None:
-        sent = [
-            f"- {label}: `{value}`"
-            for name, label in _CONTEXT_LABELS
-            if (value := getattr(context, name))
-        ]
-        if sent:
-            lines += ["", "Where the app was:", *sent]
-    return "\n".join(lines)
-
-
 async def send(
     *,
     filer: User,
     topic: FeedbackTopic,
     body: str,
-    context: Optional["FeedbackContext"] = None,
+    context: Optional["DeviceContext"] = None,
     evidence: Sequence["PreparedEvidence"] = (),
     now: Optional[datetime] = None,
 ) -> int:
@@ -85,10 +60,10 @@ async def send(
     outcome = await open_case(
         IntakeStream.feedback,
         title=_title(topic, body),
-        body=_description(filer, topic, context),
+        body=f"Feedback ({topic.value}) from account {filer.id}.",
         refs=CaseRefs(subject_user=filer.id, reported_at=moment),
         now=moment,
-        filer=CaseFiler(user_id=filer.id, subject=None, words=body),
+        filer=CaseFiler(user_id=filer.id, subject=None, words=body, device=context),
         evidence=evidence,
         topic=topic.value,
     )

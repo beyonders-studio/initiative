@@ -56,7 +56,7 @@ export const BillingForwardPage = () => {
   }, [billing, id, isLoading, sellsHere, portalUrl, t, target]);
 
   const message = (icon: React.ReactNode, title: string, description: string) => (
-    <div className="flex min-h-screen items-center justify-center">
+    <div className="flex min-h-app items-center justify-center">
       <StatusMessage
         icon={icon}
         title={title}
@@ -92,7 +92,7 @@ export const BillingForwardPage = () => {
     );
   }
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
+    <div className="flex min-h-app flex-col items-center justify-center gap-3 px-6 text-center">
       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       <p className="text-muted-foreground text-sm">{t("billingForward.opening")}</p>
     </div>

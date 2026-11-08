@@ -11,7 +11,8 @@
       "privacy": "Privacidad"
     },
     "loginRequired": "Necesitas iniciar sesión para administrar tu perfil.",
-    "goToLogin": "Ir a inicio de sesión"
+    "goToLogin": "Ir a inicio de sesión",
+    "version": "Initiative v{{version}}"
   },
   "communityLayout": {
     "title": "Configuración de la comunidad",

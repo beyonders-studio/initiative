@@ -3,6 +3,8 @@ import type { BundleInfo } from "@capgo/capacitor-updater";
 import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { usePendingUpdate } from "@/lib/pendingUpdate";
+
 import {
   buildBundleDownloadUrl,
   decideNativeUpdate,
@@ -233,13 +235,17 @@ describe("useNativeUpdate on a desktop app that may update itself", () => {
   it("fetches the new app in the background and offers a restart that stays", async () => {
     native.download.mockResolvedValue({ version: "0.80.0" });
     const { result } = renderHook(() => useNativeUpdate());
+    const pending = renderHook(() => usePendingUpdate());
 
     await waitFor(() => expect(native.toast).toHaveBeenCalled());
     expect(native.download).toHaveBeenCalledWith({ version: "0.80.0" });
     const [, options] = native.toast.mock.calls[0];
-    expect(options.duration).toBe(Number.POSITIVE_INFINITY);
     options.action.onClick();
-    expect(native.install).toHaveBeenCalled();
+    expect(native.install).toHaveBeenCalledTimes(1);
+    // The Update button outlasts the toast, and restarts the same way.
+    expect(pending.result.current?.action).toBe("restart");
+    pending.result.current?.run();
+    expect(native.install).toHaveBeenCalledTimes(2);
     expect(result.current.nativeUpdateRequired.show).toBe(false);
   });
 

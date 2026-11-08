@@ -6985,6 +6985,24 @@ export interface HeldSurfacesRead {
 }
 
 /**
+ * One page or heading of the help center, as plain text.
+ */
+export interface HelpIndexEntry {
+  title: string;
+  section: string;
+  location: string;
+  snippet: string;
+}
+
+/**
+ * Every English page and heading of the help center, down to level 3, in
+ * the order the help center has them.
+ */
+export interface HelpIndex {
+  items: HelpIndexEntry[];
+}
+
+/**
  * Hold something for the platform.
  */
 export interface HoldCreate {
@@ -8521,6 +8539,7 @@ export const NotificationType = {
   community_trial_ended: "community_trial_ended",
   community_pause_reminder: "community_pause_reminder",
   community_welcome: "community_welcome",
+  announcement: "announcement",
   connection_requested: "connection_requested",
   connection_accepted: "connection_accepted",
   message_request_received: "message_request_received",
@@ -12675,11 +12694,11 @@ export interface AppealTicketCreate {
 }
 
 /**
- * Where the app was when feedback was sent, as the sender saw it before
- * sending, and could remove. Nothing that names a person or a thing: the
- * route is its template, with every id left out.
+ * The device and page a request was sent from, as the sender saw it
+ * before sending and chose to send it. Nothing that names a person or a
+ * thing: the route is its template, with every id left out.
  */
-export interface FeedbackContext {
+export interface DeviceContext {
   app_version?: string | null;
   platform?: string | null;
   locale?: string | null;
@@ -12711,7 +12730,7 @@ export interface FeedbackTicketCreate {
    * @maxLength 5000
    */
   body: string;
-  context?: FeedbackContext | null;
+  context?: DeviceContext | null;
 }
 
 /**
@@ -12786,6 +12805,7 @@ export interface SupportTicketCreate {
    * @maxLength 5000
    */
   body: string;
+  context?: DeviceContext | null;
 }
 
 export type GetVersion200 = { [key: string]: string };

@@ -64,7 +64,7 @@ export function PluginConnectedPage() {
   const { icon: Icon, tone } = OUTCOMES[outcome];
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="flex min-h-app items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="items-center text-center">
           <LogoIcon className="mb-2 h-8 w-8" />

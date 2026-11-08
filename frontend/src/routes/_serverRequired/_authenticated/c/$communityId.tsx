@@ -111,7 +111,7 @@ function CommunityLayout() {
 
   if (!community) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-app items-center justify-center">
         <StatusMessage
           icon={<ShieldAlert />}
           title={t("notMember.title")}
@@ -128,7 +128,7 @@ function CommunityLayout() {
   // see it listed, and land here rather than on a page of refusals.
   if (closed) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-app items-center justify-center">
         <StatusMessage
           icon={<Lock />}
           title={t("closed.title")}

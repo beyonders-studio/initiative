@@ -30,7 +30,15 @@ interface TrayMenu {
 export class Desktop {
   static __capacitorElectronPlugin = {
     name: "Desktop",
-    methods: ["notify", "setBadge", "setTray", "getSettings", "setKeepRunning", "setOpenAtLogin"],
+    methods: [
+      "notify",
+      "setBadge",
+      "setTray",
+      "getSettings",
+      "setKeepRunning",
+      "setOpenAtLogin",
+      "setTitleBarColors",
+    ],
   };
 
   private tray: InstanceType<typeof Tray> | null = null;
@@ -132,6 +140,18 @@ export class Desktop {
 
   async setOpenAtLogin({ enabled }: { enabled: boolean }) {
     setOpenAtLogin(enabled, this.startsHidden());
+  }
+
+  /**
+   * Colour the window's own buttons, which Windows and Linux draw over the
+   * end of the page's title bar, to match it. A Mac draws its buttons the
+   * same in any theme.
+   */
+  async setTitleBarColors({ color, symbolColor }: { color: string; symbolColor: string }) {
+    if (process.platform === "darwin") {
+      return;
+    }
+    mainWindow()?.setTitleBarOverlay({ color, symbolColor });
   }
 
   /** Closing hides the window only where there is a way back: the dock, or the tray. */

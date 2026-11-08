@@ -1,4 +1,7 @@
 {
+  "appName": "Initiative",
+  "help": "Aide",
+  "helpDraft": "Brouillon de la demande d'aide",
   "user": "Utilisateur",
   "userWithId": "Utilisateur n° {{id}}",
   "formerMember": "Ancien membre",
@@ -336,7 +339,13 @@
     "ready": "La version {{version}} est prête. Rechargez pour l'utiliser.",
     "reload": "Recharger",
     "updated": "Mis à jour vers la version {{version}}.",
-    "whatsNew": "Nouveautés"
+    "whatsNew": "Nouveautés",
+    "update": "Mettre à jour",
+    "action": {
+      "reload": "Rechargez pour utiliser la nouvelle version",
+      "restart": "Redémarrez pour terminer la mise à jour de l'app",
+      "install": "Obtenez l'app plus récente dont cette version a besoin"
+    }
   },
   "nativeUpdate": {
     "unsigned": "La mise à jour de ce serveur n'a pas été publiée par Initiative, l'application reste donc en version {{version}}.",

@@ -339,7 +339,7 @@ const SignInCard = () => {
 
   if (bootstrap.isPending) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/60 px-4 py-12">
+      <div className="flex min-h-app items-center justify-center bg-muted/60 px-4 py-12">
         <p className="text-muted-foreground text-sm">{t("common:loading")}</p>
       </div>
     );

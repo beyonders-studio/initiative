@@ -46,14 +46,14 @@ The small **dot** on your picture is your presence: online, idle, busy, or offli
 
 **Theme**, in that menu, does Light, Dark, or System. "System" is for those of us who lost the argument with our laptop some time ago and have made peace with it.
 
-**The bell**, beside your name, is your notifications.
+**The bell**, beside your name, is your notifications. Announcements you've closed land there too, already read, so you can open one again.
 
-Under all of it, one small row:
+Under all of it, one small row. In the desktop app it sits in the window's title bar instead, at the top:
 
-- **The version number** opens the changelog, for anyone who likes to know what changed and when.
-- **Past announcements** (the info icon), for when you dismiss something at speed and experience immediate regret.
-- **Documentation** (the question mark) opens these pages.
-- **Ask for help** (the lifebuoy) appears wherever there's somebody to ask: a community that takes help requests, or a server that has given an address to write to.
+- **Update** appears only when there's a newer version waiting, and stays until you take it. On the web and phones it reloads; in the desktop app it restarts into the new app, or tells you where to get it.
+- **Help** (the question mark) searches these pages without leaving the app, starting with answers for the page you're on. Where there's somebody to ask (a server that takes help requests, or one that has given an address to write to), the way to ask sits under the results.
+
+Which version you're on, and what changed lately, is at the foot of **My Settings**, for anyone who likes to know what changed and when.
 
 ## The middle
 
