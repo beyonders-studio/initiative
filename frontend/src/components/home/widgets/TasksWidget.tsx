@@ -77,7 +77,7 @@ export const TasksWidget = ({ options, onOptionsChange, onConfigure }: HomeWidge
   const fields = useMemo(() => taskFields(allPropertyDefinitions), [allPropertyDefinitions]);
   // Rows come from every community: each one's links go to its own.
   const { t: viewT } = useTranslation(LAYOUT_NAMESPACES);
-  const env = useMemo<LayoutEnv>(() => {
+  const env = useMemo<LayoutEnv<TaskListRead>>(() => {
     const path = (to: string, task: TaskListRead) => {
       const communityId = task.community_id ?? table.activeCommunityId;
       return communityId ? communityPath(communityId, to) : to;

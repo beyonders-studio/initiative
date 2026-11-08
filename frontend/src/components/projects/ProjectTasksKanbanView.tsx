@@ -208,7 +208,7 @@ export const ProjectTasksKanbanView = ({
     () => cardOf({ card: ownCard as CardPartInput | null | undefined }, fields, TASK_LIST_SHAPE),
     [ownCard, fields]
   );
-  const view = useMemo<LayoutContext>(
+  const view = useMemo<LayoutContext<TaskListRead>>(
     () => ({
       fields,
       parts: pluginParts(plugins),

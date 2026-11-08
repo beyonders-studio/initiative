@@ -214,7 +214,7 @@ const TagTasksTable = ({ tagId }: { tagId: number }) => {
   // Properties are an initiative's own, and these rows span initiatives, so
   // the table shows the fields every task has.
   const fields = useMemo(() => taskFields([]), []);
-  const env = useMemo<LayoutEnv>(
+  const env = useMemo<LayoutEnv<TaskListRead>>(
     () => ({
       t: viewT as TranslateFn,
       communityPath: (to: string) => communityPath(to),

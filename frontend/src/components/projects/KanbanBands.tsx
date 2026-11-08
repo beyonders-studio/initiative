@@ -25,7 +25,7 @@ interface KanbanBandsProps {
   collapsedStatusIds: Set<number>;
   onToggleCollapse: (statusId: number) => void;
   canWrite: boolean;
-  view: LayoutContext;
+  view: LayoutContext<TaskListRead>;
   /** How wide an open column is. */
   columnBasis: string;
   onArchiveDoneTasks?: (statusId: number) => void;
