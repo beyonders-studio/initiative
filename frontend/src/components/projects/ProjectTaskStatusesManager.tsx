@@ -5,7 +5,6 @@
  * reader picks, or the project's default.
  */
 
-import { MouseSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import type { IconName } from "lucide-react/dynamic";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -66,16 +65,6 @@ export const ProjectTaskStatusesManager = ({
   const [newIcon, setNewIcon] = useState<IconName>(newCategoryDefaults.icon);
   const [deleteTarget, setDeleteTarget] = useState<TaskStatusRead | null>(null);
   const [fallbackId, setFallbackId] = useState<string>(FALLBACK_AUTO);
-
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 200,
-        tolerance: 8,
-      },
-    })
-  );
 
   const statusesQuery = useProjectTaskStatuses(projectId);
   const reorderStatuses = useReorderTaskStatuses(projectId);
@@ -151,7 +140,6 @@ export const ProjectTaskStatusesManager = ({
         rows={statusesQuery.data}
         loading={statusesQuery.isLoading || statusesQuery.isRefetching}
         canManage={canManage}
-        sensors={sensors}
         reorder={reorderStatuses}
         onUpdate={(statusId, data) =>
           updateStatus.mutateAsync({ statusId, data: data as TaskStatusUpdate })

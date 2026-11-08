@@ -11,7 +11,6 @@
  * starts with.
  */
 
-import { MouseSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Link } from "@tanstack/react-router";
 import { Copy, ListPlus, Pencil, Plus } from "lucide-react";
 import { useState } from "react";
@@ -79,16 +78,6 @@ export const ProjectTaskTypesManager = ({
   const [startsWithTarget, setStartsWithTarget] = useState<TaskTypeRead | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 200,
-        tolerance: 8,
-      },
-    })
-  );
-
   const typesQuery = useProjectTaskTypes(projectId);
   const reorderTypes = useReorderTaskTypes(projectId);
   const updateType = useUpdateTaskType(projectId);
@@ -152,7 +141,6 @@ export const ProjectTaskTypesManager = ({
         rows={typesQuery.data}
         loading={typesQuery.isLoading || typesQuery.isRefetching}
         canManage={canManage}
-        sensors={sensors}
         reorder={reorderTypes}
         onUpdate={(typeId, data) =>
           updateType.mutateAsync({ typeId, data: data as TaskTypeUpdate })

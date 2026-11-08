@@ -4,7 +4,7 @@
  * and colour are edited in place and saved together; one row is the default.
  */
 
-import { DndContext, type DndContextProps, type DragEndEvent } from "@dnd-kit/core";
+import { DndContext, type DragEndEvent } from "@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
@@ -17,6 +17,7 @@ import type { IconName } from "lucide-react/dynamic";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useDragSensors } from "@/hooks/useDragSensors";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
@@ -57,7 +58,6 @@ interface DefinitionTableProps<T extends Definition> {
   rows: T[] | undefined;
   loading: boolean;
   canManage: boolean;
-  sensors: DndContextProps["sensors"];
   /** Saves a new order, answering with the rows in it. */
   reorder: {
     mutateAsync: (request: { items: { id: number; position: number }[] }) => Promise<T[]>;
@@ -86,7 +86,6 @@ export const DefinitionTable = <T extends Definition>({
   rows,
   loading,
   canManage,
-  sensors,
   reorder,
   onUpdate,
   saving,
@@ -97,6 +96,7 @@ export const DefinitionTable = <T extends Definition>({
   notes,
   children,
 }: DefinitionTableProps<T>) => {
+  const sensors = useDragSensors();
   const { t } = useTranslation(["projects", "common"]);
   const [ordered, setOrdered] = useState<T[]>([]);
   const [drafts, setDrafts] = useState<Record<number, Draft>>({});
