@@ -52,6 +52,32 @@ describe("TicketComposer", () => {
     expect(screen.getByRole("button", { name: "Attach picture" })).toBeInTheDocument();
   });
 
+  it("keeps Enter in the editor from sending what the box is in", async () => {
+    const send = vi.fn();
+    renderWithProviders(
+      <div onKeyDown={send}>
+        <TicketComposer
+          aria-label="What's going on?"
+          value=""
+          onChange={() => {}}
+          policy={POLICY}
+          files={[]}
+          onFilesChange={() => {}}
+          pagePicture={{ hidePeople: true }}
+        />
+      </div>,
+      { auth: { user: buildUser() } }
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Picture this page" }));
+    await screen.findByRole("dialog", { name: "Picture of this page" });
+
+    screen.getByRole("application").focus();
+    await user.keyboard("{Control>}{Enter}{/Control}");
+
+    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ key: "Enter" }));
+  });
+
   it("leaves the people showing where the box says so", async () => {
     box({ pagePicture: { hidePeople: false } });
     const user = userEvent.setup();

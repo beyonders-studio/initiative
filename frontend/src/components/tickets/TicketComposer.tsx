@@ -138,18 +138,20 @@ export const TicketComposer = ({
     }
   };
 
-  const edited = (made: File) => {
-    if (!editing) return;
-    sessions.set(made, editing.session);
-    const { target } = editing;
+  /** Attach what the editor made, in place of the picture it was made from;
+   *  or say why the stream will not take it, and the editor stays open with
+   *  the picture as it was. */
+  const edited = (made: File, kept: Pick<PictureSession, "shapes" | "peopleHidden">) => {
+    if (!editing) return null;
+    const { session, target } = editing;
+    const refused = refusalFor(made, target ? files.length - 1 : files.length);
+    if (refused) return refused;
+    Object.assign(session, kept);
+    sessions.set(made, session);
     setEditing(null);
-    if (!target) {
-      add([made]);
-      return;
-    }
-    const refused = refusalFor(made, files.length - 1);
-    setRefusal(refused);
-    if (!refused) onFilesChange(files.map((file) => (file === target ? made : file)));
+    setRefusal(null);
+    onFilesChange(target ? files.map((file) => (file === target ? made : file)) : [...files, made]);
+    return null;
   };
 
   const drop = useFileDrop(taking, add);

@@ -74,7 +74,9 @@ interface PictureEditorProps {
   session: PictureSession;
   /** Already attached: it opens with Done, and Cancel keeps it as it was. */
   attached: boolean;
-  onDone: (file: File) => void;
+  /** Take the picture made, with what made it; or say why it is not taken,
+   *  and the editor stays open. */
+  onDone: (file: File, kept: Pick<PictureSession, "shapes" | "peopleHidden">) => string | null;
   onCancel: () => void;
 }
 
@@ -165,7 +167,7 @@ export const PictureEditor = ({ session, attached, onDone, onCancel }: PictureEd
   const [hover, setHover] = useState<{ rect: Rect; label: string } | null>(null);
   const [draft, setDraft] = useState<Rect | null>(null);
   const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   // Held in state: the dialog draws its content after this renders, and
   // what is set up on them waits until they are there.
   const [stage, setStage] = useState<HTMLDivElement | null>(null);
@@ -190,9 +192,9 @@ export const PictureEditor = ({ session, attached, onDone, onCancel }: PictureEd
     setFileUrl(url);
     loadImage(url)
       .then((image) => setSize({ w: image.naturalWidth, h: image.naturalHeight }))
-      .catch(() => setFailed(true));
+      .catch(() => setFailed(t("picture.failed")));
     return () => URL.revokeObjectURL(url);
-  }, [source]);
+  }, [source, t]);
 
   // The page's copy goes in as it is; nothing on it can be focused or used.
   useLayoutEffect(() => {
@@ -231,17 +233,19 @@ export const PictureEditor = ({ session, attached, onDone, onCancel }: PictureEd
     };
   };
 
+  /** What covers a part, measured where the part is now. */
+  const remeasure = (list: Shape[]) =>
+    list.map((shape) =>
+      shape.part ? { ...shape, rect: measure(shape.part, shape.tool === "hide" ? 2 : 5) } : shape
+    );
+
   // People shown or hidden move what is around them: what covers a part
   // follows it.
   // biome-ignore lint/correctness/useExhaustiveDependencies: measured again only when people change
   useLayoutEffect(() => {
     if (!page || !holder) return;
     showPeople(page.people, peopleHidden, blank);
-    setShapes((current) =>
-      current.map((shape) =>
-        shape.part ? { ...shape, rect: measure(shape.part, shape.tool === "hide" ? 2 : 5) } : shape
-      )
-    );
+    setShapes((current) => remeasure(current));
   }, [page, peopleHidden, blank, holder]);
 
   const change = (next: Shape[]) => {
@@ -252,7 +256,8 @@ export const PictureEditor = ({ session, attached, onDone, onCancel }: PictureEd
     const last = history.at(-1);
     if (!last) return;
     setHistory(history.slice(0, -1));
-    setShapes(last);
+    // The page may have moved since: what covers a part goes where it is now.
+    setShapes(remeasure(last));
   };
 
   const partName = (part: Element) => t(`picture.parts.${partKindOf(part) as PartKind}`);
@@ -398,11 +403,9 @@ export const PictureEditor = ({ session, attached, onDone, onCancel }: PictureEd
             : `${source.file.name.replace(/\.[^.]+$/, "")}.png`;
       const ratio = page ? Math.min(window.devicePixelRatio || 1, 2) : 1;
       const blob = await paint(base, size, shapes, ratio, type);
-      session.shapes = shapes;
-      session.peopleHidden = peopleHidden;
-      onDone(new File([blob], name, { type }));
+      setFailed(onDone(new File([blob], name, { type }), { shapes, peopleHidden }));
     } catch {
-      setFailed(true);
+      setFailed(t("picture.failed"));
     } finally {
       setSaving(false);
     }
@@ -426,7 +429,13 @@ export const PictureEditor = ({ session, attached, onDone, onCancel }: PictureEd
 
   return (
     <Dialog open onOpenChange={(open) => !open && !saving && cancel()}>
-      <DialogContent className="flex h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-6xl flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl">
+      <DialogContent
+        className="flex h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-6xl flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl"
+        // Enter here is the editor's: it does not reach the panel's send shortcut.
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.stopPropagation();
+        }}
+      >
         <DialogHeader className="border-b px-4 py-3 text-left">
           <DialogTitle>
             {source.kind === "page" ? t("picture.title") : source.file.name}
@@ -474,18 +483,17 @@ export const PictureEditor = ({ session, attached, onDone, onCancel }: PictureEd
                         className="pointer-events-none block h-full w-full"
                       />
                     ) : null}
-                    {shapes.map((shape, index) =>
+                    {/* Covers first, then marks: as the picture is painted. */}
+                    {[...shapes.filter((shape) => shape.tool === "hide"), ...marks].map((shape) =>
                       shape.tool === "hide" ? (
                         <div
-                          // biome-ignore lint/suspicious/noArrayIndexKey: shapes have no identity beyond their place
-                          key={index}
+                          key={shapes.indexOf(shape)}
                           className="pointer-events-none absolute rounded-[5px]"
                           style={{ ...place(shape.rect), background: HIDE }}
                         />
                       ) : (
                         <div
-                          // biome-ignore lint/suspicious/noArrayIndexKey: shapes have no identity beyond their place
-                          key={index}
+                          key={shapes.indexOf(shape)}
                           className="pointer-events-none absolute rounded-[9px] border-[3px]"
                           style={{ ...place(shape.rect), borderColor: MARK }}
                         >
@@ -611,7 +619,7 @@ export const PictureEditor = ({ session, attached, onDone, onCancel }: PictureEd
             ) : null}
             {failed ? (
               <p className="text-destructive text-xs" role="alert">
-                {t("picture.failed")}
+                {failed}
               </p>
             ) : null}
           </div>
