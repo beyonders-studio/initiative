@@ -30,7 +30,11 @@ describe("LoadMore", () => {
     expect(screen.getByText("Loading…")).toBeInTheDocument();
     expect(onLoadMore).toHaveBeenCalledTimes(1);
 
+    // The page landed and the end is still in view, so it asks for the next.
+    rerender(<LoadMore auto hasMore loading={false} onLoadMore={onLoadMore} />);
+    expect(onLoadMore).toHaveBeenCalledTimes(2);
+
     rerender(<LoadMore auto hasMore={false} loading={false} onLoadMore={onLoadMore} />);
-    expect(onLoadMore).toHaveBeenCalledTimes(1);
+    expect(onLoadMore).toHaveBeenCalledTimes(2);
   });
 });
