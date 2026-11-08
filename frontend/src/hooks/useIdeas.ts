@@ -8,8 +8,10 @@ import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-qu
 import {
   getListIdeasQueryKey,
   getReadIdeaQueryKey,
+  getSimilarIdeasQueryKey,
   listIdeas,
   readIdea,
+  similarIdeas,
   takeVoteBack,
   voteForIdea,
 } from "@/api/generated/ideas/ideas";
@@ -23,7 +25,7 @@ import { queryClient } from "@/lib/queryClient";
 import type { MutationOpts } from "@/types/mutation";
 
 /** Every read of the ideas list and of one idea. */
-const refreshIdeas = () =>
+export const refreshIdeas = () =>
   queryClient.invalidateQueries({
     predicate: (query) => String(query.queryKey[0]).startsWith("/api/v1/ideas"),
   });
@@ -48,6 +50,17 @@ export const useIdea = (taskId: number) =>
     queryKey: getReadIdeaQueryKey(taskId),
     queryFn: () => readIdea(taskId),
     enabled: Number.isFinite(taskId),
+    retry: false,
+  });
+
+/** The open published ideas close to `text`, closest first; nothing asked
+ *  for while `text` is empty. */
+export const useSimilarIdeas = (text: string) =>
+  useQuery<IdeaRead[]>({
+    queryKey: getSimilarIdeasQueryKey({ text }),
+    queryFn: () => similarIdeas({ text }),
+    enabled: text.length > 0,
+    placeholderData: keepPreviousData,
     retry: false,
   });
 

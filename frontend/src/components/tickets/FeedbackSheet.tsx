@@ -24,7 +24,12 @@ import { useTranslation } from "react-i18next";
 import { type DeviceContext, TicketMode } from "@/api/generated/initiativeAPI.schemas";
 import { ContactDialog } from "@/components/tickets/ContactDialog";
 import { useDeviceContext } from "@/components/tickets/DeviceContext";
-import { EMPTY_DRAFT, type FeedbackDraft, FeedbackForm } from "@/components/tickets/FeedbackForm";
+import {
+  EMPTY_DRAFT,
+  type FeedbackDraft,
+  FeedbackForm,
+  feedbackTicket,
+} from "@/components/tickets/FeedbackForm";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useServer } from "@/hooks/useServer";
@@ -161,18 +166,7 @@ const FeedbackSheet = () => {
           pending={pending}
           sent={sent}
           submitLabel={t("feedback.submit")}
-          onSend={() =>
-            file.mutate({
-              ticket: {
-                stream: "feedback",
-                type: form.kind,
-                body: form.body.trim(),
-                contactable: form.contactable,
-                context: form.withContext ? context : null,
-              },
-              files: form.files,
-            })
-          }
+          onSend={() => file.mutate({ ticket: feedbackTicket(form, context), files: form.files })}
           onDone={() => setSheetOpen(false)}
           box={box}
           thanks={thanks}

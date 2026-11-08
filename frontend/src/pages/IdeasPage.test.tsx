@@ -67,6 +67,6 @@ describe("IdeasPage", () => {
     await user.click(
       await screen.findByRole("button", { name: "Vote for Recurring events skip holidays" })
     );
-    expect(mutate).toHaveBeenCalledWith({ taskId: 7, on: true });
+    expect(mutate).toHaveBeenCalledWith({ taskId: 7, on: true }, expect.anything());
   });
 });

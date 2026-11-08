@@ -53,6 +53,11 @@ class CaseView:
     topic: Optional[str] = None
     #: How many voted for it, on a published idea; ``None`` on any other case.
     votes: Optional[int] = None
+    #: The Ideas board's project, on a feedback case or an idea where the
+    #: board is set up: what it may be joined to.
+    ideas_board_id: Optional[int] = None
+    #: The idea a feedback case is joined to, as ``(task_id, title)``.
+    joined_idea: Optional[tuple[int, str]] = None
 
 
 async def holds_cases(session: AsyncSession) -> bool:
@@ -123,7 +128,23 @@ async def read_case(session: AsyncSession, task_id: int) -> Optional[CaseView]:
         ),
         evidence=attached.get(("case", task_id), []),
         **await _subject(session, task_id),
+        **(await _ideas(session, task_id) if stream is IntakeStream.feedback else {}),
     )
+
+
+async def _ideas(session: AsyncSession, task_id: int) -> dict[str, object]:
+    """Where feedback case ``task_id`` may be joined to an idea, and the idea
+    it is joined to."""
+    from app.services.platform import ideas as ideas_service
+
+    board = await ideas_service.board_project(session)
+    if board is None:
+        return {}
+    joined = await ideas_service.joined_idea(session, task_id)
+    return {
+        "ideas_board_id": board,
+        "joined_idea": (joined.id, joined.title) if joined is not None else None,
+    }
 
 
 async def _idea(session: AsyncSession, task_id: int) -> Optional[CaseView]:
@@ -146,6 +167,7 @@ async def _idea(session: AsyncSession, task_id: int) -> Optional[CaseView]:
         messages=[],
         evidence=[],
         votes=votes,
+        ideas_board_id=await ideas_service.board_project(session),
     )
 
 

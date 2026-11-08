@@ -17,6 +17,8 @@ const state = vi.hoisted(() => ({
 const createComment = vi.fn();
 const updateTask = vi.fn();
 const takeCase = vi.fn();
+const joinIdea = vi.fn();
+const joinInto = vi.fn();
 
 vi.mock("@/hooks/useTickets", async () => {
   const actual = await vi.importActual<typeof import("@/hooks/useTickets")>("@/hooks/useTickets");
@@ -24,6 +26,8 @@ vi.mock("@/hooks/useTickets", async () => {
     ...actual,
     useTaskCase: () => ({ data: state.found, isError: state.isError }),
     useTakeCase: () => ({ mutate: takeCase, isPending: false }),
+    useJoinCaseToIdea: () => ({ mutate: joinIdea, isPending: false }),
+    useJoinIdeaInto: () => ({ mutate: joinInto, isPending: false }),
     refreshTaskCase: vi.fn(),
   };
 });
@@ -33,7 +37,15 @@ vi.mock("@/hooks/useComments", async () => {
 });
 vi.mock("@/hooks/useTasks", async () => {
   const actual = await vi.importActual<typeof import("@/hooks/useTasks")>("@/hooks/useTasks");
-  return { ...actual, useUpdateTask: () => ({ mutateAsync: updateTask, isPending: false }) };
+  return {
+    ...actual,
+    useUpdateTask: () => ({ mutateAsync: updateTask, isPending: false }),
+    useCreateTask: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useTasks: () => ({
+      data: { items: [{ id: 50, title: "Recurring events skip holidays" }] },
+      isFetching: false,
+    }),
+  };
 });
 
 // The name links to a profile, which needs a router this test does not mount.
@@ -81,6 +93,8 @@ describe("CasePanel", () => {
     createComment.mockReset().mockResolvedValue(buildComment({ id: 1 }));
     updateTask.mockReset().mockResolvedValue({});
     takeCase.mockReset();
+    joinIdea.mockReset();
+    joinInto.mockReset();
   });
 
   it("renders nothing for a task no stream opened", () => {
@@ -119,6 +133,47 @@ describe("CasePanel", () => {
     state.isError = true;
     const { container } = renderPanel();
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("shows the idea feedback is joined to, and takes it off", async () => {
+    state.found = supportCase({
+      stream: "feedback",
+      ideas_board_id: 9,
+      joined_idea: { task_id: 50, title: "Recurring events skip holidays" },
+    });
+    const user = userEvent.setup();
+    renderRouted();
+    expect(
+      await screen.findByRole("link", { name: "Recurring events skip holidays" })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Take off this idea" }));
+    expect(joinIdea).toHaveBeenCalledWith(null);
+  });
+
+  it("joins feedback to an idea picked from the board", async () => {
+    state.found = supportCase({ stream: "feedback", ideas_board_id: 9, joined_idea: null });
+    const user = userEvent.setup();
+    renderRouted();
+    await user.click(await screen.findByRole("combobox"));
+    await user.click(await screen.findByText("Recurring events skip holidays"));
+    expect(joinIdea).toHaveBeenCalledWith(50);
+  });
+
+  it("joins an idea into another once asked to confirm", async () => {
+    state.found = supportCase({
+      stream: "ideas",
+      filer: null,
+      conversation: "none",
+      votes: 3,
+      ideas_board_id: 9,
+    });
+    const user = userEvent.setup();
+    renderRouted();
+    await user.click(await screen.findByRole("combobox"));
+    await user.click(await screen.findByText("Recurring events skip holidays"));
+    expect(joinInto).not.toHaveBeenCalled();
+    await user.click(await screen.findByRole("button", { name: "Join" }));
+    expect(joinInto).toHaveBeenCalledWith(50);
   });
 
   it("lets somebody who works it take it", async () => {
