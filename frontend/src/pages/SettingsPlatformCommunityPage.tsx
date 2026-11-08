@@ -15,10 +15,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { DmPolicy } from "@/api/generated/initiativeAPI.schemas";
-import { DeletedAccountRetentionSection } from "@/components/platform/DeletedAccountRetentionSection";
-import { DeletedCommunityRetentionSection } from "@/components/platform/DeletedCommunityRetentionSection";
-import { OnHoldCommunityDeletionSection } from "@/components/platform/OnHoldCommunityDeletionSection";
+import type { CommunitySettingsResponse, DmPolicy } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
@@ -28,11 +25,17 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { readOptionalWholeNumber } from "@/lib/text";
-import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 
@@ -42,6 +45,90 @@ const MAX_GUEST_DAYS = 3650;
 const MAX_CREATION_DAILY_LIMIT = 1000;
 /** The most hours the server takes between two exports of a community: a year. */
 const MAX_EXPORT_COOLDOWN_HOURS = 8760;
+/** The most days the server takes for a deletion or retention window. */
+const MAX_WINDOW_DAYS = 3650;
+
+/** The figures this page changes in a dialog, by the setting each one writes. */
+type NumberRule = keyof Pick<
+  CommunitySettingsResponse,
+  | "max_guest_days"
+  | "community_creation_daily_limit"
+  | "community_export_cooldown_hours"
+  | "deleted_community_retention_days"
+  | "on_hold_community_deletion_days"
+  | "deleted_account_retention_days"
+>;
+
+/** How one figure reads, and the bounds it is held to. */
+interface NumberRuleCopy {
+  /** The row's label and the dialog's title. */
+  label: string;
+  description: string;
+  fieldLabel: string;
+  placeholder?: string;
+  hint?: (value: number | null) => string;
+  min: number;
+  max: number;
+  /** Whether a blank box is an answer: never, rather than nothing typed. */
+  blank: boolean;
+  /** The row's value. */
+  value: (value: number | null) => string;
+  /** What saving it says. */
+  saved: (value: number | null) => string;
+}
+
+/** One figure, changed in a dialog. Each opening starts from what is saved. */
+const NumberRuleDialog = ({
+  rule,
+  saved,
+  pending,
+  onSave,
+  open,
+  onOpenChange,
+}: {
+  rule: NumberRuleCopy;
+  saved: number | null;
+  pending: boolean;
+  onSave: (value: number | null) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) => {
+  const { t } = useTranslation("common");
+  const form = useServerForm(
+    saved,
+    (loaded) => ({ text: loaded == null ? "" : String(loaded) }),
+    open
+  );
+  const { value, valid } = readOptionalWholeNumber(form.values.text, rule.min, rule.max);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{rule.label}</DialogTitle>
+          <DialogDescription>{rule.description}</DialogDescription>
+        </DialogHeader>
+        <Field label={rule.fieldLabel} hint={rule.hint?.(value)}>
+          <Input
+            type="number"
+            min={rule.min}
+            max={rule.max}
+            className="w-40"
+            value={form.values.text}
+            placeholder={rule.placeholder}
+            onChange={(event) => form.set({ text: event.target.value })}
+          />
+        </Field>
+        <DialogFooter
+          submitLabel={t("save")}
+          pending={pending}
+          disabled={!valid || (value === null && !rule.blank) || value === saved}
+          onSubmit={() => onSave(value)}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 export const SettingsPlatformCommunityPage = () => {
   const { t } = useTranslation(["settings", "common"]);
@@ -55,34 +142,78 @@ export const SettingsPlatformCommunityPage = () => {
     isLoading,
   } = useAppConfig();
   const { data: community } = useCommunitySettings();
-  // Typed here and saved by its button, so a refetch does not reset it.
-  const guestDaysForm = useServerForm(
-    community,
-    (loaded) => ({ days: loaded ? String(loaded.max_guest_days) : "" }),
-    "max_guest_days"
-  );
-  const guestDays = readOptionalWholeNumber(guestDaysForm.values.days, 1, MAX_GUEST_DAYS);
-  // 0 is a figure here, not a blank: it means no limit, and no wait.
-  const creationLimitForm = useServerForm(
-    community,
-    (loaded) => ({ count: loaded ? String(loaded.community_creation_daily_limit) : "" }),
-    "community_creation_daily_limit"
-  );
-  const creationLimit = readOptionalWholeNumber(
-    creationLimitForm.values.count,
-    0,
-    MAX_CREATION_DAILY_LIMIT
-  );
-  const exportCooldownForm = useServerForm(
-    community,
-    (loaded) => ({ hours: loaded ? String(loaded.community_export_cooldown_hours) : "" }),
-    "community_export_cooldown_hours"
-  );
-  const exportCooldown = readOptionalWholeNumber(
-    exportCooldownForm.values.hours,
-    0,
-    MAX_EXPORT_COOLDOWN_HOURS
-  );
+  const [changing, setChanging] = useState<NumberRule | null>(null);
+
+  // The three windows are each the deployment's, one answer for everybody on
+  // the server. Blank means never: nothing happens on a timer, and whatever
+  // the window governs waits for somebody to act on it.
+  const windowRule = (
+    key: "community.retention" | "community.holdDeletion" | "community.accountRetention"
+  ): NumberRuleCopy => ({
+    label: t(`${key}.title`),
+    description: t(`${key}.description`),
+    fieldLabel: t(`${key}.label`),
+    placeholder: t(`${key}.placeholder`),
+    hint: (value) => (value === null ? t(`${key}.neverHint`) : t(`${key}.hint`)),
+    min: 1,
+    max: MAX_WINDOW_DAYS,
+    blank: true,
+    value: (value) =>
+      value === null ? t(`${key}.placeholder`) : t("settingsSection.days", { count: value }),
+    saved: (value) =>
+      value === null ? t(`${key}.savedNever`) : t(`${key}.saved`, { count: value }),
+  });
+  const numberRules: Record<NumberRule, NumberRuleCopy> = {
+    // Each community may set a shorter longest stay of its own.
+    max_guest_days: {
+      label: t("community.maxGuestDaysTitle"),
+      description: t("community.maxGuestDaysHelpText"),
+      fieldLabel: t("community.maxGuestDaysLabel"),
+      min: 1,
+      max: MAX_GUEST_DAYS,
+      blank: false,
+      value: (value) => t("settingsSection.days", { count: value ?? 0 }),
+      saved: (value) => t("community.maxGuestDaysSaved", { count: value ?? 0 }),
+    },
+    // 0 is a figure here, not a blank: it means no limit, and no wait.
+    community_creation_daily_limit: {
+      label: t("community.creationDailyLimitTitle"),
+      description: t("community.creationDailyLimitHelpText"),
+      fieldLabel: t("community.creationDailyLimitLabel"),
+      min: 0,
+      max: MAX_CREATION_DAILY_LIMIT,
+      blank: false,
+      value: (value) =>
+        value ? t("community.creationDailyLimitValue", { count: value }) : t("community.noLimit"),
+      saved: (value) =>
+        value
+          ? t("community.creationDailyLimitSaved", { count: value })
+          : t("community.creationDailyLimitSavedNone"),
+    },
+    community_export_cooldown_hours: {
+      label: t("community.exportCooldownTitle"),
+      description: t("community.exportCooldownHelpText"),
+      fieldLabel: t("community.exportCooldownLabel"),
+      min: 0,
+      max: MAX_EXPORT_COOLDOWN_HOURS,
+      blank: false,
+      value: (value) =>
+        value ? t("settingsSection.hours", { count: value }) : t("community.noWait"),
+      saved: (value) =>
+        value
+          ? t("community.exportCooldownSaved", { count: value })
+          : t("community.exportCooldownSavedNone"),
+    },
+    // Deleted, not destroyed: once a hold runs out the community waits out
+    // the retention window like any other, so an operator can still put it
+    // back.
+    deleted_community_retention_days: windowRule("community.retention"),
+    on_hold_community_deletion_days: windowRule("community.holdDeletion"),
+    // What a deployment owes the people in a community and what it owes the
+    // person leaving are different questions, and the answer to the second is
+    // usually shorter.
+    deleted_account_retention_days: windowRule("community.accountRetention"),
+  };
   // Turning the age gate off is an assertion about every account here, not a
   // preference, so it is confirmed. Turning it back on is not.
   const [confirmingAgeGateOff, setConfirmingAgeGateOff] = useState(false);
@@ -91,10 +222,18 @@ export const SettingsPlatformCommunityPage = () => {
   const [confirmingMessagesOff, setConfirmingMessagesOff] = useState(false);
 
   const update = useUpdateCommunitySettings({
-    // One endpoint, four decisions, so the write says which one it was: a
+    // One endpoint, many decisions, so the write says which one it was: a
     // reader who just switched messaging off is owed a word about messaging,
     // not about the directory they did not touch.
     onSuccess: (result, variables) => {
+      const figure = (Object.keys(numberRules) as NumberRule[]).find(
+        (field) => variables[field] !== undefined
+      );
+      if (figure) {
+        toast.success(numberRules[figure].saved(result[figure]));
+        setChanging(null);
+        return;
+      }
       if (variables.direct_messages_enabled !== undefined) {
         toast.success(
           result.direct_messages_enabled
@@ -111,11 +250,6 @@ export const SettingsPlatformCommunityPage = () => {
         );
         return;
       }
-      if (variables.max_guest_days !== undefined) {
-        guestDaysForm.settle({ days: String(variables.max_guest_days) });
-        toast.success(t("community.maxGuestDaysSaved", { count: result.max_guest_days }));
-        return;
-      }
       if (variables.public_registration_enabled !== undefined) {
         toast.success(
           result.public_registration_enabled
@@ -129,28 +263,6 @@ export const SettingsPlatformCommunityPage = () => {
           result.community_creation_enabled
             ? t("community.communityCreationEnabledToast")
             : t("community.communityCreationDisabledToast")
-        );
-        return;
-      }
-      if (variables.community_creation_daily_limit !== undefined) {
-        creationLimitForm.settle({ count: String(variables.community_creation_daily_limit) });
-        toast.success(
-          result.community_creation_daily_limit === 0
-            ? t("community.creationDailyLimitSavedNone")
-            : t("community.creationDailyLimitSaved", {
-                count: result.community_creation_daily_limit,
-              })
-        );
-        return;
-      }
-      if (variables.community_export_cooldown_hours !== undefined) {
-        exportCooldownForm.settle({ hours: String(variables.community_export_cooldown_hours) });
-        toast.success(
-          result.community_export_cooldown_hours === 0
-            ? t("community.exportCooldownSavedNone")
-            : t("community.exportCooldownSaved", {
-                count: result.community_export_cooldown_hours,
-              })
         );
         return;
       }
@@ -176,6 +288,20 @@ export const SettingsPlatformCommunityPage = () => {
   if (!canManagePlatformConfig) {
     return <p className="text-muted-foreground text-sm">{t("community.platformOnly")}</p>;
   }
+
+  /**
+   * A figure's row: its value, and Change. Under a switch that is off, the
+   * value is stated with why it waits, and nothing is offered.
+   */
+  const figureRow = (field: NumberRule, offNote?: string | false) =>
+    community ? (
+      <SettingsRow
+        label={numberRules[field].label}
+        value={numberRules[field].value(community[field])}
+        description={offNote || undefined}
+        onChange={offNote ? undefined : () => setChanging(field)}
+      />
+    ) : null;
 
   return (
     <SettingsSection title={t("community.title")} description={t("community.description")}>
@@ -235,31 +361,44 @@ export const SettingsPlatformCommunityPage = () => {
             {/* Read once, when an account is made, so changing it moves nobody
                 who is already here. Nested under the switch because it is a
                 question about messaging: with messaging off there is no policy
-                to start anybody on, and the control says so by going quiet
-                rather than disappearing. */}
-            <div className="ms-7 space-y-2 border-s ps-4">
-              <Label htmlFor="default-dm-policy">{t("community.defaultDmLabel")}</Label>
-              <Select
-                value={community?.default_dm_policy ?? "private"}
-                disabled={isLoading || update.isPending || !community || !directMessagesEnabled}
-                onValueChange={(value) =>
-                  update.mutate({
-                    community_directory_enabled: communityDirectoryEnabled,
-                    default_dm_policy: value as DmPolicy,
-                  })
-                }
-              >
-                <SelectTrigger id="default-dm-policy" className="max-w-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="private">{t("privacy.dm.private")}</SelectItem>
-                  <SelectItem value="community">{t("privacy.dm.community")}</SelectItem>
-                  <SelectItem value="public">{t("privacy.dm.public")}</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-muted-foreground text-sm">{t("community.defaultDmHelpText")}</p>
-            </div>
+                to start anybody on, so the row goes quiet, stating the policy
+                rather than offering it, and does not disappear. */}
+            {community ? (
+              <div className="ms-7 border-s ps-4">
+                {directMessagesEnabled ? (
+                  <SettingsRow
+                    label={t("community.defaultDmLabel")}
+                    description={t("community.defaultDmHelpText")}
+                  >
+                    <Select
+                      value={community.default_dm_policy}
+                      disabled={isLoading || update.isPending}
+                      onValueChange={(value) =>
+                        update.mutate({
+                          community_directory_enabled: communityDirectoryEnabled,
+                          default_dm_policy: value as DmPolicy,
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-44">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="private">{t("privacy.dm.private")}</SelectItem>
+                        <SelectItem value="community">{t("privacy.dm.community")}</SelectItem>
+                        <SelectItem value="public">{t("privacy.dm.public")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </SettingsRow>
+                ) : (
+                  <SettingsRow
+                    label={t("community.defaultDmLabel")}
+                    value={t(`privacy.dm.${community.default_dm_policy}`)}
+                    description={t("community.whileMessagesOff")}
+                  />
+                )}
+              </div>
+            ) : null}
           </>
         }
       >
@@ -317,40 +456,8 @@ export const SettingsPlatformCommunityPage = () => {
         label={t("community.guestsEnabledLabel")}
         description={t("community.guestsEnabledHelpText")}
         below={
-          <div className="ms-7 space-y-2 border-s ps-4">
-            <Label htmlFor="max-guest-days">{t("community.maxGuestDaysLabel")}</Label>
-            <div className="flex flex-wrap items-center gap-3">
-              <Input
-                id="max-guest-days"
-                type="number"
-                min={1}
-                max={MAX_GUEST_DAYS}
-                className="w-40"
-                value={guestDaysForm.values.days}
-                disabled={!community || !guestsEnabled}
-                onChange={(event) => guestDaysForm.set({ days: event.target.value })}
-              />
-              <Button
-                aria-label={t("community.maxGuestDaysSave")}
-                disabled={
-                  !community ||
-                  !guestsEnabled ||
-                  guestDays.value === null ||
-                  !guestDays.valid ||
-                  guestDays.value === community.max_guest_days ||
-                  update.isPending
-                }
-                onClick={() =>
-                  update.mutate({
-                    community_directory_enabled: communityDirectoryEnabled,
-                    max_guest_days: guestDays.value,
-                  })
-                }
-              >
-                {update.isPending ? t("common:submitting") : t("common:save")}
-              </Button>
-            </div>
-            <p className="text-muted-foreground text-sm">{t("community.maxGuestDaysHelpText")}</p>
+          <div className="ms-7 border-s ps-4">
+            {figureRow("max_guest_days", !guestsEnabled && t("community.whileGuestsOff"))}
           </div>
         }
       >
@@ -390,41 +497,12 @@ export const SettingsPlatformCommunityPage = () => {
           label={t("community.communityCreationLabel")}
           description={t("community.communityCreationHelpText")}
           below={
-            <Field
-              label={t("community.creationDailyLimitLabel")}
-              hint={t("community.creationDailyLimitHelpText")}
-              className="ms-7 border-s ps-4"
-            >
-              <div className="flex flex-wrap items-center gap-3">
-                <Input
-                  type="number"
-                  min={0}
-                  max={MAX_CREATION_DAILY_LIMIT}
-                  className="w-40"
-                  value={creationLimitForm.values.count}
-                  disabled={!community?.community_creation_enabled}
-                  onChange={(event) => creationLimitForm.set({ count: event.target.value })}
-                />
-                <Button
-                  aria-label={t("community.creationDailyLimitSave")}
-                  disabled={
-                    !community?.community_creation_enabled ||
-                    creationLimit.value === null ||
-                    !creationLimit.valid ||
-                    creationLimit.value === community.community_creation_daily_limit ||
-                    update.isPending
-                  }
-                  onClick={() =>
-                    update.mutate({
-                      community_directory_enabled: communityDirectoryEnabled,
-                      community_creation_daily_limit: creationLimit.value,
-                    })
-                  }
-                >
-                  {update.isPending ? t("common:submitting") : t("common:save")}
-                </Button>
-              </div>
-            </Field>
+            <div className="ms-7 border-s ps-4">
+              {figureRow(
+                "community_creation_daily_limit",
+                !community?.community_creation_enabled && t("community.whileCreationOff")
+              )}
+            </div>
           }
         >
           <Switch
@@ -440,46 +518,39 @@ export const SettingsPlatformCommunityPage = () => {
         </SettingsRow>
       </div>
 
-      <div className="space-y-2 border-t pt-4">
-        <Label htmlFor="community-export-cooldown">{t("community.exportCooldownLabel")}</Label>
-        <div className="flex flex-wrap items-center gap-3">
-          <Input
-            id="community-export-cooldown"
-            type="number"
-            min={0}
-            max={MAX_EXPORT_COOLDOWN_HOURS}
-            className="w-40"
-            value={exportCooldownForm.values.hours}
-            disabled={!community}
-            onChange={(event) => exportCooldownForm.set({ hours: event.target.value })}
-          />
-          <Button
-            aria-label={t("community.exportCooldownSave")}
-            disabled={
-              !community ||
-              exportCooldown.value === null ||
-              !exportCooldown.valid ||
-              exportCooldown.value === community.community_export_cooldown_hours ||
-              update.isPending
-            }
-            onClick={() =>
-              update.mutate({
-                community_directory_enabled: communityDirectoryEnabled,
-                community_export_cooldown_hours: exportCooldown.value,
-              })
-            }
-          >
-            {update.isPending ? t("common:submitting") : t("common:save")}
-          </Button>
-        </div>
-        <p className="text-muted-foreground text-sm">{t("community.exportCooldownHelpText")}</p>
+      {/* What a community may take away with it, and how long what is
+          deleted is kept. */}
+      <div className="space-y-4">
+        <h3 className="font-semibold text-sm">{t("community.exportAndDeletionTitle")}</h3>
+        {figureRow("community_export_cooldown_hours")}
+        {figureRow("deleted_community_retention_days")}
+        {figureRow("on_hold_community_deletion_days")}
+        {figureRow("deleted_account_retention_days")}
       </div>
 
-      <DeletedCommunityRetentionSection directoryEnabled={communityDirectoryEnabled} />
-
-      <OnHoldCommunityDeletionSection directoryEnabled={communityDirectoryEnabled} />
-
-      <DeletedAccountRetentionSection directoryEnabled={communityDirectoryEnabled} />
+      {community
+        ? (Object.keys(numberRules) as NumberRule[]).map((field) => (
+            <NumberRuleDialog
+              key={field}
+              rule={numberRules[field]}
+              saved={community[field]}
+              pending={update.isPending}
+              onSave={(value) =>
+                update.mutate({
+                  // The endpoint writes the directory switch on every write,
+                  // so it is sent back as it stands rather than flipped by a
+                  // save about something else.
+                  community_directory_enabled: communityDirectoryEnabled,
+                  [field]: value,
+                })
+              }
+              open={changing === field}
+              onOpenChange={(open) => {
+                if (!open) setChanging(null);
+              }}
+            />
+          ))
+        : null}
 
       <ConfirmDialog
         open={confirmingAgeGateOff}

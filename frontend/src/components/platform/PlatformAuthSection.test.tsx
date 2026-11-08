@@ -146,7 +146,10 @@ describe("PlatformAuthSection", () => {
       ];
       renderWithProviders(<PlatformAuthSection />);
 
-      expect(screen.getByLabelText("Password")).toBeDisabled();
+      // Stated as on, with why, rather than a box that cannot be unticked.
+      expect(screen.queryByRole("checkbox", { name: "Password" })).toBeNull();
+      expect(screen.getByText("The last way in cannot be withdrawn.")).toBeInTheDocument();
+      expect(screen.getByRole("checkbox", { name: "Single sign-on" })).not.toBeChecked();
     });
   });
 });

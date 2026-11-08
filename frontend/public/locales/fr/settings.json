@@ -14,6 +14,17 @@
     "goToLogin": "Aller à la connexion",
     "version": "Initiative v{{version}}"
   },
+  "settingsSection": {
+    "whenYouSave": "À l'enregistrement",
+    "change": "Modifier",
+    "changeRule": "Modifier {{rule}}",
+    "on": "Activé",
+    "off": "Désactivé",
+    "days_one": "{{count}} jour",
+    "days_other": "{{count}} jours",
+    "hours_one": "{{count}} heure",
+    "hours_other": "{{count}} heures"
+  },
   "communityLayout": {
     "title": "Paramètres de la communauté",
     "permissionDenied": "Vous avez besoin de permissions supplémentaires pour afficher cette page.",
@@ -671,8 +682,6 @@
   "captcha": {
     "title": "Captcha",
     "description": "Une vérification que la personne qui s'inscrit, ou qui demande un code de connexion par e-mail, n'est pas un robot.",
-    "on": "Activé",
-    "off": "Désactivé",
     "providerLabel": "Fournisseur",
     "providers": {
       "off": "Aucun",
@@ -685,8 +694,7 @@
     "secretKeySet": "••••••••",
     "secretKeyHelp": "Laissez vide pour conserver la clé secrète enregistrée.",
     "incomplete": "Le captcha s'active une fois le fournisseur, la clé du site et la clé secrète enregistrés.",
-    "save": "Enregistrer les paramètres du captcha",
-    "saving": "Enregistrement…",
+    "missingKeys": "inactif tant que la clé du site et la clé secrète ne sont pas enregistrées",
     "saved": "Paramètres du captcha enregistrés",
     "error": "Impossible d'enregistrer les paramètres du captcha"
   },
@@ -718,7 +726,7 @@
       "communitiesRequire_one": "{{count}} communauté exige une connexion via un fournisseur qui lui est propre.",
       "communitiesRequire_other": "{{count}} communautés exigent une connexion via un fournisseur qui leur est propre.",
       "totp": {
-        "label": "Activer l'authentification à deux facteurs",
+        "label": "Application d'authentification",
         "help": "Permettez aux gens de protéger leur compte avec un code issu d'une application d'authentification. Chacun l'active pour soi ; ici, il s'agit de savoir si le serveur la propose."
       },
       "passkey": {
@@ -731,7 +739,7 @@
       }
     },
     "sessionLifetime": {
-      "title": "Durée pendant laquelle les gens restent connectés",
+      "title": "Durée de session",
       "description": "Le temps maximal avant de devoir se reconnecter, quelle que soit l'utilisation de l'application. À distinguer de la déconnexion pour inactivité.",
       "label": "Heures",
       "placeholder": "Aucune limite",
@@ -740,21 +748,23 @@
       "error": "Nous n'avons pas pu enregistrer la limite de session.",
       "idleLabel": "Minutes d'inactivité",
       "idlePlaceholder": "Aucune limite",
+      "idleDetail_one": "les sessions inactives se terminent après {{count}} minute",
+      "idleDetail_other": "les sessions inactives se terminent après {{count}} minutes",
+      "idleDefault": "les sessions inactives se terminent selon la fenêtre définie au déploiement",
       "idleHint": "Combien de temps une session peut rester intouchée avant de se terminer. Laissez vide pour conserver la fenêtre définie au déploiement. Utiliser l'application compte comme y toucher : le délai ne s'écoule qu'une fois arrêté. Une communauté tenue au standard de conformité le raccourcit davantage pour ses membres."
     },
     "breachedPasswordCheck": {
-      "title": "Mots de passe compromis",
-      "description": "Refuser un nouveau mot de passe déjà apparu dans une fuite de données.",
-      "label": "Vérifier les nouveaux mots de passe parmi les fuites connues",
-      "onHelp": "Seuls les cinq premiers caractères de l'empreinte du mot de passe quittent ce serveur. Jamais le mot de passe lui-même.",
-      "offHelp": "Les nouveaux mots de passe ne sont pas vérifiés. Désactivez-le uniquement si ce serveur ne peut pas accéder à internet.",
+      "title": "Vérification des mots de passe compromis",
+      "description": "Refuse un nouveau mot de passe déjà apparu dans une fuite de données. Seuls les cinq premiers caractères de son empreinte quittent ce serveur, jamais le mot de passe lui-même.",
+      "onLabel": "Vérifier les nouveaux mots de passe parmi les fuites connues",
+      "offLabel": "Ne pas vérifier, pour un serveur sans accès à internet",
       "enabledToast": "Les nouveaux mots de passe sont vérifiés parmi les fuites connues.",
       "disabledToast": "Les nouveaux mots de passe ne sont plus vérifiés parmi les fuites connues.",
       "error": "Nous n'avons pas pu modifier la vérification des mots de passe compromis."
     },
     "secondFactorRequirement": {
-      "title": "Authentification à deux facteurs",
-      "description": "Si les personnes ici doivent posséder un second facteur — une application d'authentification ou une clé d'accès — en plus d'un moyen de se connecter.",
+      "title": "Second facteur",
+      "description": "Qui doit posséder un second facteur, une application d'authentification ou une clé d'accès, en plus d'un moyen de se connecter.",
       "levels": {
         "nobody": {
           "label": "Personne n'y est tenu",
@@ -776,18 +786,19 @@
       "present": "Saisir un code",
       "saved": "Enregistré. Les personnes concernées seront sollicitées à leur prochaine requête.",
       "error": "Nous n'avons pas pu enregistrer cela.",
-      "noMethod": "Autorisez d'abord l'application d'authentification ou les clés d'accès : sans l'une ou l'autre, il n'y a rien à exiger.",
+      "noMethod": "Proposez d'abord l'application d'authentification ou les clés d'accès. Sans l'une ou l'autre, il n'y a rien à demander.",
       "providers": {
         "title": "Fournisseurs dont la connexion compte",
         "help": "Une connexion via l’un d’eux satisfait l’exigence ci-dessus, car le fournisseur indique avoir appliqué son propre second facteur. La même réponse que sur la page du fournisseur."
       }
     },
     "factorMethods": {
-      "title": "Authentification à deux facteurs",
-      "description": "Ce que ce serveur propose comme second facteur. Savoir si quelqu'un doit en détenir un est le réglage suivant.",
+      "title": "Seconds facteurs proposés",
+      "description": "Les seconds facteurs que les gens peuvent configurer. La règle Second facteur décide si quelqu'un doit en détenir un.",
       "saved": "Authentification à deux facteurs mise à jour.",
       "saveError": "Impossible de modifier l'authentification à deux facteurs.",
-      "followsWaysIn": "Une clé d'accès prouve l'appareil et la personne d'un seul geste : elle répond donc à ceci en plus d'ouvrir une session. L'activation des clés d'accès se décide sous « Moyens d'accès »."
+      "setUnderWaysIn": "Défini sous Moyens d'accès",
+      "none": "Aucun"
     }
   },
   "platformUsers": {
@@ -1681,11 +1692,6 @@
     },
     "setByServer": "Défini par votre serveur",
     "intro": "Comment on se connecte à {{community}}, ce qu'il faut pour entrer et ce qui sort de la communauté.",
-    "change": "Modifier",
-    "changeRule": "Modifier {{rule}}",
-    "on": "Activé",
-    "off": "Désactivé",
-    "whenYouSave": "À l'enregistrement",
     "signInRules": {
       "title": "Règles de connexion",
       "description": "Ce qu'il faut avant de pouvoir ouvrir {{community}}.",
@@ -1703,11 +1709,11 @@
     "description": "Les fournisseurs d'authentification unique avec lesquels les personnes se connectent. Chacun dispose de son propre bouton sur la page de connexion.",
     "addProvider": "Ajouter un fournisseur",
     "empty": "Aucun fournisseur configuré pour l'instant.",
-    "disabledBadge": "Désactivé",
     "editTitle": "Modifier le fournisseur de connexion",
     "dialogDescription": "Détails du fournisseur OpenID Connect. L'URL de callback pour votre IdP est /api/v1/auth/{slug}/callback sur ce serveur.",
     "slugLabel": "Identifiant",
     "slugHelp": "Minuscules, chiffres et tirets. Fixe après la création — il forme les URL de connexion.",
+    "slugFixed": "Fixe une fois le fournisseur ajouté, car ses adresses de connexion en sont formées.",
     "slugInvalid": "Utilisez des minuscules, des chiffres et des tirets ; pas de tiret au début ni à la fin.",
     "displayNameLabel": "Nom affiché",
     "issuerLabel": "URL de l'émetteur",
@@ -1858,6 +1864,7 @@
     "ageGateOffConfirm": "Tout le monde ici a 18 ans ou plus",
     "defaultDmLabel": "Messages privés pour les nouveaux comptes",
     "defaultDmHelpText": "Le réglage avec lequel un compte démarre. Il est lu une seule fois, à la création du compte : le modifier n'ouvre aucun compte existant et n'en ferme aucun. « Privé » est la valeur livrée ; avec elle, chacun devient joignable au moment où il le décide.",
+    "whileMessagesOff": "s'applique une fois les messages directs activés",
     "directMessagesLabel": "Autoriser les membres à s'écrire",
     "directMessagesHelpText": "Mes messages, ainsi que les connexions et les demandes qui le font fonctionner. Les messages sont chiffrés de bout en bout : personne qui administre cette installation ne peut les lire — désactivez ceci là où la messagerie privée n'a pas sa place, pas pour la surveiller.",
     "directMessagesReversibleNote": "Désactiver masque Mes messages et refuse les nouveaux ; rien n'est supprimé. Les conversations, les connexions et les réglages sont toujours là si vous le réactivez.",
@@ -1875,8 +1882,7 @@
       "neverHint": "Rien n'est supprimé à l'échéance d'un délai. Une communauté reste en attente jusqu'à ce que quelqu'un lève l'attente ou la supprime.",
       "saved_one": "Les communautés en attente sont supprimées après {{count}} jour.",
       "saved_other": "Les communautés en attente sont supprimées après {{count}} jours.",
-      "savedNever": "Les communautés en attente ne sont jamais supprimées automatiquement.",
-      "save": "Enregistrer la durée d'attente des communautés"
+      "savedNever": "Les communautés en attente ne sont jamais supprimées automatiquement."
     },
     "retention": {
       "title": "Conservation des communautés supprimées",
@@ -1887,8 +1893,7 @@
       "neverHint": "Rien n'est détruit à l'échéance d'un délai. Les communautés supprimées restent dans la liste ci-dessous jusqu'à ce que quelqu'un en restaure une.",
       "saved_one": "Les communautés supprimées sont conservées {{count}} jour.",
       "saved_other": "Les communautés supprimées sont conservées {{count}} jours.",
-      "savedNever": "Les communautés supprimées sont conservées indéfiniment.",
-      "save": "Enregistrer la durée de conservation des communautés"
+      "savedNever": "Les communautés supprimées sont conservées indéfiniment."
     },
     "accountRetention": {
       "title": "Conservation des comptes supprimés",
@@ -1899,8 +1904,7 @@
       "neverHint": "Rien n'est effacé à l'échéance d'un délai. Les comptes supprimés restent dans la table des utilisateurs jusqu'à ce que quelqu'un revienne ou en restaure un.",
       "saved_one": "Les comptes supprimés sont conservés {{count}} jour.",
       "saved_other": "Les comptes supprimés sont conservés {{count}} jours.",
-      "savedNever": "Les comptes supprimés sont conservés indéfiniment.",
-      "save": "Enregistrer la durée de conservation des comptes"
+      "savedNever": "Les comptes supprimés sont conservés indéfiniment."
     },
     "engagementRankingLabel": "Permettre aux communautés de classer les résultats par engagement",
     "engagementRankingHelpText": "Désactivé, aucune communauté de ce serveur ne classe par engagement, quel que soit son propre réglage.",
@@ -1910,9 +1914,10 @@
     "guestsEnabledHelpText": "Les communautés peuvent inviter des personnes pour un nombre de jours défini. Les invités n'occupent pas de place et ne voient que ce qui leur a été donné. Tant que c'est désactivé, aucun invité n'entre.",
     "guestsEnabledToast": "Les communautés peuvent avoir des invités.",
     "guestsDisabledToast": "Les invités sont désactivés.",
+    "maxGuestDaysTitle": "Séjour maximal des invités",
     "maxGuestDaysLabel": "Séjour maximal d'un invité (jours)",
     "maxGuestDaysHelpText": "Aucun invité ne reste plus longtemps que cela, quel que soit le réglage d'une communauté.",
-    "maxGuestDaysSave": "Enregistrer le séjour maximal des invités",
+    "whileGuestsOff": "s'applique une fois les invités autorisés",
     "maxGuestDaysSaved_one": "Les invités restent {{count}} jour au plus.",
     "maxGuestDaysSaved_other": "Les invités restent {{count}} jours au plus.",
     "joinAndCreateTitle": "Qui peut rejoindre et créer",
@@ -1924,18 +1929,24 @@
     "communityCreationHelpText": "Désactivé, seules les personnes qui gèrent les communautés de ce serveur peuvent en créer une, et seules les personnes invitées peuvent s'inscrire.",
     "communityCreationEnabledToast": "Tout le monde peut créer une communauté.",
     "communityCreationDisabledToast": "Seules les personnes qui gèrent les communautés peuvent en créer une.",
+    "creationDailyLimitTitle": "Limite quotidienne par compte",
     "creationDailyLimitLabel": "Communautés qu'un compte peut créer par jour",
     "creationDailyLimitHelpText": "0 signifie aucune limite. Les personnes qui gèrent les communautés n'y sont pas soumises.",
-    "creationDailyLimitSave": "Enregistrer la limite quotidienne de communautés",
+    "whileCreationOff": "s'applique une fois que tout le monde peut créer une communauté",
+    "creationDailyLimitValue_one": "{{count}} communauté par jour",
+    "creationDailyLimitValue_other": "{{count}} communautés par jour",
     "creationDailyLimitSaved_one": "Chaque compte peut créer {{count}} communauté par jour.",
     "creationDailyLimitSaved_other": "Chaque compte peut créer {{count}} communautés par jour.",
     "creationDailyLimitSavedNone": "Il n'y a pas de limite quotidienne pour les nouvelles communautés.",
+    "exportAndDeletionTitle": "Exports et suppression",
     "exportCooldownLabel": "Heures entre deux exports d'une communauté",
     "exportCooldownHelpText": "Le temps qu'une communauté attend avant de pouvoir tout exporter à nouveau. 0 signifie aucune attente.",
-    "exportCooldownSave": "Enregistrer le délai entre les exports de communauté",
     "exportCooldownSaved_one": "Les communautés attendent {{count}} heure entre deux exports.",
     "exportCooldownSaved_other": "Les communautés attendent {{count}} heures entre deux exports.",
-    "exportCooldownSavedNone": "Les communautés peuvent exporter sans attendre."
+    "exportCooldownSavedNone": "Les communautés peuvent exporter sans attendre.",
+    "noLimit": "Aucune limite",
+    "noWait": "Aucune attente",
+    "exportCooldownTitle": "Délai entre deux exports"
   },
   "account": {
     "passwordTitle": "Mot de passe",
@@ -2118,7 +2129,11 @@
     "valuesHint": "Séparez-en plusieurs par des virgules. La connexion propre d'une communauté remplace ceci entièrement : rien d'ici n'est fusionné avec ce qu'elle dit."
   },
   "platformSecurity": {
-    "description": "Combien de temps quelqu'un peut rester connecté, le captcha demandé aux nouveaux venus, et ce qu'une notification emporte en quittant l'application."
+    "description": "Combien de temps quelqu'un peut rester connecté, le captcha demandé aux nouveaux venus, et ce qu'une notification emporte en quittant l'application.",
+    "signInRules": {
+      "title": "Règles de connexion",
+      "description": "Ce qui est demandé à chaque compte de ce serveur lorsqu'il se connecte."
+    }
   },
   "notificationDelivery": {
     "title": "Notifications qui quittent l'application",

@@ -14,6 +14,17 @@
     "goToLogin": "Ir a inicio de sesión",
     "version": "Initiative v{{version}}"
   },
+  "settingsSection": {
+    "whenYouSave": "Al guardar",
+    "change": "Cambiar",
+    "changeRule": "Cambiar {{rule}}",
+    "on": "Activado",
+    "off": "Desactivado",
+    "days_one": "{{count}} día",
+    "days_other": "{{count}} días",
+    "hours_one": "{{count}} hora",
+    "hours_other": "{{count}} horas"
+  },
   "communityLayout": {
     "title": "Configuración de la comunidad",
     "permissionDenied": "Necesitas permisos adicionales para ver esta página.",
@@ -671,8 +682,6 @@
   "captcha": {
     "title": "Captcha",
     "description": "Una comprobación de que quien se registra, o pide un código de inicio de sesión por correo, no es un bot.",
-    "on": "Activado",
-    "off": "Desactivado",
     "providerLabel": "Proveedor",
     "providers": {
       "off": "Ninguno",
@@ -685,8 +694,7 @@
     "secretKeySet": "••••••••",
     "secretKeyHelp": "Déjalo en blanco para conservar la clave secreta guardada.",
     "incomplete": "El captcha se activa cuando el proveedor, la clave del sitio y la clave secreta están guardados.",
-    "save": "Guardar ajustes del captcha",
-    "saving": "Guardando…",
+    "missingKeys": "no se activa hasta guardar la clave del sitio y la clave secreta",
     "saved": "Ajustes del captcha guardados",
     "error": "No se pudieron guardar los ajustes del captcha"
   },
@@ -718,7 +726,7 @@
       "communitiesRequire_one": "{{count}} comunidad exige iniciar sesión mediante un proveedor propio.",
       "communitiesRequire_other": "{{count}} comunidades exigen iniciar sesión mediante un proveedor propio.",
       "totp": {
-        "label": "Activar la autenticación en dos pasos",
+        "label": "Aplicación de autenticación",
         "help": "Permite que la gente proteja su cuenta con un código de una aplicación de autenticación. Cada persona la activa por su cuenta; esto decide si el servidor la ofrece siquiera."
       },
       "passkey": {
@@ -731,7 +739,7 @@
       }
     },
     "sessionLifetime": {
-      "title": "Cuánto tiempo permanece la gente con la sesión iniciada",
+      "title": "Duración de la sesión",
       "description": "El máximo que alguien puede pasar sin volver a iniciar sesión, por mucho que use la aplicación. Distinto de cerrar la sesión por no usarla.",
       "label": "Horas",
       "placeholder": "Sin límite",
@@ -740,21 +748,23 @@
       "error": "No hemos podido guardar el límite de sesión.",
       "idleLabel": "Minutos de inactividad",
       "idlePlaceholder": "Sin límite",
+      "idleDetail_one": "las sesiones inactivas terminan tras {{count}} minuto",
+      "idleDetail_other": "las sesiones inactivas terminan tras {{count}} minutos",
+      "idleDefault": "las sesiones inactivas terminan según la ventana fijada al desplegar el servidor",
       "idleHint": "Cuánto puede estar una sesión sin tocarse antes de terminar. Déjalo en blanco para conservar la ventana fijada al desplegar el servidor. Usar la aplicación cuenta como tocarla, así que solo corre cuando alguien para. Una comunidad sujeta al estándar de cumplimiento lo acorta aún más para sus miembros."
     },
     "breachedPasswordCheck": {
-      "title": "Contraseñas filtradas",
-      "description": "Rechazar una contraseña nueva que ya haya aparecido en una filtración de datos.",
-      "label": "Comprobar las contraseñas nuevas con filtraciones conocidas",
-      "onHelp": "Solo los cinco primeros caracteres del hash de la contraseña salen de este servidor. La contraseña en sí, nunca.",
-      "offHelp": "Las contraseñas nuevas no se comprueban. Desactívalo solo si este servidor no puede acceder a internet.",
+      "title": "Comprobación de contraseñas filtradas",
+      "description": "Rechaza una contraseña nueva que ya haya aparecido en una filtración de datos. Solo los cinco primeros caracteres de su hash salen de este servidor, nunca la contraseña en sí.",
+      "onLabel": "Comprobar las contraseñas nuevas con filtraciones conocidas",
+      "offLabel": "No comprobar, para un servidor sin acceso a internet",
       "enabledToast": "Las contraseñas nuevas se comprueban con filtraciones conocidas.",
       "disabledToast": "Las contraseñas nuevas ya no se comprueban con filtraciones conocidas.",
       "error": "No hemos podido cambiar la comprobación de contraseñas filtradas."
     },
     "secondFactorRequirement": {
-      "title": "Autenticación en dos pasos",
-      "description": "Si quienes están aquí deben tener un segundo factor — una aplicación de autenticación o una clave de acceso — además de una forma de iniciar sesión.",
+      "title": "Segundo factor",
+      "description": "Quién debe tener un segundo factor, una aplicación de autenticación o una clave de acceso, además de una forma de iniciar sesión.",
       "levels": {
         "nobody": {
           "label": "Nadie está obligado",
@@ -776,18 +786,19 @@
       "present": "Introducir un código",
       "saved": "Guardado. A quien le afecte se le pedirá en su siguiente petición.",
       "error": "No hemos podido guardarlo.",
-      "noMethod": "Permite antes la aplicación de autenticación o las claves de acceso: sin ninguna de las dos no hay nada que exigir.",
+      "noMethod": "Ofrece antes la aplicación de autenticación o las claves de acceso. Sin ninguna de las dos no hay nada que pedir.",
       "providers": {
         "title": "Proveedores cuyo inicio de sesión cuenta",
         "help": "Un inicio de sesión a través de alguno de estos satisface el requisito anterior, porque el proveedor informa haber ejecutado un segundo factor propio. La misma respuesta que en la página del proveedor."
       }
     },
     "factorMethods": {
-      "title": "Autenticación en dos pasos",
-      "description": "Lo que este servidor ofrece como segundo factor. Si alguien está obligado a tenerlo es el ajuste siguiente.",
+      "title": "Segundos factores ofrecidos",
+      "description": "Qué segundos factores puede configurar la gente. Si alguien está obligado a tener uno lo decide la regla Segundo factor.",
       "saved": "Autenticación en dos pasos actualizada.",
       "saveError": "No se ha podido cambiar la autenticación en dos pasos.",
-      "followsWaysIn": "Una clave de acceso demuestra el dispositivo y la persona a la vez, así que responde a esto además de abrir sesión. Si se ofrecen claves de acceso se decide en «Formas de entrar»."
+      "setUnderWaysIn": "Se decide en Formas de entrar",
+      "none": "Ninguno"
     }
   },
   "platformUsers": {
@@ -1681,11 +1692,6 @@
     },
     "setByServer": "Definido por tu servidor",
     "intro": "Cómo se inicia sesión en {{community}}, qué hace falta para entrar y qué sale de la comunidad.",
-    "change": "Cambiar",
-    "changeRule": "Cambiar {{rule}}",
-    "on": "Activado",
-    "off": "Desactivado",
-    "whenYouSave": "Al guardar",
     "signInRules": {
       "title": "Reglas de inicio de sesión",
       "description": "Lo que hace falta antes de poder abrir {{community}}.",
@@ -1703,11 +1709,11 @@
     "description": "Los proveedores de inicio de sesión único con los que las personas inician sesión. Cada uno tiene su propio botón en la página de inicio de sesión.",
     "addProvider": "Añadir proveedor",
     "empty": "Aún no hay proveedores configurados.",
-    "disabledBadge": "Desactivado",
     "editTitle": "Editar proveedor de inicio de sesión",
     "dialogDescription": "Detalles del proveedor OpenID Connect. La URL de callback para tu IdP es /api/v1/auth/{slug}/callback en este servidor.",
     "slugLabel": "Identificador",
     "slugHelp": "Minúsculas, números y guiones. Fijo tras la creación: forma las URL de inicio de sesión.",
+    "slugFixed": "Fijo una vez añadido el proveedor, porque sus direcciones de inicio de sesión se forman con él.",
     "slugInvalid": "Usa minúsculas, números y guiones; sin guion al principio ni al final.",
     "displayNameLabel": "Nombre visible",
     "issuerLabel": "URL del emisor",
@@ -1858,6 +1864,7 @@
     "ageGateOffConfirm": "Aquí todo el mundo tiene 18 o más",
     "defaultDmLabel": "Mensajes directos para cuentas nuevas",
     "defaultDmHelpText": "El ajuste con el que empieza una cuenta. Se lee una sola vez, al crearla: cambiarlo no abre ninguna cuenta existente ni cierra ninguna. «Privado» es el valor de fábrica; con él, cada persona pasa a ser localizable cuando así lo decide.",
+    "whileMessagesOff": "se usa cuando los mensajes directos están activados",
     "directMessagesLabel": "Permitir que la gente se envíe mensajes",
     "directMessagesHelpText": "Mis mensajes, junto con las conexiones y solicitudes que lo sostienen. Los mensajes están cifrados de extremo a extremo, así que nadie que gestione esta instalación puede leerlos: desactívalo donde la mensajería privada no tenga cabida, no para supervisarla.",
     "directMessagesReversibleNote": "Desactivarlo oculta Mis mensajes y rechaza los nuevos; no borra nada. Las conversaciones, las conexiones y los ajustes siguen ahí si vuelves a activarlo.",
@@ -1875,8 +1882,7 @@
       "neverHint": "No se elimina nada por plazo. Una comunidad sigue en pausa hasta que alguien levanta la pausa o la elimina.",
       "saved_one": "Las comunidades en pausa se eliminan tras {{count}} día.",
       "saved_other": "Las comunidades en pausa se eliminan tras {{count}} días.",
-      "savedNever": "Las comunidades en pausa nunca se eliminan automáticamente.",
-      "save": "Guardar cuánto tiempo siguen en pausa las comunidades"
+      "savedNever": "Las comunidades en pausa nunca se eliminan automáticamente."
     },
     "retention": {
       "title": "Conservación de comunidades eliminadas",
@@ -1887,8 +1893,7 @@
       "neverHint": "No se destruye nada por plazo. Las comunidades eliminadas siguen en la lista de abajo hasta que alguien restaure una.",
       "saved_one": "Las comunidades eliminadas se conservan {{count}} día.",
       "saved_other": "Las comunidades eliminadas se conservan {{count}} días.",
-      "savedNever": "Las comunidades eliminadas se conservan indefinidamente.",
-      "save": "Guardar cuánto se conservan las comunidades"
+      "savedNever": "Las comunidades eliminadas se conservan indefinidamente."
     },
     "accountRetention": {
       "title": "Conservación de cuentas eliminadas",
@@ -1899,8 +1904,7 @@
       "neverHint": "No se borra nada por plazo. Las cuentas eliminadas siguen en la tabla de usuarios hasta que alguien vuelva o restaure una.",
       "saved_one": "Las cuentas eliminadas se conservan {{count}} día.",
       "saved_other": "Las cuentas eliminadas se conservan {{count}} días.",
-      "savedNever": "Las cuentas eliminadas se conservan indefinidamente.",
-      "save": "Guardar cuánto se conservan las cuentas"
+      "savedNever": "Las cuentas eliminadas se conservan indefinidamente."
     },
     "engagementRankingLabel": "Permitir que las comunidades ordenen los resultados por participación",
     "engagementRankingHelpText": "Si está desactivado, ninguna comunidad de este servidor ordena por participación, sea cual sea su propia configuración.",
@@ -1910,9 +1914,10 @@
     "guestsEnabledHelpText": "Las comunidades pueden invitar a personas durante un número fijo de días. Los invitados no ocupan plaza y solo ven lo que se les dio. Mientras esté desactivado, no entra ningún invitado.",
     "guestsEnabledToast": "Las comunidades pueden tener invitados.",
     "guestsDisabledToast": "Los invitados están desactivados.",
+    "maxGuestDaysTitle": "Estancia máxima de invitados",
     "maxGuestDaysLabel": "Estancia máxima de un invitado (días)",
     "maxGuestDaysHelpText": "Ningún invitado se queda más que esto, configure lo que configure una comunidad.",
-    "maxGuestDaysSave": "Guardar la estancia máxima de invitados",
+    "whileGuestsOff": "se usa cuando se permiten invitados",
     "maxGuestDaysSaved_one": "Los invitados se quedan {{count}} día como máximo.",
     "maxGuestDaysSaved_other": "Los invitados se quedan {{count}} días como máximo.",
     "joinAndCreateTitle": "Quién puede unirse y crear",
@@ -1924,18 +1929,24 @@
     "communityCreationHelpText": "Si está desactivado, solo quienes gestionan comunidades en este servidor pueden crear una, y solo las personas invitadas pueden registrarse.",
     "communityCreationEnabledToast": "Cualquiera puede crear una comunidad.",
     "communityCreationDisabledToast": "Solo quienes gestionan comunidades pueden crear una.",
+    "creationDailyLimitTitle": "Límite diario por cuenta",
     "creationDailyLimitLabel": "Comunidades que una cuenta puede crear al día",
     "creationDailyLimitHelpText": "0 significa sin límite. No se aplica a quienes gestionan comunidades.",
-    "creationDailyLimitSave": "Guardar el límite diario de comunidades",
+    "whileCreationOff": "se usa cuando cualquiera puede crear una comunidad",
+    "creationDailyLimitValue_one": "{{count}} comunidad al día",
+    "creationDailyLimitValue_other": "{{count}} comunidades al día",
     "creationDailyLimitSaved_one": "Cada cuenta puede crear {{count}} comunidad al día.",
     "creationDailyLimitSaved_other": "Cada cuenta puede crear {{count}} comunidades al día.",
     "creationDailyLimitSavedNone": "No hay límite diario de comunidades nuevas.",
+    "exportAndDeletionTitle": "Exportaciones y eliminación",
     "exportCooldownLabel": "Horas entre exportaciones de una comunidad",
     "exportCooldownHelpText": "Cuánto espera una comunidad antes de poder exportarlo todo de nuevo. 0 significa sin espera.",
-    "exportCooldownSave": "Guardar el tiempo entre exportaciones de comunidades",
     "exportCooldownSaved_one": "Las comunidades esperan {{count}} hora entre exportaciones.",
     "exportCooldownSaved_other": "Las comunidades esperan {{count}} horas entre exportaciones.",
-    "exportCooldownSavedNone": "Las comunidades pueden exportar sin esperar."
+    "exportCooldownSavedNone": "Las comunidades pueden exportar sin esperar.",
+    "noLimit": "Sin límite",
+    "noWait": "Sin espera",
+    "exportCooldownTitle": "Tiempo entre exportaciones"
   },
   "account": {
     "passwordTitle": "Contraseña",
@@ -2118,7 +2129,11 @@
     "valuesHint": "Separad varios con comas. La conexión propia de una comunidad sustituye esto por completo; nada de aquí se combina con lo que ella diga."
   },
   "platformSecurity": {
-    "description": "Cuánto tiempo puede alguien seguir con la sesión iniciada, el captcha que se pide a quien llega por primera vez y qué lleva una notificación al salir de la aplicación."
+    "description": "Cuánto tiempo puede alguien seguir con la sesión iniciada, el captcha que se pide a quien llega por primera vez y qué lleva una notificación al salir de la aplicación.",
+    "signInRules": {
+      "title": "Reglas de inicio de sesión",
+      "description": "Lo que se pide a cada cuenta de este servidor al iniciar sesión."
+    }
   },
   "notificationDelivery": {
     "title": "Notificaciones que salen de la aplicación",

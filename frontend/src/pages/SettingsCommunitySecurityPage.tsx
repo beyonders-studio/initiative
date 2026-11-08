@@ -16,7 +16,8 @@ import { CommunityAuthProvidersSection } from "@/components/auth/CommunityAuthPr
 import { CommunityClaimRulesSection } from "@/components/auth/CommunityClaimRulesSection";
 import { CommunityPrivacySection } from "@/components/auth/CommunityPrivacySection";
 import { CustomRoleClaimRulesSection } from "@/components/auth/CustomRoleClaimRulesSection";
-import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
+import { OnOffRuleDialog } from "@/components/settings/OnOffRuleDialog";
+import { SettingsRow, SettingsSection, WhenYouSave } from "@/components/settings/SettingsSection";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -33,7 +34,7 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { providerSignInHref } from "@/lib/returnPath";
 import { readOptionalWholeNumber } from "@/lib/text";
-import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { Alert, AlertDescription } from "@/ui/alert";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
@@ -177,25 +178,6 @@ const UnmetAlert = ({ communityId, unmet }: { communityId: number; unmet: Unmet 
       <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
         <span>{line}</span>
         {action}
-      </AlertDescription>
-    </Alert>
-  );
-};
-
-/** What a change reaches once it saves. Nothing to say, nothing shown. */
-const WhenYouSave = ({ lines }: { lines: (string | false | null | undefined)[] }) => {
-  const { t } = useTranslation("settings");
-  const said = lines.filter((line): line is string => Boolean(line));
-  if (said.length === 0) return null;
-  return (
-    <Alert role="note" className="border-transparent bg-muted">
-      <AlertTitle>{t("communityAuth.whenYouSave")}</AlertTitle>
-      <AlertDescription>
-        <ul className="list-disc space-y-1 pl-4">
-          {said.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
       </AlertDescription>
     </Alert>
   );
@@ -458,10 +440,10 @@ const SignInRequirementDialog = ({
 };
 
 /**
- * A rule that is on or off: the second factor, or signing in again every
- * twelve hours. Turning one on says who it reaches before it saves.
+ * A rule of the community's that is on or off: the second factor, or signing
+ * in again every twelve hours. Saving one is asked of whoever saves it.
  */
-const OnOffRuleDialog = ({
+const CommunityOnOffRuleDialog = ({
   communityId,
   rule,
   saved,
@@ -477,26 +459,28 @@ const OnOffRuleDialog = ({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) => {
-  const { t } = useTranslation(["settings", "common"]);
+  const { t } = useTranslation("settings");
   const { activeCommunity, refreshCommunities } = useCommunities();
   const copy =
     rule === "require_second_factor" ? "communityAuth.secondFactor" : "communityAuth.sessionLimit";
-  const form = useServerForm(saved, (loaded) => ({ on: loaded ?? false }), [open, communityId]);
   const [error, setError] = useState<string | null>(null);
   const [unmet, setUnmet] = useState<Unmet | null>(null);
   const update = useUpdateCommunityAuthSettings(communityId);
 
-  const close = () => {
-    onOpenChange(false);
+  const forget = () => {
     setError(null);
     setUnmet(null);
   };
+  const close = () => {
+    onOpenChange(false);
+    forget();
+  };
 
-  const save = () =>
+  const save = (on: boolean) =>
     update.mutate(
       rule === "require_second_factor"
-        ? { require_second_factor: form.values.on }
-        : { enforce_compliance_session: form.values.on },
+        ? { require_second_factor: on }
+        : { enforce_compliance_session: on },
       {
         onSuccess: async () => {
           // A member's community list carries these too, for the pages that
@@ -514,50 +498,27 @@ const OnOffRuleDialog = ({
     );
 
   return (
-    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{t(`${copy}.title`)}</DialogTitle>
-          <DialogDescription>
-            {t(`${copy}.description`, { community: activeCommunity?.name ?? "" })}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <RadioGroup
-            value={form.values.on ? "on" : "off"}
-            onValueChange={(value) => {
-              form.set({ on: value === "on" });
-              setUnmet(null);
-              setError(null);
-            }}
-            className="gap-3"
-          >
-            {(["off", "on"] as const).map((value) => (
-              <div key={value} className="flex items-center gap-3 rounded-md border px-4 py-3">
-                <RadioGroupItem id={`${rule}-${value}`} value={value} />
-                <Label htmlFor={`${rule}-${value}`} className="font-medium text-base">
-                  {value === "on" ? t(`${copy}.onLabel`) : t(`${copy}.offLabel`)}
-                </Label>
-              </div>
-            ))}
-          </RadioGroup>
-          {/* Only turning a rule on reaches anybody; turning it off just saves. */}
-          <WhenYouSave lines={form.values.on && !saved ? impact : []} />
-          {unmet && <UnmetAlert communityId={communityId} unmet={unmet} />}
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-        </div>
-        <DialogFooter
-          submitLabel={t("common:save")}
-          pending={update.isPending}
-          disabled={form.values.on === saved}
-          onSubmit={save}
-        />
-      </DialogContent>
-    </Dialog>
+    <OnOffRuleDialog
+      id={rule}
+      title={t(`${copy}.title`)}
+      description={t(`${copy}.description`, { community: activeCommunity?.name ?? "" })}
+      onLabel={t(`${copy}.onLabel`)}
+      offLabel={t(`${copy}.offLabel`)}
+      saved={saved}
+      impact={impact}
+      pending={update.isPending}
+      onSave={save}
+      onChoose={forget}
+      open={open}
+      onOpenChange={(next) => (next ? onOpenChange(true) : close())}
+    >
+      {unmet && <UnmetAlert communityId={communityId} unmet={unmet} />}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+    </OnOffRuleDialog>
   );
 };
 
@@ -758,7 +719,7 @@ export const SettingsCommunitySecurityPage = () => {
       key: "enforce_compliance_session",
       shown: mayConfigureRestrictions,
       label: t("communityAuth.sessionLimit.title"),
-      value: sessionLimit ? t("communityAuth.on") : t("communityAuth.off"),
+      value: sessionLimit ? t("settingsSection.on") : t("settingsSection.off"),
       detail: sessionLimit
         ? t("communityAuth.sessionLimit.onDetail")
         : t("communityAuth.sessionLimit.offDetail"),
@@ -801,35 +762,23 @@ export const SettingsCommunitySecurityPage = () => {
       >
         {rules
           .filter((rule) => rule.shown)
-          .map((rule) => (
-            <SettingsRow
-              key={rule.key}
-              label={rule.label}
-              description={
-                <>
-                  <span className="text-foreground">{rule.value}</span>
-                  {rule.detail ? ` · ${rule.detail}` : null}
-                </>
-              }
-              action={
-                <>
-                  {rule.fixed || setByDeployment.has(rule.key) ? (
+          .map((rule) => {
+            const fixed = rule.fixed || setByDeployment.has(rule.key);
+            return (
+              <SettingsRow
+                key={rule.key}
+                label={rule.label}
+                value={rule.value}
+                description={rule.detail}
+                action={
+                  fixed ? (
                     <Badge variant="secondary">{t("communityAuth.setByServer")}</Badge>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      aria-label={t("communityAuth.changeRule", { rule: rule.label })}
-                      onClick={() => setChanging(rule.key)}
-                    >
-                      {t("communityAuth.change")}
-                    </Button>
-                  )}
-                </>
-              }
-            />
-          ))}
+                  ) : undefined
+                }
+                onChange={fixed ? undefined : () => setChanging(rule.key)}
+              />
+            );
+          })}
       </SettingsSection>
 
       <SignInRequirementDialog
@@ -851,7 +800,7 @@ export const SettingsCommunitySecurityPage = () => {
         figures={authSettings.guest_figures}
         guest
       />
-      <OnOffRuleDialog
+      <CommunityOnOffRuleDialog
         communityId={communityId}
         rule="require_second_factor"
         saved={authSettings.require_second_factor}
@@ -863,7 +812,7 @@ export const SettingsCommunitySecurityPage = () => {
         open={changing === "require_second_factor"}
         onOpenChange={closeDialog}
       />
-      <OnOffRuleDialog
+      <CommunityOnOffRuleDialog
         communityId={communityId}
         rule="enforce_compliance_session"
         saved={sessionLimit}

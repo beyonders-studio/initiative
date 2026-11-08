@@ -146,10 +146,10 @@ export const CommunityAuthProvidersSection = ({
                     ) : row.enabled ? (
                       <Badge variant="outline" className="gap-1.5">
                         <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
-                        {t("communityAuth.on")}
+                        {t("settingsSection.on")}
                       </Badge>
                     ) : (
-                      <Badge variant="outline">{t("communityAuth.off")}</Badge>
+                      <Badge variant="outline">{t("settingsSection.off")}</Badge>
                     )}
                   </div>
                   <p className="text-muted-foreground text-sm">

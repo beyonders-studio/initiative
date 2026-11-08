@@ -1,3 +1,4 @@
+import { Loader2, Pencil, PlugZap, Trash2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -24,10 +25,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { RowActionsMenu } from "@/ui/row-actions-menu";
 import { Switch } from "@/ui/switch";
 
 // The mutation surface the section needs — satisfied structurally by the
@@ -122,66 +125,62 @@ export const ProviderRegistrySection = ({
       ) : (
         <ul className="divide-y rounded-md border">
           {rows.map((provider) => (
-            <li key={provider.id} className="flex items-center justify-between gap-4 px-3 py-3">
-              <div className="flex min-w-0 items-start gap-3">
-                <ProviderMark icon={provider.icon} className="mt-0.5" />
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{provider.display_name}</span>
-                    <code className="rounded bg-muted px-1 py-0.5 text-xs">{provider.slug}</code>
-                    {!provider.enabled && (
-                      <Badge variant="outline">{t("authProviders.disabledBadge")}</Badge>
-                    )}
-                  </div>
-                  <p className="truncate text-muted-foreground text-sm">{provider.issuer}</p>
-                  {/* The address this provider's IdP has to send the browser
-                        back to. It follows the slug, and a slug never changes,
-                        so it is good for as long as the provider is. */}
-                  <div className="mt-1 flex items-center gap-1 text-muted-foreground text-xs">
-                    <span className="shrink-0">{t("authProviders.callbackLabel")}</span>
-                    <code className="min-w-0 truncate rounded bg-muted px-1 py-0.5">
-                      {provider.callback_url}
-                    </code>
-                    <CopyButton
-                      value={provider.callback_url}
-                      variant="ghost"
-                      className="h-6 w-6 p-0"
-                      copiedMessage={t("authProviders.callbackCopied")}
-                    />
-                  </div>
+            <li key={provider.id} className="flex items-center gap-3 px-3 py-3">
+              <ProviderMark icon={provider.icon} className="mt-0.5 self-start" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{provider.display_name}</span>
+                  <code className="rounded bg-muted px-1 py-0.5 text-xs">{provider.slug}</code>
+                  {testProvider.isPending && testProvider.variables === provider.id ? (
+                    <Badge variant="secondary" className="gap-1.5">
+                      <Loader2 className="size-3 animate-spin" aria-hidden="true" />
+                      {t("authProviders.testing")}
+                    </Badge>
+                  ) : null}
+                  {provider.enabled ? (
+                    <Badge variant="outline" className="gap-1.5">
+                      <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
+                      {t("settingsSection.on")}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">{t("settingsSection.off")}</Badge>
+                  )}
+                </div>
+                <p className="truncate text-muted-foreground text-sm">{provider.issuer}</p>
+                {/* The address this provider's IdP has to send the browser
+                    back to. It follows the slug, and a slug never changes, so
+                    it is good for as long as the provider is. */}
+                <div className="mt-1 flex items-center gap-1 text-muted-foreground text-xs">
+                  <span className="shrink-0">{t("authProviders.callbackLabel")}</span>
+                  <code className="min-w-0 truncate rounded bg-muted px-1 py-0.5">
+                    {provider.callback_url}
+                  </code>
+                  <CopyButton
+                    value={provider.callback_url}
+                    variant="ghost"
+                    className="h-6 w-6 p-0"
+                    copiedMessage={t("authProviders.callbackCopied")}
+                  />
                 </div>
               </div>
-              <div className="flex shrink-0 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => test(provider)}
-                  disabled={testProvider.isPending}
-                  pending={testProvider.isPending && testProvider.variables === provider.id}
-                >
-                  {testProvider.isPending && testProvider.variables === provider.id
-                    ? t("authProviders.testing")
-                    : t("authProviders.test")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openEdit(provider)}
-                >
+              <RowActionsMenu subject={provider.display_name}>
+                <DropdownMenuItem disabled={testProvider.isPending} onSelect={() => test(provider)}>
+                  <PlugZap className="h-4 w-4" />
+                  {t("authProviders.test")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => openEdit(provider)}>
+                  <Pencil className="h-4 w-4" />
                   {t("authProviders.edit")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
                   className="text-destructive"
-                  onClick={() => setDeleting(provider)}
+                  onSelect={() => setDeleting(provider)}
                 >
+                  <Trash2 className="h-4 w-4" />
                   {t("authProviders.delete")}
-                </Button>
-              </div>
+                </DropdownMenuItem>
+              </RowActionsMenu>
             </li>
           ))}
         </ul>
@@ -249,7 +248,6 @@ const ProviderEditForm = ({
 }) => {
   const { t } = useTranslation("settings");
   const [form, setForm] = useState({
-    slug: provider.slug,
     display_name: provider.display_name,
     issuer: provider.issuer ?? "",
     client_id: provider.client_id ?? "",
@@ -328,9 +326,15 @@ const ProviderEditForm = ({
             />
           </div>
         </div>
-        <Field label={t("authProviders.slugLabel")} hint={t("authProviders.slugHelp")}>
-          <Input value={form.slug} maxLength={64} disabled required />
-        </Field>
+        {/* Fixed once the provider is added, so it is stated rather than offered. */}
+        <div className="space-y-1">
+          <p className="font-medium text-sm">{t("authProviders.slugLabel")}</p>
+          <p className="text-muted-foreground text-sm">
+            <code className="rounded bg-muted px-1 py-0.5 text-foreground">{provider.slug}</code>
+            {" · "}
+            {t("authProviders.slugFixed")}
+          </p>
+        </div>
         <Field label={t("authProviders.displayNameLabel")}>
           <Input
             value={form.display_name}
