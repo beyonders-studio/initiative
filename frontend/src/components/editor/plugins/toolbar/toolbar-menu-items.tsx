@@ -19,6 +19,7 @@ import {
   type EditorAction,
   type EditorSwatch,
   FONT_SIZE_PRESETS,
+  type InsertAction,
   useAlignmentActions,
   useApplyFontSize,
   useApplyStyle,
@@ -250,8 +251,7 @@ export const ElementFormatMenuItems = () => {
 
 export const BlockInsertMenuItems = (props: {
   rich: boolean;
-  supportsSmartChips: boolean;
-  initiativeId: number | null;
+  hostActions: readonly InsertAction[];
 }) => {
   const actions = useBlockInsertActions(props);
   const { t } = useTranslation("editor");

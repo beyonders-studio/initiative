@@ -16,8 +16,8 @@ import type {
 } from "lexical";
 import type { JSX } from "react";
 
-import { matchSmartLinkProvider } from "@/lib/smartLinkProviders";
 import { EmbedFrame, POST_FRAME_CLASS } from "@/ui/embed-frame";
+import { matchSmartLinkProvider } from "@/ui/lib/smartLinkProviders";
 
 type TweetComponentProps = Readonly<{
   className: Readonly<{

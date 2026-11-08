@@ -32,7 +32,12 @@ import {
 import type { JSX } from "react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
-import { checkWord, getSuggestions, initSpellCheck, isSpellCheckReady } from "@/lib/spell-check";
+import {
+  checkWord,
+  getSuggestions,
+  initSpellCheck,
+  isSpellCheckReady,
+} from "@/components/editor/utils/spell-check";
 
 interface WordAtCursor {
   word: string;

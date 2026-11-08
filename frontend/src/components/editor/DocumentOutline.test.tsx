@@ -91,7 +91,7 @@ function Harness() {
         <LexicalExtensionComposer extension={extension} contentEditable={null}>
           <TooltipProvider>
             <Grab />
-            <Plugins showToolbar initiativeId={7} />
+            <Plugins showToolbar />
             <DocumentOutlineTracker />
           </TooltipProvider>
         </LexicalExtensionComposer>

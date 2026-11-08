@@ -30,8 +30,8 @@ import type * as Y from "yjs";
 
 import { useTheme } from "@/hooks/useTheme";
 import { useWhiteboardCursors } from "@/hooks/useWhiteboardCursors";
-import { renderEmbeddable, validateEmbeddable } from "@/lib/whiteboardEmbeds";
 import { cn } from "@/ui/lib/utils";
+import { renderEmbeddable, validateEmbeddable } from "@/ui/lib/whiteboardEmbeds";
 
 export interface WhiteboardScene {
   elements: readonly ExcalidrawElement[];

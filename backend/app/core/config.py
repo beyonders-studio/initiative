@@ -116,7 +116,7 @@ CSP_CAPTCHA_ORIGINS: dict[str, list[str]] = {
 
 # Origins the SPA fetches non-script assets from via fetch()/XHR, used to build
 # the connect-src directive. The spell checker lazy-loads its English dictionary
-# (.aff/.dic) from jsDelivr — see frontend/src/lib/spell-check.ts. The Help
+# (.aff/.dic) from jsDelivr — see frontend/src/components/editor/utils/spell-check.ts. The Help
 # panel reads the user guide's search index from the published help center
 # (frontend/src/hooks/useHelpIndex.ts).
 CSP_CONNECT_ORIGINS = [

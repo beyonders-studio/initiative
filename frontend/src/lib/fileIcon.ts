@@ -31,8 +31,8 @@ import type { ComponentType } from "react";
 
 import { FileKind, FileType } from "@/api/generated/initiativeAPI.schemas";
 import { FILE_TYPE_KINDS } from "@/lib/fileTypes";
-import { matchSmartLinkProvider } from "@/lib/smartLinkProviders";
 import { getFileTypeLabel } from "@/ui/lib/fileUtils";
+import { matchSmartLinkProvider } from "@/ui/lib/smartLinkProviders";
 
 /** The facts that decide the mark. Every surface carrying a file has these,
  *  under these names — a summary, a recent item, a link's far end. The media

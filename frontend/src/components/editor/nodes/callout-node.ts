@@ -1,4 +1,5 @@
 import { addClassNamesToElement } from "@lexical/utils";
+import i18n from "i18next";
 import {
   $applyNodeReplacement,
   $getNodeByKey,
@@ -15,8 +16,6 @@ import {
   type SerializedElementNode,
   type Spread,
 } from "lexical";
-
-import i18n from "@/i18n";
 
 /** The kinds of callout, each with its own colour and icon. The names are
  * the ones Obsidian writes as `> [!info]`, so a callout survives the trip to

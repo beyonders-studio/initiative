@@ -21,7 +21,7 @@ import { useTranslation } from "react-i18next";
 
 import type { DrawingScene } from "@/components/editor/editor-ui/excalidraw-canvas";
 import { $isExcalidrawNode } from "@/components/editor/nodes/excalidraw-node";
-import { useTheme } from "@/hooks/useTheme";
+import { useResolvedTheme } from "@/ui/lib/useResolvedTheme";
 import { cn } from "@/ui/lib/utils";
 
 // The canvas is the heaviest thing a document can load, so it arrives only
@@ -60,7 +60,7 @@ export default function ExcalidrawComponent({ nodeKey, data, width }: Excalidraw
   const { t } = useTranslation("editor");
   const [editor] = useLexicalComposerContext();
   const isEditable = useLexicalEditable();
-  const { resolvedTheme } = useTheme();
+  const resolvedTheme = useResolvedTheme();
   const [isSelected, setSelected, clearSelection] = useLexicalNodeSelection(nodeKey);
   const scene = useMemo(() => parseScene(data), [data]);
   const isEmpty = liveElements(scene.elements).length === 0;

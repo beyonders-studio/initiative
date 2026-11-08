@@ -11,7 +11,9 @@ import {
 import * as React from "react";
 import { type JSX, Suspense } from "react";
 
-const ExcalidrawComponent = React.lazy(() => import("../editor-ui/excalidraw-component"));
+const ExcalidrawComponent = React.lazy(
+  () => import("@/components/editor/editor-ui/excalidraw-component")
+);
 
 /** An empty drawing: no elements, nothing set, no pictures. */
 export const EMPTY_DRAWING = JSON.stringify({ elements: [], appState: {}, files: {} });

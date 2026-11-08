@@ -7,10 +7,10 @@ import {
   type SmartChipState,
   SmartChipTone,
 } from "@/api/generated/initiativeAPI.schemas";
+import { CHIP_TONE_CLASSES } from "@/components/editor/editor-ui/chip-tones";
 import { nextAsk } from "@/hooks/useSmartChips";
 import {
   CHIP_ENTITY_TYPES,
-  CHIP_TONE_CLASSES,
   chipAspect,
   chipDisplay,
   chipEntityType,
