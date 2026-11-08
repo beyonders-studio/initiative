@@ -1,6 +1,6 @@
 /**
- * Help, in the sidebar or the desktop title bar: one button that opens and
- * closes the Help panel, whatever the server offers.
+ * Help, in the desktop title bar: one button that opens and closes the Help
+ * panel, whatever the server offers.
  */
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

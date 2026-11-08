@@ -1,13 +1,13 @@
-import { Link, Outlet, useLocation, useRouter } from "@tanstack/react-router";
+import { Link, Outlet } from "@tanstack/react-router";
 import { Suspense } from "react";
 import { useTranslation } from "react-i18next";
 
+import { SettingsPageHeader } from "@/components/settings/SettingsPageHeader";
 import { SettingsTabsNav } from "@/components/settings/SettingsTabsNav";
 import { VersionDialog } from "@/components/VersionDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { compareVersions, useLatestVersion } from "@/hooks/useLatestVersion";
 import { usePrivacySections } from "@/hooks/usePrivacySections";
-import { matchActiveTab } from "@/lib/tabs";
 import { Button } from "@/ui/button";
 import { SettingsPaneSkeleton } from "@/ui/page-skeletons";
 
@@ -26,8 +26,6 @@ export const UserSettingsLayout = () => {
   const { user } = useAuth();
   const { data: latestVersion, isLoading: isLoadingVersion } = useLatestVersion();
   const currentVersion = __APP_VERSION__;
-  const pathname = useLocation({ select: (location) => location.pathname });
-  const router = useRouter();
   // Privacy is offered while any of its sections has something to set here.
   const privacy = usePrivacySections();
 
@@ -42,24 +40,17 @@ export const UserSettingsLayout = () => {
     );
   }
 
-  const tabs = userSettingsTabs
-    .filter((tab) => tab.value !== "privacy" || privacy.any)
-    .map((tab) => ({
-      value: tab.value,
-      label: t(tab.labelKey),
-      path: tab.path,
-    }));
-  const normalizedPath = pathname.replace(/\/+$/, "") || "/";
-  const activeTab = matchActiveTab(tabs, normalizedPath, "registration");
+  const tabs = userSettingsTabs.map((tab) => ({
+    value: tab.value,
+    label: t(tab.labelKey),
+    path: tab.path,
+    visible: tab.value !== "privacy" || privacy.any,
+  }));
 
   return (
     <div className="space-y-6">
-      <h1 className="font-semibold text-3xl tracking-tight">{t("layout.title")}</h1>
-      <SettingsTabsNav
-        tabs={tabs}
-        activeTab={activeTab}
-        onNavigate={(path) => router.navigate({ to: path })}
-      >
+      <SettingsPageHeader title={t("layout.title")} />
+      <SettingsTabsNav tabs={tabs}>
         <Suspense fallback={<SettingsPaneSkeleton />}>
           <Outlet />
         </Suspense>

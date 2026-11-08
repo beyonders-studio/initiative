@@ -270,7 +270,7 @@ Yes — Initiative speaks OIDC, including mapping your provider's groups to comm
 
 ## Still stuck?
 
-Look at the bottom of the sidebar, or the title bar in the desktop app. The question mark is **Help**: it links to these pages and searches them without leaving the app. Where there's somebody to ask — a server that takes help requests, or one with an address to write to — the way to ask sits under the search results.
+Open **Help** from your account menu (your name and picture at the bottom of the sidebar) or from search, or click the question mark in the desktop app's title bar. It links to these pages and searches them without leaving the app. Where there's somebody to ask — a server that takes help requests, or one with an address to write to — the way to ask sits under the search results.
 
 To share an idea, something that got in your way, or something you love with the team that makes Initiative, choose **Send feedback** in your account menu or the command palette. On a server other than Initiative Cloud, it opens Cloud's feedback page in your browser, where you sign in to send it.
 

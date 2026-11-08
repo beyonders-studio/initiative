@@ -2,14 +2,9 @@ import {
   DndContext,
   type DragEndEvent,
   type DragMoveEvent,
-  KeyboardSensor,
-  MouseSensor,
   pointerWithin,
-  TouchSensor,
   useDraggable,
   useDroppable,
-  useSensor,
-  useSensors,
 } from "@dnd-kit/core";
 import { Link } from "@tanstack/react-router";
 import { CircleChevronRight, Home } from "lucide-react";
@@ -25,6 +20,7 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/sidebar/sidebar";
+import { useDragSensors } from "@/hooks/useDragSensors";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { fileIcon } from "@/lib/fileIcon";
 import { Button } from "@/ui/button";
@@ -476,13 +472,7 @@ export const WikiPageTree = ({
     // caller's — so naming it here costs nothing and keeps the rule honest.
   }, [activePageId, pages, setExpanded]);
 
-  // The same activation distances the community rail uses, so a drag started
-  // anywhere in the sidebar feels the same.
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor)
-  );
+  const sensors = useDragSensors({ keyboard: true });
 
   const [landing, setLanding] = useState<Landing | null>(null);
 

@@ -1,4 +1,4 @@
-import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -26,7 +26,7 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { Field } from "@/ui/field";
-import { Label } from "@/ui/label";
+import { FileDropArea } from "@/ui/file-drop";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 // The real upload cap is server-owned and arrives via /api/v1/config
@@ -161,7 +161,7 @@ export function EnvelopeImportDialog({
     );
   }, [people]);
 
-  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (file: File) => {
     const generation = ++readGeneration.current;
     // Only write state if this is still the most recent pick — a slower read
     // of an earlier file must not clobber a newer selection's result.
@@ -169,11 +169,6 @@ export function EnvelopeImportDialog({
     setParseError(null);
     setEnvelope(null);
     setArchive(null);
-    const file = e.target.files?.[0];
-    if (!file) {
-      setFileName("");
-      return;
-    }
     if (isZip(file)) {
       // The server holds the size limit for zips and reads them itself.
       setFileName(file.name);
@@ -358,17 +353,11 @@ export function EnvelopeImportDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="envelope-import-file">{t("imports:envelope.selectFile")}</Label>
-            <input
-              id="envelope-import-file"
-              type="file"
+            <FileDropArea
               accept=".json,.zip,application/json,application/zip"
-              onChange={handleFileChange}
-              className="block w-full text-sm"
+              onFile={(file) => void handleFile(file)}
+              prompt={fileName || t("imports:envelope.selectFile")}
             />
-            {fileName && !parseError ? (
-              <p className="text-muted-foreground text-xs">{fileName}</p>
-            ) : null}
             {parseError ? <p className="text-destructive text-sm">{parseError}</p> : null}
           </div>
 

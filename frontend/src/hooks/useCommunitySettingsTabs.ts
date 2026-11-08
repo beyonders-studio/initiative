@@ -57,147 +57,96 @@ export const useCommunitySettingsTabs = (): { tabs: SettingsTab[]; isLoading: bo
   const urlCommunityId = params.communityId ? Number(params.communityId) : activeCommunityId;
 
   const tabs = useMemo(() => {
+    const path = (section: string) =>
+      urlCommunityId
+        ? communityPath(urlCommunityId, `/settings/${section}`)
+        : `/settings/${section}`;
     const tabs: SettingsTab[] = [
       // First, so the seat lands on it: what the community uses against its
       // caps, and — where there is a portal — the plan those caps come with.
       // Both are the seat's, like its sign-in; an ordinary admin runs the
       // community without holding its card.
-      ...(isSuperadmin
-        ? [
-            {
-              value: "usage",
-              label: billing
-                ? t("communityLayout.tabs.planAndUsage")
-                : t("communityLayout.tabs.usage"),
-              path: urlCommunityId
-                ? communityPath(urlCommunityId, "/settings/usage")
-                : "/settings/usage",
-            },
-          ]
-        : []),
-      ...(holds("profile")
-        ? [
-            {
-              value: "community",
-              label: t("communityLayout.tabs.community"),
-              path: urlCommunityId
-                ? communityPath(urlCommunityId, "/settings/community")
-                : "/settings/community",
-            },
-          ]
-        : []),
-      ...(holds("members") || holds("invites")
-        ? [
-            {
-              value: "users",
-              label: t("communityLayout.tabs.users"),
-              path: urlCommunityId
-                ? communityPath(urlCommunityId, "/settings/users")
-                : "/settings/users",
-            },
-          ]
-        : []),
-      ...(holds("roles")
-        ? [
-            {
-              value: "roles",
-              label: t("communityLayout.tabs.roles"),
-              path: urlCommunityId
-                ? communityPath(urlCommunityId, "/settings/roles")
-                : "/settings/roles",
-            },
-          ]
-        : []),
-      ...(managesGuests
-        ? [
-            {
-              value: "guests",
-              label: t("communityLayout.tabs.guests"),
-              path: urlCommunityId
-                ? communityPath(urlCommunityId, "/settings/guests")
-                : "/settings/guests",
-            },
-          ]
-        : []),
-      ...(configuresItsOwnSignIn
-        ? [
-            {
-              // Everything on this tab is the superadmin's to set, so the
-              // tab is theirs too — an ordinary admin has nothing to do on it.
-              value: "security",
-              label: t("communityLayout.tabs.security"),
-              path: urlCommunityId
-                ? communityPath(urlCommunityId, "/settings/security")
-                : "/settings/security",
-            },
-          ]
-        : []),
-      ...(reachesContent && holds("initiatives")
-        ? [
-            {
-              value: "initiatives",
-              label: t("communityLayout.tabs.initiatives"),
-              path: urlCommunityId
-                ? communityPath(urlCommunityId, "/settings/initiatives")
-                : "/settings/initiatives",
-            },
-          ]
-        : []),
-      // What the community hands to somebody outside it — an AI provider, an
+      {
+        value: "usage",
+        label: billing ? t("communityLayout.tabs.planAndUsage") : t("communityLayout.tabs.usage"),
+        path: path("usage"),
+        visible: isSuperadmin,
+      },
+      {
+        value: "community",
+        label: t("communityLayout.tabs.community"),
+        path: path("community"),
+        visible: holds("profile"),
+      },
+      {
+        value: "users",
+        label: t("communityLayout.tabs.users"),
+        path: path("users"),
+        visible: holds("members") || holds("invites"),
+      },
+      {
+        value: "roles",
+        label: t("communityLayout.tabs.roles"),
+        path: path("roles"),
+        visible: holds("roles"),
+      },
+      {
+        value: "guests",
+        label: t("communityLayout.tabs.guests"),
+        path: path("guests"),
+        visible: managesGuests,
+      },
+      // Everything on this tab is the superadmin's to set, so the tab is
+      // theirs too — an ordinary admin has nothing to do on it.
+      {
+        value: "security",
+        label: t("communityLayout.tabs.security"),
+        path: path("security"),
+        visible: configuresItsOwnSignIn,
+      },
+      {
+        value: "initiatives",
+        label: t("communityLayout.tabs.initiatives"),
+        path: path("initiatives"),
+        visible: reachesContent && holds("initiatives"),
+      },
+      // What the community hands to somebody outside it — an AI provider, a
       // plug-in — is the seat's to decide, the way its sign-in is. An ordinary
       // admin runs the community; these say who else gets to see it.
-      ...(isSuperadmin
-        ? [
-            {
-              value: "integrations",
-              label: t("communityLayout.tabs.integrations"),
-              path: urlCommunityId
-                ? communityPath(urlCommunityId, "/settings/integrations")
-                : "/settings/integrations",
-            },
-          ]
-        : []),
-      ...(reachesContent && holds("trash")
-        ? [
-            {
-              value: "trash",
-              label: t("communityLayout.tabs.trash"),
-              path: urlCommunityId
-                ? communityPath(urlCommunityId, "/settings/trash")
-                : "/settings/trash",
-            },
-          ]
-        : []),
+      {
+        value: "integrations",
+        label: t("communityLayout.tabs.integrations"),
+        path: path("integrations"),
+        visible: isSuperadmin,
+      },
+      {
+        value: "trash",
+        label: t("communityLayout.tabs.trash"),
+        path: path("trash"),
+        visible: reachesContent && holds("trash"),
+      },
       // Taking the community's every initiative out in one file, or putting
       // one back, reaches as far as deleting it does — so it sits with the
       // same seat. An ordinary admin runs the community; this one moves it.
-      ...(isSuperadmin
-        ? [
-            {
-              value: "data",
-              label: t("communityLayout.tabs.data"),
-              path: urlCommunityId
-                ? communityPath(urlCommunityId, "/settings/data")
-                : "/settings/data",
-            },
-          ]
-        : []),
-    ];
-    // Danger zone lives last — destructive community deletion is deliberately
-    // tucked behind its own tab rather than the first screen — and only the
-    // seat sees it. Deleting a community is the one action an admin could not
-    // undo and could not have undone for them; it belongs with the seat a
-    // restore needs, which is also the seat the receipt is written to.
-    if (isSuperadmin) {
-      tabs.push({
+      {
+        value: "data",
+        label: t("communityLayout.tabs.data"),
+        path: path("data"),
+        visible: isSuperadmin,
+      },
+      // Danger zone lives last — destructive community deletion is deliberately
+      // tucked behind its own tab rather than the first screen — and only the
+      // seat sees it. Deleting a community is the one action an admin could not
+      // undo and could not have undone for them; it belongs with the seat a
+      // restore needs, which is also the seat the receipt is written to.
+      {
         value: "danger-zone",
         label: t("communityLayout.tabs.dangerZone"),
-        path: urlCommunityId
-          ? communityPath(urlCommunityId, "/settings/danger-zone")
-          : "/settings/danger-zone",
-      });
-    }
-    return tabs;
+        path: path("danger-zone"),
+        visible: isSuperadmin,
+      },
+    ];
+    return tabs.filter((tab) => tab.visible);
   }, [
     urlCommunityId,
     t,
