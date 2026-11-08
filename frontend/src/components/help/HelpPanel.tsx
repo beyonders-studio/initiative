@@ -4,14 +4,13 @@
  *
  * Drawn once at the root by `HelpHost`, so the question mark in the sidebar,
  * the desktop title bar and every "Ask for help" button open the same panel,
- * signed in or not. A sheet beside the page on a computer, which stays usable,
- * and over it on a phone. It opens on the search, with answers for the page
- * showing before anything is typed. Where the server takes help requests,
- * "Ask the team" carries the search into a request; where it gave an address
- * instead, the panel shows the address.
+ * signed in or not, as a dialog over the page. It opens on the search, with
+ * answers for the page showing before anything is typed. Where the server
+ * takes help requests, "Ask the team" carries the search into a request; where
+ * it gave an address instead, the panel shows the address.
  *
- * What somebody writes is kept until it is sent or discarded: closing the
- * panel leaves a pill that opens it again.
+ * What somebody writes is kept until it is sent or discarded: closing Help
+ * leaves a pill that opens it again.
  */
 
 import { Link } from "@tanstack/react-router";
@@ -62,6 +61,7 @@ import {
   CommandList,
 } from "@/ui/command";
 import { CopyButton } from "@/ui/copy-button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/ui/dialog";
 import {
   Empty,
   EmptyContent,
@@ -71,9 +71,6 @@ import {
   EmptyTitle,
 } from "@/ui/empty";
 import { commandFilter } from "@/ui/lib/fuzzyMatch";
-import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
-import { cn } from "@/ui/lib/utils";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 /** Matches the column behind it. */
@@ -83,7 +80,6 @@ const close = () => updateHelp({ open: false });
 
 export const HelpPanel = ({ help }: { help: HelpState }) => {
   const { user } = useAuth();
-  const phone = !atLeast(useWidthClass(), "sm");
   const routeCommunityId = useActiveCommunityId();
   const communityId = help.communityId === undefined ? routeCommunityId : help.communityId;
   const availability = useTicketAvailability(communityId, { enabled: Boolean(user) });
@@ -95,18 +91,11 @@ export const HelpPanel = ({ help }: { help: HelpState }) => {
   const view: HelpView = help.view === "ask" && !canAsk ? "search" : help.view;
 
   return (
-    <Sheet open modal={phone} onOpenChange={(open) => !open && close()}>
-      <SheetContent
-        side={phone ? "bottom" : "bottom-right"}
+    <Dialog open onOpenChange={(open) => !open && close()}>
+      <DialogContent
         aria-describedby={undefined}
-        // Docked beside the page, it stays open while the page is used.
-        onInteractOutside={(event) => !phone && event.preventDefault()}
-        className={cn(
-          "flex flex-col gap-0 p-0",
-          phone
-            ? "h-[85dvh] rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
-            : "h-[min(36rem,calc(100dvh-var(--title-bar-height,0px)-2rem))]"
-        )}
+        // One height for every view, so moving between them does not resize it.
+        className="flex h-[min(36rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0"
       >
         {view === "search" ? (
           <SearchView
@@ -126,8 +115,8 @@ export const HelpPanel = ({ help }: { help: HelpState }) => {
         ) : (
           <SentView />
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -136,7 +125,7 @@ export const HelpPanel = ({ help }: { help: HelpState }) => {
 const PanelHeader = ({ title, onBack }: { title: string; onBack?: () => void }) => {
   const { t } = useTranslation("intake");
   return (
-    <SheetHeader className="flex-row items-center gap-1 space-y-0 py-3 pr-12 pl-4 text-left">
+    <DialogHeader className="flex-row items-center gap-1 py-3 pr-12 pl-4 text-left">
       {onBack ? (
         <Button
           variant="ghost"
@@ -148,8 +137,8 @@ const PanelHeader = ({ title, onBack }: { title: string; onBack?: () => void }) 
           <ArrowLeft />
         </Button>
       ) : null}
-      <SheetTitle className="text-base">{title}</SheetTitle>
-    </SheetHeader>
+      <DialogTitle className="text-base">{title}</DialogTitle>
+    </DialogHeader>
   );
 };
 
