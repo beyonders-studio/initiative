@@ -1,15 +1,15 @@
 """Backfill: copy existing local uploads into the configured S3 bucket.
 
-The final step of the local→S3 migration. Run it with the ``S3_*`` settings
-pointed at your object store **while the app is still on
-``STORAGE_BACKEND=local``**: it copies every blob under
+The step that moves existing files in the local→S3 migration. Run it once the
+app is on ``STORAGE_BACKEND=s3`` with ``S3_LOCAL_FALLBACK=true``, so a file not
+copied yet is still read from disk, and with the ``S3_*`` settings pointed at
+your object store: it copies every blob under
 ``UPLOADS_DIR/guild_<id>/`` to the S3 key ``guild_<id>/<file>``, setting the
 content-type recorded on the ``uploads`` row (falling back to a guess from the
 extension). It's **idempotent** — an object already present in S3 is skipped — so
 it is safe to re-run and resume.
 
-After it reports 0 failures, cut over: set ``STORAGE_BACKEND=s3`` (with
-``S3_LOCAL_FALLBACK=true`` for a verification window, then turn it off).
+After it reports 0 failures, turn ``S3_LOCAL_FALLBACK`` off.
 
     python -m app.db.backfill_uploads_to_s3 [--dry-run]
 """
