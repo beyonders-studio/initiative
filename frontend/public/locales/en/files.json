@@ -435,9 +435,7 @@
     "newestFirst": "Newest first",
     "oldestFirst": "Oldest first",
     "views": {
-      "label": "View",
-      "masonry": "Masonry",
-      "timeline": "Timeline"
+      "label": "View"
     },
     "groups": {
       "untagged": "Untagged",

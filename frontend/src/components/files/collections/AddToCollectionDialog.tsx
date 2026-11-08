@@ -75,7 +75,7 @@ export const AddToCollectionDialog = ({
   onOpenChange,
   onDone,
 }: AddToCollectionDialogProps) => {
-  const { t, i18n } = useTranslation(["files", "common"]);
+  const { t, i18n } = useTranslation(["files", "common", "layouts"]);
   const gp = useCommunityPath();
   const navigate = useNavigate();
   const [name, setName] = useState("");

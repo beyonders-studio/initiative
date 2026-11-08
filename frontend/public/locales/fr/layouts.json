@@ -119,6 +119,15 @@
     "gantt": "Les tâches du projet sur une frise chronologique, selon leurs dates, reliées à ce dont chacune dépend.",
     "calendar": "Les tâches du projet sur un calendrier, selon leurs dates."
   },
+  "lists": {
+    "table": "Tableau",
+    "board": "Kanban",
+    "gantt": "Gantt",
+    "calendar": "Calendrier",
+    "masonry": "Mosaïque",
+    "grid": "Grille",
+    "timeline": "Chronologie"
+  },
   "noEvents": "Cette initiative n'a aucun événement cette année. Ajoutez-en un pour voir son détail ici.",
   "eventDetail": {
     "name": "Détail de l'événement",

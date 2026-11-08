@@ -73,7 +73,7 @@ export const LayoutList = ({
   /** The layout editor's address. */
   editor?: string;
 }) => {
-  const { t } = useTranslation(["projects", "layouts", "common"]);
+  const { t } = useTranslation("layouts");
   const [deleting, setDeleting] = useState<number | null>(null);
   const views = layouts.filter(isListLayout);
   const pages = layouts.filter((layout) => !isListLayout(layout));

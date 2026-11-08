@@ -300,7 +300,7 @@ export const CanvasFrame = ({
           {bar}
         </div>
       ) : null}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: it only notes the pointer leaving, to take the hover mark down; the frame takes no input */}
+      {/* It only notes the pointer leaving, to take the hover mark down; the frame takes no input. */}
       <div
         ref={frame}
         className="relative mx-auto"

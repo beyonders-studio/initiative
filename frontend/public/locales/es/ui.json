@@ -114,6 +114,8 @@
   },
   "cancel": "Cancelar",
   "close": "Cerrar",
+  "done": "Listo",
+  "save": "Guardar",
   "breadcrumb": "Ruta de navegación",
   "confirm": {
     "continue": "Continuar",

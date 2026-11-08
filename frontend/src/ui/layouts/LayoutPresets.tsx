@@ -257,7 +257,7 @@ const PresetDialog = ({
           </Field>
           {of.controls(filters, setFilters)}
           {of.sortControls?.(list, sort, setSort, fields)}
-          <DialogFooter submitLabel={t("common:done")} disabled={!trimmed} />
+          <DialogFooter submitLabel={t("ui:done")} disabled={!trimmed} />
         </form>
       </DialogContent>
     </Dialog>

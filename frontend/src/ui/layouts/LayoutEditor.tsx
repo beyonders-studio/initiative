@@ -1,4 +1,3 @@
-import { useBlocker } from "@tanstack/react-router";
 import { Laptop, Redo2, Smartphone, Tablet, Undo2, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
@@ -687,11 +686,7 @@ export const LayoutEditor = ({
       setSaving(false);
     }
   };
-  const blocker = useBlocker({
-    shouldBlockFn: () => (dirty || saving) && !leaving.current,
-    enableBeforeUnload: () => (dirty || saving) && !leaving.current,
-    withResolver: true,
-  });
+  const blocker = host.useBlocker(() => (dirty || saving) && !leaving.current);
   const [asking, setAsking] = useState(false);
   const close = () => {
     if (dirty || saving) setAsking(true);
@@ -810,7 +805,7 @@ export const LayoutEditor = ({
           {t("layouts:discard")}
         </Button>
         <Button type="button" size="sm" disabled={!dirty || saving} onClick={() => void commit()}>
-          {saving ? t("layouts:saving") : t("common:save")}
+          {saving ? t("layouts:saving") : t("ui:save")}
         </Button>
       </header>
       {/* A screen too narrow to edit on keeps the draft, and says so. */}
@@ -931,11 +926,11 @@ export const LayoutEditor = ({
         </div>
       ) : null}
       <ConfirmDialog
-        open={asking || blocker.status === "blocked"}
+        open={asking || blocker.blocked}
         onOpenChange={(open) => {
           if (open) return;
           setAsking(false);
-          blocker.reset?.();
+          blocker.reset();
         }}
         title={t("layouts:unsavedTitle")}
         description={t(saving ? "layouts:savingBody" : "layouts:unsavedBody")}
@@ -944,7 +939,7 @@ export const LayoutEditor = ({
         onConfirm={() => {
           leaving.current = true;
           setAsking(false);
-          if (blocker.status === "blocked") blocker.proceed?.();
+          if (blocker.blocked) blocker.proceed();
           else onClose();
         }}
         destructive

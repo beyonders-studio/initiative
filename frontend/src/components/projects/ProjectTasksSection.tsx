@@ -125,7 +125,7 @@ export const ProjectTasksSection = ({
   initialComposerOpen,
   onComposerOpenChange,
 }: ProjectTasksSectionProps) => {
-  const { t } = useTranslation(["projects", "common", "errors"]);
+  const { t } = useTranslation(["projects", "common", "errors", "layouts"]);
   // Nothing is exported from an initiative that keeps its content in.
   const keepsContentIn = Boolean(useInitiative(initiativeId).data?.keep_content_in);
   const communityId = useActiveCommunityId();

@@ -119,6 +119,15 @@
     "gantt": "Las tareas del proyecto en una línea de tiempo, según sus fechas, unidas a aquello de lo que depende cada una.",
     "calendar": "Las tareas del proyecto en un calendario, según sus fechas."
   },
+  "lists": {
+    "table": "Tabla",
+    "board": "Tablero",
+    "gantt": "Gantt",
+    "calendar": "Calendario",
+    "masonry": "Mosaico",
+    "grid": "Cuadrícula",
+    "timeline": "Cronología"
+  },
   "noEvents": "Esta iniciativa no tiene eventos este año. Añade uno para ver su detalle aquí.",
   "eventDetail": {
     "name": "Detalle del evento",

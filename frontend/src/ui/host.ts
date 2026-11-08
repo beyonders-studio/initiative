@@ -11,9 +11,9 @@ import type { UserValue } from "@/ui/properties/propertyHelpers";
  * needs from that app arrives here. The reader's clock and week start change
  * while the app runs: the app writes them and components subscribe. The rest
  * is set once, at boot, with `setHost`: how to show a notice, take a picture,
- * link to a page, open another site, keep a preference, find the emoji data,
- * load the spelling dictionary, recognise the app's own origin and draw a
- * person a field names.
+ * link to a page, hold a move away from one, open another site, keep a
+ * preference, find the emoji data, load the spelling dictionary, recognise the
+ * app's own origin and draw a person a field names.
  */
 
 export type TimeFormatPreference = "system" | "12" | "24";
@@ -57,6 +57,16 @@ export interface HostLinkProps {
   children?: ReactNode;
 }
 
+/** A move to another of the app's pages, held while the page asks whether to
+ *  leave: `proceed` lets it go on, and `reset` stays. */
+export interface Blocker {
+  blocked: boolean;
+  proceed: () => void;
+  reset: () => void;
+}
+
+const NOT_BLOCKED: Blocker = { blocked: false, proceed: () => {}, reset: () => {} };
+
 export interface Host {
   /** Shows a short notice. */
   toast: { success: (message: string) => void; error: (message: string) => void };
@@ -65,6 +75,9 @@ export interface Host {
   camera: { capture: (source: PhotoSource) => Promise<File | null> } | null;
   /** A link to one of the app's own pages. */
   Link: ComponentType<HostLinkProps>;
+  /** Holds a move to another of the app's pages while `when` says, and asks
+   *  the browser's own question before the tab closes then. A hook. */
+  useBlocker: (when: () => boolean) => Blocker;
   /** Opens another site, away from the app. */
   openExternal: (url: string) => void;
   /** Where a preference is kept between visits. */
@@ -91,6 +104,7 @@ export const host: Host = {
   camera: null,
   Link: ({ to, className, "aria-label": label, draggable, children }) =>
     createElement("a", { href: to, className, "aria-label": label, draggable }, children),
+  useBlocker: () => NOT_BLOCKED,
   openExternal: (url) => {
     const safe = sanitizeUrl(url);
     if (safe !== BLOCKED_URL) window.open(safe, "_blank", "noopener,noreferrer");

@@ -435,9 +435,7 @@
     "newestFirst": "Neueste zuerst",
     "oldestFirst": "Älteste zuerst",
     "views": {
-      "label": "Ansicht",
-      "masonry": "Mauerwerk",
-      "timeline": "Zeitleiste"
+      "label": "Ansicht"
     },
     "groups": {
       "untagged": "Ohne Tag",
