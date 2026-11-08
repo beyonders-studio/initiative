@@ -19,7 +19,7 @@ from enum import Enum
 from typing import Any, AsyncIterator, Optional
 
 from limits import parse
-from sqlalchemy import String, and_, cast, exists, false, func, literal
+from sqlalchemy import String, and_, cast, false, func, literal
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -143,11 +143,13 @@ def _ideas_query(user: Optional[User], *, with_description: bool = False):
         .correlate(Task)
         .scalar_subquery()
     )
+    # A granted column, never ``*``: the ideas role reads only these two.
     voted = (
-        exists()
+        select(IdeaVote.task_id)
         .where(IdeaVote.task_id == Task.id)
         .where(IdeaVote.user_id == user.id)
         .correlate(Task)
+        .exists()
         if user is not None
         else false()
     )

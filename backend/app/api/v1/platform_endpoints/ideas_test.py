@@ -12,7 +12,8 @@ from app.core.intake import IntakeStream
 from app.core.messages import IdeaMessages, TaskMessages
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
-from app.models.platform.notification import Notification, NotificationType
+from app.models.platform.notice_outbox import NoticeOutboxItem
+from app.models.platform.notification import NotificationType
 from app.models.tenant.intake import Idea, IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.services.platform import ideas as ideas_service
@@ -192,11 +193,12 @@ async def test_voters_hear_when_an_idea_moves(client, session, acting_user, boar
     assert await ideas_service.notify_voters() == 1
     assert await ideas_service.notify_voters() == 0
 
+    await set_rls_context(session, Unattributed())
     notice = (
         await session.exec(
-            select(Notification)
-            .where(Notification.user_id == voter.user.id)
-            .where(Notification.type == NotificationType.idea_updated)
+            select(NoticeOutboxItem)
+            .where(NoticeOutboxItem.user_id == voter.user.id)
+            .where(NoticeOutboxItem.type == NotificationType.idea_updated.value)
         )
     ).one()
     assert notice.data["task_id"] == board["published"].id
