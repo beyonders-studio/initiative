@@ -1,4 +1,3 @@
-import { useBlocker } from "@tanstack/react-router";
 import type { SerializedEditorState } from "lexical";
 import { Vote } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
@@ -42,6 +41,7 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { Field } from "@/ui/field";
+import { host } from "@/ui/host";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { fromLocalDateTimeInput } from "@/ui/lib/formatDate";
@@ -129,11 +129,7 @@ export const CreatePostDialog = ({
   // prompts "Changes you made may not be saved" on every refresh. This dialog
   // is rendered by the board whether it is open or not, which made that every
   // refresh of the board.
-  const blocker = useBlocker({
-    shouldBlockFn: () => isDirty,
-    enableBeforeUnload: () => isDirty,
-    withResolver: true,
-  });
+  const blocker = host.useBlocker(() => isDirty);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -238,15 +234,15 @@ export const CreatePostDialog = ({
       </DialogContent>
 
       <ConfirmDialog
-        open={blocker.status === "blocked"}
+        open={blocker.blocked}
         onOpenChange={(next) => {
-          if (!next) blocker.reset?.();
+          if (!next) blocker.reset();
         }}
         title={t("unsaved.title")}
         description={t("unsaved.body")}
         confirmLabel={t("unsaved.leave")}
         cancelLabel={t("unsaved.stay")}
-        onConfirm={() => blocker.proceed?.()}
+        onConfirm={() => blocker.proceed()}
         destructive
       />
     </Dialog>

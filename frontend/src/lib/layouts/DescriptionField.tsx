@@ -1,4 +1,3 @@
-import { useBlocker } from "@tanstack/react-router";
 import { Sparkles } from "lucide-react";
 import { type RefObject, useContext, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -14,6 +13,7 @@ import { currentServerKey } from "@/lib/offlineSession";
 import { getItem, removeItem, setItem } from "@/lib/storage";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { host } from "@/ui/host";
 import { FieldFrame, ItemDraftContext } from "@/ui/layouts/editing";
 
 /** A description being written, and the one it was written over. */
@@ -139,11 +139,7 @@ export const DescriptionField = <I, P>({
   const open = readOnly || preview || adding ? null : draft;
   const conflict = open !== null && getHttpStatus(save.error) === 409;
   const dirty = open !== null && open.text !== (open.base ?? "");
-  const blocker = useBlocker({
-    shouldBlockFn: () => dirty && !leaving.current,
-    enableBeforeUnload: () => dirty && !leaving.current,
-    withResolver: true,
-  });
+  const blocker = host.useBlocker(() => dirty && !leaving.current);
 
   const submit = (base: string | null) => {
     if (!open) return;
@@ -301,9 +297,9 @@ export const DescriptionField = <I, P>({
         destructive
       />
       <ConfirmDialog
-        open={blocker.status === "blocked"}
+        open={blocker.blocked}
         onOpenChange={(isOpen) => {
-          if (!isOpen) blocker.reset?.();
+          if (!isOpen) blocker.reset();
         }}
         title={t("descriptionField.unsavedTitle")}
         description={t("descriptionField.unsavedBody")}
@@ -311,7 +307,7 @@ export const DescriptionField = <I, P>({
         cancelLabel={t("descriptionField.stay")}
         onConfirm={() => {
           setDraft(null);
-          blocker.proceed?.();
+          blocker.proceed();
         }}
         destructive
       />

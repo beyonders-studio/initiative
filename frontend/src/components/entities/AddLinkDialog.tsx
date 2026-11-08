@@ -9,11 +9,10 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { DEFAULT_GRANTS } from "@/components/access/grants";
 import { EntityPicker, type LinkableSuggestion } from "@/components/entities/EntityPicker";
-import { MemberSelect, type MemberSummary } from "@/components/members/MemberSearchSelect";
 import { SearchCategoryTabs } from "@/components/search/SearchCategoryTabs";
 import { useUploadFile } from "@/hooks/useFiles";
 import { type ToolRef, useRelate } from "@/hooks/useRelationships";
-import type { MemberSearchScope } from "@/hooks/useUsers";
+import { useSearchMembers } from "@/hooks/useUsers";
 import { toast } from "@/lib/mascotToast";
 import {
   canAssert,
@@ -29,7 +28,6 @@ import {
   isSearchCategory,
   type SearchCategory,
 } from "@/lib/searchResults";
-import { getUserDisplayName } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
 import {
   Dialog,
@@ -46,6 +44,7 @@ import { Label } from "@/ui/label";
 import { fileIcon } from "@/ui/lib/fileIcon";
 import { formatBytes, getFileTypeLabel, nameWithoutExtension } from "@/ui/lib/fileUtils";
 import { cn } from "@/ui/lib/utils";
+import { type Member, MemberPicker, type MemberScope } from "@/ui/member-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Tabs, TabsContent } from "@/ui/tabs";
 
@@ -56,7 +55,7 @@ const LINK_CATEGORIES: SearchCategory[] = ["tool", "member"];
  * Anybody in the community. Who a link names need not be able to open the
  * thing it is on: "depends on our accountant" is still worth saying.
  */
-const PEOPLE: MemberSearchScope = { type: "community" };
+const PEOPLE: MemberScope = { type: "community" };
 
 interface AddLinkDialogProps {
   /** The thing being linked from. */
@@ -99,7 +98,7 @@ export const AddLinkDialog = ({
   const [groupKey, setGroupKey] = useState<RelationGroupKey | null>(null);
   const [category, setCategory] = useState<SearchCategory>(DEFAULT_SEARCH_CATEGORY);
   const [picked, setPicked] = useState<LinkableSuggestion | null>(null);
-  const [person, setPerson] = useState<MemberSummary | null>(null);
+  const [person, setPerson] = useState<Member | null>(null);
   const [file, setFile] = useState<File | null>(canUpload ? initialFile : null);
   const [fileName, setFileName] = useState(() =>
     canUpload && initialFile ? nameWithoutExtension(initialFile.name) : ""
@@ -122,7 +121,7 @@ export const AddLinkDialog = ({
    */
   const farWritable = person || file ? true : picked?.can_write !== false;
   const farTitle = person
-    ? getUserDisplayName(person)
+    ? person.name
     : (picked?.title ?? (file ? fileName.trim() || file.name : null));
 
   /**
@@ -191,6 +190,7 @@ export const AddLinkDialog = ({
     clearFile();
   };
 
+  const searchMembers = useSearchMembers();
   const upload = useUploadFile();
   const relate = useRelate(anchorTool, {
     onSuccess: () => {
@@ -310,11 +310,12 @@ export const AddLinkDialog = ({
               ) : null}
             </TabsContent>
             <TabsContent value="member">
-              <MemberSelect
+              <MemberPicker
+                searchMembers={searchMembers}
                 scope={PEOPLE}
                 value={person?.id ?? null}
-                selectedUser={person}
-                onChange={(_id, member) => setPerson(member ?? null)}
+                selected={person}
+                onChange={(_id, member) => setPerson(member)}
                 placeholder={t("dialog.entityPlaceholder")}
                 emptyMessage={t("dialog.noPeople")}
                 aria-label={t("dialog.person")}

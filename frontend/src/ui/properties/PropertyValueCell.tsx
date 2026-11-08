@@ -15,8 +15,8 @@ import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
 import { numberFormat } from "@/ui/lib/intl";
 import { sanitizeUrl } from "@/ui/lib/safeUrl";
 import { cn } from "@/ui/lib/utils";
+import type { Member } from "@/ui/member-picker";
 
-import type { Member } from "./PropertyInput";
 import {
   counterCount,
   counterSettings,

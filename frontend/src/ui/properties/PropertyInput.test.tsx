@@ -10,12 +10,7 @@ import {
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { MetadataType, type PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
 
-import {
-  PropertyInput as KitInput,
-  type MemberScope,
-  type PropertyInputProps,
-  type SearchMembers,
-} from "./PropertyInput";
+import { PropertyInput as KitInput, type PropertyInputProps } from "./PropertyInput";
 
 const def = (overrides: Partial<PropertyDefinitionRead>) =>
   buildPropertyDefinition({ ...overrides });
@@ -31,6 +26,33 @@ const PropertyInput = ({
 );
 
 describe("PropertyInput", () => {
+  describe("user_reference type", () => {
+    it("searches the people of the property's own initiative", async () => {
+      const ada = { id: 7, name: "Ada Lovelace", initials: "AL" };
+      const searchMembers = vi.fn<NonNullable<PropertyInputProps["searchMembers"]>>(async () => [
+        ada,
+      ]);
+      const onChange = vi.fn();
+      renderWithProviders(
+        <PropertyInput
+          definition={def({ type: MetadataType.user_reference, initiative_id: 4 })}
+          value={null}
+          onChange={onChange}
+          searchMembers={searchMembers}
+        />
+      );
+
+      await userEvent.click(screen.getByRole("combobox"));
+      await userEvent.click(await screen.findByRole("option", { name: /Ada Lovelace/i }));
+
+      expect(searchMembers).toHaveBeenCalledWith(
+        { type: "initiative", initiativeId: 4 },
+        { search: "" }
+      );
+      expect(onChange).toHaveBeenCalledWith(7);
+    });
+  });
+
   describe("text type", () => {
     it("renders an <input type='text'> and calls onChange with the string", async () => {
       const onChange = vi.fn();
@@ -285,34 +307,6 @@ describe("PropertyInput", () => {
       const alphaOption = await screen.findByRole("option", { name: /Alpha/i });
       await userEvent.click(alphaOption);
       expect(onChange).toHaveBeenCalledWith(["alpha"]);
-    });
-  });
-
-  describe("user_reference type", () => {
-    it("names a bare id by looking it up, and searches the property's initiative once opened", async () => {
-      const ada = { id: 7, name: "Ada Lovelace", initials: "AL" };
-      const grace = { id: 8, name: "Grace Hopper", initials: "GH" };
-      const searchMembers = vi.fn<SearchMembers>(async (_scope, query) =>
-        "ids" in query ? [grace] : [ada, grace]
-      );
-      const onChange = vi.fn();
-      renderWithProviders(
-        <PropertyInput
-          definition={def({ type: MetadataType.user_reference, name: "Owner" })}
-          value={8}
-          onChange={onChange}
-          searchMembers={searchMembers}
-        />
-      );
-      const scope: MemberScope = { type: "initiative", initiativeId: 1 };
-      expect(await screen.findByText("Grace Hopper")).toBeInTheDocument();
-      expect(searchMembers).toHaveBeenCalledWith(scope, { ids: [8] });
-      expect(searchMembers).not.toHaveBeenCalledWith(scope, { search: "" });
-
-      await userEvent.click(screen.getByRole("combobox"));
-      await userEvent.click(await screen.findByRole("option", { name: /Ada Lovelace/i }));
-      expect(searchMembers).toHaveBeenCalledWith(scope, { search: "" });
-      expect(onChange).toHaveBeenCalledWith(7);
     });
   });
 

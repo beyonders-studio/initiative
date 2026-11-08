@@ -61,25 +61,43 @@ describe("useSetMemberApiAccess", () => {
 });
 
 describe("useSearchMembers", () => {
-  it("searches an initiative's members and draws each as a picker does", async () => {
-    let asked: URLSearchParams | undefined;
+  const searchMembers = () =>
+    renderHook(() => useSearchMembers(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
+      ),
+    }).result.current;
+
+  /** Answers `path` with Ada, keeping what it was asked. */
+  const answerWithAda = (path: string) => {
+    const asked: { params?: URLSearchParams } = {};
     server.use(
-      communityHttp.get("/initiatives/:initiativeId/members/search", ({ request }) => {
-        asked = new URL(request.url).searchParams;
+      communityHttp.get(path, ({ request }) => {
+        asked.params = new URL(request.url).searchParams;
         return HttpResponse.json(
           buildPage([buildUserSummary({ id: 7, display_name: "Ada Lovelace" })])
         );
       })
     );
-    const { result } = renderHook(() => useSearchMembers(), {
-      wrapper: ({ children }: { children: ReactNode }) => (
-        <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
-      ),
-    });
+    return asked;
+  };
 
-    const found = await result.current({ type: "initiative", initiativeId: 1 }, { search: "ada" });
+  it("searches an initiative's members and draws each as a picker does", async () => {
+    const asked = answerWithAda("/initiatives/:initiativeId/members/search");
+
+    const found = await searchMembers()({ type: "initiative", initiativeId: 1 }, { search: "ada" });
 
     expect(found).toEqual([{ id: 7, name: "Ada Lovelace", picture: undefined, initials: "AL" }]);
-    expect(asked?.get("search")).toBe("ada");
+    expect(asked.params?.get("search")).toBe("ada");
+  });
+
+  it("looks people up across the community, with no row to open", async () => {
+    const asked = answerWithAda("/users/search");
+
+    const found = await searchMembers()({ type: "community" }, { ids: [7] });
+
+    expect(found.map((member) => member.name)).toEqual(["Ada Lovelace"]);
+    expect(asked.params?.getAll("user_id")).toEqual(["7"]);
+    expect(asked.params?.has("resource_id")).toBe(false);
   });
 });

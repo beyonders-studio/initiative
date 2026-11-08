@@ -51,7 +51,7 @@ import { downloadBlob } from "@/lib/csv";
 import { toMember } from "@/lib/userDisplay";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
-import type { SearchMembers } from "@/ui/properties/PropertyInput";
+import type { SearchMembers } from "@/ui/member-picker";
 
 // ── Queries ─────────────────────────────────────────────────────────────────
 
@@ -347,11 +347,13 @@ export const useSearchMembers = (): SearchMembers => {
         );
         return page.items.map(toMember);
       }
-      if (scope.id == null) return [];
+      if (scope.type === "canOpen" && scope.id == null) return [];
       const page = await queryClient.fetchQuery(
         getSearchUsersQueryOptions(
           communityId,
-          { ...params, tool: scope.tool, resource_id: scope.id },
+          scope.type === "canOpen"
+            ? { ...params, tool: scope.tool, resource_id: scope.id }
+            : params,
           options
         )
       );

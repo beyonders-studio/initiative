@@ -2,7 +2,7 @@ import type { UserStatus } from "@/api/generated/initiativeAPI.schemas";
 import i18n from "@/i18n";
 import { ANONYMIZED_INITIALS, getInitials } from "@/lib/initials";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
-import type { Member } from "@/ui/properties/PropertyInput";
+import type { Member } from "@/ui/member-picker";
 
 /**
  * The minimum shape of a user object needed to render a display name.

@@ -1,5 +1,5 @@
-import { ChevronDown, ChevronsUpDown, Minus, Plus, RotateCcw, Star, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronDown, Minus, Plus, RotateCcw, Star, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -9,7 +9,6 @@ import {
   type PropertySummary,
   type Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import { Combobox } from "@/ui/combobox";
@@ -17,6 +16,7 @@ import { DateTimePicker } from "@/ui/date-time-picker";
 import { Input } from "@/ui/input";
 import { toPickerValue } from "@/ui/lib/localDateTime";
 import { cn } from "@/ui/lib/utils";
+import { type Member, MemberPicker, type SearchMembers } from "@/ui/member-picker";
 import { Slider } from "@/ui/slider";
 
 import { type FileFieldFiles, FileFieldInput } from "./FileFieldInput";
@@ -33,27 +33,6 @@ import {
 import { SignatureFieldInput } from "./SignatureFieldInput";
 
 type PropertyDefinitionLike = PropertyDefinitionRead | PropertySummary;
-
-/** Someone a person-valued property may name, as they are drawn. */
-export interface Member {
-  id: number;
-  name: string;
-  /** Their picture; their initials are drawn where they have none. */
-  picture?: string;
-  initials: string;
-}
-
-/** Whose people a person-valued property may name: who can open the row it
- *  is on, or, without one, its initiative's members. */
-export type MemberScope =
-  | { type: "canOpen"; tool: Tool; id: number | null | undefined }
-  | { type: "initiative"; initiativeId: number | null | undefined };
-
-/** The members of `scope` whose names match `search`, or those `ids` names. */
-export type SearchMembers = (
-  scope: MemberScope,
-  query: { search: string } | { ids: number[] }
-) => Promise<Member[]>;
 
 export interface PropertyInputProps {
   definition: PropertyDefinitionLike;
@@ -290,137 +269,6 @@ const CounterInput = ({
   );
 };
 
-const MemberAvatar = ({ member, className }: { member: Member; className?: string }) => (
-  <Avatar className={cn("h-6 w-6 border text-3xs", className)}>
-    {member.picture ? <AvatarImage src={member.picture} alt={member.name} /> : null}
-    <AvatarFallback userId={member.id}>{member.initials}</AvatarFallback>
-  </Avatar>
-);
-
-/** One of the people who can open `canOpen`, or else of `initiativeId`,
- *  searched for by name while the list is open; or nobody. */
-const MemberInput = ({
-  searchMembers,
-  canOpen,
-  initiativeId,
-  value,
-  selected,
-  onChange,
-  disabled,
-  className,
-}: {
-  searchMembers: SearchMembers;
-  canOpen: PropertyInputProps["canOpen"];
-  initiativeId: number | null | undefined;
-  value: number | null;
-  selected: Member | null;
-  onChange: (value: unknown) => void;
-  disabled: boolean;
-  className?: string;
-}) => {
-  const { t } = useTranslation("properties");
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [found, setFound] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(false);
-  // Who the value names once it is picked or looked up.
-  const [named, setNamed] = useState<Member | null>(null);
-
-  // Kept by its parts, so a scope given afresh each render asks nothing new.
-  const tool = canOpen?.tool;
-  const rowId = canOpen?.id;
-  const search = useCallback(
-    (asked: Parameters<SearchMembers>[1]) =>
-      searchMembers(
-        tool ? { type: "canOpen", tool, id: rowId } : { type: "initiative", initiativeId },
-        asked
-      ),
-    [searchMembers, tool, rowId, initiativeId]
-  );
-
-  useEffect(() => {
-    if (!open) return;
-    let current = true;
-    setLoading(true);
-    search({ search: query })
-      .then((members) => {
-        if (current) setFound(members);
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (current) setLoading(false);
-      });
-    return () => {
-      current = false;
-    };
-  }, [open, query, search]);
-
-  const shown =
-    value === null
-      ? null
-      : ([named, selected, ...found].find((each) => each?.id === value) ?? null);
-  const unnamed = value !== null && shown === null ? value : null;
-  useEffect(() => {
-    if (unnamed === null) return;
-    let current = true;
-    search({ ids: [unnamed] })
-      .then(([member]) => {
-        if (current && member) setNamed(member);
-      })
-      .catch(() => undefined);
-    return () => {
-      current = false;
-    };
-  }, [unnamed, search]);
-
-  const drawn =
-    shown ??
-    (value === null
-      ? null
-      : { id: value, name: t("input.userWithId", { id: value }), initials: "?" });
-
-  return (
-    <Combobox
-      items={[
-        // Clearing is listed first while there is something to clear: "" is
-        // no member's id.
-        ...(value !== null ? [{ value: "", label: t("input.clear"), icon: X }] : []),
-        ...found.map((member) => ({
-          value: String(member.id),
-          label: member.name,
-          icon: <MemberAvatar member={member} />,
-        })),
-      ]}
-      value={value !== null ? String(value) : null}
-      onValueChange={(next) => {
-        const member = found.find((each) => String(each.id) === next) ?? null;
-        setNamed(member);
-        onChange(member ? member.id : null);
-      }}
-      onSearchChange={setQuery}
-      onOpenChange={setOpen}
-      loading={loading && found.length === 0}
-      searchPlaceholder={t("input.userPlaceholder")}
-      emptyMessage={t("input.textPlaceholder")}
-      disabled={disabled}
-      trigger={
-        <Button
-          variant="outline"
-          role="combobox"
-          disabled={disabled}
-          className={cn("w-full justify-between", !drawn && "text-muted-foreground", className)}
-        >
-          <span className="flex min-w-0 items-center gap-2">
-            {drawn ? <MemberAvatar member={drawn} className="h-5 w-5 text-3xs" /> : null}
-            <span className="truncate">{drawn ? drawn.name : t("input.userPlaceholder")}</span>
-          </span>
-          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      }
-    />
-  );
-};
-
 // ── Component ──────────────────────────────────────────────────────────────
 
 export const PropertyInput = ({
@@ -640,15 +488,23 @@ export const PropertyInput = ({
       // (a filter), the property's initiative. Prefer the explicit prop,
       // falling back to the definition's own initiative when it carries one.
       return (
-        <MemberInput
+        <MemberPicker
           searchMembers={searchMembers}
-          canOpen={canOpen}
-          initiativeId={
-            initiativeId ?? ("initiative_id" in definition ? definition.initiative_id : null)
+          scope={
+            canOpen
+              ? { type: "canOpen", ...canOpen }
+              : {
+                  type: "initiative",
+                  initiativeId:
+                    initiativeId ??
+                    ("initiative_id" in definition ? definition.initiative_id : null),
+                }
           }
           value={coerceId(value)}
-          selected={selectedUser ?? null}
-          onChange={onChange}
+          selected={selectedUser}
+          onChange={(id) => onChange(id)}
+          placeholder={t("input.userPlaceholder")}
+          emptyMessage={t("input.textPlaceholder")}
           disabled={disabled}
           className={className}
         />
