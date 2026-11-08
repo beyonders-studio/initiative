@@ -1,14 +1,6 @@
 import { SiAtlassian, SiTicktick, SiTodoist, SiVikunja } from "@icons-pack/react-simple-icons";
-import { AlertTriangle, CheckCircle2, FileUp, Loader2, XCircle } from "lucide-react";
-import {
-  type ChangeEvent,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { AlertTriangle, CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -53,12 +45,13 @@ import { uploadInPieces } from "@/lib/resumableUpload";
 import { getItem, removeItem, setItem } from "@/lib/storage";
 import { Button } from "@/ui/button";
 import { Field } from "@/ui/field";
+import { FileDropArea } from "@/ui/file-drop";
 import { Input } from "@/ui/input";
 import { formatBytes } from "@/ui/lib/fileUtils";
 import { numberFormat } from "@/ui/lib/intl";
 import { Progress } from "@/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
-import { WizardDialog } from "@/ui/wizard-dialog";
+import { WizardDialog, WizardOption } from "@/ui/wizard-dialog";
 
 // Mirrors the backend's IMPORT_MAX_BUNDLE_BYTES, the most a backup sent in
 // pieces may weigh — the UX layer; the server is the enforcement.
@@ -329,13 +322,9 @@ export function ImportWizard({ open, onOpenChange, contactsInto }: ImportWizardP
     commit(jiraConnection ? "projects" : "connect");
   };
 
-  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+  const handleBackupFile = async (picked: File) => {
     setPickError(null);
     setPeeked(null);
-    const picked = e.target.files?.[0];
-    if (!picked) {
-      return;
-    }
     if (picked.size > MAX_UPLOAD_BYTES) {
       setPickError(t("wizard.pick.tooLarge", { limit: formatBytes(MAX_UPLOAD_BYTES) }));
       return;
@@ -357,11 +346,10 @@ export function ImportWizard({ open, onOpenChange, contactsInto }: ImportWizardP
     }
   };
 
-  const handleForeignFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+  const handleForeignFile = async (picked: File) => {
     setPickError(null);
     setPreview(null);
-    const picked = e.target.files?.[0];
-    if (!picked || !source || source === "backup") {
+    if (!source || source === "backup") {
       return;
     }
     if (picked.size > MAX_FOREIGN_BYTES) {
@@ -674,65 +662,48 @@ export function ImportWizard({ open, onOpenChange, contactsInto }: ImportWizardP
       {step === "source" && (
         <div className="grid grid-cols-pair gap-3">
           {SOURCES.map((option) => (
-            <button
+            <WizardOption
               key={option}
-              type="button"
+              className="items-start"
+              icon={SOURCE_ICONS[option]}
+              title={t(`wizard.source.names.${option}`)}
+              description={t(`wizard.source.descriptions.${option}`)}
               onClick={() => chooseSource(option)}
-              className="flex cursor-pointer items-start gap-3 rounded-lg border p-4 text-left transition-colors hover:border-primary hover:bg-accent"
-            >
-              {SOURCE_ICONS[option]}
-              <span className="flex-1">
-                <span className="block font-medium text-sm">
-                  {t(`wizard.source.names.${option}`)}
-                </span>
-                <span className="block text-muted-foreground text-xs">
-                  {t(`wizard.source.descriptions.${option}`)}
-                </span>
-              </span>
-            </button>
+            />
           ))}
         </div>
       )}
 
       {step === "pick" && (
         <div className="space-y-3">
-          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed p-8 text-center transition-colors hover:bg-accent">
-            <FileUp className="h-8 w-8 text-muted-foreground" />
-            <span className="font-medium text-sm">{t("wizard.pick.prompt")}</span>
-            <input
-              type="file"
-              accept=".zip,application/zip"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-          </label>
+          <FileDropArea
+            accept=".zip,application/zip"
+            onFile={(picked) => void handleBackupFile(picked)}
+            prompt={t("wizard.pick.prompt")}
+          />
           {pickError && <p className="text-destructive text-sm">{pickError}</p>}
         </div>
       )}
 
       {step === "file" && (
         <div className="space-y-3">
-          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed p-8 text-center transition-colors hover:bg-accent">
-            {previewMutation.isPending || sheetPreviewMutation.isPending ? (
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            ) : (
-              <FileUp className="h-8 w-8 text-muted-foreground" />
-            )}
-            <span className="font-medium text-sm">
-              {sheetOnly ? t("wizard.contacts.filePrompt") : t("wizard.file.prompt")}
-            </span>
-            <span className="text-muted-foreground text-xs">
-              {sheetOnly
-                ? t("wizard.contacts.where")
-                : t(`wizard.file.where.${foreignSource ?? "todoist"}`)}
-            </span>
-            <input
-              type="file"
-              accept={sheetOnly ? ".csv,text/csv" : ".csv,.json,text/csv,application/json"}
-              className="hidden"
-              onChange={handleForeignFileChange}
-            />
-          </label>
+          <FileDropArea
+            accept={sheetOnly ? ".csv,text/csv" : ".csv,.json,text/csv,application/json"}
+            onFile={(picked) => void handleForeignFile(picked)}
+            prompt={
+              previewMutation.isPending || sheetPreviewMutation.isPending
+                ? t("common:loading")
+                : sheetOnly
+                  ? t("wizard.contacts.filePrompt")
+                  : t("wizard.file.prompt")
+            }
+            disabled={previewMutation.isPending || sheetPreviewMutation.isPending}
+          />
+          <p className="text-muted-foreground text-xs">
+            {sheetOnly
+              ? t("wizard.contacts.where")
+              : t(`wizard.file.where.${foreignSource ?? "todoist"}`)}
+          </p>
           {source === "todoist" && (
             <p className="flex items-start gap-2 text-muted-foreground text-xs">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />

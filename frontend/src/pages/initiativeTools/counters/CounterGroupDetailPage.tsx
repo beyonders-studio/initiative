@@ -1,12 +1,4 @@
-import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
+import { closestCenter, DndContext, type DragEndEvent } from "@dnd-kit/core";
 import {
   rectSortingStrategy,
   SortableContext,
@@ -62,6 +54,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
+import { useDragSensors } from "@/ui/lib/useDragSensors";
 import { CardGridSkeleton, DetailPageSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 /** Where an older release kept a group's rows or grid. */
@@ -78,10 +71,7 @@ export function CounterGroupDetailPage() {
   const groupQuery = useCounterGroup(groupId);
   useToolRealtime(Tool.counter_group, groupId);
 
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { distance: 8 } })
-  );
+  const sensors = useDragSensors();
 
   const updateCounter = useUpdateCounter(groupId ?? 0);
   const setCount = useSetCount(groupId ?? 0);

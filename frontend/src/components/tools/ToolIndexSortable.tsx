@@ -7,23 +7,8 @@
  * while its card sits in a list that can be dragged.
  */
 
-import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  KeyboardSensor,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import {
-  arrayMove,
-  rectSortingStrategy,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-} from "@dnd-kit/sortable";
+import { closestCenter, DndContext, type DragEndEvent } from "@dnd-kit/core";
+import { arrayMove, rectSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import {
@@ -34,6 +19,8 @@ import {
   type Ref,
   useContext,
 } from "react";
+
+import { useDragSensors } from "@/ui/lib/useDragSensors";
 
 type DragHandleProps = HTMLAttributes<HTMLButtonElement> & { ref: Ref<HTMLButtonElement> };
 
@@ -95,12 +82,7 @@ type SortableCardsProps = {
 };
 
 export const SortableCards = ({ items, onReorder, className }: SortableCardsProps) => {
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
-    // A short press first, so a touch on a card still scrolls the page.
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
+  const sensors = useDragSensors({ keyboard: true });
   const ids = items.map((item) => item.id);
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {

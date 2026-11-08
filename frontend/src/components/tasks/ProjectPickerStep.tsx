@@ -6,6 +6,7 @@ import type { ProjectRead } from "@/api/generated/initiativeAPI.schemas";
 import { useGlobalProjects } from "@/hooks/useProjects";
 import { Input } from "@/ui/input";
 import { LoadMore } from "@/ui/load-more";
+import { WizardOption } from "@/ui/wizard-dialog";
 
 interface ProjectPickerStepProps {
   communityId: number;
@@ -89,15 +90,12 @@ export function ProjectPickerStep({ communityId, initiativeId, onPick }: Project
       ) : (
         <>
           {filteredProjects.map((project) => (
-            <button
+            <WizardOption
               key={project.id}
-              type="button"
-              className="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+              icon={<ListTodo className="h-4 w-4 shrink-0 text-muted-foreground" />}
+              title={project.name}
               onClick={() => onPick(project)}
-            >
-              <ListTodo className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <span className="font-medium text-sm">{project.name}</span>
-            </button>
+            />
           ))}
           <LoadMore
             hasMore={hasMoreProjects}

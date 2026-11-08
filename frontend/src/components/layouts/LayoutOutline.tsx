@@ -1,19 +1,5 @@
-import {
-  DndContext,
-  type DragEndEvent,
-  KeyboardSensor,
-  MouseSensor,
-  TouchSensor,
-  useDroppable,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+import { DndContext, type DragEndEvent, useDroppable } from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   Asterisk,
@@ -69,6 +55,7 @@ import { localized } from "@/lib/widgets/widgetMeta";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
+import { useDragSensors } from "@/ui/lib/useDragSensors";
 import { cn } from "@/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
@@ -310,13 +297,6 @@ export const usePartLabel = (
   return { labelOf, partLabel, pickerPlugins };
 };
 
-const useOutlineSensors = () =>
-  useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
-
 /**
  * What the view is made of, as a list beside the canvas: the view itself,
  * then a board's card part by part or a table's columns in order. A row is
@@ -347,7 +327,7 @@ export const ListLayoutOutline = ({
 }) => {
   const { t } = useTranslation(LAYOUT_NAMESPACES);
   const translate = t as TranslateFn;
-  const sensors = useOutlineSensors();
+  const sensors = useDragSensors({ keyboard: true });
   const { labelOf, partLabel } = usePartLabel(fields, plugins);
   const { definition, kind: layout } = open;
   const card = cardOf(definition, fields, open.shape);
@@ -543,7 +523,7 @@ const PartTree = ({
   edits: LayoutEdits;
   locked: boolean;
 }) => {
-  const sensors = useOutlineSensors();
+  const sensors = useDragSensors({ keyboard: true });
   const [dragging, setDragging] = useState(false);
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {

@@ -1,12 +1,4 @@
-import {
-  type DragEndEvent,
-  type DragOverEvent,
-  type DragStartEvent,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
+import type { DragEndEvent, DragOverEvent, DragStartEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { AlertTriangle, Archive, Plus } from "lucide-react";
@@ -22,6 +14,7 @@ import type {
   TaskUpdate,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
+import { invalidate, q } from "@/api/query-keys";
 import {
   buildTaskCalendarEntries,
   type CalendarEntry,
@@ -49,7 +42,7 @@ import {
   shouldInsertAfter,
 } from "@/components/projects/taskOrdering";
 import { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
-import { BulkEditTaskTagsDialog } from "@/components/tasks/BulkEditTaskTagsDialog";
+import { BulkEditTagsDialog } from "@/components/shared/BulkEditTagsDialog";
 import { ExportTasksButton } from "@/components/tasks/ExportTasksButton";
 import { TaskBulkEditDialog } from "@/components/tasks/TaskBulkEditDialog";
 import { TaskBulkEditPanel } from "@/components/tasks/TaskBulkEditPanel";
@@ -98,6 +91,7 @@ import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Dialog } from "@/ui/dialog";
 import { useWeekStart } from "@/ui/host";
+import { useDragSensors } from "@/ui/lib/useDragSensors";
 import { StatusMessage } from "@/ui/status-message";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
@@ -764,20 +758,7 @@ export const ProjectTasksSection = ({
     [persistMove, projectTasks]
   );
 
-  const mouseSensorConfig = useMemo(() => ({ activationConstraint: { distance: 4 } }), []);
-  const touchSensorConfig = useMemo(
-    () => ({ activationConstraint: { delay: 200, tolerance: 8 } }),
-    []
-  );
-
-  const kanbanSensors = useSensors(
-    useSensor(MouseSensor, mouseSensorConfig),
-    useSensor(TouchSensor, touchSensorConfig)
-  );
-  const listSensors = useSensors(
-    useSensor(MouseSensor, mouseSensorConfig),
-    useSensor(TouchSensor, touchSensorConfig)
-  );
+  const sensors = useDragSensors();
 
   const handleTaskDragStart = (event: DragStartEvent) => {
     const taskType = event.active.data.current?.type;
@@ -1014,7 +995,7 @@ export const ProjectTasksSection = ({
             canEditTasks={canEditTaskDetails}
             onStatusChange={changeTaskStatus}
             taskHref={taskHref}
-            sensors={kanbanSensors}
+            sensors={sensors}
             activeTask={activeTask}
             onDragStart={handleTaskDragStart}
             onDragOver={handleKanbanDragOver}
@@ -1075,7 +1056,7 @@ export const ProjectTasksSection = ({
                 tasks={statusFilteredTasks}
                 listParams={taskListParams}
                 taskStatuses={sortedTaskStatuses}
-                sensors={listSensors}
+                sensors={sensors}
                 canReorderTasks={canReorderTasks}
                 canEditTaskDetails={canEditTaskDetails}
                 taskActionsDisabled={taskActionsDisabled}
@@ -1207,10 +1188,13 @@ export const ProjectTasksSection = ({
             />
           </Dialog>
 
-          <BulkEditTaskTagsDialog
+          <BulkEditTagsDialog
             open={isBulkEditTagsDialogOpen}
             onOpenChange={setIsBulkEditTagsDialogOpen}
-            tasks={selectedTasks}
+            items={selectedTasks}
+            targetType="task"
+            communityId={communityId}
+            onInvalidate={() => void invalidate(q.allTasks())}
             onSuccess={() => {}}
           />
         </>

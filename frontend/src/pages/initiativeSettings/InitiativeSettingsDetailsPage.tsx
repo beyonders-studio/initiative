@@ -25,10 +25,9 @@ import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
 import { useUpdateInitiative } from "@/hooks/useInitiatives";
 import { useServerForm } from "@/hooks/useServerForm";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { DEFAULT_COLOR } from "@/lib/initiativeColors";
 import { toast } from "@/lib/mascotToast";
 import { isToolEnabled, TOOLS, toolCamelPlural, toolViewPermission } from "@/lib/tools";
-
-const DEFAULT_INITIATIVE_COLOR = "#6366F1";
 
 export const InitiativeSettingsDetailsPage = () => {
   const { t } = useTranslation(["initiatives", "common"]);
@@ -54,7 +53,7 @@ export const InitiativeSettingsDetailsPage = () => {
     (loaded) => ({
       name: loaded?.name ?? "",
       description: loaded?.description ?? "",
-      color: loaded?.color ?? DEFAULT_INITIATIVE_COLOR,
+      color: loaded?.color ?? DEFAULT_COLOR,
     }),
     initiative?.id
   );
