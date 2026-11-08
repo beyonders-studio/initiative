@@ -8,7 +8,7 @@ would return for the same actor, never more.
 
 from datetime import UTC, datetime, timedelta
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import recurrence

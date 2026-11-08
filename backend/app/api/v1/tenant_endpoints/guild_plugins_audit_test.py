@@ -13,7 +13,7 @@ fields that moved and never by what was typed into them.
 import json
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType

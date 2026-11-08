@@ -7,7 +7,7 @@ back", which the capped permission level cannot give.
 """
 
 from fastapi.routing import iter_route_contexts
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool

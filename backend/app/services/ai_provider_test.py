@@ -13,7 +13,6 @@ import logging
 from unittest.mock import patch
 
 import anthropic
-import httpx
 import httpx2
 import pytest
 from pydantic import BaseModel, ConfigDict
@@ -201,7 +200,7 @@ class _Provider:
         self.reply = reply
         self.status = status
         self.error = error or {}
-        _openai_answers(monkeypatch, self._answer(httpx))
+        _openai_answers(monkeypatch, self._answer(httpx2))
         real = anthropic.AsyncAnthropic
 
         def _anthropic(**kwargs):
@@ -239,7 +238,7 @@ def _openai_answers(monkeypatch, handler) -> None:
         lambda *, allow_private, max_bytes: safe_http.PinnedTransport(
             allow_private=allow_private,
             max_bytes=max_bytes,
-            inner=httpx.MockTransport(handler),
+            inner=httpx2.MockTransport(handler),
         ),
     )
 
@@ -439,8 +438,8 @@ async def test_a_model_that_refuses_the_schema_is_asked_without_it(monkeypatch):
         fake.sent.append((request, body))
         if first:
             first = False
-            return httpx.Response(400, json={"error": {"type": "invalid_request"}})
-        return httpx.Response(200, json=reply(body))
+            return httpx2.Response(400, json={"error": {"type": "invalid_request"}})
+        return httpx2.Response(200, json=reply(body))
 
     _openai_answers(monkeypatch, answer)
     with _resolves_to(PUBLIC_IP):

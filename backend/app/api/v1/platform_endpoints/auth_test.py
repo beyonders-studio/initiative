@@ -14,9 +14,9 @@ import uuid
 from datetime import date, timedelta
 from urllib.parse import parse_qs, urlsplit
 
-import httpx
+import httpx2
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -726,7 +726,7 @@ def two_per_address(client, monkeypatch):
     rate_limit.limiter.reset()
 
 
-async def _sign_in(client: AsyncClient, email: str, password: str) -> httpx.Response:
+async def _sign_in(client: AsyncClient, email: str, password: str) -> httpx2.Response:
     return await client.post(
         "/api/v1/auth/token", data={"username": email, "password": password}
     )
@@ -876,7 +876,7 @@ async def test_an_address_is_sent_no_more_letters_than_its_allowance(
     session.add(row)
     await session.commit()
 
-    async def _forgot(email: str) -> httpx.Response:
+    async def _forgot(email: str) -> httpx2.Response:
         return await client.post("/api/v1/auth/password/forgot", json={"email": email})
 
     for _ in range(2):
@@ -1335,7 +1335,7 @@ async def test_logout_clears_session_cookie(client: AsyncClient, session: AsyncS
 # --- OIDC login/callback (relying-party flow) --------------------------------
 #
 # End-to-end against a fake IdP: real signed id_tokens, real discovery/JWKS/
-# token/userinfo endpoints behind an httpx.MockTransport, the real settings→
+# token/userinfo endpoints behind an httpx2.MockTransport, the real settings→
 # provider reconcile, and the real identity-resolution ladder underneath.
 
 
@@ -1405,7 +1405,7 @@ async def _run_oidc_flow(
 ):
     """The full login → IdP → callback round trip; returns the callback response."""
     state, nonce = await _begin_login(client, login_params)
-    idp.token_response = httpx.Response(
+    idp.token_response = httpx2.Response(
         200,
         json={
             "access_token": "at-1",
@@ -2020,7 +2020,7 @@ async def test_row_provider_full_login_flow(
     query = {k: v[0] for k, v in parse_qs(urlsplit(location).query).items()}
     assert query["redirect_uri"].endswith("/api/v1/auth/corp/callback")
 
-    idp.token_response = httpx.Response(
+    idp.token_response = httpx2.Response(
         200,
         json={
             "access_token": "at-corp",

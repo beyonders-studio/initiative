@@ -12,7 +12,7 @@ the end.
 from datetime import UTC, datetime
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.v1.tenant_endpoints.tool_lists import TOOL_LISTS

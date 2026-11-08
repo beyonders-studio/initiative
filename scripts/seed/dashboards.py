@@ -5,6 +5,7 @@ from __future__ import annotations
 from sqlmodel import select
 
 from app.core.tools import Tool
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.counter import Counter
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.resource_grant import ResourceAccessLevel
@@ -332,6 +333,7 @@ async def seed(c: Community) -> None:
                 }
             ),
             created_by=creator.id,
+            created_by_kind=ActorKind.member,
         )
         c.session.add(dashboard)
         await c.session.flush()

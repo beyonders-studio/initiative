@@ -7,7 +7,7 @@ import io
 import json
 import zipfile
 
-import httpx
+import httpx2
 import pytest
 
 from app.core.messages import ImportEngineMessages
@@ -74,12 +74,12 @@ def _site(
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
         calls.append({"method": method, "url": url, "json": json, "headers": headers})
         if throttled:
-            return httpx.Response(429, json={})
+            return httpx2.Response(429, json={})
         if "/wiki/api/v2/spaces?keys=" in url:
             key = url.split("keys=")[1].split("&")[0]
             if key in locked:
-                return httpx.Response(200, json={"results": []})
-            return httpx.Response(
+                return httpx2.Response(200, json={"results": []})
+            return httpx2.Response(
                 200,
                 json={
                     "results": [
@@ -100,41 +100,41 @@ def _site(
                     "next": url.split("/wiki")[1].split("&cursor=")[0]
                     + f"&cursor={index + 1}"
                 }
-            return httpx.Response(200, json=body)
+            return httpx2.Response(200, json=body)
         if "-comments" in url:
             # ``/pages/{id}/footer-comments`` and ``/footer-comments/{id}/children``
             # both answer from one map, keyed by what the path names.
             path = url.split("/wiki/api/v2/")[1].split("?")[0]
-            return httpx.Response(200, json={"results": comments.get(path, [])})
+            return httpx2.Response(200, json={"results": comments.get(path, [])})
         if "/attachments?" in url:
             page_id = url.split("/pages/")[1].split("/")[0]
-            return httpx.Response(200, json={"results": attachments.get(page_id, [])})
+            return httpx2.Response(200, json={"results": attachments.get(page_id, [])})
         if "/child/attachment/" in url:
             # The site hands a download on to the media host.
             att_id = url.split("/child/attachment/")[1].split("/")[0]
-            return httpx.Response(
+            return httpx2.Response(
                 302, headers={"location": f"https://media.example.com/{att_id}"}
             )
         if url.startswith("https://media.example.com/"):
             att_id = url.rsplit("/", 1)[1]
             if att_id in files:
                 return await answered(
-                    method, url, httpx.Response(200, content=files[att_id]), kw
+                    method, url, httpx2.Response(200, content=files[att_id]), kw
                 )
-            return httpx.Response(404)
+            return httpx2.Response(404)
         if "/labels" in url:
             page_id = url.split("/pages/")[1].split("/")[0]
-            return httpx.Response(
+            return httpx2.Response(
                 200, json={"results": [{"name": n} for n in labels.get(page_id, [])]}
             )
         if "/wiki/api/v2/folders/" in url:
             folder_id = url.rsplit("/", 1)[1]
             if folder_id in folders:
-                return httpx.Response(200, json=folders[folder_id])
-            return httpx.Response(404, json={})
+                return httpx2.Response(200, json=folders[folder_id])
+            return httpx2.Response(404, json={})
         if url.endswith("/wiki/api/v2/users-bulk"):
             wanted = (json or {}).get("accountIds") or []
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json={
                     "results": [
@@ -144,7 +144,7 @@ def _site(
                     ]
                 },
             )
-        return httpx.Response(404, json={})
+        return httpx2.Response(404, json={})
 
     monkeypatch.setattr(atlassian, "request_public_target", fake_request)
     return calls

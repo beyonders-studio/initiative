@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from datetime import timedelta
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import INSTALL_HEADER

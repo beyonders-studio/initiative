@@ -11,7 +11,7 @@ import json
 from dataclasses import replace
 from datetime import UTC, date, datetime
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 

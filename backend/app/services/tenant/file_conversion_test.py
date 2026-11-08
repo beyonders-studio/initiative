@@ -8,7 +8,7 @@ import zipfile
 import pytest
 from docx import Document
 from docx.shared import Inches
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from PIL import Image
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select

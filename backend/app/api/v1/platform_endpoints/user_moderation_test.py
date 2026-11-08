@@ -11,7 +11,7 @@ from datetime import UTC
 
 import pytest
 from fastapi.routing import iter_route_contexts
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 

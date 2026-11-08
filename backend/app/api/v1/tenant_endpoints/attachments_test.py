@@ -4,7 +4,7 @@ import io
 from datetime import UTC
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from app.models.platform.guild import CommunityRole
 from app.services.tenant.attachments import detect_document_image_type

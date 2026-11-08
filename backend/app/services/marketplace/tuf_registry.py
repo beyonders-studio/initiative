@@ -65,7 +65,7 @@ from pathlib import Path
 from typing import Any
 from urllib import parse
 
-import httpx
+import httpx2
 from sqlalchemy import delete as sa_delete
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -277,7 +277,7 @@ _DEFAULT_PORTS = {"http": 80, "https": 443}
 
 
 def _origin(url: str) -> tuple[str, str, int | None]:
-    parsed = httpx.URL(url)
+    parsed = httpx2.URL(url)
     return (
         parsed.scheme,
         parsed.host,
@@ -306,7 +306,7 @@ async def _get(url: str) -> bytes:
             "GET",
             url,
             headers=_request_headers(url),
-            timeout=httpx.Timeout(FETCH_TIMEOUT_SECONDS),
+            timeout=httpx2.Timeout(FETCH_TIMEOUT_SECONDS),
             max_bytes=MAX_FETCH_BYTES,
         )
     except ResponseTooLargeError as exc:
@@ -314,7 +314,7 @@ async def _get(url: str) -> bytes:
             f"{url} is larger than {MAX_FETCH_BYTES} bytes"
         ) from exc
     except (
-        httpx.HTTPError,
+        httpx2.HTTPError,
         WebhookTargetUrlError,
         WebhookTargetUrlPrivateError,
     ) as exc:

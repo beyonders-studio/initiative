@@ -13,7 +13,7 @@ from typing import Annotated, Any
 import pytest
 from fastapi import Depends, FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from app.api.deps import ActorContext, plugin_scope, route_plugin_scope_declaration
 from app.api.plugin_openapi import COMMUNITY_PREFIX, build_plugin_openapi

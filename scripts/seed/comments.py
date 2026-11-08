@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment
 from seed.common import Community
 
@@ -170,6 +171,7 @@ async def seed(c: Community) -> None:
         comment = Comment(
             content=d["content"],
             created_by=c.users[d["author"]].id,
+            created_by_kind=ActorKind.member,
             task_id=c.tasks[d["task"]].id if "task" in d else None,
             file_id=c.files[d["file"]].id if "file" in d else None,
         )

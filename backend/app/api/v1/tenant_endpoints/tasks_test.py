@@ -18,7 +18,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
