@@ -6,6 +6,7 @@ import { recoverWithCode, requestPasswordReset } from "@/api/generated/auth/auth
 import { NewPasswordFields } from "@/components/auth/NewPasswordFields";
 import { ServerChip } from "@/components/auth/ServerChoice";
 import { SignInFrame } from "@/components/auth/SignInFrame";
+import { useApiMutation } from "@/hooks/useApiMutation";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { checkNewPassword } from "@/lib/passwordPolicy";
@@ -29,54 +30,46 @@ export const ForgotPasswordPage = () => {
   const { passwordLoginEnabled } = useAppConfig();
   const [mode, setMode] = useState<"reset" | "recover">("reset");
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = useState<string | null>(null);
+  const request = useApiMutation(
+    { mutationFn: requestPasswordReset },
+    { onError: () => setError(t("forgotPassword.error")) }
+  );
 
   const [recoveryCode, setRecoveryCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [recoverStatus, setRecoverStatus] = useState<"idle" | "submitting" | "success">("idle");
+  const recover = useApiMutation(
+    { mutationFn: recoverWithCode },
+    { onError: (err) => setError(getErrorMessage(err, "auth:forgotPassword.recoverError")) }
+  );
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setStatus("sending");
     setError(null);
-    try {
-      await requestPasswordReset({ email: email.toLowerCase().trim() });
-      setStatus("sent");
-    } catch {
-      setError(t("forgotPassword.error"));
-      setStatus("idle");
-    }
+    request.mutate({ email: email.toLowerCase().trim() });
   };
 
-  const handleRecover = async (event: FormEvent<HTMLFormElement>) => {
+  const handleRecover = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const passwordError = checkNewPassword(password, confirmPassword);
     if (passwordError) {
       setError(passwordError);
       return;
     }
-    setRecoverStatus("submitting");
     setError(null);
-    try {
-      await recoverWithCode({
-        email: email.toLowerCase().trim(),
-        recovery_code: recoveryCode.trim(),
-        password,
-      });
-      setRecoverStatus("success");
-    } catch (err) {
-      setError(getErrorMessage(err, "auth:forgotPassword.recoverError"));
-      setRecoverStatus("idle");
-    }
+    recover.mutate({
+      email: email.toLowerCase().trim(),
+      recovery_code: recoveryCode.trim(),
+      password,
+    });
   };
 
   const switchMode = (next: "reset" | "recover") => {
     setMode(next);
     setError(null);
-    setStatus("idle");
-    setRecoverStatus("idle");
+    request.reset();
+    recover.reset();
     setRecoveryCode("");
     setPassword("");
     setConfirmPassword("");
@@ -118,13 +111,11 @@ export const ForgotPasswordPage = () => {
                     autoCapitalize="none"
                   />
                 </Field>
-                <Button className="w-full" type="submit" disabled={status === "sending"}>
-                  {status === "sending"
-                    ? t("forgotPassword.submitting")
-                    : t("forgotPassword.submit")}
+                <Button className="w-full" type="submit" disabled={request.isPending}>
+                  {request.isPending ? t("forgotPassword.submitting") : t("forgotPassword.submit")}
                 </Button>
                 {error ? <p className="text-destructive text-sm">{error}</p> : null}
-                {status === "sent" ? (
+                {request.isSuccess ? (
                   <p className="text-primary text-sm">{t("forgotPassword.sent")}</p>
                 ) : null}
                 <button
@@ -135,7 +126,7 @@ export const ForgotPasswordPage = () => {
                   {t("forgotPassword.useRecoveryCode")}
                 </button>
               </form>
-            ) : recoverStatus === "success" ? (
+            ) : recover.isSuccess ? (
               <div className="space-y-4 text-primary text-sm">
                 <p>{t("forgotPassword.recovered")}</p>
                 <Button className="w-full" asChild>
@@ -172,8 +163,8 @@ export const ForgotPasswordPage = () => {
                   onPasswordChange={setPassword}
                   onConfirmChange={setConfirmPassword}
                 />
-                <Button className="w-full" type="submit" disabled={recoverStatus === "submitting"}>
-                  {recoverStatus === "submitting"
+                <Button className="w-full" type="submit" disabled={recover.isPending}>
+                  {recover.isPending
                     ? t("forgotPassword.recovering")
                     : t("forgotPassword.recoverSubmit")}
                 </Button>

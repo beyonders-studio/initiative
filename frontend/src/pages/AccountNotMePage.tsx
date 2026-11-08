@@ -3,16 +3,17 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { readAccountChange, signOutEverywhere, undoAccountChange } from "@/api/generated/auth/auth";
-import type { AccountChangeDone, AccountChangeRead } from "@/api/generated/initiativeAPI.schemas";
+import type { AccountChangeRead } from "@/api/generated/initiativeAPI.schemas";
 import { ServerChip } from "@/components/auth/ServerChoice";
 import { SignInFrame } from "@/components/auth/SignInFrame";
+import { useApiMutation } from "@/hooks/useApiMutation";
 import { useAuth } from "@/hooks/useAuth";
 import { useEmailLinkToken } from "@/hooks/useEmailLinkToken";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
 
-type Step = "reading" | "ready" | "done" | "undone" | "invalid";
+type Step = "reading" | "ready" | "invalid";
 
 /** What each undo does, by the kind the server names. */
 const UNDO_KEYS = {
@@ -55,9 +56,6 @@ export const AccountNotMePage = () => {
   const { user, refreshUser } = useAuth();
   const [step, setStep] = useState<Step>(token ? "reading" : "invalid");
   const [answer, setAnswer] = useState<AccountChangeRead | null>(null);
-  const [done, setDone] = useState<AccountChangeDone | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -69,30 +67,28 @@ export const AccountNotMePage = () => {
       .catch(() => setStep("invalid"));
   }, [token]);
 
-  const act = async (undo: boolean) => {
-    if (!token) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      setDone(await (undo ? undoAccountChange({ token }) : signOutEverywhere({ token })));
-      setStep(undo ? "undone" : "done");
+  const act = useApiMutation(
+    {
+      mutationFn: (undo: boolean) =>
+        undo ? undoAccountChange({ token }) : signOutEverywhere({ token }),
+    },
+    {
       // This browser may be one of the sessions just ended. Asking for its
       // own account finds out, and the usual expiry handling signs it out
       // here too; a browser signed in to somebody else stays as it is.
-      if (user) void refreshUser().catch(() => undefined);
-    } catch (err) {
-      setError(getErrorMessage(err, "auth:notMe.failed"));
-    } finally {
-      setSubmitting(false);
+      onSuccess: () => {
+        if (user) void refreshUser().catch(() => undefined);
+      },
     }
-  };
+  );
+  const done = act.data;
 
   const subject = t(subjectKey(answer?.notice ?? ""));
   const undoKey =
     answer?.undo && answer.undo in UNDO_KEYS
       ? UNDO_KEYS[answer.undo as keyof typeof UNDO_KEYS]
       : null;
-  const finished = step === "done" || step === "undone";
+  const finished = act.isSuccess;
   // A change that is still waiting is cancelled rather than undone.
   const cancels = answer?.undo === "hold";
 
@@ -102,7 +98,7 @@ export const AccountNotMePage = () => {
         {finished ? (
           <CardHeader>
             <CardTitle>
-              {step !== "undone"
+              {!act.variables
                 ? t("notMe.doneTitle")
                 : cancels
                   ? t("notMe.cancelledTitle")
@@ -131,12 +127,16 @@ export const AccountNotMePage = () => {
                 <p className="text-sm">{t(undoKey, { subject: answer?.subject ?? "" })}</p>
               ) : null}
               <p className="text-muted-foreground text-sm">{t("notMe.whatHappens")}</p>
-              {error ? <p className="text-destructive text-sm">{error}</p> : null}
+              {act.error ? (
+                <p className="text-destructive text-sm">
+                  {getErrorMessage(act.error, "auth:notMe.failed")}
+                </p>
+              ) : null}
               {undoKey ? (
                 <Button
                   className="w-full"
-                  onClick={() => void act(true)}
-                  disabled={step !== "ready" || submitting}
+                  onClick={() => act.mutate(true)}
+                  disabled={step !== "ready" || act.isPending}
                 >
                   {cancels ? t("notMe.cancelConfirm") : t("notMe.undoConfirm")}
                 </Button>
@@ -145,8 +145,8 @@ export const AccountNotMePage = () => {
                 <Button
                   className="w-full"
                   variant={undoKey ? "outline" : "default"}
-                  onClick={() => void act(false)}
-                  disabled={step !== "ready" || submitting}
+                  onClick={() => act.mutate(false)}
+                  disabled={step !== "ready" || act.isPending}
                 >
                   {undoKey ? t("notMe.signOutOnly") : t("notMe.confirm")}
                 </Button>

@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { UsernameClaim } from "@/api/generated/initiativeAPI.schemas";
 import { claimMyUsername } from "@/api/generated/users/users";
 import { type HandleCheck, UsernameField } from "@/components/UsernameField";
+import { useApiMutation } from "@/hooks/useApiMutation";
 import { useAuth } from "@/hooks/useAuth";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { Button } from "@/ui/button";
@@ -19,26 +21,18 @@ export const ChooseHandle = () => {
   const { user, refreshUser } = useAuth();
   const [username, setUsername] = useState("");
   const [handle, setHandle] = useState<HandleCheck>({ usable: true, offer: null });
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const claim = useApiMutation({
+    mutationFn: async (body: UsernameClaim) => {
+      await claimMyUsername(body);
+      await refreshUser();
+    },
+  });
 
   const suggestion = user?.username ?? "";
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSubmitting(true);
-    setError(null);
-    try {
-      await claimMyUsername({
-        username: username.trim().toLowerCase(),
-        offer: handle.offer ?? undefined,
-      });
-      await refreshUser();
-    } catch (err) {
-      setError(getErrorMessage(err, "auth:chooseHandle.error"));
-    } finally {
-      setSubmitting(false);
-    }
+    claim.mutate({ username: username.trim().toLowerCase(), offer: handle.offer ?? undefined });
   };
 
   return (
@@ -56,15 +50,19 @@ export const ChooseHandle = () => {
               onChange={setUsername}
               suggestion={suggestion}
               onChecked={setHandle}
-              disabled={submitting}
+              disabled={claim.isPending}
             />
-            {error && <p className="text-destructive text-sm">{error}</p>}
+            {claim.error && (
+              <p className="text-destructive text-sm">
+                {getErrorMessage(claim.error, "auth:chooseHandle.error")}
+              </p>
+            )}
             <Button
               type="submit"
               className="w-full"
-              disabled={submitting || !username.trim() || !handle.usable}
+              disabled={claim.isPending || !username.trim() || !handle.usable}
             >
-              {submitting ? t("common:submitting") : t("chooseHandle.submit")}
+              {claim.isPending ? t("common:submitting") : t("chooseHandle.submit")}
             </Button>
           </form>
         </CardContent>

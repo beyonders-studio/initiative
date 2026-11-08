@@ -16,6 +16,7 @@ import {
 } from "@/api/generated/initiatives/initiatives";
 import { bulkSetResourceGrants } from "@/api/generated/resource-grants/resource-grants";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { useAuth } from "@/hooks/useAuth";
 import { useInitiatives } from "@/hooks/useInitiatives";
 import { USER_ID_LOOKUP_MAX, USER_SEARCH_PAGE_SIZE } from "@/hooks/useUsers";
@@ -101,7 +102,6 @@ export function BulkEditAccessDialog({
     [t, resourceType]
   );
   const [tab, setTab] = useState<"people" | "roles" | "all">("people");
-  const [isPending, setIsPending] = useState(false);
 
   // Individual people state
   const [userMode, setUserMode] = useState<"grant" | "revoke">("grant");
@@ -314,8 +314,11 @@ export function BulkEditAccessDialog({
 
   // Persist rebuilt grant lists in one bulk request per chunk (owner preserved
   // server-side). Each entry is one resource's full non-owner grant list.
-  const applyBulk = useCallback(
-    async (entries: { resourceId: number; grants: ResourceGrantSchema[] }[]) => {
+  const { mutate: applyBulk, isPending } = useCommunityMutation({
+    mutationFn: async (
+      communityId,
+      entries: { resourceId: number; grants: ResourceGrantSchema[] }[]
+    ) => {
       for (let i = 0; i < entries.length; i += MAX_BULK_ITEMS) {
         const slice = entries.slice(i, i + MAX_BULK_ITEMS);
         const bulkItems: ResourceGrantBulkItem[] = slice.map((e) => ({
@@ -328,8 +331,7 @@ export function BulkEditAccessDialog({
         });
       }
     },
-    [communityId, resourceType]
-  );
+  });
 
   const finish = useCallback(() => {
     invalidate();
@@ -338,126 +340,119 @@ export function BulkEditAccessDialog({
     onSuccess();
   }, [invalidate, resetState, onOpenChange, onSuccess]);
 
-  const handleApply = useCallback(async () => {
+  const handleApply = useCallback(() => {
     if (selectedUserIds.size === 0) return;
 
-    setIsPending(true);
-    try {
-      const userIds = new Set(selectedUserIds);
-      const entries: { resourceId: number; grants: ResourceGrantSchema[] }[] = [];
+    const userIds = new Set(selectedUserIds);
+    const entries: { resourceId: number; grants: ResourceGrantSchema[] }[] = [];
 
-      for (const item of items) {
-        const existing = (item.grants ?? []).filter((g) => g.level !== "owner");
-        if (userMode === "grant") {
-          // Granting specific people switches the resource to "restricted" mode,
-          // so drop any "all initiative members" grant — ShareControl can't
-          // represent a mixed all-members + per-grantee list and would silently
-          // discard it on the next save. Also drop any existing per-user grant for
-          // the targeted people, then add them back at the chosen level.
-          const next = existing.filter(
-            (g) => !g.all_initiative_members && (g.user_id == null || !userIds.has(g.user_id))
-          );
-          for (const userId of userIds) next.push({ user_id: userId, level });
-          entries.push({ resourceId: item.id, grants: next });
-        } else {
-          // Revoke: only touch items that actually grant one of the targeted
-          // people, so the count/toast reflect real changes (not every selection).
-          const hasTarget = existing.some((g) => g.user_id != null && userIds.has(g.user_id));
-          if (!hasTarget) continue;
-          entries.push({
-            resourceId: item.id,
-            grants: existing.filter((g) => g.user_id == null || !userIds.has(g.user_id)),
-          });
-        }
-      }
-
-      await applyBulk(entries);
-
-      const affected = entries.length;
+    for (const item of items) {
+      const existing = (item.grants ?? []).filter((g) => g.level !== "owner");
       if (userMode === "grant") {
-        toast.success(
-          t("bulkAccess.userAccessGranted", { count: affected, items: resourceNoun(affected) })
+        // Granting specific people switches the resource to "restricted" mode,
+        // so drop any "all initiative members" grant — ShareControl can't
+        // represent a mixed all-members + per-grantee list and would silently
+        // discard it on the next save. Also drop any existing per-user grant for
+        // the targeted people, then add them back at the chosen level.
+        const next = existing.filter(
+          (g) => !g.all_initiative_members && (g.user_id == null || !userIds.has(g.user_id))
         );
-      } else if (affected === 0) {
-        toast.info(t("bulkAccess.nothingToUpdate"));
+        for (const userId of userIds) next.push({ user_id: userId, level });
+        entries.push({ resourceId: item.id, grants: next });
       } else {
-        toast.success(
-          t("bulkAccess.userAccessRevoked", { count: affected, items: resourceNoun(affected) })
-        );
+        // Revoke: only touch items that actually grant one of the targeted
+        // people, so the count/toast reflect real changes (not every selection).
+        const hasTarget = existing.some((g) => g.user_id != null && userIds.has(g.user_id));
+        if (!hasTarget) continue;
+        entries.push({
+          resourceId: item.id,
+          grants: existing.filter((g) => g.user_id == null || !userIds.has(g.user_id)),
+        });
       }
-      finish();
-    } catch (error) {
-      toast.error(getErrorMessage(error, "access:bulkAccess.updateError"));
-    } finally {
-      setIsPending(false);
     }
+
+    applyBulk(entries, {
+      onSuccess: () => {
+        const affected = entries.length;
+        if (userMode === "grant") {
+          toast.success(
+            t("bulkAccess.userAccessGranted", { count: affected, items: resourceNoun(affected) })
+          );
+        } else if (affected === 0) {
+          toast.info(t("bulkAccess.nothingToUpdate"));
+        } else {
+          toast.success(
+            t("bulkAccess.userAccessRevoked", { count: affected, items: resourceNoun(affected) })
+          );
+        }
+        finish();
+      },
+      onError: (error) => toast.error(getErrorMessage(error, "access:bulkAccess.updateError")),
+    });
   }, [selectedUserIds, userMode, items, level, applyBulk, finish, resourceNoun, t]);
 
-  const handleApplyRoles = useCallback(async () => {
+  const handleApplyRoles = useCallback(() => {
     if (selectedRoleIds.size === 0) return;
 
-    setIsPending(true);
-    try {
-      const roleIds = [...selectedRoleIds];
-      const entries: { resourceId: number; grants: ResourceGrantSchema[] }[] = [];
+    const roleIds = [...selectedRoleIds];
+    const entries: { resourceId: number; grants: ResourceGrantSchema[] }[] = [];
 
-      for (const item of items) {
-        const existing = (item.grants ?? []).filter((g) => g.level !== "owner");
-        const grantedRoleIds = new Set(
-          existing.filter((g) => g.role_id != null).map((g) => g.role_id as number)
-        );
+    for (const item of items) {
+      const existing = (item.grants ?? []).filter((g) => g.level !== "owner");
+      const grantedRoleIds = new Set(
+        existing.filter((g) => g.role_id != null).map((g) => g.role_id as number)
+      );
 
-        if (roleMode === "grant") {
-          // Only grant roles that belong to this item's initiative and aren't already granted.
-          const itemRoleIds = availableRoles
-            .filter((r) => r.initiativeId === item.initiative_id && roleIds.includes(r.id))
-            .map((r) => r.id)
-            .filter((id) => !grantedRoleIds.has(id));
-          if (itemRoleIds.length === 0) continue;
-          entries.push({
-            resourceId: item.id,
-            grants: [
-              // Granting specific roles switches the resource to "restricted" mode;
-              // drop any "all initiative members" grant so ShareControl doesn't
-              // receive a mixed list it can't display.
-              ...existing.filter((g) => !g.all_initiative_members),
-              ...itemRoleIds.map((id) => ({ role_id: id, level: roleLevel })),
-            ],
-          });
-        } else {
-          const toRevoke = roleIds.filter((id) => grantedRoleIds.has(id));
-          if (toRevoke.length === 0) continue;
-          const revokeSet = new Set(toRevoke);
-          entries.push({
-            resourceId: item.id,
-            grants: existing.filter((g) => g.role_id == null || !revokeSet.has(g.role_id)),
-          });
-        }
-      }
-
-      await applyBulk(entries);
-      const affected = entries.length;
-      if (affected === 0) {
-        toast.info(t("bulkAccess.rolesAlreadyAssigned"));
+      if (roleMode === "grant") {
+        // Only grant roles that belong to this item's initiative and aren't already granted.
+        const itemRoleIds = availableRoles
+          .filter((r) => r.initiativeId === item.initiative_id && roleIds.includes(r.id))
+          .map((r) => r.id)
+          .filter((id) => !grantedRoleIds.has(id));
+        if (itemRoleIds.length === 0) continue;
+        entries.push({
+          resourceId: item.id,
+          grants: [
+            // Granting specific roles switches the resource to "restricted" mode;
+            // drop any "all initiative members" grant so ShareControl doesn't
+            // receive a mixed list it can't display.
+            ...existing.filter((g) => !g.all_initiative_members),
+            ...itemRoleIds.map((id) => ({ role_id: id, level: roleLevel })),
+          ],
+        });
       } else {
-        toast.success(
-          roleMode === "grant"
-            ? t("bulkAccess.roleAccessGranted", {
-                count: affected,
-                items: resourceNoun(affected),
-              })
-            : t("bulkAccess.roleAccessRevoked", {
-                count: affected,
-                items: resourceNoun(affected),
-              })
-        );
+        const toRevoke = roleIds.filter((id) => grantedRoleIds.has(id));
+        if (toRevoke.length === 0) continue;
+        const revokeSet = new Set(toRevoke);
+        entries.push({
+          resourceId: item.id,
+          grants: existing.filter((g) => g.role_id == null || !revokeSet.has(g.role_id)),
+        });
       }
-      finish();
-    } catch (error) {
-      toast.error(getErrorMessage(error, "access:bulkAccess.roleUpdateError"));
-    } finally {
-      setIsPending(false);
     }
+
+    applyBulk(entries, {
+      onSuccess: () => {
+        const affected = entries.length;
+        if (affected === 0) {
+          toast.info(t("bulkAccess.rolesAlreadyAssigned"));
+        } else {
+          toast.success(
+            roleMode === "grant"
+              ? t("bulkAccess.roleAccessGranted", {
+                  count: affected,
+                  items: resourceNoun(affected),
+                })
+              : t("bulkAccess.roleAccessRevoked", {
+                  count: affected,
+                  items: resourceNoun(affected),
+                })
+          );
+        }
+        finish();
+      },
+      onError: (error) => toast.error(getErrorMessage(error, "access:bulkAccess.roleUpdateError")),
+    });
   }, [
     selectedRoleIds,
     roleMode,
@@ -470,58 +465,62 @@ export function BulkEditAccessDialog({
     t,
   ]);
 
-  const handleApplyAllMembers = useCallback(async () => {
-    setIsPending(true);
-    try {
-      if (allMode === "share") {
-        // Switch every selected resource to "all members" mode: a single
-        // all-members grant. Per-person and per-role grants are dropped so the
-        // resource has one coherent share mode. The owner is preserved
-        // server-side, so we don't send it.
-        await applyBulk(
-          items.map((item) => ({
-            resourceId: item.id,
-            grants: [{ all_initiative_members: true, level: allLevel }],
-          }))
-        );
-        toast.success(
-          t("bulkAccess.allMembersShared", {
-            count: items.length,
-            items: resourceNoun(items.length),
-          })
-        );
-      } else {
-        // Only touch resources that actually have an all-members grant — an
-        // unchanged write is pointless and would let the toast claim removals
-        // that never happened.
-        const affected = items.filter((item) =>
-          (item.grants ?? []).some((g) => g.all_initiative_members)
-        );
-        await applyBulk(
-          affected.map((item) => ({
-            resourceId: item.id,
-            grants: (item.grants ?? []).filter(
-              (g) => g.level !== "owner" && !g.all_initiative_members
-            ),
-          }))
-        );
-        if (affected.length === 0) {
-          toast.info(t("bulkAccess.noAllMembersAccess"));
-        } else {
-          toast.success(
-            t("bulkAccess.allMembersRemoved", {
-              count: affected.length,
-              items: resourceNoun(affected.length),
-            })
-          );
-        }
-      }
-      finish();
-    } catch (error) {
+  const handleApplyAllMembers = useCallback(() => {
+    const onError = (error: Error) =>
       toast.error(getErrorMessage(error, "access:bulkAccess.updateError"));
-    } finally {
-      setIsPending(false);
+    if (allMode === "share") {
+      // Switch every selected resource to "all members" mode: a single
+      // all-members grant. Per-person and per-role grants are dropped so the
+      // resource has one coherent share mode. The owner is preserved
+      // server-side, so we don't send it.
+      applyBulk(
+        items.map((item) => ({
+          resourceId: item.id,
+          grants: [{ all_initiative_members: true, level: allLevel }],
+        })),
+        {
+          onSuccess: () => {
+            toast.success(
+              t("bulkAccess.allMembersShared", {
+                count: items.length,
+                items: resourceNoun(items.length),
+              })
+            );
+            finish();
+          },
+          onError,
+        }
+      );
+      return;
     }
+    // Only touch resources that actually have an all-members grant — an
+    // unchanged write is pointless and would let the toast claim removals
+    // that never happened.
+    const affected = items.filter((item) =>
+      (item.grants ?? []).some((g) => g.all_initiative_members)
+    );
+    applyBulk(
+      affected.map((item) => ({
+        resourceId: item.id,
+        grants: (item.grants ?? []).filter((g) => g.level !== "owner" && !g.all_initiative_members),
+      })),
+      {
+        onSuccess: () => {
+          if (affected.length === 0) {
+            toast.info(t("bulkAccess.noAllMembersAccess"));
+          } else {
+            toast.success(
+              t("bulkAccess.allMembersRemoved", {
+                count: affected.length,
+                items: resourceNoun(affected.length),
+              })
+            );
+          }
+          finish();
+        },
+        onError,
+      }
+    );
   }, [allMode, allLevel, items, applyBulk, finish, resourceNoun, t]);
 
   const selectedUserCount = selectedUserIds.size;
@@ -763,7 +762,7 @@ export function BulkEditAccessDialog({
             pending={isPending}
             disabled={!canApplyRoles}
             destructive={roleMode === "revoke"}
-            onSubmit={() => void handleApplyRoles()}
+            onSubmit={handleApplyRoles}
           />
         ) : tab === "people" ? (
           <DialogFooter
@@ -776,7 +775,7 @@ export function BulkEditAccessDialog({
             pending={isPending}
             disabled={!canApplyUsers}
             destructive={userMode === "revoke"}
-            onSubmit={() => void handleApply()}
+            onSubmit={handleApply}
           />
         ) : (
           <DialogFooter
@@ -788,7 +787,7 @@ export function BulkEditAccessDialog({
             pendingLabel={t("bulkAccess.applying")}
             pending={isPending}
             destructive={allMode === "remove"}
-            onSubmit={() => void handleApplyAllMembers()}
+            onSubmit={handleApplyAllMembers}
           />
         )}
       </DialogContent>

@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import type {
   OwnedContentResponse,
   OwnershipTransferRequest,
-  OwnershipTransferResponse,
   Tool,
   UserCommunityMember,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -18,6 +17,7 @@ import {
 import { invalidate, q } from "@/api/query-keys";
 import type { MemberLike } from "@/components/members/MemberSearchSelect";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { USER_ID_LOOKUP_MAX, useUserSearch } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
@@ -100,7 +100,6 @@ export const TransferContentOwnershipDialog = ({
   const [recipientLabel, setRecipientLabel] = useState<string | null>(null);
   const [content, setContent] = useState<OwnedContentResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
 
   const isClaim = member === null;
 
@@ -171,29 +170,25 @@ export const TransferContentOwnershipDialog = ({
       ? getUserDisplayName(defaultRecipientUser)
       : null);
 
-  const handleSubmit = async () => {
-    if (!recipientId) return;
-    setSubmitting(true);
-    try {
-      const body = transferBody(recipientId);
-      const result = (member === null
-        ? await claimUnownedContent(communityId, body)
-        : await transferOwnership(
-            communityId,
-            member.id,
-            body
-          )) as unknown as OwnershipTransferResponse;
-      void invalidate(q.communityMembers());
-      toast.success(t("transferOwnership.moved", { count: result.total }));
-      onSuccess?.();
-      onOpenChange(false);
-    } catch (err) {
-      console.error("Failed to transfer ownership", err);
-      toast.error(getErrorMessage(err, "communities:transferOwnership.failed"));
-    } finally {
-      setSubmitting(false);
+  const transfer = useCommunityMutation(
+    {
+      mutationFn: (communityId, recipient: string) => {
+        const body = transferBody(recipient);
+        return member === null
+          ? claimUnownedContent(communityId, body)
+          : transferOwnership(communityId, member.id, body);
+      },
+      invalidate: () => invalidate(q.communityMembers()),
+      errorKey: "communities:transferOwnership.failed",
+    },
+    {
+      onSuccess: (result) => {
+        toast.success(t("transferOwnership.moved", { count: result.total }));
+        onSuccess?.();
+        onOpenChange(false);
+      },
     }
-  };
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -258,12 +253,22 @@ export const TransferContentOwnershipDialog = ({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={transfer.isPending}
+          >
             {t("common:cancel")}
           </Button>
           {!nothingToMove && !loading && (
-            <Button onClick={handleSubmit} pending={submitting} disabled={!recipientId}>
-              {submitting ? t("transferOwnership.transferring") : t("transferOwnership.confirm")}
+            <Button
+              onClick={() => transfer.mutate(recipientId)}
+              pending={transfer.isPending}
+              disabled={!recipientId}
+            >
+              {transfer.isPending
+                ? t("transferOwnership.transferring")
+                : t("transferOwnership.confirm")}
             </Button>
           )}
         </DialogFooter>

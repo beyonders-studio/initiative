@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
 import { deleteCommunity } from "@/api/generated/communities/communities";
+import { useApiMutation } from "@/hooks/useApiMutation";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
 import { getErrorMessage } from "@/lib/errorMessage";
@@ -19,7 +20,6 @@ export const SettingsCommunityDangerZonePage = () => {
   const { t } = useTranslation(["communities", "common"]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [password, setPassword] = useState("");
-  const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Some accounts are not asked for a password — they hold none, or the
@@ -39,44 +39,42 @@ export const SettingsCommunityDangerZonePage = () => {
     setDeleteError(null);
   };
 
-  const confirmDeleteCommunity = async () => {
-    if (!activeCommunity) {
-      return;
+  const removal = useApiMutation(
+    {
+      mutationFn: (communityId: number) =>
+        // The dialog's confirm is enabled only once the typed phrase matches this
+        // one exactly, so it is the phrase that was typed.
+        deleteCommunity(communityId, {
+          password,
+          confirmation_text: expectedPhrase,
+        }),
+    },
+    {
+      onMutate: () => setDeleteError(null),
+      // Deletion is confirmed (204) and irreversible. Move off the deleted community's
+      // URL onto a surviving community: switchCommunity updates the active-community context +
+      // storage, so we never land on (or reload into) the now-dangling community id —
+      // which is what produced the blank "not a member" screen. Best-effort — a
+      // refresh hiccup must not surface a misleading "unable to delete" for a community
+      // that is already gone. SPA navigation (not window.location) avoids racing the
+      // storage write that a full reload would re-read.
+      onSuccess: async (_data, deletedId) => {
+        const nextCommunity = communities.find((g) => g.id !== deletedId);
+        try {
+          if (nextCommunity) {
+            await switchCommunity(nextCommunity.id);
+          } else {
+            await refreshCommunities();
+          }
+        } catch (error) {
+          console.error(error);
+        }
+        await navigate({ to: "/" });
+      },
+      onError: (error) =>
+        setDeleteError(getErrorMessage(error, "communities:settings.unableToDelete")),
     }
-    setDeleting(true);
-    setDeleteError(null);
-    try {
-      // The dialog's confirm is enabled only once the typed phrase matches this
-      // one exactly, so it is the phrase that was typed.
-      await deleteCommunity(activeCommunity.id, {
-        password,
-        confirmation_text: expectedPhrase,
-      });
-    } catch (error) {
-      console.error(error);
-      setDeleteError(getErrorMessage(error, "communities:settings.unableToDelete"));
-      setDeleting(false);
-      return;
-    }
-    // Deletion is confirmed (204) and irreversible. Move off the deleted community's
-    // URL onto a surviving community: switchCommunity updates the active-community context +
-    // storage, so we never land on (or reload into) the now-dangling community id —
-    // which is what produced the blank "not a member" screen. Best-effort — a
-    // refresh hiccup must not surface a misleading "unable to delete" for a community
-    // that is already gone. SPA navigation (not window.location) avoids racing the
-    // storage write that a full reload would re-read.
-    const nextCommunity = communities.find((g) => g.id !== activeCommunity.id);
-    try {
-      if (nextCommunity) {
-        await switchCommunity(nextCommunity.id);
-      } else {
-        await refreshCommunities();
-      }
-    } catch (error) {
-      console.error(error);
-    }
-    void navigate({ to: "/" });
-  };
+  );
 
   if (!activeCommunity) {
     return (
@@ -121,9 +119,9 @@ export const SettingsCommunityDangerZonePage = () => {
               resetDialog();
               setShowDeleteConfirm(true);
             }}
-            disabled={deleting}
+            disabled={removal.isPending}
           >
-            {deleting ? t("settings.deleting") : t("settings.deleteCommunity")}
+            {removal.isPending ? t("settings.deleting") : t("settings.deleteCommunity")}
           </Button>
         </CardContent>
       </Card>
@@ -154,14 +152,14 @@ export const SettingsCommunityDangerZonePage = () => {
         }
         confirmLabel={t("common:delete")}
         loadingLabel={t("settings.deleting")}
-        isLoading={deleting}
+        isLoading={removal.isPending}
         confirmDisabled={!passwordless && password.length === 0}
         destructive
         onConfirm={(e) => {
           // Keep the dialog open so inline errors (wrong password)
           // stay visible; the confirm button closes it by default.
           e.preventDefault();
-          void confirmDeleteCommunity();
+          removal.mutate(activeCommunity.id);
         }}
       >
         {!passwordless && (
