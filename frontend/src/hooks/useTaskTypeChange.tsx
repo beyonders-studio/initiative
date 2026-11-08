@@ -4,7 +4,7 @@ import { type TaskUpdate, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { useFillRequired } from "@/hooks/useFillRequired";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
 import { useReadTaskNow } from "@/hooks/useTasks";
-import { detailLayoutOf, instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
+import { instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import {
   TASK_DETAIL,
   taskChanges,
@@ -12,6 +12,7 @@ import {
   useMissingAsType,
 } from "@/lib/layouts/taskLayout";
 import { requiredKeys, type StoredRegions } from "@/ui/layouts/detailLayout";
+import { detailLayoutOf } from "@/ui/layouts/layoutSet";
 
 /**
  * A task of `projectId` given another type from a list, as a drop into

@@ -15,14 +15,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 
 import {
-  type DetailLayoutDefinitionInput,
-  type DetailLayoutRead,
-  type DetailLayoutWrite,
   type GetLayoutsParams,
   type LayoutTarget,
-  type ListLayoutRead,
-  type ListLayoutReadKind,
-  type ListLayoutWrite,
   Tool,
   type ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -39,6 +33,7 @@ import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import type { MutationOpts } from "@/types/mutation";
+import type { LayoutChange } from "@/ui/layouts/layoutSet";
 
 /** The tools whose every instance lays out its own items: the backend's
  *  per-instance layout tools that draw a detail. */
@@ -98,41 +93,6 @@ export const useInitiativeLayouts = (initiativeId: number) => {
     query: { placeholderData: undefined },
   });
 };
-
-const isList = (layout: ListLayoutRead | DetailLayoutRead): layout is ListLayoutRead =>
-  "is_default" in layout;
-
-/** The ways a target lists what it holds, in the order its tool draws them. */
-export const listLayouts = (set: Pick<ToolLayoutSetRead, "layouts"> | undefined) =>
-  (set?.layouts ?? []).filter(isList);
-
-/** The target's details, in the order its tool draws them. */
-export const detailLayouts = (set: Pick<ToolLayoutSetRead, "layouts"> | undefined) =>
-  (set?.layouts ?? []).filter((layout): layout is DetailLayoutRead => !isList(layout));
-
-/** One detail's layout as changed, or null where it is drawn as shipped. */
-export const detailLayoutOf = (
-  set: ToolLayoutSetRead | undefined,
-  kind: DetailLayoutRead["kind"],
-  /** For a detail laid out per type (a project's task page), which type's. */
-  taskTypeId?: number | null
-): DetailLayoutDefinitionInput | null => {
-  const layout = detailLayouts(set).find(
-    (each) => each.kind === kind && (each.task_type_id ?? null) === (taskTypeId ?? null)
-  );
-  return layout?.updated_at ? (layout.definition as DetailLayoutDefinitionInput) : null;
-};
-
-/** One change to a target's layouts: one saved, one put back as shipped, or
- *  the list it opens on. */
-export type LayoutChange =
-  | { save: ListLayoutWrite | DetailLayoutWrite }
-  | {
-      reset: ListLayoutReadKind | DetailLayoutRead["kind"];
-      /** For a detail laid out per type: which type's page. */
-      taskTypeId?: number;
-    }
-  | { opensOn: ListLayoutReadKind };
 
 /** Make `changes`, one request each, in order, writing each answer to the
  *  target's set as it comes. Each layout keeps its own date: nothing else is

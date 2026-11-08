@@ -1,17 +1,11 @@
-import { Link } from "@tanstack/react-router";
 import { EyeClosed } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
-import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
-import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
-import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
-import { useCommunityPath } from "@/lib/communityUrl";
-import { initiativeRoute } from "@/lib/tools";
-import type { TranslateFn } from "@/types/i18n";
+import { MetadataType, type PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import { Field } from "@/ui/field";
+import { host } from "@/ui/host";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { LAYOUT_REGIONS } from "@/ui/layouts/detailLayout";
@@ -24,21 +18,21 @@ import {
   removable,
   type Selection,
 } from "@/ui/layouts/draft";
-import type { FieldDef } from "@/ui/layouts/fields";
+import type { FieldDef, LayoutEnv } from "@/ui/layouts/fields";
 import type { LayoutNode } from "@/ui/layouts/tree";
 import { listFormat } from "@/ui/lib/intl";
 import {
   COUNTER_DISPLAYS,
   type FieldDisplay,
-  type MetadataOwner,
   SCALE_DISPLAYS,
 } from "@/ui/properties/propertyHelpers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 
-import type { EditableDetail } from "./details";
-import type { LayoutEdits } from "./LayoutEditor";
+import type { EditableDetail, LayoutEdits } from "./LayoutEditor";
 import { type EditablePresets, LayoutPresets } from "./LayoutPresets";
+
+type Translate = LayoutEnv["t"];
 
 /**
  * The settings of the one thing selected, and only those: the list layout's
@@ -47,6 +41,8 @@ import { type EditablePresets, LayoutPresets } from "./LayoutPresets";
  * card or a column out of the table, where it may go.
  */
 export const ListLayoutSettings = ({
+  t,
+  name,
   layout,
   presets,
   help,
@@ -58,13 +54,18 @@ export const ListLayoutSettings = ({
   selection,
   edits,
   locked,
+  metadataHref,
 }: {
+  /** Reads the words of the kind it lists. */
+  t: Translate;
+  /** What the list is called. */
+  name: string;
   layout: ListLayout;
   /** The presets it offers; a list of files offers none. */
   presets?: EditablePresets;
   /** Its settings of its kind's own, after its presets. */
   settings?: ReactNode;
-  /** What the list is, as a key in `projects`. */
+  /** What the list is, as a key. */
   help: string;
   /** Whether the target opens on it; left out where it has no other list. */
   opensFirst?: boolean;
@@ -78,9 +79,9 @@ export const ListLayoutSettings = ({
   edits: LayoutEdits;
   /** A save is under way, and nothing changes until it answers. */
   locked: boolean;
+  /** Where the initiative's metadata is edited. */
+  metadataHref: string;
 }) => {
-  const { t } = useTranslation(LAYOUT_NAMESPACES);
-  const translate = t as TranslateFn;
   // The field selected, as a column or a part of the card.
   const selectedField =
     selection.kind === "column"
@@ -99,11 +100,11 @@ export const ListLayoutSettings = ({
     // Disabled as one, so a save under way leaves every control as it was.
     <fieldset disabled={locked} className="min-w-0">
       {selection.kind === "layout" ? (
-        <Panel heading={translate(listLayoutLooks[layout.kind].labelKey)}>
-          <p className="text-muted-foreground text-sm">{translate(help)}</p>
+        <Panel heading={name}>
+          <p className="text-muted-foreground text-sm">{t(help)}</p>
           {shown ? (
             <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="layout-shown">{translate("layouts:shownInMenu")}</Label>
+              <Label htmlFor="layout-shown">{t("layouts:shownInMenu")}</Label>
               <Switch
                 id="layout-shown"
                 checked={shown.value}
@@ -115,7 +116,7 @@ export const ListLayoutSettings = ({
           ) : null}
           {opensFirst !== undefined && shown?.value !== false ? (
             <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="layout-default">{translate("layouts:opensFirst")}</Label>
+              <Label htmlFor="layout-default">{t("layouts:opensFirst")}</Label>
               <Switch
                 id="layout-default"
                 checked={opensFirst}
@@ -132,12 +133,13 @@ export const ListLayoutSettings = ({
             <LayoutPresets layout={layout} of={presets} fields={fields} edits={edits} />
           ) : null}
           {settings}
-          <Shipped stored={stored} edits={edits} />
+          <Shipped t={t} stored={stored} edits={edits} />
         </Panel>
       ) : selection.kind === "column" ? (
         <ColumnSettings field={selection.field} fields={fields} edits={edits} />
       ) : (
         <PartSettings
+          t={t}
           tree={cardOf(layout.definition, fields, layout.shape)}
           path={selection.path}
           fields={fields}
@@ -151,7 +153,9 @@ export const ListLayoutSettings = ({
           onChange={(display) => edits.changeDisplay(selectedField, display)}
         />
       ) : null}
-      {selectedField !== null ? <MetadataFieldNote field={selectedField} fields={fields} /> : null}
+      {selectedField !== null ? (
+        <MetadataFieldNote field={selectedField} fields={fields} href={metadataHref} />
+      ) : null}
     </fieldset>
   );
 };
@@ -162,12 +166,13 @@ export const ListLayoutSettings = ({
 const MetadataFieldNote = ({
   field,
   fields,
+  href,
 }: {
   field: string;
   fields: ReadonlyMap<string, FieldDef>;
+  href: string;
 }) => {
   const { t } = useTranslation(["layouts"]);
-  const gp = useCommunityPath();
   const definition = fields.get(field)?.property;
   if (!definition || definition.project_id !== null || definition.collection_id !== null) {
     return null;
@@ -176,9 +181,7 @@ const MetadataFieldNote = ({
     <Panel heading={t("layouts:fieldProperty.metadata")}>
       <p className="text-muted-foreground text-sm">{t("layouts:fieldProperty.metadataHelp")}</p>
       <Button type="button" variant="outline" size="sm" asChild>
-        <Link to={gp(`${initiativeRoute(definition.initiative_id)}/settings/properties`)}>
-          {t("layouts:fieldProperty.openSettings")}
-        </Link>
+        <host.Link to={href}>{t("layouts:fieldProperty.openSettings")}</host.Link>
       </Button>
     </Panel>
   );
@@ -229,29 +232,29 @@ const DisplaySetting = ({
 
 /** Putting the open layout back as shipped, or saying it already is. */
 const Shipped = ({
+  t,
   stored,
   edits,
   shipped = "layouts:shipped",
 }: {
+  t: Translate;
   stored: boolean;
   edits: LayoutEdits;
   /** What says the layout is as shipped. */
   shipped?: string;
-}) => {
-  const { t } = useTranslation(LAYOUT_NAMESPACES);
-  const translate = t as TranslateFn;
-  return stored ? (
+}) =>
+  stored ? (
     <Button type="button" variant="outline" size="sm" onClick={edits.resetLayout}>
-      {translate("layouts:useShipped")}
+      {t("layouts:useShipped")}
     </Button>
   ) : (
-    <p className="text-muted-foreground text-xs">{translate(shipped)}</p>
+    <p className="text-muted-foreground text-xs">{t(shipped)}</p>
   );
-};
 
 /** The settings of what is selected on a task's detail: the layout's own, or
  *  a part's. */
 export const DetailLayoutSettings = ({
+  t,
   detail,
   of,
   stored,
@@ -259,7 +262,10 @@ export const DetailLayoutSettings = ({
   selection,
   edits,
   locked,
+  metadataHref,
 }: {
+  /** Reads the words of the kind it lays out. */
+  t: Translate;
   /** The detail as one tree: the layout, holding its header, main and side. */
   detail: LayoutNode;
   of: EditableDetail;
@@ -269,60 +275,60 @@ export const DetailLayoutSettings = ({
   selection: Selection;
   edits: LayoutEdits;
   locked: boolean;
+  /** Where the initiative's metadata is edited. */
+  metadataHref: string;
 }) => {
-  const { t } = useTranslation(LAYOUT_NAMESPACES);
-  const translate = t as TranslateFn;
   const node = selection.kind === "part" ? nodeAt(detail, selection.path) : undefined;
   return (
     <fieldset disabled={locked} className="min-w-0">
       {selection.kind === "part" ? (
         <>
-          <PartSettings tree={detail} path={selection.path} fields={fields} edits={edits} on={of} />
+          <PartSettings
+            t={t}
+            tree={detail}
+            path={selection.path}
+            fields={fields}
+            edits={edits}
+            on={of}
+          />
           {node?.type === "field" ? (
-            <MetadataFieldNote field={String(node.props?.field)} fields={fields} />
+            <MetadataFieldNote
+              field={String(node.props?.field)}
+              fields={fields}
+              href={metadataHref}
+            />
           ) : null}
         </>
       ) : (
-        <Panel heading={translate(of.words.name)}>
-          <p className="text-muted-foreground text-sm">{translate(of.words.help)}</p>
-          <Shipped stored={stored} edits={edits} shipped={of.words.shipped} />
+        <Panel heading={t(of.words.name, { name: of.typeName })}>
+          <p className="text-muted-foreground text-sm">{t(of.words.help)}</p>
+          <Shipped t={t} stored={stored} edits={edits} shipped={of.words.shipped} />
         </Panel>
       )}
     </fieldset>
   );
 };
 
-/** The target's own properties, managed beside its layouts: each with the
- *  layouts that show it, as `shownOn` names them. */
+/** The target's own properties, managed beside its layouts: `list` draws
+ *  them, each with the layouts that show it, as `shownOn` names them. */
 export const LayoutProperties = ({
-  initiativeId,
-  owner,
-  canManage,
+  list,
   shownOn,
 }: {
-  initiativeId: number;
-  owner: MetadataOwner;
-  /** Whether the request may make, edit and delete them: the server's
-   *  answer on the owner. */
-  canManage: boolean;
+  list: (placement: (definition: PropertyDefinitionRead) => string) => ReactNode;
   shownOn: (propertyId: number) => string[];
 }) => {
   const { t, i18n } = useTranslation(["layouts"]);
   return (
     <Panel heading={t("layouts:properties")}>
-      <InitiativeSettingsPropertiesTab
-        initiativeId={initiativeId}
-        owner={owner}
-        canManage={canManage}
-        placement={(definition) => {
-          const names = shownOn(definition.id);
-          return names.length > 0
-            ? t("layouts:propertiesShownOn", {
-                layouts: listFormat(i18n.language).format(names),
-              })
-            : t("layouts:propertiesNowhere");
-        }}
-      />
+      {list((definition) => {
+        const names = shownOn(definition.id);
+        return names.length > 0
+          ? t("layouts:propertiesShownOn", {
+              layouts: listFormat(i18n.language).format(names),
+            })
+          : t("layouts:propertiesNowhere");
+      })}
       <p className="text-muted-foreground text-xs">{t("layouts:propertiesPlacementHelp")}</p>
     </Panel>
   );
@@ -337,7 +343,7 @@ const ColumnSettings = ({
   fields: ReadonlyMap<string, FieldDef>;
   edits: LayoutEdits;
 }) => {
-  const { t } = useTranslation(["projects", "layouts"]);
+  const { t } = useTranslation(["layouts"]);
   const keeps = fields.get(field)?.hideable === false;
   return (
     <Panel heading={t("layouts:column")}>
@@ -357,12 +363,14 @@ const ColumnSettings = ({
 /** One part of a card or a page: how a group or a section is arranged, what
  *  the part does, and taking it off where it may go. */
 const PartSettings = ({
+  t,
   tree,
   path,
   fields,
   edits,
   on,
 }: {
+  t: Translate;
   tree: LayoutNode;
   path: NodePath;
   fields: ReadonlyMap<string, FieldDef>;
@@ -370,23 +378,19 @@ const PartSettings = ({
   /** The detail the part is on; none on a card. */
   on?: EditableDetail;
 }) => {
-  const { t } = useTranslation(LAYOUT_NAMESPACES);
-  const translate = t as TranslateFn;
   const node = nodeAt(tree, path);
   if (!node) return null;
   if (node.type === "card") {
     return (
-      <Panel heading={translate("layouts:card")}>
-        <p className="text-muted-foreground text-sm">{translate("layouts:cardHelp")}</p>
+      <Panel heading={t("layouts:card")}>
+        <p className="text-muted-foreground text-sm">{t("layouts:cardHelp")}</p>
       </Panel>
     );
   }
   if ((LAYOUT_REGIONS as readonly string[]).includes(node.type)) {
     return (
-      <Panel heading={translate(`layouts:parts.${node.type}`)}>
-        <p className="text-muted-foreground text-sm">
-          {translate(`layouts:regionHelp.${node.type}`)}
-        </p>
+      <Panel heading={t(`layouts:parts.${node.type}`)}>
+        <p className="text-muted-foreground text-sm">{t(`layouts:regionHelp.${node.type}`)}</p>
       </Panel>
     );
   }
@@ -394,10 +398,10 @@ const PartSettings = ({
   const remove = canRemove ? (
     <Button type="button" variant="outline" size="sm" onClick={() => edits.removePart(path)}>
       <EyeClosed className="h-4 w-4" aria-hidden="true" />
-      {translate("layouts:hidePart")}
+      {t("layouts:hidePart")}
     </Button>
   ) : (
-    <p className="text-muted-foreground text-xs">{translate("layouts:holdsTitle")}</p>
+    <p className="text-muted-foreground text-xs">{t("layouts:holdsTitle")}</p>
   );
   const change = (next: LayoutNode) => edits.changePart(path, next);
 
@@ -430,8 +434,8 @@ const PartSettings = ({
               ? "layouts:propertiesHelp"
               : "layouts:fieldHelp";
   return (
-    <Panel heading={translate("layouts:settings")}>
-      <p className="text-muted-foreground text-sm">{translate(help)}</p>
+    <Panel heading={t("layouts:settings")}>
+      <p className="text-muted-foreground text-sm">{t(help)}</p>
       {canRemove ? remove : null}
     </Panel>
   );
@@ -455,7 +459,7 @@ const GroupSettings = ({
   onChange: (next: LayoutNode) => void;
   children: ReactNode;
 }) => {
-  const { t } = useTranslation(["projects", "layouts"]);
+  const { t } = useTranslation(["layouts"]);
   const props = node.props ?? {};
   const set = (key: string, value: unknown) => {
     const { [key]: _left, ...rest } = props;
@@ -520,7 +524,7 @@ const SectionSettings = ({
   onChange: (next: LayoutNode) => void;
   children: ReactNode;
 }) => {
-  const { t } = useTranslation(["projects", "layouts"]);
+  const { t } = useTranslation(["layouts"]);
   const props = node.props ?? {};
   const title = typeof props.title === "string" ? props.title : "";
   const set = (key: string, value: unknown) => {

@@ -9,31 +9,38 @@
 
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { SHARED_LAYOUTS } from "@/components/layouts/details";
 import { LayoutEditor } from "@/components/layouts/LayoutEditor";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
+import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import {
   NO_DEFINITIONS,
   useAppendPropertyOption,
   useOwnedDefinitions,
 } from "@/hooks/useProperties";
 import { useRouteId } from "@/hooks/useRouteId";
-import { sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
+import { sharedTarget, useSaveLayouts, useToolLayouts } from "@/hooks/useToolLayouts";
 import { useSearchMembers } from "@/hooks/useUsers";
 import { useCommunityPath } from "@/lib/communityUrl";
+import { useLayoutPlugins } from "@/lib/layouts/plugins";
 import { initiativeRoute } from "@/lib/tools";
+import type { TranslateFn } from "@/types/i18n";
 
 export const SharedLayoutEditorPage = ({ tool }: { tool: Tool }) => {
   const id = useRouteId("initiativeId");
   const navigate = useNavigate();
   const gp = useCommunityPath();
+  const { t } = useTranslation(LAYOUT_NAMESPACES);
 
   const target = useMemo(() => (id === null ? null : sharedTarget(tool, id)), [tool, id]);
   const set = useToolLayouts(target).data;
+  const save = useSaveLayouts(target ?? sharedTarget(tool, 0));
   const shared = SHARED_LAYOUTS[tool];
   const details = useMemo(() => (id === null || !shared ? [] : [shared.detail(id)]), [id, shared]);
+  const plugins = useLayoutPlugins(id, details[0]?.spec.kind);
   const { data: definitions = NO_DEFINITIONS } = useOwnedDefinitions({
     initiativeId: id ?? undefined,
     enabled: id !== null && shared?.presets !== undefined,
@@ -52,11 +59,14 @@ export const SharedLayoutEditorPage = ({ tool }: { tool: Tool }) => {
       // Another initiative's editor starts afresh: a draft, and the question
       // before leaving it, belong to the initiative they were made for.
       key={`${tool}:${id}`}
-      target={target}
+      t={t as TranslateFn}
       initiativeId={id}
       presets={presets}
       details={details}
-      set={set}
+      plugins={plugins}
+      layouts={set}
+      save={save.mutateAsync}
+      metadataHref={gp(`${initiativeRoute(id)}/settings/properties`)}
       onClose={() => void navigate({ to: gp(`${initiativeRoute(id)}/settings/layouts`) })}
     />
   );

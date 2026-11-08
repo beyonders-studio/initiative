@@ -11,10 +11,12 @@
 
 import { useTranslation } from "react-i18next";
 
+import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { LayoutsOverview } from "@/components/layouts/LayoutList";
+import { TaskTypeDeleteDialog } from "@/components/projects/TaskTypeDeleteDialog";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { useToolSettings } from "@/components/tools/settings/ToolSettingsContext";
-import { instanceTarget, useInstanceLayouts } from "@/hooks/useToolLayouts";
+import { instanceTarget, useInstanceLayouts, useSaveLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolDetailRoute } from "@/lib/tools";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
@@ -24,6 +26,7 @@ export const ToolSettingsLayoutsPage = () => {
   const { t } = useTranslation("layouts");
   const gp = useCommunityPath();
   const set = useInstanceLayouts(tool, entity.id).data;
+  const save = useSaveLayouts(instanceTarget(tool, entity.id));
 
   if (!set) return null;
   if (!set.can_configure) return <SettingsPermissionRequired scope="tool" />;
@@ -38,7 +41,14 @@ export const ToolSettingsLayoutsPage = () => {
       <CardContent>
         <LayoutsOverview
           layouts={set.layouts}
-          target={instanceTarget(tool, entity.id)}
+          save={save.mutateAsync}
+          typeDelete={
+            tool === Tool.project
+              ? (typeId, onClose) => (
+                  <TaskTypeDeleteDialog projectId={entity.id} typeId={typeId} onClose={onClose} />
+                )
+              : undefined
+          }
           editor={editor}
         />
       </CardContent>

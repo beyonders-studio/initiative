@@ -11,7 +11,8 @@ import {
 import { getListTaskStatusesQueryOptions } from "@/api/generated/task-statuses/task-statuses";
 import { getListColumnLimitsQueryOptions } from "@/api/generated/tasks/tasks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { listLayouts, useInstanceLayouts } from "@/hooks/useToolLayouts";
+import { useInstanceLayouts } from "@/hooks/useToolLayouts";
+import { listLayouts } from "@/ui/layouts/layoutSet";
 
 /** The most a column may be limited to, as the server holds a layout to. */
 export const MAX_COLUMN_LIMIT = 10_000;

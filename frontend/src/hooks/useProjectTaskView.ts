@@ -35,7 +35,7 @@ import {
 } from "@/hooks/useListView";
 import { useProject, useProjectTaskStatuses, useProjectTaskTypes } from "@/hooks/useProjects";
 import { useKnownTagIds } from "@/hooks/useTags";
-import { detailLayoutOf, listLayouts, useInstanceLayouts } from "@/hooks/useToolLayouts";
+import { useInstanceLayouts } from "@/hooks/useToolLayouts";
 import {
   EMPTY_TASK_FILTERS,
   type StoredTaskFilters,
@@ -51,6 +51,7 @@ import { TASK_LIST_SHAPE, TASK_PRESETS, taskLayoutFor } from "@/lib/layouts/task
 import { pageParts, type StoredRegions } from "@/ui/layouts/detailLayout";
 import { columnsOf } from "@/ui/layouts/draft";
 import { catalogChoices, viewGrouping } from "@/ui/layouts/grouping";
+import { detailLayoutOf, listLayouts } from "@/ui/layouts/layoutSet";
 import { type Preset, presetsOf } from "@/ui/layouts/presets";
 
 const readTaskFilters = (raw: unknown) => specFromStored(raw as StoredTaskFilters);

@@ -7,6 +7,7 @@ import { createEvent, fireEvent, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -34,10 +35,19 @@ import {
   Tool,
   type ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
+import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { useProperties } from "@/hooks/useProperties";
-import { instanceTarget, sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
+import {
+  instanceTarget,
+  sharedTarget,
+  useSaveLayouts,
+  useToolLayouts,
+} from "@/hooks/useToolLayouts";
+import { useLayoutPlugins } from "@/lib/layouts/plugins";
 import { TASK_COLUMNS } from "@/lib/layouts/tasks";
 import { CollectionLayoutEditorPage } from "@/pages/initiativeTools/files/CollectionLayoutEditorPage";
+import type { TranslateFn } from "@/types/i18n";
 import { MAX_PRESETS } from "@/ui/layouts/presets";
 import type { LayoutNode } from "@/ui/layouts/tree";
 
@@ -92,29 +102,57 @@ const saved = (kind: string) =>
     ?.definition as Record<string, unknown> | undefined;
 
 /** The editor as its page holds it: on the project's layouts as read, which
- *  each save writes its answer over. With `calendar`, on the initiative
- *  calendar's instead. */
+ *  each save writes its answer over, its properties changed where `canManage`
+ *  says. With `calendar`, on the initiative calendar's instead. */
+const EditorPage = ({
+  kind,
+  onClose,
+  calendar = false,
+  canManage = !calendar,
+}: {
+  kind: string;
+  onClose: () => void;
+  calendar?: boolean;
+  canManage?: boolean;
+}) => {
+  const { t } = useTranslation(LAYOUT_NAMESPACES);
+  const target = calendar ? sharedTarget(Tool.calendar, 1) : instanceTarget(Tool.project, 1);
+  const read = useToolLayouts(target).data;
+  const project = useProjectLayouts();
+  const save = useSaveLayouts(target);
+  const plugins = useLayoutPlugins(1, calendar ? "calendar_event" : "task");
+  return read && project ? (
+    <LayoutEditor
+      t={t as TranslateFn}
+      initiativeId={1}
+      lists={calendar ? undefined : project.lists}
+      details={calendar ? CALENDAR_DETAILS : project.details}
+      presets={calendar ? CALENDAR_PRESETS : project.presets}
+      plugins={plugins}
+      layouts={read}
+      save={save.mutateAsync}
+      initialKind={kind}
+      properties={
+        calendar
+          ? undefined
+          : (placement) => (
+              <InitiativeSettingsPropertiesTab
+                initiativeId={1}
+                owner={{ kind: "project", id: 1 }}
+                canManage={canManage}
+                placement={placement}
+              />
+            )
+      }
+      metadataHref="/c/1/i/1/settings/properties"
+      onClose={onClose}
+    />
+  ) : null;
+};
+
 const editor = (kind: string, onClose = vi.fn(), set = buildToolLayoutSet(), calendar = false) => {
   server.use(communityHttp.get("/layouts/", () => HttpResponse.json(set)));
-  const target = calendar ? sharedTarget(Tool.calendar, 1) : instanceTarget(Tool.project, 1);
-  const Page = () => {
-    const read = useToolLayouts(target).data;
-    const project = useProjectLayouts();
-    return read && project ? (
-      <LayoutEditor
-        target={target}
-        initiativeId={1}
-        lists={calendar ? undefined : project.lists}
-        details={calendar ? CALENDAR_DETAILS : project.details}
-        presets={calendar ? CALENDAR_PRESETS : project.presets}
-        set={read}
-        initialKind={kind}
-        ownPropertiesEditable={!calendar}
-        onClose={onClose}
-      />
-    ) : null;
-  };
-  renderPage(Page);
+  renderPage(() => <EditorPage kind={kind} onClose={onClose} calendar={calendar} />);
   return { user: userEvent.setup(), onClose };
 };
 
@@ -313,24 +351,7 @@ describe("LayoutEditor", () => {
       })
     );
     server.use(communityHttp.get("/layouts/", () => HttpResponse.json(buildToolLayoutSet())));
-    const target = instanceTarget(Tool.project, 1);
-    const Page = () => {
-      const read = useToolLayouts(target).data;
-      const project = useProjectLayouts();
-      return read && project ? (
-        <LayoutEditor
-          target={target}
-          initiativeId={1}
-          lists={project.lists}
-          details={project.details}
-          presets={project.presets}
-          set={read}
-          initialKind="table"
-          onClose={vi.fn()}
-        />
-      ) : null;
-    };
-    renderPage(Page);
+    renderPage(() => <EditorPage kind="table" onClose={vi.fn()} canManage={false} />);
 
     const panel = (await screen.findByRole("heading", { name: "Properties" })).closest(
       "section"

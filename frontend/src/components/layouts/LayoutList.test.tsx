@@ -20,7 +20,8 @@ import {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { LayoutList } from "@/components/layouts/LayoutList";
-import { instanceTarget } from "@/hooks/useToolLayouts";
+import { TaskTypeDeleteDialog } from "@/components/projects/TaskTypeDeleteDialog";
+import { instanceTarget, useSaveLayouts } from "@/hooks/useToolLayouts";
 
 const bugPage: DetailLayoutRead = {
   kind: "task",
@@ -30,18 +31,43 @@ const bugPage: DetailLayoutRead = {
   updated_at: null,
 };
 
-const mount = (target = true, extra: DetailLayoutRead[] = []) =>
-  renderPage(
-    () => (
-      <LayoutList
-        layouts={
-          buildToolLayoutSet({ hidden: ["table", "gantt", "calendar"], layouts: extra }).layouts
-        }
-        target={target ? instanceTarget(Tool.project, 1) : undefined}
-      />
-    ),
-    { initialRoute: "/c/1" }
+/** A project's layouts, changed from here where `editable` says, as its
+ *  settings hold them. */
+const ProjectLayouts = ({ editable, extra }: { editable: boolean; extra: DetailLayoutRead[] }) => {
+  const save = useSaveLayouts(instanceTarget(Tool.project, 1));
+  return (
+    <LayoutList
+      layouts={
+        buildToolLayoutSet({ hidden: ["table", "gantt", "calendar"], layouts: extra }).layouts
+      }
+      save={editable ? save.mutateAsync : undefined}
+      typeDelete={
+        editable
+          ? (typeId, onClose) => (
+              <TaskTypeDeleteDialog projectId={1} typeId={typeId} onClose={onClose} />
+            )
+          : undefined
+      }
+    />
   );
+};
+
+const mount = (editable = true, extra: DetailLayoutRead[] = []) =>
+  renderPage(() => <ProjectLayouts editable={editable} extra={extra} />, {
+    initialRoute: "/c/1",
+  });
+
+/** A collection's layouts, changed from here, each opening its editor. */
+const CollectionLayouts = () => {
+  const save = useSaveLayouts(instanceTarget("collection", 5));
+  return (
+    <LayoutList
+      layouts={buildToolLayoutSet({ tool: "collection", hidden: ["timeline"] }).layouts}
+      save={save.mutateAsync}
+      editor="/c/1/i/1/files/collections/5/layouts"
+    />
+  );
+};
 
 describe("LayoutList", () => {
   it("groups a project's views apart from its task pages, and shows a hidden view", async () => {
@@ -103,16 +129,7 @@ describe("LayoutList", () => {
       })
     );
     const user = userEvent.setup();
-    renderPage(
-      () => (
-        <LayoutList
-          layouts={buildToolLayoutSet({ tool: "collection", hidden: ["timeline"] }).layouts}
-          target={instanceTarget("collection", 5)}
-          editor="/c/1/i/1/files/collections/5/layouts"
-        />
-      ),
-      { initialRoute: "/c/1" }
-    );
+    renderPage(CollectionLayouts, { initialRoute: "/c/1" });
 
     // Each layout's name opens the editor on it, the file's page among them.
     expect(await screen.findByRole("link", { name: "Edit File page" })).toHaveAttribute(
@@ -127,7 +144,7 @@ describe("LayoutList", () => {
     await waitFor(() => expect(opensOn).toEqual({ tool: "collection", kind: "grid" }));
   });
 
-  it("only reads, saying which views are hidden, without a target", async () => {
+  it("only reads, saying which views are hidden, without a way to save", async () => {
     mount(false);
 
     expect(await screen.findAllByText("Hidden")).toHaveLength(3);

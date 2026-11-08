@@ -31,7 +31,6 @@ import { useTranslation } from "react-i18next";
 import type { ChecklistItem, ChecklistProgress } from "@/api/generated/initiativeAPI.schemas";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
-import { useDragSensors } from "@/hooks/useDragSensors";
 import {
   useGenerateChecklist,
   usePromoteChecklistItem,
@@ -54,6 +53,7 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { Input } from "@/ui/input";
+import { useDragSensors } from "@/ui/lib/useDragSensors";
 import { Textarea } from "@/ui/textarea";
 
 /** A checklist as the server holds it, in one comparable string. */

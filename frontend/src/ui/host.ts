@@ -50,6 +50,8 @@ export interface HostLinkProps {
   to: string;
   search?: Record<string, unknown>;
   className?: string;
+  /** What the link is called where its text alone does not say. */
+  "aria-label"?: string;
   /** False where the link sits on something dragged, which carries the drag. */
   draggable?: boolean;
   children?: ReactNode;
@@ -87,8 +89,8 @@ const kept = new Map<string, string>();
 export const host: Host = {
   toast: { success: () => {}, error: () => {} },
   camera: null,
-  Link: ({ to, className, draggable, children }) =>
-    createElement("a", { href: to, className, draggable }, children),
+  Link: ({ to, className, "aria-label": label, draggable, children }) =>
+    createElement("a", { href: to, className, "aria-label": label, draggable }, children),
   openExternal: (url) => {
     const safe = sanitizeUrl(url);
     if (safe !== BLOCKED_URL) window.open(safe, "_blank", "noopener,noreferrer");

@@ -274,7 +274,6 @@ const ColumnLimits = ({
 /** A project's lists: of its tasks, with its own properties beside the
  *  initiative's metadata. */
 export const taskLists = (project: LayoutProject): EditableLists => ({
-  itemKind: "task",
   fields: (definitions, plugins) => taskFields([...project.properties, ...definitions], plugins),
   shape: TASK_LIST_SHAPE,
   owner: { kind: "project", id: project.id },

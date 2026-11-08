@@ -1,13 +1,10 @@
 import { useBlocker } from "@tanstack/react-router";
 import { Laptop, Redo2, Smartphone, Tablet, Undo2, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
 
 import type {
   ColumnLimit,
   DetailLayoutDefinitionInput,
-  DetailLayoutReadKind,
-  GetLayoutsParams,
   LayoutGrouping,
   LayoutPreset,
   ListLayoutDefinitionInput,
@@ -17,23 +14,15 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { NO_DEFINITIONS, useCreateProperty, useOwnedDefinitions } from "@/hooks/useProperties";
-import {
-  detailLayoutOf,
-  type LayoutChange,
-  listLayouts,
-  useSaveLayouts,
-} from "@/hooks/useToolLayouts";
-import {
-  pluginFields,
-  pluginKindOf,
-  shippedPluginParts,
-  usePluginsOnItems,
-} from "@/lib/layouts/plugins";
-import { toast } from "@/lib/mascotToast";
-import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
-import { placedProperties, type StoredRegions, storedLayout } from "@/ui/layouts/detailLayout";
+import { host } from "@/ui/host";
+import {
+  type DetailLayoutSpec,
+  placedProperties,
+  type StoredRegions,
+  storedLayout,
+} from "@/ui/layouts/detailLayout";
 import {
   CARD_LISTS,
   cardOf,
@@ -60,7 +49,8 @@ import {
   startHistory,
   withCard,
 } from "@/ui/layouts/draft";
-import { type FieldDef, propertyFieldId } from "@/ui/layouts/fields";
+import { type FieldDef, type LayoutEnv, propertyFieldId } from "@/ui/layouts/fields";
+import { detailLayoutOf, type LayoutChange, listLayouts } from "@/ui/layouts/layoutSet";
 import type { LayoutNode } from "@/ui/layouts/tree";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import type { FieldDisplay, MetadataOwner } from "@/ui/properties/propertyHelpers";
@@ -75,7 +65,6 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 import { CanvasFrame, type CanvasTools, type PreviewWidth } from "./CanvasFrame";
-import type { EditableDetail } from "./details";
 import {
   type Adders,
   AddPicker,
@@ -83,8 +72,8 @@ import {
   detailChoices,
   ListLayoutOutline,
   listChoices,
-  PropertiesPartName,
-  usePartLabel,
+  type PickerPlugin,
+  partLabels,
 } from "./LayoutOutline";
 import type { EditablePresets } from "./LayoutPresets";
 import { DetailLayoutSettings, LayoutProperties, ListLayoutSettings } from "./LayoutSettingsPanel";
@@ -154,13 +143,10 @@ export type ListPreview = {
   locked: boolean;
 };
 
-/** What a target lists (a project's tasks, a collection's files): what they
- *  are, the fields its lists can show, what they draw as shipped, the open
- *  list drawn with the target's own items, and its settings. */
+/** What a target lists (a project's tasks, a collection's files): the
+ *  fields its lists can show, what they draw as shipped, the open list drawn
+ *  with the target's own items, and its settings. */
 export type EditableLists = {
-  /** The kind of item listed, as its detail names it: plug-ins on that kind
-   *  draw on them. */
-  itemKind: DetailLayoutReadKind;
   /** Its fields, by id: the built-ins, the properties of `definitions`, and
    *  the plug-ins'. */
   fields: (definitions: PropertyDefinitionRead[], plugins: FieldDef[]) => Map<string, FieldDef>;
@@ -180,6 +166,47 @@ export type EditableLists = {
     edits: LayoutEdits
   ) => ReactNode;
 };
+
+/** A kind of detail, as the editor lays it out. */
+export type EditableDetail = {
+  spec: DetailLayoutSpec;
+  /** For a page laid out per type of item, which type's, and its name, which
+   *  `words.name` takes as `{{name}}`. */
+  taskTypeId?: number;
+  typeName?: string;
+  /** What the editor says about it, as keys, each naming its namespace: its
+   *  name, what it is, that it is as shipped, what its title and its fields
+   *  are, and where its own parts' names (`parts`) and what each does
+   *  (`partHelp`) are, as the start of their keys. */
+  words: {
+    name: string;
+    help: string;
+    shipped: string;
+    titleHelp: string;
+    hiddenHelp: string;
+    parts: string;
+  };
+  /** Its fields, by id: the built-ins, and the plug-ins' where they draw on it. */
+  fields: (definitions: PropertyDefinitionRead[], plugins: FieldDef[]) => Map<string, FieldDef>;
+  /** The detail drawn with one of its own, laid out as `tree` says. */
+  preview: (tree: LayoutNode) => ReactNode;
+};
+
+/** The plug-ins that draw on what is laid out: their fields, what an item's
+ *  page draws of them until its layout is saved, each install's parts, and
+ *  which of an install's parts a tree can still place. */
+export type LayoutPlugins = {
+  fields: FieldDef[];
+  shipped: LayoutNode[];
+  installs: PickerPlugin[];
+  addable: (
+    tree: LayoutNode,
+    install: number,
+    parts: PickerPlugin["parts"]
+  ) => PickerPlugin["parts"];
+};
+
+const NO_PLUGINS: LayoutPlugins = { fields: [], shipped: [], installs: [], addable: () => [] };
 
 /** What the editor knows a detail by: its kind, and for a page laid out per
  *  type of item, its type (`task:12`). What `initialKind` names. */
@@ -281,17 +308,22 @@ const stillThere = (selection: Selection, tree: LayoutNode, columns: string[]): 
  * or during a save, asks first.
  */
 export const LayoutEditor = ({
-  target,
+  t,
   initiativeId,
   lists,
   details,
   presets,
-  set,
+  plugins = NO_PLUGINS,
+  layouts,
+  save,
   initialKind,
-  ownPropertiesEditable = false,
+  properties,
+  metadataHref,
   onClose,
 }: {
-  target: GetLayoutsParams;
+  /** Reads the words of what is laid out: its kinds' fields, parts and lists,
+   *  and what the editor says of them. */
+  t: LayoutEnv["t"];
   initiativeId: number;
   /** Its lists, drawn with its items. A target without offers its lists'
    *  presets alone. */
@@ -299,23 +331,29 @@ export const LayoutEditor = ({
   details: EditableDetail[];
   /** The presets its lists offer; a target with no lists has none. */
   presets?: EditablePresets;
+  /** The plug-ins that draw on its items. */
+  plugins?: LayoutPlugins;
   /** The target's layouts, read by someone who may change them. */
-  set: ToolLayoutSetRead;
+  layouts: ToolLayoutSetRead;
+  /** Stores `changes`, in order, answering with the layouts as stored. One
+   *  that fails says why itself. */
+  save: (changes: LayoutChange[]) => Promise<ToolLayoutSetRead | undefined>;
   /** The layout to open on: a list's kind, or the task's detail. */
   initialKind?: string;
-  /** Whether the request may make, edit and delete the target's own
-   *  properties, the project's or the collection's: the server's answer on
-   *  it. Without it the panel lists them and changes nothing. */
-  ownPropertiesEditable?: boolean;
+  /** The target's own properties (a project's, a collection's), listed beside
+   *  its layouts, each said where it is placed by `placement`. */
+  properties?: (placement: (definition: PropertyDefinitionRead) => string) => ReactNode;
+  /** Where the initiative's metadata is edited: what a field showing it
+   *  links to. */
+  metadataHref: string;
   onClose: () => void;
 }) => {
-  const { t, i18n } = useTranslation(["projects", "layouts", "common"]);
-  const translate = t as TranslateFn;
   const wide = atLeast(useWidthClass(), "md");
-  const [base, setBase] = useState(() => draftOf(set, details));
+  const [base, setBase] = useState(() => draftOf(layouts, details));
   const [history, dispatch] = useReducer(historyReducer<Draft>, base, startHistory<Draft>);
   const draft = history.present;
-  const kinds = listLayouts(set).map((layout) => layout.kind);
+  const kinds = listLayouts(layouts).map((layout) => layout.kind);
+  const listName = (kind: ListLayoutReadKind) => t(listLayoutLooks[kind].labelKey);
   const offered = [...kinds, ...details.map(detailKey)];
   const [active, setActive] = useState<string>(
     initialKind && offered.includes(initialKind as ListLayoutReadKind)
@@ -338,21 +376,14 @@ export const LayoutEditor = ({
         shape,
       };
   const stored = openDetail ? (draft.details[detailKey(openDetail)] ?? null) : null;
-  // The plug-ins that draw on what is open: a list's items, or a detail's.
-  const itemKind = openDetail ? openDetail.spec.kind : lists?.itemKind;
-  const plugins = usePluginsOnItems(initiativeId, true, itemKind ? pluginKindOf(itemKind) : null);
   const detail = useMemo(
     () =>
-      openDetail
-        ? openDetail.spec.root(stored as StoredRegions | null, shippedPluginParts(plugins))
-        : null,
+      openDetail ? openDetail.spec.root(stored as StoredRegions | null, plugins.shipped) : null,
     [openDetail, stored, plugins]
   );
   const [width, setWidth] = useState<PreviewWidth>("desktop");
   const dirty = !same(draft, base);
-
-  const save = useSaveLayouts(target);
-  const saving = save.isPending;
+  const [saving, setSaving] = useState(false);
 
   // Someone else's change, read while nothing is changed here, is what the
   // editor starts from. One read mid-edit is set aside: Save sends only what
@@ -363,10 +394,10 @@ export const LayoutEditor = ({
     setBase(fresh);
     dispatch({ type: "reset", present: fresh });
   };
-  const [seen, setSeen] = useState(set);
-  if (seen !== set && !saving) {
-    setSeen(set);
-    if (!dirty) adopt(set);
+  const [seen, setSeen] = useState(layouts);
+  if (seen !== layouts && !saving) {
+    setSeen(layouts);
+    if (!dirty) adopt(layouts);
   }
 
   // The owner whose metadata its fields may be: a project's tasks', or a
@@ -376,9 +407,8 @@ export const LayoutEditor = ({
   const createProperty = useCreateProperty();
   // A detail's fields are its own; a list's are its target's.
   const fields = useMemo(
-    () =>
-      (openDetail ?? lists)?.fields(definitions, pluginFields(plugins, i18n.language)) ?? NO_FIELDS,
-    [lists, openDetail, definitions, plugins, i18n.language]
+    () => (openDetail ?? lists)?.fields(definitions, plugins.fields) ?? NO_FIELDS,
+    [lists, openDetail, definitions, plugins]
   );
   // The tree the part edits change.
   const tree = current ? cardOf(current.definition, fields, current.shape) : (detail ?? EMPTY_TREE);
@@ -415,19 +445,14 @@ export const LayoutEditor = ({
       return placedProperties(page).has(propertyId) || holdsPart(page, "properties");
     });
     return [
-      ...onLists.map((kind) => translate(listLayoutLooks[kind].labelKey)),
-      ...onPages.map((each) => translate(each.words.name, { name: each.typeName })),
+      ...onLists.map(listName),
+      ...onPages.map((each) => t(each.words.name, { name: each.typeName })),
     ];
   };
   // The target's own properties, managed beside the layout they are placed on.
-  const properties =
-    owner && selection.kind === "layout" ? (
-      <LayoutProperties
-        initiativeId={initiativeId}
-        owner={owner}
-        canManage={ownPropertiesEditable}
-        shownOn={shownOn}
-      />
+  const propertiesPanel =
+    properties && selection.kind === "layout" ? (
+      <LayoutProperties list={properties} shownOn={shownOn} />
     ) : null;
 
   const changeDraft = (next: Draft, then?: Selection) => {
@@ -538,16 +563,12 @@ export const LayoutEditor = ({
   // Where the target has properties of its own, the part showing every
   // property shows the initiative's metadata as well.
   const propertiesPart = owner ? "layouts:allPropertiesAndMetadata" : "layouts:allMetadata";
-  const { labelOf, partLabel, pickerPlugins } = usePartLabel(
-    fields,
-    plugins,
-    openDetail?.words.parts,
-    propertiesPart
-  );
+  const labels = partLabels(t, fields, plugins.installs, propertiesPart, openDetail?.words.parts);
+  const { labelOf, partLabel } = labels;
   const listed = current
-    ? listChoices(current, fields, pickerPlugins, translate, propertiesPart)
+    ? listChoices(current, fields, plugins, t, propertiesPart)
     : detail && openDetail
-      ? detailChoices(detail, openDetail, fields, pickerPlugins, translate, propertiesPart)
+      ? detailChoices(detail, openDetail, fields, plugins, t, propertiesPart)
       : { fields: [], plugins: [], parts: [] };
   // Wherever a field can be placed, a new one can be made, placed where Add
   // was opened: the owner's metadata, or a property of the initiative's.
@@ -644,16 +665,23 @@ export const LayoutEditor = ({
     ),
   };
 
-  const commit = () =>
-    save.mutate(changesFrom(base, draft, details), {
-      onSuccess: (stored) => {
-        if (stored) adopt(stored);
-        toast.success(t("layouts:saved"));
-      },
-    });
-
   // Leaving on purpose (Close after the question) passes.
   const leaving = useRef(false);
+
+  const commit = async () => {
+    setSaving(true);
+    try {
+      const stored = await save(changesFrom(base, draft, details));
+      // Left while it saved, the editor has nothing more to say of it.
+      if (leaving.current) return;
+      if (stored) adopt(stored);
+      host.toast.success(t("layouts:saved"));
+    } catch {
+      // The draft stays, to save again.
+    } finally {
+      setSaving(false);
+    }
+  };
   const blocker = useBlocker({
     shouldBlockFn: () => (dirty || saving) && !leaving.current,
     enableBeforeUnload: () => (dirty || saving) && !leaving.current,
@@ -682,232 +710,240 @@ export const LayoutEditor = ({
   }, []);
 
   return (
-    <PropertiesPartName.Provider value={propertiesPart}>
-      <div
-        className="fixed inset-0 z-50 flex flex-col bg-background"
-        role="dialog"
-        aria-modal="true"
-        aria-label={t("layouts:title")}
-      >
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={t("layouts:close")}
-            onClick={close}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-          <Select
-            value={active}
-            disabled={!wide}
-            onValueChange={(value) => {
-              setActive(value);
-              setSelected(LAYOUT_SELECTED);
-            }}
-          >
-            <SelectTrigger className="w-56" aria-label={t("layouts:layout")}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {kinds.map((kind) => (
-                <SelectItem key={kind} value={kind}>
-                  {hiddenOf(kind)
-                    ? t("layouts:hiddenList", { name: translate(listLayoutLooks[kind].labelKey) })
-                    : translate(listLayoutLooks[kind].labelKey)}
-                </SelectItem>
-              ))}
-              {kinds.length > 0 ? <SelectSeparator /> : null}
-              {details.map((detail) => (
-                <SelectItem key={detailKey(detail)} value={detailKey(detail)}>
-                  {translate(detail.words.name, { name: detail.typeName })}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <div className="flex-1" />
-          <ToggleGroup
-            type="single"
-            value={width}
-            onValueChange={(next) => next && setWidth(next as PreviewWidth)}
-            aria-label={t("layouts:previewWidth")}
-            disabled={!wide}
-          >
-            {WIDTHS.map(({ width: each, icon: Icon }) => (
-              <ToggleGroupItem
-                key={each}
-                value={each}
-                aria-label={t(`layouts:width.${each}`)}
-                className="h-8 w-8"
-              >
-                <Icon className="h-4 w-4" />
-              </ToggleGroupItem>
+    <div
+      className="fixed inset-0 z-50 flex flex-col bg-background"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("layouts:title")}
+    >
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b px-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={t("layouts:close")}
+          onClick={close}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+        <Select
+          value={active}
+          disabled={!wide}
+          onValueChange={(value) => {
+            setActive(value);
+            setSelected(LAYOUT_SELECTED);
+          }}
+        >
+          <SelectTrigger className="w-56" aria-label={t("layouts:layout")}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {kinds.map((kind) => (
+              <SelectItem key={kind} value={kind}>
+                {hiddenOf(kind)
+                  ? t("layouts:hiddenList", { name: listName(kind) })
+                  : listName(kind)}
+              </SelectItem>
             ))}
-          </ToggleGroup>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={t("layouts:undo")}
-            disabled={saving || history.past.length === 0}
-            onClick={() => dispatch({ type: "undo" })}
-          >
-            <Undo2 className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={t("layouts:redo")}
-            disabled={saving || history.future.length === 0}
-            onClick={() => dispatch({ type: "redo" })}
-          >
-            <Redo2 className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={!dirty || saving}
-            onClick={() => {
-              dispatch({ type: "reset", present: base });
-              setSelected(LAYOUT_SELECTED);
-            }}
-          >
-            {t("layouts:discard")}
-          </Button>
-          <Button type="button" size="sm" disabled={!dirty || saving} onClick={commit}>
-            {saving ? t("layouts:saving") : t("common:save")}
-          </Button>
-        </header>
-        {/* A screen too narrow to edit on keeps the draft, and says so. */}
-        {!wide ? (
-          <p className="p-6 text-muted-foreground text-sm">{t("layouts:compact")}</p>
-        ) : current && lists ? (
-          <div className="grid min-h-0 flex-1 grid-cols-[16rem_minmax(0,1fr)_18rem]">
-            <aside className="min-h-0 border-r">
-              <ListLayoutOutline
-                layout={current}
-                fields={fields}
-                plugins={plugins}
-                choices={choices}
-                adders={addersAt()}
-                selection={selection}
-                edits={edits}
-                locked={saving}
-              />
-            </aside>
-            <main className="min-h-0">
-              {lists.preview({
-                layout: current,
-                fields,
-                frame: (list, bar) => (
-                  <CanvasFrame
-                    width={width}
-                    selection={selection}
-                    onSelect={setSelected}
-                    tools={tools}
-                    bar={bar}
-                  >
-                    {list}
-                  </CanvasFrame>
-                ),
-                edits,
-                locked: saving,
-              })}
-            </main>
-            <aside className="min-h-0 overflow-y-auto border-l">
-              <ListLayoutSettings
-                layout={current}
-                presets={presets}
-                help={lists.help(current.kind)}
-                opensFirst={draft.opensOn === current.kind}
-                shown={{
-                  value: !hiddenOf(current.kind),
-                  canHide: shownKinds.some((kind) => kind !== current.kind),
-                }}
-                stored={draft.lists[current.kind] != null}
-                fields={fields}
-                settings={lists.settings?.(current, fields, edits)}
-                selection={selection}
-                edits={edits}
-                locked={saving}
-              />
-              {properties}
-            </aside>
-          </div>
-        ) : current && presets ? (
-          // A list with nothing of its own to draw here (the calendar's events
-          // and tasks): its settings, which are its presets.
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <div className="mx-auto w-full max-w-xl">
-              <ListLayoutSettings
-                layout={current}
-                presets={presets}
-                help="layouts:calendarListHelp"
-                stored={draft.lists[current.kind] != null}
-                fields={fields}
-                selection={LAYOUT_SELECTED}
-                edits={edits}
-                locked={saving}
-              />
-            </div>
-          </div>
-        ) : detail && openDetail ? (
-          <div className="grid min-h-0 flex-1 grid-cols-[16rem_minmax(0,1fr)_18rem]">
-            <aside className="min-h-0 border-r">
-              <DetailLayoutOutline
-                detail={detail}
-                of={openDetail}
-                fields={fields}
-                plugins={plugins}
-                choices={choices}
-                adders={addersAt()}
-                selection={selection}
-                edits={edits}
-                locked={saving}
-              />
-            </aside>
-            <main className="min-h-0">
-              <CanvasFrame width={width} selection={selection} onSelect={setSelected} tools={tools}>
-                {openDetail.preview(detail)}
-              </CanvasFrame>
-            </main>
-            <aside className="min-h-0 overflow-y-auto border-l">
-              <DetailLayoutSettings
-                detail={detail}
-                of={openDetail}
-                stored={stored !== null}
-                fields={fields}
-                selection={selection}
-                edits={edits}
-                locked={saving}
-              />
-              {properties}
-            </aside>
-          </div>
-        ) : null}
-        <ConfirmDialog
-          open={asking || blocker.status === "blocked"}
-          onOpenChange={(open) => {
-            if (open) return;
-            setAsking(false);
-            blocker.reset?.();
+            {kinds.length > 0 ? <SelectSeparator /> : null}
+            {details.map((detail) => (
+              <SelectItem key={detailKey(detail)} value={detailKey(detail)}>
+                {t(detail.words.name, { name: detail.typeName })}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="flex-1" />
+        <ToggleGroup
+          type="single"
+          value={width}
+          onValueChange={(next) => next && setWidth(next as PreviewWidth)}
+          aria-label={t("layouts:previewWidth")}
+          disabled={!wide}
+        >
+          {WIDTHS.map(({ width: each, icon: Icon }) => (
+            <ToggleGroupItem
+              key={each}
+              value={each}
+              aria-label={t(`layouts:width.${each}`)}
+              className="h-8 w-8"
+            >
+              <Icon className="h-4 w-4" />
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={t("layouts:undo")}
+          disabled={saving || history.past.length === 0}
+          onClick={() => dispatch({ type: "undo" })}
+        >
+          <Undo2 className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={t("layouts:redo")}
+          disabled={saving || history.future.length === 0}
+          onClick={() => dispatch({ type: "redo" })}
+        >
+          <Redo2 className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={!dirty || saving}
+          onClick={() => {
+            dispatch({ type: "reset", present: base });
+            setSelected(LAYOUT_SELECTED);
           }}
-          title={t("layouts:unsavedTitle")}
-          description={t(saving ? "layouts:savingBody" : "layouts:unsavedBody")}
-          confirmLabel={t("layouts:leave")}
-          cancelLabel={t("layouts:stay")}
-          onConfirm={() => {
-            leaving.current = true;
-            setAsking(false);
-            if (blocker.status === "blocked") blocker.proceed?.();
-            else onClose();
-          }}
-          destructive
-        />
-      </div>
-    </PropertiesPartName.Provider>
+        >
+          {t("layouts:discard")}
+        </Button>
+        <Button type="button" size="sm" disabled={!dirty || saving} onClick={() => void commit()}>
+          {saving ? t("layouts:saving") : t("common:save")}
+        </Button>
+      </header>
+      {/* A screen too narrow to edit on keeps the draft, and says so. */}
+      {!wide ? (
+        <p className="p-6 text-muted-foreground text-sm">{t("layouts:compact")}</p>
+      ) : current && lists ? (
+        <div className="grid min-h-0 flex-1 grid-cols-[16rem_minmax(0,1fr)_18rem]">
+          <aside className="min-h-0 border-r">
+            <ListLayoutOutline
+              name={listName(current.kind)}
+              layout={current}
+              fields={fields}
+              labels={labels}
+              choices={choices}
+              adders={addersAt()}
+              selection={selection}
+              edits={edits}
+              locked={saving}
+            />
+          </aside>
+          <main className="min-h-0">
+            {lists.preview({
+              layout: current,
+              fields,
+              frame: (list, bar) => (
+                <CanvasFrame
+                  width={width}
+                  selection={selection}
+                  onSelect={setSelected}
+                  tools={tools}
+                  bar={bar}
+                >
+                  {list}
+                </CanvasFrame>
+              ),
+              edits,
+              locked: saving,
+            })}
+          </main>
+          <aside className="min-h-0 overflow-y-auto border-l">
+            <ListLayoutSettings
+              t={t}
+              name={listName(current.kind)}
+              layout={current}
+              presets={presets}
+              help={lists.help(current.kind)}
+              opensFirst={draft.opensOn === current.kind}
+              shown={{
+                value: !hiddenOf(current.kind),
+                canHide: shownKinds.some((kind) => kind !== current.kind),
+              }}
+              stored={draft.lists[current.kind] != null}
+              fields={fields}
+              settings={lists.settings?.(current, fields, edits)}
+              selection={selection}
+              edits={edits}
+              locked={saving}
+              metadataHref={metadataHref}
+            />
+            {propertiesPanel}
+          </aside>
+        </div>
+      ) : current && presets ? (
+        // A list with nothing of its own to draw here (the calendar's events
+        // and tasks): its settings, which are its presets.
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-xl">
+            <ListLayoutSettings
+              t={t}
+              name={listName(current.kind)}
+              layout={current}
+              presets={presets}
+              help="layouts:calendarListHelp"
+              stored={draft.lists[current.kind] != null}
+              fields={fields}
+              selection={LAYOUT_SELECTED}
+              edits={edits}
+              locked={saving}
+              metadataHref={metadataHref}
+            />
+          </div>
+        </div>
+      ) : detail && openDetail ? (
+        <div className="grid min-h-0 flex-1 grid-cols-[16rem_minmax(0,1fr)_18rem]">
+          <aside className="min-h-0 border-r">
+            <DetailLayoutOutline
+              t={t}
+              detail={detail}
+              of={openDetail}
+              fields={fields}
+              labels={labels}
+              choices={choices}
+              adders={addersAt()}
+              selection={selection}
+              edits={edits}
+              locked={saving}
+            />
+          </aside>
+          <main className="min-h-0">
+            <CanvasFrame width={width} selection={selection} onSelect={setSelected} tools={tools}>
+              {openDetail.preview(detail)}
+            </CanvasFrame>
+          </main>
+          <aside className="min-h-0 overflow-y-auto border-l">
+            <DetailLayoutSettings
+              t={t}
+              detail={detail}
+              of={openDetail}
+              stored={stored !== null}
+              fields={fields}
+              selection={selection}
+              edits={edits}
+              locked={saving}
+              metadataHref={metadataHref}
+            />
+            {propertiesPanel}
+          </aside>
+        </div>
+      ) : null}
+      <ConfirmDialog
+        open={asking || blocker.status === "blocked"}
+        onOpenChange={(open) => {
+          if (open) return;
+          setAsking(false);
+          blocker.reset?.();
+        }}
+        title={t("layouts:unsavedTitle")}
+        description={t(saving ? "layouts:savingBody" : "layouts:unsavedBody")}
+        confirmLabel={t("layouts:leave")}
+        cancelLabel={t("layouts:stay")}
+        onConfirm={() => {
+          leaving.current = true;
+          setAsking(false);
+          if (blocker.status === "blocked") blocker.proceed?.();
+          else onClose();
+        }}
+        destructive
+      />
+    </div>
   );
 };

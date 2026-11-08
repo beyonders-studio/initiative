@@ -7,7 +7,7 @@
  */
 
 import { MoreHorizontal } from "lucide-react";
-import { type ReactNode, useMemo } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useReadCounter } from "@/api/generated/counters/counters";
@@ -44,41 +44,15 @@ import { resolveUploadUrl } from "@/lib/uploadUrl";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { type DetailKind, DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
-import type { DetailLayoutSpec, StoredRegions } from "@/ui/layouts/detailLayout";
-import type { FieldDef } from "@/ui/layouts/fields";
+import type { StoredRegions } from "@/ui/layouts/detailLayout";
 import type { LayoutNode } from "@/ui/layouts/tree";
 import { PropertyFilter } from "@/ui/properties/PropertyFilter";
 import type { PropertyInputProps } from "@/ui/properties/PropertyInput";
 
+import type { EditableDetail } from "./LayoutEditor";
 import { editablePresets } from "./LayoutPresets";
 import { TaskSortPicker } from "./TaskSortPicker";
 import type { LayoutProject } from "./taskLists";
-
-/** A kind of detail, as the editor lays it out. */
-export type EditableDetail = {
-  spec: DetailLayoutSpec;
-  /** For a page laid out per type of item, which type's, and its name, which
-   *  `words.name` takes as `{{name}}`. */
-  taskTypeId?: number;
-  typeName?: string;
-  /** What the editor says about it, as keys in `projects`, each naming its
-   *  namespace where it is another: its name, what it is, that it is as
-   *  shipped, what its title and its fields are, and where its own parts'
-   *  names (`parts`) and what each does (`partHelp`) are, as the start of their
-   *  keys. */
-  words: {
-    name: string;
-    help: string;
-    shipped: string;
-    titleHelp: string;
-    hiddenHelp: string;
-    parts: string;
-  };
-  /** Its fields, by id: the built-ins, and the plug-ins' where they draw on it. */
-  fields: (definitions: PropertyDefinitionRead[], plugins: FieldDef[]) => Map<string, FieldDef>;
-  /** The detail drawn with one of its own, laid out as `tree` says. */
-  preview: (tree: LayoutNode) => ReactNode;
-};
 
 /** A detail's words, kept under `key` in the layouts namespace. */
 const wordsOf = (key: string): EditableDetail["words"] => ({

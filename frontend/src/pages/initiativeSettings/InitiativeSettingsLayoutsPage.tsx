@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { type InitiativeToolLayoutsRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { SHARED_LAYOUTS } from "@/components/layouts/details";
 import { LayoutList } from "@/components/layouts/LayoutList";
+import { TaskTypeDeleteDialog } from "@/components/projects/TaskTypeDeleteDialog";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
@@ -20,6 +21,7 @@ import {
   instanceTarget,
   sharedTarget,
   useInitiativeLayouts,
+  useSaveLayouts,
   useToolLayouts,
 } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -106,6 +108,7 @@ const InstanceLayouts = ({
   const wide = atLeast(useWidthClass(), "md");
   const instance = gp(toolDetailRoute(entry.tool, initiativeId, entry.tool_id));
   const editor = `${instance}/layouts`;
+  const save = useSaveLayouts(instanceTarget(entry.tool, entry.tool_id));
   return (
     <section aria-label={entry.name} className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -123,7 +126,14 @@ const InstanceLayouts = ({
       </div>
       <LayoutList
         layouts={entry.layouts}
-        target={entry.can_configure ? instanceTarget(entry.tool, entry.tool_id) : undefined}
+        save={entry.can_configure ? save.mutateAsync : undefined}
+        typeDelete={
+          entry.can_configure && entry.tool === Tool.project
+            ? (typeId, onClose) => (
+                <TaskTypeDeleteDialog projectId={entry.tool_id} typeId={typeId} onClose={onClose} />
+              )
+            : undefined
+        }
       />
     </section>
   );

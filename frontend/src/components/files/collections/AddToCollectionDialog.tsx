@@ -21,7 +21,7 @@ import {
   useCollections,
   useCreateCollection,
 } from "@/hooks/useCollections";
-import { detailLayoutOf, instanceTarget, useReadToolLayouts } from "@/hooks/useToolLayouts";
+import { instanceTarget, useReadToolLayouts } from "@/hooks/useToolLayouts";
 import { COLLECTION_ICON } from "@/lib/collections";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { getErrorMessage } from "@/lib/errorMessage";
@@ -40,6 +40,7 @@ import {
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { requiredKeys, type StoredRegions } from "@/ui/layouts/detailLayout";
+import { detailLayoutOf } from "@/ui/layouts/layoutSet";
 import { listFormat } from "@/ui/lib/intl";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 

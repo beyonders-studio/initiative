@@ -13,23 +13,27 @@
 
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import {
   type CollectionList,
   CollectionListView,
 } from "@/components/files/collections/collectionLists";
+import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
 import { fileDetail } from "@/components/layouts/details";
 import { type EditableLists, LayoutEditor } from "@/components/layouts/LayoutEditor";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import type { ToolIndexRow } from "@/components/tools/ToolIndexPage";
 import { ToolIndexTable } from "@/components/tools/ToolIndexTable";
 import { useCollection, useCollectionFilesFeed } from "@/hooks/useCollections";
+import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { useRouteId } from "@/hooks/useRouteId";
-import { instanceTarget, useInstanceLayouts } from "@/hooks/useToolLayouts";
+import { instanceTarget, useInstanceLayouts, useSaveLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { collectionFileFields, FILE_LIST_SHAPE } from "@/lib/layouts/files";
-import { collectionRoute } from "@/lib/tools";
+import { collectionRoute, initiativeRoute } from "@/lib/tools";
+import type { TranslateFn } from "@/types/i18n";
 import { withDisplays } from "@/ui/layouts/fields";
 
 const noop = () => {};
@@ -49,9 +53,11 @@ export const CollectionLayoutEditorPage = () => {
   const id = useRouteId("collectionId");
   const navigate = useNavigate();
   const gp = useCommunityPath();
+  const { t } = useTranslation(LAYOUT_NAMESPACES);
 
   const collection = useCollection(id).data;
   const set = useInstanceLayouts("collection", id).data;
+  const save = useSaveLayouts(instanceTarget("collection", id ?? 0));
   const feed = useCollectionFilesFeed(id, NEWEST_ADDED);
   const files = useMemo(() => feed.data?.pages[0]?.items ?? [], [feed.data]);
   const rows = useMemo(
@@ -62,7 +68,6 @@ export const CollectionLayoutEditorPage = () => {
     () =>
       collection
         ? {
-            itemKind: "file",
             fields: (definitions) => collectionFileFields(collection.metadata, definitions),
             shape: FILE_LIST_SHAPE,
             owner: { kind: "collection", id: collection.id },
@@ -107,12 +112,21 @@ export const CollectionLayoutEditorPage = () => {
       // Another collection's editor starts afresh: a draft, and the question
       // before leaving it, belong to the collection they were made for.
       key={collection.id}
-      target={instanceTarget("collection", collection.id)}
+      t={t as TranslateFn}
       initiativeId={collection.initiative_id}
       lists={lists}
       details={details}
-      set={set}
-      ownPropertiesEditable={collection.can.edit}
+      layouts={set}
+      save={save.mutateAsync}
+      properties={(placement) => (
+        <InitiativeSettingsPropertiesTab
+          initiativeId={collection.initiative_id}
+          owner={{ kind: "collection", id: collection.id }}
+          canManage={collection.can.edit}
+          placement={placement}
+        />
+      )}
+      metadataHref={gp(`${initiativeRoute(collection.initiative_id)}/settings/properties`)}
       initialKind={layout}
       onClose={() =>
         void navigate({ to: gp(collectionRoute(collection.initiative_id, collection.id)) })
