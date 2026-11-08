@@ -57,120 +57,11 @@ const SEARCH_SETTLES_MS = 250;
  * what to offer instead.
  */
 export const NewConversationDialog = () => {
-  const { t } = useTranslation(["messages", "connections", "settings"]);
-  const navigate = useNavigate();
+  const { t } = useTranslation(["messages"]);
   const [open, setOpen] = useState(false);
-  const [term, setTerm] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  /**
-   * People gathered for a group, in the order they were added.
-   *
-   * Empty for the ordinary case: picking one person still opens their thread
-   * on the first click, because that is what this dialog is mostly for. A
-   * group is built by adding rather than by picking, so the two do not compete
-   * for the same gesture.
-   */
-  const [gathered, setGathered] = useState<PersonRead[]>([]);
-
-  // The field answers every keystroke; the request waits for typing to stop.
-  const settled = useDebouncedValue(term, SEARCH_SETTLES_MS);
-  // Not until it is opened: the aggregate walks every community the reader
-  // is in, and a button nobody has pressed is no reason to walk them.
-  const sections = usePeopleSections(settled, { enabled: open });
-
-  const groups = useMemo(() => sections.data?.sections ?? [], [sections.data]);
-  const ids = useMemo(() => {
-    const seen = new Set<number>();
-    for (const group of groups) {
-      for (const person of group.items) seen.add(person.id);
-    }
-    return [...seen];
-  }, [groups]);
-  // One question for everybody on screen, not one per row.
-  const permissions = useDmPermissions(open ? ids : []);
-  const answers = permissions.data?.permissions ?? {};
-
-  const requestConnection = useRequestConnection();
-  // Only a whole handle is a connection: half of one is a search term.
-  const handle = parseHandle(term);
-
-  const close = () => {
-    setOpen(false);
-    setTerm("");
-    setError(null);
-    setGathered([]);
-  };
-
-  const gather = (person: PersonRead) =>
-    setGathered((held) =>
-      held.some((one) => one.id === person.id)
-        ? held.filter((one) => one.id !== person.id)
-        : [...held, person]
-    );
-
-  const gatheredIds = useMemo(() => gathered.map((person) => person.id), [gathered]);
-  const rosterCheck = useRosterCheck(open ? gatheredIds : []);
-  const startGroup = useStartGroup();
-
-  const refusal = rosterCheck.data;
-  // Two names, because that is what the caller can act on: which pair to break
-  // up. Which of them is limiting who may message them is theirs, not ours.
-  const unreachable = refusal?.unreachable_pair?.length
-    ? gathered
-        .filter((person) => refusal.unreachable_pair?.includes(person.id))
-        .map((person) => getUserDisplayName(person))
-    : [];
-  const tooLarge = Boolean(refusal?.too_large);
-  // A roster that has just changed has not been checked yet, and one whose
-  // check failed has not been checked at all. Proposing either would hand the
-  // refusal back from the server after the person committed, which is the late
-  // answer asking early was meant to replace.
-  const checking = rosterCheck.isFetching;
-  const checkFailed = rosterCheck.isError;
-  const blocked = unreachable.length > 0 || tooLarge || checking || checkFailed;
-
-  const propose = () => {
-    setError(null);
-    startGroup.mutate(gatheredIds, {
-      onSuccess: (conversation) => {
-        close();
-        void navigate({ to: "/messages", search: { thread: conversation.id } });
-      },
-      onError: (err) => setError(getErrorMessage(err, "errors:DM_ROSTER_NOT_REACHABLE")),
-    });
-  };
-
-  const pick = (person: PersonRead) => {
-    close();
-    void navigate({ to: "/messages", search: { with: getUrlHandle(person) } });
-  };
-
-  const connect = () => {
-    if (!handle) return;
-    setError(null);
-    requestConnection.mutate(
-      { data: handle },
-      {
-        onSuccess: () => {
-          toast.success(t("settings:privacy.connections.sent"));
-          close();
-        },
-        onError: (err) => setError(getErrorMessage(err, "errors:CONTACT_GRANT_CANNOT_REACH")),
-      }
-    );
-  };
-
-  // Whether there is anybody at all to offer.
-  const anybody = groups.some((group) => group.items.length > 0);
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (next) setOpen(true);
-        else close();
-      }}
-    >
+    <Dialog open={open} onOpenChange={setOpen}>
       {/* The one thing on this column that starts something rather than
           narrowing what is already there, so it is the one thing drawn as a
           filled button. The name is inside it for a screen reader either way;
@@ -190,150 +81,258 @@ export const NewConversationDialog = () => {
         </Tooltip>
       </TooltipProvider>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{t("messages:newConversation.title")}</DialogTitle>
-          <DialogDescription>{t("messages:newConversation.description")}</DialogDescription>
-        </DialogHeader>
+        <NewConversationPicker onOpenChange={setOpen} />
+      </DialogContent>
+    </Dialog>
+  );
+};
 
-        <div className="space-y-1">
-          <Input
-            autoFocus
-            value={term}
-            onChange={(event) => {
-              setTerm(event.target.value);
-              setError(null);
-            }}
-            placeholder={t("messages:newConversation.placeholder")}
-            aria-label={t("messages:newConversation.placeholder")}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && handle) connect();
-            }}
-          />
-          <p className={error ? "text-destructive text-xs" : "text-muted-foreground text-xs"}>
-            {error ?? t("messages:newConversation.hint")}
-          </p>
-        </div>
+// Drawn only while the dialog is open, so each opening starts with nothing
+// typed and nobody gathered, and nothing is asked of the server before
+// somebody presses the button: the aggregate walks every community the reader
+// is in.
+const NewConversationPicker = ({ onOpenChange }: { onOpenChange: (open: boolean) => void }) => {
+  const { t } = useTranslation(["messages", "connections", "settings"]);
+  const navigate = useNavigate();
+  const [term, setTerm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  /**
+   * People gathered for a group, in the order they were added.
+   *
+   * Empty for the ordinary case: picking one person still opens their thread
+   * on the first click, because that is what this dialog is mostly for. A
+   * group is built by adding rather than by picking, so the two do not compete
+   * for the same gesture.
+   */
+  const [gathered, setGathered] = useState<PersonRead[]>([]);
 
-        {/* Above the rosters, because it is about somebody who is not in them.
+  // The field answers every keystroke; the request waits for typing to stop.
+  const settled = useDebouncedValue(term, SEARCH_SETTLES_MS);
+  const sections = usePeopleSections(settled);
+
+  const groups = useMemo(() => sections.data?.sections ?? [], [sections.data]);
+  const ids = useMemo(() => {
+    const seen = new Set<number>();
+    for (const group of groups) {
+      for (const person of group.items) seen.add(person.id);
+    }
+    return [...seen];
+  }, [groups]);
+  // One question for everybody on screen, not one per row.
+  const permissions = useDmPermissions(ids);
+  const answers = permissions.data?.permissions ?? {};
+
+  const requestConnection = useRequestConnection();
+  // Only a whole handle is a connection: half of one is a search term.
+  const handle = parseHandle(term);
+
+  const gather = (person: PersonRead) =>
+    setGathered((held) =>
+      held.some((one) => one.id === person.id)
+        ? held.filter((one) => one.id !== person.id)
+        : [...held, person]
+    );
+
+  const gatheredIds = useMemo(() => gathered.map((person) => person.id), [gathered]);
+  const rosterCheck = useRosterCheck(gatheredIds);
+  const startGroup = useStartGroup();
+
+  const refusal = rosterCheck.data;
+  // Two names, because that is what the caller can act on: which pair to break
+  // up. Which of them is limiting who may message them is theirs, not ours.
+  const unreachable = refusal?.unreachable_pair?.length
+    ? gathered
+        .filter((person) => refusal.unreachable_pair?.includes(person.id))
+        .map((person) => getUserDisplayName(person))
+    : [];
+  const tooLarge = Boolean(refusal?.too_large);
+  // A roster that has just changed has not been checked yet, and one whose
+  // check failed has not been checked at all. Proposing either would hand the
+  // refusal back from the server after the person committed, which is the late
+  // answer asking early was meant to replace.
+  const checking = rosterCheck.isFetching;
+  const checkFailed = rosterCheck.isError;
+  const blocked = unreachable.length > 0 || tooLarge || checking || checkFailed;
+
+  // Awaited rather than given callbacks: a callback belongs to the dialog
+  // being open, and what a request answers still lands if it was closed while
+  // the request was on its way.
+  const propose = () => {
+    setError(null);
+    startGroup.mutateAsync(gatheredIds).then(
+      (conversation) => {
+        onOpenChange(false);
+        void navigate({ to: "/messages", search: { thread: conversation.id } });
+      },
+      (err) => setError(getErrorMessage(err, "errors:DM_ROSTER_NOT_REACHABLE"))
+    );
+  };
+
+  const pick = (person: PersonRead) => {
+    onOpenChange(false);
+    void navigate({ to: "/messages", search: { with: getUrlHandle(person) } });
+  };
+
+  const connect = () => {
+    if (!handle) return;
+    setError(null);
+    requestConnection.mutateAsync({ data: handle }).then(
+      () => {
+        toast.success(t("settings:privacy.connections.sent"));
+        onOpenChange(false);
+      },
+      (err) => setError(getErrorMessage(err, "errors:CONTACT_GRANT_CANNOT_REACH"))
+    );
+  };
+
+  // Whether there is anybody at all to offer.
+  const anybody = groups.some((group) => group.items.length > 0);
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>{t("messages:newConversation.title")}</DialogTitle>
+        <DialogDescription>{t("messages:newConversation.description")}</DialogDescription>
+      </DialogHeader>
+
+      <div className="space-y-1">
+        <Input
+          autoFocus
+          value={term}
+          onChange={(event) => {
+            setTerm(event.target.value);
+            setError(null);
+          }}
+          placeholder={t("messages:newConversation.placeholder")}
+          aria-label={t("messages:newConversation.placeholder")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && handle) connect();
+          }}
+        />
+        <p className={error ? "text-destructive text-xs" : "text-muted-foreground text-xs"}>
+          {error ?? t("messages:newConversation.hint")}
+        </p>
+      </div>
+
+      {/* Above the rosters, because it is about somebody who is not in them.
             It appears only once the handle is whole: a connection is addressed
             by the exact name and number, and half of one addresses nobody. */}
-        {handle ? (
-          <Button
-            variant="outline"
-            className="w-full justify-start"
-            disabled={requestConnection.isPending}
-            onClick={connect}
-          >
-            {t("messages:newConversation.connect", {
-              handle: `${handle.username}#${String(handle.discriminator).padStart(4, "0")}`,
-            })}
-          </Button>
-        ) : null}
+      {handle ? (
+        <Button
+          variant="outline"
+          className="w-full justify-start"
+          disabled={requestConnection.isPending}
+          onClick={connect}
+        >
+          {t("messages:newConversation.connect", {
+            handle: `${handle.username}#${String(handle.discriminator).padStart(4, "0")}`,
+          })}
+        </Button>
+      ) : null}
 
-        {gathered.length > 0 ? (
-          <div className="space-y-2 rounded-md border p-2">
-            <ul className="flex flex-wrap gap-1">
-              {gathered.map((person) => (
-                <li key={person.id}>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    className="h-7 gap-1 px-2"
-                    // Labelled rather than left to its contents: the name is
-                    // already on screen, and reading it twice says less than
-                    // saying what the button does.
-                    aria-label={t("messages:newConversation.removeFromGroup", {
-                      name: getUserDisplayName(person),
-                    })}
-                    onClick={() => gather(person)}
-                  >
-                    <span className="max-w-32 truncate">{getUserDisplayName(person)}</span>
-                    <X className="size-3" aria-hidden />
-                  </Button>
-                </li>
-              ))}
-            </ul>
+      {gathered.length > 0 ? (
+        <div className="space-y-2 rounded-md border p-2">
+          <ul className="flex flex-wrap gap-1">
+            {gathered.map((person) => (
+              <li key={person.id}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="h-7 gap-1 px-2"
+                  // Labelled rather than left to its contents: the name is
+                  // already on screen, and reading it twice says less than
+                  // saying what the button does.
+                  aria-label={t("messages:newConversation.removeFromGroup", {
+                    name: getUserDisplayName(person),
+                  })}
+                  onClick={() => gather(person)}
+                >
+                  <span className="max-w-32 truncate">{getUserDisplayName(person)}</span>
+                  <X className="size-3" aria-hidden />
+                </Button>
+              </li>
+            ))}
+          </ul>
 
-            {/* Said while there is still a name to drop, which is the whole
+          {/* Said while there is still a name to drop, which is the whole
                 point of asking before the roster is submitted. */}
-            {unreachable.length > 1 ? (
-              <p className="text-destructive text-xs">
-                {t("messages:newConversation.cannotReachEachOther", {
-                  first: unreachable[0],
-                  second: unreachable[1],
-                })}
-              </p>
-            ) : tooLarge ? (
-              <p className="text-destructive text-xs">
-                {t("messages:newConversation.tooManyPeople", {
-                  count: refusal?.max_members ?? 0,
-                })}
-              </p>
-            ) : checkFailed ? (
-              <p className="text-destructive text-xs">
-                {t("messages:newConversation.checkUnavailable")}
-              </p>
-            ) : checking ? (
-              <p className="text-muted-foreground text-xs">
-                {t("messages:newConversation.checkingRoster")}
-              </p>
-            ) : (
-              <p className="text-muted-foreground text-xs">
-                {t("messages:newConversation.groupHint")}
-              </p>
-            )}
+          {unreachable.length > 1 ? (
+            <p className="text-destructive text-xs">
+              {t("messages:newConversation.cannotReachEachOther", {
+                first: unreachable[0],
+                second: unreachable[1],
+              })}
+            </p>
+          ) : tooLarge ? (
+            <p className="text-destructive text-xs">
+              {t("messages:newConversation.tooManyPeople", {
+                count: refusal?.max_members ?? 0,
+              })}
+            </p>
+          ) : checkFailed ? (
+            <p className="text-destructive text-xs">
+              {t("messages:newConversation.checkUnavailable")}
+            </p>
+          ) : checking ? (
+            <p className="text-muted-foreground text-xs">
+              {t("messages:newConversation.checkingRoster")}
+            </p>
+          ) : (
+            <p className="text-muted-foreground text-xs">
+              {t("messages:newConversation.groupHint")}
+            </p>
+          )}
 
-            <Button
-              className="w-full"
-              disabled={gathered.length < 2 || blocked || startGroup.isPending}
-              onClick={propose}
-            >
-              {t("messages:newConversation.startGroup", { count: gathered.length + 1 })}
-            </Button>
-          </div>
-        ) : null}
+          <Button
+            className="w-full"
+            disabled={gathered.length < 2 || blocked || startGroup.isPending}
+            onClick={propose}
+          >
+            {t("messages:newConversation.startGroup", { count: gathered.length + 1 })}
+          </Button>
+        </div>
+      ) : null}
 
-        <div className="-mx-2 max-h-80 overflow-y-auto px-2">
-          {sections.isLoading ? (
-            <p className="py-2 text-muted-foreground text-sm">{t("messages:loading")}</p>
-          ) : !anybody ? (
-            /* A section arrives for every community that has somebody else in
+      <div className="-mx-2 max-h-80 overflow-y-auto px-2">
+        {sections.isLoading ? (
+          <p className="py-2 text-muted-foreground text-sm">{t("messages:loading")}</p>
+        ) : !anybody ? (
+          /* A section arrives for every community that has somebody else in
                it, listable or not, so its presence is what separates the two
                silences: people are there and none of them take messages, or
                there is nobody to have taken them. */
-            <p className="py-2 text-muted-foreground text-sm">
-              {settled.trim()
-                ? t("messages:newConversation.noMatches")
-                : groups.length
-                  ? t("messages:newConversation.empty")
-                  : t("messages:newConversation.noCommunities")}
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {groups
-                .filter((group) => group.items.length > 0)
-                .map((group) => (
-                  <CommunityRoster
-                    // Remounted on a new term, which is what puts a community
-                    // somebody expanded back to its first page: under a
-                    // different term it is a different set of people, and
-                    // carrying the expansion over would fetch a second page
-                    // nobody asked for.
-                    key={`${group.community_id}:${settled}`}
-                    section={group}
-                    search={settled}
-                    answers={answers}
-                    onPick={pick}
-                    onGather={gather}
-                    gathered={new Set(gatheredIds)}
-                  />
-                ))}
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+          <p className="py-2 text-muted-foreground text-sm">
+            {settled.trim()
+              ? t("messages:newConversation.noMatches")
+              : groups.length
+                ? t("messages:newConversation.empty")
+                : t("messages:newConversation.noCommunities")}
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {groups
+              .filter((group) => group.items.length > 0)
+              .map((group) => (
+                <CommunityRoster
+                  // Remounted on a new term, which is what puts a community
+                  // somebody expanded back to its first page: under a
+                  // different term it is a different set of people, and
+                  // carrying the expansion over would fetch a second page
+                  // nobody asked for.
+                  key={`${group.community_id}:${settled}`}
+                  section={group}
+                  search={settled}
+                  answers={answers}
+                  onPick={pick}
+                  onGather={gather}
+                  gathered={new Set(gatheredIds)}
+                />
+              ))}
+          </div>
+        )}
+      </div>
+    </>
   );
 };
 

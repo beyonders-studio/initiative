@@ -35,22 +35,21 @@ export interface RequestToJoinDialogProps extends DialogProps {
   initiative: { id: number; name: string } | null;
 }
 
-export const RequestToJoinDialog = ({
+export const RequestToJoinDialog = ({ open, onOpenChange, ...props }: RequestToJoinDialogProps) => (
+  <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="bg-card">
+      <RequestToJoinForm onOpenChange={onOpenChange} {...props} />
+    </DialogContent>
+  </Dialog>
+);
+
+// Drawn only while the dialog is open, so each opening starts a fresh note.
+const RequestToJoinForm = ({
   initiative,
-  open,
   onOpenChange,
-}: RequestToJoinDialogProps) => {
+}: Omit<RequestToJoinDialogProps, "open">) => {
   const { t } = useTranslation("initiatives");
   const [message, setMessage] = useState("");
-
-  // Reset on close, however it was closed — reopening starts a fresh note.
-  const [wasOpen, setWasOpen] = useState(open);
-  if (wasOpen !== open) {
-    setWasOpen(open);
-    if (!open) {
-      setMessage("");
-    }
-  }
 
   const requestToJoin = useRequestToJoinInitiative({
     onSuccess: () => {
@@ -72,35 +71,31 @@ export const RequestToJoinDialog = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card">
-        <DialogHeader>
-          <DialogTitle>
-            {t("joinRequests.dialogTitle", { name: initiative?.name ?? "" })}
-          </DialogTitle>
-          <DialogDescription>{t("joinRequests.dialogDescription")}</DialogDescription>
-        </DialogHeader>
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="join-request-message">{t("joinRequests.messageLabel")}</Label>
-            <Textarea
-              id="join-request-message"
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              placeholder={t("joinRequests.messagePlaceholder")}
-              maxLength={JOIN_REQUEST_MESSAGE_MAX_LENGTH}
-              rows={3}
-              disabled={requestToJoin.isPending}
-            />
-            <p className="text-muted-foreground text-xs">{t("joinRequests.messageHint")}</p>
-          </div>
-          <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button type="submit" disabled={!initiative} pending={requestToJoin.isPending}>
-              {requestToJoin.isPending ? t("joinRequests.sending") : t("joinRequests.send")}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <>
+      <DialogHeader>
+        <DialogTitle>{t("joinRequests.dialogTitle", { name: initiative?.name ?? "" })}</DialogTitle>
+        <DialogDescription>{t("joinRequests.dialogDescription")}</DialogDescription>
+      </DialogHeader>
+      <form className="space-y-4" onSubmit={handleSubmit}>
+        <div className="space-y-2">
+          <Label htmlFor="join-request-message">{t("joinRequests.messageLabel")}</Label>
+          <Textarea
+            id="join-request-message"
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            placeholder={t("joinRequests.messagePlaceholder")}
+            maxLength={JOIN_REQUEST_MESSAGE_MAX_LENGTH}
+            rows={3}
+            disabled={requestToJoin.isPending}
+          />
+          <p className="text-muted-foreground text-xs">{t("joinRequests.messageHint")}</p>
+        </div>
+        <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <Button type="submit" disabled={!initiative} pending={requestToJoin.isPending}>
+            {requestToJoin.isPending ? t("joinRequests.sending") : t("joinRequests.send")}
+          </Button>
+        </DialogFooter>
+      </form>
+    </>
   );
 };
