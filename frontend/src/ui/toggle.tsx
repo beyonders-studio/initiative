@@ -17,6 +17,8 @@ const toggleVariants = cva(
         default: "h-9 min-w-9 px-2",
         sm: "h-8 min-w-8 px-1.5",
         lg: "h-10 min-w-10 px-2.5",
+        /** A picture over its label, for a choice of a few kinds. */
+        tile: "h-auto flex-col gap-1 px-1.5 py-2.5 text-center text-xs leading-tight [&_svg]:size-[1.125rem]",
       },
     },
     defaultVariants: {
