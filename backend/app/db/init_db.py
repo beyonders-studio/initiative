@@ -25,6 +25,7 @@ from app.db.schema_provisioning import (
 from app.db.session import (
     SystemSessionLocal,
     migration_chain,
+    migration_floor,
     migration_lock,
     run_migrations,
 )
@@ -36,10 +37,6 @@ from app.services.platform import dm_settings as dm_settings_service
 from app.services.platform import guilds as guilds_service
 
 logger = logging.getLogger(__name__)
-
-# The squashed baseline (v0.53.5 snapshot). Databases stamped at an older
-# revision must go through a v0.53.x release first — see check_pre_baseline_db.
-BASELINE_REVISION = "20260626_0125"
 
 
 async def init_owner() -> None:
@@ -143,10 +140,30 @@ def _require_image_knows(stamped: list[str]) -> None:
     )
 
 
+def _refuse_below_floor(revision: str) -> None:
+    """Exit with upgrade instructions when ``revision`` comes before the
+    chain's baseline: alembic would otherwise fail with a cryptic "can't
+    locate revision", the collapsed revisions being gone."""
+    baseline, release = migration_floor()
+    if _is_dated_revision(revision) and revision >= baseline:
+        return
+    raise SystemExit(
+        f"\n{'=' * 70}\n"
+        f"This database is from before {release} (revision: {revision}).\n\n"
+        f"This version's migrations start at {release}, so an older database\n"
+        f"steps through it first:\n\n"
+        f"  1. Start {release}, or any release after it and before\n"
+        f"     {get_version()}, and let it finish starting once.\n"
+        f"  2. Then start this version.\n\n"
+        f"If that release says the database is older still, start the\n"
+        f"release it names first, then come back the same way.\n"
+        f"{'=' * 70}"
+    )
+
+
 async def check_pre_baseline_db(conn: AsyncConnection) -> None:
-    """Exit with upgrade instructions if the database predates the v0.53.5
-    baseline squash — its revision id no longer exists in this chain, so
-    alembic would fail with a cryptic "can't locate revision" otherwise.
+    """Exit with upgrade instructions if the database predates the chain's
+    baseline, or is stamped at a revision this image does not have.
 
     Runs on the migration lock's connection, which autocommits."""
     has_table = await conn.scalar(
@@ -168,12 +185,13 @@ async def check_pre_baseline_db(conn: AsyncConnection) -> None:
     if not stamped:
         return  # Fresh database (empty alembic_version)
     revision = stamped[0]
+    _refuse_below_floor(revision)
 
-    if revision == BASELINE_REVISION:
+    if revision == migration_floor()[0]:
         # Stamped at the baseline, but roles may be missing on a database
         # that never actually ran it (e.g. restored without roles). Clear
-        # the stamp so the (idempotent) baseline migration re-runs — it
-        # recreates roles, RLS policies, and grants as needed.
+        # the stamp so the baseline migration re-runs — it recreates roles,
+        # RLS policies, and grants as needed.
         has_roles = await conn.scalar(
             text("SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :login)"),
             {"login": APP_LOGIN_ROLE},
@@ -185,30 +203,9 @@ async def check_pre_baseline_db(conn: AsyncConnection) -> None:
             await conn.execute(text("DELETE FROM alembic_version"))
         return
 
-    if _is_dated_revision(revision) and revision > BASELINE_REVISION:
-        # Post-squash, so alembic can run it — as long as this image is the
-        # one that has it. Say so when it isn't, for the same reason the
-        # pre-baseline message below exists.
-        _require_image_knows(stamped)
-        return  # normal upgrade
-
-    raise SystemExit(
-        f"\n{'=' * 70}\n"
-        f"Pre-v0.53.2 database detected (revision: {revision}).\n\n"
-        f"This version's migration history starts at the v0.53.5 baseline;\n"
-        f"older databases must step through a v0.53.x release first:\n\n"
-        f"  1. Deploy any v0.53.x image (e.g. ghcr.io/beyonders-studio/initiative:0.53.5)\n"
-        f"     and let it boot once — its migrations and startup conversion\n"
-        f"     bring the database to the baseline state.\n"
-        f"  2. Then deploy this version and restart.\n\n"
-        f"Step 1 is mandatory, not advisory: it is what copies guild content\n"
-        f"into the per-guild schemas. This version DROPS the old copies in\n"
-        f"the public schema (migration 20260811_0163) and cannot be rolled\n"
-        f"back, so anything not converted by then is lost.\n\n"
-        f"(Installs older than v0.30.0 are no longer supported for\n"
-        f"in-place upgrade — restore into a fresh install instead.)\n"
-        f"{'=' * 70}"
-    )
+    # Past the baseline, so alembic can run it — as long as this image is the
+    # one that has it. Say so when it isn't.
+    _require_image_knows(stamped)
 
 
 async def migrate_database() -> None:

@@ -94,6 +94,19 @@ def test_stamp_this_image_has_passes():
     assert init_db._require_image_knows(sorted(revisions)[:5]) is None
 
 
+def test_a_stamp_before_the_baseline_names_the_release_to_start():
+    """A database from before the collapse is told which release to start
+    first, in place of alembic's "Can't locate revision"."""
+    baseline, release = init_db.migration_floor()
+    assert init_db._refuse_below_floor(baseline) is None
+
+    for stamp in ("20200101_0001", "ae1027a6acf"):
+        with pytest.raises(SystemExit) as refused:
+            init_db._refuse_below_floor(stamp)
+        assert stamp in str(refused.value)
+        assert f"Start {release}" in str(refused.value)
+
+
 def test_unreadable_chain_is_left_to_alembic(monkeypatch):
     """Nothing to compare against is not evidence the database is ahead."""
     monkeypatch.setattr(init_db, "migration_chain", lambda: (frozenset(), None))

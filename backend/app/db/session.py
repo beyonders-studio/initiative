@@ -749,6 +749,15 @@ def migration_chain() -> tuple[frozenset[str], str | None]:
         return frozenset(), None
 
 
+def migration_floor() -> tuple[str, str]:
+    """The revision this image's chain starts at, and the release it was cut
+    at: the oldest a database may be stamped at and still upgrade here."""
+    chain = ScriptDirectory.from_config(_get_alembic_config())
+    root = chain.get_revision(chain.get_base())
+    assert root is not None
+    return root.revision, root.module.release
+
+
 def _names_no_database(exc: DBAPIError) -> bool:
     """Whether a connection was refused because its database does not exist
     (SQLSTATE ``3D000``)."""

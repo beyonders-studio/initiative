@@ -45,10 +45,10 @@ ALEMBIC_SCRIPT_LOCATION = Path(__file__).resolve().parent
 BACKEND_DIR = ALEMBIC_SCRIPT_LOCATION.parent
 ALEMBIC_INI_PATH = BACKEND_DIR / "alembic.ini"
 
-# The baseline is the new root: anything before it was squashed into
-# this migration (the v0.53.5 snapshot) and cannot be reached, so its
+# The baseline is the root: everything before it was collapsed into it
+# (scripts/collapse_migrations.py) and cannot be reached, so its
 # ``downgrade()`` is a permanent ``NotImplementedError``.
-BASELINE_REVISION = "20260626_0125"
+BASELINE_REVISION = ScriptDirectory(str(ALEMBIC_SCRIPT_LOCATION)).get_base()
 
 # Migrations whose ``downgrade()`` intentionally raises
 # ``NotImplementedError`` and which therefore have to be skipped when
