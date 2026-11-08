@@ -322,7 +322,7 @@ export const CanvasFrame = ({
           onDropCapture={refuse}
           onMouseOver={(event) => point(event.target)}
           onFocus={(event) => point(event.target)}
-          aria-label={t("layouts:canvas")}
+          aria-label={t("canvas")}
         >
           {children}
         </section>
@@ -336,7 +336,7 @@ export const CanvasFrame = ({
                 <button
                   type="button"
                   className="pointer-events-auto -ml-0.5 cursor-grab touch-none"
-                  aria-label={t("layouts:move", { name: tools.nameOf(selection) })}
+                  aria-label={t("move", { name: tools.nameOf(selection) })}
                   onPointerDown={(event) => {
                     event.preventDefault();
                     setHovered(null);
@@ -361,7 +361,7 @@ export const CanvasFrame = ({
                     {tools.addAt(
                       around[side],
                       <AddPoint
-                        label={t(side === "before" ? "layouts:addBefore" : "layouts:addAfter", {
+                        label={t(side === "before" ? "addBefore" : "addAfter", {
                           name,
                         })}
                       />,
@@ -381,7 +381,7 @@ export const CanvasFrame = ({
             >
               {tools.addAt(
                 inside,
-                <AddPoint label={t("layouts:addInto", { name: tools.nameOf(hovered.of) })} />,
+                <AddPoint label={t("addInto", { name: tools.nameOf(hovered.of) })} />,
                 setPicking
               )}
             </div>
