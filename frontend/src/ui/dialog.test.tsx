@@ -1,19 +1,19 @@
 /**
- * A dialog fits the phone it is opened on.
+ * Every dialog has the kit's shape, and fits the phone it is opened on.
  *
- * Two rules, both of which were broken and both of which are invisible until
- * somebody opens a dialog on a narrow screen:
+ * Two rules, both invisible until somebody opens the dialog that broke them:
  *
- * 1. The content box is a grid, so its children are grid items with
- *    `min-width: auto` — a nowrap row or an editor toolbar sets a content
- *    minimum wider than the dialog and spills out of it rather than shrinking.
+ * 1. The kit draws the surface (background, corners, border, shadow) and the
+ *    column (its height cap and what scrolls). A dialog sets its width, a
+ *    fixed height when it needs one, and its padding when its content runs to
+ *    the edges, and puts what should scroll in a `DialogBody`.
  * 2. A caller that sets an unprefixed `max-w-*` replaces the base viewport cap
  *    at *every* width, so the dialog loses its margins on mobile. Widths belong
  *    behind `sm:`, where the base `max-w-[calc(100%-2rem)]` still governs
  *    below it.
  *
  * These are asserted against the classes rather than a layout, because jsdom
- * does no layout — which is exactly why neither was caught by the suite.
+ * does no layout.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -26,20 +26,17 @@ import { Dialog, DialogContent, DialogFooter, DialogTitle } from "./dialog";
 
 const SRC = path.resolve(__dirname, "../..");
 
-describe("DialogContent", () => {
-  it("lets its grid children shrink instead of overflowing", () => {
-    render(
-      <Dialog open>
-        <DialogContent>
-          <DialogTitle>Anything</DialogTitle>
-        </DialogContent>
-      </Dialog>
-    );
-
-    const content = screen.getByRole("dialog");
-    expect(content.className).toContain("[&>*]:min-w-0");
+/** Every `.tsx` file under `dir`, with its path from the frontend. */
+const sources = (dir: string): { file: string; source: string }[] =>
+  fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) return sources(full);
+    return entry.name.endsWith(".tsx")
+      ? [{ file: path.relative(SRC, full), source: fs.readFileSync(full, "utf-8") }]
+      : [];
   });
 
+describe("DialogContent", () => {
   // Both sit at the same z-index, so as siblings the later one paints on top,
   // and which is later depends on which mounted last. Inside the overlay, the
   // content is above it whatever the order.
@@ -84,6 +81,29 @@ describe("DialogContent", () => {
   // bounds itself another way — `w-[min(72rem,95vw)]` is already viewport-
   // bounded, so lifting the max is what makes that width apply. Flagged only
   // when nothing else holds it in.
+  // The kit's own surfaces (the lightbox, the command palette) shape
+  // themselves; everything else takes the kit's.
+  it("no dialog restates the kit's surface or column", () => {
+    const restated =
+      /^(?:flex|flex-col|grid|block|w-full|overflow-.+|max-h-.+|bg-.+|rounded.*|shadow.*|border.*)$/;
+    const offenders = sources(SRC)
+      .filter(({ file }) => !file.startsWith(path.join("src", "ui", path.sep)))
+      .flatMap(({ file, source }) =>
+        [
+          ...source.matchAll(
+            /<(?:Alert)?DialogContent\s[^<]*?className=(?:"([^"]*)"|\{cn\(([^)]*)\))/g
+          ),
+        ].flatMap((match) =>
+          (match[1] ?? [...(match[2] ?? "").matchAll(/"([^"]*)"/g)].map((m) => m[1]).join(" "))
+            .split(/\s+/)
+            .filter((cls) => restated.test(cls))
+            .map((cls) => `${file}: ${cls}`)
+        )
+      );
+
+    expect(offenders, `the kit draws these — ${offenders.join(", ")}`).toEqual([]);
+  });
+
   it("no dialog sets an unprefixed fixed max width", () => {
     const offenders: string[] = [];
     const walk = (dir: string) => {

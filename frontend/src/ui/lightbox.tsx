@@ -352,7 +352,7 @@ export const Lightbox = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-[100vw] flex-col gap-0 rounded-none border-0 bg-black/95 p-0 text-white shadow-none sm:max-w-[100vw]"
+        className="h-[100dvh] max-h-[100dvh] w-screen max-w-[100vw] gap-0 rounded-none border-0 bg-black/95 p-0 text-white shadow-none sm:max-w-[100vw]"
       >
         <DialogTitle className="sr-only">{current.alt || t("lightbox.title")}</DialogTitle>
         <DialogDescription className="sr-only">{t("lightbox.description")}</DialogDescription>

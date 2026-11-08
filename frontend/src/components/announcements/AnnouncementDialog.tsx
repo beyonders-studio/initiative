@@ -22,6 +22,7 @@ import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -105,8 +106,8 @@ export const AnnouncementDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col gap-0 sm:max-w-2xl">
-        <DialogHeader className="shrink-0 space-y-2">
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader className="space-y-2">
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="gap-1.5">
               <Icon className="h-3.5 w-3.5" />
@@ -120,12 +121,8 @@ export const AnnouncementDialog = ({
           <DialogDescription className="sr-only">{t(`category.${category}`)}</DialogDescription>
         </DialogHeader>
 
-        {/* A plain overflow container rather than ScrollArea: the dialog is
-            bounded by max-height, and Radix's viewport sizes itself with
-            ``h-full``, which resolves to nothing against an indefinite height
-            — the content would be clipped instead of scrolled. */}
-        <div ref={bodyRef} className="-mr-2 min-h-0 flex-1 overflow-y-auto pr-2">
-          <div className="space-y-6 py-4">
+        <DialogBody ref={bodyRef}>
+          <div className="space-y-6">
             {(pages[safeIndex] ?? []).map((section, index) => (
               <AnnouncementSectionView
                 // Sections have no identity of their own — they are an ordered
@@ -137,7 +134,7 @@ export const AnnouncementDialog = ({
               />
             ))}
           </div>
-        </div>
+        </DialogBody>
 
         {pages.length > 1 || footer ? (
           <DialogFooter className="shrink-0 border-t pt-4 sm:items-center">

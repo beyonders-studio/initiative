@@ -126,7 +126,7 @@ export const TaskTypeStartsWithDialog = ({
 
   return (
     <Dialog open={type !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto bg-card">
+      <DialogContent>
         <form onSubmit={handleSubmit} className="space-y-5">
           <DialogHeader>
             <DialogTitle>{t("taskTypes.startsWith.title", { name: type?.name })}</DialogTitle>

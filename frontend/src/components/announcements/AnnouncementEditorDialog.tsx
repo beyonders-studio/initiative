@@ -24,6 +24,7 @@ import { Button } from "@/ui/button";
 import { DateTimePicker } from "@/ui/date-time-picker";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -217,18 +218,16 @@ export const AnnouncementEditorDialog = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="flex max-h-[90vh] flex-col gap-0 sm:max-w-3xl">
-          <DialogHeader className="shrink-0">
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
             <DialogTitle>
               {announcement ? t("operator.editTitle") : t("operator.newTitle")}
             </DialogTitle>
             <DialogDescription>{t("operator.editorSubtitle")}</DialogDescription>
           </DialogHeader>
 
-          {/* Plain overflow rather than ScrollArea — see AnnouncementDialog:
-              a max-height dialog gives Radix's viewport no height to fill. */}
-          <div className="-mr-2 min-h-0 flex-1 overflow-y-auto pr-2">
-            <div className="space-y-6 py-4">
+          <DialogBody>
+            <div className="space-y-6">
               <Field label={t("operator.fields.title")}>
                 <Input
                   value={state.title}
@@ -471,7 +470,7 @@ export const AnnouncementEditorDialog = ({
                 ))}
               </div>
             </div>
-          </div>
+          </DialogBody>
 
           <DialogFooter
             className="shrink-0 border-t pt-4"

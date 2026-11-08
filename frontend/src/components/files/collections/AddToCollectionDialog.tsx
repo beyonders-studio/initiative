@@ -31,6 +31,7 @@ import { collectionRoute } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -146,8 +147,8 @@ export const AddToCollectionDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[80vh] flex-col gap-0 p-0 sm:max-w-lg">
-        <DialogHeader className="border-b px-5 py-4">
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
           <DialogTitle>{t("collections.addTo")}</DialogTitle>
           <DialogDescription>
             {t("collections.addToDescription", { count: fileIds.length })}
@@ -155,8 +156,8 @@ export const AddToCollectionDialog = ({
         </DialogHeader>
 
         {making ? (
-          <form onSubmit={submitNew} className="flex min-h-0 flex-1 flex-col">
-            <div className="relative min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          <form onSubmit={submitNew} className="contents">
+            <DialogBody className="space-y-4">
               <Field label={t("collections.shapes.name")}>
                 <Input
                   value={name}
@@ -213,8 +214,8 @@ export const AddToCollectionDialog = ({
                   </Select>
                 </Field>
               ) : null}
-            </div>
-            <DialogFooter className="border-t px-5 py-3">
+            </DialogBody>
+            <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setMaking(false)}>
                 {t("common:back")}
               </Button>
@@ -225,13 +226,11 @@ export const AddToCollectionDialog = ({
           </form>
         ) : (
           <>
-            <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            <DialogBody>
               {changeable.length === 0 ? (
-                <p className="px-3 py-2 text-muted-foreground text-sm">
-                  {t("collections.noneToAddTo")}
-                </p>
+                <p className="py-2 text-muted-foreground text-sm">{t("collections.noneToAddTo")}</p>
               ) : (
-                <ul className="space-y-0.5">
+                <ul className="-mx-3 space-y-0.5">
                   {changeable.map((collection) => (
                     <li key={collection.id}>
                       <AddToOne collection={collection} fileIds={fileIds} onAdded={finish} />
@@ -239,9 +238,9 @@ export const AddToCollectionDialog = ({
                   ))}
                 </ul>
               )}
-            </div>
+            </DialogBody>
 
-            <form onSubmit={submitNew} className="flex items-center gap-2 border-t px-5 py-3">
+            <form onSubmit={submitNew} className="flex items-center gap-2">
               <Input
                 value={name}
                 onChange={(event) => setName(event.target.value)}

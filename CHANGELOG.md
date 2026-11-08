@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A project's task table scrolls with the page,** not in a box of its own, and its column headings stay at the top as you scroll. A collection's table draws only the files near the view, so a long collection keeps up as you scroll through it.
 - **Lists, pages and panels show their shape while they load** instead of a "Loading…" line, and anything that fails to load says so, with **Try again**.
 - **Confirmations look like every other dialog.** They have the same lighter, blurred backdrop (side panels too), rounded corners at every width and a margin on phones. Deleting several tasks or tools at once asks in the app instead of in the browser's prompt.
+- **Every dialog has the same surface.** Create dialogs, and the dialogs that were lighter than the rest in the dark theme, now match them, and the file pickers take the usual header. A long list or form scrolls between a dialog's title and its buttons, which stay in view.
 - **Every tool's create dialog has a Cancel button,** and creating a project or a contact asks the same way as every other tool.
 - **Every settings switch sits the same way:** to the right of its label and description, and clicking the label flips it. A screen reader reads the description with the switch.
 - **Every dialog's buttons behave the same.** Save, Create and Delete show a spinner while they work and can't be pressed twice, and Cancel is the same outlined button everywhere, waiting while the work is under way.

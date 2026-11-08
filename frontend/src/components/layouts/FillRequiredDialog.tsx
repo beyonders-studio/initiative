@@ -48,7 +48,7 @@ export const FillRequiredDialog = <I extends Item, C, P>({
   ...props
 }: DialogProps & FillProps<I, C, P>) => (
   <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="@container w-full sm:max-w-2xl">
+    <DialogContent className="@container sm:max-w-2xl">
       <Filling {...props} />
     </DialogContent>
   </Dialog>

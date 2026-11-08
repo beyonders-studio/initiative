@@ -59,6 +59,7 @@ import { localized } from "@/lib/widgets/widgetMeta";
 import { Button } from "@/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -267,7 +268,7 @@ export function WidgetConfigDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-3xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{t("dashboards:config.title")}</DialogTitle>
           <DialogDescription>
@@ -275,7 +276,7 @@ export function WidgetConfigDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid max-h-[60vh] gap-6 overflow-y-auto md:grid-cols-[1fr_18rem]">
+        <DialogBody className="grid gap-6 md:grid-cols-[1fr_18rem]">
           <div className="space-y-5">
             <Field label={t("dashboards:config.widgetTitle")}>
               <Input
@@ -419,7 +420,7 @@ export function WidgetConfigDialog({
               isPlugin ? pluginWidgetSource(pluginCatalog.data, widget.type) : undefined
             }
           />
-        </div>
+        </DialogBody>
 
         <DialogFooter submitLabel={t("common:save")} onSubmit={save} disabled={unsaveable} />
       </DialogContent>
