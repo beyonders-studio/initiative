@@ -10,7 +10,6 @@ import {
   INSERT_PARAGRAPH_COMMAND,
   KEY_BACKSPACE_COMMAND,
   type LexicalEditor,
-  type ParagraphNode,
   type SerializedLexicalNode,
 } from "lexical";
 import { describe, expect, it } from "vitest";
@@ -193,7 +192,7 @@ describe("folding a callout", () => {
       $getRoot().clear().append(callout);
       callout.setCollapsed(true);
       // Its first line shows, so writing there leaves it folded.
-      callout.getFirstChildOrThrow<ParagraphNode>().selectEnd();
+      callout.getFirstChildOrThrow().selectEnd();
     });
     editor.getEditorState().read(() => {
       const callout = $getRoot().getFirstChild();
@@ -202,7 +201,7 @@ describe("folding a callout", () => {
 
     update(editor, () => {
       const callout = $getRoot().getFirstChild();
-      if ($isCalloutNode(callout)) callout.getLastChildOrThrow<ParagraphNode>().selectEnd();
+      if ($isCalloutNode(callout)) callout.getLastChildOrThrow().selectEnd();
     });
     editor.update(() => {}, { discrete: true });
     editor.getEditorState().read(() => {

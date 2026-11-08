@@ -2,7 +2,7 @@ import { buildEditorFromExtensions } from "@lexical/extension";
 import { ListExtension } from "@lexical/list";
 import { $convertFromMarkdownString, $convertToMarkdownString } from "@lexical/markdown";
 import { RichTextExtension } from "@lexical/rich-text";
-import { $getRoot, defineExtension, type ElementNode, type LexicalEditor } from "lexical";
+import { $getRoot, $isElementNode, defineExtension, type LexicalEditor } from "lexical";
 import { describe, expect, it } from "vitest";
 
 import { CalloutExtension } from "@/components/editor/extensions/callout-extension";
@@ -48,11 +48,9 @@ describe("columns in markdown", () => {
     editor.getEditorState().read(() => {
       const container = $getRoot().getFirstChild();
       expect($isLayoutContainerNode(container) && container.getTemplateColumns()).toBe("1fr 3fr");
-      const [narrow, wide] = $isLayoutContainerNode(container)
-        ? container.getChildren<ElementNode>()
-        : [];
+      const [narrow, wide] = $isLayoutContainerNode(container) ? container.getChildren() : [];
       expect(narrow?.getTextContent()).toBe("The narrow one.");
-      expect(wide?.getFirstChild()?.getType()).toBe("list");
+      expect($isElementNode(wide) && wide.getFirstChild()?.getType()).toBe("list");
       exported = $convertToMarkdownString(MARKDOWN_TRANSFORMERS);
     });
     expect(exported.split("\n")).toEqual(SOURCE);

@@ -6,8 +6,8 @@ import {
   $createParagraphNode,
   $createTextNode,
   $getRoot,
+  $isElementNode,
   defineExtension,
-  type ElementNode,
   type LexicalEditor,
   type SerializedLexicalNode,
 } from "lexical";
@@ -86,8 +86,8 @@ describe("a drawing in a document", () => {
       discrete: true,
     });
     editor.getEditorState().read(() => {
-      const paragraph = $getRoot().getFirstChild<ElementNode>();
-      const node = paragraph?.getFirstDescendant?.() ?? null;
+      const paragraph = $getRoot().getFirstChild();
+      const node = $isElementNode(paragraph) ? paragraph.getFirstDescendant() : null;
       expect(paragraph?.getType()).toBe("paragraph");
       expect($isExcalidrawNode(node) && node.getData()).toBe(EMPTY_DRAWING);
     });
@@ -134,9 +134,9 @@ describe("a drawing in markdown", () => {
       discrete: true,
     });
     restored.getEditorState().read(() => {
-      const [before, drawing, after] = $getRoot().getChildren<ElementNode>();
+      const [before, drawing, after] = $getRoot().getChildren();
       expect(before.getTextContent()).toBe("Before");
-      const node = drawing.getFirstDescendant?.() ?? null;
+      const node = $isElementNode(drawing) ? drawing.getFirstDescendant() : null;
       expect($isExcalidrawNode(node) && node.getData()).toBe(tricky);
       expect(after.getTextContent()).toBe("After");
     });

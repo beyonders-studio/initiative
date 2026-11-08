@@ -1,7 +1,13 @@
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { LexicalExtensionComposer } from "@lexical/react/LexicalExtensionComposer";
 import { render } from "@testing-library/react";
-import { $createParagraphNode, $createTextNode, $getRoot, type LexicalEditor } from "lexical";
+import {
+  $createParagraphNode,
+  $createTextNode,
+  $getRoot,
+  $isElementNode,
+  type LexicalEditor,
+} from "lexical";
 import { describe, expect, it } from "vitest";
 
 import { documentExtension } from "./document-extension";
@@ -39,9 +45,8 @@ function typedIntoADocument(line: string): string[] {
 
   const types: string[] = [];
   editor.getEditorState().read(() => {
-    for (const node of $getRoot()
-      .getFirstChildOrThrow<ReturnType<typeof $createParagraphNode>>()
-      .getChildren()) {
+    const paragraph = $getRoot().getFirstChildOrThrow();
+    for (const node of $isElementNode(paragraph) ? paragraph.getChildren() : []) {
       types.push(node.getType());
     }
   });
