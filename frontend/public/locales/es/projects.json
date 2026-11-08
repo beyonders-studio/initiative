@@ -98,10 +98,7 @@
   },
   "assignee": {
     "emptyMessage": "Invita a miembros de la iniciativa para asignar tareas.",
-    "searchPlaceholder": "Buscar miembros",
-    "removeAssignee": "Quitar a {{name}}",
-    "clearAssignees": "Limpiar asignados",
-    "you": "Tú"
+    "searchPlaceholder": "Buscar miembros"
   },
   "statuses": {
     "description": "Reordena, renombra o cambia la categoría de las columnas de tareas usadas por este proyecto.",

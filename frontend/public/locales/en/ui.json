@@ -74,7 +74,10 @@
     "close": "Close"
   },
   "memberPicker": {
-    "userWithId": "User #{{id}}"
+    "userWithId": "User #{{id}}",
+    "you": "You",
+    "remove": "Remove {{name}}",
+    "clearAll": "Clear assignees"
   },
   "multiSelect": {
     "empty": "No options available",

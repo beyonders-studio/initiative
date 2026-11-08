@@ -98,10 +98,7 @@
   },
   "assignee": {
     "emptyMessage": "Invite initiative members to assign tasks.",
-    "searchPlaceholder": "Search members",
-    "removeAssignee": "Remove {{name}}",
-    "clearAssignees": "Clear assignees",
-    "you": "You"
+    "searchPlaceholder": "Search members"
   },
   "statuses": {
     "description": "Reorder, rename, or change category for the task columns used by this project.",

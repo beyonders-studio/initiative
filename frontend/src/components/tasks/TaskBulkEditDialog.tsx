@@ -9,11 +9,11 @@ import type {
   TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
 import { TaskPriorityOption } from "@/components/tasks/TaskPriorityOption";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { useAuth } from "@/hooks/useAuth";
+import { useSearchMembers } from "@/hooks/useUsers";
 import { useListedMissingAsType } from "@/lib/layouts/taskLayout";
 import {
   isHourlyRule,
@@ -33,6 +33,7 @@ import {
 } from "@/ui/dialog";
 import { Field } from "@/ui/field";
 import { Label } from "@/ui/label";
+import { MemberPicker } from "@/ui/member-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** The type option that takes a picked type back: the tasks keep theirs. */
@@ -77,6 +78,7 @@ export const TaskBulkEditDialog = ({
 }: TaskBulkEditDialogProps) => {
   const { t } = useTranslation(["tasks", "common", "projects"]);
   const { user: currentUser } = useAuth();
+  const searchMembers = useSearchMembers();
   const [startDate, setStartDate] = useState<string>("");
   const [dueDate, setDueDate] = useState<string>("");
   const [assigneeIds, setAssigneeIds] = useState<number[]>([]);
@@ -186,10 +188,13 @@ export const TaskBulkEditDialog = ({
             <AccordionTrigger>{t("bulkEdit.assignmentSection")}</AccordionTrigger>
             <AccordionContent className="space-y-4 pb-4">
               <Field label={t("bulkEdit.assigneesLabel")}>
-                <MemberMultiSelect
+                <MemberPicker
+                  multiple
+                  searchMembers={searchMembers}
                   scope={{ type: "canOpen", tool: Tool.project, id: projectId }}
-                  selectedIds={assigneeIds}
+                  value={assigneeIds}
                   onChange={setAssigneeIds}
+                  placeholder={t("projects:assignee.searchPlaceholder")}
                   emptyMessage={t("bulkEdit.noUsersAvailable")}
                   currentUserId={currentUser?.id}
                 />

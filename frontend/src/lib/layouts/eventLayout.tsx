@@ -27,7 +27,6 @@ import {
   eventRange,
 } from "@/components/initiativeTools/events/EventDateTimeFields";
 import { toDateKey, toTimeSlot } from "@/components/initiativeTools/events/eventDateTime";
-import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import type { OccurrenceScope } from "@/components/recurrence/OccurrenceScopeDialog";
 import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
 import { TagsField } from "@/components/tags/TagsField";
@@ -41,6 +40,7 @@ import {
   useUpdateEventRSVP,
 } from "@/hooks/useCalendarEvents";
 import { itemSaves } from "@/hooks/useFieldSave";
+import { useSearchMembers } from "@/hooks/useUsers";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import {
@@ -52,7 +52,7 @@ import {
 } from "@/lib/recurrence";
 import { referenceRef } from "@/lib/smartChips";
 import { eventRoute } from "@/lib/tools";
-import { getUserDisplayName } from "@/lib/userDisplay";
+import { getUserDisplayName, toMember } from "@/lib/userDisplay";
 import type { TranslateFn } from "@/types/i18n";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -72,6 +72,7 @@ import { TitleField } from "@/ui/layouts/fieldEditors";
 import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
 import { dateTimeFormat } from "@/ui/lib/intl";
 import { hour12Option } from "@/ui/lib/timeFormat";
+import { MemberPicker } from "@/ui/member-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 
@@ -503,16 +504,19 @@ const Attendees = ({ item: event }: EditorProps) => {
     sameIds
   );
   const users = useMemo(
-    () => event.attendees.flatMap((attendee) => (attendee.user ? [attendee.user] : [])),
+    () => event.attendees.flatMap((attendee) => (attendee.user ? [toMember(attendee.user)] : [])),
     [event.attendees]
   );
+  const searchMembers = useSearchMembers();
   return (
     <FieldFrame label={label} save={save} changed={draft.changed} keys={draft.keys}>
       {readOnly ? null : (
-        <MemberMultiSelect
+        <MemberPicker
+          multiple
+          searchMembers={searchMembers}
           scope={{ type: "canOpen", tool: Tool.calendar, id: event.calendar_id }}
-          selectedIds={draft.value}
-          selectedUsers={users}
+          value={draft.value}
+          selected={users}
           onChange={draft.edit}
           placeholder={t("addAttendee")}
           emptyMessage={t("noAttendees")}
