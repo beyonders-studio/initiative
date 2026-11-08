@@ -31,7 +31,7 @@ const titleBarHeight = () => {
  * where the window draws its own: a browser, a phone, a desktop app from
  * before it drew one, or a window gone full screen.
  */
-export const useTitleBarHeight = () => useSyncExternalStore(subscribe, titleBarHeight, () => 0);
+const useTitleBarHeight = () => useSyncExternalStore(subscribe, titleBarHeight, () => 0);
 
 /** Colour the window's own buttons to the bar, and again whenever the theme or accent changes. */
 const useWindowButtonColors = (shown: boolean) => {

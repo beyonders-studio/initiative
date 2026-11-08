@@ -15,7 +15,6 @@ import { useTranslation } from "react-i18next";
 
 import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
 import { AppLinks } from "@/components/AppLinks";
-import { useTitleBarHeight } from "@/components/DesktopTitleBar";
 import { ThoughtBubble } from "@/components/icons/ThoughtBubble";
 import { AppearanceMenuItems, ThemeIcon } from "@/components/ModeToggle";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -64,8 +63,6 @@ export const SidebarUserFooter = ({
 }: SidebarUserFooterProps) => {
   const { t } = useTranslation(["nav", "profiles", "common"]);
   const feedbackOffered = useFeedbackOffered();
-  // The desktop app's title bar carries the app's corner instead.
-  const inTitleBar = useTitleBarHeight() > 0;
   // A fly-out needs a hover to open it and room beside the menu to land in.
   // A phone has neither — the sidebar is already a sheet against the edge — so
   // there the choices behind one are drilled into: the menu becomes that list,
@@ -387,11 +384,9 @@ export const SidebarUserFooter = ({
             </PopoverContent>
           ) : null}
         </Popover>
-        {inTitleBar ? null : (
-          <div className="flex justify-end border-t px-3 py-2">
-            <AppLinks />
-          </div>
-        )}
+        <div className="flex justify-end border-t px-3 py-2">
+          <AppLinks />
+        </div>
       </div>
     </SidebarFooter>
   );

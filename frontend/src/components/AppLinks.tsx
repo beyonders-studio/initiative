@@ -9,8 +9,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/t
 
 /**
  * The app's corner: the update it is waiting on, while it is behind, and Help.
- * Drawn under the person in the sidebar, or in the desktop app's title bar,
- * which takes it out of the sidebar.
+ * Drawn under the person in the sidebar, and in the desktop app's title bar
+ * as well.
  */
 export const AppLinks = ({ className }: { className?: string }) => {
   const { t } = useTranslation("common");

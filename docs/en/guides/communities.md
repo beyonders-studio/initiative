@@ -282,7 +282,7 @@ Reporting something **illegal** asks which law it breaks, and goes to the commun
 
 ## Asking for help
 
-The question mark at the foot of the sidebar (in the desktop app, in the title bar) is **Help**. It searches these pages first, from inside the app, and before you type it shows answers for the page you're on. Where your server takes help requests, **Ask the team** sits under the results and starts a request with whatever you searched. Say what happened, pick what it's about, and paste, drop or attach a screenshot if it helps. The request goes to the people who run the server, not to the community's own admins.
+The question mark at the foot of the sidebar, and in the desktop app's title bar, is **Help**. It searches these pages first, from inside the app, and before you type it shows answers for the page you're on. Where your server takes help requests, **Ask the team** sits under the results and starts a request with whatever you searched. Say what happened, pick what it's about, and paste, drop or attach a screenshot if it helps. The request goes to the people who run the server, not to the community's own admins.
 
 Each request carries this device's details: the app's version, the platform, your language and theme, the page you were on (without anything that names what was on it) and the window's size. The line above **Send** shows them, and its switch leaves them out. Close Help halfway through and your draft waits for you as a **Help request draft** button in the corner.
 

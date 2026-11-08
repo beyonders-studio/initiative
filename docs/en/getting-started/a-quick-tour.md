@@ -48,7 +48,7 @@ The small **dot** on your picture is your presence: online, idle, busy, or offli
 
 **The bell**, beside your name, is your notifications. Announcements you've closed land there too, already read, so you can open one again.
 
-Under all of it, one small row. In the desktop app it sits in the window's title bar instead, at the top:
+Under all of it, one small row. The desktop app has it in the window's title bar as well:
 
 - **Update** appears only when there's a newer version waiting, and stays until you take it. On the web and phones it reloads; in the desktop app it restarts into the new app, or tells you where to get it.
 - **Help** (the question mark) searches these pages without leaving the app, starting with answers for the page you're on. Where there's somebody to ask (a server that takes help requests, or one that has given an address to write to), the way to ask sits under the results.
