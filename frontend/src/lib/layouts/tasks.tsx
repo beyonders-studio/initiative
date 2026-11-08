@@ -1,17 +1,248 @@
-import { Ban, MessageSquare } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Ban, CornerLeftUp, MessageSquare } from "lucide-react";
+import { memo } from "react";
 
-import {
-  type DetailLayoutDefinitionInput,
-  MetadataType,
-  type PropertyDefinitionRead,
+import type {
+  ChecklistProgress,
+  DetailLayoutDefinitionInput,
+  PropertyDefinitionRead,
+  TagSummary,
+  TaskAssigneeSummary,
+  TaskParentSummary,
+  TaskPriority,
+  TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { namePropertyColumns } from "@/ui/properties/propertyColumns";
+import { UnreadDot } from "@/components/notifications/UnreadDot";
+import { priorityVariant } from "@/components/projects/projectTasksConfig";
+import { TaskAssigneeList, TaskAssigneeStack } from "@/components/projects/TaskAssigneeList";
+import { TaskBlockersHoverCard } from "@/components/projects/TaskBlockersHoverCard";
+import { TaskDescriptionHoverCard } from "@/components/projects/TaskDescriptionHoverCard";
+import { TaskSubtasksHoverCard } from "@/components/projects/TaskSubtasksHoverCard";
+import { TagBadge } from "@/components/tags";
+import { TagBadgeList } from "@/components/tags/TagBadge";
+import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
+import { TaskTypeMark, TaskTypeOption } from "@/components/tasks/TaskTypeOption";
+import { MentionText } from "@/components/user/MentionText";
+import { useUnreadTree } from "@/hooks/useUnreadTree";
+import { summarizeStored } from "@/lib/recurrence";
+import { truncateText } from "@/lib/text";
+import { entityRefRoute } from "@/lib/tools";
+import { Badge } from "@/ui/badge";
+import { cn } from "@/ui/lib/utils";
 import { listedValue } from "@/ui/properties/propertyHelpers";
-import { iconForPropertyType } from "@/ui/properties/propertyTypeIcons";
 
 import { at, detailLayoutSpec, type Region, storedLayout } from "./detailLayout";
-import { type FieldDef, propertyFieldId } from "./fields";
+import type { ListShape } from "./draft";
+import {
+  ExcerptField,
+  type FieldDef,
+  type FieldRendererProps,
+  type LayoutEnv,
+  type LayoutItem,
+  propertyFieldId,
+  propertyFields,
+  TitleField,
+} from "./fields";
 import type { LayoutNode } from "./tree";
+
+// A table's title cell carries what the card shows as fields of their own,
+// where the table has no column for it.
+const TitleCell = ({
+  title,
+  task,
+  type,
+  unread,
+  env,
+}: {
+  title: string;
+  task: LayoutItem;
+  type: TaskTypeRead | null;
+  unread: boolean;
+  env: LayoutEnv;
+}) => {
+  const recurrence = task.recurrence
+    ? summarizeStored(
+        task.recurrence,
+        task.due_date || task.start_date,
+        {
+          strategy: task.recurrence_strategy,
+          shift: task.recurrence_shift,
+          limit: task.recurrence_limit,
+        },
+        env.t
+      )
+    : null;
+  return (
+    <div className="flex w-full min-w-60 items-center gap-2">
+      <div className="flex min-w-0 flex-1 flex-col items-start text-left">
+        <div className="flex items-start gap-1.5">
+          {/* One line of the title tall, so it sits on the first line's middle. */}
+          {type ? <TaskTypeMark type={type} className="h-lh" /> : null}
+          <Link
+            to={env.itemHref(task)}
+            draggable={false}
+            className="flex items-center gap-2 rounded-sm font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            {title}
+            {unread ? <UnreadDot /> : null}
+          </Link>
+        </div>
+        {recurrence ? (
+          <p className="text-muted-foreground text-xs">{truncateText(recurrence, 100)}</p>
+        ) : null}
+        <TaskChecklistProgress progress={task.checklist_progress} className="mt-2 max-w-[200px]" />
+      </div>
+      <TaskSubtasksHoverCard task={task} />
+      <TaskBlockersHoverCard task={task} />
+      <TaskDescriptionHoverCard task={task} />
+    </div>
+  );
+};
+
+// A task's title, marked while it is unread. A project with one type draws
+// none in its cells: the type tells nothing apart.
+const TaskTitle = ({ typed, ...props }: FieldRendererProps & { typed: boolean }) => {
+  const { value, item, variant, env } = props;
+  const unread = useUnreadTree().hasSubject(item.community_id, "task", item.id);
+  if (variant === "cell") {
+    return (
+      <TitleCell
+        title={value as string}
+        task={item}
+        type={typed ? item.task_type : null}
+        unread={unread}
+        env={env}
+      />
+    );
+  }
+  return (
+    <TitleField
+      {...props}
+      mark={unread ? <UnreadDot className="ml-2 inline-block align-middle" /> : null}
+    />
+  );
+};
+
+const TypedTitle = memo(function TypedTitle(props: FieldRendererProps) {
+  return <TaskTitle {...props} typed />;
+});
+
+const UntypedTitle = memo(function UntypedTitle(props: FieldRendererProps) {
+  return <TaskTitle {...props} typed={false} />;
+});
+
+// The people a task's words mention are drawn as chips.
+const DescriptionField = memo(function DescriptionField(props: FieldRendererProps) {
+  return (
+    <ExcerptField {...props}>
+      <MentionText text={props.value as string} />
+    </ExcerptField>
+  );
+});
+
+const AssigneesField = memo(function AssigneesField({ value, variant }: FieldRendererProps) {
+  const people = value as TaskAssigneeSummary[];
+  if (variant === "cell") {
+    return people.length > 0 ? (
+      <TaskAssigneeStack assignees={people} />
+    ) : (
+      <span className="text-muted-foreground text-sm">&mdash;</span>
+    );
+  }
+  return <TaskAssigneeList assignees={people} className="text-xs" />;
+});
+
+const RecurrenceField = memo(function RecurrenceField({ value, item, env }: FieldRendererProps) {
+  const summary = summarizeStored(
+    value as string,
+    item.due_date || item.start_date,
+    {
+      strategy: item.recurrence_strategy,
+      shift: item.recurrence_shift,
+      limit: item.recurrence_limit,
+    },
+    env.t
+  );
+  return summary ? <p>{truncateText(summary, 80)}</p> : null;
+});
+
+const ChecklistField = memo(function ChecklistField({ value }: FieldRendererProps) {
+  return <TaskChecklistProgress progress={value as ChecklistProgress} className="w-full pt-1" />;
+});
+
+const SubtasksField = memo(function SubtasksField({ value }: FieldRendererProps) {
+  return (
+    <TaskChecklistProgress
+      of="subtasks"
+      progress={value as ChecklistProgress}
+      className="w-full min-w-24 pt-1"
+    />
+  );
+});
+
+// The task this one is part of, as a link to it: on a card a line above what
+// the card says, in a cell its name.
+const ParentField = memo(function ParentField({ value, item, variant, env }: FieldRendererProps) {
+  const parent = value as TaskParentSummary | null;
+  if (!parent) {
+    return variant === "cell" ? (
+      <span className="text-muted-foreground text-sm">&mdash;</span>
+    ) : null;
+  }
+  return (
+    <Link
+      // By the task alone: a parent may be in another of the initiative's
+      // projects, which a project's own task links would name wrongly.
+      to={env.communityPath(entityRefRoute("task", parent.id), item)}
+      draggable={false}
+      title={env.t("tasks:subtasks.partOf", { title: parent.title })}
+      className={cn(
+        "flex min-w-0 max-w-full items-center gap-1 rounded-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-1 focus-visible:ring-ring",
+        variant === "cell" ? "text-sm" : "text-xs"
+      )}
+    >
+      <CornerLeftUp className="h-3 w-3 shrink-0" aria-hidden="true" />
+      <span className="truncate">{parent.title}</span>
+    </Link>
+  );
+});
+
+const PriorityField = memo(function PriorityField({ value, field, env }: FieldRendererProps) {
+  const priority = value as TaskPriority;
+  const text = priority.replace("_", " ");
+  return (
+    <Badge variant={priorityVariant[priority]}>
+      {field.phrase ? env.t(field.phrase, { priority: text }) : text}
+    </Badge>
+  );
+});
+
+const TagsField = memo(function TagsField({ value, item, variant, env }: FieldRendererProps) {
+  const tags = value as TagSummary[];
+  const tagHref = (tag: TagSummary) => env.communityPath(`/tags/${tag.id}`, item);
+  if (variant === "cell") {
+    return tags.length > 0 ? (
+      <TagBadgeList tags={tags} tagHref={tagHref} />
+    ) : (
+      <span className="text-muted-foreground text-sm">&mdash;</span>
+    );
+  }
+  return tags.map((tag) => <TagBadge key={tag.id} tag={tag} size="sm" to={tagHref(tag)} />);
+});
+
+// A card shows a type by its icon alone, beside the title and named on hover;
+// a cell names it.
+const TaskTypeField = memo(function TaskTypeField({ value, variant }: FieldRendererProps) {
+  const type = value as TaskTypeRead | null;
+  if (!type) {
+    return variant === "cell" ? (
+      <span className="text-muted-foreground text-sm">&mdash;</span>
+    ) : null;
+  }
+  if (variant === "cell") return <TaskTypeOption type={type} className="text-sm" />;
+  // One line of the title tall, so the icon sits on the first line's middle.
+  return <TaskTypeMark type={type} className="h-lh" iconClassName="h-4 w-4" />;
+});
 
 const builtin = (
   field: Omit<FieldDef, "source" | "label" | "hideable" | "requireable"> & Partial<FieldDef>
@@ -44,19 +275,24 @@ export const taskFields = (
       value: (task) => task.title,
       // A table has no room for the card's icon of its own, so its title
       // cell draws it.
-      typeOf: (task) => (typed ? task.task_type : null),
+      render: typed ? TypedTitle : UntypedTitle,
     }),
     // A project with one type draws none: the type tells nothing apart.
-    builtin({ id: "type", kind: "taskType", value: (task) => (typed ? task.task_type : null) }),
+    builtin({
+      id: "type",
+      render: TaskTypeField,
+      value: (task) => (typed ? task.task_type : null),
+    }),
     builtin({
       id: "description",
       kind: "excerpt",
+      render: DescriptionField,
       requireable: true,
       value: (task) => task.description_excerpt,
     }),
     builtin({
       id: "assignees",
-      kind: "people",
+      render: AssigneesField,
       requireable: true,
       value: (task) => task.assignees,
     }),
@@ -72,27 +308,28 @@ export const taskFields = (
       kind: "date",
       phrase: "kanban.due",
       past: "destructive",
+      done: (task) => task.task_status?.category === "done",
       value: (task) => task.due_date,
     }),
     builtin({
       id: "recurrence",
-      kind: "recurrence",
+      render: RecurrenceField,
       requireable: true,
       value: (task) => task.recurrence,
     }),
     builtin({
       id: "checklist",
-      kind: "checklist",
+      render: ChecklistField,
       requireable: true,
       value: (task) => task.checklist_progress,
     }),
     // How far the tasks that are part of this one have got, and the task
     // this one is part of.
-    builtin({ id: "subtasks", kind: "subtasks", value: (task) => task.subtask_progress }),
-    builtin({ id: "parent", kind: "parent", value: (task) => task.parent }),
+    builtin({ id: "subtasks", render: SubtasksField, value: (task) => task.subtask_progress }),
+    builtin({ id: "parent", render: ParentField, value: (task) => task.parent }),
     builtin({
       id: "priority",
-      kind: "priority",
+      render: PriorityField,
       phrase: "kanban.priority",
       value: (task) => task.priority,
     }),
@@ -113,31 +350,12 @@ export const taskFields = (
       phrase: "relations:blockers.label",
       value: (task) => task.blocked_by_open_count || null,
     }),
-    builtin({ id: "tags", kind: "tags", requireable: true, value: (task) => task.tags }),
+    builtin({ id: "tags", render: TagsField, requireable: true, value: (task) => task.tags }),
     ...propertyFields(definitions, (task, definition) => listedValue(task.properties, definition)),
     ...plugins,
   ];
   return new Map(fields.map((field) => [field.id, field]));
 };
-
-/** One field per property the initiative defines, two that share a name told
- *  apart in their labels; `read` reads one's value off an item. */
-export const propertyFields = (
-  definitions: PropertyDefinitionRead[],
-  read: (item: Parameters<FieldDef["value"]>[0], definition: PropertyDefinitionRead) => unknown
-): FieldDef[] =>
-  namePropertyColumns(definitions).map(({ definition, label }) => ({
-    id: propertyFieldId(definition.id),
-    kind: "property",
-    source: "property",
-    label,
-    hideable: true,
-    // A checkbox is always on or off, so never empty.
-    requireable: definition.type !== MetadataType.checkbox,
-    icon: iconForPropertyType(definition.type),
-    value: (item) => read(item, definition),
-    property: definition,
-  }));
 
 const field = (id: string): LayoutNode => ({ type: "field", props: { field: id } });
 
@@ -190,6 +408,13 @@ export const TASK_CARD: LayoutNode = {
       ],
     },
   ],
+};
+
+/** A project's lists, of its tasks. */
+export const TASK_LIST_SHAPE: ListShape = {
+  card: TASK_CARD,
+  columns: TASK_COLUMNS,
+  columnFields: new Set(TASK_COLUMNS),
 };
 
 /** What every task page has across the top: its title and what else can be

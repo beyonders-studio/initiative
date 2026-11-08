@@ -4,34 +4,71 @@
  * same fields, cards and columns a project's lists draw tasks with.
  */
 
+import { memo } from "react";
+
 import type {
   CollectionFileSummary,
+  FileSummary,
   PropertyDefinitionRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { FileTypeBadge } from "@/components/files/fileColumns";
+import { formatBytes } from "@/ui/lib/fileUtils";
+import { cn } from "@/ui/lib/utils";
 import { listedValue, nonEmptyPropertySummaries } from "@/ui/properties/propertyHelpers";
 
 import { at, detailLayoutSpec, type Region } from "./detailLayout";
 import type { ListShape } from "./draft";
-import { type FieldDef, type FieldKind, isEmptyValue, type LayoutItem } from "./fields";
-import { propertyFields } from "./tasks";
+import {
+  type FieldDef,
+  type FieldRendererProps,
+  isEmptyValue,
+  type LayoutItem,
+  propertyFields,
+} from "./fields";
 import type { LayoutNode } from "./tree";
 
 /** The file a collection's list draws, which its fields are read from. */
 const fileOf = (item: LayoutItem) => item as unknown as CollectionFileSummary;
 
+// A file's own fields hold the file, or its size, as their value.
+const NameField = memo(function NameField({ value, variant }: FieldRendererProps) {
+  return (
+    <p className={cn("min-w-0 truncate", variant === "card" ? "font-medium text-sm" : "text-sm")}>
+      {(value as FileSummary).name}
+    </p>
+  );
+});
+
+const TypeField = memo(function TypeField({ value }: FieldRendererProps) {
+  return <FileTypeBadge file={value as FileSummary} />;
+});
+
+// A file of the app's own has no size; a cell says so.
+const SizeField = memo(function SizeField({ value, variant }: FieldRendererProps) {
+  return typeof value === "number" ? (
+    <span
+      className={cn(
+        "tabular-nums",
+        variant === "card" ? "text-muted-foreground text-xs" : "text-sm"
+      )}
+    >
+      {formatBytes(value)}
+    </span>
+  ) : variant === "cell" ? (
+    <span className="text-muted-foreground text-sm">&mdash;</span>
+  ) : null;
+});
+
 /** A file's own fields, by the id a layout names each by (`FileFieldId`). */
 const FILE_FIELDS: Record<
   string,
-  {
-    kind: FieldKind;
-    label: string;
-    phrase?: string;
+  Pick<FieldDef, "kind" | "render" | "label" | "phrase"> & {
     read: (file: CollectionFileSummary) => unknown;
   }
 > = {
-  name: { kind: "fileName", label: "common:name", read: (file) => file },
-  type: { kind: "fileType", label: "files:columns.type", read: (file) => file },
-  size: { kind: "fileSize", label: "files:columns.size", read: (file) => file.file_size },
+  name: { render: NameField, label: "common:name", read: (file) => file },
+  type: { render: TypeField, label: "files:columns.type", read: (file) => file },
+  size: { render: SizeField, label: "files:columns.size", read: (file) => file.file_size },
   added: {
     kind: "date",
     label: "files:columns.added",

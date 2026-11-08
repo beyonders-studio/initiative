@@ -24,6 +24,7 @@ import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useFieldCatalog } from "@/hooks/useFieldCatalog";
 import type { FieldDef } from "@/lib/layouts/fields";
 import { activeGrouping, groupables, offeredGroupings } from "@/lib/layouts/grouping";
+import { BOARD_COLUMNS, taskGroups } from "@/lib/layouts/taskGroupings";
 import { browserTimezone } from "@/lib/timezones";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -31,7 +32,7 @@ import type { TranslateFn } from "@/types/i18n";
  *  and the project's properties that do. */
 export function useGroupables(fields: ReadonlyMap<string, FieldDef>, t: TranslateFn) {
   const { groupings: catalog } = useFieldCatalog("tasks");
-  return useMemo(() => groupables(catalog, fields, t), [catalog, fields, t]);
+  return useMemo(() => groupables(catalog, fields, t, BOARD_COLUMNS), [catalog, fields, t]);
 }
 
 export function useTaskGroupings({
@@ -95,8 +96,8 @@ export function useTaskGroupings({
         all,
         groupings,
         kind,
-        statuses,
-        tasks,
+        items: tasks,
+        own: taskGroups({ statuses, tasks, t }),
         served: data && entry ? { field: entry.field, data } : undefined,
         t,
       }),

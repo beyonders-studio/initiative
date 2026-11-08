@@ -5,7 +5,7 @@
  * listed there at the top.
  */
 
-import type { TaskGroupRow } from "@/lib/layouts/grouping";
+import type { TaskGroupRow } from "@/lib/layouts/taskGroupings";
 
 /** A row of a task tree: the task, how deep it is, and its parts' rows. */
 export type TaskTreeRow = TaskGroupRow & { level: number; subRows?: TaskTreeRow[] };

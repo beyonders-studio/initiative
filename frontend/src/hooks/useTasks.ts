@@ -63,7 +63,7 @@ import {
 } from "@/hooks/useFieldSave";
 import { chipKey } from "@/hooks/useSmartChips";
 import { fetchAllPages } from "@/lib/fetchAllPages";
-import type { GroupMove } from "@/lib/layouts/grouping";
+import type { GroupMove } from "@/lib/layouts/taskGroupings";
 import { withZone } from "@/lib/recurrence";
 import { chipRef } from "@/lib/smartChips";
 import { fireTaskCompletionFeedback } from "@/lib/taskCompletionFeedback";

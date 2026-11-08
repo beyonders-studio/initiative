@@ -55,7 +55,7 @@ import {
   shippedPluginParts,
   usePluginsOnItems,
 } from "@/lib/layouts/plugins";
-import { taskFields } from "@/lib/layouts/tasks";
+import { TASK_LIST_SHAPE, taskFields } from "@/lib/layouts/tasks";
 import type { LayoutNode } from "@/lib/layouts/tree";
 import { toast } from "@/lib/mascotToast";
 import type { TranslateFn } from "@/types/i18n";
@@ -304,12 +304,13 @@ export const LayoutEditor = ({
   const [selected, setSelected] = useState<Selection>(LAYOUT_SELECTED);
   const openDetail = details.find((detail) => detailKey(detail) === active);
   const onDetail = openDetail !== undefined;
+  const shape = lists?.shape ?? TASK_LIST_SHAPE;
   const current: ListLayout | null = onDetail
     ? null
     : {
         kind: active as ListLayoutReadKind,
         definition: draft.lists[active as ListLayoutReadKind] ?? {},
-        shape: lists?.shape,
+        shape,
       };
   const stored = openDetail ? (draft.details[detailKey(openDetail)] ?? null) : null;
   // The plug-ins that draw on what is open: a list's tasks, or a detail's item.
@@ -387,9 +388,9 @@ export const LayoutEditor = ({
     const field = propertyFieldId(propertyId);
     const onLists = shownKinds.filter((kind) => {
       const definition = draft.lists[kind] ?? {};
-      if (kind === "table") return columnsOf(definition, NO_FIELDS, lists?.shape).includes(field);
+      if (kind === "table") return columnsOf(definition, NO_FIELDS, shape).includes(field);
       if (!CARD_LISTS.has(kind)) return false;
-      const card = cardOf(definition, NO_FIELDS, lists?.shape);
+      const card = cardOf(definition, NO_FIELDS, shape);
       return namedFields(card).has(field) || holdsPart(card, "properties");
     });
     const onPages = details.filter((each) => {

@@ -1,7 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 
-import type { TaskStatusRead } from "@/api/generated/initiativeAPI.schemas";
+import type { TaskListRead, TaskStatusRead } from "@/api/generated/initiativeAPI.schemas";
 import {
   ArchiveDoneButton,
   CollapsedHeader,
@@ -9,12 +9,13 @@ import {
   ExpandedHeader,
   KanbanCards,
 } from "@/components/projects/KanbanColumn";
-import type { Band, TaskGrouping } from "@/lib/layouts/grouping";
+import type { Band } from "@/lib/layouts/grouping";
+import type { TaskGrouping } from "@/lib/layouts/taskGroupings";
 import type { LayoutContext } from "@/lib/layouts/tree";
 import { cn } from "@/ui/lib/utils";
 
 interface KanbanBandsProps {
-  bands: Band[];
+  bands: Band<TaskListRead>[];
   grouping: TaskGrouping;
   statuses: TaskStatusRead[];
   /** How many tasks each column holds, once each, whatever bands they are in. */
@@ -121,7 +122,7 @@ export const KanbanBands = ({
               key={status.id}
               statusId={status.id}
               group={band.key}
-              tasks={band.tasks.filter((task) => task.task_status_id === status.id)}
+              tasks={band.items.filter((task) => task.task_status_id === status.id)}
               collapsed={collapsedStatusIds.has(status.id)}
               canWrite={canWrite}
               view={view}
@@ -145,7 +146,7 @@ const BandRow = ({
   onToggle,
   children,
 }: {
-  band: Band;
+  band: Band<TaskListRead>;
   grouping: TaskGrouping;
   folded: boolean;
   onToggle: () => void;
@@ -168,7 +169,7 @@ const BandRow = ({
           <ChevronDown className={cn("h-4 w-4 transition-transform", folded && "-rotate-90")} />
         </button>
         <span id={labelId}>{grouping.header(band.key)}</span>
-        <span className="text-muted-foreground text-sm tabular-nums">{band.tasks.length}</span>
+        <span className="text-muted-foreground text-sm tabular-nums">{band.items.length}</span>
       </div>
       {folded ? null : <div className="flex gap-4">{children}</div>}
     </div>

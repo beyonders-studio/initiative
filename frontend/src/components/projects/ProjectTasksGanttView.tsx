@@ -236,7 +236,7 @@ export const ProjectTasksGanttView = ({
     const byId = new Map(shown.map((task) => [task.id, task]));
     const own = active
       ? boardBands(active, tasks).flatMap((band): GanttRow[] => {
-          const held = band.tasks.map((task) => byId.get(task.id) ?? task);
+          const held = band.items.map((task) => byId.get(task.id) ?? task);
           return [
             { type: "group", key: band.key, count: held.length },
             ...taskRows(held, wholes, folded, `${band.key}:`),

@@ -1,8 +1,7 @@
 import type { PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
 
 import { at, detailLayoutSpec, type Region } from "./detailLayout";
-import type { FieldDef, FieldKind } from "./fields";
-import { propertyFields } from "./tasks";
+import { type FieldDef, type FieldKind, propertyFields } from "./fields";
 import type { LayoutNode } from "./tree";
 
 /** A counter's fields, each with its label's key and the kind of value it is.
