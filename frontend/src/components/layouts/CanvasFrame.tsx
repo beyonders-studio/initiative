@@ -1,4 +1,3 @@
-import type { GroupingState } from "@tanstack/react-table";
 import { GripVertical, Plus } from "lucide-react";
 import {
   type ComponentProps,
@@ -6,46 +5,15 @@ import {
   type MouseEvent,
   type ReactNode,
   type SyntheticEvent,
-  useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  LayoutGrouping,
-  TaskListRead,
-  TaskStatusRead,
-} from "@/api/generated/initiativeAPI.schemas";
-import { ProjectTasksGanttView } from "@/components/projects/ProjectTasksGanttView";
-import { ProjectTasksKanbanView } from "@/components/projects/ProjectTasksKanbanView";
-import { ProjectTasksTableView } from "@/components/projects/ProjectTasksTableView";
-import { columnLimitsOf } from "@/hooks/useColumnLimits";
-import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
-import type { ProjectTaskTableState } from "@/hooks/useProjectTaskView";
-import { useGroupables, useTaskGroupings } from "@/hooks/useTaskGroupings";
-import { useTasks } from "@/hooks/useTasks";
-import { buildTaskListParams, EMPTY_TASK_FILTERS } from "@/lib/filters/taskFilters";
-import type { TranslateFn } from "@/types/i18n";
-import {
-  cardOf,
-  columnsOf,
-  indexPaths,
-  type ListLayout,
-  type Place,
-  pathKey,
-  pathOf,
-  type Selection,
-  sameSelection,
-} from "@/ui/layouts/draft";
-import type { FieldDef } from "@/ui/layouts/fields";
-import { viewGrouping, withGroupShown } from "@/ui/layouts/grouping";
+import { type Place, pathKey, pathOf, type Selection, sameSelection } from "@/ui/layouts/draft";
 import { cn } from "@/ui/lib/utils";
-
-import { CanvasGrouping } from "./LayoutGroupings";
 
 /** How wide the canvas draws the layout: the widths a person might read it at. */
 export type PreviewWidth = "desktop" | "tablet" | "phone";
@@ -55,9 +23,6 @@ const MAX_WIDTH: Record<PreviewWidth, string | undefined> = {
   tablet: "45rem",
   phone: "24rem",
 };
-
-const noop = () => {};
-const NO_COLLAPSED = new Set<number>();
 
 /** The part an element is in: the nearest marked one. A table marks its
  *  columns by field, and a tree its parts by path. */
@@ -176,7 +141,7 @@ export const CanvasFrame = ({
   bar?: ReactNode;
   children: ReactNode;
 }) => {
-  const { t } = useTranslation(["projects", "layouts"]);
+  const { t } = useTranslation("layouts");
   const content = useRef<HTMLElement>(null);
   const frame = useRef<HTMLDivElement>(null);
   // The element pointed at, and the one last clicked: a board draws a part on
@@ -357,7 +322,7 @@ export const CanvasFrame = ({
           onDropCapture={refuse}
           onMouseOver={(event) => point(event.target)}
           onFocus={(event) => point(event.target)}
-          aria-label={t("layouts:canvas")}
+          aria-label={t("canvas")}
         >
           {children}
         </section>
@@ -371,7 +336,7 @@ export const CanvasFrame = ({
                 <button
                   type="button"
                   className="pointer-events-auto -ml-0.5 cursor-grab touch-none"
-                  aria-label={t("layouts:move", { name: tools.nameOf(selection) })}
+                  aria-label={t("move", { name: tools.nameOf(selection) })}
                   onPointerDown={(event) => {
                     event.preventDefault();
                     setHovered(null);
@@ -396,7 +361,7 @@ export const CanvasFrame = ({
                     {tools.addAt(
                       around[side],
                       <AddPoint
-                        label={t(side === "before" ? "layouts:addBefore" : "layouts:addAfter", {
+                        label={t(side === "before" ? "addBefore" : "addAfter", {
                           name,
                         })}
                       />,
@@ -416,7 +381,7 @@ export const CanvasFrame = ({
             >
               {tools.addAt(
                 inside,
-                <AddPoint label={t("layouts:addInto", { name: tools.nameOf(hovered.of) })} />,
+                <AddPoint label={t("addInto", { name: tools.nameOf(hovered.of) })} />,
                 setPicking
               )}
             </div>
@@ -493,181 +458,3 @@ const DropMark = ({ box, drop, tools }: { box: Box; drop: Drop; tools: CanvasToo
       };
   return <div className="absolute bg-primary" style={edge} />;
 };
-
-/** The list layout being edited, with the project's own tasks. */
-export const LayoutCanvas = ({
-  projectId,
-  initiativeId,
-  statuses,
-  layout: open,
-  fields,
-  width,
-  selection,
-  onSelect,
-  tools,
-  onGroupingsChange,
-}: {
-  projectId: number;
-  initiativeId: number;
-  statuses: TaskStatusRead[];
-  layout: ListLayout;
-  fields: ReadonlyMap<string, FieldDef>;
-  width: PreviewWidth;
-  selection: Selection;
-  onSelect: (selection: Selection) => void;
-  tools: CanvasTools;
-  /** The list's groupings, with a group hidden or shown on the canvas. */
-  onGroupingsChange: (groupings: LayoutGrouping[]) => void;
-}) => {
-  const { t } = useTranslation(LAYOUT_NAMESPACES);
-  const { definition, kind: layout, shape } = open;
-  // Every task, in the project's order: filters and sorts are each person's.
-  const params = useMemo(() => buildTaskListParams(EMPTY_TASK_FILTERS, { projectId }), [projectId]);
-  const tasks = useTasks(params).data?.items ?? NO_TASKS;
-
-  const card = cardOf(definition, fields, shape);
-  const paths = useMemo(() => indexPaths(card), [card]);
-  const groupedTasks = useMemo(() => {
-    const groups: Record<number, TaskListRead[]> = {};
-    for (const status of statuses) groups[status.id] = [];
-    for (const task of tasks) {
-      groups[task.task_status_id] ??= [];
-      groups[task.task_status_id].push(task);
-    }
-    return groups;
-  }, [tasks, statuses]);
-  // The limits being set, against the open tasks the preview holds.
-  const columnLimits = useMemo(
-    () =>
-      columnLimitsOf(
-        (definition.limits ?? []).map(({ status_id, limit }) => ({
-          status_id,
-          limit,
-          count: groupedTasks[status_id]?.length ?? 0,
-        }))
-      ),
-    [definition.limits, groupedTasks]
-  );
-  // Each list's preview is grouped as the list starts until a grouping is
-  // picked here, as a person's list is, so the groups of it can be hidden.
-  const [picks, setPicks] = useState<Partial<Record<string, GroupingState>>>({});
-  const picked = picks[layout] ?? null;
-  const setGrouping = useCallback(
-    (next: GroupingState) => setPicks((all) => ({ ...all, [layout]: next })),
-    [layout]
-  );
-  const all = useGroupables(fields, t as TranslateFn);
-  const grouping = useMemo(
-    () => viewGrouping(definition, layout, picked, all),
-    [definition, layout, picked, all]
-  );
-  const { offered, active } = useTaskGroupings({
-    fields,
-    statuses,
-    tasks,
-    groupings: definition.groupings,
-    kind: layout,
-    grouping,
-    params,
-    t: t as TranslateFn,
-  });
-  const tableState = useMemo<ProjectTaskTableState>(
-    () => [
-      { grouping, sorting: [] },
-      { setGrouping, setSorting: noop },
-    ],
-    [grouping, setGrouping]
-  );
-
-  return (
-    <CanvasFrame
-      width={width}
-      selection={selection}
-      onSelect={onSelect}
-      tools={tools}
-      bar={
-        layout !== "calendar" && offered.length > 0 ? (
-          <CanvasGrouping
-            offered={offered}
-            active={active}
-            grouping={grouping}
-            onGroupingChange={setGrouping}
-            disabled={tools.locked}
-            onToggle={(id, key, shown) =>
-              onGroupingsChange(withGroupShown(definition.groupings, layout, all, id, key, shown))
-            }
-          />
-        ) : undefined
-      }
-    >
-      {layout === "board" ? (
-        <ProjectTasksKanbanView
-          projectId={projectId}
-          initiativeId={initiativeId}
-          taskStatuses={statuses}
-          groupedTasks={groupedTasks}
-          listParams={params}
-          collapsedStatusIds={NO_COLLAPSED}
-          canReorderTasks={false}
-          taskHref={taskHref}
-          sensors={undefined}
-          activeTask={null}
-          onDragStart={noop}
-          onDragOver={noop}
-          onDragEnd={noop}
-          onDragCancel={noop}
-          onToggleCollapse={noop}
-          card={card}
-          displays={definition.displays}
-          columnLimits={columnLimits}
-          grouping={grouping}
-          viewGroupings={definition.groupings}
-          editing={paths}
-        />
-      ) : null}
-      {layout === "table" ? (
-        <ProjectTasksTableView
-          projectId={projectId}
-          initiativeId={initiativeId}
-          tasks={tasks}
-          listParams={params}
-          taskStatuses={statuses}
-          sensors={undefined}
-          canReorderTasks={false}
-          canEditTaskDetails={false}
-          taskActionsDisabled
-          onDragStart={noop}
-          onDragEnd={noop}
-          onDragCancel={noop}
-          onStatusChange={noop}
-          taskHref={taskHref}
-          tableState={tableState}
-          viewColumns={columnsOf(definition, fields, shape)}
-          displays={definition.displays}
-          viewGroupings={definition.groupings}
-          editing
-        />
-      ) : null}
-      {layout === "calendar" ? (
-        <p className="text-muted-foreground text-sm">{t("layouts:calendarNote")}</p>
-      ) : null}
-      {layout === "gantt" ? (
-        <ProjectTasksGanttView
-          initiativeId={initiativeId}
-          projectId={projectId}
-          tasks={tasks}
-          taskStatuses={statuses}
-          listParams={params}
-          scale="week"
-          grouping={grouping}
-          viewGroupings={definition.groupings}
-          taskHref={taskHref}
-          editing
-        />
-      ) : null}
-    </CanvasFrame>
-  );
-};
-
-const NO_TASKS: TaskListRead[] = [];
-const taskHref = () => "#";

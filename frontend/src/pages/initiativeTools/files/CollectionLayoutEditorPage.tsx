@@ -25,12 +25,12 @@ import { SettingsPermissionRequired } from "@/components/settings/SettingsPermis
 import type { ToolIndexRow } from "@/components/tools/ToolIndexPage";
 import { ToolIndexTable } from "@/components/tools/ToolIndexTable";
 import { useCollection, useCollectionFilesFeed } from "@/hooks/useCollections";
-import { useProperties } from "@/hooks/useProperties";
 import { useRouteId } from "@/hooks/useRouteId";
 import { instanceTarget, useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { collectionFileFields, FILE_LIST_SHAPE } from "@/lib/layouts/files";
 import { collectionRoute } from "@/lib/tools";
+import { withDisplays } from "@/ui/layouts/fields";
 
 const noop = () => {};
 const NO_SELECTION = {
@@ -54,10 +54,6 @@ export const CollectionLayoutEditorPage = () => {
   const set = useInstanceLayouts("collection", id).data;
   const feed = useCollectionFilesFeed(id, NEWEST_ADDED);
   const files = useMemo(() => feed.data?.pages[0]?.items ?? [], [feed.data]);
-  const { data: properties = [] } = useProperties({
-    initiativeId: collection?.initiative_id,
-    enabled: collection !== undefined,
-  });
   const rows = useMemo(
     () => files.map((file) => ({ ...file, card: null }) as ToolIndexRow),
     [files]
@@ -66,36 +62,38 @@ export const CollectionLayoutEditorPage = () => {
     () =>
       collection
         ? {
-            fields: collectionFileFields(collection.metadata, properties),
+            itemKind: "file",
+            fields: (definitions) => collectionFileFields(collection.metadata, definitions),
             shape: FILE_LIST_SHAPE,
             owner: { kind: "collection", id: collection.id },
             help: (kind) => `files:collections.listHelp.${kind}`,
-            preview: (layout, fields) => (
-              <CollectionListView
-                kind={layout.kind as CollectionList}
-                definition={layout.definition}
-                fields={fields}
-                files={files}
-                onActivate={noop}
-                editing
-                table={(columns) => (
-                  <ToolIndexTable
-                    tool={Tool.file}
-                    initiativeId={collection.initiative_id}
-                    rows={rows}
-                    laidOut={columns}
-                    selection={NO_SELECTION}
-                    sorting={[]}
-                    onSortingChange={noop}
-                    columnVisibility={{}}
-                    onColumnVisibilityChange={noop}
-                  />
-                )}
-              />
-            ),
+            preview: ({ layout, fields, frame }) =>
+              frame(
+                <CollectionListView
+                  kind={layout.kind as CollectionList}
+                  definition={layout.definition}
+                  fields={withDisplays(fields, layout.definition.displays)}
+                  files={files}
+                  onActivate={noop}
+                  editing
+                  table={(columns) => (
+                    <ToolIndexTable
+                      tool={Tool.file}
+                      initiativeId={collection.initiative_id}
+                      rows={rows}
+                      laidOut={columns}
+                      selection={NO_SELECTION}
+                      sorting={[]}
+                      onSortingChange={noop}
+                      columnVisibility={{}}
+                      onColumnVisibilityChange={noop}
+                    />
+                  )}
+                />
+              ),
           }
         : null,
-    [collection, properties, files, rows]
+    [collection, files, rows]
   );
   const details = useMemo(
     () => (collection ? [fileDetail(collection, files[0], feed.isSuccess)] : []),

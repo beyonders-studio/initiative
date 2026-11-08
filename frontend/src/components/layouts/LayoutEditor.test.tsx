@@ -6,6 +6,7 @@
 import { createEvent, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
+import { useMemo } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -33,6 +34,7 @@ import {
   Tool,
   type ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { useProperties } from "@/hooks/useProperties";
 import { instanceTarget, sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { TASK_COLUMNS } from "@/lib/layouts/tasks";
 import { CollectionLayoutEditorPage } from "@/pages/initiativeTools/files/CollectionLayoutEditorPage";
@@ -41,6 +43,7 @@ import type { LayoutNode } from "@/ui/layouts/tree";
 
 import { calendarPresets, eventDetail, taskDetails, taskPresets } from "./details";
 import { LayoutEditor } from "./LayoutEditor";
+import { taskLists } from "./taskLists";
 
 const STATUSES = buildDefaultTaskStatuses(1);
 const TASK_TYPE = {
@@ -56,15 +59,28 @@ const TASK_TYPE = {
   starting_values: null,
 };
 const PROJECT = { id: 1, initiativeId: 1, statuses: STATUSES, types: [TASK_TYPE] };
-const PROJECT_DETAILS = taskDetails(PROJECT);
 const CALENDAR_DETAILS = [eventDetail(1)];
-const PROJECT_PRESETS = taskPresets(PROJECT);
 const CALENDAR_PRESETS = calendarPresets([], {
   appendOption: async () => ({ value: "", label: "" }),
   searchMembers: async () => [],
 });
 
 type Write = ListLayoutWrite | DetailLayoutWrite;
+
+/** The project's lists, task pages and presets, as its page gives them: with
+ *  its own properties, as read. */
+const useProjectLayouts = () => {
+  const { data: properties } = useProperties({ owner: { kind: "project", id: PROJECT.id } });
+  return useMemo(() => {
+    if (!properties) return null;
+    const project = { ...PROJECT, properties };
+    return {
+      lists: taskLists(project),
+      details: taskDetails(project),
+      presets: taskPresets(project),
+    };
+  }, [properties]);
+};
 
 /** Each request a save made, in order: a layout saved, one put back as
  *  shipped, or the list the project opens on. */
@@ -83,13 +99,14 @@ const editor = (kind: string, onClose = vi.fn(), set = buildToolLayoutSet(), cal
   const target = calendar ? sharedTarget(Tool.calendar, 1) : instanceTarget(Tool.project, 1);
   const Page = () => {
     const read = useToolLayouts(target).data;
-    return read ? (
+    const project = useProjectLayouts();
+    return read && project ? (
       <LayoutEditor
         target={target}
         initiativeId={1}
-        project={calendar ? undefined : PROJECT}
-        details={calendar ? CALENDAR_DETAILS : PROJECT_DETAILS}
-        presets={calendar ? CALENDAR_PRESETS : PROJECT_PRESETS}
+        lists={calendar ? undefined : project.lists}
+        details={calendar ? CALENDAR_DETAILS : project.details}
+        presets={calendar ? CALENDAR_PRESETS : project.presets}
         set={read}
         initialKind={kind}
         ownPropertiesEditable={!calendar}
@@ -299,13 +316,14 @@ describe("LayoutEditor", () => {
     const target = instanceTarget(Tool.project, 1);
     const Page = () => {
       const read = useToolLayouts(target).data;
-      return read ? (
+      const project = useProjectLayouts();
+      return read && project ? (
         <LayoutEditor
           target={target}
           initiativeId={1}
-          project={PROJECT}
-          details={PROJECT_DETAILS}
-          presets={PROJECT_PRESETS}
+          lists={project.lists}
+          details={project.details}
+          presets={project.presets}
           set={read}
           initialKind="table"
           onClose={vi.fn()}
