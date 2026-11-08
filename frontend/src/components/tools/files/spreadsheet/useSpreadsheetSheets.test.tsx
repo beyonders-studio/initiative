@@ -2,15 +2,11 @@ import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 
-import { useSpreadsheetSheets } from "@/components/tools/files/spreadsheet/useSpreadsheetSheets";
-import {
-  SHEET_CELLS,
-  sheetContainer,
-  sheetPart,
-  sheetsRoot,
-} from "@/components/tools/files/spreadsheet/workbookDoc";
 import { parseSpreadsheetContent } from "@/lib/spreadsheet/content";
 import { MAX_SHEETS } from "@/lib/spreadsheet/sheets";
+
+import { useSpreadsheetSheets } from "./useSpreadsheetSheets";
+import { SHEET_CELLS, sheetContainer, sheetPart, sheetsRoot } from "./workbookDoc";
 
 const content = (cells: Record<string, unknown>) =>
   parseSpreadsheetContent({ cells: cells as Record<string, string | number> });

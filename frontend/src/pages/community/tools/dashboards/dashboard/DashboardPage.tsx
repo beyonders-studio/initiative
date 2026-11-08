@@ -1,3 +1,4 @@
+import { Eye } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -16,11 +17,21 @@ import { useRecordOpen } from "@/hooks/usePersonalItems";
 import { useRouteId } from "@/hooks/useRouteId";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolListRoute, toolSettingsRoute } from "@/lib/tools";
-import { DashboardUpdateBadge } from "@/pages/community/tools/dashboards/dashboard/DashboardUpdateBadge";
-import { InitiativeViewNotice } from "@/pages/community/tools/dashboards/dashboard/InitiativeViewNotice";
-import { WidgetConfigDialog } from "@/pages/community/tools/dashboards/dashboard/WidgetConfigDialog";
-import { WidgetPicker } from "@/pages/community/tools/dashboards/dashboard/WidgetPicker";
 import { DetailHeaderSkeleton } from "@/ui/page-skeletons";
+
+import { DashboardUpdateBadge } from "./DashboardUpdateBadge";
+import { WidgetConfigDialog } from "./WidgetConfigDialog";
+import { WidgetPicker } from "./WidgetPicker";
+
+function InitiativeViewNotice() {
+  const { t } = useTranslation("dashboards");
+  return (
+    <p className="inline-flex items-center gap-1.5 text-muted-foreground text-xs">
+      <Eye className="h-3.5 w-3.5" aria-hidden />
+      {t("viewMode.notice")}
+    </p>
+  );
+}
 
 export function DashboardPage() {
   const { t } = useTranslation(["dashboards", "common"]);

@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 
 import { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { whereItLives } from "@/components/entities/EntityPicker";
-import { CreateFileDialog } from "@/components/tools/files/CreateFileDialog";
 import { ReadOnlyFileBody } from "@/components/tools/files/detail/ReadOnlyFileBody";
 import { useFile } from "@/hooks/useFiles";
 import { useInitiative } from "@/hooks/useInitiatives";
@@ -16,6 +15,8 @@ import { Button } from "@/ui/button";
 import { isStoredFileType } from "@/ui/lib/fileTypes";
 import type { FileFieldFiles } from "@/ui/properties/FileFieldInput";
 import type { FileFieldValue } from "@/ui/properties/propertyHelpers";
+
+import { CreateFileDialog } from "./CreateFileDialog";
 
 /** A file this app draws itself, as its own page draws it, read-only. A
  *  body loads its content once, so it waits for this visit's own fetch. */

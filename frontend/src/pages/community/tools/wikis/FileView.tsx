@@ -16,12 +16,6 @@ import { useRouteId } from "@/hooks/useRouteId";
 import { useWiki } from "@/hooks/useWikis";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolDetailRoute } from "@/lib/tools";
-import { WikiChrome } from "@/pages/community/tools/wikis/WikiChrome";
-import {
-  WikiConnectionsSheet,
-  WikiPageConnections,
-} from "@/pages/community/tools/wikis/WikiPageConnections";
-import { WikiPageNav } from "@/pages/community/tools/wikis/WikiPageNav";
 import { Button } from "@/ui/button";
 import { Card, CardHeader, CardTitle } from "@/ui/card";
 import { atLeast, useRegionWidthClass } from "@/ui/lib/useWidthClass";
@@ -29,6 +23,10 @@ import { cn } from "@/ui/lib/utils";
 import { EditorSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
 import { Skeleton } from "@/ui/skeleton";
+
+import { WikiChrome } from "./WikiChrome";
+import { WikiConnectionsSheet, WikiPageConnections } from "./WikiPageConnections";
+import { WikiPageNav } from "./WikiPageNav";
 
 /**
  * A file, read as a page of the wiki it was put in.

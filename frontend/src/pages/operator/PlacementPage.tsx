@@ -25,13 +25,14 @@ import {
 } from "@/hooks/useProviderPlacement";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
-import { ProviderPlacementRuleDialog } from "@/pages/operator/ProviderPlacementRuleDialog";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
+
+import { ProviderPlacementRuleDialog } from "./ProviderPlacementRuleDialog";
 
 /** The rule dialog's subject: a provider, and the rule on it being edited. */
 type Editing = { provider: PlacementProviderRead; rule: ProviderPlacementRuleRead | null };

@@ -80,10 +80,6 @@ import { getProjectColor } from "@/lib/projectColor";
 import { getItem, setItem } from "@/lib/storage";
 import { taskReadToListRow } from "@/lib/taskUtils";
 import { browserTimezone } from "@/lib/timezones";
-import { ExportTasksButton } from "@/pages/community/tools/projects/project/ExportTasksButton";
-import { TaskBulkEditDialog } from "@/pages/community/tools/projects/project/TaskBulkEditDialog";
-import { TaskBulkEditPanel } from "@/pages/community/tools/projects/project/TaskBulkEditPanel";
-import { ToolLayoutSelect } from "@/pages/community/tools/projects/project/ToolLayoutSelect";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Dialog } from "@/ui/dialog";
@@ -95,6 +91,11 @@ import type { LayoutNode } from "@/ui/layouts/tree";
 import { useDragSensors } from "@/ui/lib/useDragSensors";
 import { StatusMessage } from "@/ui/status-message";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
+
+import { ExportTasksButton } from "./ExportTasksButton";
+import { TaskBulkEditDialog } from "./TaskBulkEditDialog";
+import { TaskBulkEditPanel } from "./TaskBulkEditPanel";
+import { ToolLayoutSelect } from "./ToolLayoutSelect";
 
 /** A status change on screen whose request has not answered yet. */
 type PendingStatus = { vars: UpdateTaskVariables; status: TaskStatusRead };

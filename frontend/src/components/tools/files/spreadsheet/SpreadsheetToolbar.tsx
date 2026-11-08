@@ -31,7 +31,6 @@ import {
 import { Fragment, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { SpreadsheetFormattingStore } from "@/components/tools/files/spreadsheet/useSpreadsheetFormatting";
 import { HISTORY_SHORTCUT } from "@/hooks/useYjsHistory";
 import type {
   BorderLineStyle,
@@ -62,6 +61,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
+
+import type { SpreadsheetFormattingStore } from "./useSpreadsheetFormatting";
 
 export type SelectionMode = "range" | "columns" | "rows";
 

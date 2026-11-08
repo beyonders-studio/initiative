@@ -17,7 +17,8 @@ import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { CreateFileDialog } from "@/components/tools/files/CreateFileDialog";
+
+import { CreateFileDialog } from "./CreateFileDialog";
 
 const page = () => () => <CreateFileDialog open onOpenChange={() => {}} initiativeId={7} />;
 

@@ -24,7 +24,6 @@ import { useTranslation } from "react-i18next";
 import { type SearchSuggestion, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { openHelp } from "@/components/help/helpStore";
 import { InitiativeMark } from "@/components/icons/InitiativeMark";
-import { SearchCategoryTabs } from "@/components/search/SearchCategoryTabs";
 import { getOpenCreateTaskWizard } from "@/components/tasks/CreateTaskWizard";
 import { useFeedback } from "@/components/tickets/FeedbackSheet";
 import { useSecurityReporting } from "@/components/tickets/ReportSecurityProblem";
@@ -75,6 +74,8 @@ import {
 import { commandFilter } from "@/ui/lib/fuzzyMatch";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { Tabs } from "@/ui/tabs";
+
+import { SearchCategoryTabs } from "./SearchCategoryTabs";
 
 // Module-level callback so other components can open the command center
 let openCommandCenter: (() => void) | null = null;

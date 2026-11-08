@@ -26,10 +26,6 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
-import { KanbanBands } from "@/components/tools/projects/KanbanBands";
-import { type ColumnFill, KanbanColumn } from "@/components/tools/projects/KanbanColumn";
-import { priorityVariant } from "@/components/tools/projects/projectTasksConfig";
-import { resolveKanbanDropTarget } from "@/components/tools/projects/taskOrdering";
 import { MentionText } from "@/components/user/MentionText";
 import { type ColumnLimits, NO_COLUMN_LIMITS } from "@/hooks/useColumnLimits";
 import { useCounterSteps, useProjectLayoutEnv } from "@/hooks/useLayoutEnv";
@@ -49,8 +45,12 @@ import { type LayoutContext, type LayoutNode, namesField } from "@/ui/layouts/tr
 import { formatDateTime } from "@/ui/lib/formatDate";
 import { cn } from "@/ui/lib/utils";
 
+import { KanbanBands } from "./KanbanBands";
+import { type ColumnFill, KanbanColumn } from "./KanbanColumn";
+import { priorityVariant } from "./projectTasksConfig";
 import { TaskAssigneeList } from "./TaskAssigneeList";
 import { type BoardActions, BoardActionsContext, TaskCardActions } from "./TaskQuickActions";
+import { resolveKanbanDropTarget } from "./taskOrdering";
 
 type ProjectTasksKanbanViewProps = {
   projectId: number;

@@ -2,10 +2,11 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { AddToCollectionDialog } from "@/components/tools/files/collections/AddToCollectionDialog";
 import { useToolCreateAccess } from "@/hooks/useInitiativeAccess";
 import { COLLECTION_ICON } from "@/lib/collections";
 import { Button } from "@/ui/button";
+
+import { AddToCollectionDialog } from "./AddToCollectionDialog";
 
 interface AddToCollectionButtonProps {
   initiativeId: number;

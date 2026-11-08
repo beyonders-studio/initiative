@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { SpreadsheetCellsStore } from "@/components/tools/files/spreadsheet/useSpreadsheetCells";
-import type { SpreadsheetSelection } from "@/components/tools/files/spreadsheet/useSpreadsheetSelection";
 import type { SheetBounds } from "@/lib/spreadsheet/bounds";
 import { type CellRange, type CellValue, keyOf } from "@/lib/spreadsheet/coords";
 import { computeAutofillTarget, computeFillWrites } from "@/lib/spreadsheet/fill";
+
+import type { SpreadsheetCellsStore } from "./useSpreadsheetCells";
+import type { SpreadsheetSelection } from "./useSpreadsheetSelection";
 
 interface UseSpreadsheetFillArgs {
   readOnly: boolean;

@@ -4,11 +4,12 @@ import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useAuth } from "@/hooks/useAuth";
 import { useOidcSettings } from "@/hooks/useSettings";
 import { Capability, hasCapability } from "@/lib/permissions";
-import { AuthProvidersSection } from "@/pages/platform/auth/AuthProvidersSection";
-import { PlatformAuthSection } from "@/pages/platform/auth/PlatformAuthSection";
-import { ProviderDefaultsSection } from "@/pages/platform/auth/ProviderDefaultsSection";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
+
+import { AuthProvidersSection } from "./AuthProvidersSection";
+import { PlatformAuthSection } from "./PlatformAuthSection";
+import { ProviderDefaultsSection } from "./ProviderDefaultsSection";
 
 /**
  * Platform → Authentication.

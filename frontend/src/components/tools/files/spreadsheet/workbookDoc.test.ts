@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 
+import { parseSpreadsheetContent } from "@/lib/spreadsheet/content";
+
 import {
   ensureSheetContainer,
   ensureWorkbook,
@@ -12,8 +14,7 @@ import {
   sheetContainer,
   sheetPart,
   sheetsRoot,
-} from "@/components/tools/files/spreadsheet/workbookDoc";
-import { parseSpreadsheetContent } from "@/lib/spreadsheet/content";
+} from "./workbookDoc";
 
 const cellsOf = (doc: Y.Doc, id: string): Record<string, unknown> =>
   (sheetPart(sheetContainer(doc, id), SHEET_CELLS)?.toJSON() ?? {}) as Record<string, unknown>;

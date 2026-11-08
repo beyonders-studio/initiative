@@ -7,7 +7,13 @@ import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { useToolImportAction } from "@/components/imports/ToolImportAction";
 import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
 import { TimelineRail } from "@/components/timeline/TimelineRail";
-import { readToolListFilters, type ToolListFilters } from "@/components/tools/ToolFilterFields";
+import {
+  readToolListFilters,
+  ToolFilterFields,
+  type ToolFilterFieldsProps,
+  type ToolListFilters,
+} from "@/components/tools/ToolFilterFields";
+import { ToolFilterPanel } from "@/components/tools/ToolFilterPanel";
 import { ToolListToolbar } from "@/components/tools/ToolListToolbar";
 import { ToolViewFilter } from "@/components/tools/ToolViewFilter";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -23,18 +29,90 @@ import { useCommunityPath } from "@/lib/communityUrl";
 import { postPeriod } from "@/lib/posts";
 import { browserTimezone } from "@/lib/timezones";
 import { type ToolView, toolDetailRoute, toolViewParams } from "@/lib/tools";
-import { CreatePostDialog } from "@/pages/community/tools/posts/CreatePostDialog";
-import { PostCard } from "@/pages/community/tools/posts/PostCard";
-import { PostsFilterBar, type ReadFilter } from "@/pages/community/tools/posts/PostsFilterBar";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Label } from "@/ui/label";
 import { formatPeriod, formatPeriodYear } from "@/ui/lib/formatDate";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { LoadMore } from "@/ui/load-more";
 import { CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { parsePropertyFilters } from "@/ui/properties/PropertyFilter";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { StatusMessage } from "@/ui/status-message";
 import { useVirtualRows } from "@/ui/virtual-rows";
+
+import { CreatePostDialog } from "./CreatePostDialog";
+import { PostCard } from "./PostCard";
+
+/** What a board is showing: everything, or only what is still waiting. */
+type ReadFilter = "all" | "unread";
+
+type PostsFilterBarProps = ToolFilterFieldsProps<typeof Tool.post> & {
+  readFilter: ReadFilter;
+  onReadFilterChange: (value: ReadFilter) => void;
+  filtersOpen: boolean;
+  onFiltersOpenChange: (open: boolean) => void;
+  /** How many filters are currently set — tells "Clear all" whether it has
+   *  anything to do. */
+  activeCount?: number;
+  /** Resets every filter this bar owns — offered in the mobile sheet. */
+  onClear?: () => void;
+};
+
+/**
+ * The board's filters, in the panel every other tool list uses: the board's
+ * shared fields, and the read state, which is the reader's own.
+ */
+const PostsFilterBar = ({
+  value,
+  onChange,
+  readFilter,
+  onReadFilterChange,
+  filtersOpen,
+  onFiltersOpenChange,
+  onClear,
+  activeCount,
+  initiativeId,
+}: PostsFilterBarProps) => {
+  const { t } = useTranslation(["posts", "common"]);
+
+  return (
+    <ToolFilterPanel
+      open={filtersOpen}
+      onOpenChange={onFiltersOpenChange}
+      onClear={onClear}
+      activeCount={activeCount}
+    >
+      <ToolFilterFields
+        tool={Tool.post}
+        value={value}
+        onChange={onChange}
+        initiativeId={initiativeId}
+      >
+        <div className="w-full space-y-2 sm:w-48">
+          <Label
+            htmlFor="post-read-filter"
+            className="block font-medium text-muted-foreground text-xs"
+          >
+            {t("filters.readState")}
+          </Label>
+          <Select
+            value={readFilter}
+            onValueChange={(next) => onReadFilterChange(next as ReadFilter)}
+          >
+            <SelectTrigger id="post-read-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("filters.allPosts")}</SelectItem>
+              <SelectItem value="unread">{t("filters.unreadOnly")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </ToolFilterFields>
+    </ToolFilterPanel>
+  );
+};
 
 /**
  * A first guess at a card's height, corrected by measurement as each mounts.

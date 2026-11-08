@@ -16,8 +16,9 @@ import { EntitiesExportButton } from "@/components/exports/BulkExportButton";
 import { TOOL_EXPORT_FORMATS } from "@/components/exports/formats";
 import { exportFilenameStem } from "@/lib/exportDownload";
 import { toolEnvelopeType, toolKebabSingular } from "@/lib/tools";
-import { useToolSettings } from "@/pages/community/tools/settings/ToolSettingsContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+
+import { useToolSettings } from "./ToolSettingsContext";
 
 export const ToolExportCard = () => {
   const { t } = useTranslation(["common", "exports"]);

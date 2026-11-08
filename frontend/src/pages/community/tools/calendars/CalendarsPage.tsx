@@ -39,6 +39,7 @@ import { useToolImportAction } from "@/components/imports/ToolImportAction";
 import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
 import { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { TaskStatusPriorityFilters } from "@/components/tasks/TaskStatusPriorityFilters";
+import { CreateToolDialog, type CreateToolDialogProps } from "@/components/tools/CreateToolDialog";
 import {
   CalendarPicker,
   type ProjectTaskCalendar,
@@ -96,13 +97,13 @@ import {
   carriedCalendarView,
   EMPTY_CALENDAR_VIEW_FILTERS,
 } from "@/lib/filters/calendarFilters";
+import { DEFAULT_COLOR } from "@/lib/initiativeColors";
 import { CALENDAR_PRESETS } from "@/lib/layouts/events";
 import { getProjectColor } from "@/lib/projectColor";
 import { browserTimezone } from "@/lib/timezones";
 import { eventRoute, taskRoute, toolListRoute, toolSettingsRoute } from "@/lib/tools";
-import { CreateCalendarDialog } from "@/pages/community/tools/calendars/CreateCalendarDialog";
-import { ICalImportDialog } from "@/pages/community/tools/calendars/ICalImportDialog";
 import { Button } from "@/ui/button";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import {
   DateRangeField,
   dateRangeBounds,
@@ -110,6 +111,7 @@ import {
   type LocalDateRange,
 } from "@/ui/date-range-field";
 import { DropdownMenuItem } from "@/ui/dropdown-menu";
+import { Field } from "@/ui/field";
 import { useWeekStart } from "@/ui/host";
 import { Label } from "@/ui/label";
 import { listLayouts } from "@/ui/layouts/layoutSet";
@@ -117,6 +119,48 @@ import { type Preset, presetName, presetsOf } from "@/ui/layouts/presets";
 import { CalendarPageSkeleton, CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { PropertyFilter, type PropertyFilterCondition } from "@/ui/properties/PropertyFilter";
 import { Switch } from "@/ui/switch";
+
+import { ICalImportDialog } from "./ICalImportDialog";
+
+/**
+ * The shared create dialog with the one thing a calendar asks for beside it:
+ * the colour its events are drawn in.
+ */
+const CreateCalendarDialog = (props: Omit<CreateToolDialogProps, "tool" | "text" | "extra">) => {
+  const { t } = useTranslation("calendars");
+  const [color, setColor] = useState(DEFAULT_COLOR);
+
+  const [wasOpen, setWasOpen] = useState(props.open);
+  if (wasOpen !== props.open) {
+    setWasOpen(props.open);
+    if (!props.open) setColor(DEFAULT_COLOR);
+  }
+
+  return (
+    <CreateToolDialog
+      {...props}
+      tool={Tool.calendar}
+      text={{
+        ns: "calendars",
+        create: "createCalendar",
+        // The namespace's own `descriptionPlaceholder` is an event's.
+        descriptionPlaceholder: "calendarDescriptionPlaceholder",
+      }}
+      extra={{
+        payload: { color },
+        field: (
+          <Field label={t("calendarColor")}>
+            <ColorPickerPopover
+              value={color}
+              onChangeComplete={setColor}
+              triggerLabel={t("calendarColor")}
+            />
+          </Field>
+        ),
+      }}
+    />
+  );
+};
 
 /** Where a calendar page keeps one person's view: the initiative's calendar,
  *  one community calendar, or the community's calendars together. What an

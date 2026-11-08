@@ -18,19 +18,14 @@ import { SettingsPermissionRequired } from "@/components/settings/SettingsPermis
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { toolListRoute } from "@/lib/tools";
-import {
-  canUseArchiveCard,
-  ToolArchiveCard,
-} from "@/pages/community/tools/settings/ToolArchiveCard";
-import {
-  canUseDuplicateCard,
-  ToolDuplicateCard,
-} from "@/pages/community/tools/settings/ToolDuplicateCard";
-import { ToolExportCard } from "@/pages/community/tools/settings/ToolExportCard";
-import { useToolSettings } from "@/pages/community/tools/settings/ToolSettingsContext";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+
+import { canUseArchiveCard, ToolArchiveCard } from "./ToolArchiveCard";
+import { canUseDuplicateCard, ToolDuplicateCard } from "./ToolDuplicateCard";
+import { ToolExportCard } from "./ToolExportCard";
+import { useToolSettings } from "./ToolSettingsContext";
 
 export const AdvancedPage = () => {
   const { t } = useTranslation("common");

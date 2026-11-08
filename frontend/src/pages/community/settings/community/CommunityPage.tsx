@@ -7,13 +7,14 @@ import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { useCommunities } from "@/hooks/useCommunities";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { CommunityArtworkPanel } from "@/pages/community/settings/community/CommunityArtworkPanel";
-import { CommunityDiscoveryPanel } from "@/pages/community/settings/community/CommunityDiscoveryPanel";
-import { CommunityLocationPanel } from "@/pages/community/settings/community/CommunityLocationPanel";
 import { Button } from "@/ui/button";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Textarea } from "@/ui/textarea";
+
+import { CommunityArtworkPanel } from "./CommunityArtworkPanel";
+import { CommunityDiscoveryPanel } from "./CommunityDiscoveryPanel";
+import { CommunityLocationPanel } from "./CommunityLocationPanel";
 
 export const CommunityPage = () => {
   const { activeCommunity, refreshCommunities, updateCommunityInState } = useCommunities();

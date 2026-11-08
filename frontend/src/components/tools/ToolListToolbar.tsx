@@ -3,7 +3,6 @@ import { ListChecks, MoreHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ToolFilterButton } from "@/components/tools/ToolFilterPanel";
 import { Button } from "@/ui/button";
 import {
   DropdownMenu,
@@ -12,6 +11,8 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/ui/tabs";
+
+import { ToolFilterButton } from "./ToolFilterPanel";
 
 export type ToolViewOption<V extends string> = {
   value: V;

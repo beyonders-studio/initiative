@@ -1,6 +1,6 @@
 import { useParams } from "@tanstack/react-router";
 
-import { PluginPage } from "@/pages/community/plugins/PluginPage";
+import { PluginPage } from "./PluginPage";
 
 /** Reads the install id off the route so the page itself takes a plain prop. */
 export function PluginRoute() {

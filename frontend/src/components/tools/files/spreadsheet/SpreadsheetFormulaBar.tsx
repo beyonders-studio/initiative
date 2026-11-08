@@ -1,9 +1,10 @@
 import { type FocusEvent, type KeyboardEvent, type RefObject, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { type DraftStore, useDraft } from "@/components/tools/files/spreadsheet/draftStore";
-import { FormulaCellInput } from "@/components/tools/files/spreadsheet/FormulaCellInput";
 import type { FormulaRefToken } from "@/lib/spreadsheet/formula-refs";
+
+import { type DraftStore, useDraft } from "./draftStore";
+import { FormulaCellInput } from "./FormulaCellInput";
 
 const NO_TOKENS: FormulaRefToken[] = [];
 

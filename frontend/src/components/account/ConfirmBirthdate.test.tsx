@@ -28,7 +28,7 @@ vi.mock("@/hooks/useLegalDocuments", async (importOriginal) => ({
   }),
 }));
 
-import { ConfirmBirthdate } from "@/components/account/ConfirmBirthdate";
+import { ConfirmBirthdate } from "./ConfirmBirthdate";
 
 const render = () => renderWithProviders(<ConfirmBirthdate />, { auth: { logout } });
 

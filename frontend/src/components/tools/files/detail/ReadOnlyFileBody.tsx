@@ -2,8 +2,9 @@ import { Loader2 } from "lucide-react";
 import { Suspense, useMemo } from "react";
 
 import type { FileRead } from "@/api/generated/initiativeAPI.schemas";
-import { fileBody } from "@/components/tools/files/detail/fileBodies";
 import { useCollaboration } from "@/hooks/useCollaboration";
+
+import { fileBody } from "./fileBodies";
 
 const ignore = () => {};
 

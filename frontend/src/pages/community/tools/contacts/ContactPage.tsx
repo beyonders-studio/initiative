@@ -59,7 +59,6 @@ import {
 } from "@/lib/contacts";
 import { toast } from "@/lib/mascotToast";
 import { toolDetailRoute, toolListRoute, toolSettingsRoute } from "@/lib/tools";
-import { ContactNewTaskDialog } from "@/pages/community/tools/contacts/ContactNewTaskDialog";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -73,6 +72,8 @@ import {
 import { dateTimeFormat } from "@/ui/lib/intl";
 import { DetailHeaderSkeleton } from "@/ui/page-skeletons";
 import { Skeleton } from "@/ui/skeleton";
+
+import { ContactNewTaskDialog } from "./ContactNewTaskDialog";
 
 /** The icon in front of each kind of detail. */
 const DETAIL_ICONS = { phones: Phone, emails: Mail, addresses: MapPin, websites: Globe };

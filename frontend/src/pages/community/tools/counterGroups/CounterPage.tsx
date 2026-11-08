@@ -29,7 +29,6 @@ import { useCommunityPath } from "@/lib/communityUrl";
 import { getContrastingTextColor } from "@/lib/counter-color";
 import { isAtMax, isAtMin } from "@/lib/counter-math";
 import { counterRoute, toolDetailRoute, toolListRoute } from "@/lib/tools";
-import { EditCounterDialog } from "@/pages/community/tools/counterGroups/EditCounterDialog";
 import { Button } from "@/ui/button";
 import {
   DropdownMenu,
@@ -39,6 +38,8 @@ import {
 } from "@/ui/dropdown-menu";
 import { cn } from "@/ui/lib/utils";
 import { CounterFocusSkeleton } from "@/ui/page-skeletons";
+
+import { EditCounterDialog } from "./EditCounterDialog";
 
 const SWIPE_THRESHOLD_PX = 60;
 

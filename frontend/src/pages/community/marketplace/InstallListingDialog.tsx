@@ -37,7 +37,6 @@ import { listingShownHere } from "@/lib/marketplaceCuration";
 import { toast } from "@/lib/mascotToast";
 import { projectEnvelopeHasDates, readProjectEnvelope } from "@/lib/projectListing";
 import { toolDetailRoute } from "@/lib/tools";
-import { ListingProvenance } from "@/pages/community/marketplace/ListingProvenance";
 import type { DialogProps } from "@/types/dialog";
 import { DateTimePicker } from "@/ui/date-time-picker";
 import {
@@ -53,6 +52,8 @@ import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+
+import { ListingProvenance } from "./ListingProvenance";
 
 export interface InstallListingDialogProps extends DialogProps {
   listing: MarketplaceListingDetail;

@@ -38,7 +38,7 @@ vi.mock("@/hooks/useLegalDocuments", async (importOriginal) => ({
   }),
 }));
 
-import { AcceptTerms } from "@/components/account/AcceptTerms";
+import { AcceptTerms } from "./AcceptTerms";
 
 const render = () => renderWithProviders(<AcceptTerms />, { auth: { refreshUser, logout } });
 

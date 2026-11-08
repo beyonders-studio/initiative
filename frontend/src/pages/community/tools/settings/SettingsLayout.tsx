@@ -2,11 +2,12 @@ import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useRouteId } from "@/hooks/useRouteId";
 import { toolCamelSingular, toolViews } from "@/lib/tools";
+
 import {
   type ToolMutation,
   ToolSettingsLayout,
   type ToolSettingsLayoutProps,
-} from "@/pages/community/tools/settings/ToolSettingsLayout";
+} from "./ToolSettingsLayout";
 
 type ToolSettingsPageProps = {
   tool: Tool;

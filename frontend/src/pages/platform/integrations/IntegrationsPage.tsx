@@ -13,9 +13,10 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "@/hooks/useAuth";
 import { Capability, hasCapability } from "@/lib/permissions";
-import { AIPage } from "@/pages/platform/integrations/AIPage";
-import { MarketplaceRegistrySection } from "@/pages/platform/integrations/MarketplaceRegistrySection";
-import { PluginServicesPage } from "@/pages/platform/integrations/PluginServicesPage";
+
+import { AIPage } from "./AIPage";
+import { MarketplaceRegistrySection } from "./MarketplaceRegistrySection";
+import { PluginServicesPage } from "./PluginServicesPage";
 
 export const IntegrationsPage = () => {
   const { t } = useTranslation("settings");

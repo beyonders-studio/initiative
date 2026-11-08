@@ -42,10 +42,11 @@ import {
   subscribeSavedNear,
 } from "@/lib/directoryNear";
 import { getErrorCode } from "@/lib/errorMessage";
-import { DirectoryNearControl } from "@/pages/communities/DirectoryNearControl";
 import { LoadMore } from "@/ui/load-more";
 import { Skeleton } from "@/ui/skeleton";
 import { StatusMessage } from "@/ui/status-message";
+
+import { DirectoryNearControl } from "./DirectoryNearControl";
 
 /** Stable keys for the loading placeholders — an index key on a list that can
  *  change is the lint rule this avoids. */

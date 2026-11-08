@@ -2,17 +2,18 @@ import { ChevronDown } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 
 import type { TaskListRead, TaskStatusRead } from "@/api/generated/initiativeAPI.schemas";
+import type { TaskGrouping } from "@/lib/layouts/taskGroupings";
+import type { Band } from "@/ui/layouts/grouping";
+import type { LayoutContext } from "@/ui/layouts/tree";
+import { cn } from "@/ui/lib/utils";
+
 import {
   ArchiveDoneButton,
   CollapsedHeader,
   type ColumnFill,
   ExpandedHeader,
   KanbanCards,
-} from "@/components/tools/projects/KanbanColumn";
-import type { TaskGrouping } from "@/lib/layouts/taskGroupings";
-import type { Band } from "@/ui/layouts/grouping";
-import type { LayoutContext } from "@/ui/layouts/tree";
-import { cn } from "@/ui/lib/utils";
+} from "./KanbanColumn";
 
 interface KanbanBandsProps {
   bands: Band<TaskListRead>[];

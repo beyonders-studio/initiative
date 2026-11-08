@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { buildProject, resetFactories } from "@/__tests__/factories";
 import { renderPage } from "@/__tests__/helpers/render";
-import { ProjectHeader } from "@/pages/community/tools/projects/project/ProjectHeader";
+
+import { ProjectHeader } from "./ProjectHeader";
 
 const renderHeader = (overrides: Parameters<typeof buildProject>[0]) =>
   renderPage(() => <ProjectHeader project={buildProject(overrides)} projectIsArchived={false} />);

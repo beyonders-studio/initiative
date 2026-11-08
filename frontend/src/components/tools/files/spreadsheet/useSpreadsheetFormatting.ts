@@ -1,16 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type * as Y from "yjs";
 
-import {
-  META_FROZEN_COLS,
-  META_FROZEN_ROWS,
-  SHEET_CELLSTYLES,
-  SHEET_COLUMNS,
-  SHEET_META,
-  SHEET_ROWS,
-  sheetContainer,
-  sheetPart,
-} from "@/components/tools/files/spreadsheet/workbookDoc";
 import type { SheetId } from "@/lib/spreadsheet/sheets";
 import {
   type CellFmt,
@@ -26,6 +16,16 @@ import {
 } from "@/lib/spreadsheet/styles";
 
 import { SPREADSHEET_ORIGINS } from "./origins";
+import {
+  META_FROZEN_COLS,
+  META_FROZEN_ROWS,
+  SHEET_CELLSTYLES,
+  SHEET_COLUMNS,
+  SHEET_META,
+  SHEET_ROWS,
+  sheetContainer,
+  sheetPart,
+} from "./workbookDoc";
 
 /**
  * Collaborative store for one sheet's formatting structures (schema v2's

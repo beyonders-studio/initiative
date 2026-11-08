@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { buildFileSummary } from "@/__tests__/factories";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { FileType } from "@/api/generated/initiativeAPI.schemas";
-import { CollectionFileTile } from "@/components/tools/files/collections/CollectionFileTile";
+
+import { CollectionFileTile } from "./CollectionFileTile";
 
 const file = buildFileSummary({
   name: "Hero",

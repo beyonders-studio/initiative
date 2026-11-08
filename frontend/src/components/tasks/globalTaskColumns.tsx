@@ -7,9 +7,6 @@ import {
   type TaskStatusRead,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
-import { TaskPrioritySelector } from "@/components/tasks/TaskPrioritySelector";
-import { TaskStatusSelector } from "@/components/tasks/TaskStatusSelector";
 import { TaskBlockersHoverCard } from "@/components/tools/projects/TaskBlockersHoverCard";
 import { TaskDescriptionHoverCard } from "@/components/tools/projects/TaskDescriptionHoverCard";
 import { NO_TASK_COLUMN_LIMITS, type TaskColumnLimits } from "@/hooks/useColumnLimits";
@@ -33,6 +30,10 @@ import { type FieldColumnOptions, fieldColumn } from "@/ui/layouts/columns";
 import type { FieldDef, LayoutEnv } from "@/ui/layouts/fields";
 import type { AppColumnDef } from "@/ui/lib/table";
 import { SortHeader } from "@/ui/sort-icon";
+
+import { TaskChecklistProgress } from "./TaskChecklistProgress";
+import { TaskPrioritySelector } from "./TaskPrioritySelector";
+import { TaskStatusSelector } from "./TaskStatusSelector";
 
 interface GlobalTaskColumnsOptions {
   activeCommunityId: number | null;

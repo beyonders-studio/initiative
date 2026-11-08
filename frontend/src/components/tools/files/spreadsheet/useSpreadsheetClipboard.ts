@@ -2,10 +2,6 @@ import { type ClipboardEvent, useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type * as Y from "yjs";
 
-import { SPREADSHEET_ORIGINS } from "@/components/tools/files/spreadsheet/origins";
-import type { SpreadsheetCellsStore } from "@/components/tools/files/spreadsheet/useSpreadsheetCells";
-import type { SpreadsheetFormattingStore } from "@/components/tools/files/spreadsheet/useSpreadsheetFormatting";
-import type { SpreadsheetSelection } from "@/components/tools/files/spreadsheet/useSpreadsheetSelection";
 import { toast } from "@/lib/mascotToast";
 import { CEILING, clipToCeiling, type SheetGrid } from "@/lib/spreadsheet/bounds";
 import {
@@ -27,6 +23,11 @@ import { clipboardToCells, coerceScalar, offsetCells } from "@/lib/spreadsheet/c
 import { type Evaluator, isFormula } from "@/lib/spreadsheet/formula";
 import type { SheetId, SheetMeta } from "@/lib/spreadsheet/sheets";
 import type { CellFmt } from "@/lib/spreadsheet/styles";
+
+import { SPREADSHEET_ORIGINS } from "./origins";
+import type { SpreadsheetCellsStore } from "./useSpreadsheetCells";
+import type { SpreadsheetFormattingStore } from "./useSpreadsheetFormatting";
+import type { SpreadsheetSelection } from "./useSpreadsheetSelection";
 
 interface UseSpreadsheetClipboardArgs {
   readOnly: boolean;

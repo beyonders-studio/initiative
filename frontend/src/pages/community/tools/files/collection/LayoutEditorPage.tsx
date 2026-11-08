@@ -27,15 +27,13 @@ import { instanceTarget, useInstanceLayouts, useSaveLayouts } from "@/hooks/useT
 import { useCommunityPath } from "@/lib/communityUrl";
 import { collectionFileFields, FILE_LIST_SHAPE } from "@/lib/layouts/files";
 import { collectionRoute, initiativeRoute } from "@/lib/tools";
-import {
-  type CollectionList,
-  CollectionListView,
-} from "@/pages/community/tools/files/collection/collectionLists";
 import type { ToolIndexRow } from "@/pages/community/tools/ToolIndexPage";
 import { ToolIndexTable } from "@/pages/community/tools/ToolIndexTable";
 import type { TranslateFn } from "@/types/i18n";
 import { withDisplays } from "@/ui/layouts/fields";
 import { type EditableLists, LayoutEditor } from "@/ui/layouts/LayoutEditor";
+
+import { type CollectionList, CollectionListView } from "./collectionLists";
 
 const noop = () => {};
 const NO_SELECTION = {

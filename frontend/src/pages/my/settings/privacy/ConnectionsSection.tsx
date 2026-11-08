@@ -8,9 +8,10 @@ import {
   useRequestConnection,
 } from "@/hooks/useDirectMessages";
 import { toast } from "@/lib/mascotToast";
-import { HandleField } from "@/pages/my/settings/privacy/HandleField";
 import { Button } from "@/ui/button";
 import { formatDate } from "@/ui/lib/formatDate";
+
+import { HandleField } from "./HandleField";
 
 interface ConnectionsSectionProps {
   /** Show the "connect by handle" field. Off where the page is a directory. */

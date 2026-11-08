@@ -4,7 +4,8 @@
 
 import { useProject } from "@/hooks/useProjects";
 import { useRouteId } from "@/hooks/useRouteId";
-import { ProjectTaskStatusesManager } from "@/pages/community/tools/projects/settings/ProjectTaskStatusesManager";
+
+import { ProjectTaskStatusesManager } from "./ProjectTaskStatusesManager";
 
 export const TaskStatusesPage = () => {
   const project = useProject(useRouteId("projectId")).data;

@@ -13,9 +13,10 @@ import { UserHandle } from "@/components/user/UserHandle";
 import { presenceLabelKey } from "@/lib/presence";
 import { decorationSrc, resolveDecoration } from "@/lib/profileDecorations";
 import type { AvatarSourceUser, DisplayableUser } from "@/lib/userDisplay";
-import { PresenceMenu } from "@/pages/my/settings/profile/PresenceMenu";
-import { ProfilePicture } from "@/pages/my/settings/profile/ProfilePicture";
 import { Card, CardContent } from "@/ui/card";
+
+import { PresenceMenu } from "./PresenceMenu";
+import { ProfilePicture } from "./ProfilePicture";
 
 interface ProfilePreviewProps {
   user: DisplayableUser & AvatarSourceUser;

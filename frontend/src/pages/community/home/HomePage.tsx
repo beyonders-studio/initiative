@@ -34,12 +34,13 @@ import { activityLastVisitKey } from "@/lib/activityLastVisit";
 import { renderableBanner } from "@/lib/banner";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { readableTextShadow } from "@/lib/contrastColor";
-import { CommunityBannerBadges } from "@/pages/community/home/CommunityBannerBadges";
-import { CommunityComingUp } from "@/pages/community/home/CommunityComingUp";
-import { CommunityHomeEmptyState } from "@/pages/community/home/CommunityHomeEmptyState";
-import { CommunityRecentComments } from "@/pages/community/home/CommunityRecentComments";
-import { CreateInitiativeWizard } from "@/pages/community/home/CreateInitiativeWizard";
 import { cn } from "@/ui/lib/utils";
+
+import { CommunityBannerBadges } from "./CommunityBannerBadges";
+import { CommunityComingUp } from "./CommunityComingUp";
+import { CommunityHomeEmptyState } from "./CommunityHomeEmptyState";
+import { CommunityRecentComments } from "./CommunityRecentComments";
+import { CreateInitiativeWizard } from "./CreateInitiativeWizard";
 
 /** The rail's circles, in order; the first is the default. All and Yours are
  *  views of the activity feed; Comments shows the comments themselves. */

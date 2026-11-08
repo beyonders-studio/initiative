@@ -16,12 +16,9 @@ import { describe, expect, it, vi } from "vitest";
 import { ownerCan } from "@/__tests__/factories";
 import { renderPage } from "@/__tests__/helpers/render";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import {
-  type ToolSettingsEntity,
-  ToolSettingsProvider,
-} from "@/pages/community/tools/settings/ToolSettingsContext";
 
 import { DetailsPage } from "./DetailsPage";
+import { type ToolSettingsEntity, ToolSettingsProvider } from "./ToolSettingsContext";
 
 vi.mock("@/components/tags", () => ({
   TagPicker: () => <div data-testid="tag-picker" />,

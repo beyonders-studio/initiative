@@ -12,7 +12,6 @@ import { ProviderMark } from "@/components/auth/ProviderMark";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { messageForCode } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import { ConnectProviderWizard, ProbeReport } from "@/pages/platform/auth/ConnectProviderWizard";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -32,6 +31,8 @@ import { Label } from "@/ui/label";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
 import { Switch } from "@/ui/switch";
+
+import { ConnectProviderWizard, ProbeReport } from "./ConnectProviderWizard";
 
 // The mutation surface the section needs — satisfied structurally by the
 // React Query mutation objects the wrappers' domain hooks return, so the

@@ -20,15 +20,15 @@ import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { PostReactionsField } from "@/pages/community/tools/posts/PostReactionsField";
-import {
-  type ToolMutation,
-  type ToolSettingsEntity,
-  ToolSettingsProvider,
-} from "@/pages/community/tools/settings/ToolSettingsContext";
 
 import { AccessPage } from "./AccessPage";
 import { AdvancedPage } from "./AdvancedPage";
 import { DetailsPage } from "./DetailsPage";
+import {
+  type ToolMutation,
+  type ToolSettingsEntity,
+  ToolSettingsProvider,
+} from "./ToolSettingsContext";
 
 const ADDED_TAG = buildTagSummary({ id: 99, name: "Added tag" });
 

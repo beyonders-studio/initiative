@@ -2,12 +2,10 @@ import { Archive, Pencil, Tags, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { TaskListRead } from "@/api/generated/initiativeAPI.schemas";
-import {
-  type ExportParams,
-  ExportTasksButton,
-} from "@/pages/community/tools/projects/project/ExportTasksButton";
 import { Button } from "@/ui/button";
 import { SelectionBar } from "@/ui/selection-bar";
+
+import { type ExportParams, ExportTasksButton } from "./ExportTasksButton";
 
 type TaskBulkEditPanelProps = {
   selectedTasks: TaskListRead[];

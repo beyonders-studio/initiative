@@ -1,32 +1,12 @@
-/**
- * A plug-in's own surface, in an iframe.
- *
- * The security shape, which mirrors what the mint endpoint already enforces:
- *
- * 1. The server decides whether a surface may be opened — the install must be
- *    enabled, its registration live, and the seat's placement and roles must
- *    admit the caller. A refusal never reaches the plug-in.
- * 2. The token is delivered by `postMessage` to the iframe's own origin, never
- *    in the URL, so it stays out of history, referrers and proxy logs.
- * 3. Inbound messages are ignored unless `event.origin` is one the registration
- *    listed and `event.source` is the frame this page mounted.
- * 4. The token is one-shot, so a reloading page asks again and gets a fresh
- *    one rather than being stuck until the page is reloaded.
- * 5. The frame is granted the browser features the surface's manifest declared,
- *    and no others.
- *
- * The handoff also carries `sells`: whether this host may lead anyone to a
- * purchase here (a billing portal is configured, and this device may sell —
- * see `@/lib/storeSelling`). A plug-in's page hides its own purchase copy when
- * it is false.
- */
-
 import { Loader2 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { isOwnOrigin } from "@/api/client";
-import type { CommunityPluginHandoff } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  CommunityPluginHandoff,
+  CommunityPluginListingRef,
+} from "@/api/generated/initiativeAPI.schemas";
 import {
   createCommunityPluginHandoff,
   createInitiativePluginHandoff,
@@ -45,14 +25,49 @@ import { pageAllow, pluginPages } from "@/lib/pluginSurfaces";
 import { getItem, setItem } from "@/lib/storage";
 import { DEFAULT_THEME } from "@/lib/themes";
 import { localized } from "@/lib/widgets/widgetMeta";
-import {
-  PluginProviderNotice,
-  pluginNoticeKey,
-} from "@/pages/community/plugins/PluginProviderNotice";
 import { Button } from "@/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
 import { cn } from "@/ui/lib/utils";
 import { EditorSkeleton, SkeletonPillRow, SkeletonRegion } from "@/ui/page-skeletons";
+
+/** Where one member's acknowledgement for one plug-in in one community is kept. */
+const pluginNoticeKey = (server: string, userId: number, communityId: number, pluginId: number) =>
+  `initiative-plugin-notice:${server}:${userId}:${communityId}:${pluginId}`;
+
+interface PluginProviderNoticeProps {
+  name: string;
+  listing: CommunityPluginListingRef | null;
+  onContinue: () => void;
+}
+
+function PluginProviderNotice({ name, listing, onContinue }: PluginProviderNoticeProps) {
+  const { t } = useTranslation("plugins");
+
+  return (
+    <Card className="mx-auto mt-6 max-w-lg">
+      <CardHeader>
+        <CardTitle>{t("providerNotice.title", { name })}</CardTitle>
+        {listing ? (
+          <CardDescription>
+            {t("providerNotice.madeBy", { name, publisher: listing.publisher })}
+          </CardDescription>
+        ) : null}
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <p>{t("providerNotice.provided")}</p>
+        {listing ? (
+          <div className="flex items-center gap-1 text-muted-foreground">
+            <span>{t("providerNotice.report")}</span>
+            <ReportButton targetType="marketplace_listing" targetId={listing.id} />
+          </div>
+        ) : null}
+      </CardContent>
+      <CardFooter>
+        <Button onClick={onContinue}>{t("providerNotice.continue")}</Button>
+      </CardFooter>
+    </Card>
+  );
+}
 
 /** The message names a page and this host agree on. */
 const READY = "initiative-plugin:ready";

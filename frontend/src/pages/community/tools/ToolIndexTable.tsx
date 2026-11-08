@@ -20,13 +20,14 @@ import { useProperties } from "@/hooks/useProperties";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolDetailRoute, toolRouteSegment } from "@/lib/tools";
-import type { ToolIndexRow } from "@/pages/community/tools/ToolIndexPage";
 import { Checkbox } from "@/ui/checkbox";
 import { DataTable } from "@/ui/data-table";
 import type { AppColumnDef } from "@/ui/lib/table";
 import { buildPropertyColumns, propertyColumnIds } from "@/ui/properties/propertyColumns";
 import { RelativeTime } from "@/ui/relative-time";
 import { SortHeader } from "@/ui/sort-icon";
+
+import type { ToolIndexRow } from "./ToolIndexPage";
 
 /** The list fields a table header sorts by, as its column ids. */
 export const TABLE_SORT_FIELDS: ReadonlySet<string> = new Set(["name", "updated_at"]);

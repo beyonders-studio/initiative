@@ -20,8 +20,6 @@ import {
 } from "@/hooks/useSettings";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
-import { BillingConsoleButton } from "@/pages/operator/communities/BillingConsoleButton";
-import { CommunityOperatorSettingsSheet } from "@/pages/operator/communities/CommunityOperatorSettingsSheet";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -32,6 +30,9 @@ import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { StatusMessage } from "@/ui/status-message";
+
+import { BillingConsoleButton } from "./BillingConsoleButton";
+import { CommunityOperatorSettingsSheet } from "./CommunityOperatorSettingsSheet";
 
 // Storage caps are entered in binary GB (GiB) so a value round-trips cleanly
 // with `formatBytes` (which is also 1024-based). The editor for them, and for

@@ -22,7 +22,8 @@ import {
 import { detailLayoutLooks } from "@/components/tools/projects/projectTasksConfig";
 import { TaskTypeDeleteDialog } from "@/components/tools/projects/TaskTypeDeleteDialog";
 import { instanceTarget, useSaveLayouts } from "@/hooks/useToolLayouts";
-import { LayoutList } from "@/ui/layouts/LayoutList";
+
+import { LayoutList } from "./LayoutList";
 
 const bugPage: DetailLayoutRead = {
   kind: "task",

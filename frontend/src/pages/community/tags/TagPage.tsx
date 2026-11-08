@@ -13,7 +13,6 @@ import {
   toolNavLabelKey,
   toolRouteSegment,
 } from "@/lib/tools";
-import { TagToolTab, toolTabCount } from "@/pages/community/tags/TagToolTab";
 import { Button } from "@/ui/button";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -21,6 +20,8 @@ import { Input } from "@/ui/input";
 import { TableSkeleton, TagDetailSkeleton } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
 import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/ui/tabs";
+
+import { TagToolTab, toolTabCount } from "./TagToolTab";
 
 export const TagPage = () => {
   const { t } = useTranslation(["tags", "common", "nav"]);

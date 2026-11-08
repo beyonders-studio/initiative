@@ -71,7 +71,7 @@ vi.mock("@/hooks/useCommunityAuthPolicy", () => ({
   useCommunityAuthSettings: () => ({ data: { auth_options: state.authOptions } }),
 }));
 
-vi.mock("@/pages/community/settings/users/UnownedContentCard", () => ({
+vi.mock("./UnownedContentCard", () => ({
   UnownedContentCard: () => null,
 }));
 

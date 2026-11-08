@@ -2,7 +2,6 @@ import type { MouseEvent, PointerEvent, ReactNode } from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { LineBand } from "@/components/tools/files/spreadsheet/useSpreadsheetStructure";
 import { colIndexToLetter } from "@/lib/spreadsheet/coords";
 import type { SortDirection } from "@/lib/spreadsheet/sort";
 import type { LineAxis } from "@/lib/spreadsheet/transform";
@@ -17,6 +16,8 @@ import {
   ContextMenuTrigger,
 } from "@/ui/context-menu";
 import { cn } from "@/ui/lib/utils";
+
+import type { LineBand } from "./useSpreadsheetStructure";
 
 export const ROW_HEADER_WIDTH = 56;
 export const COL_HEADER_HEIGHT = 26;

@@ -11,8 +11,6 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import { createDraftStore } from "@/components/tools/files/spreadsheet/draftStore";
-import type { SpreadsheetCellsStore } from "@/components/tools/files/spreadsheet/useSpreadsheetCells";
 import { toast } from "@/lib/mascotToast";
 import type { CellPos, SheetGrid } from "@/lib/spreadsheet/bounds";
 import { type CellValue, colIndexToLetter, keyOf } from "@/lib/spreadsheet/coords";
@@ -30,6 +28,9 @@ import {
   type SheetMeta,
   sheetNameKey,
 } from "@/lib/spreadsheet/sheets";
+
+import { createDraftStore } from "./draftStore";
+import type { SpreadsheetCellsStore } from "./useSpreadsheetCells";
 
 /** A formula-reference highlight on one cell: its color and which of its
  *  edges sit on the boundary of the reference's box (so the four edges of a

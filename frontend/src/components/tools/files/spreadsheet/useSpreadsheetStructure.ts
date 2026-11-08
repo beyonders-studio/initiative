@@ -2,10 +2,6 @@ import { type Dispatch, type SetStateAction, useCallback, useMemo } from "react"
 import { useTranslation } from "react-i18next";
 import type * as Y from "yjs";
 
-import { SPREADSHEET_ORIGINS } from "@/components/tools/files/spreadsheet/origins";
-import type { SpreadsheetCellsStore } from "@/components/tools/files/spreadsheet/useSpreadsheetCells";
-import type { SpreadsheetFormattingStore } from "@/components/tools/files/spreadsheet/useSpreadsheetFormatting";
-import type { SpreadsheetSelection } from "@/components/tools/files/spreadsheet/useSpreadsheetSelection";
 import { toast } from "@/lib/mascotToast";
 import { MAX_COLS, MAX_ROWS, type SheetBounds, type SheetGrid } from "@/lib/spreadsheet/bounds";
 import type { CellValue } from "@/lib/spreadsheet/coords";
@@ -17,6 +13,11 @@ import {
   rewriteReferencesToSheet,
   transformSheet,
 } from "@/lib/spreadsheet/transform";
+
+import { SPREADSHEET_ORIGINS } from "./origins";
+import type { SpreadsheetCellsStore } from "./useSpreadsheetCells";
+import type { SpreadsheetFormattingStore } from "./useSpreadsheetFormatting";
+import type { SpreadsheetSelection } from "./useSpreadsheetSelection";
 
 /** A run of whole rows or columns: the ones a header menu acts on. */
 export interface LineBand {

@@ -5,9 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 import { ownerCan } from "@/__tests__/factories";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { ToolSettingsProvider } from "@/pages/community/tools/settings/ToolSettingsContext";
 
 import { ToolExportCard } from "./ToolExportCard";
+import { ToolSettingsProvider } from "./ToolSettingsContext";
 
 const noopMutation = () => ({ mutate: vi.fn(), isPending: false });
 

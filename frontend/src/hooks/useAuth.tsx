@@ -34,7 +34,6 @@ import type { Token, UserCreate, UserRead } from "@/api/generated/initiativeAPI.
 import { readMe } from "@/api/generated/users/users";
 import { clearAllWhiteboardSceneCaches } from "@/components/tools/files/whiteboardSceneCache";
 import { forgetMessagesOnThisDevice, serveAccount } from "@/crypto/messaging";
-import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { clearJustSignedIn, markJustSignedIn } from "@/lib/authTransition";
 import { getErrorCode, getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
@@ -64,6 +63,8 @@ import { queryClient } from "@/lib/queryClient";
 import { CREDENTIAL_KEYS, removeItem } from "@/lib/storage";
 import { clearUploadToken } from "@/lib/uploadToken";
 import { prefetchViewPreferences } from "@/lib/viewPreferences";
+
+import { useNetworkStatus } from "./useNetworkStatus";
 
 interface LoginPayload {
   email: string;

@@ -17,8 +17,15 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { TOOL_SKETCHES } from "@/components/initiatives/ToolSkeletons";
 import { EXTRA_PERMISSION_KEYS } from "@/hooks/useInitiativeRoles";
-import { PALETTE_TOOLS, TOOL_PALETTE } from "@/lib/toolPalette";
-import { TOOL_HAS_DETAIL } from "@/lib/toolRows";
+
+import access from "../../public/locales/en/access.json";
+import command from "../../public/locales/en/command.json";
+import communityHome from "../../public/locales/en/communityHome.json";
+import initiatives from "../../public/locales/en/initiatives.json";
+import nav from "../../public/locales/en/nav.json";
+import trash from "../../public/locales/en/trash.json";
+import { PALETTE_TOOLS, TOOL_PALETTE } from "./toolPalette";
+import { TOOL_HAS_DETAIL } from "./toolRows";
 import {
   counterRoute,
   entityRefRoute,
@@ -48,14 +55,7 @@ import {
   toolSettingsRoute,
   toolSettingsSectionRoute,
   toolViewPermission,
-} from "@/lib/tools";
-
-import access from "../../public/locales/en/access.json";
-import command from "../../public/locales/en/command.json";
-import communityHome from "../../public/locales/en/communityHome.json";
-import initiatives from "../../public/locales/en/initiatives.json";
-import nav from "../../public/locales/en/nav.json";
-import trash from "../../public/locales/en/trash.json";
+} from "./tools";
 
 // Route files (keys only — nothing is loaded). The community tree holds each
 // tool's tab, detail, and settings routes, nested under their initiative.
@@ -417,7 +417,7 @@ describe("tool surfaces are wired, not just typed", () => {
   // required now; these pin the sources that fill them.
 
   it("the community-home row builder handles every tool", async () => {
-    const { buildToolRows } = await import("@/lib/toolRows");
+    const { buildToolRows } = await import("./toolRows");
     const empty = Object.fromEntries(TOOLS.map((tool) => [tool, undefined])) as Parameters<
       typeof buildToolRows
     >[1];
@@ -436,7 +436,7 @@ describe("tool exports", () => {
   it("every bulk-export tool has a format source, and only those", async () => {
     const { fileTypeFormats, TOOL_EXPORT_FORMATS } = await import("@/components/exports/formats");
     const { FileType } = await import("@/api/generated/initiativeAPI.schemas");
-    const { BULK_EXPORT_TOOLS } = await import("@/lib/tools");
+    const { BULK_EXPORT_TOOLS } = await import("./tools");
 
     for (const tool of BULK_EXPORT_TOOLS) {
       // Files are per-type (their format set depends on the selection);
@@ -467,9 +467,7 @@ describe("tool imports", () => {
   // through both — so they share BULK_EXPORT_TOOLS rather than two sets that
   // could drift apart.
   it("round-trips the envelope type discriminator for every portable tool", async () => {
-    const { BULK_EXPORT_TOOLS, toolEnvelopeType, toolForEnvelopeType } = await import(
-      "@/lib/tools"
-    );
+    const { BULK_EXPORT_TOOLS, toolEnvelopeType, toolForEnvelopeType } = await import("./tools");
     for (const tool of BULK_EXPORT_TOOLS) {
       expect(toolForEnvelopeType(toolEnvelopeType(tool))).toBe(tool);
     }
@@ -485,7 +483,7 @@ describe("tool imports", () => {
   // that matches no source renders as its own raw key in the UI, which is how
   // `initiative-calendar-events` survived a calendar rename unnoticed.
   it("labels every import source in every locale", async () => {
-    const { BULK_EXPORT_TOOLS, toolEnvelopeType } = await import("@/lib/tools");
+    const { BULK_EXPORT_TOOLS, toolEnvelopeType } = await import("./tools");
     for (const locale of locales) {
       const file = await import(`../../public/locales/${locale}/imports.json`);
       const labels = (file.default ?? file).table.source as Record<string, string>;
@@ -500,7 +498,7 @@ describe("tool imports", () => {
   });
 
   it("labels every export source in every locale", async () => {
-    const { BULK_EXPORT_TOOLS, toolKebabSingular } = await import("@/lib/tools");
+    const { BULK_EXPORT_TOOLS, toolKebabSingular } = await import("./tools");
     for (const locale of locales) {
       const file = await import(`../../public/locales/${locale}/exports.json`);
       const labels = (file.default ?? file).table.source as Record<string, string>;

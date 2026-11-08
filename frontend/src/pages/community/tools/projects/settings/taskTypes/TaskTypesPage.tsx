@@ -5,7 +5,8 @@
 
 import { useProject } from "@/hooks/useProjects";
 import { useRouteId } from "@/hooks/useRouteId";
-import { ProjectTaskTypesManager } from "@/pages/community/tools/projects/settings/taskTypes/ProjectTaskTypesManager";
+
+import { ProjectTaskTypesManager } from "./ProjectTaskTypesManager";
 
 export const TaskTypesPage = () => {
   const project = useProject(useRouteId("projectId")).data;

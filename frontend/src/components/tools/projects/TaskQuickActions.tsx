@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 
 import type { TaskListRead, TaskStatusRead } from "@/api/generated/initiativeAPI.schemas";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
-import { TaskAssigneeStack } from "@/components/tools/projects/TaskAssigneeList";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useUpdateTaskInCommunity } from "@/hooks/useTasks";
@@ -23,6 +22,8 @@ import {
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
+
+import { TaskAssigneeStack } from "./TaskAssigneeList";
 
 /** What a board offers its cards' menus: its columns, and moving a task
  *  between them as dropping it in one would. */

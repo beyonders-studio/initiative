@@ -29,15 +29,16 @@ import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import { INSTANCE_LAYOUT_TOOLS, useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolDetailRoute, toolSettingsSectionRoute } from "@/lib/tools";
-import { canUseArchiveCard } from "@/pages/community/tools/settings/ToolArchiveCard";
-import { canUseDuplicateCard } from "@/pages/community/tools/settings/ToolDuplicateCard";
+import { SettingsPaneSkeleton } from "@/ui/page-skeletons";
+
+import { canUseArchiveCard } from "./ToolArchiveCard";
+import { canUseDuplicateCard } from "./ToolDuplicateCard";
 import {
   type ToolExportOptions,
   type ToolMutation,
   type ToolSettingsEntity,
   ToolSettingsProvider,
-} from "@/pages/community/tools/settings/ToolSettingsContext";
-import { SettingsPaneSkeleton } from "@/ui/page-skeletons";
+} from "./ToolSettingsContext";
 
 export type { ToolMutation, ToolSettingsEntity };
 

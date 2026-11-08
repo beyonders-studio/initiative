@@ -19,7 +19,8 @@ import { describe, expect, it } from "vitest";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
-import { PostReadersDialog } from "@/pages/community/tools/posts/PostReadersDialog";
+
+import { PostReadersDialog } from "./PostReadersDialog";
 
 const person = (id: number, username: string, extra: Record<string, unknown> = {}) => ({
   id,

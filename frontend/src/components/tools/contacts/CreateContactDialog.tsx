@@ -3,16 +3,14 @@ import { useTranslation } from "react-i18next";
 
 import { EndpointKind, RelationshipType, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { CreateToolDialog } from "@/components/tools/CreateToolDialog";
-import {
-  ContactDetailsFields,
-  ContactKindToggle,
-} from "@/components/tools/contacts/ContactDetailsFields";
 import { useContactsList } from "@/hooks/useContacts";
 import { useRelate } from "@/hooks/useRelationships";
 import { type ContactDetails, filledDetails, NO_DETAILS } from "@/lib/contacts";
 import type { DialogProps } from "@/types/dialog";
 import { Combobox } from "@/ui/combobox";
 import { Field } from "@/ui/field";
+
+import { ContactDetailsFields, ContactKindToggle } from "./ContactDetailsFields";
 
 /** An organization a person can be part of. */
 type Organization = { id: number; name: string };

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { VersionDialog } from "@/components/updates/VersionDialog";
 import { compareVersions, useLatestVersion } from "@/hooks/useLatestVersion";
 import { toast } from "@/lib/mascotToast";
 import { getItem, setItem } from "@/lib/storage";
+
+import { VersionDialog } from "./VersionDialog";
 
 const CURRENT_VERSION = __APP_VERSION__;
 const LAST_RUN_VERSION_KEY = "initiative-last-run-version";

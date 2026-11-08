@@ -1,15 +1,3 @@
-/**
- * Home: where a signed-in person lands, laid out the way they want it.
- *
- * People are here for different things — their own list, a community they
- * follow, an organisation they run, work somebody handed them — so the page is
- * a canvas of widgets the reader arranges, starting from one of a few layouts
- * made for those reasons. Someone who is here for more than one keeps several
- * views — work on one, the soccer league on another — and moves between them
- * with tabs. It began as My Tasks, and with nothing arranged it still is: a
- * greeting over the focus card and the tasks table.
- */
-
 import { Check, ImageIcon, LayoutTemplate, Pencil, Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -17,12 +5,15 @@ import { useTranslation } from "react-i18next";
 import { invalidate, q } from "@/api/query-keys";
 import { type HomeLayoutChoice, HomeLayoutsDialog } from "@/components/home/HomeLayoutsDialog";
 import { HomeActionsContext } from "@/components/home/homeActions";
+import { HOME_WIDGETS } from "@/components/home/widgets";
 import { useAuth } from "@/hooks/useAuth";
 import { useHomeViews } from "@/hooks/useHomeViews";
 import { useMyDecorations } from "@/hooks/useUsers";
+import type { HomeWidget, HomeWidgetOptions } from "@/lib/home/layout";
 import {
   addWidget,
   applyGrid,
+  canAddWidget,
   HOME_LAYOUT_VERSION,
   type HomeLayout,
   moveWidget,
@@ -31,14 +22,17 @@ import {
   setWidgetOptions,
 } from "@/lib/home/layout";
 import { presetLayout } from "@/lib/home/presets";
+import { HOME_WIDGET_TYPES, type HomeWidgetType } from "@/lib/home/widgetTypes";
 import { decorationSrc, resolveDecoration } from "@/lib/profileDecorations";
-import { AddHomeWidgetDialog } from "@/pages/my/home/AddHomeWidgetDialog";
-import { HomeBannerDialog } from "@/pages/my/home/HomeBannerDialog";
-import { HomeCanvas } from "@/pages/my/home/HomeCanvas";
-import { HomeViewBanner } from "@/pages/my/home/HomeViewBanner";
-import { HomeViewTabs } from "@/pages/my/home/HomeViewTabs";
-import { HomeWidgetSettingsDialog } from "@/pages/my/home/HomeWidgetSettingsDialog";
 import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
 import {
   Empty,
   EmptyContent,
@@ -51,6 +45,110 @@ import { atLeast, useRegionWidthClass } from "@/ui/lib/useWidthClass";
 import { cn } from "@/ui/lib/utils";
 import { PullToRefresh } from "@/ui/pull-to-refresh";
 import { Skeleton } from "@/ui/skeleton";
+import { WizardOption } from "@/ui/wizard-dialog";
+
+import { HomeBannerDialog } from "./HomeBannerDialog";
+import { HomeCanvas } from "./HomeCanvas";
+import { HomeViewBanner } from "./HomeViewBanner";
+import { HomeViewTabs } from "./HomeViewTabs";
+
+interface HomeWidgetSettingsDialogProps {
+  widget: HomeWidget | null;
+  onClose: () => void;
+  onChange: (id: string, options: HomeWidgetOptions) => void;
+}
+
+function HomeWidgetSettingsDialog({ widget, onClose, onChange }: HomeWidgetSettingsDialogProps) {
+  const { t } = useTranslation(["home", "common"]);
+  const Settings = widget ? HOME_WIDGETS[widget.type].Settings : undefined;
+
+  return (
+    <Dialog
+      open={widget !== null && Settings !== undefined}
+      onOpenChange={(open) => !open && onClose()}
+    >
+      {/* The widget's own form is the whole description. */}
+      <DialogContent aria-describedby={undefined}>
+        {widget && Settings ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>
+                {t("settingsDialog.title", { title: t(`widgets.${widget.type}.title`) })}
+              </DialogTitle>
+            </DialogHeader>
+            <Settings
+              options={widget.options ?? {}}
+              onChange={(options) => onChange(widget.id, options)}
+            />
+            <DialogFooter>
+              <Button type="button" onClick={onClose}>
+                {t("common:done")}
+              </Button>
+            </DialogFooter>
+          </>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface AddHomeWidgetDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  layout: HomeLayout;
+  onAdd: (type: HomeWidgetType) => void;
+}
+
+function AddHomeWidgetDialog({ open, onOpenChange, layout, onAdd }: AddHomeWidgetDialogProps) {
+  const { t } = useTranslation("home");
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{t("picker.title")}</DialogTitle>
+          <DialogDescription>{t("picker.description")}</DialogDescription>
+        </DialogHeader>
+        <ul className="grid grid-cols-fill-56/2 gap-2">
+          {HOME_WIDGET_TYPES.map((type) => {
+            const { icon: Icon } = HOME_WIDGETS[type];
+            const available = canAddWidget(layout, type);
+            const placed = layout.widgets.some((widget) => widget.type === type);
+            return (
+              <li key={type}>
+                <WizardOption
+                  disabled={!available}
+                  onClick={() => {
+                    onAdd(type);
+                    onOpenChange(false);
+                  }}
+                  className="h-full items-start"
+                  icon={
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted">
+                      <Icon className="size-5 text-muted-foreground" aria-hidden="true" />
+                    </span>
+                  }
+                  title={t(`widgets.${type}.title`)}
+                  description={
+                    <>
+                      {t(`widgets.${type}.description`)}
+                      {placed && !available ? (
+                        <span className="mt-1 flex items-center gap-1">
+                          <Check className="size-3" aria-hidden="true" />
+                          {t("picker.onPage")}
+                        </span>
+                      ) : null}
+                    </>
+                  }
+                />
+              </li>
+            );
+          })}
+        </ul>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export const HomePage = () => {
   const { t } = useTranslation(["home", "common"]);

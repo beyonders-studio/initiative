@@ -1,9 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { TaskPriorityOption } from "@/components/tasks/TaskPriorityOption";
 import { priorityDotClass, priorityVariant } from "@/components/tools/projects/projectTasksConfig";
 import { PRIORITY_ORDER } from "@/lib/sorting";
+
+import { TaskPriorityOption } from "./TaskPriorityOption";
 
 describe("TaskPriorityOption", () => {
   it("draws a dot in the priority's colour beside its label", () => {

@@ -730,7 +730,7 @@ describe("IndexPage", () => {
 
 describe("VendorSetupPage", () => {
   it("hands GitHub's code and the setup's state to the server once", async () => {
-    const { VendorSetupPage } = await import("@/pages/platform/integrations/VendorSetupPage");
+    const { VendorSetupPage } = await import("./VendorSetupPage");
     renderPage(VendorSetupPage, {
       auth: { user: buildUser({ role: "owner", capabilities: ["plugins.manage"] }) },
       initialRoute: "/settings/platform/integrations/vendor-setup/$registrationId",
@@ -748,7 +748,7 @@ describe("VendorSetupPage", () => {
   });
 
   it("says the setup failed when GitHub sent no code", async () => {
-    const { VendorSetupPage } = await import("@/pages/platform/integrations/VendorSetupPage");
+    const { VendorSetupPage } = await import("./VendorSetupPage");
     renderPage(VendorSetupPage, {
       auth: { user: buildUser({ role: "owner", capabilities: ["plugins.manage"] }) },
       initialRoute: "/settings/platform/integrations/vendor-setup/$registrationId",

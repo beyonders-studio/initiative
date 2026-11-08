@@ -37,7 +37,6 @@ import { toast } from "@/lib/mascotToast";
 import { isAdminRole } from "@/lib/permissions";
 import { initiativeRoute } from "@/lib/tools";
 import { getUserDisplayName } from "@/lib/userDisplay";
-import { CommunityInitiativeDefaultsCard } from "@/pages/community/settings/initiatives/CommunityInitiativeDefaultsCard";
 import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 import { DataTable } from "@/ui/data-table";
@@ -50,6 +49,8 @@ import { Skeleton } from "@/ui/skeleton";
 import { StatusMessage } from "@/ui/status-message";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
+
+import { CommunityInitiativeDefaultsCard } from "./CommunityInitiativeDefaultsCard";
 
 const COMMUNITY_SCOPE: MemberSearchScope = { type: "community" };
 const NONE: never[] = [];

@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { WhiteboardScene } from "@/components/tools/files/WhiteboardFileEditor";
+import { getItem, removeItem, setItem } from "@/lib/storage";
+
+import type { WhiteboardScene } from "./WhiteboardFileEditor";
 import {
   clearAllWhiteboardSceneCaches,
   clearWhiteboardSceneCache,
   loadWhiteboardScene,
   stampWhiteboardSceneCache,
-} from "@/components/tools/files/whiteboardSceneCache";
-import { getItem, removeItem, setItem } from "@/lib/storage";
+} from "./whiteboardSceneCache";
 
 const DOC_ID = 42;
 const KEY = `wb-scene-${DOC_ID}`;

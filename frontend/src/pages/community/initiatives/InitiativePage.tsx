@@ -11,7 +11,6 @@ import { useRouteId } from "@/hooks/useRouteId";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { resolveInitiativeColor } from "@/lib/initiativeColors";
 import { initiativeRoute, TOOLS, toolCamelPlural, toolListRoute } from "@/lib/tools";
-import { InitiativeMembersPeek } from "@/pages/community/initiatives/InitiativeMembersPeek";
 import { CalendarsView } from "@/pages/community/tools/calendars/CalendarsPage";
 import { ContactsView } from "@/pages/community/tools/contacts/ContactsPage";
 import { CounterGroupsView } from "@/pages/community/tools/counterGroups/CounterGroupsPage";
@@ -25,6 +24,8 @@ import { cn } from "@/ui/lib/utils";
 import { PageHeaderSkeleton, SkeletonRegion, ToolListSkeleton } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
 import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/ui/tabs";
+
+import { InitiativeMembersPeek } from "./InitiativeMembersPeek";
 
 type ToolViewProps = { fixedInitiativeId: number; canCreate: boolean };
 

@@ -53,7 +53,6 @@ import { TASK_DETAIL, taskChanges, taskFillContext, withoutValues } from "@/lib/
 import { toast } from "@/lib/mascotToast";
 import { queryClient } from "@/lib/queryClient";
 import { taskRoute, toolDetailRoute, toolListRoute } from "@/lib/tools";
-import { MoveTaskDialog } from "@/pages/community/tools/projects/task/MoveTaskDialog";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import {
@@ -68,6 +67,8 @@ import type { StoredRegions } from "@/ui/layouts/detailLayout";
 import { detailLayoutOf } from "@/ui/layouts/layoutSet";
 import { TaskEditSkeleton } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
+
+import { MoveTaskDialog } from "./MoveTaskDialog";
 
 type MoveTaskVariables = {
   targetProjectId: number;

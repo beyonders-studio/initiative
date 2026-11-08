@@ -1,7 +1,15 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { SortingState } from "@tanstack/react-table";
 import { ExternalLink, LayoutList as LayoutsIcon, Plus, Tags, Trash2, Upload } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  type ReactNode,
+  useCallback,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -66,21 +74,13 @@ import { toast } from "@/lib/mascotToast";
 import { browserTimezone } from "@/lib/timezones";
 import { collectionRoute, toolDetailRoute, toolListRoute } from "@/lib/tools";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
-import {
-  CollectionDropzone,
-  type CollectionDropzoneHandle,
-} from "@/pages/community/tools/files/collection/CollectionDropzone";
-import {
-  type CollectionList,
-  CollectionListView,
-} from "@/pages/community/tools/files/collection/collectionLists";
-import { UploadProgress } from "@/pages/community/tools/files/collection/UploadProgress";
 import type { ToolIndexRow } from "@/pages/community/tools/ToolIndexPage";
 import { TABLE_SORT_FIELDS, ToolIndexTable } from "@/pages/community/tools/ToolIndexTable";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
 import { DropdownMenuItem } from "@/ui/dropdown-menu";
+import { DropOverlay } from "@/ui/file-drop";
 import { Label } from "@/ui/label";
 import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
 import { requiredKeys, type StoredRegions } from "@/ui/layouts/detailLayout";
@@ -90,6 +90,8 @@ import { detailLayoutOf, listLayouts } from "@/ui/layouts/layoutSet";
 import { listLayoutLooks } from "@/ui/layouts/looks";
 import { formatPeriod } from "@/ui/lib/formatDate";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { useFileDrop } from "@/ui/lib/useFileDrop";
+import { cn } from "@/ui/lib/utils";
 import { Lightbox, type LightboxItem } from "@/ui/lightbox";
 import { LoadMore } from "@/ui/load-more";
 import { CardGridSkeleton, DetailHeaderSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
@@ -97,6 +99,67 @@ import { RelativeTime } from "@/ui/relative-time";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
 import { StatusMessage } from "@/ui/status-message";
+
+import { type CollectionList, CollectionListView } from "./collectionLists";
+import { UploadProgress } from "./UploadProgress";
+
+interface CollectionDropzoneHandle {
+  /** Open the file dialog — for a button somewhere else on the page. */
+  open: () => void;
+}
+
+interface CollectionDropzoneProps {
+  /** Whether dropping does anything. A reader who may not change the
+   *  collection sees the wall and no overlay. */
+  enabled: boolean;
+  onFiles: (files: File[]) => void;
+  className?: string;
+  children: ReactNode;
+}
+
+/**
+ * The wall as a place to drop files.
+ *
+ * Wraps the whole collection rather than offering a box at the top: forty
+ * files dragged from a folder land wherever the cursor is, and the cursor is
+ * over the wall.
+ *
+ * The same component owns the file input, so "Upload files" and a drop go
+ * through one `onFiles`.
+ */
+const CollectionDropzone = forwardRef<CollectionDropzoneHandle, CollectionDropzoneProps>(
+  ({ enabled, onFiles, className, children }, ref) => {
+    const { t } = useTranslation("files");
+    const inputRef = useRef<HTMLInputElement | null>(null);
+    const drop = useFileDrop(enabled, onFiles);
+
+    useImperativeHandle(ref, () => ({ open: () => inputRef.current?.click() }), []);
+
+    return (
+      <div className={cn("relative", className)} {...drop.handlers}>
+        {children}
+        {enabled && (
+          <input
+            ref={inputRef}
+            type="file"
+            multiple
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden
+            onChange={(event) => {
+              const files = Array.from(event.target.files ?? []);
+              // The same file twice in a row is a new choice, not a repeat.
+              event.target.value = "";
+              if (files.length > 0) onFiles(files);
+            }}
+          />
+        )}
+        {drop.dragging && <DropOverlay icon={Upload} label={t("collections.dropPrompt")} tall />}
+      </div>
+    );
+  }
+);
+CollectionDropzone.displayName = "CollectionDropzone";
 
 /** A file as the wall and the table both list it. */
 type FileRow = CollectionFileSummary & { card: null };

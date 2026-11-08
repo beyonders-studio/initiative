@@ -15,7 +15,7 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 let finish: (path?: string) => void = () => {};
-vi.mock("@/pages/share/ShareWizard", () => ({
+vi.mock("./ShareWizard", () => ({
   ShareWizard: ({ onDone }: { onDone: (path?: string) => void }) => {
     finish = onDone;
     return null;

@@ -12,16 +12,6 @@ import { useTranslation } from "react-i18next";
 
 import { Tool, WikiPageKind, type WikiPageSummary } from "@/api/generated/initiativeAPI.schemas";
 import { HiddenFilesRequest } from "@/components/access/RequestAccess";
-import {
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarInput,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/sidebar/sidebar";
 import { FileChooserDialog } from "@/components/tools/files/FileChooserDialog";
 import { SubscribeButton } from "@/components/tools/SubscribeButton";
 import { WikiPageActions } from "@/components/tools/wikis/WikiPageActions";
@@ -41,6 +31,17 @@ import { TOOL_ICONS, toolSettingsRoute, wikiFileRoute, wikiPageRoute } from "@/l
 import { Button } from "@/ui/button";
 import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
+
+import {
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInput,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "./sidebar";
 
 // Adding a file to a wiki is named by the files tool itself, so the row
 // says which tool it reaches into rather than inventing a second mark for it.

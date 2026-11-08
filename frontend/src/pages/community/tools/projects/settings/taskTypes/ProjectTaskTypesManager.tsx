@@ -37,14 +37,12 @@ import { useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { toolDetailRoute } from "@/lib/tools";
-import { TaskTypeAddDialog } from "@/pages/community/tools/projects/settings/taskTypes/TaskTypeAddDialog";
-import { TaskTypeCopyDialog } from "@/pages/community/tools/projects/settings/taskTypes/TaskTypeCopyDialog";
-import {
-  startsWithSomething,
-  TaskTypeStartsWithDialog,
-} from "@/pages/community/tools/projects/settings/taskTypes/TaskTypeStartsWithDialog";
 import { Button } from "@/ui/button";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
+
+import { TaskTypeAddDialog } from "./TaskTypeAddDialog";
+import { TaskTypeCopyDialog } from "./TaskTypeCopyDialog";
+import { startsWithSomething, TaskTypeStartsWithDialog } from "./TaskTypeStartsWithDialog";
 
 /** The most types a project may have; the server holds it to the same. */
 export const MAX_TASK_TYPES = 20;

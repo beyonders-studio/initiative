@@ -39,32 +39,19 @@ import { type PropertySummary, type TagSummary, Tool } from "@/api/generated/ini
 import { invalidate, q } from "@/api/query-keys";
 import { BulkAccessSection } from "@/components/access/BulkAccessSection";
 import type { BulkAccessItem } from "@/components/access/BulkEditAccessDialog";
-import { SelectableGridItem } from "@/components/access/SelectableGridItem";
 import { ImportWizard } from "@/components/imports/ImportWizard";
 import { ToolImportAction, useToolImportAction } from "@/components/imports/ToolImportAction";
-import {
-  BrowseMarketplaceButton,
-  BrowseMarketplaceMenuItem,
-} from "@/components/marketplace/BrowseMarketplaceButton";
 import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
 import { TagBadgeList } from "@/components/tags/TagBadge";
-import { TagBrowseLayout } from "@/components/tags/TagBrowseLayout";
 import { BookmarkButton } from "@/components/tools/BookmarkButton";
 import { CreateToolDialog } from "@/components/tools/CreateToolDialog";
 import { ContactCard, ContactMark } from "@/components/tools/contacts/ContactCard";
 import { CreateContactDialog } from "@/components/tools/contacts/CreateContactDialog";
-import { useContactColumns } from "@/components/tools/contacts/contactColumns";
-import { CounterGroupCard } from "@/components/tools/counterGroups/CounterGroupCard";
-import { DashboardCard } from "@/components/tools/dashboards/DashboardCard";
 import { CreateFileDialog } from "@/components/tools/files/CreateFileDialog";
 import { AddToCollectionButton } from "@/components/tools/files/collections/AddToCollectionButton";
 import { CollectionFilterField } from "@/components/tools/files/collections/CollectionFilterField";
-import { FileCard } from "@/components/tools/files/FileCard";
 import { useFileColumns } from "@/components/tools/files/fileColumns";
-import { CreateProjectDialog } from "@/components/tools/projects/CreateProjectDialog";
-import { ProjectCard } from "@/components/tools/projects/ProjectCard";
-import { useProjectColumns } from "@/components/tools/projects/projectColumns";
 import {
   readToolListFilters,
   ToolFilterFields,
@@ -73,7 +60,6 @@ import {
 import { ToolFilterPanel } from "@/components/tools/ToolFilterPanel";
 import { ToolListToolbar } from "@/components/tools/ToolListToolbar";
 import { ToolViewFilter } from "@/components/tools/ToolViewFilter";
-import { WikiCard } from "@/components/tools/wikis/WikiCard";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCreateFromSearchParam } from "@/hooks/useCreateFromSearchParam";
@@ -105,12 +91,14 @@ import {
   toolViewParams,
   toolViews,
 } from "@/lib/tools";
-import { SortableCards } from "@/pages/community/tools/ToolIndexSortable";
-import {
-  TABLE_SORT_FIELDS,
-  ToolIndexTable,
-  toolTableStorageKey,
-} from "@/pages/community/tools/ToolIndexTable";
+import { useContactColumns } from "@/pages/community/tools/contacts/contactColumns";
+import { CounterGroupCard } from "@/pages/community/tools/counterGroups/CounterGroupCard";
+import { DashboardCard } from "@/pages/community/tools/dashboards/DashboardCard";
+import { FileCard } from "@/pages/community/tools/files/FileCard";
+import { CreateProjectDialog } from "@/pages/community/tools/projects/CreateProjectDialog";
+import { ProjectCard } from "@/pages/community/tools/projects/ProjectCard";
+import { useProjectColumns } from "@/pages/community/tools/projects/projectColumns";
+import { WikiCard } from "@/pages/community/tools/wikis/WikiCard";
 import type { DialogProps } from "@/types/dialog";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
@@ -124,6 +112,12 @@ import { CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { PaginationBar } from "@/ui/pagination-bar";
 import { parsePropertyFilters } from "@/ui/properties/PropertyFilter";
 import { StatusMessage } from "@/ui/status-message";
+
+import { BrowseMarketplaceButton, BrowseMarketplaceMenuItem } from "./BrowseMarketplaceButton";
+import { SelectableGridItem } from "./SelectableGridItem";
+import { TagBrowseLayout } from "./TagBrowseLayout";
+import { SortableCards } from "./ToolIndexSortable";
+import { TABLE_SORT_FIELDS, ToolIndexTable, toolTableStorageKey } from "./ToolIndexTable";
 
 // ---------------------------------------------------------------------------
 // What a tool contributes

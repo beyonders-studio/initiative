@@ -8,7 +8,8 @@ import {
   useTestAuthProvider,
   useUpdateAuthProvider,
 } from "@/hooks/useSettings";
-import { ProviderRegistrySection } from "@/pages/platform/auth/ProviderRegistrySection";
+
+import { ProviderRegistrySection } from "./ProviderRegistrySection";
 
 /** The operator-global login provider registry (platform Settings → Authentication). */
 export const AuthProvidersSection = () => {

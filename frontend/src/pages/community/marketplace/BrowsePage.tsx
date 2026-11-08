@@ -23,11 +23,12 @@ import { useInstalledListings } from "@/hooks/useDashboards";
 import { useMarketplaceListings } from "@/hooks/useMarketplace";
 import { type CommunityShelf, parseCommunityShelf } from "@/lib/marketplace";
 import { catalogueSources, listingShownHere } from "@/lib/marketplaceCuration";
-import { MarketplaceCard } from "@/pages/community/marketplace/MarketplaceCard";
 import { Input } from "@/ui/input";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { Skeleton } from "@/ui/skeleton";
 import { StatusMessage } from "@/ui/status-message";
+
+import { MarketplaceCard } from "./MarketplaceCard";
 
 const PAGE_SIZE = 24;
 /** One line per shelf, so a new kind shows its own rather than the dashboards'.

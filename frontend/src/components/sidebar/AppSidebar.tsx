@@ -18,26 +18,6 @@ import { AdminSurface, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { CommunitySidebar } from "@/components/communities/CommunitySidebar";
 import { DIRECTORY_SECTION_ID } from "@/components/communityHome/InitiativeDirectory";
 import { InitiativeMark } from "@/components/icons/InitiativeMark";
-import { CommunityDirectorySidebar } from "@/components/sidebar/CommunityDirectorySidebar";
-import { HomeSidebarContent } from "@/components/sidebar/HomeSidebarContent";
-import { InitiativeSection } from "@/components/sidebar/InitiativeSection";
-import { PluginsSection } from "@/components/sidebar/PluginsSection";
-import { SidebarSearchButton } from "@/components/sidebar/SidebarSearchButton";
-import { SidebarUserFooter } from "@/components/sidebar/SidebarUserFooter";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarSeparator,
-} from "@/components/sidebar/sidebar";
-import { TagBrowser } from "@/components/sidebar/TagBrowser";
-import { WikiSidebarContent } from "@/components/sidebar/WikiSidebarContent";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useAutoCloseSidebar } from "@/hooks/useAutoCloseSidebar";
@@ -62,6 +42,27 @@ import { ScrollArea } from "@/ui/scroll-area";
 import { Skeleton } from "@/ui/skeleton";
 import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
+
+import { CommunityDirectorySidebar } from "./CommunityDirectorySidebar";
+import { HomeSidebarContent } from "./HomeSidebarContent";
+import { InitiativeSection } from "./InitiativeSection";
+import { PluginsSection } from "./PluginsSection";
+import { SidebarSearchButton } from "./SidebarSearchButton";
+import { SidebarUserFooter } from "./SidebarUserFooter";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarSeparator,
+} from "./sidebar";
+import { TagBrowser } from "./TagBrowser";
+import { WikiSidebarContent } from "./WikiSidebarContent";
 
 export const AppSidebar = () => {
   const { user, logout, refreshUser } = useAuth();

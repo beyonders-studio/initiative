@@ -14,8 +14,9 @@ import { layOutVirtualList } from "@/__tests__/helpers/layOutVirtualList";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { LinkedTaskRead, TaskEdgeRead } from "@/api/generated/initiativeAPI.schemas";
-import { ProjectTasksGanttView } from "@/components/tools/projects/ProjectTasksGanttView";
 import { DAY, PX_PER_DAY } from "@/lib/gantt";
+
+import { ProjectTasksGanttView } from "./ProjectTasksGanttView";
 
 layOutVirtualList((element) => element.dataset.testid === "gantt", {
   height: 600,

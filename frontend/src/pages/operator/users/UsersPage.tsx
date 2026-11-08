@@ -14,10 +14,6 @@ import { useExportPlatformUsersCsv, usePlatformUsers } from "@/hooks/useOperator
 import { useServerTableState } from "@/hooks/useServerTableState";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { getUserHandle } from "@/lib/userDisplay";
-import {
-  sheetOffersSomething,
-  UserOperatorSettingsSheet,
-} from "@/pages/operator/users/UserOperatorSettingsSheet";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { DataTable } from "@/ui/data-table";
@@ -28,6 +24,8 @@ import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
 import { SortHeader } from "@/ui/sort-icon";
 import { StatusMessage } from "@/ui/status-message";
+
+import { sheetOffersSomething, UserOperatorSettingsSheet } from "./UserOperatorSettingsSheet";
 
 /** The columns the server sorts the roster by. Status sorts by how much of the
  *  app is left to an account, which brings the ones needing attention together

@@ -39,7 +39,7 @@ const renderCard = (
 // The body is a Lexical editor; mounting one per card is the cost the board's
 // small page size exists to bound, and none of it is what these cases are
 // about.
-vi.mock("@/pages/community/tools/posts/PostBody", () => ({
+vi.mock("./PostBody", () => ({
   PostBody: ({ body }: { body: Record<string, unknown> }) => (
     <div data-testid="post-body">{JSON.stringify(body)}</div>
   ),

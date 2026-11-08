@@ -20,7 +20,6 @@ import { usePluginMenuActions } from "@/lib/layouts/plugins";
 import { POST_DETAIL } from "@/lib/layouts/postLayout";
 import { toast } from "@/lib/mascotToast";
 import { toolListRoute, toolSettingsRoute } from "@/lib/tools";
-import { PostPinButton } from "@/pages/community/tools/posts/PostPinButton";
 import { Button } from "@/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdown-menu";
 import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
@@ -28,6 +27,8 @@ import type { StoredRegions } from "@/ui/layouts/detailLayout";
 import { detailLayoutOf } from "@/ui/layouts/layoutSet";
 import { DetailHeaderSkeleton } from "@/ui/page-skeletons";
 import { Skeleton } from "@/ui/skeleton";
+
+import { PostPinButton } from "./PostPinButton";
 
 /**
  * One notice, on its own page — where its comments and reactions live, laid

@@ -6,7 +6,6 @@ import {
   useState,
 } from "react";
 
-import type { SpreadsheetFormattingStore } from "@/components/tools/files/spreadsheet/useSpreadsheetFormatting";
 import {
   MAX_COL_WIDTH,
   MAX_ROW_HEIGHT,
@@ -14,6 +13,8 @@ import {
   MIN_ROW_HEIGHT,
 } from "@/lib/spreadsheet/styles";
 import type { LineAxis } from "@/lib/spreadsheet/transform";
+
+import type { SpreadsheetFormattingStore } from "./useSpreadsheetFormatting";
 
 export const ROW_HEIGHT = 28;
 export const COL_WIDTH = 110;

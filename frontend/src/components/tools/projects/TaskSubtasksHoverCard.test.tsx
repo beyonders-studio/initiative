@@ -17,7 +17,8 @@ import {
   SearchEntityType,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { TaskSubtasksHoverCard } from "@/components/tools/projects/TaskSubtasksHoverCard";
+
+import { TaskSubtasksHoverCard } from "./TaskSubtasksHoverCard";
 
 const row = (
   id: number,

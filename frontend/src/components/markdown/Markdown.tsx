@@ -12,7 +12,6 @@ import remarkGfm from "remark-gfm";
 
 import { LinkedMentionSpan, PlainMentionSpan } from "@/components/comments/MentionSpan";
 import { remarkMentions } from "@/components/comments/remarkCommentPlugins";
-import { InLink, ProseImage } from "@/components/markdown/ProseImage";
 import { ThemeContext } from "@/hooks/useTheme";
 import { releaseImageUrl } from "@/lib/releaseImages";
 import { isStoredUpload, remarkImageLinks, remarkLineBreaks } from "@/lib/remarkProse";
@@ -27,6 +26,8 @@ import {
 import { sanitizeUrl } from "@/ui/lib/safeUrl";
 import { cn } from "@/ui/lib/utils";
 import { ImageLightboxScope } from "@/ui/lightbox";
+
+import { InLink, ProseImage } from "./ProseImage";
 
 // react-markdown hands every custom component the hast `node`, which is not a
 // DOM attribute — it is dropped before the rest of the props reach the element.

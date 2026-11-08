@@ -4,9 +4,10 @@ import { useTranslation } from "react-i18next";
 
 import { ImportWizard } from "@/components/imports/ImportWizard";
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { CommunityExportCard } from "@/pages/community/settings/data/CommunityExportCard";
-import { DataJobsTable } from "@/pages/community/settings/data/DataJobsTable";
 import { Button } from "@/ui/button";
+
+import { CommunityExportCard } from "./CommunityExportCard";
+import { DataJobsTable } from "./DataJobsTable";
 
 export const DataPage = () => {
   const { t } = useTranslation(["exports", "imports"]);

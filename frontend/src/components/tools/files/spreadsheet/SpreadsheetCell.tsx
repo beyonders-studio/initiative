@@ -8,12 +8,13 @@ import {
   useMemo,
 } from "react";
 
-import { type DraftStore, useDraft } from "@/components/tools/files/spreadsheet/draftStore";
-import { FormulaCellInput } from "@/components/tools/files/spreadsheet/FormulaCellInput";
-import type { RefHighlight } from "@/components/tools/files/spreadsheet/useSpreadsheetEditing";
 import type { FormulaRefToken } from "@/lib/spreadsheet/formula-refs";
 import { Checkbox } from "@/ui/checkbox";
 import { cn } from "@/ui/lib/utils";
+
+import { type DraftStore, useDraft } from "./draftStore";
+import { FormulaCellInput } from "./FormulaCellInput";
+import type { RefHighlight } from "./useSpreadsheetEditing";
 
 /** A cell's event handlers, keyed by the cell they fire on. */
 export interface CellHandlers {

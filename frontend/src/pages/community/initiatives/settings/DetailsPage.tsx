@@ -1,32 +1,133 @@
-/**
- * `/settings` — an initiative's name, description, colour, and which optional
- * tools it offers. How people join it lives with the roster, on
- * `/settings/members`.
- *
- * The name/description/colour form saves on its button; the tool switches are
- * single settings that save on change, each sending only the field that moved.
- */
-
 import { useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { InitiativeUpdate, Tool } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  InitiativeRoleRead,
+  InitiativeUpdate,
+  Tool,
+} from "@/api/generated/initiativeAPI.schemas";
+import { ToolsSection } from "@/components/initiatives/ToolsToggles";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useGrantToolToRoles, useInitiativeRoles } from "@/hooks/useInitiativeRoles";
+import {
+  useGrantToolToRoles,
+  useInitiativeDefaults,
+  useInitiativeRoles,
+} from "@/hooks/useInitiativeRoles";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
 import { useUpdateInitiative } from "@/hooks/useInitiatives";
 import { useServerForm } from "@/hooks/useServerForm";
 import { DEFAULT_COLOR } from "@/lib/initiativeColors";
 import { toast } from "@/lib/mascotToast";
 import { isToolEnabled, TOOLS, toolCamelPlural, toolViewPermission } from "@/lib/tools";
-import { InitiativeSettingsDetailsTab } from "@/pages/community/initiatives/settings/InitiativeSettingsDetailsTab";
-import {
-  type ToolAudience,
-  ToolDisableDialog,
-  ToolEnableDialog,
-} from "@/pages/community/initiatives/settings/ToolAudienceDialogs";
+import { Button } from "@/ui/button";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Textarea } from "@/ui/textarea";
+
+import { type ToolAudience, ToolDisableDialog, ToolEnableDialog } from "./ToolAudienceDialogs";
+
+interface InitiativeSettingsDetailsTabProps {
+  name: string;
+  setName: (value: string) => void;
+  description: string;
+  setDescription: (value: string) => void;
+  color: string;
+  setColor: (value: string) => void;
+  /** Master-switch value per toggleable tool. */
+  toolSwitches: Partial<Record<Tool, boolean>>;
+  onToggleTool: (tool: Tool, value: boolean) => void;
+  canManageMembers: boolean;
+  isSaving: boolean;
+  onSaveDetails: (event: FormEvent<HTMLFormElement>) => void;
+  /** The initiative's roles, so each enabled tool can say who can see it. */
+  roles?: InitiativeRoleRead[];
+  /** Grant a tool's view permission to every non-manager role. */
+  onGrantToEveryone?: (tool: Tool) => void;
+  /** Send the reader to the roles screen. */
+  onManageRoles?: () => void;
+}
+
+const InitiativeSettingsDetailsTab = ({
+  name,
+  setName,
+  description,
+  setDescription,
+  color,
+  setColor,
+  toolSwitches,
+  onToggleTool,
+  canManageMembers,
+  isSaving,
+  onSaveDetails,
+  roles,
+  onGrantToEveryone,
+  onManageRoles,
+}: InitiativeSettingsDetailsTabProps) => {
+  const { t } = useTranslation(["initiatives", "common"]);
+  // The switches the community set for every initiative are shown, not changed.
+  const defaults = useInitiativeDefaults().data;
+
+  return (
+    <div className="space-y-6">
+      <SettingsSection description={t("settings.detailsDescription")}>
+        <form className="space-y-4" onSubmit={onSaveDetails}>
+          <div className="grid grid-cols-pair gap-4">
+            <Field label={t("settings.nameLabel")}>
+              <Input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                maxLength={255}
+                disabled={!canManageMembers || isSaving}
+                required
+              />
+            </Field>
+            <Field label={t("settings.colorLabel")}>
+              <ColorPickerPopover
+                value={color}
+                onChange={setColor}
+                disabled={!canManageMembers || isSaving}
+              />
+            </Field>
+          </div>
+          <Field label={t("settings.descriptionLabel")}>
+            <Textarea
+              rows={4}
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder={t("settings.descriptionPlaceholder")}
+              disabled={!canManageMembers || isSaving}
+            />
+          </Field>
+          {canManageMembers ? (
+            <Button type="submit" pending={isSaving}>
+              {isSaving ? t("settings.saving") : t("settings.saveChanges")}
+            </Button>
+          ) : (
+            <p className="text-muted-foreground text-sm">{t("settings.editPermissionNote")}</p>
+          )}
+        </form>
+      </SettingsSection>
+      {/* Saves on change, unlike the details form above: each switch is a
+          single setting, not a field waiting on a Save button. */}
+      <ToolsSection
+        layout="card"
+        canManage={canManageMembers}
+        isSaving={isSaving}
+        values={toolSwitches}
+        onToggle={onToggleTool}
+        idPrefix="settings"
+        roles={roles}
+        onGrantToEveryone={onGrantToEveryone}
+        onManageRoles={onManageRoles}
+        setByCommunity={defaults?.tools}
+      />
+    </div>
+  );
+};
 
 export const DetailsPage = () => {
   const { t } = useTranslation(["initiatives", "common"]);

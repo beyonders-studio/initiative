@@ -20,7 +20,8 @@ import {
   SearchEntityType,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { TaskBlockersHoverCard } from "@/components/tools/projects/TaskBlockersHoverCard";
+
+import { TaskBlockersHoverCard } from "./TaskBlockersHoverCard";
 
 const blockerRow = (title: string, isOpen: boolean): RelationshipRead => ({
   id: 1,

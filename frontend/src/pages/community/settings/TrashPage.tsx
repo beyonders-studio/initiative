@@ -1,6 +1,7 @@
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { TrashTable } from "@/components/trash/TrashTable";
-import { RetentionSetting } from "@/pages/community/settings/RetentionSetting";
+
+import { RetentionSetting } from "./RetentionSetting";
 
 export const TrashPage = () => (
   // The whole community settings section is admin-gated by CommunitySettingsLayout, so

@@ -6,9 +6,10 @@ import { TimelineRail } from "@/components/timeline/TimelineRail";
 import { CollectionFileTile } from "@/components/tools/files/collections/CollectionFileTile";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
 import { fileRatio, formatDay, groupByDay } from "@/lib/collections";
-import type { CollectionCard } from "@/pages/community/tools/files/collection/collectionLists";
 import { formatPeriod, formatPeriodYear } from "@/ui/lib/formatDate";
 import { type VirtualRow, VirtualRows } from "@/ui/virtual-rows";
+
+import type { CollectionCard } from "./collectionLists";
 
 interface CollectionTimelineViewProps {
   files: CollectionFileSummary[];

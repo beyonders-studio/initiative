@@ -11,10 +11,6 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { ReadyMadeGallery } from "@/components/shared/ReadyMadeGallery";
 import {
-  asksForMetadata,
-  RequiredMetadataDialog,
-} from "@/components/tools/files/collections/RequiredMetadataDialog";
-import {
   useAddCollectionFiles,
   useCollectionShapes,
   useCollections,
@@ -43,6 +39,8 @@ import { detailLayoutOf } from "@/ui/layouts/layoutSet";
 import { listLayoutLooks } from "@/ui/layouts/looks";
 import { listFormat } from "@/ui/lib/intl";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+
+import { asksForMetadata, RequiredMetadataDialog } from "./RequiredMetadataDialog";
 
 interface AddToCollectionDialogProps {
   initiativeId: number;

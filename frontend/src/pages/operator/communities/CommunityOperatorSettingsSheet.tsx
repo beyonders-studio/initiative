@@ -39,11 +39,6 @@ import {
   useUpdateCommunityStorage,
 } from "@/hooks/useSettings";
 import { toast } from "@/lib/mascotToast";
-import {
-  BillingConsoleButton,
-  opensBillingHere,
-} from "@/pages/operator/communities/BillingConsoleButton";
-import { CommunityRestoreWizard } from "@/pages/operator/communities/CommunityRestoreWizard";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
@@ -51,6 +46,9 @@ import { formatDate } from "@/ui/lib/formatDate";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui/sheet";
 import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
+
+import { BillingConsoleButton, opensBillingHere } from "./BillingConsoleButton";
+import { CommunityRestoreWizard } from "./CommunityRestoreWizard";
 
 const GIB = 1024 ** 3;
 

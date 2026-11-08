@@ -1,23 +1,11 @@
-/**
- * Community-wide search results.
- *
- * Tabs by KIND of thing rather than one per tool, and no counts on any of
- * them: a tab is a place to look, not a reported quantity. Per-tool tabs would
- * privilege projects and files — an artifact of them being the two core
- * tools — and would reflow every time a tool is added.
- *
- * A tab is a differently scoped query, not a filter over one, so the tab a
- * reader is on is the only scope that runs. The others are asked for a single
- * row, which is enough to show a tab with nothing behind it as disabled rather
- * than let the reader click through to an empty page.
- */
-
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { Search, SearchX, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { UserSummary } from "@/api/generated/initiativeAPI.schemas";
 import { SearchCategoryTabs } from "@/components/search/SearchCategoryTabs";
+import { UserHandle } from "@/components/user/UserHandle";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunitySearch } from "@/hooks/useSearch";
 import { useUserSearch } from "@/hooks/useUsers";
@@ -29,8 +17,8 @@ import {
   type SearchCategory,
   TOOL_ENTITY_TYPES,
 } from "@/lib/searchResults";
-import { MemberResultRow } from "@/pages/community/search/MemberResultRow";
-import { SearchResultList } from "@/pages/community/search/SearchResultRow";
+import { getAvatarSrc, getInitialsForUser, getUrlHandle } from "@/lib/userDisplay";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
 import { Input } from "@/ui/input";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
@@ -38,6 +26,39 @@ import { PaginationBar } from "@/ui/pagination-bar";
 import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
 import { Tabs, TabsContent } from "@/ui/tabs";
+
+import { SearchResultList } from "./SearchResultRow";
+
+/**
+ * One member found.
+ *
+ * A person is not a tool, so this is not the tool row with a different icon:
+ * it shows the face and the handle, which is what identifies someone. It opens
+ * their profile, which is public and belongs to the person rather than to the
+ * community the search ran in — so the link leaves the community tree.
+ */
+function MemberResultRow({ member }: { member: UserSummary }) {
+  const name = member.display_name?.trim();
+  return (
+    <Link
+      to="/u/$handle"
+      params={{ handle: getUrlHandle(member) }}
+      className="flex items-center gap-3 rounded-md px-3 py-2 hover:bg-accent"
+    >
+      <Avatar className="h-8 w-8 shrink-0">
+        <AvatarImage src={getAvatarSrc(member)} alt="" />
+        <AvatarFallback className="text-xs">{getInitialsForUser(member)}</AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        {name && <div className="truncate font-medium">{name}</div>}
+        <UserHandle
+          user={member}
+          className={name ? "text-muted-foreground text-sm" : "font-medium"}
+        />
+      </div>
+    </Link>
+  );
+}
 
 /** A page of one category. */
 const PAGE_SIZE = 20;

@@ -22,8 +22,6 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { AccessGrantStatusBadge } from "@/components/access/AccessGrantStatusBadge";
 import { CommentContent } from "@/components/comments/CommentContent";
-import { CaseHolds } from "@/components/tickets/CaseHolds";
-import { communityEvidenceUrl, EvidenceList } from "@/components/tickets/Evidence";
 import { UserHandle } from "@/components/user/UserHandle";
 import { UserHoverLink } from "@/components/user/UserHoverLink";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -47,6 +45,9 @@ import { minutesLeft } from "@/ui/lib/formatDate";
 import { useRelativeTime } from "@/ui/lib/useRelativeTime";
 import { cn } from "@/ui/lib/utils";
 import { Textarea } from "@/ui/textarea";
+
+import { CaseHolds } from "./CaseHolds";
+import { communityEvidenceUrl, EvidenceList } from "./Evidence";
 
 interface CasePanelProps {
   taskId: number;

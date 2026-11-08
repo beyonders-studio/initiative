@@ -36,10 +36,6 @@ import { listingShownHere } from "@/lib/marketplaceCuration";
 import { listingKindTool } from "@/lib/tools";
 import { resolveArtworkUrl } from "@/lib/uploadUrl";
 import { readConfig, readDefinition } from "@/lib/widgets/definition";
-import { InstallListingDialog } from "@/pages/community/marketplace/InstallListingDialog";
-import { InstallPluginDialog } from "@/pages/community/marketplace/InstallPluginDialog";
-import { ListingProvenance } from "@/pages/community/marketplace/ListingProvenance";
-import { ProjectListingPreview } from "@/pages/community/marketplace/ProjectListingPreview";
 import { Badge } from "@/ui/badge";
 import {
   Breadcrumb,
@@ -59,6 +55,11 @@ import {
 } from "@/ui/carousel";
 import { Skeleton } from "@/ui/skeleton";
 import { StatusMessage } from "@/ui/status-message";
+
+import { InstallListingDialog } from "./InstallListingDialog";
+import { InstallPluginDialog } from "./InstallPluginDialog";
+import { ListingProvenance } from "./ListingProvenance";
+import { ProjectListingPreview } from "./ProjectListingPreview";
 
 export function ListingPage() {
   const { t } = useTranslation(["marketplace", "plugins"]);

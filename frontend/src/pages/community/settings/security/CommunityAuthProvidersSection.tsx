@@ -37,10 +37,6 @@ import {
 } from "@/hooks/useCommunityAuthPolicy";
 import { useServer } from "@/hooks/useServer";
 import { toast } from "@/lib/mascotToast";
-import {
-  ConnectSignInWizard,
-  NARROWING_CLAIMS,
-} from "@/pages/community/settings/security/ConnectSignInWizard";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -53,6 +49,8 @@ import {
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/ui/empty";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
+
+import { ConnectSignInWizard, NARROWING_CLAIMS } from "./ConnectSignInWizard";
 
 export const CommunityAuthProvidersSection = ({
   communityId,

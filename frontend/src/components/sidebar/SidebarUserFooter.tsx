@@ -20,7 +20,6 @@ import { ThoughtBubble } from "@/components/icons/ThoughtBubble";
 import { useTitleBarHeight } from "@/components/navigation/DesktopTitleBar";
 import { AppearanceMenuItems, ThemeIcon } from "@/components/navigation/ModeToggle";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
-import { SidebarFooter } from "@/components/sidebar/sidebar";
 import { useFeedback } from "@/components/tickets/FeedbackSheet";
 import { UpdateButton } from "@/components/updates/UpdateButton";
 import { PresenceDot } from "@/components/user/PresenceDot";
@@ -46,6 +45,8 @@ import {
 } from "@/ui/dropdown-menu";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import { Popover, PopoverAnchor, PopoverContent } from "@/ui/popover";
+
+import { SidebarFooter } from "./sidebar";
 
 export interface SidebarUserFooterProps {
   /** The signed-in account, or null while it is still being fetched. */

@@ -62,11 +62,6 @@ import {
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { hasInitiativeSurfaces } from "@/lib/pluginSurfaces";
-import { PluginScopesPanel } from "@/pages/community/settings/integrations/PluginScopesPanel";
-import {
-  PluginPendingUpdate,
-  PluginUpdatesPanel,
-} from "@/pages/community/settings/integrations/PluginUpdatesPanel";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -78,6 +73,9 @@ import { Label } from "@/ui/label";
 import { formatDate } from "@/ui/lib/formatDate";
 import { cn } from "@/ui/lib/utils";
 import { Skeleton } from "@/ui/skeleton";
+
+import { PluginScopesPanel } from "./PluginScopesPanel";
+import { PluginPendingUpdate, PluginUpdatesPanel } from "./PluginUpdatesPanel";
 
 export function PluginsPage() {
   const { t } = useTranslation(["plugins", "common"]);

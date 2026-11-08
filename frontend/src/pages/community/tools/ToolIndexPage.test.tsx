@@ -33,13 +33,10 @@ import { queryClient } from "@/lib/queryClient";
 import { setItem } from "@/lib/storage";
 import { TOOLS, toolCamelPlural, toolRouteSegment, toolViews } from "@/lib/tools";
 import { viewPreferencesQueryKey } from "@/lib/viewPreferences";
-import {
-  type ToolIndexEntry,
-  ToolIndexPage,
-  toolIndexEntry,
-} from "@/pages/community/tools/ToolIndexPage";
-import { toolTableStorageKey } from "@/pages/community/tools/ToolIndexTable";
 import type { TranslateFn } from "@/types/i18n";
+
+import { type ToolIndexEntry, ToolIndexPage, toolIndexEntry } from "./ToolIndexPage";
+import { toolTableStorageKey } from "./ToolIndexTable";
 
 const INITIATIVE_ID = 1;
 

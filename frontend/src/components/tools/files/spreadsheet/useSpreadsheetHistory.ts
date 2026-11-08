@@ -1,8 +1,9 @@
 import type * as Y from "yjs";
 
-import { UNDOABLE_SPREADSHEET_ORIGINS } from "@/components/tools/files/spreadsheet/origins";
-import { Y_SHEETS_KEY } from "@/components/tools/files/spreadsheet/workbookDoc";
 import { useYjsHistory, type YjsHistory } from "@/hooks/useYjsHistory";
+
+import { UNDOABLE_SPREADSHEET_ORIGINS } from "./origins";
+import { Y_SHEETS_KEY } from "./workbookDoc";
 
 /**
  * Per-session undo/redo for the spreadsheet — a thin adapter over the

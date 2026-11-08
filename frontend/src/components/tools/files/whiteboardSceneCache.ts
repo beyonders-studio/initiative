@@ -9,8 +9,9 @@
  * room's newer state on a later revisit).
  */
 
-import type { WhiteboardScene } from "@/components/tools/files/WhiteboardFileEditor";
 import { getItem, listKeys, removeItem, setItem } from "@/lib/storage";
+
+import type { WhiteboardScene } from "./WhiteboardFileEditor";
 
 const CACHE_PREFIX = "wb-scene-";
 

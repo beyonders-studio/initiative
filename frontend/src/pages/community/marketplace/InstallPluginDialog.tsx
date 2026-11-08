@@ -38,7 +38,6 @@ import { listingShownHere } from "@/lib/marketplaceCuration";
 import { toast } from "@/lib/mascotToast";
 import { STANDING_SCOPES, scopeSentence, toggleScope } from "@/lib/pluginScopes";
 import { communityPluginPath, declaredPages } from "@/lib/pluginSurfaces";
-import { ListingProvenance } from "@/pages/community/marketplace/ListingProvenance";
 import type { DialogProps } from "@/types/dialog";
 import { Checkbox } from "@/ui/checkbox";
 import {
@@ -54,6 +53,8 @@ import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
+
+import { ListingProvenance } from "./ListingProvenance";
 
 export interface InstallPluginDialogProps extends DialogProps {
   listing: MarketplaceListingDetail;

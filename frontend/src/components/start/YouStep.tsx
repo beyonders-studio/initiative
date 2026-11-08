@@ -7,12 +7,13 @@ import { useSuggestUsernames } from "@/api/generated/auth/auth";
 import { type HandleCheck, UsernameField } from "@/components/account/UsernameField";
 import { BirthdateField } from "@/components/auth/BirthdateField";
 import type { useAgeConfirmation } from "@/components/auth/useAgeConfirmation";
-import { ContinueButton } from "@/components/start/stepParts";
 import { TIMEZONE_OPTIONS } from "@/lib/timezones";
 import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 import { Field } from "@/ui/field";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+
+import { ContinueButton } from "./stepParts";
 
 /** How long typing settles before the suggestions start from it. */
 const SEED_SETTLES_MS = 400;

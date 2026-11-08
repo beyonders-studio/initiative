@@ -6,12 +6,10 @@ import { TagBadge } from "@/components/tags/TagBadge";
 import { CollectionFileTile } from "@/components/tools/files/collections/CollectionFileTile";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
 import { fileRatio, groupByTag } from "@/lib/collections";
-import type { CollectionCard } from "@/pages/community/tools/files/collection/collectionLists";
-import {
-  type MasonryEntry,
-  MasonryWall,
-} from "@/pages/community/tools/files/collection/MasonryWall";
 import { useWidthClass } from "@/ui/lib/useWidthClass";
+
+import type { CollectionCard } from "./collectionLists";
+import { type MasonryEntry, MasonryWall } from "./MasonryWall";
 
 interface CollectionMasonryViewProps {
   files: CollectionFileSummary[];

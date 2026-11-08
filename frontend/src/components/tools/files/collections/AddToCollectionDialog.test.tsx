@@ -12,7 +12,8 @@ import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import i18n from "@/__tests__/helpers/i18n-test";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
-import { AddToCollectionDialog } from "@/components/tools/files/collections/AddToCollectionDialog";
+
+import { AddToCollectionDialog } from "./AddToCollectionDialog";
 
 const toasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock("@/lib/mascotToast", () => ({ toast: toasts }));

@@ -44,8 +44,6 @@ import { pickRandomCounterColor } from "@/lib/counter-color";
 import { blankCounter, COUNTER_DETAIL, counterReady } from "@/lib/layouts/counterLayout";
 import { toast } from "@/lib/mascotToast";
 import { counterRoute, toolListRoute, toolSettingsRoute } from "@/lib/tools";
-import { type CounterLayout, CounterRow } from "@/pages/community/tools/counterGroups/CounterRow";
-import { EditCounterDialog } from "@/pages/community/tools/counterGroups/EditCounterDialog";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import {
@@ -56,6 +54,9 @@ import {
 } from "@/ui/dropdown-menu";
 import { useDragSensors } from "@/ui/lib/useDragSensors";
 import { CardGridSkeleton, DetailPageSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+
+import { type CounterLayout, CounterRow } from "./CounterRow";
+import { EditCounterDialog } from "./EditCounterDialog";
 
 /** Where an older release kept a group's rows or grid. */
 const layoutStorageKey = (groupId: number) => `counter-group-${groupId}-layout`;

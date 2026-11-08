@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type * as Y from "yjs";
 
+import { DEFAULT_COLS, DEFAULT_ROWS } from "@/lib/spreadsheet/bounds";
+import { type CellValue, keyOf } from "@/lib/spreadsheet/coords";
+import type { SheetId } from "@/lib/spreadsheet/sheets";
+
+import { SPREADSHEET_ORIGINS } from "./origins";
 import {
   META_COLS,
   META_ROWS,
@@ -8,12 +13,7 @@ import {
   SHEET_META,
   sheetContainer,
   sheetPart,
-} from "@/components/tools/files/spreadsheet/workbookDoc";
-import { DEFAULT_COLS, DEFAULT_ROWS } from "@/lib/spreadsheet/bounds";
-import { type CellValue, keyOf } from "@/lib/spreadsheet/coords";
-import type { SheetId } from "@/lib/spreadsheet/sheets";
-
-import { SPREADSHEET_ORIGINS } from "./origins";
+} from "./workbookDoc";
 
 /**
  * Write access to one sheet's cell map, plus its grid dimensions.

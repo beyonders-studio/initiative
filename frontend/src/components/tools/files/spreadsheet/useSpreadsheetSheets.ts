@@ -1,28 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type * as Y from "yjs";
 
-import {
-  ensureSheetContainer,
-  ensureWorkbook,
-  META_COLS,
-  META_FROZEN_COLS,
-  META_FROZEN_ROWS,
-  META_HIDDEN,
-  META_NAME,
-  META_ORDER,
-  META_ROWS,
-  readSheetOrder,
-  SHEET_CELLS,
-  SHEET_CELLSTYLES,
-  SHEET_COLUMNS,
-  SHEET_META,
-  SHEET_ROWS,
-  type SheetContainer,
-  seedSheet,
-  sheetContainer,
-  sheetPart,
-  sheetsRoot,
-} from "@/components/tools/files/spreadsheet/workbookDoc";
 import { MAX_COLS, MAX_ROWS } from "@/lib/spreadsheet/bounds";
 import {
   SPREADSHEET_SCHEMA_VERSION,
@@ -44,6 +22,28 @@ import {
 import type { CellFmt, ColumnFmt, RowFmt } from "@/lib/spreadsheet/styles";
 
 import { SPREADSHEET_ORIGINS } from "./origins";
+import {
+  ensureSheetContainer,
+  ensureWorkbook,
+  META_COLS,
+  META_FROZEN_COLS,
+  META_FROZEN_ROWS,
+  META_HIDDEN,
+  META_NAME,
+  META_ORDER,
+  META_ROWS,
+  readSheetOrder,
+  SHEET_CELLS,
+  SHEET_CELLSTYLES,
+  SHEET_COLUMNS,
+  SHEET_META,
+  SHEET_ROWS,
+  type SheetContainer,
+  seedSheet,
+  sheetContainer,
+  sheetPart,
+  sheetsRoot,
+} from "./workbookDoc";
 
 /**
  * The workbook level of a spreadsheet file: which sheets exist, what

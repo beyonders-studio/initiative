@@ -39,16 +39,14 @@ import { useFieldCatalogs } from "@/hooks/useQueryVocabulary";
 import { joinRange, splitRange } from "@/lib/spreadsheet/range";
 import { type FilterLeaf, type FilterNode, toFilterFieldSpec } from "@/lib/widgets/conditions";
 import { withParamAnswer } from "@/lib/widgets/pluginParams";
-import {
-  FilterBuilder,
-  fieldLabel,
-} from "@/pages/community/tools/dashboards/dashboard/FilterBuilder";
 import { Button } from "@/ui/button";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { listFormat } from "@/ui/lib/intl";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+
+import { FilterBuilder, fieldLabel } from "./FilterBuilder";
 
 /** The datasets a query may name. Read from the generated enum, which is the
  *  backend's own registry — so a dataset declared there is offered here on the

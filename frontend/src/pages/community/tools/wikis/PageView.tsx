@@ -33,12 +33,6 @@ import { useAddWikiPage, useUpdateWikiPage, useWiki, useWikiPage } from "@/hooks
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { toolDetailRoute, toolRouteSegment, wikiPageRoute } from "@/lib/tools";
-import { WikiChrome } from "@/pages/community/tools/wikis/WikiChrome";
-import {
-  WikiConnectionsSheet,
-  WikiPageConnections,
-} from "@/pages/community/tools/wikis/WikiPageConnections";
-import { WikiPageNav } from "@/pages/community/tools/wikis/WikiPageNav";
 import { Button } from "@/ui/button";
 import { Card, CardHeader, CardTitle } from "@/ui/card";
 import { PropertiesField } from "@/ui/layouts/fieldEditors";
@@ -49,6 +43,10 @@ import { EditorSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
 import { Skeleton } from "@/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
+
+import { WikiChrome } from "./WikiChrome";
+import { WikiConnectionsSheet, WikiPageConnections } from "./WikiPageConnections";
+import { WikiPageNav } from "./WikiPageNav";
 
 // The editor is the largest thing in the bundle; every other surface that
 // draws one loads it on demand, and a static import here would pull it back

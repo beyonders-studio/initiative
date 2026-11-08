@@ -18,9 +18,10 @@ import { TaskTypeDeleteDialog } from "@/components/tools/projects/TaskTypeDelete
 import { instanceTarget, useInstanceLayouts, useSaveLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolDetailRoute } from "@/lib/tools";
-import { useToolSettings } from "@/pages/community/tools/settings/ToolSettingsContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { LayoutsOverview } from "@/ui/layouts/LayoutList";
+
+import { useToolSettings } from "./ToolSettingsContext";
 
 export const LayoutsPage = () => {
   const { tool, entity } = useToolSettings();

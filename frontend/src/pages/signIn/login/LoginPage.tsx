@@ -30,13 +30,13 @@ import {
 } from "@/lib/passkeys";
 import { providerSignInHref } from "@/lib/returnPath";
 import { compactCode } from "@/lib/secondFactorAnswer";
-import { PasskeyRelayCard } from "@/pages/signIn/login/PasskeyRelayCard";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
+import { PasskeyRelayCard } from "./PasskeyRelayCard";
 import { RegisterPage } from "./RegisterPage";
 
 /** What to call a phone in the sign-in record when it will not say. */

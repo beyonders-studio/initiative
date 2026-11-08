@@ -26,7 +26,8 @@ import { renderPage } from "@/__tests__/helpers/render";
 import type { TaskStatusRead, ToolLayoutSetRead } from "@/api/generated/initiativeAPI.schemas";
 import { toast } from "@/lib/mascotToast";
 import { fireTaskCompletionFeedback } from "@/lib/taskCompletionFeedback";
-import { ProjectTasksSection } from "@/pages/community/tools/projects/project/ProjectTasksSection";
+
+import { ProjectTasksSection } from "./ProjectTasksSection";
 
 vi.mock("@/lib/csv", () => ({ downloadBlob: vi.fn() }));
 vi.mock("@/lib/taskCompletionFeedback", async (importOriginal) => ({

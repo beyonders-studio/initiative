@@ -1,5 +1,5 @@
-import { AIPage } from "@/pages/community/settings/integrations/AIPage";
-import { PluginsPage } from "@/pages/community/settings/integrations/PluginsPage";
+import { AIPage } from "./AIPage";
+import { PluginsPage } from "./PluginsPage";
 
 /**
  * What the community hands to somebody outside it (Settings → Integrations):

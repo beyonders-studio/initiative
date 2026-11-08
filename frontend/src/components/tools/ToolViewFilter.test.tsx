@@ -10,7 +10,8 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { ToolViewFilter } from "@/components/tools/ToolViewFilter";
+
+import { ToolViewFilter } from "./ToolViewFilter";
 
 const options = () =>
   screen.getAllByRole("radio").map((option) => option.getAttribute("aria-label"));

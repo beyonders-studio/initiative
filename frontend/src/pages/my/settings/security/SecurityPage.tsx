@@ -22,10 +22,6 @@ import { useCommunities } from "@/hooks/useCommunities";
 import { useCreateApiKey, useDeleteApiKey } from "@/hooks/useSecurity";
 import { toast } from "@/lib/mascotToast";
 import { HeldChangeNotice } from "@/pages/my/settings/HeldChangeNotice";
-import { PasskeysSection } from "@/pages/my/settings/security/PasskeysSection";
-import { PasswordSection } from "@/pages/my/settings/security/PasswordSection";
-import { SignedInSection } from "@/pages/my/settings/security/SignedInSection";
-import { TwoFactorSection } from "@/pages/my/settings/security/TwoFactorSection";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
@@ -46,6 +42,11 @@ import { formatDateTime } from "@/ui/lib/formatDate";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { StatusMessage } from "@/ui/status-message";
+
+import { PasskeysSection } from "./PasskeysSection";
+import { PasswordSection } from "./PasswordSection";
+import { SignedInSection } from "./SignedInSection";
+import { TwoFactorSection } from "./TwoFactorSection";
 
 const computeStatus = (key: ApiKeyMetadata) => {
   if (!key.is_active) {

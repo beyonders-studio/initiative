@@ -3,9 +3,10 @@ import { Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
-import { DecorationStore } from "@/pages/my/marketplace/DecorationStore";
-import { HomeLayoutStore } from "@/pages/my/marketplace/HomeLayoutStore";
 import { Button } from "@/ui/button";
+
+import { DecorationStore } from "./DecorationStore";
+import { HomeLayoutStore } from "./HomeLayoutStore";
 
 /**
  * The marketplace a person gets things from for themselves.

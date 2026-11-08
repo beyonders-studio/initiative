@@ -13,10 +13,6 @@ import {
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
-import {
-  PluginServiceFormDialog,
-  type PluginServiceFormValues,
-} from "@/pages/platform/integrations/PluginServiceFormDialog";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -24,6 +20,8 @@ import { Label } from "@/ui/label";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
+
+import { PluginServiceFormDialog, type PluginServiceFormValues } from "./PluginServiceFormDialog";
 
 /** Whether a registration carries a key set, pasted or by address. */
 const hasKeys = (registration: PluginServiceRegistrationRead): boolean =>

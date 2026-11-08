@@ -6,9 +6,10 @@ import { TagBadge } from "@/components/tags/TagBadge";
 import { CollectionFileTile } from "@/components/tools/files/collections/CollectionFileTile";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
 import { groupByTag } from "@/lib/collections";
-import type { CollectionCard } from "@/pages/community/tools/files/collection/collectionLists";
 import { useWidthClass } from "@/ui/lib/useWidthClass";
 import { type VirtualRow, VirtualRows } from "@/ui/virtual-rows";
+
+import type { CollectionCard } from "./collectionLists";
 
 interface CollectionGridViewProps {
   files: CollectionFileSummary[];

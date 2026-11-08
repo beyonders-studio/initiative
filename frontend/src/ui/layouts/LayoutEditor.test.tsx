@@ -56,10 +56,10 @@ import { useLayoutPlugins } from "@/lib/layouts/plugins";
 import { TASK_COLUMNS } from "@/lib/layouts/tasks";
 import { LayoutEditorPage } from "@/pages/community/tools/files/collection/LayoutEditorPage";
 import type { TranslateFn } from "@/types/i18n";
-import { MAX_PRESETS } from "@/ui/layouts/presets";
-import type { LayoutNode } from "@/ui/layouts/tree";
 
 import { LayoutEditor } from "./LayoutEditor";
+import { MAX_PRESETS } from "./presets";
+import type { LayoutNode } from "./tree";
 
 const STATUSES = buildDefaultTaskStatuses(1);
 const TASK_TYPE = {

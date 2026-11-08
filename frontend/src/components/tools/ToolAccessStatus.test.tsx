@@ -8,7 +8,8 @@ import { buildShareStanding } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
-import { ToolAccessStatus } from "@/components/tools/ToolAccessStatus";
+
+import { ToolAccessStatus } from "./ToolAccessStatus";
 
 const failed = (status: number): AxiosError => {
   const error = new AxiosError("failed");

@@ -26,7 +26,6 @@ import type {
 import { PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
 import { sharedTaskColumns } from "@/components/tasks/globalTaskColumns";
 import { statusTriggerStyle, TaskStatusOption } from "@/components/tasks/TaskStatusOption";
-import { TaskAssigneesCell } from "@/components/tools/projects/TaskQuickActions";
 import { type ColumnLimits, NO_COLUMN_LIMITS } from "@/hooks/useColumnLimits";
 import { useCounterSteps, useProjectLayoutEnv } from "@/hooks/useLayoutEnv";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
@@ -49,6 +48,8 @@ import { cn } from "@/ui/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
 import { SortHeader } from "@/ui/sort-icon";
 import { TableRow } from "@/ui/table";
+
+import { TaskAssigneesCell } from "./TaskQuickActions";
 
 type ProjectTasksListViewProps = {
   projectId: number;

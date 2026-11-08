@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { buildProject, resetFactories } from "@/__tests__/factories";
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import { ProjectDetailsFields } from "@/pages/community/tools/projects/settings/ProjectDetailsFields";
+
+import { ProjectDetailsFields } from "./ProjectDetailsFields";
 
 const INVERTED = "The end date can't be before the start date.";
 

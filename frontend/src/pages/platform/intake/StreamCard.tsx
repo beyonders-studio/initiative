@@ -1,21 +1,4 @@
-/**
- * Where this deployment's operations work lands (platform settings → Intake).
- *
- * Whether people may send feedback to the Initiative team comes first, then
- * who to contact. Both stand on their own: a deployment that routes nothing
- * anywhere still sends feedback to the team, and tells people whom to write to.
- *
- * Then two levels of decision, in the order an owner makes them: name the
- * community that receives operations work, then say which project each stream
- * lands in. Nothing below the first is offered until it is answered, because
- * every id in it belongs to that community.
- *
- * Each stream offers the same two routes: import the blueprint, which produces
- * a ready-made project, or point at a project the team already has. Both end in
- * the same binding — the blueprint is a convenience, not a different mechanism.
- */
-
-import { type FormEvent, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -23,278 +6,26 @@ import {
   type IntakeBindingRead,
   type IntakeBindingUpsert,
   type IntakeInitiativeOption,
-  type IntakeSettingsRead,
   type IntakeStream,
 } from "@/api/generated/initiativeAPI.schemas";
-import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
-import { useAuth } from "@/hooks/useAuth";
 import {
   useDeleteIntakeBinding,
   useImportIntakeBlueprint,
-  useIntakeOptions,
-  useIntakeSettings,
-  useUpdateFeedbackSwitch,
-  useUpdateIntakeGeneralContact,
-  useUpdateIntakeStreamContact,
-  useUpdateOperationsCommunity,
   useUpsertIntakeBinding,
 } from "@/hooks/useIntakeSettings";
-import { useServerForm } from "@/hooks/useServerForm";
-import { usePlatformCommunities } from "@/hooks/useSettings";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import { Capability, hasCapability } from "@/lib/permissions";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
-import { Combobox } from "@/ui/combobox";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Field } from "@/ui/field";
-import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { formatDateTime } from "@/ui/lib/formatDate";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
-import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
 
 /** Sentinel for "no community", which a Select cannot express with "". */
-const NONE = "none";
-
-export const IntakePage = () => {
-  const { t } = useTranslation("intake");
-  const { user } = useAuth();
-  const isOwner = hasCapability(user, Capability.configManage);
-
-  const {
-    data: settings,
-    isLoading,
-    isFetching: settingsFetching,
-    isError: settingsFailed,
-    refetch: refetchSettings,
-  } = useIntakeSettings({ enabled: isOwner });
-  const {
-    data: options,
-    isFetching: optionsFetching,
-    isError: optionsFailed,
-    refetch: refetchOptions,
-  } = useIntakeOptions({ enabled: isOwner });
-  // Searched on the server while the picker is open, rather than every
-  // community on the deployment loaded up front.
-  const [communitySearch, setCommunitySearch] = useState("");
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const communitiesQuery = usePlatformCommunities(
-    { search: communitySearch || undefined, sort_by: "name", page_size: 25 },
-    { enabled: isOwner && pickerOpen }
-  );
-
-  // The two reads describe one community between them — where each stream
-  // lands, and what it could land in — so the page acts on both or neither.
-  const failed = settingsFailed || optionsFailed;
-  const settled = !failed && !settingsFetching && !optionsFetching;
-
-  const [clearing, setClearing] = useState(false);
-
-  const updateCommunity = useUpdateOperationsCommunity();
-
-  if (!isOwner) {
-    return <p className="text-muted-foreground text-sm">{t("ownerOnly")}</p>;
-  }
-
-  // A read that failed is a different state from a deployment that has
-  // configured nothing, and says so. The picker stays out of reach until the
-  // current value is known.
-  if (failed) {
-    return (
-      <StatusMessage
-        onRetry={() => {
-          refetchSettings();
-          refetchOptions();
-        }}
-      />
-    );
-  }
-
-  const boundCommunityId = settings?.operations_community_id ?? null;
-
-  return (
-    <div className="space-y-6">
-      {settings ? <FeedbackCard enabled={settings.feedback_enabled} settled={settled} /> : null}
-      {settings ? <ContactsCard settings={settings} settled={settled} /> : null}
-
-      <SettingsSection
-        title={t("community.title")}
-        description={t("community.description")}
-        contentClassName="space-y-3"
-      >
-        <Label>{t("community.label")}</Label>
-        <Combobox
-          className="max-w-md"
-          aria-label={t("community.label")}
-          value={boundCommunityId === null ? NONE : String(boundCommunityId)}
-          selectedLabel={
-            boundCommunityId === null
-              ? t("community.none")
-              : (settings?.operations_community_name ?? null)
-          }
-          items={[
-            { value: NONE, label: t("community.none") },
-            ...(communitiesQuery.data?.items ?? []).map((community) => ({
-              value: String(community.id),
-              label: community.name,
-            })),
-          ]}
-          onSearchChange={setCommunitySearch}
-          onOpenChange={setPickerOpen}
-          loading={communitiesQuery.isFetching}
-          placeholder={t("community.placeholder")}
-          disabled={isLoading || !settled || updateCommunity.isPending}
-          onValueChange={(value) => {
-            // Clearing it stops every stream at once, so it is confirmed;
-            // choosing a different one is an ordinary change.
-            if (value === NONE) {
-              setClearing(true);
-              return;
-            }
-            updateCommunity.mutate({ community_id: Number(value) });
-          }}
-        />
-        <p className="text-muted-foreground text-sm">{t("community.helpText")}</p>
-      </SettingsSection>
-
-      {boundCommunityId === null ? (
-        <p className="text-muted-foreground text-sm">{t("streams.chooseCommunityFirst")}</p>
-      ) : (
-        <div className="space-y-4">
-          {(settings?.bindings ?? []).map((binding) => (
-            <StreamCard
-              key={binding.stream}
-              binding={binding}
-              initiatives={options?.initiatives ?? []}
-              settled={settled}
-            />
-          ))}
-        </div>
-      )}
-
-      <ConfirmDialog
-        open={clearing}
-        onOpenChange={setClearing}
-        title={t("community.clearTitle")}
-        description={t("community.clearBody")}
-        confirmLabel={t("community.clearConfirm")}
-        onConfirm={() => updateCommunity.mutate({ community_id: null })}
-      />
-    </div>
-  );
-};
-
-/** Whether people here may send feedback to the Initiative team. */
-const FeedbackCard = ({ enabled, settled }: { enabled: boolean; settled: boolean }) => {
-  const { t } = useTranslation("intake");
-  const update = useUpdateFeedbackSwitch();
-  return (
-    <SettingsSection
-      title={t("feedbackSwitch.title")}
-      description={t("feedbackSwitch.description")}
-    >
-      <SettingsRow label={t("feedbackSwitch.label")}>
-        <Switch
-          checked={enabled}
-          disabled={!settled || update.isPending}
-          onCheckedChange={(checked) => update.mutate({ enabled: checked })}
-        />
-      </SettingsRow>
-    </SettingsSection>
-  );
-};
-
-/**
- * Who a notice tells somebody to contact: one general address, and one per
- * stream. A stream left blank uses the general address — never another
- * stream's — and with neither set the notice names nobody.
- */
-const ContactsCard = ({
-  settings,
-  settled,
-}: {
-  settings: IntakeSettingsRead;
-  settled: boolean;
-}) => {
-  const { t } = useTranslation("intake");
-  // A stream nobody files into has nobody to point at an address.
-  const streams = settings.bindings
-    .filter((binding) => binding.filed !== false)
-    .map((binding) => binding.stream as IntakeStream);
-  // One flat field per address: "general", then each stream by name.
-  const contactsOf = (loaded: IntakeSettingsRead | undefined): Record<string, string> => ({
-    general: loaded?.general_contact_email ?? "",
-    ...Object.fromEntries(
-      streams.map((stream) => [stream, loaded?.contact_emails?.[stream] ?? ""])
-    ),
-  });
-  const saved = contactsOf(settings);
-  const form = useServerForm(settings, contactsOf, "intake-contacts");
-  const draft = form.values;
-
-  const updateGeneral = useUpdateIntakeGeneralContact();
-  const updateStream = useUpdateIntakeStreamContact();
-  const saving = updateGeneral.isPending || updateStream.isPending;
-  const changedOf = (sent: Record<string, string>, field: string) =>
-    (sent[field] ?? saved[field]).trim() !== saved[field];
-  const changed = Object.keys(saved).some((field) => changedOf(draft, field));
-
-  const onSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    // What is being sent, so anything typed while this is in flight is not
-    // counted as saved by it.
-    const sent = draft;
-    const email = (value: string) => value.trim() || null;
-    try {
-      if (changedOf(sent, "general")) {
-        await updateGeneral.mutateAsync({ email: email(sent.general) });
-      }
-      for (const stream of streams) {
-        if (changedOf(sent, stream)) {
-          await updateStream.mutateAsync({ stream, body: { email: email(sent[stream]) } });
-        }
-      }
-      form.settle(sent);
-      toast.success(t("contacts.saved"));
-    } catch (err) {
-      toast.error(getErrorMessage(err, "intake:contacts.saveError"));
-    }
-  };
-
-  return (
-    <SettingsSection title={t("contacts.title")} description={t("contacts.description")}>
-      <form className="max-w-md space-y-4" onSubmit={onSubmit}>
-        <Field label={t("contacts.generalLabel")}>
-          <Input
-            type="email"
-            value={draft.general}
-            placeholder={t("contacts.generalPlaceholder")}
-            disabled={!settled || saving}
-            onChange={(event) => form.set({ general: event.target.value })}
-          />
-        </Field>
-        {streams.map((stream) => (
-          <Field key={stream} label={t(`streams.${stream}.title`)}>
-            <Input
-              type="email"
-              value={draft[stream]}
-              placeholder={t("contacts.streamPlaceholder")}
-              disabled={!settled || saving}
-              onChange={(event) => form.set({ [stream]: event.target.value })}
-            />
-          </Field>
-        ))}
-        <Button type="submit" disabled={!settled || saving || !changed}>
-          {saving ? t("contacts.saving") : t("contacts.save")}
-        </Button>
-      </form>
-    </SettingsSection>
-  );
-};
+export const NONE = "none";
 
 interface StreamCardProps {
   binding: IntakeBindingRead;
@@ -303,7 +34,7 @@ interface StreamCardProps {
   settled: boolean;
 }
 
-const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
+export const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
   const { t } = useTranslation("intake");
   const stream = binding.stream as IntakeStream;
 

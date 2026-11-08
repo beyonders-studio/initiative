@@ -2,7 +2,8 @@ import { useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 import { markPendingShareOpened, setPendingShare, usePendingShare } from "@/lib/share/pendingShare";
-import { ShareWizard } from "@/pages/share/ShareWizard";
+
+import { ShareWizard } from "./ShareWizard";
 
 /**
  * Where something shared from another app's share sheet is made into a task, a

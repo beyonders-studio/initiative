@@ -20,13 +20,14 @@ import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { toolDetailRoute } from "@/lib/tools";
-import { PostBody } from "@/pages/community/tools/posts/PostBody";
-import { PostPinButton } from "@/pages/community/tools/posts/PostPinButton";
-import { PostReadersDialog } from "@/pages/community/tools/posts/PostReadersDialog";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
 import { formatDateTime } from "@/ui/lib/formatDate";
 import { cn } from "@/ui/lib/utils";
+
+import { PostBody } from "./PostBody";
+import { PostPinButton } from "./PostPinButton";
+import { PostReadersDialog } from "./PostReadersDialog";
 
 interface PostCardProps {
   post: PostRead;

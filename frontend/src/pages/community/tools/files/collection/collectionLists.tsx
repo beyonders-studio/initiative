@@ -17,9 +17,6 @@ import type { GridToggleOptions } from "@/hooks/useGridSelection";
 import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { cardLines, FILE_COLUMN_OF, FILE_LIST_SHAPE } from "@/lib/layouts/files";
-import { CollectionGridView } from "@/pages/community/tools/files/collection/CollectionGridView";
-import { CollectionMasonryView } from "@/pages/community/tools/files/collection/CollectionMasonryView";
-import { CollectionTimelineView } from "@/pages/community/tools/files/collection/CollectionTimelineView";
 import type { ToolIndexRow } from "@/pages/community/tools/ToolIndexPage";
 import type { TranslateFn } from "@/types/i18n";
 import { fieldColumn } from "@/ui/layouts/columns";
@@ -27,6 +24,10 @@ import { cardOf, columnsOf, indexPaths } from "@/ui/layouts/draft";
 import type { FieldDef, LayoutEnv } from "@/ui/layouts/fields";
 import { type LayoutContext, type LayoutNode, LayoutTree, namesField } from "@/ui/layouts/tree";
 import type { AppColumnDef } from "@/ui/lib/table";
+
+import { CollectionGridView } from "./CollectionGridView";
+import { CollectionMasonryView } from "./CollectionMasonryView";
+import { CollectionTimelineView } from "./CollectionTimelineView";
 
 /** A card under each file's picture, and how tall it stands for a file: what
  *  the masonry wall, which places files without measuring them, reserves. */

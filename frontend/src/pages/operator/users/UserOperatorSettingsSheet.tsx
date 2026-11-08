@@ -64,7 +64,6 @@ import { toast } from "@/lib/mascotToast";
 import { Capability, hasAnyCapability } from "@/lib/permissions";
 import { getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
 import { CasePicker } from "@/pages/operator/CasePicker";
-import { OperatorDeleteUserDialog } from "@/pages/operator/users/OperatorDeleteUserDialog";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -76,6 +75,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
 import { Textarea } from "@/ui/textarea";
+
+import { OperatorDeleteUserDialog } from "./OperatorDeleteUserDialog";
 
 /** Platform roles ordered least → most privileged. */
 export const PLATFORM_ROLE_ORDER: UserRole[] = [

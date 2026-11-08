@@ -32,9 +32,6 @@ import { toast } from "@/lib/mascotToast";
 import { findNewMentions } from "@/lib/mentionUtils";
 import { toolListRoute, toolRouteSegment, toolSettingsRoute } from "@/lib/tools";
 import { CollaborationError } from "@/lib/yjs/CollaborationProvider";
-import { CollaborationStatusBadge } from "@/pages/community/tools/files/file/CollaborationStatusBadge";
-import { FileCollections } from "@/pages/community/tools/files/file/FileCollections";
-import { FileFeaturedImage } from "@/pages/community/tools/files/file/FileFeaturedImage";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import { FeaturedImageProvider } from "@/ui/editor/context/featured-image-context";
@@ -48,6 +45,10 @@ import { Label } from "@/ui/label";
 import { useRelativeTime } from "@/ui/lib/useRelativeTime";
 import { cn } from "@/ui/lib/utils";
 import { FileDetailSkeleton } from "@/ui/page-skeletons";
+
+import { CollaborationStatusBadge } from "./CollaborationStatusBadge";
+import { FileCollections } from "./FileCollections";
+import { FileFeaturedImage } from "./FileFeaturedImage";
 
 export const FilePage = () => {
   const { t } = useTranslation(["files", "properties", "common", "editor"]);

@@ -14,8 +14,9 @@ import { ShareControl } from "@/components/access/ShareControl";
 import { ShareRequestsCard } from "@/components/access/ShareRequests";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { toast } from "@/lib/mascotToast";
-import { useToolSettings } from "@/pages/community/tools/settings/ToolSettingsContext";
 import { Card, CardContent, CardDescription, CardHeader } from "@/ui/card";
+
+import { useToolSettings } from "./ToolSettingsContext";
 
 export const AccessPage = () => {
   const { t } = useTranslation(["common", "access"]);

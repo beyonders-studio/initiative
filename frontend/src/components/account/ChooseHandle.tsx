@@ -3,12 +3,13 @@ import { useTranslation } from "react-i18next";
 
 import type { UsernameClaim } from "@/api/generated/initiativeAPI.schemas";
 import { claimMyUsername } from "@/api/generated/users/users";
-import { type HandleCheck, UsernameField } from "@/components/account/UsernameField";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { useAuth } from "@/hooks/useAuth";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+
+import { type HandleCheck, UsernameField } from "./UsernameField";
 
 /**
  * The screen an account meets when it was handed a handle rather than picking

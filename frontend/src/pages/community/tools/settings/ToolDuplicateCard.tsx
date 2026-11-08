@@ -19,10 +19,6 @@ import { useInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { toolDetailRoute } from "@/lib/tools";
-import {
-  type ToolSettingsEntity,
-  useToolSettings,
-} from "@/pages/community/tools/settings/ToolSettingsContext";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import {
@@ -36,6 +32,8 @@ import {
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+
+import { type ToolSettingsEntity, useToolSettings } from "./ToolSettingsContext";
 
 /** Whether this viewer may copy it: write on it, or read on a template, which
  *  is made to be copied. Where the copy may go is the dialog's question. A

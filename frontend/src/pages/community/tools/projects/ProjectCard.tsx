@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { type ProjectRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { BookmarkButton } from "@/components/tools/BookmarkButton";
-import { PinProjectButton } from "@/components/tools/projects/PinProjectButton";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolDetailRoute } from "@/lib/tools";
 import { ToolIndexDragHandle } from "@/pages/community/tools/ToolIndexSortable";
@@ -12,6 +11,8 @@ import { Badge } from "@/ui/badge";
 import { Card, CardFooter, CardHeader, CardTitle } from "@/ui/card";
 import { formatDate } from "@/ui/lib/formatDate";
 import { Progress } from "@/ui/progress";
+
+import { PinProjectButton } from "./PinProjectButton";
 
 /** A project on its initiative's list. The unread mark is the list's to draw,
  *  in the card's top corner, so the controls stop short of it. */

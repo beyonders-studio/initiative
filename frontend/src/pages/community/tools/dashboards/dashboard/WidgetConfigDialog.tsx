@@ -55,8 +55,6 @@ import { canDraw, resolveMapping } from "@/lib/widgets/shape";
 import { shapeFor } from "@/lib/widgets/shapes";
 import { paramsFor } from "@/lib/widgets/sources";
 import { localized } from "@/lib/widgets/widgetMeta";
-import { QueryBuilder } from "@/pages/community/tools/dashboards/dashboard/QueryBuilder";
-import { SqlEditor } from "@/pages/community/tools/dashboards/dashboard/SqlEditor";
 import { Button } from "@/ui/button";
 import {
   Dialog,
@@ -72,6 +70,9 @@ import { Input } from "@/ui/input";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
+
+import { QueryBuilder } from "./QueryBuilder";
+import { SqlEditor } from "./SqlEditor";
 
 export interface WidgetConfigDialogProps {
   widget: DefinitionWidget | null;

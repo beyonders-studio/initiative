@@ -70,7 +70,7 @@ const content = (hidden: Record<string, { hidden: true }>) => ({
 });
 
 const renderSheet = async (rows: Record<string, { hidden: true }>) => {
-  const { SpreadsheetFileEditor } = await import("@/components/tools/files/SpreadsheetFileEditor");
+  const { SpreadsheetFileEditor } = await import("./SpreadsheetFileEditor");
   renderWithProviders(
     <SpreadsheetFileEditor
       initialContent={content(rows) as any}

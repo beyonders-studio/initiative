@@ -21,8 +21,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { pluginWidgetSample, pluginWidgetSource } from "@/api/pluginData";
-import { WidgetProvenance } from "@/components/tools/dashboards/WidgetProvenance";
-import { WidgetTile } from "@/components/tools/dashboards/WidgetTile";
 import { useWidgetCatalog } from "@/hooks/useDashboards";
 import { usePluginWidgetCatalog } from "@/hooks/usePluginData";
 import { useWidgetData, type WidgetBinding } from "@/hooks/useWidgetData";
@@ -39,6 +37,9 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 import { cn } from "@/ui/lib/utils";
+
+import { WidgetProvenance } from "./WidgetProvenance";
+import { WidgetTile } from "./WidgetTile";
 
 export interface DashboardWidgetProps {
   widget: DefinitionWidget;
