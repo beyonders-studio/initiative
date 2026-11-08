@@ -34,6 +34,7 @@ from app.core.tools import Tool
 from app.db import session as db_session
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.models.tenant.reaction import Reaction
 from app.schemas.tenant.reaction import ReactionGroup, ReactionSummary, ReactionUser
@@ -256,7 +257,10 @@ def summarize(
             group = ReactionGroup(emoji=reaction.emoji, count=0)
             groups[reaction.emoji] = group
         group.count += 1
-        if reaction.created_by == viewer_id:
+        if (
+            reaction.created_by_kind == ActorKind.member
+            and reaction.created_by == viewer_id
+        ):
             group.reacted = True
         if len(group.users) < MAX_NAMED_REACTORS and reaction.reactor is not None:
             group.users.append(ReactionUser.model_validate(reaction.reactor))
@@ -328,6 +332,7 @@ async def toggle_reaction(
     mine = (
         Reaction.target_type == target.value,
         Reaction.target_id == ctx.target_id,
+        Reaction.created_by_kind == ActorKind.member,
         Reaction.created_by == user.id,
     )
 
