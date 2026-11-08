@@ -508,3 +508,29 @@ async def test_an_idea_joins_another(client, session, acting_user, desk):
     assert opened.status_code == 200, opened.text
     assert opened.json()["task_id"] == calendars
     assert (await _case(client, desk, case_id))["joined_idea"]["task_id"] == calendars
+
+    # Joined again, the first page follows both joins.
+    made = await client.post(
+        f"{desk['tasks']}/",
+        json={
+            "project_id": desk["boards"]["ideas"]["project_id"],
+            "title": "Holidays everywhere",
+            "task_type_id": desk["boards"]["ideas"]["task_type_id"],
+        },
+        headers=desk["team"],
+    )
+    holidays = made.json()["id"]
+    again = await client.post(
+        f"{desk['tasks']}/{calendars}/idea/join-into",
+        json={"idea_task_id": holidays},
+        headers=desk["team"],
+    )
+    assert again.status_code == 204, again.text
+    assert (await client.get(f"{IDEAS}/{recurring}")).json()["task_id"] == holidays
+    # Nothing joins an idea that was joined into another.
+    refused = await client.post(
+        f"{desk['tasks']}/{holidays}/idea/join-into",
+        json={"idea_task_id": recurring},
+        headers=desk["team"],
+    )
+    assert refused.status_code == 404

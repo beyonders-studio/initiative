@@ -28,7 +28,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.intake import CaseField, IntakeStream, meta, offered_streams
 from app.core.rate_limit import take_allowance
 from app.core.relationships import EndpointKind, RelationshipType
-from app.db import cohorts
+from app.db import cohorts, reference_targets
 from app.db.request_context import SystemGuild
 from app.db.session import routed_guild_id, set_rls_context
 from app.models.platform.notification import NotificationType
@@ -469,7 +469,10 @@ async def board_project(session: AsyncSession) -> Optional[int]:
     return (await session.exec(select(_board_project()))).first()
 
 
-async def _board_task(session: AsyncSession, task_id: int) -> Task:
+async def _board_task(session: AsyncSession, task_id: int, *, changing: bool) -> Task:
+    """``task_id`` on the Ideas board and not archived, locked as a vote locks
+    it: for update where its votes are about to move, and for share where one
+    is about to be added, so neither is lost to the other."""
     task = (
         await session.exec(
             select(Task)
@@ -478,6 +481,13 @@ async def _board_task(session: AsyncSession, task_id: int) -> Task:
         )
     ).first()
     if task is None:
+        raise NotOnTheBoard
+    await session.refresh(
+        task,
+        ["archived_at", "task_status_id"],
+        with_for_update=True if changing else {"read": True},
+    )
+    if task.archived_at is not None:
         raise NotOnTheBoard
     return task
 
@@ -556,7 +566,7 @@ async def join(
     Raises :class:`NotOnTheBoard`.
     """
     await _feedback(session, case.id)
-    idea = await _board_task(session, idea_task_id)
+    idea = await _board_task(session, idea_task_id, changing=False)
     joined = False
     for edge in await _joins(session, case.id):
         if edge.target_id == idea.id:
@@ -631,10 +641,10 @@ async def join_into(
 
     if not board_open() or not await holds_cases(session):
         raise NotOnTheBoard
-    await _board_task(session, source.id)
-    target = await _board_task(session, target_task_id)
-    if target.id == source.id:
+    if target_task_id == source.id:
         raise NotOnTheBoard
+    await _board_task(session, source.id, changing=True)
+    target = await _board_task(session, target_task_id, changing=False)
     # Each vote keeps the status its voter was last told about: both ideas
     # are on one board, so the next pass tells them where the target stands.
     await session.exec(
@@ -665,6 +675,13 @@ async def join_into(
         )
     ).all()
     for edge in parts:
+        part = await reference_targets.resolve_one(
+            session, EndpointKind(edge.source_type), edge.source_id, user_id=by
+        )
+        # What is archived keeps its links as they are: an idea joined into
+        # this one before reaches the target through it.
+        if part is None or part.archived:
+            continue
         await relationships.remove(session, edge, removed_by=by, tombstone=False)
         if not (edge.source_type == "task" and edge.source_id == target.id):
             await relationships.create(
