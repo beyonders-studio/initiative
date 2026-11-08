@@ -19,7 +19,7 @@
     "body": "{{appName}} keeps a few things in this browser to work at all — what keeps you signed in, the theme you picked, what you had open.",
     "nothingOptional": "That's the lot. Nothing else is kept, and nothing follows you to other sites.",
     "optionalIntro": "Anything beyond that is yours to decide.",
-    "spamCheck": "If you make an account, the sign-up form loads a spam check from {{provider}}, which sets a cookie of its own.",
+    "spamCheck": "The sign-up form, and the form that emails you a sign-in code, load a spam check from {{provider}}, which sets a cookie of its own.",
     "readMore": "What's kept",
     "alwaysOn": "Always on",
     "rejectAll": "Reject optional",

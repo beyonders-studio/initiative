@@ -202,7 +202,7 @@
     "title": "IA de la communauté",
     "adminOnly": "Seuls les administrateurs de la communauté peuvent gérer les connexions d'IA.",
     "disabledDescription": "Les fonctionnalités d'IA sont désactivées pour la plateforme.",
-    "managedByPlatform": "Les connexions d'IA sont gérées au niveau de la plateforme. Les membres définissent leur propre clé dans les paramètres de leur profil.",
+    "managedByPlatform": "Les connexions d'IA sont gérées au niveau de la plateforme.",
     "managedByServer": "La personne qui gère ce serveur s'occupe de l'IA de cette communauté."
   },
   "platformAI": {
@@ -817,8 +817,8 @@
     },
     "roleDescriptions": {
       "member": "Accès standard à ses propres communautés. Aucun privilège au niveau de la plateforme.",
-      "support": "Visibilité en lecture seule de la plateforme (utilisateurs, communautés) et peut demander un accès temporaire à une communauté.",
-      "moderator": "Tout ce que peut faire le support, plus la gestion des utilisateurs (suspendre/réactiver) et la modération du contenu.",
+      "support": "Tout ce que peut faire un modérateur, plus la récupération de comptes (connexion, second facteur, réactivation), et peut demander un accès temporaire en lecture ou en lecture et écriture à une communauté.",
+      "moderator": "Voit les utilisateurs et les communautés de la plateforme, modère les comptes et le contenu, suspend des comptes et peut demander un accès de modération temporaire à une communauté.",
       "operator": "Gère les utilisateurs, les communautés et les rôles sur toute la plateforme, avec accès aux données inter-communautés et approuve les demandes d'accès.",
       "owner": "Contrôle total, y compris la configuration de toute la plateforme (authentification, personnalisation, email, IA). Le seul rôle pouvant gérer la configuration."
     },
@@ -988,7 +988,7 @@
     "requestDescription": "Demandez un accès temporaire et limité à une communauté. Les approbateurs l'accordent et il expire automatiquement.",
     "breakGlass": {
       "title": "Accès d'urgence",
-      "description": "Accordez-vous un accès d'urgence à une communauté — approuvé instantanément, limité à cette communauté et expirant automatiquement. Lecture et écriture agit comme un administrateur de communauté complet. Chaque accès d'urgence est enregistré.",
+      "description": "Accordez-vous un accès d'urgence à une communauté — approuvé instantanément, limité à cette communauté et expirant automatiquement. Il vous permet de modifier le contenu existant et de changer les paramètres de la communauté. Chaque accès d'urgence est enregistré.",
       "reasonPlaceholder": "Pourquoi vous avez besoin d'un accès d'urgence (p. ex. incident n° 123)",
       "submit": "Accès d'urgence",
       "activated": "Accès d'urgence activé",

@@ -19,7 +19,7 @@
     "body": "{{appName}} speichert ein paar Dinge in diesem Browser, um überhaupt zu funktionieren: was Sie angemeldet hält, das gewählte Design, was Sie offen hatten.",
     "nothingOptional": "Mehr nicht. Es wird nichts weiter gespeichert, und nichts folgt Ihnen auf andere Websites.",
     "optionalIntro": "Alles darüber hinaus entscheiden Sie.",
-    "spamCheck": "Wenn Sie ein Konto anlegen, lädt das Registrierungsformular eine Spam-Prüfung von {{provider}}, die ein eigenes Cookie setzt.",
+    "spamCheck": "Das Registrierungsformular und das Formular, das Ihnen einen Anmeldecode per E-Mail schickt, laden eine Spam-Prüfung von {{provider}}, die ein eigenes Cookie setzt.",
     "readMore": "Was gespeichert wird",
     "alwaysOn": "Immer aktiv",
     "rejectAll": "Optionale ablehnen",
