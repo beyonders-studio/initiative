@@ -59,22 +59,15 @@ interface ChosenItem {
 
 const itemKey = (item: SearchSuggestion) => `${item.entity_type}:${item.entity_id}`;
 
-type ExtendGuestDialogProps = {
+const ExtendGuestDialog = ({
+  communityId,
+  guest,
+  onOpenChange,
+}: {
   communityId: number;
   guest: UserCommunityMember | null;
   onOpenChange: (open: boolean) => void;
-};
-
-const ExtendGuestDialog = (props: ExtendGuestDialogProps) => (
-  <Dialog open={props.guest !== null} onOpenChange={props.onOpenChange}>
-    <DialogContent>
-      <ExtendGuestForm {...props} />
-    </DialogContent>
-  </Dialog>
-);
-
-// Drawn only while the dialog is open, so each guest starts from a week.
-const ExtendGuestForm = ({ communityId, guest, onOpenChange }: ExtendGuestDialogProps) => {
+}) => {
   const { t } = useTranslation(["communities", "common"]);
   const [days, setDays] = useState(7);
   const extend = useExtendGuest({
@@ -85,38 +78,46 @@ const ExtendGuestForm = ({ communityId, guest, onOpenChange }: ExtendGuestDialog
     onError: (error) => toast.error(getErrorMessage(error, "communities:guests.extendError")),
   });
 
+  const [prevGuest, setPrevGuest] = useState(guest);
+  if (prevGuest !== guest) {
+    setPrevGuest(guest);
+    if (guest) setDays(7);
+  }
+
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (guest) extend.mutate({ communityId, userId: guest.id, days });
   };
 
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>
-          {t("guests.extendTitle", { name: guest ? getUserDisplayName(guest) : "" })}
-        </DialogTitle>
-        <DialogDescription>{t("guests.extendDescription")}</DialogDescription>
-      </DialogHeader>
-      <form className="space-y-4" onSubmit={submit}>
-        <div className="space-y-2">
-          <Label htmlFor="extend-guest-days">{t("guests.extendDaysLabel")}</Label>
-          <Input
-            id="extend-guest-days"
-            type="number"
-            min={1}
-            value={days}
-            onChange={(event) => setDays(Number(event.target.value))}
-            autoFocus
+    <Dialog open={guest !== null} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {t("guests.extendTitle", { name: guest ? getUserDisplayName(guest) : "" })}
+          </DialogTitle>
+          <DialogDescription>{t("guests.extendDescription")}</DialogDescription>
+        </DialogHeader>
+        <form className="space-y-4" onSubmit={submit}>
+          <div className="space-y-2">
+            <Label htmlFor="extend-guest-days">{t("guests.extendDaysLabel")}</Label>
+            <Input
+              id="extend-guest-days"
+              type="number"
+              min={1}
+              value={days}
+              onChange={(event) => setDays(Number(event.target.value))}
+              autoFocus
+            />
+          </div>
+          <DialogFooter
+            submitLabel={t("guests.extend")}
+            pending={extend.isPending}
+            disabled={days < 1}
           />
-        </div>
-        <DialogFooter
-          submitLabel={t("guests.extend")}
-          pending={extend.isPending}
-          disabled={days < 1}
-        />
-      </form>
-    </>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 };
 

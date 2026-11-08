@@ -100,21 +100,13 @@ type CreateContactDialogProps = DialogProps & {
  * A new contact: a person or an organization, how to reach them, and for a
  * person the organization they are at, which is a link rather than a field.
  */
-export const CreateContactDialog = ({ open, onOpenChange, ...props }: CreateContactDialogProps) => (
-  <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="max-h-[90dvh] overflow-y-auto bg-card sm:max-w-lg">
-      <CreateContactForm onOpenChange={onOpenChange} {...props} />
-    </DialogContent>
-  </Dialog>
-);
-
-// Drawn only while the dialog is open, so each opening starts empty.
-const CreateContactForm = ({
+export const CreateContactDialog = ({
+  open,
   onOpenChange,
   initiativeId,
   organization: fixedOrganization,
   onSuccess,
-}: Omit<CreateContactDialogProps, "open">) => {
+}: CreateContactDialogProps) => {
   const { t } = useTranslation(["contacts", "common"]);
   const id = useId();
   const [name, setName] = useState("");
@@ -122,6 +114,18 @@ const CreateContactForm = ({
   const [details, setDetails] = useState<ContactDetails>(NO_DETAILS);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [grants, setGrants] = useState<ResourceGrantSchema[]>([...DEFAULT_GRANTS]);
+
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (!open) {
+      setName("");
+      setIsOrganization(false);
+      setDetails(NO_DETAILS);
+      setOrganization(null);
+      setGrants([...DEFAULT_GRANTS]);
+    }
+  }
 
   const partOf = fixedOrganization ?? (isOrganization ? null : organization);
   const relate = useRelate();
@@ -156,59 +160,61 @@ const CreateContactForm = ({
   };
 
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>{t("newContact")}</DialogTitle>
-        <DialogDescription>
-          {fixedOrganization
-            ? t("addPersonDescription", { name: fixedOrganization.name })
-            : t("createDescription")}
-        </DialogDescription>
-      </DialogHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto bg-card sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{t("newContact")}</DialogTitle>
+          <DialogDescription>
+            {fixedOrganization
+              ? t("addPersonDescription", { name: fixedOrganization.name })
+              : t("createDescription")}
+          </DialogDescription>
+        </DialogHeader>
 
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor={`${id}-name`}>{t("name")}</Label>
-          <Input
-            id={`${id}-name`}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder={t("namePlaceholder")}
-            maxLength={255}
-            autoFocus
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor={`${id}-name`}>{t("name")}</Label>
+            <Input
+              id={`${id}-name`}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder={t("namePlaceholder")}
+              maxLength={255}
+              autoFocus
+            />
+          </div>
+
+          {fixedOrganization ? null : (
+            <ContactKindToggle isOrganization={isOrganization} onChange={setIsOrganization} />
+          )}
+
+          <ContactDetailsFields value={details} onChange={setDetails} />
+
+          {fixedOrganization || isOrganization ? null : (
+            <div className="space-y-2">
+              <Label>{t("partOf")}</Label>
+              <OrganizationPicker
+                initiativeId={initiativeId}
+                value={organization}
+                onChange={setOrganization}
+              />
+            </div>
+          )}
+
+          <CreateAccessSection
+            initiativeId={initiativeId ?? null}
+            grants={grants}
+            onChange={setGrants}
+            defaultOpen={false}
           />
         </div>
 
-        {fixedOrganization ? null : (
-          <ContactKindToggle isOrganization={isOrganization} onChange={setIsOrganization} />
-        )}
-
-        <ContactDetailsFields value={details} onChange={setDetails} />
-
-        {fixedOrganization || isOrganization ? null : (
-          <div className="space-y-2">
-            <Label>{t("partOf")}</Label>
-            <OrganizationPicker
-              initiativeId={initiativeId}
-              value={organization}
-              onChange={setOrganization}
-            />
-          </div>
-        )}
-
-        <CreateAccessSection
-          initiativeId={initiativeId ?? null}
-          grants={grants}
-          onChange={setGrants}
-          defaultOpen={false}
-        />
-      </div>
-
-      <DialogFooter>
-        <Button type="button" onClick={submit} pending={pending} disabled={!canSubmit}>
-          {pending ? t("creating") : t("newContact")}
-        </Button>
-      </DialogFooter>
-    </>
+        <DialogFooter>
+          <Button type="button" onClick={submit} pending={pending} disabled={!canSubmit}>
+            {pending ? t("creating") : t("newContact")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };

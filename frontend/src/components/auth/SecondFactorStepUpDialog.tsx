@@ -53,6 +53,13 @@ import { Label } from "@/ui/label";
  * one page's.
  */
 export const SecondFactorStepUpDialog = () => {
+  // The array form, so the line a put-down prompt deserves — named by
+  // `describePasskeyPromptError` as a fully qualified key — is one `t` accepts.
+  const { t } = useTranslation(["auth", "common"]);
+  const { logout, stepUpWithFactor, stepUpWithPasskey, stepUpWithEmailCode } = useAuth();
+  const { emailOtpLoginEnabled } = useAppConfig();
+  const router = useRouter();
+  const navigate = useNavigate();
   // Everything is accepted except the deployment's own ask while the person
   // is on the page that answers it: the shell around that page makes requests
   // of its own, and each would put this dialog back over the thing it is
@@ -64,32 +71,6 @@ export const SecondFactorStepUpDialog = () => {
     AUTH_FACTOR_REQUIRED_EVENT,
     (detail) => !(detail?.platform === true && onSecurityPage)
   );
-
-  return (
-    <Dialog open={open} onOpenChange={(next) => !next && clear()}>
-      <DialogContent>
-        <StepUpAnswer challenge={challenge} dismiss={clear} />
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-// Drawn only while the dialog is open, so each ask starts with nothing typed,
-// no code sent and no error.
-const StepUpAnswer = ({
-  challenge,
-  dismiss,
-}: {
-  challenge: FactorChallengeDetail | null;
-  dismiss: () => void;
-}) => {
-  // The array form, so the line a put-down prompt deserves — named by
-  // `describePasskeyPromptError` as a fully qualified key — is one `t` accepts.
-  const { t } = useTranslation(["auth", "common"]);
-  const { logout, stepUpWithFactor, stepUpWithPasskey, stepUpWithEmailCode } = useAuth();
-  const { emailOtpLoginEnabled } = useAppConfig();
-  const router = useRouter();
-  const navigate = useNavigate();
   const wantsPasskey = challenge?.kind === "passkey";
   const wantsProof = challenge?.kind === "proof";
   /** The deployment asking, rather than one community. */
@@ -112,14 +93,14 @@ const StepUpAnswer = ({
   // was asked for. Both routes are platform-scoped, so neither is itself
   // refused by the community that raised the challenge.
   const statusQuery = useReadSecondFactor({
-    query: { enabled: challenge !== null && !presentsPasskey },
+    query: { enabled: open && !presentsPasskey },
   });
   // Asked on both sides now. On the passkey side it decides what to offer; on
   // the code side it is the other way to answer the same ask — a user-verified
   // passkey records the factor too, so an account with a key and no
   // authenticator app has one already.
   const passkeyQuery = useListPasskeys({
-    query: { enabled: challenge !== null },
+    query: { enabled: open },
   });
   // Three states, not two. While the answer is in flight, offer the way in:
   // the refusal that opened this dialog is the common case and an account that
@@ -133,6 +114,14 @@ const StepUpAnswer = ({
   /** A key to present, where the ask is for a code and the account has none. */
   const canPresentPasskey = passkeyQuery.isSuccess && (passkeyQuery.data.passkeys ?? []).length > 0;
   const passkeysUnknown = passkeyQuery.isError;
+
+  const dismiss = () => {
+    clear();
+    setCode("");
+    setUseRecoveryCode(false);
+    setEmailChallenge(null);
+    setError(null);
+  };
 
   /** What both answers do once the session carries the factor: every query
    *  refused while it did not should ask again, and the dialog is done. The
@@ -229,219 +218,243 @@ const StepUpAnswer = ({
       ? t(wantsProof ? "factorStepUp.proofSignIn" : "factorStepUp.passkeyNone")
       : t(wantsProof ? "factorStepUp.proofDescription" : "factorStepUp.passkeyDescription");
 
-  return emailChallenge ? (
-    <>
-      <DialogHeader>
-        <DialogTitle>{t("factorStepUp.proofTitle")}</DialogTitle>
-        <DialogDescription>{t("factorStepUp.emailCodeSent")}</DialogDescription>
-      </DialogHeader>
-      <form className="space-y-4" onSubmit={submitEmailCode}>
-        <div className="space-y-2">
-          <Label htmlFor="step-up-email-code">{t("factorStepUp.emailCodeLabel")}</Label>
-          <Input
-            id="step-up-email-code"
-            name="step-up-email-code"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            autoFocus
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-            required
-          />
-        </div>
-        {error && <p className="text-destructive text-sm">{error}</p>}
-        {/* A code lasts minutes and a few tries; a spent one is replaced
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && dismiss()}>
+      <DialogContent>
+        {emailChallenge ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>{t("factorStepUp.proofTitle")}</DialogTitle>
+              <DialogDescription>{t("factorStepUp.emailCodeSent")}</DialogDescription>
+            </DialogHeader>
+            <form className="space-y-4" onSubmit={submitEmailCode}>
+              <div className="space-y-2">
+                <Label htmlFor="step-up-email-code">{t("factorStepUp.emailCodeLabel")}</Label>
+                <Input
+                  id="step-up-email-code"
+                  name="step-up-email-code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                  required
+                />
+              </div>
+              {error && <p className="text-destructive text-sm">{error}</p>}
+              {/* A code lasts minutes and a few tries; a spent one is replaced
                   here rather than by starting the change over. */}
-        <button
-          type="button"
-          className="text-primary text-sm underline-offset-4 hover:underline"
-          onClick={sendEmailCode}
-          disabled={submitting}
-        >
-          {t("factorStepUp.emailCodeResend")}
-        </button>
-        <DialogFooter
-          cancel={t("factorStepUp.dismiss")}
-          submitLabel={t("factorStepUp.submit")}
-          pendingLabel={t("login.submitting")}
-          pending={submitting}
-          disabled={!code.trim()}
-        />
-      </form>
-    </>
-  ) : presentsPasskey ? (
-    <>
-      <DialogHeader>
-        <DialogTitle>
-          {t(wantsProof ? "factorStepUp.proofTitle" : "factorStepUp.passkeyTitle")}
-        </DialogTitle>
-        <DialogDescription>{presentDescription}</DialogDescription>
-      </DialogHeader>
+              <button
+                type="button"
+                className="text-primary text-sm underline-offset-4 hover:underline"
+                onClick={sendEmailCode}
+                disabled={submitting}
+              >
+                {t("factorStepUp.emailCodeResend")}
+              </button>
+              <DialogFooter
+                cancel={t("factorStepUp.dismiss")}
+                submitLabel={t("factorStepUp.submit")}
+                pendingLabel={t("login.submitting")}
+                pending={submitting}
+                disabled={!code.trim()}
+              />
+            </form>
+          </>
+        ) : presentsPasskey ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>
+                {t(wantsProof ? "factorStepUp.proofTitle" : "factorStepUp.passkeyTitle")}
+              </DialogTitle>
+              <DialogDescription>{presentDescription}</DialogDescription>
+            </DialogHeader>
 
-      {error && <p className="text-destructive text-sm">{error}</p>}
+            {error && <p className="text-destructive text-sm">{error}</p>}
 
-      <DialogFooter>
-        <Button variant="outline" onClick={dismiss}>
-          {t("factorStepUp.dismiss")}
-        </Button>
-        {offersEmailCode && (
-          <Button type="button" onClick={sendEmailCode} disabled={submitting}>
-            <Mail className="h-4 w-4" aria-hidden="true" />
-            {t("factorStepUp.emailCode")}
-          </Button>
-        )}
-        {hasNoPasskey ? (
-          wantsProof ? (
-            <Button type="button" onClick={signInAgain} disabled={submitting}>
-              {t("factorStepUp.signInAgain")}
-            </Button>
-          ) : (
-            <Button asChild>
-              <Link to="/profile/security" onClick={dismiss}>
-                {t("factorStepUp.passkeyAdd")}
-              </Link>
-            </Button>
-          )
-        ) : (
-          <Button type="button" onClick={presentPasskey} disabled={submitting}>
-            <KeyRound className="h-4 w-4" aria-hidden="true" />
-            {submitting ? t("factorStepUp.passkeyWorking") : t("factorStepUp.passkeyPresent")}
-          </Button>
-        )}
-      </DialogFooter>
-
-      {passkeysUnknown &&
-        (wantsProof ? (
-          <p className="text-muted-foreground text-sm">
-            <button
-              type="button"
-              onClick={signInAgain}
-              disabled={submitting}
-              className="text-primary underline-offset-4 hover:underline"
-            >
-              {t("factorStepUp.signInAgain")}
-            </button>
-          </p>
-        ) : (
-          <p className="text-muted-foreground text-sm">
-            <Link
-              to="/profile/security"
-              onClick={dismiss}
-              className="text-primary underline-offset-4 hover:underline"
-            >
-              {t("factorStepUp.passkeyAdd")}
-            </Link>
-          </p>
-        ))}
-    </>
-  ) : (
-    <>
-      <DialogHeader>
-        <DialogTitle>
-          {t(fromPlatform ? "factorStepUp.platformTitle" : "factorStepUp.title")}
-        </DialogTitle>
-        <DialogDescription>
-          {hasNoFactor
-            ? t(fromPlatform ? "factorStepUp.platformNotEnrolled" : "factorStepUp.notEnrolled")
-            : useRecoveryCode
-              ? t("factorStepUp.recoveryDescription")
-              : t(fromPlatform ? "factorStepUp.platformDescription" : "factorStepUp.description")}
-        </DialogDescription>
-      </DialogHeader>
-
-      {hasNoFactor ? (
-        <DialogFooter>
-          {fromPlatform ? (
-            <Button variant="outline" onClick={signInAgain} disabled={submitting}>
-              {t("factorStepUp.signOut")}
-            </Button>
-          ) : (
-            <Button variant="outline" onClick={dismiss}>
-              {t("factorStepUp.dismiss")}
-            </Button>
-          )}
-          {canPresentPasskey && (
-            <Button type="button" variant="outline" onClick={presentPasskey} disabled={submitting}>
-              <KeyRound className="h-4 w-4" aria-hidden="true" />
-              {t("factorStepUp.passkeyPresent")}
-            </Button>
-          )}
-          <Button asChild>
-            <Link to="/profile/security" onClick={dismiss}>
-              {t("factorStepUp.setUp")}
-            </Link>
-          </Button>
-        </DialogFooter>
-      ) : (
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="step-up-code">
-              {useRecoveryCode ? t("secondFactor.recoveryLabel") : t("secondFactor.codeLabel")}
-            </Label>
-            <Input
-              id="step-up-code"
-              name="step-up-code"
-              // A recovery code carries letters and dashes; a live code is
-              // six digits, and the numeric keypad is what a phone should
-              // offer for it.
-              inputMode={useRecoveryCode ? "text" : "numeric"}
-              autoComplete="one-time-code"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              autoFocus
-              placeholder={
-                useRecoveryCode
-                  ? t("secondFactor.recoveryPlaceholder")
-                  : t("secondFactor.codePlaceholder")
-              }
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              required
-            />
-          </div>
-          {error && <p className="text-destructive text-sm">{error}</p>}
-          <button
-            type="button"
-            className="text-primary text-sm underline-offset-4 hover:underline"
-            onClick={() => {
-              setUseRecoveryCode((previous) => !previous);
-              setCode("");
-              setError(null);
-            }}
-          >
-            {useRecoveryCode
-              ? t("secondFactor.useAuthenticator")
-              : t("secondFactor.useRecoveryCode")}
-          </button>
-          <DialogFooter>
-            {fromPlatform ? (
-              <Button type="button" variant="outline" onClick={signInAgain} disabled={submitting}>
-                {t("factorStepUp.signOut")}
-              </Button>
-            ) : (
-              <Button type="button" variant="outline" onClick={dismiss}>
+            <DialogFooter>
+              <Button variant="outline" onClick={dismiss}>
                 {t("factorStepUp.dismiss")}
               </Button>
+              {offersEmailCode && (
+                <Button type="button" onClick={sendEmailCode} disabled={submitting}>
+                  <Mail className="h-4 w-4" aria-hidden="true" />
+                  {t("factorStepUp.emailCode")}
+                </Button>
+              )}
+              {hasNoPasskey ? (
+                wantsProof ? (
+                  <Button type="button" onClick={signInAgain} disabled={submitting}>
+                    {t("factorStepUp.signInAgain")}
+                  </Button>
+                ) : (
+                  <Button asChild>
+                    <Link to="/profile/security" onClick={dismiss}>
+                      {t("factorStepUp.passkeyAdd")}
+                    </Link>
+                  </Button>
+                )
+              ) : (
+                <Button type="button" onClick={presentPasskey} disabled={submitting}>
+                  <KeyRound className="h-4 w-4" aria-hidden="true" />
+                  {submitting ? t("factorStepUp.passkeyWorking") : t("factorStepUp.passkeyPresent")}
+                </Button>
+              )}
+            </DialogFooter>
+
+            {passkeysUnknown &&
+              (wantsProof ? (
+                <p className="text-muted-foreground text-sm">
+                  <button
+                    type="button"
+                    onClick={signInAgain}
+                    disabled={submitting}
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    {t("factorStepUp.signInAgain")}
+                  </button>
+                </p>
+              ) : (
+                <p className="text-muted-foreground text-sm">
+                  <Link
+                    to="/profile/security"
+                    onClick={dismiss}
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    {t("factorStepUp.passkeyAdd")}
+                  </Link>
+                </p>
+              ))}
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>
+                {t(fromPlatform ? "factorStepUp.platformTitle" : "factorStepUp.title")}
+              </DialogTitle>
+              <DialogDescription>
+                {hasNoFactor
+                  ? t(
+                      fromPlatform ? "factorStepUp.platformNotEnrolled" : "factorStepUp.notEnrolled"
+                    )
+                  : useRecoveryCode
+                    ? t("factorStepUp.recoveryDescription")
+                    : t(
+                        fromPlatform
+                          ? "factorStepUp.platformDescription"
+                          : "factorStepUp.description"
+                      )}
+              </DialogDescription>
+            </DialogHeader>
+
+            {hasNoFactor ? (
+              <DialogFooter>
+                {fromPlatform ? (
+                  <Button variant="outline" onClick={signInAgain} disabled={submitting}>
+                    {t("factorStepUp.signOut")}
+                  </Button>
+                ) : (
+                  <Button variant="outline" onClick={dismiss}>
+                    {t("factorStepUp.dismiss")}
+                  </Button>
+                )}
+                {canPresentPasskey && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={presentPasskey}
+                    disabled={submitting}
+                  >
+                    <KeyRound className="h-4 w-4" aria-hidden="true" />
+                    {t("factorStepUp.passkeyPresent")}
+                  </Button>
+                )}
+                <Button asChild>
+                  <Link to="/profile/security" onClick={dismiss}>
+                    {t("factorStepUp.setUp")}
+                  </Link>
+                </Button>
+              </DialogFooter>
+            ) : (
+              <form className="space-y-4" onSubmit={handleSubmit}>
+                <div className="space-y-2">
+                  <Label htmlFor="step-up-code">
+                    {useRecoveryCode
+                      ? t("secondFactor.recoveryLabel")
+                      : t("secondFactor.codeLabel")}
+                  </Label>
+                  <Input
+                    id="step-up-code"
+                    name="step-up-code"
+                    // A recovery code carries letters and dashes; a live code is
+                    // six digits, and the numeric keypad is what a phone should
+                    // offer for it.
+                    inputMode={useRecoveryCode ? "text" : "numeric"}
+                    autoComplete="one-time-code"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    autoFocus
+                    placeholder={
+                      useRecoveryCode
+                        ? t("secondFactor.recoveryPlaceholder")
+                        : t("secondFactor.codePlaceholder")
+                    }
+                    value={code}
+                    onChange={(event) => setCode(event.target.value)}
+                    required
+                  />
+                </div>
+                {error && <p className="text-destructive text-sm">{error}</p>}
+                <button
+                  type="button"
+                  className="text-primary text-sm underline-offset-4 hover:underline"
+                  onClick={() => {
+                    setUseRecoveryCode((previous) => !previous);
+                    setCode("");
+                    setError(null);
+                  }}
+                >
+                  {useRecoveryCode
+                    ? t("secondFactor.useAuthenticator")
+                    : t("secondFactor.useRecoveryCode")}
+                </button>
+                <DialogFooter>
+                  {fromPlatform ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={signInAgain}
+                      disabled={submitting}
+                    >
+                      {t("factorStepUp.signOut")}
+                    </Button>
+                  ) : (
+                    <Button type="button" variant="outline" onClick={dismiss}>
+                      {t("factorStepUp.dismiss")}
+                    </Button>
+                  )}
+                  <Button type="submit" disabled={submitting || !code.trim()}>
+                    {submitting ? t("login.submitting") : t("factorStepUp.submit")}
+                  </Button>
+                </DialogFooter>
+                {statusUnknown && (
+                  <p className="text-muted-foreground text-sm">
+                    {t("factorStepUp.noFactorHint")}{" "}
+                    <Link
+                      to="/profile/security"
+                      onClick={dismiss}
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      {t("factorStepUp.setUp")}
+                    </Link>
+                  </p>
+                )}
+              </form>
             )}
-            <Button type="submit" disabled={submitting || !code.trim()}>
-              {submitting ? t("login.submitting") : t("factorStepUp.submit")}
-            </Button>
-          </DialogFooter>
-          {statusUnknown && (
-            <p className="text-muted-foreground text-sm">
-              {t("factorStepUp.noFactorHint")}{" "}
-              <Link
-                to="/profile/security"
-                onClick={dismiss}
-                className="text-primary underline-offset-4 hover:underline"
-              >
-                {t("factorStepUp.setUp")}
-              </Link>
-            </p>
-          )}
-        </form>
-      )}
-    </>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 };

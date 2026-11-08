@@ -86,25 +86,14 @@ const toPersonItem = (member: UserSummary): ComboboxItem => {
  * per-tool wrappers (files, projects, counters) supply `items`,
  * `resourceType`, and how to invalidate their caches.
  */
-export function BulkEditAccessDialog({ open, onOpenChange, ...props }: BulkEditAccessDialogProps) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <BulkEditAccessForm onOpenChange={onOpenChange} {...props} />
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// Drawn only while the dialog is open, so each opening starts on People with
-// nothing chosen, and nothing is read before it opens.
-function BulkEditAccessForm({
+export function BulkEditAccessDialog({
+  open,
   onOpenChange,
   items,
   resourceType,
   invalidate,
   onSuccess,
-}: Omit<BulkEditAccessDialogProps, "open">) {
+}: BulkEditAccessDialogProps) {
   const { t } = useTranslation(["access", "common"]);
   const communityId = useActiveCommunityId();
   const { user: currentUser } = useAuth();
@@ -142,7 +131,7 @@ function BulkEditAccessForm({
   }, [items]);
 
   // Fetch initiative names
-  const { data: initiatives = [] } = useInitiatives();
+  const { data: initiatives = [] } = useInitiatives({ enabled: open });
 
   const initiativeNameById = useMemo(() => {
     const map = new Map<number, string>();
@@ -165,7 +154,7 @@ function BulkEditAccessForm({
       memberQuery(
         id,
         { search: userSearch.trim() || undefined, page_size: USER_SEARCH_PAGE_SIZE },
-        userMode === "grant"
+        open && userMode === "grant"
       )
     ),
   });
@@ -196,7 +185,7 @@ function BulkEditAccessForm({
       memberQuery(
         initiativeId,
         { user_id: userIds, page_size: USER_ID_LOOKUP_MAX },
-        userMode === "revoke"
+        open && userMode === "revoke"
       )
     ),
   });
@@ -217,6 +206,7 @@ function BulkEditAccessForm({
       queryKey: getListInitiativeRolesQueryKey(communityId, id),
       queryFn: () =>
         listInitiativeRoles(communityId, id) as unknown as Promise<InitiativeRoleRead[]>,
+      enabled: open,
     })),
   });
 
@@ -306,6 +296,29 @@ function BulkEditAccessForm({
     return Array.from(userMap.values()).sort((a, b) => a.label.localeCompare(b.label));
   }, [items, membersById, currentUser]);
 
+  const resetState = useCallback(() => {
+    setTab("people");
+    setUserMode("grant");
+    setSelectedUserIds(new Set());
+    setLevel("read");
+    setUserSearch("");
+    setRoleMode("grant");
+    setSelectedRoleIds(new Set());
+    setRoleLevel("read");
+    setAllMode("share");
+    setAllLevel("read");
+  }, []);
+
+  const handleOpenChange = useCallback(
+    (value: boolean) => {
+      if (!value) {
+        resetState();
+      }
+      onOpenChange(value);
+    },
+    [onOpenChange, resetState]
+  );
+
   // Persist rebuilt grant lists in one bulk request per chunk (owner preserved
   // server-side). Each entry is one resource's full non-owner grant list.
   const applyBulk = useCallback(
@@ -327,9 +340,10 @@ function BulkEditAccessForm({
 
   const finish = useCallback(() => {
     invalidate();
+    resetState();
     onOpenChange(false);
     onSuccess();
-  }, [invalidate, onOpenChange, onSuccess]);
+  }, [invalidate, resetState, onOpenChange, onSuccess]);
 
   const handleApply = useCallback(async () => {
     if (selectedUserIds.size === 0) return;
@@ -541,248 +555,250 @@ function BulkEditAccessForm({
   }, [tab, roleMode, userMode, allMode, count, resourceNoun, t]);
 
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>{t("bulkAccess.title")}</DialogTitle>
-        <DialogDescription>{dialogDescription}</DialogDescription>
-      </DialogHeader>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("bulkAccess.title")}</DialogTitle>
+          <DialogDescription>{dialogDescription}</DialogDescription>
+        </DialogHeader>
 
-      <Tabs
-        value={tab}
-        onValueChange={(v) => {
-          setTab(v as "people" | "roles" | "all");
-          setSelectedUserIds(new Set());
-          setUserSearch("");
-          setSelectedRoleIds(new Set());
-        }}
-      >
-        <TabsBar>
-          <TabsTrigger value="people">{t("share.people")}</TabsTrigger>
-          <TabsTrigger value="roles">{t("share.roles")}</TabsTrigger>
-          <TabsTrigger value="all">{t("bulkAccess.tabAllMembers")}</TabsTrigger>
-        </TabsBar>
+        <Tabs
+          value={tab}
+          onValueChange={(v) => {
+            setTab(v as "people" | "roles" | "all");
+            setSelectedUserIds(new Set());
+            setUserSearch("");
+            setSelectedRoleIds(new Set());
+          }}
+        >
+          <TabsBar>
+            <TabsTrigger value="people">{t("share.people")}</TabsTrigger>
+            <TabsTrigger value="roles">{t("share.roles")}</TabsTrigger>
+            <TabsTrigger value="all">{t("bulkAccess.tabAllMembers")}</TabsTrigger>
+          </TabsBar>
 
-        <TabsContent value="people" className="mt-4 space-y-3">
-          <div className="space-y-2">
-            <label htmlFor="userMode" className="font-medium text-sm">
-              {t("bulkAccess.actionLabel")}
-            </label>
-            <Select
-              value={userMode}
-              onValueChange={(v) => {
-                setUserMode(v as "grant" | "revoke");
-                setSelectedUserIds(new Set());
-                setUserSearch("");
-              }}
-            >
-              <SelectTrigger id="userMode">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="grant">{t("bulkAccess.grantAccess")}</SelectItem>
-                <SelectItem value="revoke">{t("bulkAccess.revokeAccess")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {userMode === "revoke" && revocableUsers.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t("bulkAccess.noUserAccess")}</p>
-          ) : (
-            <>
-              <div className="space-y-2">
-                <label htmlFor="userPicker" className="font-medium text-sm">
-                  {t("share.people")}
-                </label>
-                <Combobox
-                  multiple
-                  id="userPicker"
-                  items={userMode === "grant" ? availableUsers : revocableUsers}
-                  value={[...selectedUserIds].map(String)}
-                  onValueChange={(next) => setSelectedUserIds(new Set(next.map(Number)))}
-                  // Granting searches the server; the granted are searched here.
-                  onSearchChange={userMode === "grant" ? setUserSearch : undefined}
-                  placeholder={
-                    userMode === "grant"
-                      ? t("bulkAccess.selectPeople")
-                      : t("bulkAccess.selectPeopleToRevoke")
-                  }
-                  emptyMessage={t("share.noPeople")}
-                  searchPlaceholder={t("share.searchPeople")}
-                />
-              </div>
-              {userMode === "grant" && (
-                <div className="space-y-2">
-                  <label htmlFor="userLevel" className="font-medium text-sm">
-                    {t("bulkAccess.permissionLevel")}
-                  </label>
-                  <Select value={level} onValueChange={(v) => setLevel(v as "read" | "write")}>
-                    <SelectTrigger id="userLevel">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="read">{t("share.viewer")}</SelectItem>
-                      <SelectItem value="write">{t("share.editor")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </>
-          )}
-        </TabsContent>
-
-        <TabsContent value="roles" className="mt-4 space-y-3">
-          <div className="space-y-2">
-            <label htmlFor="roleMode" className="font-medium text-sm">
-              {t("bulkAccess.actionLabel")}
-            </label>
-            <Select
-              value={roleMode}
-              onValueChange={(v) => {
-                setRoleMode(v as "grant" | "revoke");
-                setSelectedRoleIds(new Set());
-              }}
-            >
-              <SelectTrigger id="roleMode">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="grant">{t("bulkAccess.grantAccess")}</SelectItem>
-                <SelectItem value="revoke">{t("bulkAccess.revokeAccess")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {roleMode === "revoke" && revocableRoles.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t("bulkAccess.noRoleAccess")}</p>
-          ) : (
-            <>
-              <div className="space-y-2">
-                <label htmlFor="rolePicker" className="font-medium text-sm">
-                  {t("share.roles")}
-                </label>
-                <Combobox
-                  multiple
-                  id="rolePicker"
-                  items={displayRoles.map((r) => ({
-                    value: String(r.id),
-                    label: r.displayName,
-                    sublabel: initiativeIds.length > 1 ? r.initiativeName : undefined,
-                  }))}
-                  value={[...selectedRoleIds].map(String)}
-                  onValueChange={(next) => setSelectedRoleIds(new Set(next.map(Number)))}
-                  loading={roleMode === "grant" && roleQueries.some((query) => query.isLoading)}
-                  placeholder={
-                    roleMode === "grant"
-                      ? t("bulkAccess.selectRoles")
-                      : t("bulkAccess.selectRolesToRevoke")
-                  }
-                  emptyMessage={t("share.noRoles")}
-                  searchPlaceholder={t("share.searchRoles")}
-                />
-              </div>
-              {roleMode === "grant" && (
-                <div className="space-y-2">
-                  <label htmlFor="roleLevel" className="font-medium text-sm">
-                    {t("bulkAccess.permissionLevel")}
-                  </label>
-                  <Select
-                    value={roleLevel}
-                    onValueChange={(v) => setRoleLevel(v as "read" | "write")}
-                  >
-                    <SelectTrigger id="roleLevel">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="read">{t("share.viewer")}</SelectItem>
-                      <SelectItem value="write">{t("share.editor")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </>
-          )}
-        </TabsContent>
-
-        <TabsContent value="all" className="mt-4 space-y-3">
-          <div className="space-y-2">
-            <label htmlFor="allMode" className="font-medium text-sm">
-              {t("bulkAccess.actionLabel")}
-            </label>
-            <Select value={allMode} onValueChange={(v) => setAllMode(v as "share" | "remove")}>
-              <SelectTrigger id="allMode">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="share">{t("bulkAccess.shareAllMembers")}</SelectItem>
-                <SelectItem value="remove">{t("bulkAccess.removeAllMembersAccess")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {allMode === "share" && (
+          <TabsContent value="people" className="mt-4 space-y-3">
             <div className="space-y-2">
-              <label htmlFor="allLevel" className="font-medium text-sm">
-                {t("bulkAccess.permissionLevel")}
+              <label htmlFor="userMode" className="font-medium text-sm">
+                {t("bulkAccess.actionLabel")}
               </label>
-              <Select value={allLevel} onValueChange={(v) => setAllLevel(v as "read" | "write")}>
-                <SelectTrigger id="allLevel">
+              <Select
+                value={userMode}
+                onValueChange={(v) => {
+                  setUserMode(v as "grant" | "revoke");
+                  setSelectedUserIds(new Set());
+                  setUserSearch("");
+                }}
+              >
+                <SelectTrigger id="userMode">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="read">{t("share.viewer")}</SelectItem>
-                  <SelectItem value="write">{t("share.editor")}</SelectItem>
+                  <SelectItem value="grant">{t("bulkAccess.grantAccess")}</SelectItem>
+                  <SelectItem value="revoke">{t("bulkAccess.revokeAccess")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          )}
 
-          <p className="text-muted-foreground text-xs">
-            {allMode === "share"
-              ? t("bulkAccess.shareAllMembersHint")
-              : t("bulkAccess.removeAllMembersHint")}
-          </p>
-        </TabsContent>
-      </Tabs>
+            {userMode === "revoke" && revocableUsers.length === 0 ? (
+              <p className="text-muted-foreground text-sm">{t("bulkAccess.noUserAccess")}</p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <label htmlFor="userPicker" className="font-medium text-sm">
+                    {t("share.people")}
+                  </label>
+                  <Combobox
+                    multiple
+                    id="userPicker"
+                    items={userMode === "grant" ? availableUsers : revocableUsers}
+                    value={[...selectedUserIds].map(String)}
+                    onValueChange={(next) => setSelectedUserIds(new Set(next.map(Number)))}
+                    // Granting searches the server; the granted are searched here.
+                    onSearchChange={userMode === "grant" ? setUserSearch : undefined}
+                    placeholder={
+                      userMode === "grant"
+                        ? t("bulkAccess.selectPeople")
+                        : t("bulkAccess.selectPeopleToRevoke")
+                    }
+                    emptyMessage={t("share.noPeople")}
+                    searchPlaceholder={t("share.searchPeople")}
+                  />
+                </div>
+                {userMode === "grant" && (
+                  <div className="space-y-2">
+                    <label htmlFor="userLevel" className="font-medium text-sm">
+                      {t("bulkAccess.permissionLevel")}
+                    </label>
+                    <Select value={level} onValueChange={(v) => setLevel(v as "read" | "write")}>
+                      <SelectTrigger id="userLevel">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="read">{t("share.viewer")}</SelectItem>
+                        <SelectItem value="write">{t("share.editor")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </>
+            )}
+          </TabsContent>
 
-      {tab === "roles" ? (
-        <DialogFooter
-          submitLabel={
-            roleMode === "grant"
-              ? t("bulkAccess.grantRoles", { count: selectedRoleCount })
-              : t("bulkAccess.revokeRoles", { count: selectedRoleCount })
-          }
-          pendingLabel={t("bulkAccess.applying")}
-          pending={isPending}
-          disabled={!canApplyRoles}
-          destructive={roleMode === "revoke"}
-          onSubmit={() => void handleApplyRoles()}
-        />
-      ) : tab === "people" ? (
-        <DialogFooter
-          submitLabel={
-            userMode === "grant"
-              ? t("bulkAccess.grantPeople", { count: selectedUserCount })
-              : t("bulkAccess.revokePeople", { count: selectedUserCount })
-          }
-          pendingLabel={t("bulkAccess.applying")}
-          pending={isPending}
-          disabled={!canApplyUsers}
-          destructive={userMode === "revoke"}
-          onSubmit={() => void handleApply()}
-        />
-      ) : (
-        <DialogFooter
-          submitLabel={
-            allMode === "share"
-              ? t("bulkAccess.shareAllMembers")
-              : t("bulkAccess.removeAllMembersAccess")
-          }
-          pendingLabel={t("bulkAccess.applying")}
-          pending={isPending}
-          destructive={allMode === "remove"}
-          onSubmit={() => void handleApplyAllMembers()}
-        />
-      )}
-    </>
+          <TabsContent value="roles" className="mt-4 space-y-3">
+            <div className="space-y-2">
+              <label htmlFor="roleMode" className="font-medium text-sm">
+                {t("bulkAccess.actionLabel")}
+              </label>
+              <Select
+                value={roleMode}
+                onValueChange={(v) => {
+                  setRoleMode(v as "grant" | "revoke");
+                  setSelectedRoleIds(new Set());
+                }}
+              >
+                <SelectTrigger id="roleMode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="grant">{t("bulkAccess.grantAccess")}</SelectItem>
+                  <SelectItem value="revoke">{t("bulkAccess.revokeAccess")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {roleMode === "revoke" && revocableRoles.length === 0 ? (
+              <p className="text-muted-foreground text-sm">{t("bulkAccess.noRoleAccess")}</p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <label htmlFor="rolePicker" className="font-medium text-sm">
+                    {t("share.roles")}
+                  </label>
+                  <Combobox
+                    multiple
+                    id="rolePicker"
+                    items={displayRoles.map((r) => ({
+                      value: String(r.id),
+                      label: r.displayName,
+                      sublabel: initiativeIds.length > 1 ? r.initiativeName : undefined,
+                    }))}
+                    value={[...selectedRoleIds].map(String)}
+                    onValueChange={(next) => setSelectedRoleIds(new Set(next.map(Number)))}
+                    loading={roleMode === "grant" && roleQueries.some((query) => query.isLoading)}
+                    placeholder={
+                      roleMode === "grant"
+                        ? t("bulkAccess.selectRoles")
+                        : t("bulkAccess.selectRolesToRevoke")
+                    }
+                    emptyMessage={t("share.noRoles")}
+                    searchPlaceholder={t("share.searchRoles")}
+                  />
+                </div>
+                {roleMode === "grant" && (
+                  <div className="space-y-2">
+                    <label htmlFor="roleLevel" className="font-medium text-sm">
+                      {t("bulkAccess.permissionLevel")}
+                    </label>
+                    <Select
+                      value={roleLevel}
+                      onValueChange={(v) => setRoleLevel(v as "read" | "write")}
+                    >
+                      <SelectTrigger id="roleLevel">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="read">{t("share.viewer")}</SelectItem>
+                        <SelectItem value="write">{t("share.editor")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="all" className="mt-4 space-y-3">
+            <div className="space-y-2">
+              <label htmlFor="allMode" className="font-medium text-sm">
+                {t("bulkAccess.actionLabel")}
+              </label>
+              <Select value={allMode} onValueChange={(v) => setAllMode(v as "share" | "remove")}>
+                <SelectTrigger id="allMode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="share">{t("bulkAccess.shareAllMembers")}</SelectItem>
+                  <SelectItem value="remove">{t("bulkAccess.removeAllMembersAccess")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {allMode === "share" && (
+              <div className="space-y-2">
+                <label htmlFor="allLevel" className="font-medium text-sm">
+                  {t("bulkAccess.permissionLevel")}
+                </label>
+                <Select value={allLevel} onValueChange={(v) => setAllLevel(v as "read" | "write")}>
+                  <SelectTrigger id="allLevel">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="read">{t("share.viewer")}</SelectItem>
+                    <SelectItem value="write">{t("share.editor")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <p className="text-muted-foreground text-xs">
+              {allMode === "share"
+                ? t("bulkAccess.shareAllMembersHint")
+                : t("bulkAccess.removeAllMembersHint")}
+            </p>
+          </TabsContent>
+        </Tabs>
+
+        {tab === "roles" ? (
+          <DialogFooter
+            submitLabel={
+              roleMode === "grant"
+                ? t("bulkAccess.grantRoles", { count: selectedRoleCount })
+                : t("bulkAccess.revokeRoles", { count: selectedRoleCount })
+            }
+            pendingLabel={t("bulkAccess.applying")}
+            pending={isPending}
+            disabled={!canApplyRoles}
+            destructive={roleMode === "revoke"}
+            onSubmit={() => void handleApplyRoles()}
+          />
+        ) : tab === "people" ? (
+          <DialogFooter
+            submitLabel={
+              userMode === "grant"
+                ? t("bulkAccess.grantPeople", { count: selectedUserCount })
+                : t("bulkAccess.revokePeople", { count: selectedUserCount })
+            }
+            pendingLabel={t("bulkAccess.applying")}
+            pending={isPending}
+            disabled={!canApplyUsers}
+            destructive={userMode === "revoke"}
+            onSubmit={() => void handleApply()}
+          />
+        ) : (
+          <DialogFooter
+            submitLabel={
+              allMode === "share"
+                ? t("bulkAccess.shareAllMembers")
+                : t("bulkAccess.removeAllMembersAccess")
+            }
+            pendingLabel={t("bulkAccess.applying")}
+            pending={isPending}
+            destructive={allMode === "remove"}
+            onSubmit={() => void handleApplyAllMembers()}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

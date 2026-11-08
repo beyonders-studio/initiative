@@ -36,27 +36,12 @@ interface BulkEditTagsDialogProps<T extends TaggableItem> extends DialogWithSucc
 export function BulkEditTagsDialog<T extends TaggableItem>({
   open,
   onOpenChange,
-  ...props
-}: BulkEditTagsDialogProps<T>) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <BulkEditTagsForm onOpenChange={onOpenChange} {...props} />
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// Drawn only while the dialog is open, so each opening starts on Add with no
-// tags chosen.
-function BulkEditTagsForm<T extends TaggableItem>({
-  onOpenChange,
   items,
   targetType,
   communityId,
   onInvalidate,
   onSuccess,
-}: Omit<BulkEditTagsDialogProps<T>, "open">) {
+}: BulkEditTagsDialogProps<T>) {
   const { t } = useTranslation("common");
   const count = items.length;
   const [mode, setMode] = useState<"add" | "remove">("add");
@@ -75,6 +60,22 @@ function BulkEditTagsForm<T extends TaggableItem>({
     }
     return Array.from(tagMap.values());
   }, [items]);
+
+  const resetState = useCallback(() => {
+    setTagsToAdd([]);
+    setTagsToRemove([]);
+    setMode("add");
+  }, []);
+
+  const handleOpenChange = useCallback(
+    (value: boolean) => {
+      if (!value) {
+        resetState();
+      }
+      onOpenChange(value);
+    },
+    [onOpenChange, resetState]
+  );
 
   const handleApply = useCallback(async () => {
     if (mode === "add" && tagsToAdd.length === 0) return;
@@ -96,6 +97,7 @@ function BulkEditTagsForm<T extends TaggableItem>({
       );
 
       onInvalidate();
+      resetState();
       onOpenChange(false);
       onSuccess();
     } catch (error) {
@@ -112,6 +114,7 @@ function BulkEditTagsForm<T extends TaggableItem>({
     targetType,
     communityId,
     onInvalidate,
+    resetState,
     onOpenChange,
     onSuccess,
     t,
@@ -120,52 +123,54 @@ function BulkEditTagsForm<T extends TaggableItem>({
   const canApply = mode === "add" ? tagsToAdd.length > 0 : tagsToRemove.length > 0;
 
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>{t("bulkTags.title")}</DialogTitle>
-        <DialogDescription>
-          {mode === "add"
-            ? t("bulkTags.descriptionAdd", { count })
-            : t("bulkTags.descriptionRemove", { count })}
-        </DialogDescription>
-      </DialogHeader>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("bulkTags.title")}</DialogTitle>
+          <DialogDescription>
+            {mode === "add"
+              ? t("bulkTags.descriptionAdd", { count })
+              : t("bulkTags.descriptionRemove", { count })}
+          </DialogDescription>
+        </DialogHeader>
 
-      <Tabs value={mode} onValueChange={(v) => setMode(v as "add" | "remove")}>
-        <TabsBar>
-          <TabsTrigger value="add">{t("bulkTags.tabAdd")}</TabsTrigger>
-          <TabsTrigger value="remove">{t("bulkTags.tabRemove")}</TabsTrigger>
-        </TabsBar>
+        <Tabs value={mode} onValueChange={(v) => setMode(v as "add" | "remove")}>
+          <TabsBar>
+            <TabsTrigger value="add">{t("bulkTags.tabAdd")}</TabsTrigger>
+            <TabsTrigger value="remove">{t("bulkTags.tabRemove")}</TabsTrigger>
+          </TabsBar>
 
-        <TabsContent value="add" className="mt-4">
-          <TagPicker
-            selectedTags={tagsToAdd}
-            onChange={setTagsToAdd}
-            placeholder={t("bulkTags.addPlaceholder")}
-          />
-        </TabsContent>
-
-        <TabsContent value="remove" className="mt-4">
-          {existingTags.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t("bulkTags.noTags")}</p>
-          ) : (
+          <TabsContent value="add" className="mt-4">
             <TagPicker
-              selectedTags={tagsToRemove}
-              onChange={(tags) =>
-                setTagsToRemove(tags.filter((tag) => existingTags.some((e) => e.id === tag.id)))
-              }
-              placeholder={t("bulkTags.removePlaceholder")}
+              selectedTags={tagsToAdd}
+              onChange={setTagsToAdd}
+              placeholder={t("bulkTags.addPlaceholder")}
             />
-          )}
-        </TabsContent>
-      </Tabs>
+          </TabsContent>
 
-      <DialogFooter
-        submitLabel={t("bulkTags.apply")}
-        onSubmit={() => void handleApply()}
-        pending={isPending}
-        pendingLabel={t("bulkTags.applying")}
-        disabled={!canApply}
-      />
-    </>
+          <TabsContent value="remove" className="mt-4">
+            {existingTags.length === 0 ? (
+              <p className="text-muted-foreground text-sm">{t("bulkTags.noTags")}</p>
+            ) : (
+              <TagPicker
+                selectedTags={tagsToRemove}
+                onChange={(tags) =>
+                  setTagsToRemove(tags.filter((tag) => existingTags.some((e) => e.id === tag.id)))
+                }
+                placeholder={t("bulkTags.removePlaceholder")}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
+
+        <DialogFooter
+          submitLabel={t("bulkTags.apply")}
+          onSubmit={() => void handleApply()}
+          pending={isPending}
+          pendingLabel={t("bulkTags.applying")}
+          disabled={!canApply}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }
