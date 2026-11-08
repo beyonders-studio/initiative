@@ -97,7 +97,7 @@
       "noMatchAsk": "Try other words, or ask the team below. Your search goes into the request.",
       "noMatchWrite": "Try other words, or write to the address below.",
       "noMatchBrowse": "Try other words, or browse the user guide.",
-      "unavailable": "Search isn't set up on this server. The user guide link above has everything.",
+      "unavailable": "Search couldn't reach the user guide. The link above opens it.",
       "noAnswer": "No answer here?",
       "openRequests_one": "{{count}} open request",
       "openRequests_other": "{{count}} open requests",

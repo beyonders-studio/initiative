@@ -7042,24 +7042,6 @@ export interface HeldSurfacesRead {
 }
 
 /**
- * One page or heading of the help center, as plain text.
- */
-export interface HelpIndexEntry {
-  title: string;
-  section: string;
-  location: string;
-  snippet: string;
-}
-
-/**
- * Every English page and heading of the help center, down to level 3, in
- * the order the help center has them.
- */
-export interface HelpIndex {
-  items: HelpIndexEntry[];
-}
-
-/**
  * Hold something for the platform.
  */
 export interface HoldCreate {

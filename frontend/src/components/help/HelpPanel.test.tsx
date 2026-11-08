@@ -4,8 +4,10 @@
  */
 import { act, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import {
   claimHelp,
@@ -15,6 +17,7 @@ import {
   setHelpDraft,
   updateHelp,
 } from "@/components/help/helpStore";
+import { HELP_INDEX_URL } from "@/hooks/useHelpIndex";
 import { DOCS_SITE_URL, docsUrl } from "@/lib/links";
 
 const CONTEXT = vi.hoisted(() => ({
@@ -36,32 +39,28 @@ const fileOptions = vi.hoisted(() => ({
   current: undefined as { onSuccess?: () => void } | undefined,
 }));
 
-vi.mock("@/api/generated/help/help", () => ({
-  useReadHelpIndex: () => ({
-    data: {
-      items: [
-        {
-          title: "My invite link doesn't work",
-          section: "FAQ › Getting in",
-          location: "en/faq/#my-invite-link-doesnt-work",
-          snippet: "Invite links expire, and an admin can turn them off.",
-        },
-        {
-          title: "Projects and tasks",
-          section: "Guides",
-          location: "en/guides/projects/",
-          snippet: "A project holds its tasks on a board, a list or a timeline.",
-        },
-        {
-          title: "Due dates and reminders are a few hours off",
-          section: "FAQ › Your account",
-          location: "en/faq/#due-dates-and-reminders-are-a-few-hours-off",
-          snippet: "Your time zone is set under My Settings.",
-        },
-      ],
+const HELP_INDEX = {
+  items: [
+    {
+      title: "My invite link doesn't work",
+      section: "FAQ › Getting in",
+      location: "en/faq/#my-invite-link-doesnt-work",
+      snippet: "Invite links expire, and an admin can turn them off.",
     },
-  }),
-}));
+    {
+      title: "Projects and tasks",
+      section: "Guides",
+      location: "en/guides/projects/",
+      snippet: "A project holds its tasks on a board, a list or a timeline.",
+    },
+    {
+      title: "Due dates and reminders are a few hours off",
+      section: "FAQ › Your account",
+      location: "en/faq/#due-dates-and-reminders-are-a-few-hours-off",
+      snippet: "Your time zone is set under My Settings.",
+    },
+  ],
+};
 vi.mock("@/hooks/useActiveCommunityId", () => ({ useActiveCommunityId: () => 3 }));
 const openExternal = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/openExternal", () => ({ openExternal }));
@@ -104,6 +103,7 @@ describe("Help", () => {
     offer.mode = "form";
     offer.contact = null;
     filed.items = [];
+    server.use(http.get(HELP_INDEX_URL, () => HttpResponse.json(HELP_INDEX)));
   });
   afterEach(() => {
     updateHelp({
@@ -122,9 +122,17 @@ describe("Help", () => {
 
   it("opens on answers for the page, before anything is typed", async () => {
     await openPanel();
-    expect(screen.getByText("For this page")).toBeInTheDocument();
+    expect(await screen.findByText("For this page")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("option", { name: /Projects and tasks/ }));
     expect(openExternal).toHaveBeenCalledWith(`${DOCS_SITE_URL}en/guides/projects/`);
+  });
+
+  it("points to the guide itself when its search can't be reached", async () => {
+    server.use(http.get(HELP_INDEX_URL, () => new HttpResponse(null, { status: 503 })));
+    await openPanel();
+    expect(
+      await screen.findByText("Search couldn't reach the user guide. The link above opens it.")
+    ).toBeInTheDocument();
   });
 
   it("finds the answer to what is typed, and says when nothing matches", async () => {
