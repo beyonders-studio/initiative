@@ -1,4 +1,4 @@
-import { Check, TriangleAlert } from "lucide-react";
+import { Check, Lock, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -65,6 +65,9 @@ interface ToolPickerCardProps {
   checked: boolean;
   onCheckedChange: (value: boolean) => void;
   disabled: boolean;
+  /** The community set this switch for every initiative: a lock stands in
+   *  for the tick, and the card keeps its colours. */
+  fixed?: boolean;
   /** Rendered under the card, OUTSIDE the toggle. The audience line carries
    *  its own buttons, and a button inside a button is invalid HTML. */
   audience?: ReactNode;
@@ -86,6 +89,7 @@ export const ToolPickerCard = ({
   checked,
   onCheckedChange,
   disabled,
+  fixed = false,
   audience,
 }: ToolPickerCardProps) => (
   <div
@@ -100,25 +104,30 @@ export const ToolPickerCard = ({
       role="switch"
       aria-checked={checked}
       id={id}
-      disabled={disabled}
+      disabled={disabled || fixed}
       onClick={() => onCheckedChange(!checked)}
       className={cn(
-        "flex flex-col gap-2 text-left disabled:cursor-not-allowed disabled:opacity-60",
+        "flex flex-col gap-2 text-left disabled:cursor-not-allowed",
+        !fixed && "disabled:opacity-60",
         checked ? "text-foreground" : "text-muted-foreground"
       )}
     >
       <span className="flex items-center gap-2">
         <ToolIconTile tool={tool} active={checked} />
         <span className="flex-1 font-medium text-sm">{title}</span>
-        <span
-          aria-hidden="true"
-          className={cn(
-            "flex h-5 w-5 items-center justify-center rounded-full border",
-            checked ? "border-primary bg-primary text-primary-foreground" : "border-border"
-          )}
-        >
-          {checked ? <Check className="h-3 w-3" /> : null}
-        </span>
+        {fixed ? (
+          <Lock className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        ) : (
+          <span
+            aria-hidden="true"
+            className={cn(
+              "flex h-5 w-5 items-center justify-center rounded-full border",
+              checked ? "border-primary bg-primary text-primary-foreground" : "border-border"
+            )}
+          >
+            {checked ? <Check className="h-3 w-3" /> : null}
+          </span>
+        )}
       </span>
       <ToolSketch tool={tool} active={checked} />
       <span className="text-xs leading-snug">{description}</span>
@@ -234,7 +243,8 @@ export const ToolsSection = ({
             description={t(`${camel}FeatureDescription` as never)}
             checked={enabled}
             onCheckedChange={(value) => onToggle(tool, value)}
-            disabled={disabled || fixed}
+            disabled={disabled}
+            fixed={fixed}
             audience={
               fixed ? (
                 <p className="border-t pt-2 text-muted-foreground text-xs">

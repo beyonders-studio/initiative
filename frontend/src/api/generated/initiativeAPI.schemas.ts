@@ -7241,6 +7241,8 @@ export interface InitiativeDefaultsRead {
   tools: Partial<Record<Tool, boolean>>;
   member_permissions: Partial<Record<PermissionKey, boolean>>;
   custom_roles: boolean;
+  own_tools: Partial<Record<Tool, number[]>>;
+  own_member_permissions: Partial<Record<PermissionKey, number[]>>;
 }
 
 /**

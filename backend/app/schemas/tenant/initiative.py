@@ -159,6 +159,12 @@ class InitiativeDefaultsRead(SanitizedBaseModel):
     member_permissions: Dict[PermissionKey, bool] = Field(default_factory=dict)
     #: Whether managers may add roles of their own.
     custom_roles: bool = True
+    #: For a community admin: the live initiatives whose own switch has each
+    #: tool on, by tool. What a rule set here would override.
+    own_tools: Dict[Tool, List[int]] = Field(default_factory=dict)
+    #: For a community admin: the live initiatives whose own built-in member
+    #: role holds each permission, by permission.
+    own_member_permissions: Dict[PermissionKey, List[int]] = Field(default_factory=dict)
 
 
 class InitiativeDefaultsUpdate(SanitizedBaseModel):

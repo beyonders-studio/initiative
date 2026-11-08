@@ -36,34 +36,28 @@
     "resolveError": "Die Anfrage kann derzeit nicht beantwortet werden."
   },
   "manage": {
-    "description": "Lege die Projektmanager einer Initiative fest, archiviere eine Initiative, um sie ohne Löschen aus der Seitenleiste auszublenden, gewähre Projektmanagern vollen Zugriff oder verschiebe eine Initiative in den Papierkorb. Mache dich selbst zum Projektmanager, um eine Initiative über deine eigene Seitenleiste zu bearbeiten.",
+    "description": "Alle Initiativen dieser Community und wer sie leitet. Mache jemanden zum Projektmanager, um ihm eine Initiative zu übertragen; mache dich selbst dazu, um von deiner eigenen Seitenleiste aus darin zu arbeiten.",
     "adminRequired": "Du musst Community-Administrator sein, um Initiativen zu verwalten.",
     "loading": "Initiativen werden geladen…",
     "loadError": "Initiativen können derzeit nicht geladen werden.",
     "filterByName": "Nach Name filtern",
-    "idColumn": "ID",
     "nameColumn": "Initiative",
-    "membersColumn": "Mitglieder",
     "managersColumn": "Projektmanager",
-    "statusColumn": "Status",
     "actionsColumn": "Aktionen",
     "memberCount_one": "{{count}} Mitglied",
     "memberCount_other": "{{count}} Mitglieder",
-    "managerCount_one": "{{count}} Manager",
-    "managerCount_other": "{{count}} Manager",
-    "noManagers": "Keine",
+    "noManagers": "Kein Manager",
     "noCandidates": "Keine Mitglieder gefunden.",
     "managersUpdated": "Projektmanager aktualisiert.",
     "managersError": "Projektmanager können derzeit nicht aktualisiert werden.",
     "managersUnavailable": "Die Rollen dieser Initiative konnten nicht geladen werden — bitte aktualisieren.",
-    "active": "Aktiv",
-    "archived": "Archiviert",
     "archive": "Archivieren",
     "unarchive": "Wiederherstellen",
     "delete": "Löschen",
     "archivedToast": "Initiative \"{{name}}\" archiviert.",
     "unarchivedToast": "Initiative \"{{name}}\" wiederhergestellt.",
-    "deletedToast": "Initiative \"{{name}}\" in den Papierkorb verschoben."
+    "deletedToast": "Initiative \"{{name}}\" in den Papierkorb verschoben.",
+    "openSettings": "Einstellungen öffnen"
   },
   "createDialog": {
     "title": "Initiative erstellen",
@@ -278,7 +272,9 @@
       "description": "Wie jedes Tool dieser Initiative darstellt, was es enthält: jedes Layout, wann es zuletzt geändert wurde, und mit welcher Liste ein Projekt öffnet. Geändert werden sie jeweils in ihrem Editor.",
       "noProjects": "Diese Initiative hat noch keine Projekte.",
       "loadError": "Die Layouts konnten nicht geladen werden."
-    }
+    },
+    "fixedOn": "An",
+    "fixedOff": "Aus"
   },
   "advancedTools": "Werkzeuge",
   "advancedToolsDescription": "Wähle, woraus diese Initiative besteht. Projekte und Dateien sind von Anfang an aktiv; den Rest fügst du selbst hinzu.",
@@ -327,18 +323,92 @@
   "contactsFeature": "Kontakte",
   "contactsFeatureDescription": "Die Menschen und Firmen, für die oder mit denen ihr arbeitet: die Kundin, der Veranstaltungsort, der Lieferant, einen Tipp vom Anruf entfernt.",
   "communityDefaults": {
-    "title": "Jede Initiative",
-    "description": "Ein Tool oder eine Mitgliederberechtigung, die du hier festlegst, gilt in jeder Initiative dieser Community; deren Manager sehen sie als festgelegt. Bleibt es jeder Initiative überlassen, entscheidet sie selbst.",
-    "toolsHeading": "Tools",
-    "memberHeading": "Was Mitglieder tun können",
-    "memberHelp": "Für die eingebaute Rolle „Mitglied“ in jeder Initiative.",
-    "choice": {
-      "initiative": "Jede Initiative entscheidet",
-      "on": "Überall an",
-      "off": "Überall aus"
+    "title": "Regeln für jede Initiative",
+    "description": "Jede Initiative entscheidet selbst über ihre Tools und darüber, was ihre Mitglieder tun können. Eine Regel hier entscheidet es für alle, und deren Manager sehen sie als festgelegt. Manager und Moderatoren können immer alles.",
+    "add": "Regel hinzufügen",
+    "empty": "Keine Regeln. Jede Initiative entscheidet selbst über ihre Tools und darüber, was ihre Mitglieder tun können.",
+    "editLabel": "Regel für {{tool}} bearbeiten",
+    "removeLabel": "Regel für {{tool}} entfernen",
+    "items": {
+      "calendars": "Termine",
+      "contacts": "Kontakte",
+      "dashboards": "Dashboards",
+      "files": "Dateien",
+      "posts": "Beiträge",
+      "counterGroups": "Zähler",
+      "wikis": "Wikis",
+      "projects": "Projekte"
     },
+    "rule": {
+      "toolOn": "In jeder Initiative eingeschaltet.",
+      "toolOff": "In jeder Initiative ausgeschaltet.",
+      "viewCreate": "Mitglieder können {{items}} ansehen und erstellen.",
+      "viewNotCreate": "Mitglieder können {{items}} ansehen, aber nicht erstellen.",
+      "view": "Mitglieder können {{items}} ansehen.",
+      "notView": "Mitglieder können {{items}} nicht ansehen.",
+      "create": "Mitglieder können {{items}} erstellen.",
+      "notCreate": "Mitglieder können {{items}} nicht erstellen."
+    },
+    "extra": {
+      "dashboards_run_as_initiative": {
+        "on": "Mitglieder können ein Dashboard als Initiative ausführen.",
+        "off": "Nur Manager können ein Dashboard als Initiative ausführen."
+      }
+    },
+    "addTitle": "Regel hinzufügen",
+    "editTitle": "Regel für {{tool}}",
+    "dialogDescription": "Wähle, was in jeder Initiative gilt, auch in später hinzugefügten. Was jeder Initiative überlassen bleibt, entscheidet sie selbst.",
+    "toolLabel": "Tool",
+    "question": {
+      "tool": "Ist {{tool}} eingeschaltet?",
+      "view": "Können Mitglieder {{items}} ansehen?",
+      "create": "Können Mitglieder {{items}} erstellen?",
+      "extra": {
+        "dashboards_run_as_initiative": "Können Mitglieder ein Dashboard als Initiative ausführen?"
+      }
+    },
+    "answer": {
+      "tool": {
+        "each": "Jede Initiative entscheidet",
+        "on": "In jeder Initiative an",
+        "off": "In jeder Initiative aus"
+      },
+      "member": {
+        "each": "Jede Initiative entscheidet",
+        "on": "Ja, in jeder Initiative",
+        "off": "Nein, nur Manager"
+      }
+    },
+    "createNeedsView": "Mitglieder können nichts erstellen, was sie nicht ansehen können.",
+    "offNote": "Ist {{tool}} überall aus, gibt es für Mitglieder nichts anzusehen oder zu erstellen; ihre Antworten bleiben bei jeder Initiative.",
+    "reads": "Die Regel lautet:",
+    "noRule": "Keine Regel. Jede Initiative entscheidet.",
+    "changesHeading": "Was sie heute ändert",
+    "changesNone": "Heute keine Initiative.",
+    "changes": {
+      "tool": {
+        "on": "Schaltet {{tool}} in {{names}} ein.",
+        "off": "Schaltet {{tool}} in {{names}} aus. Nichts darin wird gelöscht."
+      },
+      "view": {
+        "on": "Mitglieder können in {{names}} {{items}} ansehen.",
+        "off": "Mitglieder können in {{names}} keine {{items}} mehr ansehen."
+      },
+      "create": {
+        "on": "Mitglieder können in {{names}} {{items}} erstellen.",
+        "off": "Mitglieder können in {{names}} keine {{items}} mehr erstellen."
+      },
+      "extra": {
+        "dashboards_run_as_initiative": {
+          "on": "Mitglieder können in {{names}} ein Dashboard als Initiative ausführen.",
+          "off": "Mitglieder können in {{names}} kein Dashboard mehr als Initiative ausführen."
+        }
+      }
+    },
+    "save": "Regel speichern",
+    "remove": "Regel entfernen",
+    "customRolesHelp": "Erlaubt den Managern jeder Initiative, neben Moderator, Projektmanager und Mitglied eigene Rollen hinzuzufügen. Ausgeschaltet dürfen die bereits hinzugefügten Rollen nicht mehr als Mitglieder.",
     "customRolesLabel": "Manager können Rollen hinzufügen",
-    "customRolesHelp": "Aus, können Initiativen keine Rollen hinzufügen, und ihre vorhandenen eigenen Rollen dürfen nicht mehr als Mitglieder.",
     "saved": "Für jede Initiative gespeichert",
     "error": "Speichern fehlgeschlagen"
   }

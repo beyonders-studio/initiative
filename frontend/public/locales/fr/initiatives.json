@@ -36,34 +36,28 @@
     "resolveError": "Impossible de répondre à cette demande pour le moment."
   },
   "manage": {
-    "description": "Désignez les chefs de projet d'une initiative, archivez-la pour la masquer de la barre latérale sans la supprimer, accordez un accès complet aux chefs de projet ou supprimez une initiative en la plaçant dans la corbeille. Désignez-vous comme chef de projet pour travailler dans une initiative depuis votre propre barre latérale.",
+    "description": "Toutes les initiatives de cette communauté et qui les dirige. Désignez quelqu'un comme chef de projet pour lui en confier une ; désignez-vous pour y travailler depuis votre propre barre latérale.",
     "adminRequired": "Vous devez être administrateur de la communauté pour gérer les initiatives.",
     "loading": "Chargement des initiatives…",
     "loadError": "Impossible de charger les initiatives pour le moment.",
     "filterByName": "Filtrer par nom",
-    "idColumn": "ID",
     "nameColumn": "Initiative",
-    "membersColumn": "Membres",
     "managersColumn": "Chefs de projet",
-    "statusColumn": "Statut",
     "actionsColumn": "Actions",
     "memberCount_one": "{{count}} membre",
     "memberCount_other": "{{count}} membres",
-    "managerCount_one": "{{count}} chef",
-    "managerCount_other": "{{count}} chefs",
-    "noManagers": "Aucun",
+    "noManagers": "Aucun chef de projet",
     "noCandidates": "Aucun membre trouvé.",
     "managersUpdated": "Chefs de projet mis à jour.",
     "managersError": "Impossible de mettre à jour les chefs de projet pour le moment.",
     "managersUnavailable": "Impossible de charger les rôles de cette initiative — actualisez la page.",
-    "active": "Active",
-    "archived": "Archivée",
     "archive": "Archiver",
     "unarchive": "Restaurer",
     "delete": "Supprimer",
     "archivedToast": "Initiative « {{name}} » archivée.",
     "unarchivedToast": "Initiative « {{name}} » restaurée.",
-    "deletedToast": "Initiative « {{name}} » déplacée dans la corbeille."
+    "deletedToast": "Initiative « {{name}} » déplacée dans la corbeille.",
+    "openSettings": "Ouvrir les paramètres"
   },
   "createDialog": {
     "title": "Créer une initiative",
@@ -278,7 +272,9 @@
       "description": "Comment chaque outil de cette initiative présente ce qu'il contient : chaque disposition, sa dernière modification, et la liste sur laquelle un projet s'ouvre. Elles se modifient dans l'éditeur de chacun.",
       "noProjects": "Cette initiative n'a encore aucun projet.",
       "loadError": "Impossible de charger les dispositions."
-    }
+    },
+    "fixedOn": "Activé",
+    "fixedOff": "Désactivé"
   },
   "advancedTools": "Outils",
   "advancedToolsDescription": "Choisissez ce qui compose cette initiative. Les projets et les fichiers sont actifs dès le départ ; le reste, c'est à vous de l'ajouter.",
@@ -327,18 +323,92 @@
   "contactsFeature": "Contacts",
   "contactsFeatureDescription": "Les personnes et entreprises pour qui ou avec qui vous travaillez : le client, le lieu, le fournisseur, à un geste d’un appel.",
   "communityDefaults": {
-    "title": "Toutes les initiatives",
-    "description": "Un outil ou une autorisation de membre défini ici s'applique dans toutes les initiatives de cette communauté ; leurs responsables le voient comme défini. Laissé à chaque initiative, il reste le leur.",
-    "toolsHeading": "Outils",
-    "memberHeading": "Ce que les membres peuvent faire",
-    "memberHelp": "Pour le rôle intégré Membre dans chaque initiative.",
-    "choice": {
-      "initiative": "Chaque initiative décide",
-      "on": "Activé partout",
-      "off": "Désactivé partout"
+    "title": "Règles pour toutes les initiatives",
+    "description": "Chaque initiative décide de ses outils et de ce que ses membres peuvent faire. Une règle définie ici en décide pour toutes, et leurs responsables la voient comme définie. Les responsables et les modérateurs peuvent toujours tout faire.",
+    "add": "Ajouter une règle",
+    "empty": "Aucune règle. Chaque initiative décide de ses outils et de ce que ses membres peuvent faire.",
+    "editLabel": "Modifier la règle de {{tool}}",
+    "removeLabel": "Retirer la règle de {{tool}}",
+    "items": {
+      "calendars": "événements",
+      "contacts": "contacts",
+      "dashboards": "tableaux de bord",
+      "files": "fichiers",
+      "posts": "publications",
+      "counterGroups": "compteurs",
+      "wikis": "wikis",
+      "projects": "projets"
     },
+    "rule": {
+      "toolOn": "Activé dans toutes les initiatives.",
+      "toolOff": "Désactivé dans toutes les initiatives.",
+      "viewCreate": "Les membres peuvent voir et créer des {{items}}.",
+      "viewNotCreate": "Les membres peuvent voir les {{items}} ; seuls les responsables en créent.",
+      "view": "Les membres peuvent voir les {{items}}.",
+      "notView": "Les membres ne peuvent pas voir les {{items}}.",
+      "create": "Les membres peuvent créer des {{items}}.",
+      "notCreate": "Seuls les responsables créent des {{items}}."
+    },
+    "extra": {
+      "dashboards_run_as_initiative": {
+        "on": "Les membres peuvent exécuter un tableau de bord en tant qu'initiative.",
+        "off": "Seuls les responsables peuvent exécuter un tableau de bord en tant qu'initiative."
+      }
+    },
+    "addTitle": "Ajouter une règle",
+    "editTitle": "Règle pour {{tool}}",
+    "dialogDescription": "Choisissez ce qui s'applique dans toutes les initiatives, y compris celles ajoutées plus tard. Ce qui est laissé à chaque initiative reste le sien.",
+    "toolLabel": "Outil",
+    "question": {
+      "tool": "{{tool}} est-il activé ?",
+      "view": "Les membres peuvent-ils voir les {{items}} ?",
+      "create": "Les membres peuvent-ils créer des {{items}} ?",
+      "extra": {
+        "dashboards_run_as_initiative": "Les membres peuvent-ils exécuter un tableau de bord en tant qu'initiative ?"
+      }
+    },
+    "answer": {
+      "tool": {
+        "each": "Chaque initiative décide",
+        "on": "Activé partout",
+        "off": "Désactivé partout"
+      },
+      "member": {
+        "each": "Chaque initiative décide",
+        "on": "Oui, dans toutes les initiatives",
+        "off": "Non, seulement les responsables"
+      }
+    },
+    "createNeedsView": "Les membres ne peuvent pas créer ce qu'ils ne peuvent pas voir.",
+    "offNote": "Avec {{tool}} désactivé partout, les membres n'ont rien à voir ni à créer ; leurs réponses restent à chaque initiative.",
+    "reads": "La règle dit :",
+    "noRule": "Aucune règle. Chaque initiative décide.",
+    "changesHeading": "Ce qu'elle change aujourd'hui",
+    "changesNone": "Aucune initiative aujourd'hui.",
+    "changes": {
+      "tool": {
+        "on": "Active {{tool}} dans {{names}}.",
+        "off": "Désactive {{tool}} dans {{names}}. Rien n'y est supprimé."
+      },
+      "view": {
+        "on": "Permet aux membres de voir les {{items}} dans {{names}}.",
+        "off": "Empêche les membres de voir les {{items}} dans {{names}}."
+      },
+      "create": {
+        "on": "Permet aux membres de créer des {{items}} dans {{names}}.",
+        "off": "Empêche les membres de créer des {{items}} dans {{names}}."
+      },
+      "extra": {
+        "dashboards_run_as_initiative": {
+          "on": "Permet aux membres d'exécuter un tableau de bord en tant qu'initiative dans {{names}}.",
+          "off": "Empêche les membres d'exécuter un tableau de bord en tant qu'initiative dans {{names}}."
+        }
+      }
+    },
+    "save": "Enregistrer la règle",
+    "remove": "Retirer la règle",
+    "customRolesHelp": "Permet aux responsables de chaque initiative d'ajouter leurs propres rôles en plus de Modérateur, Chef de projet et Membre. Désactivé, les rôles qu'ils ont déjà ajoutés ne peuvent pas faire plus que les membres.",
     "customRolesLabel": "Les responsables peuvent ajouter des rôles",
-    "customRolesHelp": "Désactivé, les initiatives ne peuvent pas ajouter de rôles, et leurs rôles personnalisés existants ne peuvent pas faire plus que les membres.",
     "saved": "Enregistré pour toutes les initiatives",
     "error": "Enregistrement impossible"
   }

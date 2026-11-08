@@ -1,4 +1,4 @@
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Loader2, Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -28,6 +28,7 @@ import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
 import { Switch } from "@/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 /**
  * The initiative's tools, split by whether it actually uses them.
@@ -59,6 +60,23 @@ interface InitiativeSettingsRolesTabProps {
 }
 
 const NOTHING_LOCKED: ReadonlySet<string> = new Set();
+
+/** A permission the community set for every initiative: its value, shown as
+ *  the content it is, with where it comes from. */
+const SetByCommunity = ({ on, t }: { on: boolean; t: (key: never) => string }) => (
+  <TooltipProvider delayDuration={200}>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex h-5 items-center gap-1 rounded bg-muted px-1.5 font-medium text-foreground text-xs">
+          <Lock className="h-3 w-3" aria-hidden="true" />
+          {t((on ? "settings.fixedOn" : "settings.fixedOff") as never)}
+          <span className="sr-only">{t("settings.setByCommunity" as never)}</span>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{t("settings.setByCommunity" as never)}</TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+);
 
 /**
  * One tool, one row: what this role may see, and what it may make.
@@ -99,8 +117,8 @@ const ToolPermissionRow = ({
   // The pair moves together (see handleTogglePermission), so a switch whose
   // change would move a partner the community set is held too.
   const held = {
-    view: locked.has(viewKey) || (canView && canCreate && locked.has(createKey)),
-    create: locked.has(createKey) || (!canCreate && !canView && locked.has(viewKey)),
+    view: canView && canCreate && locked.has(createKey),
+    create: !canCreate && !canView && locked.has(viewKey),
   };
 
   return (
@@ -122,12 +140,16 @@ const ToolPermissionRow = ({
             <span className="text-muted-foreground text-xs">
               {t(`settings.permissions.${permission}Short` as never)}
             </span>
-            <Switch
-              checked={checked}
-              disabled={disabled || held[permission]}
-              aria-label={t(PERMISSION_LABEL_KEYS[key] as never)}
-              onCheckedChange={(next) => onToggle(role, tool, permission, next)}
-            />
+            {locked.has(key) ? (
+              <SetByCommunity on={checked} t={t} />
+            ) : (
+              <Switch
+                checked={checked}
+                disabled={disabled || held[permission]}
+                aria-label={t(PERMISSION_LABEL_KEYS[key] as never)}
+                onCheckedChange={(next) => onToggle(role, tool, permission, next)}
+              />
+            )}
           </span>
         ))}
       </div>
@@ -342,9 +364,6 @@ export const InitiativeSettingsRolesTab = ({
                   )}
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {lockedFor(role).size > 0 && (
-                    <p className="text-muted-foreground text-xs">{t("settings.setByCommunity")}</p>
-                  )}
                   {/* One list of every tool the initiative uses. Projects and
                       files used to sit above a section headed "Tools",
                       which taught a split the app no longer has — they are
@@ -368,21 +387,21 @@ export const InitiativeSettingsRolesTab = ({
                       <span className="min-w-0 flex-1 text-sm">
                         {t(PERMISSION_LABEL_KEYS[key] as never)}
                       </span>
-                      <Switch
-                        checked={role.permissions[key] ?? false}
-                        disabled={
-                          !canManageMembers ||
-                          updateRoleMutation.isPending ||
-                          lockedFor(role).has(key)
-                        }
-                        aria-label={t(PERMISSION_LABEL_KEYS[key] as never)}
-                        onCheckedChange={(on) =>
-                          updateRoleMutation.mutate({
-                            roleId: role.id,
-                            data: { permissions: { ...role.permissions, [key]: on } },
-                          })
-                        }
-                      />
+                      {lockedFor(role).has(key) ? (
+                        <SetByCommunity on={role.permissions[key] ?? false} t={translate} />
+                      ) : (
+                        <Switch
+                          checked={role.permissions[key] ?? false}
+                          disabled={!canManageMembers || updateRoleMutation.isPending}
+                          aria-label={t(PERMISSION_LABEL_KEYS[key] as never)}
+                          onCheckedChange={(on) =>
+                            updateRoleMutation.mutate({
+                              roleId: role.id,
+                              data: { permissions: { ...role.permissions, [key]: on } },
+                            })
+                          }
+                        />
+                      )}
                     </div>
                   ))}
 

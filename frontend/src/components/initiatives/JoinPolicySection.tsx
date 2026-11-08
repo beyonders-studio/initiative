@@ -29,7 +29,7 @@ const SELECTABLE_POLICIES: readonly InitiativeJoinPolicy[] = [
   InitiativeJoinPolicy.open,
 ];
 
-const POLICY_LABEL_KEY: Record<InitiativeJoinPolicy, string> = {
+export const POLICY_LABEL_KEY: Record<InitiativeJoinPolicy, string> = {
   [InitiativeJoinPolicy.private]: "settings.joinPolicy.privateLabel",
   [InitiativeJoinPolicy.request]: "settings.joinPolicy.requestLabel",
   [InitiativeJoinPolicy.open]: "settings.joinPolicy.openLabel",

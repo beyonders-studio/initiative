@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Rules for every initiative read as sentences.** **Settings › Initiatives** lists only the rules your community has set, one line per tool ("Members can view posts but not create them"). **Add a rule** asks plain questions and names the initiatives the rule would change before you save it. In an initiative's settings, a value the community set shows as a lock and its value.
+- **The initiatives table shows who runs each one.** Project managers appear by name, each initiative shows how people join it, archived initiatives have their own view, and Archive and Delete are in each row's menu.
 - **Send feedback starts from what you want to say:** suggest an idea, something's not right, or give a compliment, each with its own question. It docks beside the page on a wide screen, keeps your draft when you close it, and takes a screenshot pasted into it. Feedback goes one way unless you tick that the team can contact you with questions; **Something's not right** points you to **Ask for help** for anything you need sorted out.
 - **A report thanks you in place.** Sending a report or a security report shows the thanks in its dialog, with an address to write to where the server gives one, rather than in a passing notice.
 - **Attach files from inside the box you write in.** Help requests, feedback, reports and replies to your tickets have a paperclip in the text box, whose tooltip says how many files and how large. Drop or paste a picture on the box to attach it, and attached pictures show as thumbnails.
