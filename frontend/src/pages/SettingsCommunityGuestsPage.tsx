@@ -32,6 +32,7 @@ import { TOOLS } from "@/lib/tools";
 import { getUrlHandle, getUserDisplayName } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Combobox } from "@/ui/combobox";
 import { DataTable } from "@/ui/data-table";
 import {
   Dialog,
@@ -45,7 +46,6 @@ import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import type { AppColumnDef } from "@/ui/lib/table";
-import { MultiSelect } from "@/ui/multi-select";
 import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { RelativeTime } from "@/ui/relative-time";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
@@ -305,14 +305,15 @@ export const SettingsCommunityGuestsPage = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="guest-initiatives">{t("guests.initiativesLabel")}</Label>
-              <MultiSelect
+              <Combobox
+                multiple
                 id="guest-initiatives"
-                selectedValues={initiativeIds}
-                options={(initiativesQuery.data ?? []).map((row) => ({
+                value={initiativeIds}
+                items={(initiativesQuery.data ?? []).map((row) => ({
                   value: String(row.id),
                   label: row.name,
                 }))}
-                onChange={setInitiativeIds}
+                onValueChange={setInitiativeIds}
                 placeholder={t("guests.initiativesPlaceholder")}
                 className="w-full max-w-72"
               />

@@ -52,9 +52,9 @@ import {
 import { getProjectColor } from "@/lib/projectColor";
 import { browserTimezone } from "@/lib/timezones";
 import { entityRefRoute, toolSettingsRoute } from "@/lib/tools";
+import { Combobox } from "@/ui/combobox";
 import { useWeekStart } from "@/ui/host";
 import { Label } from "@/ui/label";
-import { MultiSelect } from "@/ui/multi-select";
 import { CalendarGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 /** Where one person's view of their calendar is kept. What an older release
@@ -381,13 +381,14 @@ export const MyCalendar = ({ frame, framed = true }: MyCalendarProps) => {
             <Label className="mb-2 block font-medium text-muted-foreground text-xs">
               {t("tasks:filters.filterByCommunity")}
             </Label>
-            <MultiSelect
-              selectedValues={communityFilters.map(String)}
-              options={communities.map((community) => ({
+            <Combobox
+              multiple
+              value={communityFilters.map(String)}
+              items={communities.map((community) => ({
                 value: String(community.id),
                 label: community.name,
               }))}
-              onChange={(values) => {
+              onValueChange={(values) => {
                 const numericValues = values.map(Number).filter(Number.isFinite);
                 setCommunityFilters(numericValues);
               }}

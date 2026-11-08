@@ -31,9 +31,9 @@ import { toolsWithContent, useMyToolCounts, useMyToolRows } from "@/hooks/useMyT
 import { useToolBrowserSearch } from "@/hooks/useToolBrowserSearch";
 import { TOOL_ICONS, toolNavLabelKey, toolRouteSegment } from "@/lib/tools";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Combobox } from "@/ui/combobox";
 import { Label } from "@/ui/label";
 import { cn } from "@/ui/lib/utils";
-import { MultiSelect } from "@/ui/multi-select";
 import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
@@ -138,13 +138,14 @@ export function MyToolsPage() {
               >
                 {t("communities.label")}
               </Label>
-              <MultiSelect
-                selectedValues={communityFilters.map(String)}
-                options={communities.map((community) => ({
+              <Combobox
+                multiple
+                value={communityFilters.map(String)}
+                items={communities.map((community) => ({
                   value: String(community.id),
                   label: community.name,
                 }))}
-                onChange={(values) => {
+                onValueChange={(values) => {
                   const ids = values.map(Number).filter(Number.isFinite);
                   setSearch({
                     communities: ids.length > 0 ? ids.join(",") : undefined,

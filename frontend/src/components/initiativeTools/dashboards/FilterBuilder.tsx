@@ -49,9 +49,9 @@ import {
   optionLabelKey,
 } from "@/lib/widgets/conditions";
 import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
-import { MultiSelect } from "@/ui/multi-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 
@@ -429,11 +429,12 @@ function TaskTypeValues({
     }))
   );
   return (
-    <MultiSelect
-      selectedValues={selected}
-      options={choices}
+    <Combobox
+      multiple
+      value={selected}
+      items={choices}
       placeholder={t("filterBuilder.chooseValue")}
-      onChange={onChange}
+      onValueChange={onChange}
     />
   );
 }
@@ -610,12 +611,13 @@ function ValueControl({
       );
     }
     return (
-      <MultiSelect
-        selectedValues={list}
-        options={optionList}
+      <Combobox
+        multiple
+        value={list}
+        items={optionList}
         placeholder={t("dashboards:filterBuilder.chooseValue")}
         // Ids travel as numbers; "me" is the DSL's own token and stays a string.
-        onChange={(values) =>
+        onValueChange={(values) =>
           onChange(values.map((value) => (value === "me" ? value : Number(value))))
         }
       />

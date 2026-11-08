@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import type { ProjectRead } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +14,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/ui/dialog";
-import { SearchableCombobox } from "@/ui/searchable-combobox";
 
 type MoveTaskDialogProps = {
   trigger?: ReactNode;
@@ -95,7 +95,7 @@ export const MoveTaskDialog = ({
         ) : availableProjects.length === 0 ? (
           <p className="text-muted-foreground text-sm">{t("move.noProjects")}</p>
         ) : (
-          <SearchableCombobox
+          <Combobox
             items={comboboxItems}
             value={selectedValue}
             onValueChange={setSelectedValue}
