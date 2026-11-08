@@ -15,18 +15,19 @@ import { useTranslation } from "react-i18next";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
 import { taskDetails, taskPresets } from "@/components/layouts/details";
-import { LayoutEditor } from "@/components/layouts/LayoutEditor";
 import { taskLists } from "@/components/layouts/taskLists";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { useProject, useProjectTaskStatuses, useProjectTaskTypes } from "@/hooks/useProjects";
 import { useProperties } from "@/hooks/useProperties";
+import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 import { useRouteId } from "@/hooks/useRouteId";
 import { instanceTarget, useInstanceLayouts, useSaveLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { useLayoutPlugins } from "@/lib/layouts/plugins";
 import { initiativeRoute, toolSettingsRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
+import { LayoutEditor } from "@/ui/layouts/LayoutEditor";
 
 export const ProjectLayoutEditorPage = () => {
   const { layout } = useSearch({ strict: false }) as { layout?: string };
@@ -45,6 +46,10 @@ export const ProjectLayoutEditorPage = () => {
   const set = useInstanceLayouts(Tool.project, id).data;
   const save = useSaveLayouts(instanceTarget(Tool.project, id ?? 0));
   const plugins = useLayoutPlugins(project?.initiative_id, "task");
+  const propertyEnv = usePropertyEnv({
+    initiativeId: project?.initiative_id ?? null,
+    enabled: true,
+  });
   const editing = useMemo(
     () =>
       project && statuses && types && properties
@@ -69,6 +74,7 @@ export const ProjectLayoutEditorPage = () => {
       presets={presets}
       details={details}
       plugins={plugins}
+      propertyEnv={propertyEnv}
       layouts={set}
       save={save.mutateAsync}
       initialKind={layout}

@@ -13,7 +13,6 @@ import {
   asksForMetadata,
   RequiredMetadataDialog,
 } from "@/components/files/collections/RequiredMetadataDialog";
-import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { ReadyMadeGallery } from "@/components/shared/ReadyMadeGallery";
 import {
   useAddCollectionFiles,
@@ -41,6 +40,7 @@ import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { requiredKeys, type StoredRegions } from "@/ui/layouts/detailLayout";
 import { detailLayoutOf } from "@/ui/layouts/layoutSet";
+import { listLayoutLooks } from "@/ui/layouts/looks";
 import { listFormat } from "@/ui/lib/intl";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 

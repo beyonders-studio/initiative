@@ -13,21 +13,17 @@ import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { SHARED_LAYOUTS } from "@/components/layouts/details";
-import { LayoutEditor } from "@/components/layouts/LayoutEditor";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
-import {
-  NO_DEFINITIONS,
-  useAppendPropertyOption,
-  useOwnedDefinitions,
-} from "@/hooks/useProperties";
+import { NO_DEFINITIONS } from "@/hooks/useProperties";
+import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 import { useRouteId } from "@/hooks/useRouteId";
 import { sharedTarget, useSaveLayouts, useToolLayouts } from "@/hooks/useToolLayouts";
-import { useSearchMembers } from "@/hooks/useUsers";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { useLayoutPlugins } from "@/lib/layouts/plugins";
 import { initiativeRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
+import { LayoutEditor } from "@/ui/layouts/LayoutEditor";
 
 export const SharedLayoutEditorPage = ({ tool }: { tool: Tool }) => {
   const id = useRouteId("initiativeId");
@@ -41,15 +37,11 @@ export const SharedLayoutEditorPage = ({ tool }: { tool: Tool }) => {
   const shared = SHARED_LAYOUTS[tool];
   const details = useMemo(() => (id === null || !shared ? [] : [shared.detail(id)]), [id, shared]);
   const plugins = useLayoutPlugins(id, details[0]?.spec.kind);
-  const { data: definitions = NO_DEFINITIONS } = useOwnedDefinitions({
-    initiativeId: id ?? undefined,
-    enabled: id !== null && shared?.presets !== undefined,
-  });
-  const appendOption = useAppendPropertyOption();
-  const searchMembers = useSearchMembers();
+  const propertyEnv = usePropertyEnv({ initiativeId: id, enabled: true });
+  const { definitions, appendOption, searchMembers } = propertyEnv;
   const presets = useMemo(
-    () => shared?.presets?.(definitions, { appendOption, searchMembers }),
-    [shared, definitions, appendOption, searchMembers]
+    () => shared?.presets?.(definitions.data ?? NO_DEFINITIONS, { appendOption, searchMembers }),
+    [shared, definitions.data, appendOption, searchMembers]
   );
 
   if (!set || !target || id === null) return null;
@@ -64,6 +56,7 @@ export const SharedLayoutEditorPage = ({ tool }: { tool: Tool }) => {
       presets={presets}
       details={details}
       plugins={plugins}
+      propertyEnv={propertyEnv}
       layouts={set}
       save={save.mutateAsync}
       metadataHref={gp(`${initiativeRoute(id)}/settings/properties`)}

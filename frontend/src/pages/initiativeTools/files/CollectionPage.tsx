@@ -36,9 +36,8 @@ import { FileChooserDialog } from "@/components/files/FileChooserDialog";
 import { COLLECTION_SORT_FIELDS } from "@/components/files/fileColumns";
 import { ToolFilterPanel } from "@/components/initiativeTools/shared/ToolFilterPanel";
 import { ToolListToolbar } from "@/components/initiativeTools/shared/ToolListToolbar";
-import { LayoutsOverview } from "@/components/layouts/LayoutList";
 import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
-import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
+import { detailLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { ToolChest } from "@/components/tools/ToolChest";
 import {
@@ -86,7 +85,9 @@ import { Label } from "@/ui/label";
 import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
 import { requiredKeys, type StoredRegions } from "@/ui/layouts/detailLayout";
 import { withDisplays } from "@/ui/layouts/fields";
+import { LayoutsOverview } from "@/ui/layouts/LayoutList";
 import { detailLayoutOf, listLayouts } from "@/ui/layouts/layoutSet";
+import { listLayoutLooks } from "@/ui/layouts/looks";
 import { formatPeriod } from "@/ui/lib/formatDate";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { Lightbox, type LightboxItem } from "@/ui/lightbox";
@@ -811,6 +812,7 @@ export function CollectionPage() {
             </DialogHeader>
             <LayoutsOverview
               layouts={layoutsQuery.data.layouts}
+              pageLooks={detailLayoutLooks}
               save={saveLayouts.mutateAsync}
               editor={gp(`${collectionRoute(collection.initiative_id, collection.id)}/layouts`)}
             />

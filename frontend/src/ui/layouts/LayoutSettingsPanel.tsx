@@ -130,7 +130,7 @@ export const ListLayoutSettings = ({
             </div>
           ) : null}
           {presets ? (
-            <LayoutPresets layout={layout} of={presets} fields={fields} edits={edits} />
+            <LayoutPresets t={t} layout={layout} of={presets} fields={fields} edits={edits} />
           ) : null}
           {settings}
           <Shipped t={t} stored={stored} edits={edits} />

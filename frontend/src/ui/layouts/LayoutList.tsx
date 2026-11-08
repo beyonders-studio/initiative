@@ -7,10 +7,10 @@ import type {
   ListLayoutDefinitionInput,
   ListLayoutRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { layoutLook } from "@/components/projects/projectTasksConfig";
 import { Button } from "@/ui/button";
 import { host } from "@/ui/host";
 import { isListLayout, type LayoutChange } from "@/ui/layouts/layoutSet";
+import { type LayoutLook, listLayoutLooks } from "@/ui/layouts/looks";
 import { formatDateTime } from "@/ui/lib/formatDate";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import { Switch } from "@/ui/switch";
@@ -23,6 +23,9 @@ type SaveLayouts = (changes: LayoutChange[]) => Promise<unknown>;
 /** Asks whether to delete the task type `typeId` with its page, while it is
  *  set; `onClose` puts it away. */
 type TypeDelete = (typeId: number | null, onClose: () => void) => ReactNode;
+
+/** Each kind of page's icon and name. */
+type PageLooks = Record<DetailLayoutRead["kind"], LayoutLook>;
 
 const noop = () => {};
 
@@ -57,11 +60,13 @@ const setOf = (definition: ListLayoutRead["definition"]) =>
  */
 export const LayoutList = ({
   layouts,
+  pageLooks,
   save,
   typeDelete,
   editor,
 }: {
   layouts: Layout[];
+  pageLooks: PageLooks;
   /** Saves a view shown or hidden; left out, the list only reads. */
   save?: SaveLayouts;
   typeDelete?: TypeDelete;
@@ -76,7 +81,9 @@ export const LayoutList = ({
   const typed = pages.filter((page) => "task_type_id" in page && page.task_type_id).length;
 
   const row = (layout: Layout) => {
-    const { icon: Icon, labelKey } = layoutLook(layout.kind);
+    const { icon: Icon, labelKey } = isListLayout(layout)
+      ? listLayoutLooks[layout.kind]
+      : pageLooks[layout.kind];
     const typeId = "task_type_id" in layout ? layout.task_type_id : null;
     const name =
       typeId && "task_type_name" in layout
@@ -186,11 +193,13 @@ export const LayoutList = ({
  */
 export const LayoutsOverview = ({
   layouts,
+  pageLooks,
   save,
   typeDelete,
   editor,
 }: {
   layouts: Layout[];
+  pageLooks: PageLooks;
   save: SaveLayouts;
   typeDelete?: TypeDelete;
   /** The layout editor's address. */
@@ -202,6 +211,7 @@ export const LayoutsOverview = ({
     <div className="space-y-4">
       <LayoutList
         layouts={layouts}
+        pageLooks={pageLooks}
         save={save}
         typeDelete={typeDelete}
         editor={wide ? editor : undefined}

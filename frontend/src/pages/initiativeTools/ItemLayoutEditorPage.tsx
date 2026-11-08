@@ -13,16 +13,17 @@ import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { ITEM_DETAILS } from "@/components/layouts/details";
-import { LayoutEditor } from "@/components/layouts/LayoutEditor";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
+import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 import { useRouteId } from "@/hooks/useRouteId";
 import { instanceTarget, useInstanceLayouts, useSaveLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { useLayoutPlugins } from "@/lib/layouts/plugins";
 import { initiativeRoute, toolCamelSingular, toolSettingsSectionRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
+import { LayoutEditor } from "@/ui/layouts/LayoutEditor";
 
 export const ItemLayoutEditorPage = ({ tool }: { tool: Tool }) => {
   const id = useRouteId(`${toolCamelSingular(tool)}Id`);
@@ -41,6 +42,7 @@ export const ItemLayoutEditorPage = ({ tool }: { tool: Tool }) => {
     [initiativeId, id, detail]
   );
   const plugins = useLayoutPlugins(initiativeId, details[0]?.spec.kind);
+  const propertyEnv = usePropertyEnv({ initiativeId, enabled: true });
 
   if (!set || id === null || initiativeId === null) return null;
   if (!set.can_configure) return <SettingsPermissionRequired scope="tool" />;
@@ -53,6 +55,7 @@ export const ItemLayoutEditorPage = ({ tool }: { tool: Tool }) => {
       initiativeId={initiativeId}
       details={details}
       plugins={plugins}
+      propertyEnv={propertyEnv}
       layouts={set}
       save={save.mutateAsync}
       metadataHref={gp(`${initiativeRoute(initiativeId)}/settings/properties`)}

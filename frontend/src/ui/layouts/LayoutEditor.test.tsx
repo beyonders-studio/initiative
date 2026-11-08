@@ -36,8 +36,16 @@ import {
   type ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
+import {
+  calendarPresets,
+  eventDetail,
+  taskDetails,
+  taskPresets,
+} from "@/components/layouts/details";
+import { taskLists } from "@/components/layouts/taskLists";
 import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { useProperties } from "@/hooks/useProperties";
+import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 import {
   instanceTarget,
   sharedTarget,
@@ -51,9 +59,7 @@ import type { TranslateFn } from "@/types/i18n";
 import { MAX_PRESETS } from "@/ui/layouts/presets";
 import type { LayoutNode } from "@/ui/layouts/tree";
 
-import { calendarPresets, eventDetail, taskDetails, taskPresets } from "./details";
 import { LayoutEditor } from "./LayoutEditor";
-import { taskLists } from "./taskLists";
 
 const STATUSES = buildDefaultTaskStatuses(1);
 const TASK_TYPE = {
@@ -121,6 +127,7 @@ const EditorPage = ({
   const project = useProjectLayouts();
   const save = useSaveLayouts(target);
   const plugins = useLayoutPlugins(1, calendar ? "calendar_event" : "task");
+  const propertyEnv = usePropertyEnv({ initiativeId: 1, enabled: true });
   return read && project ? (
     <LayoutEditor
       t={t as TranslateFn}
@@ -129,6 +136,7 @@ const EditorPage = ({
       details={calendar ? CALENDAR_DETAILS : project.details}
       presets={calendar ? CALENDAR_PRESETS : project.presets}
       plugins={plugins}
+      propertyEnv={propertyEnv}
       layouts={read}
       save={save.mutateAsync}
       initialKind={kind}

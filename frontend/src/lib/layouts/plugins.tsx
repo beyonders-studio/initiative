@@ -19,7 +19,6 @@ import {
   type PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import type { PluginDataParam } from "@/api/pluginData";
-import type { LayoutPlugins } from "@/components/layouts/LayoutEditor";
 import { PluginParamControl } from "@/components/plugins/PluginParamControl";
 import contract from "@/contract/manifest.contract.json";
 import { useCommunityPlugins, useRunPluginAction } from "@/hooks/useCommunityPlugins";
@@ -38,6 +37,7 @@ import {
 } from "@/ui/dialog";
 import { DropdownMenuItem } from "@/ui/dropdown-menu";
 import type { FieldDef, FieldRendererProps } from "@/ui/layouts/fields";
+import type { LayoutPlugins } from "@/ui/layouts/LayoutEditor";
 import { Section } from "@/ui/layouts/section";
 import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
 import { numberFormat } from "@/ui/lib/intl";

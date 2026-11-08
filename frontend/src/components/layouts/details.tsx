@@ -45,12 +45,12 @@ import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { type DetailKind, DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
 import type { StoredRegions } from "@/ui/layouts/detailLayout";
+import type { EditableDetail } from "@/ui/layouts/LayoutEditor";
+import { editablePresets } from "@/ui/layouts/LayoutPresets";
 import type { LayoutNode } from "@/ui/layouts/tree";
 import { PropertyFilter } from "@/ui/properties/PropertyFilter";
 import type { PropertyInputProps } from "@/ui/properties/PropertyInput";
 
-import type { EditableDetail } from "./LayoutEditor";
-import { editablePresets } from "./LayoutPresets";
 import { TaskSortPicker } from "./TaskSortPicker";
 import type { LayoutProject } from "./taskLists";
 

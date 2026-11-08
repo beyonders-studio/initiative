@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
 
 import { type InitiativeToolLayoutsRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { SHARED_LAYOUTS } from "@/components/layouts/details";
-import { LayoutList } from "@/components/layouts/LayoutList";
+import { detailLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { TaskTypeDeleteDialog } from "@/components/projects/TaskTypeDeleteDialog";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { SettingsSection } from "@/components/settings/SettingsSection";
@@ -33,6 +33,7 @@ import {
   toolNavLabelKey,
 } from "@/lib/tools";
 import { Button } from "@/ui/button";
+import { LayoutList } from "@/ui/layouts/LayoutList";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import { StatusMessage } from "@/ui/status-message";
 
@@ -126,6 +127,7 @@ const InstanceLayouts = ({
       </div>
       <LayoutList
         layouts={entry.layouts}
+        pageLooks={detailLayoutLooks}
         save={entry.can_configure ? save.mutateAsync : undefined}
         typeDelete={
           entry.can_configure && entry.tool === Tool.project
@@ -168,7 +170,7 @@ const SharedLayouts = ({ tool, initiativeId }: { tool: Tool; initiativeId: numbe
           </Button>
         ) : null}
       </div>
-      <LayoutList layouts={details} />
+      <LayoutList layouts={details} pageLooks={detailLayoutLooks} />
     </section>
   );
 };
