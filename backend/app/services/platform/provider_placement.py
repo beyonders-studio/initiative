@@ -752,10 +752,33 @@ async def update_rule(
     await _require_placeable(
         session, provider_id=row.provider_id, guild_id=row.guild_id
     )
+    initiative = await rewrite_rule(
+        session,
+        row,
+        payload.model_dump(exclude_unset=True),
+        fields=AUDITED_FIELDS,
+        actor_user_id=actor_user_id,
+        record={"via": "platform", "author": ClaimRuleAuthor.provider.value},
+    )
+    return await _read_one(session, row, initiative)
+
+
+async def rewrite_rule(
+    session: AsyncSession,
+    row: OIDCClaimMapping,
+    data: dict,
+    *,
+    fields: Collection[str],
+    actor_user_id: int | None,
+    record: dict,
+) -> RuleInitiative | None:
+    """Change what a placement rule matches or where it lands, a platform
+    rule or a community's own: record what moved, commit, and retire the place
+    it left. ``data`` holds only the fields being changed; ``record`` says
+    whose rule it is in the audit line. Returns where it places people now."""
     assert row.id is not None
     was = (await rule_initiatives(row.guild_id, [row], named=False)).get(row.id)
-    before = audited(row, AUDITED_FIELDS, was)
-    data = payload.model_dump(exclude_unset=True)
+    before = audited(row, fields, was)
 
     row.claim_value, row.scope_claim, row.scope_value = _clean_match(
         data["claim_value"] if "claim_value" in data else row.claim_value,
@@ -789,9 +812,7 @@ async def update_rule(
         excluding=row.id,
     )
     session.add(row)
-    changed = audit_service.changed_fields(
-        before, audited(row, AUDITED_FIELDS, initiative)
-    )
+    changed = audit_service.changed_fields(before, audited(row, fields, initiative))
     if changed["changed"]:
         await audit_service.record(
             session,
@@ -800,11 +821,7 @@ async def update_rule(
             guild_id=row.guild_id,
             target_type="claim_rule",
             target_id=row.id,
-            detail={
-                "via": "platform",
-                "author": ClaimRuleAuthor.provider.value,
-                **changed,
-            },
+            detail={**record, **changed},
         )
     await session.commit()
     if initiative is None:
@@ -817,7 +834,7 @@ async def update_rule(
             row.guild_id, row.id, before=row.placement_version - 1
         )
     await session.refresh(row)
-    return await _read_one(session, row, initiative)
+    return initiative
 
 
 async def delete_rule(

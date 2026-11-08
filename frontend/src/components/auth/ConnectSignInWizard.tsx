@@ -14,8 +14,9 @@
  *   3. Where they land — joining on arrival, and a first group rule
  *   4. Do we insist    — only where the reader may set the requirement
  *
- * Editing an arrangement does not come through here. Somebody changing one
- * field should not walk three screens, so the list on the page edits in place.
+ * Editing a connection comes through here too. It opens on the narrowing with
+ * the connection's own answers and asks only the two questions that belong to
+ * the connection: whose people, and whether they join on arrival.
  */
 
 import { useState } from "react";
@@ -32,6 +33,7 @@ import {
   useConnectProvider,
   useCreateClaimRule,
   useUpdateCommunityAuthSettings,
+  useUpdateProviderConnection,
 } from "@/hooks/useCommunityAuthPolicy";
 import { useWizard } from "@/hooks/useWizard";
 import { getErrorMessage } from "@/lib/errorMessage";
@@ -46,7 +48,7 @@ import { WizardDialog } from "@/ui/wizard-dialog";
 
 /** Which claim narrows which provider. Each one spells "our tenant"
  *  differently, and only the provider knows which word it uses. */
-const NARROWING_CLAIMS = ["hd", "tid", "groups", "domain"] as const;
+export const NARROWING_CLAIMS = ["hd", "tid", "groups", "domain"] as const;
 
 /** The server takes any claim name (``guild_provider_connections.claim`` is a
  *  64-character string), so the four above are shortcuts rather than the whole
@@ -68,10 +70,11 @@ export interface ConnectSignInWizardProps {
   onOpenChange: (open: boolean) => void;
   /** Whether this reader may also make the provider the way in. */
   canRequire: boolean;
-  /** Open on this provider rather than on the picker — taking over an
-   *  arrangement the deployment answered for, where the provider is already
-   *  decided and only the narrowing is the community's to write. */
-  startOn?: number | null;
+  /** Open on this connection's narrowing rather than on the picker. One the
+   *  deployment answers for is taken over: the provider is already decided,
+   *  and saving writes a connection of the community's own from its answers.
+   *  One of the community's own is edited. */
+  connection?: CommunityProviderConnectionRead | null;
 }
 
 export const ConnectSignInWizard = ({
@@ -79,25 +82,22 @@ export const ConnectSignInWizard = ({
   open,
   onOpenChange,
   canRequire,
-  startOn = null,
+  connection = null,
 }: ConnectSignInWizardProps) => {
   const { t } = useTranslation(["settings", "common"]);
-  const { step, go, back, canGoBack, reset } = useWizard<Step>("provider");
+  const { step, go, back, canGoBack, reset, commit } = useWizard<Step>("provider");
 
   const availableQuery = useConnectableProviders(communityId);
   const connectionsQuery = useCommunityProviderConnections(communityId);
   const connect = useConnectProvider(communityId);
   const createRule = useCreateClaimRule(communityId);
   const updatePolicy = useUpdateCommunityAuthSettings(communityId);
+  const updateConnection = useUpdateProviderConnection(communityId);
 
-  const [providerId, setProviderId] = useState<number | null>(startOn);
-  // The wizard stays mounted between openings, so a provider chosen for it
-  // has to land each time it opens rather than only on the first mount.
-  const [prev, setPrev] = useState({ open, startOn });
-  if (prev.open !== open || prev.startOn !== startOn) {
-    setPrev({ open, startOn });
-    if (open && startOn !== null) setProviderId(startOn);
-  }
+  // The connection being edited, when it is one of the community's own.
+  const editingId = connection && !connection.inherited ? connection.id : null;
+
+  const [providerId, setProviderId] = useState<number | null>(null);
   const [claim, setClaim] = useState("");
   // Whether the claim is being typed rather than picked from the shortcuts.
   const [customClaim, setCustomClaim] = useState(false);
@@ -107,6 +107,37 @@ export const ConnectSignInWizard = ({
   const [ruleRole, setRuleRole] = useState("member");
   const [insist, setInsist] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  /** Fill in the narrowing and joining from a connection already in force. A
+   *  claim that is not one of the shortcuts is shown as typed. */
+  const seed = (
+    row: Pick<
+      CommunityProviderConnectionRead,
+      "provider_id" | "claim" | "claim_values" | "auto_join"
+    >
+  ) => {
+    setProviderId(row.provider_id);
+    setCustomClaim(
+      Boolean(row.claim) && !(NARROWING_CLAIMS as readonly string[]).includes(row.claim ?? "")
+    );
+    setClaim(row.claim ?? "");
+    setClaimValues(row.claim_values.join(", "));
+    setAutoJoin(row.auto_join);
+  };
+
+  // The wizard stays mounted between openings, so a connection it is opened
+  // on has to land each time it opens, the first mount included.
+  const [prev, setPrev] = useState<{
+    open: boolean;
+    connection: CommunityProviderConnectionRead | null;
+  }>({ open: false, connection: null });
+  if (prev.open !== open || prev.connection !== connection) {
+    setPrev({ open, connection });
+    if (open && connection) {
+      seed(connection);
+      commit("narrowing");
+    }
+  }
 
   const connections: CommunityProviderConnectionRead[] = connectionsQuery.data ?? [];
   // A provider the community merely inherits stays choosable: connecting to it
@@ -121,11 +152,15 @@ export const ConnectSignInWizard = ({
   );
 
   // The requirement is a question only somebody who may answer it is asked,
-  // so the wizard is three steps long for everybody else.
-  const steps: Step[] = canRequire
-    ? ["provider", "narrowing", "landing", "insist"]
-    : ["provider", "narrowing", "landing"];
-  const landingIsLast = !canRequire;
+  // so the wizard is three steps long for everybody else, and an edit asks
+  // only the connection's own two.
+  const steps: Step[] =
+    editingId !== null
+      ? ["narrowing", "landing"]
+      : canRequire
+        ? ["provider", "narrowing", "landing", "insist"]
+        : ["provider", "narrowing", "landing"];
+  const landingIsLast = editingId !== null || !canRequire;
 
   const values = splitValues(claimValues);
   const narrowed = claim !== "" && values.length > 0;
@@ -153,10 +188,14 @@ export const ConnectSignInWizard = ({
   /** Choosing a provider carries the deployment's answer forward where there
    *  is one, so taking an arrangement over starts from it rather than blank. */
   const chooseProvider = (row: ConnectableProviderRead) => {
-    const inherited = inheritedByProvider.get(row.id);
-    setProviderId(row.id);
-    setClaim(inherited?.claim ?? "");
-    setClaimValues(inherited?.claim_values.join(", ") ?? "");
+    seed(
+      inheritedByProvider.get(row.id) ?? {
+        provider_id: row.id,
+        claim: null,
+        claim_values: [],
+        auto_join: false,
+      }
+    );
     go("narrowing");
   };
 
@@ -164,6 +203,15 @@ export const ConnectSignInWizard = ({
     if (providerId === null) return;
     setSaving(true);
     try {
+      if (editingId !== null) {
+        await updateConnection.mutateAsync({
+          connectionId: editingId,
+          data: { claim, claim_values: values, auto_join: autoJoin },
+        });
+        toast.success(t("settings:communityAuth.connections.saved"));
+        closeWizard();
+        return;
+      }
       await connect.mutateAsync({
         provider_id: providerId,
         claim: narrowed ? claim : null,
@@ -337,40 +385,42 @@ export const ConnectSignInWizard = ({
             />
           </div>
 
-          <div className="space-y-3 rounded-md border bg-muted/40 p-3">
-            <div className="space-y-1">
-              <Label htmlFor="wizard-rule-group">
-                {t("settings:communityAuth.wizard.ruleTitle")}
-              </Label>
-              <p className="text-muted-foreground text-xs">
-                {t("settings:communityAuth.wizard.ruleHelp")}
-              </p>
+          {editingId === null && (
+            <div className="space-y-3 rounded-md border bg-muted/40 p-3">
+              <div className="space-y-1">
+                <Label htmlFor="wizard-rule-group">
+                  {t("settings:communityAuth.wizard.ruleTitle")}
+                </Label>
+                <p className="text-muted-foreground text-xs">
+                  {t("settings:communityAuth.wizard.ruleHelp")}
+                </p>
+              </div>
+              <Input
+                id="wizard-rule-group"
+                value={ruleGroup}
+                placeholder={t("settings:communityAuth.rules.groupPlaceholder")}
+                onChange={(event) => setRuleGroup(event.target.value)}
+              />
+              <div className="space-y-2">
+                <Label htmlFor="wizard-rule-role">
+                  {t("settings:communityAuth.rules.standingLabel")}
+                </Label>
+                <Select value={ruleRole} onValueChange={setRuleRole}>
+                  <SelectTrigger id="wizard-rule-role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="member">
+                      {t("settings:communityAuth.rules.role.member")}
+                    </SelectItem>
+                    <SelectItem value="admin">
+                      {t("settings:communityAuth.rules.role.admin")}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <Input
-              id="wizard-rule-group"
-              value={ruleGroup}
-              placeholder={t("settings:communityAuth.rules.groupPlaceholder")}
-              onChange={(event) => setRuleGroup(event.target.value)}
-            />
-            <div className="space-y-2">
-              <Label htmlFor="wizard-rule-role">
-                {t("settings:communityAuth.rules.standingLabel")}
-              </Label>
-              <Select value={ruleRole} onValueChange={setRuleRole}>
-                <SelectTrigger id="wizard-rule-role">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="member">
-                    {t("settings:communityAuth.rules.role.member")}
-                  </SelectItem>
-                  <SelectItem value="admin">
-                    {t("settings:communityAuth.rules.role.admin")}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          )}
 
           <Button
             className="w-full"
@@ -380,9 +430,11 @@ export const ConnectSignInWizard = ({
           >
             {saving
               ? t("settings:authProviders.saving")
-              : landingIsLast
-                ? t("settings:authProviders.wizard.connect")
-                : t("common:next")}
+              : editingId !== null
+                ? t("common:save")
+                : landingIsLast
+                  ? t("settings:authProviders.wizard.connect")
+                  : t("common:next")}
           </Button>
         </div>
       )}
