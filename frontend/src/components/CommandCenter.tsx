@@ -24,7 +24,7 @@ import { type SearchSuggestion, Tool } from "@/api/generated/initiativeAPI.schem
 import { InitiativeMark } from "@/components/icons/InitiativeMark";
 import { SearchCategoryTabs } from "@/components/search/SearchCategoryTabs";
 import { getOpenCreateTaskWizard } from "@/components/tasks/CreateTaskWizard";
-import { openFeedback, useFeedbackOffered } from "@/components/tickets/FeedbackSheet";
+import { useFeedback } from "@/components/tickets/FeedbackSheet";
 import { useSecurityReporting } from "@/components/tickets/ReportSecurityProblem";
 import { getOpenCreateToolWizard } from "@/components/tools/CreateToolWizard";
 import { MentionText } from "@/components/user/MentionText";
@@ -261,7 +261,7 @@ export function CommandCenter() {
   const dmEnabled = useDirectMessagesEnabled();
   const hasTickets = useHasFiledTickets();
   const securityReporting = useSecurityReporting();
-  const feedbackOffered = useFeedbackOffered();
+  const feedback = useFeedback();
   const showPlatformSettings = canManagePlatformConfig(user);
   const showOperatorDashboard = canAccessOperatorDashboard(user);
 
@@ -458,12 +458,12 @@ export function CommandCenter() {
               <span>{t("actions.reportSecurityProblem")}</span>
             </CommandItem>
           )}
-          {feedbackOffered && (
+          {feedback.offered && (
             <CommandItem
               value="action-send-feedback"
               onSelect={() => {
                 setOpen(false);
-                openFeedback();
+                feedback.open();
               }}
             >
               <MessageSquareHeart className="text-muted-foreground" />

@@ -304,10 +304,17 @@
     "discard": "Abandonner",
     "writeSomething": "Écrivez quelque chose pour l'envoyer.",
     "submit": "Envoyer l'avis",
+    "signInToSend": "Se connecter pour envoyer",
     "thanks": "Merci pour votre avis !",
     "thanksBody": "L'équipe lit chaque message.",
     "done": "Terminé",
     "error": "Impossible d'envoyer. Réessayez dans un instant."
+  },
+  "feedbackSwitch": {
+    "title": "Avis",
+    "description": "Les idées, les problèmes et les compliments vont à l'équipe qui fait Initiative. Désactivé, personne ici ne voit Envoyer un avis et rien n'est envoyé.",
+    "label": "Permettre d'envoyer un avis à l'équipe d'Initiative",
+    "error": "Impossible de modifier ce réglage. Réessayez dans un instant."
   },
   "moderationTopics": {
     "appeal": "Recours contre votre suspension"

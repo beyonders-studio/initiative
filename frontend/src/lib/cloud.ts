@@ -5,6 +5,9 @@
 export const CLOUD_ORIGIN = __CLOUD_ORIGIN__;
 export const CLOUD_SERVER_URL = `${CLOUD_ORIGIN}/api/v1`;
 
+/** Whether a server's origin is Initiative Cloud's. */
+export const isCloudOrigin = (origin: string | null): boolean => origin === CLOUD_ORIGIN;
+
 /**
  * Whether Initiative Cloud is open. Until it is, the apps offer it as coming
  * soon and a fresh install starts with no server; once it is, the apps start

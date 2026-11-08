@@ -304,10 +304,17 @@
     "discard": "Verwerfen",
     "writeSomething": "Schreib etwas, um es zu senden.",
     "submit": "Feedback senden",
+    "signInToSend": "Zum Senden anmelden",
     "thanks": "Danke für dein Feedback!",
     "thanksBody": "Das Team liest jede Rückmeldung.",
     "done": "Fertig",
     "error": "Das konnte nicht gesendet werden. Versuch es gleich noch einmal."
+  },
+  "feedbackSwitch": {
+    "title": "Feedback",
+    "description": "Ideen, Probleme und Lob gehen an das Team, das Initiative macht. Ausgeschaltet sieht hier niemand „Feedback senden“, und nichts wird gesendet.",
+    "label": "Feedback an das Initiative-Team erlauben",
+    "error": "Das ließ sich nicht ändern. Versuch es gleich noch einmal."
   },
   "moderationTopics": {
     "appeal": "Einspruch gegen deine Sperre"

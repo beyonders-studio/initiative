@@ -13,6 +13,7 @@ import { Route as ServerRequiredRouteImport } from './routes/_serverRequired'
 import { Route as ServerRequiredAuthenticatedRouteImport } from './routes/_serverRequired/_authenticated'
 import { Route as ServerRequiredDemoRouteImport } from './routes/_serverRequired/demo'
 import { Route as ServerRequiredDownloadRouteImport } from './routes/_serverRequired/download'
+import { Route as ServerRequiredFeedbackRouteImport } from './routes/_serverRequired/feedback'
 import { Route as ServerRequiredForgotPasswordRouteImport } from './routes/_serverRequired/forgot-password'
 import { Route as ServerRequiredLoginRouteImport } from './routes/_serverRequired/login'
 import { Route as ServerRequiredPricingRouteImport } from './routes/_serverRequired/pricing'
@@ -205,6 +206,11 @@ const ServerRequiredDemoRoute = ServerRequiredDemoRouteImport.update({
 const ServerRequiredDownloadRoute = ServerRequiredDownloadRouteImport.update({
   id: '/download',
   path: '/download',
+  getParentRoute: () => ServerRequiredRoute,
+} as any)
+const ServerRequiredFeedbackRoute = ServerRequiredFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
   getParentRoute: () => ServerRequiredRoute,
 } as any)
 const ServerRequiredForgotPasswordRoute =
@@ -1513,6 +1519,7 @@ export interface FileRoutesByFullPath {
   '/': typeof ServerRequiredAuthenticatedIndexRoute
   '/demo': typeof ServerRequiredDemoRoute
   '/download': typeof ServerRequiredDownloadRoute
+  '/feedback': typeof ServerRequiredFeedbackRoute
   '/forgot-password': typeof ServerRequiredForgotPasswordRoute
   '/login': typeof ServerRequiredLoginRoute
   '/pricing': typeof ServerRequiredPricingRoute
@@ -1691,6 +1698,7 @@ export interface FileRoutesByTo {
   '/': typeof ServerRequiredAuthenticatedIndexRoute
   '/demo': typeof ServerRequiredDemoRoute
   '/download': typeof ServerRequiredDownloadRoute
+  '/feedback': typeof ServerRequiredFeedbackRoute
   '/forgot-password': typeof ServerRequiredForgotPasswordRoute
   '/login': typeof ServerRequiredLoginRoute
   '/pricing': typeof ServerRequiredPricingRoute
@@ -1854,6 +1862,7 @@ export interface FileRoutesById {
   '/_serverRequired/_authenticated': typeof ServerRequiredAuthenticatedRouteWithChildren
   '/_serverRequired/demo': typeof ServerRequiredDemoRoute
   '/_serverRequired/download': typeof ServerRequiredDownloadRoute
+  '/_serverRequired/feedback': typeof ServerRequiredFeedbackRoute
   '/_serverRequired/forgot-password': typeof ServerRequiredForgotPasswordRoute
   '/_serverRequired/login': typeof ServerRequiredLoginRoute
   '/_serverRequired/pricing': typeof ServerRequiredPricingRoute
@@ -2035,6 +2044,7 @@ export interface FileRouteTypes {
     | '/'
     | '/demo'
     | '/download'
+    | '/feedback'
     | '/forgot-password'
     | '/login'
     | '/pricing'
@@ -2213,6 +2223,7 @@ export interface FileRouteTypes {
     | '/'
     | '/demo'
     | '/download'
+    | '/feedback'
     | '/forgot-password'
     | '/login'
     | '/pricing'
@@ -2375,6 +2386,7 @@ export interface FileRouteTypes {
     | '/_serverRequired/_authenticated'
     | '/_serverRequired/demo'
     | '/_serverRequired/download'
+    | '/_serverRequired/feedback'
     | '/_serverRequired/forgot-password'
     | '/_serverRequired/login'
     | '/_serverRequired/pricing'
@@ -2584,6 +2596,13 @@ declare module '@tanstack/react-router' {
       path: '/download'
       fullPath: '/download'
       preLoaderRoute: typeof ServerRequiredDownloadRouteImport
+      parentRoute: typeof ServerRequiredRoute
+    }
+    '/_serverRequired/feedback': {
+      id: '/_serverRequired/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof ServerRequiredFeedbackRouteImport
       parentRoute: typeof ServerRequiredRoute
     }
     '/_serverRequired/forgot-password': {
@@ -4501,6 +4520,7 @@ interface ServerRequiredRouteChildren {
   ServerRequiredAuthenticatedRoute: typeof ServerRequiredAuthenticatedRouteWithChildren
   ServerRequiredDemoRoute: typeof ServerRequiredDemoRoute
   ServerRequiredDownloadRoute: typeof ServerRequiredDownloadRoute
+  ServerRequiredFeedbackRoute: typeof ServerRequiredFeedbackRoute
   ServerRequiredForgotPasswordRoute: typeof ServerRequiredForgotPasswordRoute
   ServerRequiredLoginRoute: typeof ServerRequiredLoginRoute
   ServerRequiredPricingRoute: typeof ServerRequiredPricingRoute
@@ -4523,6 +4543,7 @@ const ServerRequiredRouteChildren: ServerRequiredRouteChildren = {
     ServerRequiredAuthenticatedRouteWithChildren,
   ServerRequiredDemoRoute: ServerRequiredDemoRoute,
   ServerRequiredDownloadRoute: ServerRequiredDownloadRoute,
+  ServerRequiredFeedbackRoute: ServerRequiredFeedbackRoute,
   ServerRequiredForgotPasswordRoute: ServerRequiredForgotPasswordRoute,
   ServerRequiredLoginRoute: ServerRequiredLoginRoute,
   ServerRequiredPricingRoute: ServerRequiredPricingRoute,

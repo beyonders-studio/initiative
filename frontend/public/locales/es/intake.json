@@ -304,10 +304,17 @@
     "discard": "Descartar",
     "writeSomething": "Escribe algo para enviarlo.",
     "submit": "Enviar comentarios",
+    "signInToSend": "Inicia sesión para enviar",
     "thanks": "¡Gracias por tu opinión!",
     "thanksBody": "El equipo lee cada una.",
     "done": "Listo",
     "error": "No se pudo enviar. Inténtalo de nuevo en un momento."
+  },
+  "feedbackSwitch": {
+    "title": "Comentarios",
+    "description": "Las ideas, los problemas y los elogios van al equipo que hace Initiative. Desactivado, aquí nadie ve Enviar comentarios y no se envía nada.",
+    "label": "Permitir enviar comentarios al equipo de Initiative",
+    "error": "No se pudo cambiar. Inténtalo de nuevo en un momento."
   },
   "moderationTopics": {
     "appeal": "Apelación contra tu suspensión"

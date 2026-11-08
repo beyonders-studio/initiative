@@ -304,10 +304,17 @@
     "discard": "Discard",
     "writeSomething": "Write something to send.",
     "submit": "Send feedback",
+    "signInToSend": "Sign in to send",
     "thanks": "Thanks for the feedback!",
     "thanksBody": "The team reads every one.",
     "done": "Done",
     "error": "Could not send that. Try again in a moment."
+  },
+  "feedbackSwitch": {
+    "title": "Feedback",
+    "description": "Ideas, problems and compliments go to the team that makes Initiative. Off, nobody here is offered Send feedback and nothing is sent.",
+    "label": "Let people send feedback to the Initiative team",
+    "error": "Could not change that. Try again in a moment."
   },
   "moderationTopics": {
     "appeal": "Appeal against your suspension"

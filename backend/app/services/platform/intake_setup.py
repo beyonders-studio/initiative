@@ -21,7 +21,7 @@ from fastapi import HTTPException, status as http_status
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.intake import Conversation, IntakeStream, meta
+from app.core.intake import Conversation, IntakeStream, meta, offered_streams
 from app.core.tools import Tool
 from app.core.messages import GuildMessages, InitiativeMessages, IntakeMessages
 from app.db import cohorts, operations_schema
@@ -154,11 +154,14 @@ async def set_stream_contact(
 
 
 async def contacts(session: AsyncSession) -> tuple[Optional[str], dict[str, str]]:
-    """The general address and every stream's own, as set."""
+    """The general address and the own address of every stream this server
+    takes, as set."""
     row = (await session.exec(select(AppSetting).where(AppSetting.id == 1))).first()
     if row is None:
         return None, {}
-    return row.intake_general_contact, dict(row.intake_contacts or {})
+    taken = {stream.value for stream in offered_streams()}
+    own = {k: v for k, v in (row.intake_contacts or {}).items() if k in taken}
+    return row.intake_general_contact, own
 
 
 async def _resolve_project(
@@ -490,14 +493,15 @@ async def _view(
 async def list_bindings(
     session: AsyncSession,
 ) -> tuple[Optional[int], list[BindingView]]:
-    """Every stream and where it currently lands.
+    """Every stream this server takes and where it currently lands.
 
     Returns one view per stream, bound or not, so the settings page renders the
     full set rather than only what somebody has already configured.
     """
+    streams = offered_streams()
     guild_id = await operations_guild_id(session)
     if guild_id is None:
-        return None, [await _view(session, s, None, None, None) for s in IntakeStream]
+        return None, [await _view(session, s, None, None, None) for s in streams]
 
     async with _route(guild_id) as routed:
         bindings = {
@@ -505,7 +509,7 @@ async def list_bindings(
             for row in await routed.exec(select(IntakeBinding))
         }
         views: list[BindingView] = []
-        for stream in IntakeStream:
+        for stream in streams:
             binding = bindings.get(stream)
             project = initiative = None
             if binding is not None:
