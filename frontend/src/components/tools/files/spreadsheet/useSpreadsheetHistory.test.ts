@@ -118,8 +118,8 @@ describe("spreadsheet undo", () => {
 
 /** Every tree a spreadsheet transaction can be written from. */
 const SOURCE_ROOTS = [
-  join(__dirname, ".."), // components/files, spreadsheet/ included
-  join(__dirname, "..", "..", "..", "lib", "spreadsheet"),
+  join(__dirname, ".."), // components/tools/files, spreadsheet/ included
+  join(__dirname, "..", "..", "..", "..", "lib", "spreadsheet"),
 ];
 
 /** Every source file under those trees, at any depth. */

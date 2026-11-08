@@ -43,7 +43,7 @@ describe("ToolListToolbar heading", () => {
  * how the posts board shipped its unread filter with no way to reach it.
  */
 describe("every filtered list can open its filters", () => {
-  const SRC = path.resolve(__dirname, "../../..");
+  const SRC = path.resolve(__dirname, "../..");
 
   const walk = (dir: string, found: string[] = []): string[] => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
