@@ -205,6 +205,10 @@ _ALLOWED: dict[tuple[str, str], str] = {
         "intake: settles the community a case is about, as an access grant for "
         "it is asked for"
     ),
+    (f"{_SERVICES}/ideas.py", "vote"): (
+        "ideas: writes a vote into the operations community once a read "
+        "through the ideas role has shown the idea is published and open"
+    ),
     (f"{_SERVICES}/grant_cases.py", "_as_reader"): (
         "grant cases: routes the person naming a case into the operations "
         "community through the seam, as themselves, to read it"
