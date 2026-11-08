@@ -75,9 +75,10 @@ dev = [
 package = false
 
 [tool.ruff.lint]
-# Ruff's default rules, plus the logging-format rules (arguments passed to the
-# logger rather than formatted into the message).
-extend-select = ["G"]
+# Pyflakes and the pycodestyle errors, plus the logging-format rules
+# (arguments passed to the logger rather than formatted into the message).
+# Named rather than left to Ruff's defaults, which grow between releases.
+select = ["E4", "E7", "E9", "F", "G"]
 
 [tool.ty.rules]
 # Full default rule set is enforced (CI runs `scripts/ci/check ty`).
