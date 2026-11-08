@@ -5,8 +5,9 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "@/ui/button";
 import { Calendar } from "@/ui/calendar";
+import { useFieldControl } from "@/ui/field";
 import { useTimeFormat } from "@/ui/host";
-import { Input } from "@/ui/input";
+import { fieldClass, Input } from "@/ui/input";
 import { parseLocalCalendarDate, resolveLocalDateTime } from "@/ui/lib/localDateTime";
 import { dateTimePattern } from "@/ui/lib/timeFormat";
 import { cn } from "@/ui/lib/utils";
@@ -97,6 +98,7 @@ export const DateTimePicker = ({
   includeTime = true,
 }: DateTimePickerProps) => {
   const { t } = useTranslation("ui");
+  const field = useFieldControl({ id });
   // Read so the typed and trigger labels re-render on a clock change.
   useTimeFormat();
   const parsedValue = value
@@ -243,29 +245,28 @@ export const DateTimePicker = ({
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <Button
-          id={id}
+        <button
           type="button"
-          variant="outline"
+          {...field}
           disabled={disabled}
           data-empty={!selectedDate}
           className={cn(
-            "inline-flex w-full items-center justify-start gap-2 text-left font-normal data-[empty=true]:text-muted-foreground",
-            "min-h-10"
+            fieldClass,
+            "items-center gap-2 whitespace-nowrap data-[empty=true]:text-muted-foreground"
           )}
         >
-          <CalendarIcon className="h-4 w-4" />
+          <CalendarIcon className="h-4 w-4 shrink-0" />
           {selectedDate ? (
             format(selectedDate, includeTime ? dateTimePattern("PP") : "PP")
           ) : (
             <span>{placeholder ?? defaultPlaceholder}</span>
           )}
-        </Button>
+        </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
         <div className="border-b p-3">
           <Input
-            id={id ? `${id}-input` : undefined}
+            id={field.id ? `${field.id}-input` : undefined}
             type="text"
             value={inputValue}
             placeholder={t("datePicker.typeDate")}
@@ -304,13 +305,13 @@ export const DateTimePicker = ({
           {includeTime && (
             <div className="flex flex-1 flex-col gap-1">
               <label
-                htmlFor={`${id ?? "datetime"}-time`}
+                htmlFor={`${field.id ?? "datetime"}-time`}
                 className="font-medium text-muted-foreground text-xs"
               >
                 {t("datePicker.time")}
               </label>
               <Input
-                id={`${id ?? "datetime"}-time`}
+                id={`${field.id ?? "datetime"}-time`}
                 type="time"
                 aria-invalid={invalid || undefined}
                 aria-describedby={invalid ? errorId : undefined}

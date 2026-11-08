@@ -42,6 +42,7 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { Empty, EmptyDescription } from "@/ui/empty";
+import { Field } from "@/ui/field";
 import { Label } from "@/ui/label";
 import { listFormat } from "@/ui/lib/intl";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
@@ -262,8 +263,7 @@ export const CommunityInitiativeDefaultsCard = ({
         </DialogHeader>
         <div className="space-y-5">
           {adding && (
-            <div className="space-y-2">
-              <Label htmlFor="community-rule-tool">{t("communityDefaults.toolLabel")}</Label>
+            <Field label={t("communityDefaults.toolLabel")}>
               <Select
                 value={tool}
                 onValueChange={(next) =>
@@ -274,7 +274,7 @@ export const CommunityInitiativeDefaultsCard = ({
                   })
                 }
               >
-                <SelectTrigger id="community-rule-tool" className="w-56">
+                <SelectTrigger className="w-56">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -285,7 +285,7 @@ export const CommunityInitiativeDefaultsCard = ({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           )}
           {question(tool, draft, "tool")}
           {draft.tool === "off" ? (

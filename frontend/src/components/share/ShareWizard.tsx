@@ -24,8 +24,8 @@ import { shareNote, shareTitle } from "@/lib/share/shareContent";
 import { getItem, setItem } from "@/lib/storage";
 import { TOOL_ICONS } from "@/lib/tools";
 import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { cn } from "@/ui/lib/utils";
 import { Textarea } from "@/ui/textarea";
 import { WizardFrame } from "@/ui/wizard-dialog";
@@ -271,30 +271,25 @@ export function ShareWizard({ share, onDone }: ShareWizardProps) {
           </form>
         ) : destination && writes ? (
           <form className="space-y-4" onSubmit={submit}>
-            <div className="space-y-2">
-              <Label htmlFor="share-title">{t("compose.title")}</Label>
+            <Field
+              label={t("compose.title")}
+              error={titleHasSigil && t("errors:RESERVED_SIGIL_IN_NAME")}
+            >
               <Input
-                id="share-title"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 maxLength={255}
-                aria-invalid={titleHasSigil || undefined}
                 autoFocus
               />
-              {titleHasSigil && (
-                <p className="text-destructive text-sm">{t("errors:RESERVED_SIGIL_IN_NAME")}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="share-note">{t("compose.note")}</Label>
+            </Field>
+            <Field label={t("compose.note")}>
               <Textarea
-                id="share-note"
                 value={note}
                 onChange={(event) => setNote(event.target.value)}
                 placeholder={t("compose.notePlaceholder")}
                 rows={5}
               />
-            </div>
+            </Field>
             {images.length > 0 && (
               <div className="grid grid-cols-fill-24/4 gap-2">
                 {images.map((image) => (

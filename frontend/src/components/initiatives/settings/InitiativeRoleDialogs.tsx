@@ -19,8 +19,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 
 export interface InitiativeRoleDialogsProps {
   initiativeId: number;
@@ -117,10 +117,8 @@ export const InitiativeRoleDialogs = ({
             <DialogDescription>{t("settings.createRoleDescription")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="new-role-display-name">{t("settings.roleDisplayNameLabel")}</Label>
+            <Field label={t("settings.roleDisplayNameLabel")}>
               <Input
-                id="new-role-display-name"
                 value={newRoleDisplayName}
                 onChange={(e) => {
                   const display = e.target.value;
@@ -137,11 +135,12 @@ export const InitiativeRoleDialogs = ({
                 }}
                 placeholder={t("settings.roleDisplayNamePlaceholder")}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="new-role-name">{t("settings.roleInternalNameLabel")}</Label>
+            </Field>
+            <Field
+              label={t("settings.roleInternalNameLabel")}
+              hint={t("settings.roleInternalNameHint")}
+            >
               <Input
-                id="new-role-name"
                 value={newRoleName}
                 onChange={(e) => {
                   const snakeCase = e.target.value
@@ -157,8 +156,7 @@ export const InitiativeRoleDialogs = ({
                 }}
                 placeholder={t("settings.roleInternalNamePlaceholder")}
               />
-              <p className="text-muted-foreground text-xs">{t("settings.roleInternalNameHint")}</p>
-            </div>
+            </Field>
           </div>
           <DialogFooter
             submitLabel={t("settings.createRole")}
@@ -193,15 +191,13 @@ export const InitiativeRoleDialogs = ({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="rename-role-display-name">{t("settings.roleDisplayNameLabel")}</Label>
+            <Field label={t("settings.roleDisplayNameLabel")}>
               <Input
-                id="rename-role-display-name"
                 value={renameDisplayName}
                 onChange={(e) => setRenameDisplayName(e.target.value)}
                 placeholder={t("settings.roleDisplayNamePlaceholder")}
               />
-            </div>
+            </Field>
           </div>
           <DialogFooter
             submitLabel={t("common:save")}

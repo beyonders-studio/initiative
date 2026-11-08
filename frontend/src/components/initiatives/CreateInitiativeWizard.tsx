@@ -47,6 +47,7 @@ import { DEFAULT_ENABLED_TOOLS, TOOLS, toolViewPermission } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { DialogFooter } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
@@ -273,32 +274,26 @@ export const CreateInitiativeWizard = ({
               </div>
             </div>
           ) : null}
-          <div className="space-y-2">
-            <Label htmlFor="new-initiative-name">{t("createDialog.nameLabel")}</Label>
+          <Field label={t("createDialog.nameLabel")}>
             <Input
-              id="new-initiative-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder={t("createDialog.namePlaceholder")}
               maxLength={255}
               required
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="new-initiative-description">{t("createDialog.descriptionLabel")}</Label>
+          </Field>
+          <Field label={t("createDialog.descriptionLabel")}>
             <Textarea
-              id="new-initiative-description"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder={t("createDialog.descriptionPlaceholder")}
               rows={3}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="new-initiative-color">{t("createDialog.colorLabel")}</Label>
-            <ColorPickerPopover id="new-initiative-color" value={color} onChange={setColor} />
-            <p className="text-muted-foreground text-xs">{t("createDialog.colorHint")}</p>
-          </div>
+          </Field>
+          <Field label={t("createDialog.colorLabel")} hint={t("createDialog.colorHint")}>
+            <ColorPickerPopover value={color} onChange={setColor} />
+          </Field>
           {footer({ label: t("createWizard.nextTools"), disabled: !trimmedName, submit: true })}
         </form>
       ) : null}

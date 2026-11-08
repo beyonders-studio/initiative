@@ -49,6 +49,7 @@ import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { Combobox } from "@/ui/combobox";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
@@ -287,29 +288,25 @@ const ContactsCard = ({
       </CardHeader>
       <CardContent>
         <form className="max-w-md space-y-4" onSubmit={onSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="intake-contact-general">{t("contacts.generalLabel")}</Label>
+          <Field label={t("contacts.generalLabel")}>
             <Input
-              id="intake-contact-general"
               type="email"
               value={draft.general}
               placeholder={t("contacts.generalPlaceholder")}
               disabled={!settled || saving}
               onChange={(event) => form.set({ general: event.target.value })}
             />
-          </div>
+          </Field>
           {streams.map((stream) => (
-            <div key={stream} className="space-y-2">
-              <Label htmlFor={`intake-contact-${stream}`}>{t(`streams.${stream}.title`)}</Label>
+            <Field key={stream} label={t(`streams.${stream}.title`)}>
               <Input
-                id={`intake-contact-${stream}`}
                 type="email"
                 value={draft[stream]}
                 placeholder={t("contacts.streamPlaceholder")}
                 disabled={!settled || saving}
                 onChange={(event) => form.set({ [stream]: event.target.value })}
               />
-            </div>
+            </Field>
           ))}
           <Button type="submit" disabled={!settled || saving || !changed}>
             {saving ? t("contacts.saving") : t("contacts.save")}
@@ -417,10 +414,9 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
           <div className="space-y-3">
             <p className="text-muted-foreground text-sm">{t("stream.setUpHelp")}</p>
             <div className="flex flex-wrap items-end gap-2">
-              <div className="space-y-2">
-                <Label htmlFor={`initiative-${stream}`}>{t("stream.initiativeLabel")}</Label>
+              <Field label={t("stream.initiativeLabel")}>
                 <Select value={initiativeId} onValueChange={setInitiativeId} disabled={busy}>
-                  <SelectTrigger id={`initiative-${stream}`} className="w-64">
+                  <SelectTrigger className="w-64">
                     <SelectValue placeholder={t("stream.initiativePlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -431,7 +427,7 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
               <Button
                 disabled={busy || !initiativeId}
                 onClick={() =>
@@ -441,8 +437,7 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                 {t("stream.setUpForMe")}
               </Button>
             </div>
-            <div className="space-y-2 border-t pt-4">
-              <Label htmlFor={`project-${stream}`}>{t("stream.existingProjectLabel")}</Label>
+            <Field label={t("stream.existingProjectLabel")} className="border-t pt-4">
               <Select
                 value=""
                 disabled={busy || projects.length === 0}
@@ -450,7 +445,7 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                   upsert.mutate({ stream, body: { project_id: Number(value), enabled: true } })
                 }
               >
-                <SelectTrigger id={`project-${stream}`} className="max-w-md">
+                <SelectTrigger className="max-w-md">
                   <SelectValue placeholder={t("stream.existingProjectPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -461,12 +456,17 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor={`bound-project-${stream}`}>{t("stream.landsInLabel")}</Label>
+            {/* Repointing starts fresh in the new project: an incident still
+                open in the old one stays where the work on it is. */}
+            <Field
+              label={t("stream.landsInLabel")}
+              hint={!binding.project_archived && t("stream.repointNote")}
+              error={binding.project_archived && t("stream.archivedNote")}
+            >
               <Select
                 value={String(binding.project_id)}
                 disabled={busy}
@@ -477,7 +477,7 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                   })
                 }
               >
-                <SelectTrigger id={`bound-project-${stream}`} className="max-w-md">
+                <SelectTrigger className="max-w-md">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -496,23 +496,15 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                   ))}
                 </SelectContent>
               </Select>
-              {binding.project_archived ? (
-                <p className="text-destructive text-sm">{t("stream.archivedNote")}</p>
-              ) : (
-                /* Repointing starts fresh in the new project: an incident still
-                   open in the old one stays where the work on it is. */
-                <p className="text-muted-foreground text-xs">{t("stream.repointNote")}</p>
-              )}
-            </div>
+            </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor={`status-${stream}`}>{t("stream.landingStatusLabel")}</Label>
+            <Field label={t("stream.landingStatusLabel")}>
               <Select
                 value={binding.default_status_id ? String(binding.default_status_id) : NONE}
                 disabled={busy || statuses.length === 0}
                 onValueChange={(value) => save({ default_status_id: statusValue(value) })}
               >
-                <SelectTrigger id={`status-${stream}`} className="max-w-xs">
+                <SelectTrigger className="max-w-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -524,18 +516,17 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
 
             {/* A project with one type has nothing to choose. */}
             {types.length > 1 || binding.task_type_id ? (
-              <div className="space-y-2">
-                <Label htmlFor={`type-${stream}`}>{t("stream.caseTypeLabel")}</Label>
+              <Field label={t("stream.caseTypeLabel")}>
                 <Select
                   value={statusOption(binding.task_type_id)}
                   disabled={busy}
                   onValueChange={(value) => save({ task_type_id: statusValue(value) })}
                 >
-                  <SelectTrigger id={`type-${stream}`} className="max-w-xs">
+                  <SelectTrigger className="max-w-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -555,14 +546,13 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
             ) : null}
 
             {binding.conversation && binding.conversation !== Conversation.none ? (
               <div className="space-y-3">
                 <div className="grid grid-cols-pair gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor={`awaiting-${stream}`}>{t("stream.awaitingLabel")}</Label>
+                  <Field label={t("stream.awaitingLabel")}>
                     <Select
                       value={statusOption(binding.awaiting_filer_status_id)}
                       disabled={busy || statuses.length === 0}
@@ -570,7 +560,7 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                         save({ awaiting_filer_status_id: statusValue(value) })
                       }
                     >
-                      <SelectTrigger id={`awaiting-${stream}`}>
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -582,15 +572,14 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`active-${stream}`}>{t("stream.activeLabel")}</Label>
+                  </Field>
+                  <Field label={t("stream.activeLabel")}>
                     <Select
                       value={statusOption(binding.active_status_id)}
                       disabled={busy || statuses.length === 0}
                       onValueChange={(value) => save({ active_status_id: statusValue(value) })}
                     >
-                      <SelectTrigger id={`active-${stream}`}>
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -602,7 +591,7 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
+                  </Field>
                 </div>
                 <p className="text-muted-foreground text-xs">
                   {binding.awaiting_filer_status_id

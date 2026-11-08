@@ -17,8 +17,8 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { readOptionalWholeNumber } from "@/lib/text";
 import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 
 const MIN_DAYS = 1;
 const MAX_DAYS = 3650;
@@ -70,10 +70,8 @@ const DaysWindowForm = ({
   return (
     <SettingsSection title={t(`${i18nKey}.title`)} description={t(`${i18nKey}.description`)}>
       <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1">
-          <Label htmlFor={inputId}>{t(`${i18nKey}.label`)}</Label>
+        <Field label={t(`${i18nKey}.label`)} id={inputId} className="space-y-1">
           <Input
-            id={inputId}
             type="number"
             min={MIN_DAYS}
             max={MAX_DAYS}
@@ -82,7 +80,7 @@ const DaysWindowForm = ({
             onChange={(event) => setValue(event.target.value)}
             placeholder={t(`${i18nKey}.placeholder`)}
           />
-        </div>
+        </Field>
         <Button
           // Several of these sit on this page, so each says what it saves
           // rather than all being "Save" to anybody who cannot see which box it

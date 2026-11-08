@@ -48,6 +48,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
@@ -166,10 +167,9 @@ export function InstallListingDialog({
           <p className="text-muted-foreground text-sm">{t("marketplace:install.noInitiatives")}</p>
         ) : (
           <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="install-initiative">{t("marketplace:install.initiative")}</Label>
+            <Field label={t("marketplace:install.initiative")} className="space-y-1.5">
               <Select value={initiativeId} onValueChange={setInitiativeId}>
-                <SelectTrigger id="install-initiative">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -180,18 +180,16 @@ export function InstallListingDialog({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
 
             {isDashboard ? (
-              <div className="space-y-1.5">
-                <Label htmlFor="install-name">{t("marketplace:install.name")}</Label>
+              <Field label={t("marketplace:install.name")} className="space-y-1.5">
                 <Input
-                  id="install-name"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   placeholder={listing.name}
                 />
-              </div>
+              </Field>
             ) : null}
 
             {offersExample ? (
@@ -215,18 +213,13 @@ export function InstallListingDialog({
             ) : null}
 
             {asksForStart ? (
-              <div className="space-y-1.5">
-                <Label htmlFor="install-starts-on">{t("marketplace:install.startsOn")}</Label>
-                <DateTimePicker
-                  id="install-starts-on"
-                  value={startsOn}
-                  onChange={setStartsOn}
-                  includeTime={false}
-                />
-                <p className="text-muted-foreground text-xs">
-                  {t("marketplace:install.startsOnHelp")}
-                </p>
-              </div>
+              <Field
+                label={t("marketplace:install.startsOn")}
+                hint={t("marketplace:install.startsOnHelp")}
+                className="space-y-1.5"
+              >
+                <DateTimePicker value={startsOn} onChange={setStartsOn} includeTime={false} />
+              </Field>
             ) : null}
           </div>
         )}

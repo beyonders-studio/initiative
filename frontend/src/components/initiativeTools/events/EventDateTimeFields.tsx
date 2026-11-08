@@ -2,6 +2,7 @@ import { useId, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { DateTimePicker } from "@/ui/date-time-picker";
+import { Field } from "@/ui/field";
 import { Label } from "@/ui/label";
 import { formatClockSlot } from "@/ui/lib/timeFormat";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
@@ -126,8 +127,7 @@ export const EventDateTimeFields = ({
     });
 
   const startDateField = (
-    <div className="space-y-2">
-      <Label>{t("startDate")}</Label>
+    <Field label={t("startDate")}>
       <DateTimePicker
         value={startDate}
         includeTime={false}
@@ -137,7 +137,7 @@ export const EventDateTimeFields = ({
             : applyStart(next, startTime)
         }
       />
-    </div>
+    </Field>
   );
 
   return (
@@ -162,32 +162,29 @@ export const EventDateTimeFields = ({
       {allDay ? (
         <div className="grid grid-cols-2 gap-4">
           {startDateField}
-          <div className="space-y-2">
-            <Label>{t("endDate")}</Label>
+          <Field label={t("endDate")}>
             <DateTimePicker
               value={endDate}
               includeTime={false}
               onChange={(next) => onChange({ endDate: next })}
               calendarProps={endCalendarProps}
             />
-          </div>
+          </Field>
         </div>
       ) : (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-4">
             {startDateField}
-            <div className="space-y-2">
-              <Label>{t("startTime")}</Label>
+            <Field label={t("startTime")}>
               <TimeSelect
                 value={startTime}
                 options={TIME_OPTIONS}
                 onChange={(next) => applyStart(startDate, next)}
               />
-            </div>
+            </Field>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>{t("endDate")}</Label>
+            <Field label={t("endDate")}>
               <DateTimePicker
                 value={endDate}
                 includeTime={false}
@@ -199,15 +196,14 @@ export const EventDateTimeFields = ({
                 }
                 calendarProps={endCalendarProps}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>{t("endTime")}</Label>
+            </Field>
+            <Field label={t("endTime")}>
               <TimeSelect
                 value={endTime}
                 options={endTimeOptions}
                 onChange={(next) => onChange({ endTime: next })}
               />
-            </div>
+            </Field>
           </div>
         </div>
       )}

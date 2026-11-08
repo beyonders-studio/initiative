@@ -65,6 +65,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
@@ -276,15 +277,13 @@ export function WidgetConfigDialog({
 
         <div className="grid max-h-[60vh] gap-6 overflow-y-auto md:grid-cols-[1fr_18rem]">
           <div className="space-y-5">
-            <section className="space-y-2">
-              <Label htmlFor="widget-title">{t("dashboards:config.widgetTitle")}</Label>
+            <Field label={t("dashboards:config.widgetTitle")}>
               <Input
-                id="widget-title"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder={t("dashboards:config.widgetTitlePlaceholder")}
               />
-            </section>
+            </Field>
 
             <section className="space-y-2">
               <h3 className="font-medium text-sm">{t("dashboards:config.sectionBinding")}</h3>
@@ -318,10 +317,14 @@ export function WidgetConfigDialog({
 
             {isPlugin && (
               <section className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="plugin-endpoint">{t("dashboards:config.pluginEndpoint")}</Label>
+                <Field
+                  label={t("dashboards:config.pluginEndpoint")}
+                  hint={
+                    !pluginCatalog.isLoading && !plugin && t("dashboards:config.pluginNotInstalled")
+                  }
+                >
                   <Select value={binding.endpoint_id ?? ""} onValueChange={setPluginEndpoint}>
-                    <SelectTrigger id="plugin-endpoint">
+                    <SelectTrigger>
                       <SelectValue placeholder={t("dashboards:config.pluginEndpointPlaceholder")} />
                     </SelectTrigger>
                     <SelectContent>
@@ -332,12 +335,7 @@ export function WidgetConfigDialog({
                       ))}
                     </SelectContent>
                   </Select>
-                  {!pluginCatalog.isLoading && !plugin && (
-                    <p className="text-muted-foreground text-xs">
-                      {t("dashboards:config.pluginNotInstalled")}
-                    </p>
-                  )}
-                </div>
+                </Field>
 
                 {/* The endpoint's own parameters. Which values each permits is
                     the plug-in's to answer — a repository, a label, a board are all

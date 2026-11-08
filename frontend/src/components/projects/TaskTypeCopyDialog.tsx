@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
@@ -101,10 +102,9 @@ const TaskTypeCopyForm = ({
         <DialogDescription>{t("taskTypes.copy.description")}</DialogDescription>
       </DialogHeader>
 
-      <div className="space-y-2">
-        <Label htmlFor="copy-types-from">{t("taskTypes.copy.fromLabel")}</Label>
+      <Field label={t("taskTypes.copy.fromLabel")}>
         <Select value={sourceId === null ? "" : String(sourceId)} onValueChange={pickSource}>
-          <SelectTrigger id="copy-types-from">
+          <SelectTrigger>
             <SelectValue placeholder={t("taskTypes.copy.fromPlaceholder")} />
           </SelectTrigger>
           <SelectContent>
@@ -115,7 +115,7 @@ const TaskTypeCopyForm = ({
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </Field>
 
       {/* Positioned, so the hidden inputs Radix adds to form controls
               scroll with the list instead of stretching the dialog. */}

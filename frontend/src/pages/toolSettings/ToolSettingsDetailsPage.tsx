@@ -22,8 +22,8 @@ import { PropertiesField } from "@/lib/layouts/fieldEditors";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { Switch } from "@/ui/switch";
 import { Textarea } from "@/ui/textarea";
 
@@ -84,27 +84,23 @@ export const ToolSettingsDetailsPage = () => {
       {update && (
         <Card>
           <CardContent className="space-y-4 pt-6">
-            <div className="space-y-2">
-              <Label htmlFor="tool-settings-name">{t("name")}</Label>
+            <Field label={t("name")}>
               <Input
-                id="tool-settings-name"
                 value={details.values.name}
                 onChange={(e) => details.set({ name: e.target.value })}
                 placeholder={t("toolSettings.namePlaceholder")}
                 disabled={!canManage}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tool-settings-description">{t("description")}</Label>
+            </Field>
+            <Field label={t("description")}>
               <Textarea
-                id="tool-settings-description"
                 value={details.values.description}
                 onChange={(e) => details.set({ description: e.target.value })}
                 placeholder={t("toolSettings.descriptionPlaceholder")}
                 disabled={!canManage}
                 rows={3}
               />
-            </div>
+            </Field>
             {canManage && (
               <Button
                 onClick={handleDetailsSave}

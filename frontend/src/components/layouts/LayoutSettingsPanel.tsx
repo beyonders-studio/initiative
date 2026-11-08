@@ -34,6 +34,7 @@ import type { LayoutNode } from "@/lib/layouts/tree";
 import { initiativeRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { listFormat } from "@/ui/lib/intl";
@@ -220,13 +221,12 @@ const DisplaySetting = ({
           COUNTER_DISPLAYS.map((display) => [display, t(`layouts:counterDisplay.${display}`)]),
         ];
   return (
-    <div className="space-y-2 px-4 pb-4">
-      <Label htmlFor="field-display">{label}</Label>
+    <Field label={label} className="px-4 pb-4">
       <Select
         value={offered.some(([display]) => display === value) ? value : "number"}
         onValueChange={(next) => onChange(next as FieldDisplay)}
       >
-        <SelectTrigger id="field-display">
+        <SelectTrigger>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -237,7 +237,7 @@ const DisplaySetting = ({
           ))}
         </SelectContent>
       </Select>
-    </div>
+    </Field>
   );
 };
 
@@ -561,13 +561,12 @@ const GroupSettings = ({
   );
   return (
     <Panel heading={t("layouts:group")}>
-      <div className="space-y-2">
-        <Label htmlFor="group-direction">{t("layouts:arrange")}</Label>
+      <Field label={t("layouts:arrange")}>
         <Select
           value={props.direction === "row" ? "row" : "column"}
           onValueChange={(direction) => set("direction", direction === "row" ? "row" : undefined)}
         >
-          <SelectTrigger id="group-direction">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -575,14 +574,13 @@ const GroupSettings = ({
             <SelectItem value="row">{t("layouts:sideBySide")}</SelectItem>
           </SelectContent>
         </Select>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="group-gap">{t("layouts:spacing")}</Label>
+      </Field>
+      <Field label={t("layouts:spacing")}>
         <Select
           value={props.gap === "sm" ? "sm" : "xs"}
           onValueChange={(gap) => set("gap", gap === "sm" ? "sm" : undefined)}
         >
-          <SelectTrigger id="group-gap">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -590,7 +588,7 @@ const GroupSettings = ({
             <SelectItem value="sm">{t("layouts:roomy")}</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </Field>
       {props.direction === "row" ? flag("wrap", true, t("layouts:wrap")) : null}
       {flag("align", "start", t("layouts:ownWidth"))}
       {flag("tone", "muted", t("layouts:muted"))}
@@ -621,10 +619,8 @@ const SectionSettings = ({
     // Titled, it is an accordion that opens and closes; untitled, a box.
     <Panel heading={t(title ? "layouts:blocks.accordion" : "layouts:blocks.box")}>
       <p className="text-muted-foreground text-sm">{t("layouts:sectionHelp")}</p>
-      <div className="space-y-2">
-        <Label htmlFor="section-title">{t("layouts:sectionTitle")}</Label>
+      <Field label={t("layouts:sectionTitle")}>
         <CommittedInput
-          id="section-title"
           value={title}
           // An accordion just added is named by typing over its title.
           selectOn={title === t("layouts:blocks.accordion") ? node : undefined}
@@ -639,7 +635,7 @@ const SectionSettings = ({
             });
           }}
         />
-      </div>
+      </Field>
       <div className="flex items-center justify-between gap-2">
         <Label htmlFor="section-collapsed">{t("layouts:startFolded")}</Label>
         <Switch
@@ -666,7 +662,7 @@ const CommittedInput = ({
   selectOn,
   onCommit,
 }: {
-  id: string;
+  id?: string;
   value: string;
   optional?: boolean;
   /** It takes a whole number. */

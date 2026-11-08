@@ -548,7 +548,6 @@ const SortableTypeRow = ({
       </TableCell>
       <TableCell>
         <ColorPickerPopover
-          className="h-9"
           value={draft?.color ?? type.color}
           onChangeComplete={(hex) => onFieldChange(type.id, "color", hex)}
           disabled={disabled}

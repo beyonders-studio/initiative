@@ -30,6 +30,7 @@ import { readOptionalWholeNumber } from "@/lib/text";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
@@ -420,13 +421,13 @@ export const SettingsPlatformCommunityPage = () => {
           <p className="text-muted-foreground text-sm">
             {t("community.communityCreationHelpText")}
           </p>
-          <div className="ms-7 space-y-2 border-s ps-4">
-            <Label htmlFor="community-creation-daily-limit">
-              {t("community.creationDailyLimitLabel")}
-            </Label>
+          <Field
+            label={t("community.creationDailyLimitLabel")}
+            hint={t("community.creationDailyLimitHelpText")}
+            className="ms-7 border-s ps-4"
+          >
             <div className="flex flex-wrap items-center gap-3">
               <Input
-                id="community-creation-daily-limit"
                 type="number"
                 min={0}
                 max={MAX_CREATION_DAILY_LIMIT}
@@ -454,10 +455,7 @@ export const SettingsPlatformCommunityPage = () => {
                 {update.isPending ? t("common:submitting") : t("common:save")}
               </Button>
             </div>
-            <p className="text-muted-foreground text-sm">
-              {t("community.creationDailyLimitHelpText")}
-            </p>
-          </div>
+          </Field>
         </div>
 
         <div className="space-y-2 border-t pt-4">

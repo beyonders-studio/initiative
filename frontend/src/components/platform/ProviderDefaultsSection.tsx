@@ -28,8 +28,8 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 
 const ProviderDefaultRow = ({ provider }: { provider: AuthProviderOwnerRead }) => {
   const { t } = useTranslation("settings");
@@ -112,28 +112,16 @@ const ProviderDefaultRow = ({ provider }: { provider: AuthProviderOwnerRead }) =
 
       {editing && (
         <div className="space-y-3 rounded-md border bg-muted/40 p-3">
-          <div className="space-y-2">
-            <Label htmlFor={`default-claim-${provider.id}`}>
-              {t("providerDefaults.claimLabel")}
-            </Label>
+          <Field label={t("providerDefaults.claimLabel")}>
             <Input
-              id={`default-claim-${provider.id}`}
               value={claim}
               onChange={(event) => setClaim(event.target.value)}
               placeholder="tid"
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor={`default-values-${provider.id}`}>
-              {t("providerDefaults.valuesLabel")}
-            </Label>
-            <Input
-              id={`default-values-${provider.id}`}
-              value={claimValues}
-              onChange={(event) => setClaimValues(event.target.value)}
-            />
-            <p className="text-muted-foreground text-xs">{t("providerDefaults.valuesHint")}</p>
-          </div>
+          </Field>
+          <Field label={t("providerDefaults.valuesLabel")} hint={t("providerDefaults.valuesHint")}>
+            <Input value={claimValues} onChange={(event) => setClaimValues(event.target.value)} />
+          </Field>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>
               {t("authProviders.cancel")}

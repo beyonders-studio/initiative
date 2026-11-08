@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
-import { Label } from "@/ui/label";
+import { Field } from "@/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** Where a deleted type's tasks go unless the reader picks another: the
@@ -77,13 +77,12 @@ export const TaskTypeDeleteDialog = ({
         {isOnlyType ? (
           <p className="text-muted-foreground text-sm">{t("taskTypes.onlyType")}</p>
         ) : (
-          <div className="space-y-2">
-            <Label htmlFor="fallback-task-type">{t("taskTypes.fallbackLabel")}</Label>
+          <Field label={t("taskTypes.fallbackLabel")}>
             <Select
               value={fallbackId}
               onValueChange={(value) => typeId !== null && setPicked({ typeId, value })}
             >
-              <SelectTrigger id="fallback-task-type">
+              <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -94,7 +93,7 @@ export const TaskTypeDeleteDialog = ({
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
         )}
         <DialogFooter
           submitLabel={t("common:delete")}

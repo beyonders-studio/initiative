@@ -40,6 +40,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { FileDropArea } from "@/ui/file-drop";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
@@ -295,15 +296,13 @@ export const AddLinkDialog = ({
               )}
 
               {file ? (
-                <div className="space-y-2">
-                  <Label htmlFor="relation-upload-name">{t("dialog.upload.name")}</Label>
+                <Field label={t("dialog.upload.name")}>
                   <Input
-                    id="relation-upload-name"
                     value={fileName}
                     onChange={(event) => setFileName(event.target.value)}
                     disabled={pending}
                   />
-                </div>
+                </Field>
               ) : canUpload ? (
                 /* The other way to name the far end: something that is not in
                    the app yet. */

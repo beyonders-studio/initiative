@@ -38,6 +38,7 @@ import { classifySecondFactorAnswer } from "@/lib/secondFactorAnswer";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { LoadMore } from "@/ui/load-more";
@@ -399,14 +400,13 @@ const BreakGlassSection = () => {
       </CardHeader>
       <CardContent>
         <form className="grid grid-cols-pair gap-4" onSubmit={submit}>
-          <div className="space-y-1">
-            <Label>{t("accessGrants.communityLabel")}</Label>
+          <Field label={t("accessGrants.communityLabel")} className="space-y-1">
             <CommunityPicker
               aria-label={t("accessGrants.communityLabel")}
               value={community}
               onChange={setCommunity}
             />
-          </div>
+          </Field>
           <CaseField choice={caseChoice} community={community} optional />
           <CommunityNoticeField
             id="bg-notice"
@@ -414,10 +414,9 @@ const BreakGlassSection = () => {
             value={notice}
             onChange={setNotice}
           />
-          <div className="space-y-1">
-            <Label htmlFor="bg-duration">{t("accessGrants.durationLabel")}</Label>
+          <Field label={t("accessGrants.durationLabel")} className="space-y-1">
             <Select value={duration} onValueChange={setDuration}>
-              <SelectTrigger id="bg-duration">
+              <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -428,17 +427,15 @@ const BreakGlassSection = () => {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="col-span-full space-y-1">
-            <Label htmlFor="bg-reason">{t("accessGrants.reasonLabel")}</Label>
+          </Field>
+          <Field label={t("accessGrants.reasonLabel")} className="col-span-full space-y-1">
             <Textarea
-              id="bg-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder={t("accessGrants.breakGlass.reasonPlaceholder")}
               required
             />
-          </div>
+          </Field>
           {needsCode && (
             <div className="col-span-full space-y-1">
               <Label htmlFor="bg-code">{t("accessGrants.breakGlass.codeLabel")}</Label>
@@ -580,14 +577,13 @@ const RequestSection = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         <form className="grid grid-cols-pair gap-4" onSubmit={submit}>
-          <div className="space-y-1">
-            <Label>{t("accessGrants.communityLabel")}</Label>
+          <Field label={t("accessGrants.communityLabel")} className="space-y-1">
             <CommunityPicker
               aria-label={t("accessGrants.communityLabel")}
               value={community}
               onChange={setCommunity}
             />
-          </div>
+          </Field>
           <CaseField choice={caseChoice} community={community} optional={false} />
           <CommunityNoticeField
             id="ag-notice"
@@ -617,10 +613,13 @@ const RequestSection = () => {
             <p className="text-muted-foreground text-xs">{t("accessGrants.purposeContentHelp")}</p>
           </div>
           {canAskAny ? (
-            <div className="space-y-1">
-              <Label htmlFor="ag-settings-level">{t("accessGrants.purposeSettings")}</Label>
+            <Field
+              label={t("accessGrants.purposeSettings")}
+              hint={t("accessGrants.purposeSettingsHelp")}
+              className="space-y-1"
+            >
               <Select value={settingsLevel} onValueChange={setSettingsLevel}>
-                <SelectTrigger id="ag-settings-level">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -629,15 +628,11 @@ const RequestSection = () => {
                   <SelectItem value="superadmin">{t("accessGrants.levelSuperadmin")}</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-muted-foreground text-xs">
-                {t("accessGrants.purposeSettingsHelp")}
-              </p>
-            </div>
+            </Field>
           ) : null}
-          <div className="space-y-1">
-            <Label htmlFor="ag-duration">{t("accessGrants.durationLabel")}</Label>
+          <Field label={t("accessGrants.durationLabel")} className="space-y-1">
             <Select value={duration} onValueChange={setDuration}>
-              <SelectTrigger id="ag-duration">
+              <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -648,17 +643,15 @@ const RequestSection = () => {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="col-span-full space-y-1">
-            <Label htmlFor="ag-reason">{t("accessGrants.reasonLabel")}</Label>
+          </Field>
+          <Field label={t("accessGrants.reasonLabel")} className="col-span-full space-y-1">
             <Textarea
-              id="ag-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder={t("accessGrants.reasonPlaceholder")}
               required
             />
-          </div>
+          </Field>
           <div className="col-span-full">
             <Button
               type="submit"

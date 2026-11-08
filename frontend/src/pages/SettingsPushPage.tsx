@@ -19,6 +19,7 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
@@ -132,10 +133,12 @@ export const SettingsPushPage = () => {
           ))}
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="push-service-account">{t("push.serviceAccountLabel")}</Label>
+        <Field
+          label={t("push.serviceAccountLabel")}
+          hint={!serviceAccountInvalid && t("push.serviceAccountHelp")}
+          error={serviceAccountInvalid && t("push.serviceAccountInvalid")}
+        >
           <Textarea
-            id="push-service-account"
             rows={6}
             spellCheck={false}
             autoComplete="off"
@@ -143,14 +146,8 @@ export const SettingsPushPage = () => {
             value={serviceAccount}
             onChange={(event) => setServiceAccount(event.target.value)}
             placeholder={hasServiceAccount ? t("push.serviceAccountSet") : ""}
-            aria-invalid={serviceAccountInvalid}
           />
-          {serviceAccountInvalid ? (
-            <p className="text-destructive text-xs">{t("push.serviceAccountInvalid")}</p>
-          ) : (
-            <p className="text-muted-foreground text-xs">{t("push.serviceAccountHelp")}</p>
-          )}
-        </div>
+        </Field>
 
         <Button type="submit" disabled={update.isPending || serviceAccountInvalid}>
           {update.isPending ? t("push.saving") : t("push.save")}

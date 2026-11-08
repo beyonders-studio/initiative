@@ -11,6 +11,7 @@ import { uploadAttachment } from "@/lib/attachmentUtils";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import { DialogFooter } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { ImagePicker } from "@/ui/image-picker";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
@@ -34,26 +35,22 @@ export function InsertImageUriDialogBody({
 
   return (
     <div className="grid gap-4 py-4">
-      <div className="grid gap-2">
-        <Label htmlFor="image-url">{t("imageDialog.imageUrl")}</Label>
+      <Field label={t("imageDialog.imageUrl")}>
         <Input
-          id="image-url"
           placeholder={t("imageDialog.imageUrlPlaceholder")}
           onChange={(e) => setSrc(e.target.value)}
           value={src}
           data-test-id="image-modal-url-input"
         />
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="alt-text">{t("imageDialog.altText")}</Label>
+      </Field>
+      <Field label={t("imageDialog.altText")}>
         <Input
-          id="alt-text"
           placeholder={t("imageDialog.altTextPlaceholder")}
           onChange={(e) => setAltText(e.target.value)}
           value={altText}
           data-test-id="image-modal-alt-text-input"
         />
-      </div>
+      </Field>
       <DialogFooter>
         <Button
           type="submit"
@@ -88,21 +85,18 @@ function InsertImageDetails({
   const { t } = useTranslation(["editor", "common"]);
   const featured = useFeaturedImage();
   const featuredId = useId();
-  const altTextId = useId();
   const [makeFeatured, setMakeFeatured] = useState(false);
 
   return (
     <>
-      <div className="grid gap-2">
-        <Label htmlFor={altTextId}>{t("imageDialog.altText")}</Label>
+      <Field label={t("imageDialog.altText")}>
         <Input
-          id={altTextId}
           placeholder={t("imageDialog.altTextPlaceholder")}
           onChange={(e) => onAltTextChange(e.target.value)}
           value={altText}
           data-test-id="image-modal-alt-text-input"
         />
-      </div>
+      </Field>
       {featured ? (
         <div className="flex items-center gap-2">
           <Checkbox

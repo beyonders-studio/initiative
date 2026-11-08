@@ -22,7 +22,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/ui/button";
+import { useFieldControl } from "@/ui/field";
 import { host } from "@/ui/host";
+import { fieldClass } from "@/ui/input";
 import { cn } from "@/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
@@ -194,25 +196,25 @@ interface EmojiFieldProps {
 
 const EmojiField = ({ id, value, onChange, disabled = false, placeholder }: EmojiFieldProps) => {
   const { t } = useTranslation("ui");
+  const field = useFieldControl({ id });
   const [open, setOpen] = useState(false);
 
   return (
     <div className="flex w-full flex-col gap-1">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button
+          <button
             type="button"
-            id={id}
-            variant="outline"
-            className="w-full justify-start"
+            {...field}
+            className={cn(fieldClass, "items-center")}
             disabled={disabled}
           >
             {value ? (
               <span className="text-xl leading-none">{value}</span>
             ) : (
-              <span className="text-sm">{placeholder ?? t("emojiPicker.pick")}</span>
+              <span className="text-muted-foreground">{placeholder ?? t("emojiPicker.pick")}</span>
             )}
-          </Button>
+          </button>
         </PopoverTrigger>
         {/*
           The popover is capped at the room Radix measured for it rather than

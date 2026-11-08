@@ -1,5 +1,5 @@
 import { Signature } from "lucide-react";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/ui/button";
@@ -11,8 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 
 import { SignatureName } from "./PropertyValueCell";
 import { signatureValue } from "./propertyHelpers";
@@ -45,7 +45,6 @@ export const SignatureFieldInput = ({
   const { t } = useTranslation(["properties", "common"]);
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
-  const inputId = useId();
   const signature = signatureValue(value);
   if (signature) return <SignatureName signature={signature} updatedAt={updatedAt} />;
   if (typeof value === "string" && value.trim()) {
@@ -86,16 +85,14 @@ export const SignatureFieldInput = ({
               <DialogTitle>{t("input.signTitle", { name })}</DialogTitle>
               <DialogDescription>{t("input.signStatement")}</DialogDescription>
             </DialogHeader>
-            <div className="space-y-2">
-              <Label htmlFor={inputId}>{t("input.signNameLabel")}</Label>
+            <Field label={t("input.signNameLabel")}>
               <Input
-                id={inputId}
                 value={typed}
                 onChange={(event) => setTyped(event.target.value)}
                 autoComplete="name"
                 autoFocus
               />
-            </div>
+            </Field>
             <DialogFooter submitLabel={t("input.sign")} disabled={!signed} />
           </form>
         </DialogContent>

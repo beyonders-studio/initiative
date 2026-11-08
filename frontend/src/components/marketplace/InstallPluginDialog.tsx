@@ -50,6 +50,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
@@ -136,15 +137,13 @@ export function InstallPluginDialog({ listing, open, onOpenChange }: InstallPlug
             the same sentence the card and the listing page showed. */}
         <ListingProvenance listing={listing} />
 
-        <div className="space-y-1.5">
-          <Label htmlFor="install-plugin-name">{t("plugins:install.name")}</Label>
+        <Field label={t("plugins:install.name")} className="space-y-1.5">
           <Input
-            id="install-plugin-name"
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder={listing.name}
           />
-        </div>
+        </Field>
 
         {requested.length > 0 && (
           <section className="space-y-2" aria-labelledby="install-plugin-reach">

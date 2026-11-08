@@ -10,11 +10,12 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useFieldControl } from "@/ui/field";
+import { fieldClass } from "@/ui/input";
 import { commandFilter } from "@/ui/lib/fuzzyMatch";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { cn } from "@/ui/lib/utils";
 
-import { Button } from "./button";
 import {
   Command,
   CommandEmpty,
@@ -154,6 +155,7 @@ export const Combobox = (props: ComboboxProps) => {
     "aria-label": ariaLabel,
   } = props;
   const { t } = useTranslation("ui");
+  const field = useFieldControl({ id });
   const [ownOpen, setOwnOpen] = useState(false);
   const open = !disabled && (props.open ?? ownOpen);
   const [query, setQuery] = useState("");
@@ -248,14 +250,15 @@ export const Combobox = (props: ComboboxProps) => {
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         {trigger ?? (
-          <Button
-            id={id}
-            variant="outline"
+          <button
+            type="button"
             role="combobox"
             aria-expanded={open}
             aria-label={ariaLabel}
+            {...field}
             className={cn(
-              "w-full justify-between font-normal",
+              fieldClass,
+              "items-center justify-between gap-2",
               !chosenLabel && "text-muted-foreground"
             )}
             disabled={disabled}
@@ -264,7 +267,7 @@ export const Combobox = (props: ComboboxProps) => {
               {chosenLabel || placeholder || t("combobox.placeholder")}
             </span>
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-          </Button>
+          </button>
         )}
       </PopoverTrigger>
       <PopoverContent className="w-[320px] min-w-(--radix-popover-trigger-width) p-0" align={align}>

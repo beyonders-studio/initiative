@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
@@ -82,21 +83,21 @@ export const AIConnectionDialog = ({
         </DialogHeader>
 
         <form className="space-y-4" onSubmit={submit}>
-          <div className="space-y-2">
-            <Label htmlFor="ai-connection-label">{t("aiConnections.labelLabel")}</Label>
+          <Field label={t("aiConnections.labelLabel")}>
             <Input
-              id="ai-connection-label"
               value={form.label}
               required
               onChange={(event) => setField("label", event.target.value)}
               placeholder={t("aiConnections.labelPlaceholder")}
             />
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="ai-connection-provider">{t("ai.providerFieldLabel")}</Label>
+          <Field
+            label={t("ai.providerFieldLabel")}
+            hint={form.provider === "custom" && t("aiConnections.customHint")}
+          >
             <Select value={form.provider} onValueChange={changeProvider}>
-              <SelectTrigger id="ai-connection-provider">
+              <SelectTrigger>
                 <SelectValue placeholder={t("ai.providerPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
@@ -107,16 +108,18 @@ export const AIConnectionDialog = ({
                 ))}
               </SelectContent>
             </Select>
-            {form.provider === "custom" && (
-              <p className="text-muted-foreground text-xs">{t("aiConnections.customHint")}</p>
-            )}
-          </div>
+          </Field>
 
           {showApiKeyField && (
-            <div className="space-y-2">
-              <Label htmlFor="ai-connection-key">{t("ai.apiKeyLabel")}</Label>
+            <Field
+              label={t("ai.apiKeyLabel")}
+              hint={
+                connection?.has_api_key
+                  ? t("aiConnections.apiKeyHelpExisting")
+                  : t("aiConnections.apiKeyHelpNew")
+              }
+            >
               <Input
-                id="ai-connection-key"
                 type="password"
                 value={form.apiKey}
                 onChange={(event) => setField("apiKey", event.target.value)}
@@ -126,12 +129,7 @@ export const AIConnectionDialog = ({
                     : t("aiConnections.apiKeyPlaceholderNew")
                 }
               />
-              <p className="text-muted-foreground text-xs">
-                {connection?.has_api_key
-                  ? t("aiConnections.apiKeyHelpExisting")
-                  : t("aiConnections.apiKeyHelpNew")}
-              </p>
-            </div>
+            </Field>
           )}
 
           {showBaseUrlField && (
@@ -153,8 +151,13 @@ export const AIConnectionDialog = ({
           )}
 
           {form.provider && (
-            <div className="space-y-2">
-              <Label>{t("ai.modelLabel")}</Label>
+            <Field
+              label={t("ai.modelLabel")}
+              hint={
+                !form.model &&
+                (isEdit ? t("aiConnections.modelHintPick") : t("aiConnections.modelHintNew"))
+              }
+            >
               <Combobox
                 items={modelOptions.map((model) => ({ value: model, label: model }))}
                 value={form.model}
@@ -171,12 +174,7 @@ export const AIConnectionDialog = ({
                 // The models already listed stay listed while they are looked up again.
                 loading={isFetchingModels && modelOptions.length === 0}
               />
-              {!form.model && (
-                <p className="text-muted-foreground text-xs">
-                  {isEdit ? t("aiConnections.modelHintPick") : t("aiConnections.modelHintNew")}
-                </p>
-              )}
-            </div>
+            </Field>
           )}
 
           {scope === "platform" && (

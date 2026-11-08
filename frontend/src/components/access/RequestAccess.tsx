@@ -25,6 +25,7 @@ import { toast } from "@/lib/mascotToast";
 import type { DialogProps } from "@/types/dialog";
 import { Button } from "@/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Label } from "@/ui/label";
 import { cn } from "@/ui/lib/utils";
 import { StatusMessage } from "@/ui/status-message";
@@ -102,10 +103,8 @@ const RequestAccessForm = ({ target, level, onSent, className }: RequestAccessFo
           </ToggleGroup>
         </div>
       )}
-      <div className="space-y-2">
-        <Label htmlFor={`${id}-note`}>{t("request.note")}</Label>
+      <Field label={t("request.note")}>
         <Textarea
-          id={`${id}-note`}
           value={note}
           onChange={(event) => setNote(event.target.value)}
           placeholder={t("request.notePlaceholder")}
@@ -113,7 +112,7 @@ const RequestAccessForm = ({ target, level, onSent, className }: RequestAccessFo
           rows={3}
           disabled={create.isPending}
         />
-      </div>
+      </Field>
       <div className="flex justify-end">
         <Button type="submit" pending={create.isPending}>
           {t("request.submit")}

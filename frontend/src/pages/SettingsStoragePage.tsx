@@ -17,8 +17,8 @@ import { Capability, hasCapability } from "@/lib/permissions";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
@@ -143,8 +143,7 @@ export const SettingsStoragePage = () => {
       </CardHeader>
       <CardContent>
         <form className="space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="storage-backend">{t("storage.backendLabel")}</Label>
+          <Field label={t("storage.backendLabel")} hint={t("storage.backendHelp")}>
             <Select
               value={form.values.backend}
               onValueChange={(value) => {
@@ -155,7 +154,7 @@ export const SettingsStoragePage = () => {
                 }
               }}
             >
-              <SelectTrigger id="storage-backend" className="w-full sm:w-72">
+              <SelectTrigger className="w-full sm:w-72">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -163,8 +162,7 @@ export const SettingsStoragePage = () => {
                 <SelectItem value="s3">{t("storage.backendS3")}</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-muted-foreground text-xs">{t("storage.backendHelp")}</p>
-          </div>
+          </Field>
 
           {isS3 && (
             <>
@@ -174,58 +172,46 @@ export const SettingsStoragePage = () => {
               </Alert>
 
               <div className="grid grid-cols-pair gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="s3-bucket">{t("storage.bucketLabel")}</Label>
+                <Field label={t("storage.bucketLabel")}>
                   <Input
-                    id="s3-bucket"
                     value={form.values.s3_bucket}
                     onChange={(event) => form.set({ s3_bucket: event.target.value })}
                     placeholder={t("storage.bucketPlaceholder")}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="s3-region">{t("storage.regionLabel")}</Label>
+                </Field>
+                <Field label={t("storage.regionLabel")}>
                   <Input
-                    id="s3-region"
                     value={form.values.s3_region}
                     onChange={(event) => form.set({ s3_region: event.target.value })}
                     placeholder="us-east-1"
                   />
-                </div>
+                </Field>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="s3-endpoint">{t("storage.endpointLabel")}</Label>
+              <Field label={t("storage.endpointLabel")} hint={t("storage.endpointHelp")}>
                 <Input
-                  id="s3-endpoint"
                   value={form.values.s3_endpoint_url}
                   onChange={(event) => form.set({ s3_endpoint_url: event.target.value })}
                   placeholder={t("storage.endpointPlaceholder")}
                 />
-                <p className="text-muted-foreground text-xs">{t("storage.endpointHelp")}</p>
-              </div>
+              </Field>
 
               <div className="grid grid-cols-pair gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="s3-access-key">{t("storage.accessKeyLabel")}</Label>
+                <Field label={t("storage.accessKeyLabel")}>
                   <Input
-                    id="s3-access-key"
                     value={form.values.s3_access_key_id}
                     onChange={(event) => form.set({ s3_access_key_id: event.target.value })}
                     placeholder={t("storage.accessKeyPlaceholder")}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="s3-secret-key">{t("storage.secretKeyLabel")}</Label>
+                </Field>
+                <Field label={t("storage.secretKeyLabel")} hint={t("storage.secretKeyHelp")}>
                   <Input
-                    id="s3-secret-key"
                     type="password"
                     value={secret}
                     onChange={(event) => setSecret(event.target.value)}
                     placeholder={hasSecret ? t("storage.secretKeySet") : ""}
                   />
-                  <p className="text-muted-foreground text-xs">{t("storage.secretKeyHelp")}</p>
-                </div>
+                </Field>
               </div>
 
               <div className="grid grid-cols-pair gap-4">

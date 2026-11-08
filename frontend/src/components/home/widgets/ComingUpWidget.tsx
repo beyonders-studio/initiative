@@ -22,7 +22,7 @@ import { communityPath } from "@/lib/communityUrl";
 import { browserTimezone } from "@/lib/timezones";
 import { entityRefRoute, taskRoute } from "@/lib/tools";
 import { Button } from "@/ui/button";
-import { Label } from "@/ui/label";
+import { Field } from "@/ui/field";
 import { dateTimeFormat } from "@/ui/lib/intl";
 import { formatCompactTime } from "@/ui/lib/timeFormat";
 import { useLiveClockValue } from "@/ui/lib/useRelativeTime";
@@ -231,13 +231,12 @@ export const ComingUpWidget = ({ options }: HomeWidgetProps) => {
 export const ComingUpSettings = ({ options, onChange }: HomeWidgetSettingsProps) => {
   const { t } = useTranslation("home");
   return (
-    <div className="space-y-2">
-      <Label htmlFor="coming-up-days">{t("widgets.comingUp.days")}</Label>
+    <Field label={t("widgets.comingUp.days")}>
       <Select
         value={String(daysOf(options))}
         onValueChange={(value) => onChange({ ...options, days: Number(value) })}
       >
-        <SelectTrigger id="coming-up-days">
+        <SelectTrigger>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -248,6 +247,6 @@ export const ComingUpSettings = ({ options, onChange }: HomeWidgetSettingsProps)
           ))}
         </SelectContent>
       </Select>
-    </div>
+    </Field>
   );
 };

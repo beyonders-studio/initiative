@@ -8,7 +8,7 @@ import {
   type CreateToolDialogProps,
 } from "@/components/initiativeTools/shared/CreateToolDialog";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
-import { Label } from "@/ui/label";
+import { Field } from "@/ui/field";
 
 /**
  * The shared create dialog with the one thing a calendar asks for beside it:
@@ -39,15 +39,13 @@ export const CreateCalendarDialog = (
       extra={{
         payload: { color },
         field: (
-          <div className="space-y-2">
-            <Label htmlFor="create-calendar-color">{t("calendarColor")}</Label>
+          <Field label={t("calendarColor")}>
             <ColorPickerPopover
-              id="create-calendar-color"
               value={color}
               onChangeComplete={setColor}
               triggerLabel={t("calendarColor")}
             />
-          </div>
+          </Field>
         ),
       }}
     />

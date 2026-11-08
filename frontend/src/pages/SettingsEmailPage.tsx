@@ -8,8 +8,8 @@ import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { Switch } from "@/ui/switch";
 
 interface EmailPayload {
@@ -109,19 +109,15 @@ export const SettingsEmailPage = () => {
       <CardContent>
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="grid grid-cols-pair gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="smtp-host">{t("email.hostLabel")}</Label>
+            <Field label={t("email.hostLabel")}>
               <Input
-                id="smtp-host"
                 value={form.values.host}
                 onChange={(event) => form.set({ host: event.target.value })}
                 placeholder={t("email.hostPlaceholder")}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="smtp-port">{t("email.portLabel")}</Label>
+            </Field>
+            <Field label={t("email.portLabel")}>
               <Input
-                id="smtp-port"
                 type="number"
                 min={1}
                 max={65535}
@@ -129,7 +125,7 @@ export const SettingsEmailPage = () => {
                 onChange={(event) => form.set({ port: event.target.value })}
                 placeholder={t("email.portPlaceholder")}
               />
-            </div>
+            </Field>
           </div>
           <div className="grid grid-cols-pair gap-4">
             <div className="flex items-center justify-between rounded-md border px-4 py-3">
@@ -154,46 +150,37 @@ export const SettingsEmailPage = () => {
             </div>
           </div>
           <div className="grid grid-cols-pair gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="smtp-username">{t("email.usernameLabel")}</Label>
+            <Field label={t("email.usernameLabel")}>
               <Input
-                id="smtp-username"
                 value={form.values.username}
                 onChange={(event) => form.set({ username: event.target.value })}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="smtp-password">{t("email.passwordLabel")}</Label>
+            </Field>
+            <Field label={t("email.passwordLabel")} hint={t("email.passwordHelp")}>
               <Input
-                id="smtp-password"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder={emailQuery.data.has_password ? t("email.passwordPlaceholder") : ""}
               />
-              <p className="text-muted-foreground text-xs">{t("email.passwordHelp")}</p>
-            </div>
+            </Field>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="smtp-from">{t("email.fromAddressLabel")}</Label>
+          <Field label={t("email.fromAddressLabel")}>
             <Input
-              id="smtp-from"
               value={form.values.from_address}
               onChange={(event) => form.set({ from_address: event.target.value })}
               placeholder={t("email.fromAddressPlaceholder")}
             />
-          </div>
+          </Field>
           <div className="grid grid-cols-pair gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="smtp-test-recipient">{t("email.testRecipientLabel")}</Label>
+            <Field label={t("email.testRecipientLabel")}>
               <Input
-                id="smtp-test-recipient"
                 type="email"
                 value={form.values.test_recipient}
                 onChange={(event) => form.set({ test_recipient: event.target.value })}
                 placeholder={t("email.testRecipientPlaceholder")}
               />
-            </div>
+            </Field>
             <div className="flex items-end">
               <Button
                 type="button"

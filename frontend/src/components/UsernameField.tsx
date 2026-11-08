@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { checkUsernameAvailable } from "@/api/generated/auth/auth";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 
 /** What the check said about the name typed so far. */
 export interface HandleCheck {
@@ -103,11 +103,16 @@ export const UsernameField = ({
       : null;
 
   return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{t("register.usernameLabel")}</Label>
+    <Field
+      label={t("register.usernameLabel")}
+      error={
+        availability.state === "taken" &&
+        tErrors(availability.reason, { defaultValue: tErrors("USERNAME_UNAVAILABLE") })
+      }
+      id={id}
+    >
       <div className="relative">
         <Input
-          id={id}
           value={value}
           onChange={(event) => {
             setTouched(true);
@@ -132,11 +137,6 @@ export const UsernameField = ({
           </span>
         </span>
       </div>
-      {availability.state === "taken" ? (
-        <p className="text-destructive text-xs">
-          {tErrors(availability.reason, { defaultValue: tErrors("USERNAME_UNAVAILABLE") })}
-        </p>
-      ) : null}
-    </div>
+    </Field>
   );
 };

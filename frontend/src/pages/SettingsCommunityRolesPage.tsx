@@ -34,6 +34,7 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
@@ -110,24 +111,24 @@ const CustomRoleDialog = ({ role, open, onOpenChange }: CustomRoleDialogProps) =
           <DialogDescription>{t("customRoles.dialogDescription")}</DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="custom-role-name">{t("customRoles.nameLabel")}</Label>
+          <Field label={t("customRoles.nameLabel")}>
             <Input
-              id="custom-role-name"
               value={name}
               maxLength={MAX_NAME_LENGTH}
               onChange={(event) => setName(event.target.value)}
               autoFocus
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="custom-role-rung">{t("customRoles.rungLabel")}</Label>
+          </Field>
+          <Field
+            label={t("customRoles.rungLabel")}
+            hint={role ? t("customRoles.rungFixed") : t(`customRoles.rungHelp.${rung}`)}
+          >
             <Select
               value={rung}
               onValueChange={(value) => setRung(value as Rung)}
               disabled={Boolean(role)}
             >
-              <SelectTrigger id="custom-role-rung" className="w-full max-w-72">
+              <SelectTrigger className="w-full max-w-72">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -138,10 +139,7 @@ const CustomRoleDialog = ({ role, open, onOpenChange }: CustomRoleDialogProps) =
                 </SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-muted-foreground text-xs">
-              {role ? t("customRoles.rungFixed") : t(`customRoles.rungHelp.${rung}`)}
-            </p>
-          </div>
+          </Field>
           <fieldset className="space-y-3">
             <legend className="mb-2 font-medium text-sm">{t("customRoles.surfacesLabel")}</legend>
             {offered.map((surface) => {

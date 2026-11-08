@@ -43,8 +43,8 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import type { AppColumnDef } from "@/ui/lib/table";
 import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { RelativeTime } from "@/ui/relative-time";
@@ -99,17 +99,15 @@ const ExtendGuestDialog = ({
           <DialogDescription>{t("guests.extendDescription")}</DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={submit}>
-          <div className="space-y-2">
-            <Label htmlFor="extend-guest-days">{t("guests.extendDaysLabel")}</Label>
+          <Field label={t("guests.extendDaysLabel")}>
             <Input
-              id="extend-guest-days"
               type="number"
               min={1}
               value={days}
               onChange={(event) => setDays(Number(event.target.value))}
               autoFocus
             />
-          </div>
+          </Field>
           <DialogFooter
             submitLabel={t("guests.extend")}
             pending={extend.isPending}
@@ -284,27 +282,23 @@ export const SettingsCommunityGuestsPage = () => {
         <CardContent className="space-y-4">
           <form className="space-y-4" onSubmit={createInvite}>
             <div className="grid grid-cols-fill-48/3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="guest-days">{t("guests.guestDaysLabel")}</Label>
+              <Field label={t("guests.guestDaysLabel")}>
                 <Input
-                  id="guest-days"
                   type="number"
                   min={1}
                   value={guestDays}
                   onChange={(event) => setGuestDays(Number(event.target.value))}
                 />
-              </div>
+              </Field>
               <InviteLimitFields
                 idPrefix="guest-invite"
                 value={inviteLimits}
                 onChange={setInviteLimits}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="guest-initiatives">{t("guests.initiativesLabel")}</Label>
+            <Field label={t("guests.initiativesLabel")}>
               <Combobox
                 multiple
-                id="guest-initiatives"
                 value={initiativeIds}
                 items={(initiativesQuery.data ?? []).map((row) => ({
                   value: String(row.id),
@@ -314,7 +308,7 @@ export const SettingsCommunityGuestsPage = () => {
                 placeholder={t("guests.initiativesPlaceholder")}
                 className="w-full max-w-72"
               />
-            </div>
+            </Field>
             <div className="space-y-2">
               <p className="font-medium text-sm">{t("guests.itemsLabel")}</p>
               <p className="text-muted-foreground text-sm">{t("guests.itemsHelp")}</p>

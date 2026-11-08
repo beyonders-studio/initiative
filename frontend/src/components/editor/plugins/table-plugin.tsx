@@ -15,8 +15,8 @@ import { createContext, type JSX, useContext, useEffect, useMemo, useState } fro
 import { invariant } from "@/components/editor/shared/invariant";
 import { Button } from "@/ui/button";
 import { DialogFooter } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 
 export type InsertTableCommandPayload = Readonly<{
   columns: string;
@@ -112,28 +112,24 @@ export function InsertTableDialog({
   return (
     <>
       <div className="grid gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor="rows">Number of rows</Label>
+        <Field label="Number of rows">
           <Input
-            id="rows"
             placeholder={"# of rows (1-500)"}
             onChange={(e) => setRows(e.target.value)}
             value={rows}
             data-test-id="table-modal-rows"
             type="number"
           />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="columns">Number of columns</Label>
+        </Field>
+        <Field label="Number of columns">
           <Input
-            id="columns"
             placeholder={"# of columns (1-50)"}
             onChange={(e) => setColumns(e.target.value)}
             value={columns}
             data-test-id="table-modal-columns"
             type="number"
           />
-        </div>
+        </Field>
       </div>
       <DialogFooter data-test-id="table-model-confirm-insert">
         <Button disabled={isDisabled} onClick={onClick}>

@@ -46,6 +46,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { collator } from "@/ui/lib/intl";
@@ -141,7 +142,6 @@ const OptionListEditor = ({ options, onChange, disabled }: OptionListEditorProps
                 onChangeComplete={(value) => handlePatch(index, { color: value })}
                 disabled={disabled}
                 triggerLabel={t("properties:manager.colorLabel")}
-                className="h-9"
               />
             </div>
             <Button
@@ -352,24 +352,21 @@ const PropertyDialog = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="property-manager-name">{t("properties:manager.nameLabel")}</Label>
+          <Field label={t("properties:manager.nameLabel")}>
             <Input
-              id="property-manager-name"
               value={formState.name}
               onChange={(e) => setFormState((prev) => ({ ...prev, name: e.target.value }))}
               autoFocus
             />
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="property-manager-type">{t("properties:manager.typeLabel")}</Label>
+          <Field label={t("properties:manager.typeLabel")}>
             <Select
               value={formState.type}
               onValueChange={(next) => handleTypeChange(next as MetadataType)}
               disabled={isEditing}
             >
-              <SelectTrigger id="property-manager-type">
+              <SelectTrigger>
                 <div className="flex min-w-0 items-center gap-2">
                   {(() => {
                     const Icon = iconForPropertyType(formState.type);
@@ -393,16 +390,15 @@ const PropertyDialog = ({
                 })}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
 
           {formState.type === MetadataType.currency ? (
-            <div className="space-y-2">
-              <Label>{t("properties:currency.label")}</Label>
+            <Field label={t("properties:currency.label")}>
               <CurrencySelect
                 value={formState.currency}
                 onChange={(currency) => setFormState((prev) => ({ ...prev, currency }))}
               />
-            </div>
+            </Field>
           ) : null}
 
           {formState.type === MetadataType.counter ? (
@@ -412,13 +408,12 @@ const PropertyDialog = ({
             />
           ) : null}
 
-          <div className="space-y-2">
-            <Label>{t("properties:manager.colorLabel")}</Label>
+          <Field label={t("properties:manager.colorLabel")}>
             <ColorPickerPopover
               value={formState.color ?? DEFAULT_COLOR}
               onChangeComplete={(value) => setFormState((prev) => ({ ...prev, color: value }))}
             />
-          </div>
+          </Field>
 
           {typeRequiresOptions(formState.type) ? (
             <div className="space-y-2">
@@ -546,23 +541,20 @@ const PromoteDialog = ({
             {t("properties:manager.promoteBody", { count: sources.length })}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="promote-name">{t("properties:manager.nameLabel")}</Label>
+        <Field
+          label={t("properties:manager.nameLabel")}
+          hint={
+            same !== undefined && fits && t("properties:manager.promoteInto", { name: same.name })
+          }
+          error={same !== undefined && !fits && t("properties:manager.promoteTaken")}
+        >
           <Input
-            id="promote-name"
             value={name}
             maxLength={100}
             onChange={(event) => setName(event.target.value)}
             autoFocus
           />
-          {same !== undefined ? (
-            <p className={fits ? "text-muted-foreground text-sm" : "text-destructive text-sm"}>
-              {fits
-                ? t("properties:manager.promoteInto", { name: same.name })
-                : t("properties:manager.promoteTaken")}
-            </p>
-          ) : null}
-        </div>
+        </Field>
         <DialogFooter
           submitLabel={t("properties:manager.promote")}
           pendingLabel={t("common:submitting")}
