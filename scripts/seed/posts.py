@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from app.core.tools import Tool
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.post import Post
 from app.models.tenant.post_poll import PostPoll, PostPollOption, PostPollVote
 from app.models.tenant.post_read import PostRead
@@ -223,6 +224,7 @@ async def seed(c: Community) -> None:
             name=d["name"],
             body=_body(c, d),
             created_by=creator.id,
+            created_by_kind=ActorKind.member,
             created_at=d.get("created_at") or published or datetime.now(UTC),
             updated_at=published or datetime.now(UTC),
             published_at=published,

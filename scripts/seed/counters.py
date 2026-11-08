@@ -5,6 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from app.core.tools import Tool
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.counter import Counter, CounterGroup, CounterViewMode
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from seed.common import Community, share
@@ -137,6 +138,7 @@ async def seed(c: Community) -> None:
             name=d["name"],
             description=d.get("description"),
             created_by=creator.id,
+            created_by_kind=ActorKind.member,
         )
         c.session.add(group)
         await c.session.flush()
