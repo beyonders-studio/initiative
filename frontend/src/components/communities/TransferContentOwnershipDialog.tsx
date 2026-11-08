@@ -17,7 +17,7 @@ import {
 import { invalidate, q } from "@/api/query-keys";
 import type { MemberLike } from "@/components/members/MemberSearchSelect";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useCommunityMutation } from "@/hooks/useApiMutation";
+import { useApiMutation } from "@/hooks/useApiMutation";
 import { USER_ID_LOOKUP_MAX, useUserSearch } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
@@ -170,13 +170,24 @@ export const TransferContentOwnershipDialog = ({
       ? getUserDisplayName(defaultRecipientUser)
       : null);
 
-  const transfer = useCommunityMutation(
+  // The request carries the community, whose content and where it goes, so
+  // closing the dialog while it waits for the connection cannot change what it
+  // moves.
+  const transfer = useApiMutation(
     {
-      mutationFn: (communityId, recipient: string) => {
+      mutationFn: ({
+        community,
+        from,
+        recipient,
+      }: {
+        community: number;
+        from: number | null;
+        recipient: string;
+      }) => {
         const body = transferBody(recipient);
-        return member === null
-          ? claimUnownedContent(communityId, body)
-          : transferOwnership(communityId, member.id, body);
+        return from === null
+          ? claimUnownedContent(community, body)
+          : transferOwnership(community, from, body);
       },
       invalidate: () => invalidate(q.communityMembers()),
       errorKey: "communities:transferOwnership.failed",
@@ -262,7 +273,13 @@ export const TransferContentOwnershipDialog = ({
           </Button>
           {!nothingToMove && !loading && (
             <Button
-              onClick={() => transfer.mutate(recipientId)}
+              onClick={() =>
+                transfer.mutate({
+                  community: communityId,
+                  from: member?.id ?? null,
+                  recipient: recipientId,
+                })
+              }
               pending={transfer.isPending}
               disabled={!recipientId}
             >

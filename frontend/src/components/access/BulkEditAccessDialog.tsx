@@ -331,14 +331,16 @@ export function BulkEditAccessDialog({
         });
       }
     },
+    // Here rather than in a call's callbacks, which do not run once the dialog
+    // is gone, so the lists refresh even when the page is left mid-write.
+    invalidate,
   });
 
   const finish = useCallback(() => {
-    invalidate();
     resetState();
     onOpenChange(false);
     onSuccess();
-  }, [invalidate, resetState, onOpenChange, onSuccess]);
+  }, [resetState, onOpenChange, onSuccess]);
 
   const handleApply = useCallback(() => {
     if (selectedUserIds.size === 0) return;
