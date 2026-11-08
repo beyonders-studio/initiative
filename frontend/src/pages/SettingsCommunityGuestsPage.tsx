@@ -110,14 +110,11 @@ const ExtendGuestDialog = ({
               autoFocus
             />
           </div>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              {t("common:cancel")}
-            </Button>
-            <Button type="submit" disabled={days < 1 || extend.isPending}>
-              {t("guests.extend")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("guests.extend")}
+            pending={extend.isPending}
+            disabled={days < 1}
+          />
         </form>
       </DialogContent>
     </Dialog>

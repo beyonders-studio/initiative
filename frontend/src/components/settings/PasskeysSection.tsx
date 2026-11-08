@@ -444,14 +444,11 @@ export const PasskeysSection = () => {
               </div>
             ) : null}
             {removeError ? <p className="text-destructive text-sm">{removeError}</p> : null}
-            <DialogFooter className="gap-2">
-              <Button type="button" variant="outline" onClick={() => setRemoveTarget(null)}>
-                {t("common:cancel")}
-              </Button>
-              <Button type="submit" variant="destructive" disabled={remove.isPending}>
-                {t("passkeys.remove")}
-              </Button>
-            </DialogFooter>
+            <DialogFooter
+              submitLabel={t("passkeys.remove")}
+              pending={remove.isPending}
+              destructive
+            />
           </form>
         </DialogContent>
       </Dialog>

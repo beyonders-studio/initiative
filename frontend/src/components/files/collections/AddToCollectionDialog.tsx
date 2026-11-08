@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Loader2, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -223,8 +223,7 @@ export const AddToCollectionDialog = ({
               <Button type="button" variant="ghost" onClick={() => setMaking(false)}>
                 {t("common:back")}
               </Button>
-              <Button type="submit" disabled={!trimmed || create.isPending}>
-                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              <Button type="submit" pending={create.isPending} disabled={!trimmed}>
                 {t("collections.shapes.create")}
               </Button>
             </DialogFooter>

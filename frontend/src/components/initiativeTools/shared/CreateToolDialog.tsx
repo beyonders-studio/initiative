@@ -1,5 +1,4 @@
 import type { FlatNamespace } from "i18next";
-import { Loader2 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -244,15 +243,8 @@ export const CreateToolDialog = ({
         </div>
 
         <DialogFooter>
-          <Button type="button" onClick={handleSubmit} disabled={!canSubmit}>
-            {isCreating ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("creating")}
-              </>
-            ) : (
-              t(text.create)
-            )}
+          <Button type="button" onClick={handleSubmit} pending={isCreating} disabled={!canSubmit}>
+            {isCreating ? t("creating") : t(text.create)}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -19,7 +19,6 @@ import {
   ChevronUp,
   GripVertical,
   ListTree,
-  Loader2,
   Sparkles,
   SquareCheck,
   Trash2,
@@ -342,13 +341,9 @@ export const TaskChecklist = ({
               variant="ghost"
               size="sm"
               onClick={() => generateChecklist.mutate(taskId)}
-              disabled={generateChecklist.isPending}
+              pending={generateChecklist.isPending}
             >
-              {generateChecklist.isPending ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Sparkles className="h-3 w-3" />
-              )}
+              <Sparkles className="h-3 w-3" />
               {t("checklist.aiGenerate")}
             </Button>
           ) : null}
@@ -450,14 +445,11 @@ export const TaskChecklist = ({
               </div>
             ))}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAiDialogOpen(false)}>
-              {t("common:cancel")}
-            </Button>
-            <Button onClick={handleAddSuggestions} disabled={selected.size === 0}>
-              {t("checklist.addSelected", { count: selected.size })}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("checklist.addSelected", { count: selected.size })}
+            onSubmit={handleAddSuggestions}
+            disabled={selected.size === 0}
+          />
         </DialogContent>
       </Dialog>
     </Card>

@@ -3,7 +3,6 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ProjectRead } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 import {
   Dialog,
@@ -60,7 +59,6 @@ export const MoveTaskDialog = ({
   }, [open, availableProjects, selectedValue]);
 
   const isDisabled = isLoading || availableProjects.length === 0 || hasError;
-  const confirmDisabled = isDisabled || isSaving || !selectedValue;
 
   const handleConfirm = () => {
     const parsed = Number(selectedValue);
@@ -109,19 +107,13 @@ export const MoveTaskDialog = ({
           <span>{t("move.statusResetWarning")}</span>
         </div>
 
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isSaving}
-          >
-            {t("common:cancel")}
-          </Button>
-          <Button type="button" onClick={handleConfirm} disabled={confirmDisabled}>
-            {isSaving ? t("move.moving") : t("move.moveTask")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("move.moveTask")}
+          onSubmit={handleConfirm}
+          pending={isSaving}
+          pendingLabel={t("move.moving")}
+          disabled={isDisabled || !selectedValue}
+        />
       </DialogContent>
     </Dialog>
   );

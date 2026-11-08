@@ -4,14 +4,12 @@
  * its own modals rather than a shared bundle carrying everyone's.
  */
 
-import { Loader2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { InitiativeRoleRead } from "@/api/generated/initiativeAPI.schemas";
 import { useCreateRole, useDeleteRole, useUpdateRole } from "@/hooks/useInitiativeRoles";
 import { toast } from "@/lib/mascotToast";
-import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import {
   Dialog,
@@ -162,26 +160,13 @@ export const InitiativeRoleDialogs = ({
               <p className="text-muted-foreground text-xs">{t("settings.roleInternalNameHint")}</p>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewRoleDialog(false)}>
-              {t("common:cancel")}
-            </Button>
-            <Button
-              onClick={handleCreateRole}
-              disabled={
-                createRoleMutation.isPending || !newRoleName.trim() || !newRoleDisplayName.trim()
-              }
-            >
-              {createRoleMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("settings.creatingRole")}
-                </>
-              ) : (
-                t("settings.createRole")
-              )}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("settings.createRole")}
+            pendingLabel={t("settings.creatingRole")}
+            onSubmit={handleCreateRole}
+            pending={createRoleMutation.isPending}
+            disabled={!newRoleName.trim() || !newRoleDisplayName.trim()}
+          />
         </DialogContent>
       </Dialog>
 
@@ -218,24 +203,13 @@ export const InitiativeRoleDialogs = ({
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRoleToRename(null)}>
-              {t("common:cancel")}
-            </Button>
-            <Button
-              onClick={confirmRenameRole}
-              disabled={updateRoleMutation.isPending || !renameDisplayName.trim()}
-            >
-              {updateRoleMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("settings.savingRole")}
-                </>
-              ) : (
-                t("common:save")
-              )}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("common:save")}
+            pendingLabel={t("settings.savingRole")}
+            onSubmit={confirmRenameRole}
+            pending={updateRoleMutation.isPending}
+            disabled={!renameDisplayName.trim()}
+          />
         </DialogContent>
       </Dialog>
     </>

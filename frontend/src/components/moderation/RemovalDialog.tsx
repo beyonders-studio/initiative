@@ -13,7 +13,6 @@ import {
   RemovalReason,
   type RemovalReason as RemovalReasonValue,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -129,20 +128,15 @@ export const RemovalDialog = ({
             />
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            variant="destructive"
-            disabled={reason === "" || pending}
-            onClick={() => {
-              if (reason !== "") onConfirm({ reason, note: note.trim() || null });
-            }}
-          >
-            {t("remove.submit")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("remove.submit")}
+          onSubmit={() => {
+            if (reason !== "") onConfirm({ reason, note: note.trim() || null });
+          }}
+          pending={pending}
+          disabled={reason === ""}
+          destructive
+        />
       </DialogContent>
     </Dialog>
   );

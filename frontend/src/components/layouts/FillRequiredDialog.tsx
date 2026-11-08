@@ -1,4 +1,3 @@
-import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -111,9 +110,9 @@ const Filling = <I extends Item, C, P>({
         <Button
           type="button"
           onClick={confirm}
-          disabled={pending || holding.size > 0 || missing.length > 0}
+          disabled={holding.size > 0 || missing.length > 0}
+          pending={pending}
         >
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {t("layouts:required.confirm")}
         </Button>
       </DialogFooter>

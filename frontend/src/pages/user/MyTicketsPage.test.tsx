@@ -65,8 +65,8 @@ describe("MyTicketsPage", () => {
     const link = await screen.findByRole("link", { name: /Lost my phone/ });
     expect(link).toHaveAttribute("href", "/my-tickets/7");
     expect(screen.getByText("Waiting on you")).toBeInTheDocument();
-    // An untitled ticket goes by what it is about, beside its kind.
-    expect(screen.getByRole("link", { name: /An idea.*Feedback/ })).toHaveAttribute(
+    // An untitled ticket whose topic has no name of its own goes by its stream.
+    expect(screen.getByRole("link", { name: /^Feedback Feedback/ })).toHaveAttribute(
       "href",
       "/my-tickets/9"
     );

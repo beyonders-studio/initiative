@@ -5,7 +5,6 @@ import type { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schem
 import { useCreateTool } from "@/hooks/useCreateTool";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { TOOL_ICONS, TOOLS, toolNavLabelKey } from "@/lib/tools";
-import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -104,14 +103,12 @@ export function CreateReferencedThingDialog({
           <p className="text-muted-foreground text-sm">{t("createNothingAllowed")}</p>
         )}
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
-            {t("common:cancel")}
-          </Button>
-          <Button disabled={chosen === null || createTool.isPending} onClick={() => void create()}>
-            {t("common:create")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("common:create")}
+          onSubmit={() => void create()}
+          pending={createTool.isPending}
+          disabled={chosen === null}
+        />
       </DialogContent>
     </Dialog>
   );

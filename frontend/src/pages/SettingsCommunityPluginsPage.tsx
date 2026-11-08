@@ -37,7 +37,6 @@ import {
   ArrowUpCircle,
   Blocks,
   ChevronDown,
-  Loader2,
   ShieldCheck,
   Store,
   TriangleAlert,
@@ -278,9 +277,8 @@ function PluginRow({
                 size="sm"
                 variant="outline"
                 onClick={() => save({ enabled: !plugin.enabled })}
-                disabled={update.isPending}
+                pending={update.isPending}
               >
-                {update.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 {plugin.enabled ? t("plugins:manage.disable") : t("plugins:manage.enable")}
               </Button>
               <Button size="sm" variant="destructive" onClick={() => confirm(true)}>

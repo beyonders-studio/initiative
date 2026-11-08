@@ -1,4 +1,4 @@
-import { Loader2, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -356,17 +356,14 @@ export const AddLinkDialog = ({
           ) : null}
         </div>
         <DialogFooter>
-          <Button type="button" onClick={() => void submit()} disabled={pending || !ready}>
-            {pending ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {upload.isPending ? t("dialog.uploading") : t("dialog.submitting")}
-              </>
-            ) : file ? (
-              t("dialog.submitUpload")
-            ) : (
-              t("dialog.submit")
-            )}
+          <Button type="button" onClick={() => void submit()} pending={pending} disabled={!ready}>
+            {pending
+              ? upload.isPending
+                ? t("dialog.uploading")
+                : t("dialog.submitting")
+              : file
+                ? t("dialog.submitUpload")
+                : t("dialog.submit")}
           </Button>
         </DialogFooter>
       </DialogContent>

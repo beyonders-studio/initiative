@@ -11,7 +11,6 @@
  * declares.
  */
 
-import { Loader2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -97,9 +96,9 @@ function SettingField({
         />
         <Button
           type="submit"
-          disabled={draft === null || draft.trim() === (setting.value ?? "") || save.isPending}
+          disabled={draft === null || draft.trim() === (setting.value ?? "")}
+          pending={save.isPending}
         >
-          {save.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           {t("common:save")}
         </Button>
       </form>

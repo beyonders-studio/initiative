@@ -611,14 +611,10 @@ export const FileDetailPage = () => {
                 onClick={() => {
                   if (!saveFile.isPending) saveNow();
                 }}
-                disabled={saveFile.isPending}
+                pending={saveFile.isPending}
                 className="shrink-0"
               >
-                {saveFile.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
+                <Save className="h-4 w-4" />
                 {t("common:save")}
               </Button>
             ) : null}
@@ -727,16 +723,10 @@ export const FileDetailPage = () => {
                             <Button
                               type="button"
                               onClick={() => saveNow()}
-                              disabled={!isDirty || saveFile.isPending}
+                              disabled={!isDirty}
+                              pending={saveFile.isPending}
                             >
-                              {saveFile.isPending ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                  {t("detail.saving")}
-                                </>
-                              ) : (
-                                t("detail.saveChanges")
-                              )}
+                              {saveFile.isPending ? t("detail.saving") : t("detail.saveChanges")}
                             </Button>
                             <div className="flex items-center gap-2">
                               <Checkbox

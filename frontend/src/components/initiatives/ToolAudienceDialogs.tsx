@@ -17,7 +17,6 @@ import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { toolCamelPlural } from "@/lib/tools";
-import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import {
   Dialog,
@@ -94,14 +93,11 @@ export const ToolEnableDialog = ({
             </div>
           </div>
         </RadioGroup>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
-            {t("common:cancel")}
-          </Button>
-          <Button onClick={() => tool && onConfirm(tool, audience)} disabled={isSaving}>
-            {t("settings.toolAudience.enableConfirm")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("settings.toolAudience.enableConfirm")}
+          onSubmit={() => tool && onConfirm(tool, audience)}
+          pending={isSaving}
+        />
       </DialogContent>
     </Dialog>
   );

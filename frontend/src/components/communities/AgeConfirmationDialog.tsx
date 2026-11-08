@@ -102,14 +102,13 @@ export const AgeConfirmationDialog = ({
             />
             <p className="text-muted-foreground text-xs">{t("auth:confirmAge.scopeNote")}</p>
             {error ? <p className="text-destructive text-sm">{error}</p> : null}
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setOpen(false)} disabled={submitting}>
-                {t("common:cancel")}
-              </Button>
-              <Button onClick={() => void confirm()} disabled={!birthdate || submitting}>
-                {submitting ? t("common:submitting") : t("communities:community.ageGateConfirm")}
-              </Button>
-            </DialogFooter>
+            <DialogFooter
+              submitLabel={t("communities:community.ageGateConfirm")}
+              pendingLabel={t("common:submitting")}
+              pending={submitting}
+              disabled={!birthdate}
+              onSubmit={() => void confirm()}
+            />
           </>
         )}
       </DialogContent>

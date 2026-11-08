@@ -1,4 +1,3 @@
-import { Loader2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -24,7 +23,6 @@ import {
 } from "@/lib/recurrence";
 import { PRIORITY_ORDER } from "@/lib/sorting";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
-import { Button } from "@/ui/button";
 import { DateTimePicker } from "@/ui/date-time-picker";
 import {
   DialogContent,
@@ -64,7 +62,6 @@ interface TaskBulkEditDialogProps {
   initiativeId: number;
   isSubmitting: boolean;
   onApply: (changes: Partial<TaskBulkUpdate>) => void;
-  onCancel: () => void;
 }
 
 export const TaskBulkEditDialog = ({
@@ -76,7 +73,6 @@ export const TaskBulkEditDialog = ({
   initiativeId,
   isSubmitting,
   onApply,
-  onCancel,
 }: TaskBulkEditDialogProps) => {
   const { t } = useTranslation(["tasks", "common", "projects"]);
   const { user: currentUser } = useAuth();
@@ -302,21 +298,13 @@ export const TaskBulkEditDialog = ({
           </AccordionItem>
         </Accordion>
 
-        <DialogFooter className="mt-6">
-          <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
-            {t("common:cancel")}
-          </Button>
-          <Button type="submit" disabled={!hasChanges || typeBlocked || isSubmitting}>
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("bulkEdit.applying")}
-              </>
-            ) : (
-              t("bulkEdit.applyChanges")
-            )}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          className="mt-6"
+          submitLabel={t("bulkEdit.applyChanges")}
+          pending={isSubmitting}
+          pendingLabel={t("bulkEdit.applying")}
+          disabled={!hasChanges || typeBlocked}
+        />
       </form>
     </DialogContent>
   );

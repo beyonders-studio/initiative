@@ -102,7 +102,14 @@ export const PinnedBanner = ({ post, canPin = false, className }: PinnedBannerPr
             />
           </div>
 
-          <DialogFooter>
+          <DialogFooter
+            submitLabel={t("common:save")}
+            pending={setPin.isPending}
+            disabled={!expiresAt}
+            onSubmit={() =>
+              setPin.mutate({ pinned: true, expires_at: fromLocalDateTimeInput(expiresAt) })
+            }
+          >
             {post.pin_expires_at && (
               <Button
                 variant="ghost"
@@ -112,17 +119,6 @@ export const PinnedBanner = ({ post, canPin = false, className }: PinnedBannerPr
                 {t("pin.removeExpiry")}
               </Button>
             )}
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              {t("common:cancel")}
-            </Button>
-            <Button
-              disabled={setPin.isPending || !expiresAt}
-              onClick={() =>
-                setPin.mutate({ pinned: true, expires_at: fromLocalDateTimeInput(expiresAt) })
-              }
-            >
-              {t("common:save")}
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

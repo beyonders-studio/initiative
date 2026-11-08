@@ -212,14 +212,10 @@ const SummaryBody = ({
           size="icon"
           className="h-8 w-8"
           onClick={() => void write()}
-          disabled={writing}
+          pending={writing}
           title={t("summary.regenerate")}
         >
-          {writing ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
+          <RefreshCw className="h-4 w-4" />
         </Button>
       </div>
       {since}

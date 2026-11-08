@@ -6,7 +6,6 @@ import type {
   ConnectionScope,
 } from "@/api/generated/initiativeAPI.schemas";
 import { PROVIDER_CONFIGS } from "@/lib/ai-providers";
-import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 import {
   Dialog,
@@ -200,14 +199,12 @@ export const AIConnectionDialog = ({
             />
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              {t("aiConnections.cancel")}
-            </Button>
-            <Button type="submit" disabled={isPending || !canSave}>
-              {isPending ? t("aiConnections.saving") : t("aiConnections.save")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("aiConnections.save")}
+            pending={isPending}
+            pendingLabel={t("aiConnections.saving")}
+            disabled={!canSave}
+          />
         </form>
       </DialogContent>
     </Dialog>

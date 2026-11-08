@@ -68,13 +68,12 @@ const PackRow = ({
         variant="destructive"
         size="sm"
         className="shrink-0"
-        disabled={busy}
+        pending={busy}
         onClick={onRemove}
         // Every row's button says the same three words; in a list this long the
         // name is the only thing that tells them apart when they are read out.
         aria-label={t("myPacks.removeNamed", { name: entry.name })}
       >
-        {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
         {t("myPacks.remove")}
       </Button>
     </li>

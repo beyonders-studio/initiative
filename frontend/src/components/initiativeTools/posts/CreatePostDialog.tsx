@@ -1,6 +1,6 @@
 import { useBlocker } from "@tanstack/react-router";
 import type { SerializedEditorState } from "lexical";
-import { Loader2, Vote } from "lucide-react";
+import { Vote } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -111,7 +111,6 @@ export const CreatePostDialog = ({
   // somebody who started one meant to ask something.
   const canSubmit =
     name.trim().length > 0 &&
-    !create.isPending &&
     (poll === null || isPollDraftValid(poll)) &&
     !required.isLoading &&
     missing.length === 0;
@@ -217,35 +216,28 @@ export const CreatePostDialog = ({
           <CreateAccessSection initiativeId={initiativeId} grants={grants} onChange={setGrants} />
         </div>
 
-        <DialogFooter className="items-center">
+        <DialogFooter
+          className="items-center"
+          submitLabel={scheduledFor ? t("schedule.submit") : t("createPost")}
+          pendingLabel={t("creating")}
+          pending={create.isPending}
+          disabled={!canSubmit}
+          onSubmit={() =>
+            create.mutate({
+              name: name.trim(),
+              initiative_id: initiativeId,
+              body: { ...body },
+              grants,
+              scheduled_for: fromLocalDateTimeInput(scheduledFor),
+              poll: poll ? pollDraftToWrite(poll) : null,
+              tag_ids: values.tags.map((tag) => tag.id),
+              properties: valuesOf(values),
+            })
+          }
+        >
           {missing.length > 0 ? (
             <p className="text-muted-foreground text-xs">{t("layouts:required.toAdd")}</p>
           ) : null}
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            disabled={!canSubmit}
-            onClick={() =>
-              create.mutate({
-                name: name.trim(),
-                initiative_id: initiativeId,
-                body: { ...body },
-                grants,
-                scheduled_for: fromLocalDateTimeInput(scheduledFor),
-                poll: poll ? pollDraftToWrite(poll) : null,
-                tag_ids: values.tags.map((tag) => tag.id),
-                properties: valuesOf(values),
-              })
-            }
-          >
-            {create.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            {create.isPending
-              ? t("creating")
-              : scheduledFor
-                ? t("schedule.submit")
-                : t("createPost")}
-          </Button>
         </DialogFooter>
       </DialogContent>
 

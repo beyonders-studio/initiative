@@ -3,6 +3,7 @@ import { XIcon } from "lucide-react";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 
+import { Button } from "@/ui/button";
 import { cn } from "@/ui/lib/utils";
 
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -101,13 +102,65 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
+type DialogFooterProps = Omit<React.ComponentProps<"div">, "onSubmit"> & {
+  /**
+   * The submit button's label. With it the footer draws the usual pair after
+   * its children: Cancel, which closes the dialog, then the submit button.
+   * Without it the footer only lays out its children.
+   */
+  submitLabel?: React.ReactNode;
+  /** The submit button's click. Without one it submits the form the footer is in. */
+  onSubmit?: () => void;
+  /** Cancel's label, when it is not the kit's own word. */
+  cancel?: string;
+  /** The work is under way: the submit button spins and both buttons are disabled. */
+  pending?: boolean;
+  /** The submit button's label while `pending`. */
+  pendingLabel?: React.ReactNode;
+  /** Disables the submit button. */
+  disabled?: boolean;
+  destructive?: boolean;
+};
+
+function DialogFooter({
+  className,
+  children,
+  submitLabel,
+  onSubmit,
+  cancel,
+  pending = false,
+  pendingLabel,
+  disabled,
+  destructive,
+  ...props
+}: DialogFooterProps) {
+  const { t } = useTranslation("ui");
   return (
     <div
       data-slot="dialog-footer"
       className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)}
       {...props}
-    />
+    >
+      {children}
+      {submitLabel !== undefined && (
+        <>
+          <DialogPrimitive.Close asChild>
+            <Button variant="outline" disabled={pending}>
+              {cancel ?? t("cancel")}
+            </Button>
+          </DialogPrimitive.Close>
+          <Button
+            type={onSubmit ? "button" : "submit"}
+            onClick={onSubmit}
+            variant={destructive ? "destructive" : "default"}
+            pending={pending}
+            disabled={disabled}
+          >
+            {pending ? (pendingLabel ?? submitLabel) : submitLabel}
+          </Button>
+        </>
+      )}
+    </div>
   );
 }
 
