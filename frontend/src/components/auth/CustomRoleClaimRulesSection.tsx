@@ -141,7 +141,7 @@ export const CustomRoleClaimRulesSection = ({ communityId }: { communityId: numb
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-medium text-sm">{t("customRoleRules.title")}</h3>
-        {closed ? null : (
+        {closed || connections.length === 0 ? null : (
           <Button
             type="button"
             variant="outline"

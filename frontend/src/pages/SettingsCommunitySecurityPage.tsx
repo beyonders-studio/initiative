@@ -22,8 +22,10 @@ import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
 import {
   useCommunityAuthSettings,
+  useCommunityClaimRules,
   useCommunityLoginProviders,
   useCommunityProviderConnections,
+  useCustomRoleClaimRules,
   useUpdateCommunityAuthSettings,
 } from "@/hooks/useCommunityAuthPolicy";
 import { useServerForm } from "@/hooks/useServerForm";
@@ -661,6 +663,20 @@ export const SettingsCommunitySecurityPage = () => {
     enabled: communityId > 0 && mayConfigureProviders,
   });
   const connections = connectionsQuery.data ?? [];
+  // A group rule names a provider, so until one is connected there is nothing
+  // to write one against; rules already written stay readable regardless,
+  // and so do the server's, which can apply with no connection.
+  const claimRules = useCommunityClaimRules(communityId, {
+    enabled: communityId > 0 && mayConfigureProviders,
+  }).data;
+  const roleRules = useCustomRoleClaimRules(communityId, {
+    enabled: communityId > 0 && mayConfigureProviders,
+  }).data;
+  const showsGroupRules =
+    connections.length > 0 ||
+    Boolean(claimRules?.rules.length) ||
+    Boolean(claimRules?.provider_rules.length) ||
+    Boolean(roleRules?.length);
   // Only a live connection can be required. A disconnected or switched-off
   // one cannot serve a sign-in, and neither can one whose provider the
   // operator has since withdrawn.
@@ -864,9 +880,7 @@ export const SettingsCommunitySecurityPage = () => {
         <CommunityAuthProvidersSection communityId={communityId} communityName={communityName} />
       ) : null}
 
-      {/* A group rule names a provider, so there is nothing to write one
-          against until something is connected. */}
-      {mayConfigureProviders && connections.length > 0 ? (
+      {mayConfigureProviders && showsGroupRules ? (
         <SettingsSection
           title={t("communityAuth.groupRules.title")}
           description={t("communityAuth.groupRules.description")}

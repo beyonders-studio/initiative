@@ -330,7 +330,7 @@ async def create_custom_role_claim_rule(
         rule = await custom_roles_service.add_claim_rule(
             session,
             provider_id=payload.provider_id,
-            claim_value=payload.claim_value.strip(),
+            claim_value=payload.claim_value,
             role_id=payload.role_id,
         )
     except IntegrityError:
@@ -423,7 +423,7 @@ async def update_custom_role_claim_rule(
         )
     before = {"claim_value": rule.claim_value, "role_id": rule.role_id}
     if payload.claim_value is not None:
-        rule.claim_value = payload.claim_value.strip()
+        rule.claim_value = payload.claim_value
     if payload.role_id is not None:
         rule.role_id = payload.role_id
     session.add(rule)

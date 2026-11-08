@@ -37,8 +37,8 @@ from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
 from fastapi import HTTPException, status
-from sqlalchemy import select as sa_select
-from sqlmodel import func, select
+from sqlalchemy import or_, select as sa_select
+from sqlmodel import col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import rules as rule_catalog
@@ -243,6 +243,12 @@ async def community_figures(
             .where(
                 GuildMembership.guild_id == guild_id,
                 User.status == UserStatus.active,
+                # A guest whose time has ended reaches nothing, before the
+                # sweep removes the row.
+                or_(
+                    col(GuildMembership.guest_until).is_(None),
+                    col(GuildMembership.guest_until) > func.now(),
+                ),
             )
             .group_by(is_guest)
         )

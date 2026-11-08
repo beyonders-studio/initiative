@@ -184,16 +184,19 @@ export const CommunityClaimRulesSection = ({ communityId }: { communityId: numbe
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-medium text-sm">{t("communityAuth.rules.title")}</h3>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          aria-label={t("communityAuth.rules.add")}
-          onClick={() => openDialog()}
-        >
-          <Plus className="h-4 w-4" />
-          {t("communityAuth.groupRules.add")}
-        </Button>
+        {/* A rule names a provider this community is connected to. */}
+        {connections.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-label={t("communityAuth.rules.add")}
+            onClick={() => openDialog()}
+          >
+            <Plus className="h-4 w-4" />
+            {t("communityAuth.groupRules.add")}
+          </Button>
+        )}
       </div>
 
       {rulesQuery.isLoading ? (

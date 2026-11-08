@@ -1,8 +1,8 @@
 """A community's custom roles, as its settings read and write them."""
 
-from typing import Optional
+from typing import Annotated, Optional
 
-from pydantic import Field, field_validator
+from pydantic import Field, StringConstraints, field_validator
 
 from app.core.rules import SetBy
 from app.models.platform.guild import AdminSurface, CommunityRole
@@ -61,12 +61,18 @@ class HeldSurfacesRead(SanitizedBaseModel):
     surfaces: list[AdminSurface]
 
 
+#: A group as a provider spells it, without the spaces around it.
+GroupName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)
+]
+
+
 class CustomRoleClaimRuleCreate(SanitizedBaseModel):
     #: One of the community's connected sign-in providers.
     provider_id: int
     #: The group the provider asserts, as the community's other claim rules
     #: name it.
-    claim_value: str = Field(min_length=1, max_length=500)
+    claim_value: GroupName
     role_id: int
 
 
@@ -74,7 +80,7 @@ class CustomRoleClaimRuleUpdate(SanitizedBaseModel):
     """Change the group a rule reads or the role it gives. Its provider and
     its place in the order are not changed here."""
 
-    claim_value: Optional[str] = Field(default=None, min_length=1, max_length=500)
+    claim_value: Optional[GroupName] = None
     role_id: Optional[int] = None
 
 

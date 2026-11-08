@@ -399,6 +399,10 @@ async def test_the_seat_orders_the_groups_that_give_custom_roles(
         f"{url}/{ids[0]}", headers=headers, json={"claim_value": "CREW"}
     )
     assert taken.status_code == 409, taken.text
+    blank = await client.patch(
+        f"{url}/{ids[0]}", headers=headers, json={"claim_value": "   "}
+    )
+    assert blank.status_code == 422, blank.text
 
     await rules.put(
         session,

@@ -3,7 +3,7 @@ session-satisfaction enforcement inside the guild RLS."""
 
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from collections.abc import Awaitable, Callable
 
 import pytest
@@ -159,6 +159,8 @@ async def test_the_seat_reads_how_many_each_rule_would_ask(
     away = await create_user(session, status=UserStatus.suspended)
     await create_guild_membership(session, user=away, guild=seat.guild)
     await create_guest(session, seat.guild)
+    # Nor a guest whose time has ended.
+    await create_guest(session, seat.guild, ends_in=timedelta(hours=-1))
     await session.commit()
 
     body = (

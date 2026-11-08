@@ -145,8 +145,12 @@ const useInvalidateConnections = (communityId: number) => {
   // and the step-up dialog. Without the last one a freshly connected provider
   // cannot be required until the cache expires. The rules list reads it too:
   // whether the deployment's rules for a provider apply here follows the
-  // connection's acceptance.
+  // connection's acceptance. And the seat's settings count, per connected
+  // provider, who has never signed in through it.
   return () => {
+    void queryClient.invalidateQueries({
+      queryKey: getGetCommunityAuthSettingsQueryKey(communityId),
+    });
     void queryClient.invalidateQueries({
       queryKey: getListCommunityClaimRulesQueryKey(communityId),
     });
