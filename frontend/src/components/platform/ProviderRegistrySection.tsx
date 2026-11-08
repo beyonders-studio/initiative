@@ -342,11 +342,9 @@ const ProviderEditForm = ({
             required
           />
         </Field>
-        <div className="space-y-2">
-          <Label htmlFor="provider-issuer">{t("authProviders.issuerLabel")}</Label>
+        <Field label={t("authProviders.issuerLabel")}>
           <div className="flex items-center gap-2">
             <Input
-              id="provider-issuer"
               type="url"
               value={form.issuer}
               onChange={(event) => {
@@ -369,7 +367,7 @@ const ProviderEditForm = ({
             </Button>
           </div>
           {probe ? <ProbeReport probe={probe} /> : null}
-        </div>
+        </Field>
         <Field label={t("authProviders.clientIdLabel")}>
           <Input
             value={form.client_id}
@@ -377,10 +375,8 @@ const ProviderEditForm = ({
             required
           />
         </Field>
-        <div className="space-y-2">
-          <Label htmlFor="provider-client-secret">{t("authProviders.clientSecretLabel")}</Label>
+        <Field label={t("authProviders.clientSecretLabel")}>
           <Input
-            id="provider-client-secret"
             type="password"
             value={form.client_secret}
             onChange={(event) =>
@@ -403,7 +399,7 @@ const ProviderEditForm = ({
               {t("authProviders.clearSecret")}
             </label>
           )}
-        </div>
+        </Field>
         <Field label={t("authProviders.scopesLabel")}>
           <Input
             value={form.scopes}

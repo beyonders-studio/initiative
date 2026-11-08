@@ -345,10 +345,12 @@ export function QueryBuilder({
               </SelectContent>
             </Select>
           </Field>
-          <div className="space-y-1">
-            <Label htmlFor="builder-range">{t("dashboards:builder.range")}</Label>
+          <Field
+            label={t("dashboards:builder.range")}
+            hint={t("dashboards:builder.rangeHelp")}
+            className="space-y-1"
+          >
             <Input
-              id="builder-range"
               key={`${reading.file}:${reading.range ?? ""}`}
               defaultValue={parts.cells}
               placeholder="A1:D"
@@ -360,8 +362,7 @@ export function QueryBuilder({
                 if (event.key === "Enter") event.currentTarget.blur();
               }}
             />
-            <p className="text-muted-foreground text-xs">{t("dashboards:builder.rangeHelp")}</p>
-          </div>
+          </Field>
         </section>
       )}
 

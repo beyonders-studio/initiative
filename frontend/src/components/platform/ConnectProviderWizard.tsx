@@ -374,8 +374,11 @@ export const ConnectProviderWizard = ({
             <Input value={scopes} onChange={(event) => setScopes(event.target.value)} />
           </Field>
 
-          <div className="space-y-1">
-            <Label>{t("authProviders.claimPathLabel")}</Label>
+          <Field
+            label={t("authProviders.claimPathLabel")}
+            hint={t("authProviders.claimPathHelp")}
+            className="space-y-1"
+          >
             <Combobox
               items={[
                 ...new Set([...(shown?.claims_supported ?? []), ...GROUPS_CLAIM_SUGGESTIONS]),
@@ -387,10 +390,8 @@ export const ConnectProviderWizard = ({
               searchPlaceholder={t("authProviders.claimPathSearch")}
               emptyMessage={t("authProviders.claimPathEmpty")}
               typedLabel={(value) => t("authProviders.claimPathUseTyped", { value })}
-              aria-label={t("authProviders.claimPathLabel")}
             />
-            <p className="text-muted-foreground text-xs">{t("authProviders.claimPathHelp")}</p>
-          </div>
+          </Field>
 
           <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2">
             <div>

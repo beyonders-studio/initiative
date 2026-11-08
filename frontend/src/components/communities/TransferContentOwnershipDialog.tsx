@@ -34,7 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
-import { Label } from "@/ui/label";
+import { Field } from "@/ui/field";
 
 /**
  * Counts keyed by tool, rendered as "3 projects · 1 calendar". The label comes
@@ -238,8 +238,14 @@ export const TransferContentOwnershipDialog = ({
               </ul>
             </div>
 
-            <div className="space-y-2">
-              <Label>{t("transferOwnership.recipientLabel")}</Label>
+            <Field
+              label={t("transferOwnership.recipientLabel")}
+              hint={
+                eligiblePlugins.length > 0
+                  ? t("transferOwnership.adminsOrPlugins")
+                  : t("transferOwnership.adminsOnly")
+              }
+            >
               <Combobox
                 items={recipients}
                 value={recipientId}
@@ -252,14 +258,8 @@ export const TransferContentOwnershipDialog = ({
                 selectedLabel={selectedLabel}
                 loading={adminSearch.isFetching && recipients.length === 0}
                 placeholder={t("transferOwnership.recipientPlaceholder")}
-                aria-label={t("transferOwnership.recipientLabel")}
               />
-              <p className="text-muted-foreground text-xs">
-                {eligiblePlugins.length > 0
-                  ? t("transferOwnership.adminsOrPlugins")
-                  : t("transferOwnership.adminsOnly")}
-              </p>
-            </div>
+            </Field>
           </div>
         )}
 

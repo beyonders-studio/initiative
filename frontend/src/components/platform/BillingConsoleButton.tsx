@@ -30,8 +30,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 
 type BillingConsole = "support" | "operator";
 
@@ -154,10 +154,16 @@ const SecondFactorDialog = ({
             if (entered) onAnswer(classifySecondFactorAnswer(entered));
           }}
         >
-          <div className="space-y-1">
-            <Label htmlFor="billing-factor-code">{t("accessGrants.breakGlass.codeLabel")}</Label>
+          <Field
+            label={t("accessGrants.breakGlass.codeLabel")}
+            hint={
+              knownUnenrolled
+                ? t("accessGrants.breakGlass.codeNotEnrolled")
+                : t("accessGrants.breakGlass.codeHelp")
+            }
+            className="space-y-1"
+          >
             <Input
-              id="billing-factor-code"
               autoComplete="one-time-code"
               autoCapitalize="none"
               autoCorrect="off"
@@ -166,12 +172,7 @@ const SecondFactorDialog = ({
               onChange={(event) => setCode(event.target.value)}
               placeholder={t("accessGrants.breakGlass.codePlaceholder")}
             />
-            <p className="text-muted-foreground text-xs">
-              {knownUnenrolled
-                ? t("accessGrants.breakGlass.codeNotEnrolled")
-                : t("accessGrants.breakGlass.codeHelp")}
-            </p>
-          </div>
+          </Field>
           <DialogFooter className="flex-wrap gap-2">
             {hasKey && passkeysRunHere() ? (
               <Button

@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -145,7 +145,6 @@ export const RecurrenceEditor = ({
   disabled = false,
 }: RecurrenceEditorProps) => {
   const { t, i18n } = useTranslation(["projects", "dates"]);
-  const controlId = useId();
   const rule = value === "custom" ? null : value;
   const hourly = kind === "task" && strategy === "rolling" && isHourlyRule(value);
   const limitInvalid = hourly && !isValidTaskRecurrence({ rule: value, strategy, limit });
@@ -263,8 +262,7 @@ export const RecurrenceEditor = ({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor={`${controlId}-preset`}>{t("recurrence.repeat")}</Label>
+      <Field label={t("recurrence.repeat")}>
         <Select
           value={preset}
           onValueChange={(next) => {
@@ -273,7 +271,7 @@ export const RecurrenceEditor = ({
           }}
           disabled={disabled}
         >
-          <SelectTrigger id={`${controlId}-preset`}>
+          <SelectTrigger>
             <SelectValue placeholder={t("recurrence.doesNotRepeat")} />
           </SelectTrigger>
           <SelectContent>
@@ -296,7 +294,7 @@ export const RecurrenceEditor = ({
               .join(" · ")}
           </div>
         ) : null}
-      </div>
+      </Field>
 
       {building && rule ? (
         <div className="space-y-4 rounded-md border border-border/70 p-4">
@@ -567,8 +565,14 @@ export const RecurrenceEditor = ({
       ) : null}
 
       {kind === "task" && rule && strategy && (onStrategyChange || onTaskChange) ? (
-        <div className="space-y-2">
-          <Label htmlFor={`${controlId}-strategy`}>{t("recurrence.repeatStrategy")}</Label>
+        <Field
+          label={t("recurrence.repeatStrategy")}
+          hint={
+            strategy === "rolling"
+              ? t("recurrence.strategyAfterCompletionDescription")
+              : t("recurrence.strategyOnScheduleDescription")
+          }
+        >
           <Select
             value={strategy}
             onValueChange={(next) => {
@@ -576,7 +580,7 @@ export const RecurrenceEditor = ({
             }}
             disabled={disabled}
           >
-            <SelectTrigger id={`${controlId}-strategy`}>
+            <SelectTrigger>
               <SelectValue placeholder={t("recurrence.selectStrategy")} />
             </SelectTrigger>
             <SelectContent>
@@ -584,12 +588,7 @@ export const RecurrenceEditor = ({
               <SelectItem value="rolling">{t("recurrence.strategyAfterCompletion")}</SelectItem>
             </SelectContent>
           </Select>
-          <p className="text-muted-foreground text-xs">
-            {strategy === "rolling"
-              ? t("recurrence.strategyAfterCompletionDescription")
-              : t("recurrence.strategyOnScheduleDescription")}
-          </p>
-        </div>
+        </Field>
       ) : null}
     </div>
   );

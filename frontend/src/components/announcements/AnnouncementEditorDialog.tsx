@@ -381,10 +381,8 @@ export const AnnouncementEditorDialog = ({
                     {t("operator.fields.timezoneHint", { zone: browserTimezone() })}
                   </p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="announcement-published">{t("operator.fields.publishedAt")}</Label>
+                <Field label={t("operator.fields.publishedAt")}>
                   <DateTimePicker
-                    id="announcement-published"
                     includeTime
                     value={state.publishedAt}
                     placeholder={t("operator.fields.draftPlaceholder")}
@@ -417,7 +415,7 @@ export const AnnouncementEditorDialog = ({
                       </Button>
                     ) : null}
                   </div>
-                </div>
+                </Field>
 
                 <Field
                   label={t("operator.fields.expiresAt")}

@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next";
 import type { DashboardRead } from "@/api/generated/initiativeAPI.schemas";
 import { DashboardViewMode } from "@/api/generated/initiativeAPI.schemas";
 import { useSetDashboardViewMode } from "@/hooks/useDashboards";
-import { Label } from "@/ui/label";
+import { Field } from "@/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 export function DashboardViewModeField({ dashboard }: { dashboard: DashboardRead }) {
@@ -23,14 +23,13 @@ export function DashboardViewModeField({ dashboard }: { dashboard: DashboardRead
   const mayChooseInitiative = dashboard.can_run_as_initiative;
 
   return (
-    <div className="space-y-2">
-      <Label htmlFor="dashboard-view-mode">{t("viewMode.label")}</Label>
+    <Field label={t("viewMode.label")}>
       <Select
         value={mode}
         onValueChange={(next) => setMode.mutate(next as DashboardViewMode)}
         disabled={!canEdit || setMode.isPending}
       >
-        <SelectTrigger id="dashboard-view-mode">
+        <SelectTrigger>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -54,6 +53,6 @@ export function DashboardViewModeField({ dashboard }: { dashboard: DashboardRead
       {canEdit && !mayChooseInitiative && (
         <p className="text-muted-foreground text-xs">{t("viewMode.notAllowed")}</p>
       )}
-    </div>
+    </Field>
   );
 }
