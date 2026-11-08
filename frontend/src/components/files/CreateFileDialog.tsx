@@ -4,7 +4,6 @@ import {
   FileText,
   ImageIcon,
   Link as LinkIcon,
-  Loader2,
   Plus,
   Presentation,
   Upload,
@@ -13,12 +12,19 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { ResourceGrantSchema } from "@/api/generated/initiativeAPI.schemas";
+import type { FileRead, ResourceGrantSchema } from "@/api/generated/initiativeAPI.schemas";
 import { FileType, SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import { CreateAccessSection } from "@/components/access/CreateAccessSection";
 import { DEFAULT_GRANTS } from "@/components/access/grants";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
-import { Button } from "@/components/ui/button";
+import { useCreateFile, useUploadFile } from "@/hooks/useFiles";
+import { useInitiative } from "@/hooks/useInitiatives";
+import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
+import type { EditorFileType } from "@/lib/fileTypes";
+import { toast } from "@/lib/mascotToast";
+import { matchSmartLinkProvider, SUPPORTED_PROVIDER_BADGES } from "@/lib/smartLinkProviders";
+import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -26,29 +32,17 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { FileDropArea } from "@/components/ui/file-drop";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
-import { useCreateFile, useUploadFile } from "@/hooks/useFiles";
-import { useInitiative } from "@/hooks/useInitiatives";
-import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
-import type { EditorFileType } from "@/lib/fileTypes";
-import { formatBytes, getFileTypeLabel, nameWithoutExtension } from "@/lib/fileUtils";
-import { numberFormat } from "@/lib/intl";
-import { toast } from "@/lib/mascotToast";
-import { matchSmartLinkProvider, SUPPORTED_PROVIDER_BADGES } from "@/lib/smartLinkProviders";
-import type { DialogProps } from "@/types/dialog";
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { FileDropArea } from "@/ui/file-drop";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { formatBytes, getFileTypeLabel, nameWithoutExtension } from "@/ui/lib/fileUtils";
+import { numberFormat } from "@/ui/lib/intl";
+import { Progress } from "@/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
+import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/ui/tabs";
 
 type CreateFileDialogProps = DialogProps & {
   /** The initiative the file is made in. */
@@ -56,7 +50,7 @@ type CreateFileDialogProps = DialogProps & {
   /** If provided, the created file will be auto-attached to this project */
   projectId?: number;
   /** Called after successful creation/upload */
-  onSuccess?: (file: { id: number }) => void;
+  onSuccess?: (file: FileRead) => void;
   /** A file dropped on the page to open this; the dialog opens on Upload holding it. */
   initialFile?: File | null;
 };
@@ -223,10 +217,8 @@ export const CreateFileDialog = ({
 
           {/* Shared fields: Title and Initiative */}
           <div className="mt-4 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="create-doc-title">{t("create.titleLabel")}</Label>
+            <Field label={t("create.titleLabel")}>
               <Input
-                id="create-doc-title"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 placeholder={
@@ -235,7 +227,7 @@ export const CreateFileDialog = ({
                     : t("create.titlePlaceholderAttach")
                 }
               />
-            </div>
+            </Field>
             <div className="space-y-2">
               <Label>{t("create.initiativeLabel")}</Label>
               <div className="rounded-md border px-3 py-2 text-sm">
@@ -246,13 +238,12 @@ export const CreateFileDialog = ({
 
           {/* New file tab content */}
           <TabsContent value="new" className="mt-4 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="create-doc-type">{t("create.fileTypeLabel")}</Label>
+            <Field label={t("create.fileTypeLabel")}>
               <Select
                 value={newFileType}
                 onValueChange={(value) => setNewFileType(value as NewFileType)}
               >
-                <SelectTrigger id="create-doc-type">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -263,7 +254,7 @@ export const CreateFileDialog = ({
                   <SelectItem value={FileType.sheet}>{t("create.fileTypeSpreadsheet")}</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>{t("create.templateLabel")}</Label>
@@ -280,7 +271,7 @@ export const CreateFileDialog = ({
                   </Button>
                 )}
               </div>
-              <AsyncCombobox
+              <Combobox
                 items={templateItems}
                 value={selectedTemplateId || null}
                 selectedLabel={selectedTemplateLabel}
@@ -448,16 +439,10 @@ export const CreateFileDialog = ({
                   grants,
                 });
               }}
+              pending={createFile.isPending}
               disabled={!canSubmitNew}
             >
-              {createFile.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("create.creating")}
-                </>
-              ) : (
-                t("create.createFile")
-              )}
+              {createFile.isPending ? t("create.creating") : t("create.createFile")}
             </Button>
           ) : createDialogTab === "upload" ? (
             <Button
@@ -477,16 +462,12 @@ export const CreateFileDialog = ({
                   onProgress: (arrived, total) => setSent(total ? arrived / total : 1),
                 });
               }}
+              pending={uploadFile.isPending}
               disabled={!canSubmitUpload}
             >
-              {uploadFile.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("create.uploadingProgress", { percent: percent.format(sent) })}
-                </>
-              ) : (
-                t("create.uploadFile")
-              )}
+              {uploadFile.isPending
+                ? t("create.uploadingProgress", { percent: percent.format(sent) })
+                : t("create.uploadFile")}
             </Button>
           ) : (
             <Button
@@ -503,16 +484,10 @@ export const CreateFileDialog = ({
                   grants,
                 });
               }}
+              pending={createFile.isPending}
               disabled={!canSubmitSmartLink}
             >
-              {createFile.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("create.creating")}
-                </>
-              ) : (
-                t("create.createSmartLink")
-              )}
+              {createFile.isPending ? t("create.creating") : t("create.createSmartLink")}
             </Button>
           )}
         </DialogFooter>

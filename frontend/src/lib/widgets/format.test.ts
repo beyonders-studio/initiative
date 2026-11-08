@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { dateTimeFormat } from "@/lib/intl";
+import { dateTimeFormat } from "@/ui/lib/intl";
 
 import { formatAxisValue, formatTimeBucket, formatValue } from "./format";
 

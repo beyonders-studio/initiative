@@ -1,7 +1,7 @@
 import { useBlocker } from "@tanstack/react-router";
 import type { SerializedEditorState } from "lexical";
-import { Loader2, Vote } from "lucide-react";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { Vote } from "lucide-react";
+import { lazy, Suspense, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -25,9 +25,15 @@ import {
   useRequiredKeys,
   valuesOf,
 } from "@/components/layouts/RequiredValues";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
+import { useCreatePost } from "@/hooks/usePosts";
+import { useProperties } from "@/hooks/useProperties";
+import { sharedTarget } from "@/hooks/useToolLayouts";
+import { fromLocalDateTimeInput } from "@/lib/formatDate";
+import { MAX_POST_TEXT_CHARS } from "@/lib/posts";
+import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { DateTimePicker } from "@/ui/date-time-picker";
 import {
   Dialog,
   DialogContent,
@@ -35,19 +41,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useCreatePost } from "@/hooks/usePosts";
-import { useProperties } from "@/hooks/useProperties";
-import { sharedTarget } from "@/hooks/useToolLayouts";
-import { fromLocalDateTimeInput } from "@/lib/formatDate";
-import { MAX_POST_TEXT_CHARS } from "@/lib/posts";
-import type { DialogProps } from "@/types/dialog";
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Skeleton } from "@/ui/skeleton";
 
 const Editor = lazy(() =>
-  import("@/components/ui/editor/editor").then((m) => ({ default: m.Editor }))
+  import("@/components/editor/editor").then((m) => ({ default: m.Editor }))
 );
 
 type CreatePostDialogProps = DialogProps & {
@@ -87,7 +88,9 @@ export const CreatePostDialog = ({
   const [values, setValues] = useState(EMPTY_REQUIRED);
   const missing = missingIn(required.keys, values, definitions);
 
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (!open) {
       setName("");
       setBody(null);
@@ -96,7 +99,7 @@ export const CreatePostDialog = ({
       setPoll(null);
       setValues(EMPTY_REQUIRED);
     }
-  }, [open]);
+  }
 
   const create = useCreatePost({
     onSuccess: (post) => {
@@ -109,7 +112,6 @@ export const CreatePostDialog = ({
   // somebody who started one meant to ask something.
   const canSubmit =
     name.trim().length > 0 &&
-    !create.isPending &&
     (poll === null || isPollDraftValid(poll)) &&
     !required.isLoading &&
     missing.length === 0;
@@ -142,16 +144,14 @@ export const CreatePostDialog = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="create-post-name">{t("name")}</Label>
+          <Field label={t("name")}>
             <Input
-              id="create-post-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder={t("namePlaceholder")}
               maxLength={255}
             />
-          </div>
+          </Field>
 
           <div className="space-y-2">
             <Label htmlFor="create-post-body">{t("body")}</Label>
@@ -200,50 +200,40 @@ export const CreatePostDialog = ({
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="create-post-schedule">{t("schedule.label")}</Label>
+          <Field label={t("schedule.label")} hint={t("schedule.hint")}>
             <DateTimePicker
-              id="create-post-schedule"
               includeTime
               value={scheduledFor}
               placeholder={t("schedule.placeholder")}
               onChange={setScheduledFor}
             />
-            <p className="text-muted-foreground text-xs">{t("schedule.hint")}</p>
-          </div>
+          </Field>
 
           <CreateAccessSection initiativeId={initiativeId} grants={grants} onChange={setGrants} />
         </div>
 
-        <DialogFooter className="items-center">
+        <DialogFooter
+          className="items-center"
+          submitLabel={scheduledFor ? t("schedule.submit") : t("createPost")}
+          pendingLabel={t("creating")}
+          pending={create.isPending}
+          disabled={!canSubmit}
+          onSubmit={() =>
+            create.mutate({
+              name: name.trim(),
+              initiative_id: initiativeId,
+              body: { ...body },
+              grants,
+              scheduled_for: fromLocalDateTimeInput(scheduledFor),
+              poll: poll ? pollDraftToWrite(poll) : null,
+              tag_ids: values.tags.map((tag) => tag.id),
+              properties: valuesOf(values),
+            })
+          }
+        >
           {missing.length > 0 ? (
             <p className="text-muted-foreground text-xs">{t("layouts:required.toAdd")}</p>
           ) : null}
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            disabled={!canSubmit}
-            onClick={() =>
-              create.mutate({
-                name: name.trim(),
-                initiative_id: initiativeId,
-                body: { ...body },
-                grants,
-                scheduled_for: fromLocalDateTimeInput(scheduledFor),
-                poll: poll ? pollDraftToWrite(poll) : null,
-                tag_ids: values.tags.map((tag) => tag.id),
-                properties: valuesOf(values),
-              })
-            }
-          >
-            {create.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            {create.isPending
-              ? t("creating")
-              : scheduledFor
-                ? t("schedule.submit")
-                : t("createPost")}
-          </Button>
         </DialogFooter>
       </DialogContent>
 

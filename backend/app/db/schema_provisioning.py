@@ -146,7 +146,6 @@ SYSTEM_GUILD_MAINTENANCE_GRANTS: dict[str, tuple[str, ...]] = {
     # record (``SELECT *``) before capture/search triggers resolve identifiers.
     # PostgreSQL therefore requires table-level SELECT for these dependencies.
     "projects": ("SELECT",),
-    "queues": ("SELECT",),
     "counter_groups": ("SELECT",),
     "calendars": ("SELECT",),
     "dashboards": ("SELECT",),
@@ -156,6 +155,7 @@ SYSTEM_GUILD_MAINTENANCE_GRANTS: dict[str, tuple[str, ...]] = {
     # the scrub rewrites that comment.
     "wikis": ("SELECT",),
     "wiki_pages": ("SELECT",),
+    "contacts": ("SELECT",),
     "initiatives": ("SELECT",),
     # Content and search-index triggers must still record the scrub. Their
     # writes are column-scoped where possible; DELETE needs a table privilege.
@@ -223,6 +223,11 @@ class ProvisioningBundle:
     construction. ``digests`` hashes each part's render (the grants as
     rendered statements), so a guild migration, a registry edit or a grants
     change moves the digest of the part it touches and nothing else.
+
+    Each part is what every community's schema has. ``operations`` holds each
+    part's share for the operations community's schema alone
+    (``app.db.operations_schema``): its tables' structure and what acts on
+    them, and the sweeps only it runs.
     """
 
     schema_ddl: str
@@ -233,6 +238,7 @@ class ProvisioningBundle:
     capture_ddl: str
     search_ddl: str
     timer_ddl: str
+    operations: dict[str, str]
     digests: dict[str, str]
 
     @property
@@ -275,7 +281,12 @@ async def get_provisioning_bundle() -> ProvisioningBundle:
         if _bundle is not None:
             return _bundle
         from app.db.event_capture import render_guild_capture_ddl
-        from app.db.guild_ddl import render_guild_rls_ddl, render_guild_schema_ddl
+        from app.db.guild_ddl import (
+            render_guild_rls_ddl,
+            render_guild_schema_ddl,
+            split_operations,
+        )
+        from app.db.tenancy import OPERATIONS_TABLES
         from app.db.registry_checks import (
             render_guild_registry_check_ddl,
             render_guild_registry_validate_ddl,
@@ -283,16 +294,29 @@ async def get_provisioning_bundle() -> ProvisioningBundle:
         from app.db.search_index import render_guild_search_ddl
         from app.db.timers import render_guild_timer_ddl
 
-        schema_ddl = await render_guild_schema_ddl(db_session.provisioning_engine)
-        checks_ddl = render_guild_registry_check_ddl()
-        rls_ddl = render_guild_rls_ddl()
-        capture_ddl = render_guild_capture_ddl()
+        engine = db_session.provisioning_engine
+        schema_ddl = await render_guild_schema_ddl(engine)
+        checks_ddl, operations_checks = split_operations(
+            render_guild_registry_check_ddl()
+        )
+        rls_ddl, operations_rls = split_operations(render_guild_rls_ddl())
+        capture_ddl, operations_capture = split_operations(render_guild_capture_ddl())
         # Naming the operator class in the rendered text is what makes the
         # digest move when it is installed later, so the sweep rebuilds indexes
         # that were created without it.
         opclass = f"public.{SEARCH_OPCLASS}" if await search_operator_ready() else None
-        search_ddl = render_guild_search_ddl(opclass)
+        search_ddl, operations_search = split_operations(
+            render_guild_search_ddl(opclass)
+        )
         timer_ddl = render_guild_timer_ddl()
+        operations = {
+            "schema": await render_guild_schema_ddl(engine, OPERATIONS_TABLES),
+            "checks": operations_checks,
+            "rls": operations_rls,
+            "capture": operations_capture,
+            "search": operations_search,
+            "timers": render_guild_timer_ddl(operations=True),
+        }
         grants = _grant_statements("__stamp__", 0)
         _bundle = ProvisioningBundle(
             schema_ddl=schema_ddl,
@@ -302,14 +326,15 @@ async def get_provisioning_bundle() -> ProvisioningBundle:
             capture_ddl=capture_ddl,
             search_ddl=search_ddl,
             timer_ddl=timer_ddl,
+            operations=operations,
             digests={
-                "schema": _digest(schema_ddl),
-                "checks": _digest(checks_ddl),
+                "schema": _digest(schema_ddl, operations["schema"]),
+                "checks": _digest(checks_ddl, operations["checks"]),
                 "grants": _digest(*grants),
-                "rls": _digest(rls_ddl),
-                "capture": _digest(capture_ddl),
-                "search": _digest(search_ddl),
-                "timers": _digest(timer_ddl),
+                "rls": _digest(rls_ddl, operations["rls"]),
+                "capture": _digest(capture_ddl, operations["capture"]),
+                "search": _digest(search_ddl, operations["search"]),
+                "timers": _digest(timer_ddl, operations["timers"]),
             },
         )
         return _bundle
@@ -435,6 +460,14 @@ async def apply_guild_search(conn: AsyncConnection, schema: str) -> None:
     shared functions that :func:`apply_guild_trigger_functions` keeps current.
     """
     ddl = (await get_provisioning_bundle()).search_ddl
+    raw = await conn.get_raw_connection()
+    await raw.driver_connection.execute(
+        f'SET search_path TO "{schema}", public;\n{ddl}\nSET search_path TO public;'
+    )
+
+
+async def _run_in_schema(conn: AsyncConnection, schema: str, ddl: str) -> None:
+    """Run schema-relative ``ddl`` with the search_path pointed at ``schema``."""
     raw = await conn.get_raw_connection()
     await raw.driver_connection.execute(
         f'SET search_path TO "{schema}", public;\n{ddl}\nSET search_path TO public;'
@@ -795,6 +828,7 @@ async def _apply_parts(
     parts: tuple[str, ...],
     *,
     validate_checks: bool = True,
+    operations: bool | None = None,
 ) -> None:
     """Apply ``parts`` of the bundle to ``guild_<id>``, then stamp the schema.
 
@@ -803,13 +837,31 @@ async def _apply_parts(
     ``validate_checks=False`` replaces the registry CHECKs without checking
     the rows already there, and stamps ``checks`` pending until the caller
     validates them in a transaction of its own.
+
+    A schema that has the operations tables gets each part's operations share
+    too; ``operations=True`` gives it them, tables first, where it has none.
     """
+    from app.db.guild_ddl import is_operations_statement
+    from app.db.operations_schema import holds_operations
+
     schema = guild_schema_name(guild_id)
+    bundle = await get_provisioning_bundle()
     if "schema" in parts:
         await conn.exec_driver_sql(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
+    if operations is None:
+        operations = await holds_operations(conn, schema)
+    share = bundle.operations if operations else {}
+
+    async def then_operations(part: str) -> None:
+        if share.get(part):
+            await _run_in_schema(conn, schema, share[part])
+
+    if "schema" in parts:
         await apply_guild_schema(conn, schema)  # canonical Alembic-owned table DDL
+        await then_operations("schema")
     if "checks" in parts:  # CHECKs that follow a registry
         await apply_guild_checks(conn, schema, validate=validate_checks)
+        await then_operations("checks")
     if "grants" in parts:
         roles = _guild_roles(guild_id)
         existing = await _existing_roles(conn, roles)
@@ -817,18 +869,25 @@ async def _apply_parts(
             conn,
             [
                 *(f'CREATE ROLE "{r}" NOLOGIN' for r in roles if r not in existing),
-                *_grant_statements(schema, guild_id),
+                *(
+                    s
+                    for s in _grant_statements(schema, guild_id)
+                    if operations or not is_operations_statement(s)
+                ),
             ],
         )
     if "rls" in parts:
         await apply_guild_rls(conn, schema)  # initiative-level RLS policies
+        await then_operations("rls")
     if "capture" in parts:
         await apply_guild_capture(conn, schema)  # change-capture triggers
+        await then_operations("capture")
     if "search" in parts:
         await apply_guild_search(conn, schema)  # search-index refresh triggers
+        await then_operations("search")
     if "timers" in parts:
         await apply_guild_timers(conn, schema)  # sweep-timer triggers
-    bundle = await get_provisioning_bundle()
+        await then_operations("timers")
     pending = "checks" in parts and not validate_checks
     await _write_stamp(
         conn, schema, bundle.stamp_pending("checks") if pending else bundle.stamp
@@ -861,11 +920,14 @@ async def drop_guild_schema(conn: AsyncConnection, guild_id: int) -> None:
     await advisory_lock(conn, LockNamespace.GUILD_PROVISION, guild_id)
     await conn.exec_driver_sql(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
     provisioning_login, _ = settings.database_login("DATABASE_URL")
-    from app.db.filer_access import filer_role_name
+    from app.db.operations_schema import OPERATIONS_ROLES
 
-    # The filer role is created only in the operations community, but goes
-    # with whichever community holds it.
-    roles = (*_guild_roles(guild_id), filer_role_name(guild_id))
+    # The reader roles are created only in the operations community, but go
+    # with whichever community holds them.
+    roles = (
+        *_guild_roles(guild_id),
+        *(spec.name(guild_id) for spec in OPERATIONS_ROLES),
+    )
     existing = await _existing_roles(conn, roles)
     for role in roles:
         if role in existing:

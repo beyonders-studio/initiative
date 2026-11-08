@@ -25,7 +25,6 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
 import { useGetFcmConfig } from "@/api/generated/settings/settings";
-import { Button } from "@/components/ui/button";
 import {
   androidApkUrl,
   desktopInstallerUrl,
@@ -33,6 +32,7 @@ import {
   OBTAINIUM_URL,
   RELEASES_URL,
 } from "@/lib/links";
+import { Button } from "@/ui/button";
 
 import { DarkBand } from "./DarkBand";
 import { LandingShell } from "./LandingShell";

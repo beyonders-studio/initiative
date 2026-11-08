@@ -21,6 +21,9 @@
     "user_reference": "Personne",
     "currency": "Montant",
     "scale": "Échelle",
+    "counter": "Compteur",
+    "file": "Fichier",
+    "signature": "Signature",
     "link": "Lien",
     "badge": "Badge",
     "json": "Données"
@@ -59,11 +62,23 @@
     "optionAddFailed": "Impossible d'ajouter l'option",
     "scalePlaceholder": "0–100",
     "stars_one": "{{count}} étoile",
-    "stars_other": "{{count}} étoiles"
+    "stars_other": "{{count}} étoiles",
+    "stepDown": "Diminuer {{name}} d'un pas",
+    "stepUp": "Augmenter {{name}} d'un pas",
+    "reset": "Réinitialiser {{name}}",
+    "newFile": "Nouveau fichier",
+    "fileUnavailable": "Un fichier que vous ne pouvez pas ouvrir",
+    "sign": "Signer",
+    "signTitle": "Signer {{name}}",
+    "signStatement": "En saisissant votre nom et en signant, vous apposez votre signature sur cet élément tel qu'il est maintenant. Elle est enregistrée sous votre compte.",
+    "signNameLabel": "Votre nom",
+    "signingAs": "Signature en tant que {{name}}"
   },
   "cell": {
     "emptyValue": "—",
-    "none": "Aucun"
+    "none": "Aucun",
+    "signed": "{{name}}, {{date}}",
+    "updatedAfterSigning": "Modifié après la signature"
   },
   "manager": {
     "title": "Métadonnées",
@@ -132,5 +147,17 @@
     "label": "Devise",
     "none": "Aucune devise ne correspond",
     "default": "EUR"
+  },
+  "counter": {
+    "step": "Pas",
+    "min": "Minimum",
+    "max": "Maximum",
+    "initial": "Valeur initiale",
+    "stepPlaceholder": "1",
+    "minPlaceholder": "Aucun",
+    "maxPlaceholder": "Aucun",
+    "initialPlaceholder": "0",
+    "stepPositive": "Le pas doit être supérieur à zéro",
+    "minAboveMax": "Le minimum ne peut pas dépasser le maximum"
   }
 }

@@ -103,7 +103,10 @@
       "assets": "{{restored}} archivos restaurados, {{deduped}} ya presentes",
       "unmatchedHandles": "Algunas personas no se asignaron. Nadie aquí coincide con ellas, o no puedes añadirlas a esta iniciativa: {{handles}}",
       "failedEntries": "Elementos que no se importaron:",
-      "nothing": "No se importó nada."
+      "nothing": "No se importó nada.",
+      "failedRows_one": "Se dejó fuera {{count}} fila:",
+      "failedRows_other": "Se dejaron fuera {{count}} filas:",
+      "failedRow": "Fila {{row}} · {{field}}"
     },
     "atlassian": {
       "connect": {
@@ -224,6 +227,32 @@
         "filesBlocked_other": "{{count}} archivos, porque esta iniciativa tiene los archivos desactivados",
         "dropped": "Se omite: {{items}}"
       }
+    },
+    "contacts": {
+      "title": "Importar contactos",
+      "fileHint": "Un archivo CSV: una exportación de contactos o una hoja de cálculo guardada como CSV.",
+      "filePrompt": "Elige un archivo CSV",
+      "where": "En una hoja de cálculo: Archivo → Descargar o Guardar como → CSV",
+      "columnsPrompt": "¿Qué contiene cada columna?",
+      "rows_one": "{{count}} fila para importar",
+      "rows_other": "{{count}} filas para importar",
+      "note": "Cada fila se convierte en un contacto nuevo. Una fila que no se puede leer se deja fuera, y el informe dice cuál.",
+      "untitled": "Columna {{n}}",
+      "labelOf": "Etiqueta de {{column}}",
+      "labelFrom": "Etiqueta de la columna {{column}}",
+      "noLabel": "Sin etiqueta",
+      "targets": {
+        "ignore": "Dejar fuera",
+        "name": "Nombre",
+        "type": "Persona u organización",
+        "emails": "Correo",
+        "phones": "Teléfono",
+        "addresses": "Dirección",
+        "websites": "Sitio web",
+        "organization": "Organización",
+        "tags": "Etiquetas",
+        "properties": "Propiedades"
+      }
     }
   },
   "envelope": {
@@ -270,12 +299,13 @@
       "backup": "Copia de seguridad",
       "initiative-project": "Proyecto",
       "initiative-file": "Archivo",
-      "initiative-queue": "Cola",
       "initiative-calendar": "Calendario",
       "initiative-post": "Publicación",
       "initiative-wiki": "Wiki",
+      "initiative-contact": "Contacto",
       "initiative-counter-group": "Grupo de contadores",
-      "initiative-dashboard": "Panel"
+      "initiative-dashboard": "Panel",
+      "contacts-csv": "Contactos de una hoja de cálculo"
     },
     "cancel": "Cancelar",
     "viewReport": "Ver informe",

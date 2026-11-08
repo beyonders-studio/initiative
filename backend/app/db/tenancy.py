@@ -60,6 +60,7 @@ __all__ = [
     "CREATED_BY_EXEMPT_TABLES",
     "INITIATIVE_SCOPED_TABLES",
     "GUILD_SCOPED_TABLES",
+    "OPERATIONS_TABLES",
     "ALL_CLASSIFIED_TABLES",
     "is_guild_scoped",
     "is_shared",
@@ -182,7 +183,7 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         # row for its install.
         "plugin_member_consents",
         # How a member shows the community's lists: their filters, order and
-        # layout for a project, a tool list, a queue, the roster. One owner per
+        # layout for a project, a tool list, the roster. One owner per
         # row; no initiative of its own, since a key may name the community's
         # roster or its calendars together.
         "view_preferences",
@@ -382,6 +383,9 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         # A ballot: ``user_id`` is the voter, which is both the author of the
         # row and its whole content.
         "post_poll_votes",
+        # A vote for an idea, likewise; the voter is not a member, and the
+        # writer that records it has nobody of its own to name.
+        "idea_votes",
         "personal_items",
         # A value belongs to its definition's owner, not to whoever set it.
         "metadata_values",
@@ -423,6 +427,16 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
 # content (keys of INITIATIVE_PATHS) plus the guild-level exemptions. Derived,
 # so a guild table is declared in exactly ONE place.
 GUILD_SCOPED_TABLES: frozenset[str] = INITIATIVE_SCOPED_TABLES | GUILD_LEVEL_TABLES
+
+# Guild tables only the operations community fills
+# (``app_settings.operations_guild_id``). ``guild_template`` has them like every
+# guild table, and one community's schema does: provisioning leaves them out,
+# and choosing the operations community creates them
+# (``app.db.operations_schema``). Each is still classified above, which is how
+# it is secured there.
+OPERATIONS_TABLES: frozenset[str] = frozenset(
+    {"intake_bindings", "intake_cases", "case_grants", "idea_votes"}
+)
 
 # Union of every table that has an explicit placement decision.
 ALL_CLASSIFIED_TABLES: frozenset[str] = SHARED_TABLES | GUILD_SCOPED_TABLES

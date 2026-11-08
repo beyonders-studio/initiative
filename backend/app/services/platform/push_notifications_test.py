@@ -67,6 +67,8 @@ _IN_APP_ONLY = {
     # A plug-in asking a member to consent: answered on the plug-in's settings, where
     # it waits until they get to it.
     NotificationType.plugin_consent_requested,
+    # The record of an announcement already shown in its own dialog.
+    NotificationType.announcement,
     # A version of an installed plug-in waiting for the seat: it waits on the
     # settings page until they get to it, so nothing is gained by interrupting
     # them on a device.

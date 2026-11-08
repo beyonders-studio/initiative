@@ -252,9 +252,3 @@ export const useStoreSellingAnswer = (): boolean | undefined => {
   }, []);
   return sells;
 };
-
-/**
- * Whether this device may sell, for a component. False until a phone's store
- * has answered, so no buy button appears and then goes away.
- */
-export const useStoreSelling = (): boolean => useStoreSellingAnswer() ?? false;

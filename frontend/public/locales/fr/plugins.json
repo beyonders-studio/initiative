@@ -33,6 +33,7 @@
     "autoUpdateOff": "Les mises à jour sont désormais appliquées manuellement.",
     "upgradeTo": "Mettre à jour vers {{version}}",
     "upToDate": "À jour",
+    "updateWaiting": "Mise à jour en attente",
     "upgraded": "Mise à jour vers {{version}}.",
     "removeManagedNeutral": "Les frais de ce plug-in sont gérés par votre fournisseur.",
     "removeManagedAction": "Gérer",
@@ -45,7 +46,8 @@
     "decline": "Refuser",
     "declined": "Vous avez refusé la version {{version}}. Le plug-in reste sur sa version actuelle.",
     "declinedDone": "Version {{version}} refusée.",
-    "moved": "Une autre version est maintenant disponible. Vérifiez ce qu'elle demande."
+    "moved": "Une autre version est maintenant disponible. Vérifiez ce qu'elle demande.",
+    "refused": "La version {{version}} ne peut pas fonctionner sur ce serveur."
   },
   "install": {
     "title": "Ajouter {{name}}",
@@ -266,10 +268,6 @@
         "read": "Lire les fichiers",
         "write": "Lire et modifier les fichiers"
       },
-      "queues": {
-        "read": "Lire les files",
-        "write": "Lire et modifier les files"
-      },
       "counter_groups": {
         "read": "Lire les compteurs",
         "write": "Lire et modifier les compteurs"
@@ -289,6 +287,10 @@
       "wikis": {
         "read": "Lire les wikis",
         "write": "Lire et modifier les wikis"
+      },
+      "contacts": {
+        "read": "Lire les contacts",
+        "write": "Lire et modifier les contacts"
       },
       "comments": {
         "read": "Lire les commentaires",

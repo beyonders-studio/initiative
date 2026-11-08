@@ -19,7 +19,7 @@ is there (``import_engine.mentions``). A reference to another thing —
 (``import_engine.references``).
 
 Out of scope (see plan): files, attachments, project-role permissions,
-bookmarks, recents, queues. Those would extend the schema under a future
+bookmarks, recents. Those would extend the schema under a future
 ``schema_version`` bump.
 """
 
@@ -309,6 +309,7 @@ async def build_project_export(
             color=definitions[property_id].color,
             options=definitions[property_id].options,
             currency=definitions[property_id].currency,
+            counter=definitions[property_id].counter,
             project=definitions[property_id].project_id is not None,
         )
         for property_id in property_places

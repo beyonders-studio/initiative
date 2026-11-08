@@ -19,8 +19,14 @@ import type {
   PlacementProviderRead,
   ProviderPlacementRuleRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
-import { Button } from "@/components/ui/button";
+import {
+  useCreatePlacementRule,
+  usePlacementCommunities,
+  usePlacementTargets,
+  useUpdatePlacementRule,
+} from "@/hooks/useProviderPlacement";
+import { toast } from "@/lib/mascotToast";
+import { Combobox } from "@/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -28,25 +34,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import {
-  useCreatePlacementRule,
-  usePlacementCommunities,
-  usePlacementTargets,
-  useUpdatePlacementRule,
-} from "@/hooks/useProviderPlacement";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 /** Sentinel for "the community itself", which has no initiative id. */
 const COMMUNITY_ONLY = "community";
@@ -159,8 +152,6 @@ export const ProviderPlacementRuleDialog = ({
             toast.success(t("providerPlacement.saved"));
             onClose();
           },
-          onError: (error) =>
-            toast.error(getErrorMessage(error, "settings:providerPlacement.saveError")),
         }
       );
       return;
@@ -172,8 +163,6 @@ export const ProviderPlacementRuleDialog = ({
           toast.success(t("providerPlacement.added"));
           onClose();
         },
-        onError: (error) =>
-          toast.error(getErrorMessage(error, "settings:providerPlacement.addError")),
       }
     );
   };
@@ -196,16 +185,13 @@ export const ProviderPlacementRuleDialog = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="placement-group">{t("providerPlacement.groupLabel")}</Label>
+          <Field label={t("providerPlacement.groupLabel")} hint={t("providerPlacement.groupHelp")}>
             <Input
-              id="placement-group"
               value={group}
               onChange={(event) => setGroup(event.target.value)}
               placeholder={t("providerPlacement.groupPlaceholder")}
             />
-            <p className="text-muted-foreground text-xs">{t("providerPlacement.groupHelp")}</p>
-          </div>
+          </Field>
 
           <div className="space-y-3 rounded-md border px-4 py-3">
             <div className="flex items-start justify-between gap-4">
@@ -219,28 +205,20 @@ export const ProviderPlacementRuleDialog = ({
             </div>
             {scoped && (
               <div className="grid grid-cols-pair gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="placement-scope-claim">
-                    {t("providerPlacement.directoryClaimLabel")}
-                  </Label>
+                <Field label={t("providerPlacement.directoryClaimLabel")}>
                   <Input
-                    id="placement-scope-claim"
                     value={scopeClaim}
                     onChange={(event) => setScopeClaim(event.target.value)}
                     placeholder={t("providerPlacement.directoryClaimPlaceholder")}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="placement-scope-value">
-                    {t("providerPlacement.directoryValueLabel")}
-                  </Label>
+                </Field>
+                <Field label={t("providerPlacement.directoryValueLabel")}>
                   <Input
-                    id="placement-scope-value"
                     value={scopeValue}
                     onChange={(event) => setScopeValue(event.target.value)}
                     placeholder={t("providerPlacement.directoryValuePlaceholder")}
                   />
-                </div>
+                </Field>
               </div>
             )}
           </div>
@@ -257,7 +235,7 @@ export const ProviderPlacementRuleDialog = ({
               <p className="font-medium text-sm">{community?.name}</p>
             ) : (
               <>
-                <AsyncCombobox
+                <Combobox
                   aria-label={t("providerPlacement.communityLabel")}
                   items={communityItems}
                   value={community ? String(community.id) : null}
@@ -283,10 +261,9 @@ export const ProviderPlacementRuleDialog = ({
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="placement-role">{t("communityAuth.rules.standingLabel")}</Label>
+          <Field label={t("communityAuth.rules.standingLabel")}>
             <Select value={communityRole} onValueChange={setCommunityRole}>
-              <SelectTrigger id="placement-role">
+              <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -294,13 +271,13 @@ export const ProviderPlacementRuleDialog = ({
                 <SelectItem value="admin">{t("communityAuth.rules.role.admin")}</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </Field>
 
           {community !== null && (
-            <div className="space-y-2">
-              <Label htmlFor="placement-initiative">
-                {t("communityAuth.rules.initiativeLabel")}
-              </Label>
+            <Field
+              label={t("communityAuth.rules.initiativeLabel")}
+              hint={targetsQuery.isError && t("providerPlacement.targetsUnavailable")}
+            >
               <Select
                 value={initiativeId}
                 onValueChange={(value) => {
@@ -308,7 +285,7 @@ export const ProviderPlacementRuleDialog = ({
                   setInitiativeRoleId("");
                 }}
               >
-                <SelectTrigger id="placement-initiative">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -322,21 +299,13 @@ export const ProviderPlacementRuleDialog = ({
                   ))}
                 </SelectContent>
               </Select>
-              {targetsQuery.isError && (
-                <p className="text-muted-foreground text-xs">
-                  {t("providerPlacement.targetsUnavailable")}
-                </p>
-              )}
-            </div>
+            </Field>
           )}
 
           {chosenInitiative !== null && (
-            <div className="space-y-2">
-              <Label htmlFor="placement-initiative-role">
-                {t("communityAuth.rules.initiativeRoleLabel")}
-              </Label>
+            <Field label={t("communityAuth.rules.initiativeRoleLabel")}>
               <Select value={initiativeRoleId} onValueChange={setInitiativeRoleId}>
-                <SelectTrigger id="placement-initiative-role">
+                <SelectTrigger>
                   <SelectValue placeholder={t("communityAuth.rules.initiativeRolePlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -347,18 +316,16 @@ export const ProviderPlacementRuleDialog = ({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           )}
         </div>
 
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
-            {t("authProviders.cancel")}
-          </Button>
-          <Button type="button" onClick={submit} disabled={!canSubmit}>
-            {editing ? t("providerPlacement.save") : t("providerPlacement.add")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={editing ? t("providerPlacement.save") : t("providerPlacement.add")}
+          onSubmit={submit}
+          pending={saving}
+          disabled={!canSubmit}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -2,9 +2,11 @@ import { ExternalLink } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
 import { matchSmartLinkProvider } from "@/lib/smartLinkProviders";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { EmbedFrame, POST_FRAME_CLASS } from "@/ui/embed-frame";
+import { sanitizeUrl } from "@/ui/lib/safeUrl";
+import { cn } from "@/ui/lib/utils";
 
 export interface SmartLinkContent {
   url: string;
@@ -35,20 +37,23 @@ export function SmartLinkFileViewer({ content, className }: SmartLinkFileViewerP
   }
 
   if (match.canEmbed && match.embedSrc) {
+    // A post sizes itself to what its page reports; everything else fills the box.
+    const sizesItself = match.heightOf !== undefined;
     return (
       <div
         className={cn(
-          "relative h-[80vh] w-full overflow-hidden rounded-lg border bg-background shadow",
+          sizesItself
+            ? "w-full"
+            : "relative h-[80vh] w-full overflow-hidden rounded-lg border bg-background shadow",
           className
         )}
       >
-        <iframe
+        <EmbedFrame
           src={match.embedSrc}
-          className="h-full w-full border-0"
           title={url}
-          allow={match.iframeAttrs.allow}
-          referrerPolicy={match.iframeAttrs.referrerPolicy}
-          allowFullScreen
+          {...match.iframeAttrs}
+          heightOf={match.heightOf}
+          className={sizesItself ? POST_FRAME_CLASS : "h-full w-full border-0"}
         />
       </div>
     );
@@ -71,7 +76,7 @@ export function SmartLinkFileViewer({ content, className }: SmartLinkFileViewerP
         {match.embedHintKey ? t(match.embedHintKey) : t("smartLink.unsupportedProvider")}
       </p>
       <Button asChild variant="default" size="sm">
-        <a href={url} target="_blank" rel="noopener noreferrer">
+        <a href={sanitizeUrl(url)} target="_blank" rel="noopener noreferrer">
           <ExternalLink className="h-4 w-4" />
           {t("smartLink.openInNewTab")}
         </a>

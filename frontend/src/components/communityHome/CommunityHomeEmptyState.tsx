@@ -15,13 +15,14 @@
  * community-admin gate), so the copy keys off the same prop the button does.
  */
 
-import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { InitiativeDirectoryEntry } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeDirectory } from "@/components/communityHome/InitiativeDirectory";
-import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/ui/button";
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 export interface CommunityHomeEmptyStateProps {
   entries: InitiativeDirectoryEntry[];
@@ -55,12 +56,11 @@ export const CommunityHomeEmptyState = ({
       {entries.length > 0 ? (
         <InitiativeDirectory entries={entries} onCreate={onCreate} />
       ) : directoryStatus === "pending" ? (
-        <div className="flex items-center gap-2 text-muted-foreground text-sm">
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          {t("loading")}
-        </div>
+        <SkeletonRegion>
+          <CardGridSkeleton count={3} />
+        </SkeletonRegion>
       ) : directoryStatus === "error" ? (
-        <p className="text-destructive text-sm">{t("directory.loadError")}</p>
+        <StatusMessage />
       ) : (
         <Card>
           <CardHeader>

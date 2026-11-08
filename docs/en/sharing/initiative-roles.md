@@ -25,14 +25,14 @@ Permissions are grouped by tool, and each offers **View**, **Create**, or neithe
 |---|---|
 | **Projects** | View, Create |
 | **Files** | View, Create |
-| **Queues** | View, Create |
 | **Counters** | View, Create |
 | **Events** (calendar) | View, Create |
 | **Dashboards** | View, Create |
 | **Posts** | View, Create |
 | **Wikis** | View, Create |
+| **Contacts** | View, Create |
 
-So a "Contributor" might view and create projects and files, while a "Guest" only views them and has no idea the queues exist.
+So a "Contributor" might view and create projects and files, while a "Guest" only views them and has no idea the dashboards exist.
 
 ![A role's permissions](../images/sharing/role-permissions.png)
 

@@ -1,24 +1,19 @@
 import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
-import { FormSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import { useServerForm } from "@/hooks/useServerForm";
 import { useInterfaceSettings, useUpdateInterfaceSettings } from "@/hooks/useSettings";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { Field } from "@/ui/field";
+import { Label } from "@/ui/label";
+import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
+import { Switch } from "@/ui/switch";
 
 export const SettingsBrandingPage = () => {
   const { t } = useTranslation("settings");
@@ -78,34 +73,32 @@ export const SettingsBrandingPage = () => {
               <FormSkeleton card={false} fields={2} />
             </SkeletonRegion>
           ) : interfaceQuery.isError ? (
-            <p className="text-destructive text-sm">{t("branding.interfaceError")}</p>
+            <StatusMessage onRetry={interfaceQuery.refetch} />
           ) : (
             <form className="grid grid-cols-pair gap-6" onSubmit={handleInterfaceSubmit}>
-              <div className="space-y-3 rounded-lg border p-4">
-                <Label htmlFor="light-accent" className="font-medium text-sm">
-                  {t("branding.lightModeLabel")}
-                </Label>
+              <Field
+                label={t("branding.lightModeLabel")}
+                hint={t("branding.lightModeHelp")}
+                className="space-y-3 rounded-lg border p-4"
+              >
                 <ColorPickerPopover
-                  id="light-accent"
                   value={form.values.light}
                   onChange={(next) => form.set({ light: next })}
                   triggerLabel={t("branding.adjust")}
                 />
-                <p className="text-muted-foreground text-xs">{t("branding.lightModeHelp")}</p>
-              </div>
+              </Field>
 
-              <div className="space-y-3 rounded-lg border p-4">
-                <Label htmlFor="dark-accent" className="font-medium text-sm">
-                  {t("branding.darkModeLabel")}
-                </Label>
+              <Field
+                label={t("branding.darkModeLabel")}
+                hint={t("branding.darkModeHelp")}
+                className="space-y-3 rounded-lg border p-4"
+              >
                 <ColorPickerPopover
-                  id="dark-accent"
                   value={form.values.dark}
                   onChange={(next) => form.set({ dark: next })}
                   triggerLabel={t("branding.adjust")}
                 />
-                <p className="text-muted-foreground text-xs">{t("branding.darkModeHelp")}</p>
-              </div>
+              </Field>
 
               <CardFooter className="col-span-full flex flex-wrap gap-3 p-0 pt-2">
                 <Button type="submit" disabled={updateInterface.isPending}>

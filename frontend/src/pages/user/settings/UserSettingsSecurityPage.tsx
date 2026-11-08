@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { useReadSecondFactor } from "@/api/generated/auth/auth";
 import type { ApiKeyMetadata } from "@/api/generated/initiativeAPI.schemas";
+import { useListMyApiKeys } from "@/api/generated/users/users";
 import {
   isSubscription,
   NewSubscriptionLinkDialog,
@@ -20,11 +21,17 @@ import {
   SecurityReportDialog,
   useSecurityReporting,
 } from "@/components/tickets/ReportSecurityProblem";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
+import { useAppConfig } from "@/hooks/useAppConfig";
+import { useAuth } from "@/hooks/useAuth";
+import { useCommunities } from "@/hooks/useCommunities";
+import { useCreateApiKey, useDeleteApiKey } from "@/hooks/useSecurity";
+import { formatDateTime } from "@/lib/formatDate";
+import { toast } from "@/lib/mascotToast";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { DateTimePicker } from "@/ui/date-time-picker";
 import {
   Dialog,
   DialogContent,
@@ -32,22 +39,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useAppConfig } from "@/hooks/useAppConfig";
-import { useAuth } from "@/hooks/useAuth";
-import { useCommunities } from "@/hooks/useCommunities";
-import { useCreateApiKey, useDeleteApiKey, useMyApiKeys } from "@/hooks/useSecurity";
-import { formatDateTime } from "@/lib/formatDate";
-import { toast } from "@/lib/mascotToast";
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { StatusMessage } from "@/ui/status-message";
 
 const computeStatus = (key: ApiKeyMetadata) => {
   if (!key.is_active) {
@@ -151,19 +149,16 @@ const NewApiKeyDialog = ({
             <DialogHeader>
               <DialogTitle>{t("security.generateTitle")}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-2">
-              <Label htmlFor="api-key-name">{t("security.keyNameLabel")}</Label>
+            <Field label={t("security.keyNameLabel")}>
               <Input
-                id="api-key-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder={t("security.keyNamePlaceholder")}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="api-key-community">{t("security.communityLabel")}</Label>
+            </Field>
+            <Field label={t("security.communityLabel")} hint={t("security.communityHelp")}>
               <Select value={communityId} onValueChange={setCommunityId}>
-                <SelectTrigger id="api-key-community">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -177,12 +172,9 @@ const NewApiKeyDialog = ({
                     ))}
                 </SelectContent>
               </Select>
-              <p className="text-muted-foreground text-xs">{t("security.communityHelp")}</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="api-key-expiration">{t("security.expirationLabel")}</Label>
+            </Field>
+            <Field label={t("security.expirationLabel")}>
               <DateTimePicker
-                id="api-key-expiration"
                 value={expiresAtInput}
                 onChange={setExpiresAtInput}
                 placeholder={t("security.neverExpires")}
@@ -192,7 +184,7 @@ const NewApiKeyDialog = ({
                   },
                 }}
               />
-            </div>
+            </Field>
             <div className="flex items-start gap-2">
               <Checkbox
                 id="api-key-read-only"
@@ -205,14 +197,11 @@ const NewApiKeyDialog = ({
                 <p className="text-muted-foreground text-xs">{t("security.readOnlyHelp")}</p>
               </div>
             </div>
-            <DialogFooter className="gap-2">
-              <Button type="button" variant="outline" onClick={close}>
-                {t("common:cancel")}
-              </Button>
-              <Button type="submit" disabled={createKey.isPending}>
-                {createKey.isPending ? t("security.generating") : t("security.generateButton")}
-              </Button>
-            </DialogFooter>
+            <DialogFooter
+              submitLabel={t("security.generateButton")}
+              pendingLabel={t("security.generating")}
+              pending={createKey.isPending}
+            />
           </form>
         )}
       </DialogContent>
@@ -240,7 +229,7 @@ export const UserSettingsSecurityPage = () => {
   const communityName = (id: number) =>
     communities.find((community) => community.id === id)?.name ?? String(id);
 
-  const apiKeysQuery = useMyApiKeys();
+  const apiKeysQuery = useListMyApiKeys();
   const apiKeys = apiKeysQuery.data?.keys ?? [];
 
   const deleteKey = useDeleteApiKey({
@@ -279,9 +268,11 @@ export const UserSettingsSecurityPage = () => {
         }
       >
         {apiKeysQuery.isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("security.loadingKeys")}</p>
+          <SkeletonRegion>
+            <ListSkeleton rows={2} avatar={false} />
+          </SkeletonRegion>
         ) : apiKeysQuery.isError ? (
-          <p className="text-destructive text-sm">{t("security.keysError")}</p>
+          <StatusMessage onRetry={apiKeysQuery.refetch} />
         ) : apiKeys.length === 0 ? (
           <p className="text-muted-foreground text-sm">{t("security.noKeys")}</p>
         ) : (
@@ -375,7 +366,6 @@ export const UserSettingsSecurityPage = () => {
         title={t("security.deleteDialogTitle")}
         description={t("security.deleteDialogDescription", { name: deleteTarget?.name ?? "" })}
         confirmLabel={t("security.deleteButton")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("security.deleting")}
         isLoading={deleteKey.isPending}
         destructive

@@ -52,10 +52,14 @@ describe("SettingsCommunityRolesPage", () => {
     );
   });
 
-  it("says when the community has no roles, beside the way to add one", async () => {
+  it("lists the built-in roles, beside the way to add one", async () => {
     setup();
 
-    expect(await screen.findByText("This community has no custom roles.")).toBeInTheDocument();
+    expect(await screen.findByText("Superadmin")).toBeInTheDocument();
+    expect(screen.getByText("Admin")).toBeInTheDocument();
+    expect(screen.getByText("Member")).toBeInTheDocument();
+    // Guests are off unless the deployment turns them on.
+    expect(screen.queryByText("Guest")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add role" })).toBeInTheDocument();
   });
 
@@ -72,7 +76,7 @@ describe("SettingsCommunityRolesPage", () => {
     setup();
 
     const { dialog, offered } = await fillNewRole(user);
-    expect(offered).toHaveLength(5);
+    expect(offered).toHaveLength(6);
     await user.click(within(dialog).getByRole("button", { name: "Add role" }));
 
     await waitFor(() =>
@@ -80,7 +84,14 @@ describe("SettingsCommunityRolesPage", () => {
         {
           name: "Greeter",
           base_rung: "member",
-          surfaces: ["profile", "invites", "members", "community_calendars", "usage"],
+          surfaces: [
+            "profile",
+            "invites",
+            "members",
+            "community_calendars",
+            "community_contacts",
+            "usage",
+          ],
         },
       ])
     );

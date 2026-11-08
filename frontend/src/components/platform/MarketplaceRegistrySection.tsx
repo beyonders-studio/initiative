@@ -7,31 +7,31 @@
  * Everything here is `config.manage`.
  */
 
-import { type ChangeEvent, useRef, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { RegistryRefreshRead } from "@/api/generated/initiativeAPI.schemas";
+import { useReadRegistryStatus } from "@/api/generated/marketplace/marketplace";
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   useRefreshRegistry,
-  useRegistryStatus,
   useUpdateRegistrySettings,
   useUploadRegistryBundle,
 } from "@/hooks/useMarketplaceRegistry";
 import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
 import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { FileDropArea } from "@/ui/file-drop";
+import { Label } from "@/ui/label";
+import { Switch } from "@/ui/switch";
 
 /** What the status row records for an uploaded bundle. */
 const BUNDLE_SOURCE = "bundle";
 
 export const MarketplaceRegistrySection = () => {
   const { t } = useTranslation("settings");
-  const status = useRegistryStatus();
-  const fileInput = useRef<HTMLInputElement>(null);
+  const status = useReadRegistryStatus();
   const [bundle, setBundle] = useState<File | null>(null);
 
   const reportApplied = (result: RegistryRefreshRead, key: "refreshed" | "bundleApplied") => {
@@ -59,7 +59,6 @@ export const MarketplaceRegistrySection = () => {
     onSuccess: (result) => {
       reportApplied(result, "bundleApplied");
       setBundle(null);
-      if (fileInput.current) fileInput.current.value = "";
     },
     onError: (err) => toast.error(getErrorMessage(err, "settings:marketplaceRegistry.bundleError")),
   });
@@ -69,10 +68,6 @@ export const MarketplaceRegistrySection = () => {
 
   const stale = state.expires_at !== null && new Date(state.expires_at).getTime() < Date.now();
   const busy = update.isPending || refresh.isPending || upload.isPending;
-
-  const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
-    setBundle(event.target.files?.[0] ?? null);
-  };
 
   return (
     <SettingsSection
@@ -143,17 +138,11 @@ export const MarketplaceRegistrySection = () => {
           </Button>
 
           <div className="space-y-2 border-t pt-4">
-            <Label htmlFor="marketplace-registry-bundle">
-              {t("marketplaceRegistry.bundleLabel")}
-            </Label>
             <p className="text-muted-foreground text-sm">{t("marketplaceRegistry.bundleHelp")}</p>
-            <input
-              ref={fileInput}
-              id="marketplace-registry-bundle"
-              type="file"
+            <FileDropArea
               accept=".tar,.tgz,.tar.gz,application/gzip,application/x-tar"
-              onChange={handleFile}
-              className="block w-full text-sm"
+              onFile={setBundle}
+              prompt={bundle ? bundle.name : t("marketplaceRegistry.bundleLabel")}
             />
             <Button
               type="button"

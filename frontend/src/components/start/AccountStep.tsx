@@ -4,13 +4,13 @@ import { useTranslation } from "react-i18next";
 import { CaptchaWidget } from "@/components/auth/CaptchaWidget";
 import { LegalNotice } from "@/components/auth/LegalNotice";
 import { NewPasswordFields } from "@/components/auth/NewPasswordFields";
-import { StepField } from "@/components/start/stepParts";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useLegalIndex } from "@/hooks/useLegalDocuments";
-import { browserOffersPasskeys } from "@/lib/passkeys";
+import { passkeysRunHere } from "@/lib/passkeys";
 import { checkNewPassword } from "@/lib/passwordPolicy";
+import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
 
 /**
  * The ways in this deployment offers: an address with a password and/or a
@@ -58,7 +58,7 @@ export const AccountStep = ({
   // A captcha token is spent by being checked, so every attempt gets a fresh
   // widget: bumping this remounts it.
   const [captchaKey, setCaptchaKey] = useState(0);
-  const keysOffered = passkeyLoginEnabled && browserOffersPasskeys();
+  const keysOffered = passkeyLoginEnabled && passkeysRunHere();
   const formDoor = passwordLoginEnabled || keysOffered;
   const incomplete = !email.trim() || (captcha !== null && !captchaToken) || blocked;
   // Its notice is still being read: wait, so it's there to agree to.
@@ -89,9 +89,8 @@ export const AccountStep = ({
     <form className="space-y-4" onSubmit={submitPassword}>
       {children}
       {formDoor ? (
-        <StepField id="start-email" label={t("register.emailLabel")}>
+        <Field label={t("register.emailLabel")}>
           <Input
-            id="start-email"
             type="email"
             value={email}
             onChange={(event) => onEmailChange(event.target.value)}
@@ -99,7 +98,7 @@ export const AccountStep = ({
             autoCapitalize="none"
             required
           />
-        </StepField>
+        </Field>
       ) : null}
       {passwordLoginEnabled ? (
         <NewPasswordFields

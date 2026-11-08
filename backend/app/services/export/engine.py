@@ -11,9 +11,12 @@ adapter queried, and the download endpoint re-gates on the DataJob row.
 from __future__ import annotations
 
 import asyncio
+import tempfile
+import zipfile
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Protocol
 
 from sqlalchemy import func
@@ -28,11 +31,19 @@ from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.services.export.contract import (
     RenderBackend,
     RenderedArtifact,
+    RenderItem,
     RenderRequest,
 )
 from app.services.export.local_backend import LocalRenderBackend
-from app.services.storage import get_guild_storage
+from app.services.storage import (
+    ReadableBlob,
+    StorageBackend,
+    blob_pieces,
+    get_guild_storage,
+)
 from app.services.export import limits as export_limits
+from app.services.data_jobs import while_beating
+from app.services.import_engine.atlassian import HEARTBEAT_SECONDS
 from app.core.user_input_validators import resolve_zone
 from app.core.user_display import name_here
 
@@ -91,7 +102,11 @@ class InlineExport:
 
     filename: str
     content_type: str
-    content: bytes
+    #: The bytes, or a stored file or an archive on disk for the response to
+    #: stream.
+    content: bytes | ReadableBlob
+    #: An archive written for this response, removed once it is sent.
+    temporary: Path | None = None
 
 
 def get_backend() -> RenderBackend:
@@ -175,13 +190,13 @@ async def start_export(
         )
         request = await apply_brand(request, session)
         request = stamp_export(request, await name_here(session, user))
+        stem = _bundle_stem(source, params.get("tz"))
+        force_zip = getattr(adapter, "force_zip", False)
+        if any(_is_stored(item, request) for item in request.batch):
+            return await _inline_with_stored(request, stem=stem, force_zip=force_zip)
         artifacts = await get_backend().render(request)
         artifact = await asyncio.to_thread(
-            _bundle,
-            artifacts,
-            format=format,
-            stem=_bundle_stem(source, params.get("tz")),
-            force_zip=getattr(adapter, "force_zip", False),
+            _bundle, artifacts, format=format, stem=stem, force_zip=force_zip
         )
         return InlineExport(
             filename=artifact.filename or f"{artifact.key}.{format}",
@@ -223,6 +238,43 @@ async def start_export(
     return job
 
 
+async def _inline_with_stored(
+    request: RenderRequest, *, stem: str, force_zip: bool
+) -> InlineExport:
+    """An inline export that carries stored files, for the response to
+    stream: one file on its own as itself, read from storage, anything else
+    as an archive written to disk (:func:`_write_archive`)."""
+    if len(request.batch) == 1 and not force_zip:
+        (item,) = request.batch
+        blob = await asyncio.to_thread(
+            get_guild_storage(request.guild_id).open_readable,
+            str(item.data["storage_key"]),
+        )
+        if blob is None:
+            raise FileNotFoundError(item.data["storage_key"])
+        return InlineExport(
+            filename=_stored_name(item, request),
+            content_type=str(item.data.get("content_type") or "")
+            or blob.content_type
+            or "application/octet-stream",
+            content=blob,
+        )
+    handle = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
+    handle.close()
+    path = Path(handle.name)
+    try:
+        await _write_archive(request, path, _no_heartbeat)
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
+    return InlineExport(
+        filename=f"{stem}.zip",
+        content_type="application/zip",
+        content=ReadableBlob(path=path),
+        temporary=path,
+    )
+
+
 @dataclass(frozen=True)
 class ArtifactLocation:
     """Where a finished job's bytes ended up. Exactly one field is set.
@@ -257,10 +309,10 @@ async def render_to_storage(
 
     beat = heartbeat or _no_heartbeat
     stem = _bundle_stem(source, tz)
-    if getattr(ADAPTERS.get(source), "force_zip", False):
-        # The aggregate sources assemble on disk: a whole community's archive
-        # is not something to hold in memory twice (once as rendered
-        # artifacts, once as the zip) just to hand it to storage.
+    if getattr(ADAPTERS.get(source), "force_zip", False) or len(request.batch) > 1:
+        # An archive assembles on disk: a whole community's, or a selection
+        # of files, is not something to hold in memory twice (once as
+        # rendered artifacts, once as the zip) just to hand it to storage.
         return await _stream_zip_to_storage(
             request,
             job_id=job_id,
@@ -268,6 +320,26 @@ async def render_to_storage(
             guild_id=request.guild_id,
             heartbeat=beat,
         )
+
+    if request.batch and _is_stored(request.batch[0], request):
+        # One stored file going out unconverted is stored again under the
+        # job's key, named as below.
+        item = request.batch[0]
+        key = f"exports/{job_id}-{_stored_name(item, request)}"
+        await while_beating(
+            asyncio.to_thread(
+                _store_again,
+                get_guild_storage(request.guild_id),
+                str(item.data["storage_key"]),
+                key,
+                str(item.data.get("content_type") or "") or None,
+            ),
+            beat,
+            every=HEARTBEAT_SECONDS,
+            finish=True,
+        )
+        await beat()
+        return ArtifactLocation(artifact_ref=key)
 
     artifacts: list[RenderedArtifact] = []
     async for rendered in render_artifacts(request):
@@ -326,8 +398,9 @@ async def _stream_zip_to_storage(
     """Build the archive on disk, then put the file where it belongs.
 
     Peak memory is one artifact plus the zip's compressor state, instead of
-    every rendered artifact and a second full copy in the zip buffer. The temp
-    file is removed either way; a failed job leaves nothing behind.
+    every rendered artifact and a second full copy in the zip buffer
+    (:func:`_write_archive`). The temp file is removed either way; a failed
+    job leaves nothing behind.
 
     The routing decision is made on the **assembled** size rather than on the
     pre-flight estimate, because the estimate counts stored blob bytes and the
@@ -336,9 +409,6 @@ async def _stream_zip_to_storage(
     The estimate still drives what the wizard warns about before submitting.
     """
     from app.services.export import delivery
-    import tempfile
-    import zipfile
-    from pathlib import Path
 
     # Same naming as the eager path so the download endpoint recovers the same
     # filename: `exports/{job_id}-{stem}.zip`, prefix stripped on the way out.
@@ -347,41 +417,134 @@ async def _stream_zip_to_storage(
     handle.close()
     tmp_path = Path(handle.name)
     try:
-        taken: set[str] = set()
-        # Each entry is compressed in a thread, one at a time, so the event
-        # loop keeps serving while a large archive is built.
-        archive = await asyncio.to_thread(
-            zipfile.ZipFile, tmp_path, "w", zipfile.ZIP_DEFLATED
-        )
-        try:
-            async for artifact in render_artifacts(request):
-                name = artifact.filename or f"{artifact.key}.{request.format}"
-                name = _dedupe_name(name, taken)
-                taken.add(name)
-                await asyncio.to_thread(archive.writestr, name, artifact.content)
-                await heartbeat()
-        finally:
-            await asyncio.to_thread(archive.close)
+        await _write_archive(request, tmp_path, heartbeat)
         size = tmp_path.stat().st_size
         if size > settings.EXPORT_MAX_DOWNLOAD_BYTES:
             if not delivery.is_configured():
                 from app.core.messages import ExportMessages
 
                 raise ExportError(ExportMessages.EXPORT_DESTINATION_REQUIRED)
-            destination_ref = await asyncio.to_thread(
-                delivery.deliver,
-                tmp_path,
-                guild_id=guild_id,
-                filename=f"{stem}-{job_id}.zip",
+            destination_ref = await while_beating(
+                asyncio.to_thread(
+                    delivery.deliver,
+                    tmp_path,
+                    guild_id=guild_id,
+                    filename=f"{stem}-{job_id}.zip",
+                ),
+                heartbeat,
+                every=HEARTBEAT_SECONDS,
+                finish=True,
             )
             return ArtifactLocation(destination_ref=destination_ref)
         storage = get_guild_storage(request.guild_id)
-        await asyncio.to_thread(
-            storage.write_file, key, tmp_path, content_type="application/zip"
+        await while_beating(
+            asyncio.to_thread(
+                storage.write_file, key, tmp_path, content_type="application/zip"
+            ),
+            heartbeat,
+            every=HEARTBEAT_SECONDS,
+            finish=True,
         )
     finally:
         await asyncio.to_thread(tmp_path.unlink, missing_ok=True)
     return ArtifactLocation(artifact_ref=key)
+
+
+def _is_stored(item: RenderItem, request: RenderRequest) -> bool:
+    """Whether ``item`` is a stored file that goes out unconverted, which the
+    engine copies from storage rather than having it rendered."""
+    return (item.format or request.format) == "file"
+
+
+def _stored_name(item: RenderItem, request: RenderRequest) -> str:
+    """The name a stored file goes out under: the adapter's path for it, else
+    its own name."""
+    return (
+        item.filename
+        or (f"{item.key}.file" if item.format is not None else None)
+        or str(item.data.get("filename") or "")
+        or f"{item.key}.{request.format}"
+    )
+
+
+async def _write_archive(
+    request: RenderRequest, path: Path, heartbeat: Heartbeat
+) -> None:
+    """Write the request's archive to ``path``: each artifact rendered in
+    turn, and each stored file that goes in unconverted copied from storage
+    into its entry a piece at a time, however large. Each entry is compressed
+    in a thread, one at a time, so the event loop keeps serving while a large
+    archive is built."""
+    storage = get_guild_storage(request.guild_id)
+    copied = [item for item in request.batch if _is_stored(item, request)]
+    rendered = replace(
+        request,
+        batch=tuple(item for item in request.batch if not _is_stored(item, request)),
+    )
+    taken: set[str] = set()
+    archive = await asyncio.to_thread(zipfile.ZipFile, path, "w", zipfile.ZIP_DEFLATED)
+    try:
+        async for artifact in render_artifacts(rendered):
+            name = artifact.filename or f"{artifact.key}.{request.format}"
+            name = _dedupe_name(name, taken)
+            taken.add(name)
+            await asyncio.to_thread(archive.writestr, name, artifact.content)
+            await heartbeat()
+        for item in copied:
+            name = _dedupe_name(_stored_name(item, request), taken)
+            taken.add(name)
+            await _copy_stored(
+                archive, name, storage, str(item.data["storage_key"]), heartbeat
+            )
+            await heartbeat()
+    finally:
+        await asyncio.to_thread(archive.close)
+
+
+def _store_again(
+    storage: StorageBackend, key: str, target: str, content_type: str | None
+) -> None:
+    """Store the stored file ``key`` again as ``target``, from its own file on
+    disk or through a temporary one a piece at a time, however large.
+    Blocking; run it in a thread."""
+    blob = storage.open_readable(key)
+    if blob is None:
+        raise FileNotFoundError(key)
+    content_type = content_type or blob.content_type
+    if blob.path is not None:
+        storage.write_file(target, blob.path, content_type=content_type)
+        return
+    with tempfile.NamedTemporaryFile(prefix="export-") as spool:
+        for piece in blob_pieces(blob):
+            spool.write(piece)
+        spool.flush()
+        storage.write_file(target, Path(spool.name), content_type=content_type)
+
+
+async def _copy_stored(
+    archive: zipfile.ZipFile,
+    name: str,
+    storage: StorageBackend,
+    key: str,
+    heartbeat: Heartbeat,
+) -> None:
+    """Write the stored file ``key`` into ``archive`` as ``name``, a piece at a
+    time, each read and written in a thread, with ``heartbeat`` awaited
+    between pieces so a large file keeps the job alive. A heartbeat that
+    raises stops the copy with its entry closed, so the archive still
+    closes."""
+    blob = await asyncio.to_thread(storage.open_readable, key)
+    if blob is None:
+        raise FileNotFoundError(key)
+    pieces = blob_pieces(blob)
+    entry = await asyncio.to_thread(archive.open, name, "w", force_zip64=True)
+    try:
+        while (piece := await asyncio.to_thread(next, pieces, None)) is not None:
+            await asyncio.to_thread(entry.write, piece)
+            await heartbeat()
+    finally:
+        await asyncio.to_thread(entry.close)
+        pieces.close()
 
 
 def _bundle_stem(source: str, tz: str | None) -> str:

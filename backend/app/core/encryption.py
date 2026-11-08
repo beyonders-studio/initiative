@@ -28,7 +28,6 @@ SALT_FCM_SERVICE_ACCOUNT = b"fcm-service-account"
 # The key this server sends to the push relay with, issued when it registered.
 SALT_PUSH_RELAY_KEY = b"push-relay-key"
 SALT_EMAIL = b"email"
-SALT_EVENT_PUBLISHER_PAYLOAD = b"event-publisher-payload"
 # Values a guild (or one of its members) supplies to an installed plug-in's
 # connection form. Held per key inside a JSONB map rather than in a column of
 # its own, because one install can hold several.

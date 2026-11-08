@@ -6,21 +6,20 @@
  * the people browsing for one.
  */
 
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { updateCommunity } from "@/api/generated/communities/communities";
-import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { PlacePicker } from "@/components/communities/PlacePicker";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { useCommunities } from "@/hooks/useCommunities";
 import type { CommunityLocation } from "@/lib/communityLocation";
 import { type Place, placeFrom } from "@/lib/directoryNear";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
 
 /** The server's limit on the community's own name for the place. */
 const LABEL_MAX = 60;
@@ -42,41 +41,38 @@ export const CommunityLocationPanel = () => {
   const { t } = useTranslation(["communities", "common"]);
   const [draft, setDraft] = useState<Place>(() => placeFrom(activeCommunity?.location));
   const [label, setLabel] = useState(() => activeCommunity?.location?.label ?? "");
-  const [saving, setSaving] = useState(false);
+  const save = useCommunityMutation(
+    {
+      mutationFn: async (communityId, location: CommunityLocation | null) => {
+        updateCommunityInState(await updateCommunity(communityId, { location }));
+        await refreshCommunities();
+      },
+      errorKey: "communities:settings.unableToUpdate",
+    },
+    {
+      onSuccess: (_data, location) =>
+        toast.success(location ? t("location.saved") : t("location.removed")),
+    }
+  );
 
   const stored = activeCommunity?.location;
   // Compared by value: the community list is refetched on focus, and a fresh copy
   // of the same location must not throw away what is being typed.
   const storedKey = JSON.stringify(stored ?? null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: storedKey is stored, by value
-  useEffect(() => {
+  const [prevStoredKey, setPrevStoredKey] = useState(storedKey);
+  if (prevStoredKey !== storedKey) {
+    setPrevStoredKey(storedKey);
     setDraft(placeFrom(stored));
     setLabel(stored?.label ?? "");
-  }, [storedKey]);
+  }
 
   if (!activeCommunity) return null;
-
-  const save = async (location: CommunityLocation | null, done: string) => {
-    setSaving(true);
-    try {
-      const result = (await updateCommunity(activeCommunity.id, {
-        location,
-      } as Parameters<typeof updateCommunity>[1])) as unknown as CommunityRead;
-      updateCommunityInState(result);
-      await refreshCommunities();
-      toast.success(done);
-    } catch (err) {
-      toast.error(getErrorMessage(err, "communities:settings.unableToUpdate"));
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const location = locationOf(draft, label);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    void save(location, t("location.saved"));
+    save.mutate(location);
   };
 
   return (
@@ -87,43 +83,34 @@ export const CommunityLocationPanel = () => {
       </CardHeader>
       <CardContent>
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="community-location">{t("location.fieldLabel")}</Label>
-            <PlacePicker
-              id="community-location"
-              value={draft}
-              onChange={setDraft}
-              disabled={saving}
-            />
-          </div>
+          <Field label={t("location.fieldLabel")}>
+            <PlacePicker value={draft} onChange={setDraft} disabled={save.isPending} />
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="community-location-label">{t("location.labelLabel")}</Label>
+          <Field label={t("location.labelLabel")} hint={t("location.labelHint")}>
             <Input
-              id="community-location-label"
               value={label}
               onChange={(event) => setLabel(event.target.value)}
               maxLength={LABEL_MAX}
               placeholder={t("location.labelPlaceholder")}
-              disabled={saving}
+              disabled={save.isPending}
             />
-            <p className="text-muted-foreground text-xs">{t("location.labelHint")}</p>
-          </div>
+          </Field>
 
           {activeCommunity.is_community && location ? (
             <p className="text-muted-foreground text-xs">{t("location.listedNote")}</p>
           ) : null}
 
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={saving || !location}>
-              {saving ? t("settings.saving") : t("location.save")}
+            <Button type="submit" disabled={save.isPending || !location}>
+              {save.isPending ? t("settings.saving") : t("location.save")}
             </Button>
             {stored ? (
               <Button
                 type="button"
                 variant="outline"
-                disabled={saving}
-                onClick={() => void save(null, t("location.removed"))}
+                disabled={save.isPending}
+                onClick={() => save.mutate(null)}
               >
                 {t("location.remove")}
               </Button>

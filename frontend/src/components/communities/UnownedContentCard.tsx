@@ -2,10 +2,10 @@ import { useTranslation } from "react-i18next";
 
 import type { OwnedContentResponse, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { useListUnownedContent } from "@/api/generated/users/users";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { toolCamelPlural } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 interface UnownedContentCardProps {
   onClaim: () => void;

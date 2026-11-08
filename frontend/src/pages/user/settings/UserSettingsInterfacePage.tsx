@@ -5,17 +5,6 @@ import { useTranslation } from "react-i18next";
 import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { SearchableCombobox } from "@/components/ui/searchable-combobox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useKeepScreenAwake } from "@/hooks/useKeepScreenAwake";
 import { useUpdateCurrentUser } from "@/hooks/useUsers";
 import { autoUpdateConsented, desktopCanUpdate, setAutoUpdateConsent } from "@/lib/desktopUpdates";
@@ -30,10 +19,15 @@ import {
 } from "@/lib/taskCompletionFeedback";
 import type { ThemeColors } from "@/lib/themes";
 import { getThemeList } from "@/lib/themes";
-import { parseTimeFormat, TIME_FORMAT_PREFERENCES } from "@/lib/timeFormat";
 import { TIMEZONE_OPTIONS } from "@/lib/timezones";
-import { cn } from "@/lib/utils";
 import Desktop from "@/plugins/desktop";
+import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
+import { parseTimeFormat, TIME_FORMAT_PREFERENCES } from "@/ui/host";
+import { Input } from "@/ui/input";
+import { cn } from "@/ui/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 const WEEK_START_OPTIONS = [
   { labelKey: "dates:weekdays.sunday", value: 0 },
@@ -373,7 +367,7 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
 
         <SettingsRow label={t("profile.timezoneLabel")} description={t("profile.timezoneHelp")}>
           <div className="w-full sm:w-52">
-            <SearchableCombobox
+            <Combobox
               items={TIMEZONE_OPTIONS.map((tz) => ({ value: tz, label: tz }))}
               value={prefs.timezone}
               onValueChange={(next) => savePrefs({ timezone: next })}

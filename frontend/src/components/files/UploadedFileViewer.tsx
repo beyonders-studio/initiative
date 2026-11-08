@@ -17,11 +17,6 @@ import { Document, Page, pdfjs } from "react-pdf";
 
 import { FileKind, FileType, type FileVersionRead } from "@/api/generated/initiativeAPI.schemas";
 import { Markdown } from "@/components/Markdown";
-import { Lightbox } from "@/components/shared/Lightbox";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   useConvertFile,
   useDeleteFileVersion,
@@ -29,17 +24,23 @@ import {
   usePutVideoThumbnail,
   useUploadFileVersion,
 } from "@/hooks/useFiles";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { fileIcon } from "@/lib/fileIcon";
 import { FILE_TYPE_KINDS } from "@/lib/fileTypes";
-import { formatBytes, getFileExtension, getFileTypeLabel } from "@/lib/fileUtils";
-import { numberFormat } from "@/lib/intl";
 import { resolveFileDownloadUrl, resolveFileVersionDownloadUrl } from "@/lib/uploadUrl";
-import { cn } from "@/lib/utils";
 import { drawVideoFrame } from "@/lib/videoFrame";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { formatBytes, getFileExtension, getFileTypeLabel } from "@/ui/lib/fileUtils";
+import { numberFormat } from "@/ui/lib/intl";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { cn } from "@/ui/lib/utils";
+import { Lightbox } from "@/ui/lightbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
+import { StatusMessage } from "@/ui/status-message";
 
 // Self-host the PDF.js worker as a same-origin app asset rather than loading it
 // from a CDN. A cross-origin worker URL forces pdf.js to import() it from inside a
@@ -356,11 +357,7 @@ export const UploadedFileViewer = ({
     baseWidth !== null && maxPageWidth !== null ? ((baseWidth - 32) * scale) / maxPageWidth : null;
 
   if (!resolvedUrl || !inlineUrl) {
-    return (
-      <div className="flex items-center justify-center rounded-lg border p-8 text-muted-foreground">
-        <p>{t("viewer.loadError")}</p>
-      </div>
-    );
+    return <StatusMessage />;
   }
 
   // A file shown only as a card is drawn by its kind's mark.
@@ -409,13 +406,9 @@ export const UploadedFileViewer = ({
                       size="sm"
                       className="h-7"
                       onClick={() => versionInputRef.current?.click()}
-                      disabled={uploadVersion.isPending}
+                      pending={uploadVersion.isPending}
                     >
-                      {uploadVersion.isPending ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Upload className="h-3.5 w-3.5" />
-                      )}
+                      <Upload className="h-3.5 w-3.5" />
                       {uploadVersion.isPending
                         ? t("create.uploadingProgress", { percent: percent.format(versionSent) })
                         : t("versions.uploadNew")}
@@ -489,7 +482,6 @@ export const UploadedFileViewer = ({
         description={convertNote ? t(convertNote) : undefined}
         confirmLabel={t("convert.confirm")}
         loadingLabel={t("convert.converting")}
-        cancelLabel={t("common:cancel")}
         onConfirm={() => convert.mutate(fileId)}
         isLoading={convert.isPending}
       >
@@ -518,7 +510,6 @@ export const UploadedFileViewer = ({
             : undefined
         }
         confirmLabel={t("versions.deleteVersion")}
-        cancelLabel={t("common:cancel")}
         onConfirm={handleConfirmDeleteVersion}
         isLoading={deleteVersion.isPending}
         destructive
@@ -616,6 +607,7 @@ export const UploadedFileViewer = ({
             className="w-full bg-muted"
             style={{ height: "70vh", minHeight: 500 }}
             title={originalFilename || t("viewer.textDocument")}
+            sandbox=""
             referrerPolicy="no-referrer"
           />
         ) : isHtml ? (

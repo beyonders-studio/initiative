@@ -120,17 +120,21 @@ class BundleWriter:
             raise RuntimeError("bundle already finished")
         return self._archive
 
-    async def put_asset(self, stored: StoredImage, data: bytes) -> None:
-        """Add one downloaded file under ``assets/``. A key already written
-        is not written twice."""
+    async def put_asset(self, stored: StoredImage, source: Path) -> None:
+        """Add one downloaded file under ``assets/``, from the file on disk it
+        was downloaded to, a chunk at a time. A key already written is not
+        written twice."""
         path = f"assets/{stored.storage_key}"
         if path in self._assets:
             return
         self._assets.add(path)
-        info = zipfile.ZipInfo(path, date_time=datetime.now().timetuple()[:6])
-        info.compress_type = _compression(stored.content_type)
         async with self._lock:
-            await asyncio.to_thread(self._open().writestr, info, data)
+            await asyncio.to_thread(
+                self._open().write,
+                source,
+                path,
+                compress_type=_compression(stored.content_type),
+            )
 
     def finish(
         self,

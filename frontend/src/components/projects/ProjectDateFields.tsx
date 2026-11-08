@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Label } from "@/components/ui/label";
 import { dateRangeBounds } from "@/lib/dateRange";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Field } from "@/ui/field";
 
 type ProjectDateFieldsProps = {
   /** Namespaces the two field ids so several instances can share a page. */
@@ -35,10 +35,8 @@ export const ProjectDateFields = ({
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-pair gap-4">
-        <div className="space-y-2">
-          <Label htmlFor={`${idPrefix}-start-date`}>{t("projects:schedule.startLabel")}</Label>
+        <Field label={t("projects:schedule.startLabel")}>
           <DateTimePicker
-            id={`${idPrefix}-start-date`}
             value={startDate}
             onChange={onStartDateChange}
             includeTime={false}
@@ -46,11 +44,9 @@ export const ProjectDateFields = ({
             placeholder={t("common:optional")}
             calendarProps={dateRange.startCalendarProps}
           />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor={`${idPrefix}-end-date`}>{t("projects:schedule.endLabel")}</Label>
+        </Field>
+        <Field label={t("projects:schedule.endLabel")}>
           <DateTimePicker
-            id={`${idPrefix}-end-date`}
             value={endDate}
             onChange={onEndDateChange}
             includeTime={false}
@@ -58,7 +54,7 @@ export const ProjectDateFields = ({
             placeholder={t("common:optional")}
             calendarProps={dateRange.endCalendarProps}
           />
-        </div>
+        </Field>
       </div>
       {dateRange.isInverted ? (
         <p className="text-destructive text-sm" role="alert">

@@ -2,7 +2,6 @@ import { useTranslation } from "react-i18next";
 
 import type { UserProfile } from "@/api/generated/initiativeAPI.schemas";
 import { UserHandle } from "@/components/UserHandle";
-import { Button } from "@/components/ui/button";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import {
   useAcceptMessageRequest,
@@ -11,6 +10,7 @@ import {
   useRequestMessage,
 } from "@/hooks/useDirectMessages";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
 
 /**
  * Somebody you were sent here to talk to, and cannot yet.
@@ -34,7 +34,7 @@ import { toast } from "@/lib/mascotToast";
  * and the copy below does not try to.
  */
 export const StartWithPerson = ({ person }: { person: UserProfile }) => {
-  const { t } = useTranslation(["messages", "contacts", "settings"]);
+  const { t } = useTranslation(["messages", "connections", "settings"]);
 
   const { data: permission } = useDmPermission(person.id);
   const { data: requests } = useMessageRequests();
@@ -81,11 +81,11 @@ export const StartWithPerson = ({ person }: { person: UserProfile }) => {
             onClick={() =>
               requestMessage.mutate(
                 { data: { user_id: person.id } },
-                { onSuccess: () => toast.success(t("contacts:actions.askSent")) }
+                { onSuccess: () => toast.success(t("connections:actions.askSent")) }
               )
             }
           >
-            {t("contacts:actions.ask")}
+            {t("connections:actions.ask")}
           </Button>
         ) : null}
       </div>

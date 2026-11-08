@@ -4,31 +4,20 @@ import { useTranslation } from "react-i18next";
 import type { ProjectCreate, ResourceGrantSchema } from "@/api/generated/initiativeAPI.schemas";
 import { CreateAccessSection } from "@/components/access/CreateAccessSection";
 import { DEFAULT_GRANTS } from "@/components/access/grants";
-import { EmojiPicker } from "@/components/EmojiPicker";
 import { ProjectDateFields } from "@/components/projects/ProjectDateFields";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useCreateProject, useTemplateProjects } from "@/hooks/useProjects";
 import { dateRangeBounds } from "@/lib/dateRange";
 import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { EmojiField } from "@/ui/emoji-picker";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
+import { Textarea } from "@/ui/textarea";
 
 const NO_TEMPLATE_VALUE = "template-none";
 
@@ -139,34 +128,25 @@ export const CreateProjectDialog = ({
         </DialogHeader>
         <form className="w-full max-w-lg" onSubmit={handleSubmit}>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="project-icon">{t("createDialog.iconLabel")}</Label>
-              <EmojiPicker
-                id="project-icon"
-                value={icon || undefined}
-                onChange={(emoji) => setIcon(emoji ?? "")}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project-name">{t("common:name")}</Label>
+            <Field label={t("createDialog.iconLabel")}>
+              <EmojiField value={icon || undefined} onChange={(emoji) => setIcon(emoji ?? "")} />
+            </Field>
+            <Field label={t("common:name")}>
               <Input
-                id="project-name"
                 placeholder={t("createDialog.namePlaceholder")}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 required
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project-description">{t("createDialog.descriptionLabel")}</Label>
+            </Field>
+            <Field label={t("createDialog.descriptionLabel")}>
               <Textarea
-                id="project-description"
                 placeholder={t("createDialog.descriptionPlaceholder")}
                 rows={3}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
               />
-            </div>
+            </Field>
             <ProjectDateFields
               idPrefix="create-project"
               startDate={startDate}
@@ -180,8 +160,10 @@ export const CreateProjectDialog = ({
                 {initiativeName ?? t("filters.selectedInitiative")}
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="project-template">{t("createDialog.templateLabel")}</Label>
+            <Field
+              label={t("createDialog.templateLabel")}
+              hint={isTemplateProject && t("createDialog.disableTemplateHint")}
+            >
               {templatesQuery.isLoading ? (
                 <p className="text-muted-foreground text-sm">
                   {t("createDialog.loadingTemplates")}
@@ -194,7 +176,7 @@ export const CreateProjectDialog = ({
                   onValueChange={setSelectedTemplateId}
                   disabled={isTemplateProject}
                 >
-                  <SelectTrigger id="project-template">
+                  <SelectTrigger>
                     <SelectValue placeholder={t("createDialog.noTemplate")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -209,12 +191,7 @@ export const CreateProjectDialog = ({
                   </SelectContent>
                 </Select>
               )}
-              {isTemplateProject ? (
-                <p className="text-muted-foreground text-xs">
-                  {t("createDialog.disableTemplateHint")}
-                </p>
-              ) : null}
-            </div>
+            </Field>
             <div className="flex items-center justify-between rounded-lg border bg-muted/20 p-3">
               <div>
                 <Label htmlFor="create-as-template" className="text-base">

@@ -9,6 +9,7 @@
   },
   "dialog": {
     "gotIt": "Got it",
+    "gone": "That announcement has ended, so it can't be shown again.",
     "more_one": "{{count}} more",
     "more_other": "{{count}} more",
     "back": "Back",
@@ -102,18 +103,6 @@
       "everyone": "Anyone in the audience above is shown it.",
       "existing": "For a change people lived through — somebody who joined afterwards is not told.",
       "new": "For somebody just arriving — an onboarding tip, stale for everyone else."
-    }
-  },
-  "archive": {
-    "title": "Announcements",
-    "empty": "Nothing has been announced yet.",
-    "read": "Read it",
-    "unread": "Unread",
-    "readLabel": "Read",
-    "allCaughtUp": "You're all caught up.",
-    "filter": {
-      "all": "All ({{count}})",
-      "unread": "Unread ({{count}})"
     }
   }
 }

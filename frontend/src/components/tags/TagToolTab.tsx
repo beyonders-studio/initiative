@@ -22,15 +22,10 @@ import {
   type TaskListRead,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { TableSkeleton } from "@/components/skeletons/PageSkeletons";
 import { sharedTaskColumns } from "@/components/tasks/globalTaskColumns";
 import { type ToolSortField, ToolTable } from "@/components/toolBrowser/ToolTable";
-import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/ui/data-table";
-import { RelativeTime } from "@/components/ui/relative-time";
 import { MentionText } from "@/components/user/MentionText";
 import { useCommunityToolRows } from "@/hooks/useCommunityToolRows";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInitiatives } from "@/hooks/useInitiatives";
 import { useServerTableState } from "@/hooks/useServerTableState";
 import { useTagEntities } from "@/hooks/useTags";
@@ -41,7 +36,6 @@ import { fieldColumn } from "@/lib/layouts/columns";
 import { LAYOUT_NAMESPACES, type LayoutEnv } from "@/lib/layouts/fields";
 import { taskFields } from "@/lib/layouts/tasks";
 import { hitIcon, searchHitPath } from "@/lib/searchResults";
-import type { AppColumnDef } from "@/lib/table";
 import {
   type ChildKind,
   entityRefRoute,
@@ -53,6 +47,12 @@ import {
   toolNavLabelKey,
 } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
+import { DataTable } from "@/ui/data-table";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { TableSkeleton } from "@/ui/page-skeletons";
+import { RelativeTime } from "@/ui/relative-time";
+import { StatusMessage } from "@/ui/status-message";
 
 /** What a tool holds that can carry a tag, by tool: every child kind the
  *  bulk tag edit can address. Derived, so a newly taggable kind gets its
@@ -72,19 +72,6 @@ export const TAGGED_CHILDREN = Object.fromEntries(
  *  children's, from the tag's counts. */
 export const toolTabCount = (tool: Tool, counts: Record<string, number>): number =>
   (counts[tool] ?? 0) + TAGGED_CHILDREN[tool].reduce((sum, kind) => sum + (counts[kind] ?? 0), 0);
-
-/** A section or the page whose list could not be read, and the way to ask again. */
-export const TagLoadError = ({ onRetry }: { onRetry: () => void }) => {
-  const { t } = useTranslation(["tags", "common"]);
-  return (
-    <div className="flex items-center gap-2 text-muted-foreground text-sm">
-      <span>{t("detail.loadError")}</span>
-      <Button type="button" variant="ghost" size="sm" onClick={onRetry}>
-        {t("common:tryAgain")}
-      </Button>
-    </div>
-  );
-};
 
 const FIRST_PAGE_SIZE = 20;
 /** A child kind's table has no sort control of its own: rows come by name. */
@@ -159,7 +146,7 @@ const TagToolTable = ({
   );
 
   if (isLoading) return <TableSkeleton rows={4} columns={5} />;
-  if (isError && rows.length === 0) return <TagLoadError onRetry={refetch} />;
+  if (isError && rows.length === 0) return <StatusMessage onRetry={refetch} />;
 
   return (
     <ToolTable
@@ -307,7 +294,7 @@ const TagTasksTable = ({ tagId }: { tagId: number }) => {
   );
 
   if (isLoading) return <TableSkeleton rows={4} columns={6} />;
-  if (isError && !data) return <TagLoadError onRetry={() => void refetch()} />;
+  if (isError && !data) return <StatusMessage onRetry={refetch} />;
 
   return (
     <DataTable
@@ -332,7 +319,7 @@ const TagTasksTable = ({ tagId }: { tagId: number }) => {
 };
 
 /** The things of one kind inside a tool carrying the tag — a wiki's pages, a
- *  queue's items — by name, each beside the tool it lives in. */
+ *  calendar's events — by name, each beside the tool it lives in. */
 const TagEntityTable = ({
   kind,
   tagId,
@@ -445,7 +432,7 @@ const TagEntityTable = ({
   );
 
   if (isLoading) return <TableSkeleton rows={4} columns={4} />;
-  if (isError && !data) return <TagLoadError onRetry={() => void refetch()} />;
+  if (isError && !data) return <StatusMessage onRetry={refetch} />;
 
   return (
     <DataTable

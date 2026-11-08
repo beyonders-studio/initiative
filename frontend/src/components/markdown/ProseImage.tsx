@@ -9,9 +9,9 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import { LazyImage } from "@/components/shared/LazyImage";
-import { Lightbox, type LightboxItem } from "@/components/shared/Lightbox";
-import { cn } from "@/lib/utils";
+import { LazyImage } from "@/ui/lazy-image";
+import { cn } from "@/ui/lib/utils";
+import { Lightbox, type LightboxItem } from "@/ui/lightbox";
 
 interface Picture {
   src: string;

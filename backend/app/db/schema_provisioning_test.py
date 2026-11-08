@@ -29,7 +29,7 @@ from app.db.schema_provisioning import (
     provision_guild_schema,
     SYSTEM_LOGIN_ROLE,
 )
-from app.db.tenancy import GUILD_SCOPED_TABLES
+from app.db.tenancy import GUILD_SCOPED_TABLES, OPERATIONS_TABLES
 
 
 # Synthetic ids well above any real guild; each test uses its own.
@@ -86,7 +86,7 @@ async def test_provision_creates_every_guild_scoped_table(engine):
                 {"s": schema},
             )
             created = {row[0] for row in res}
-        assert created == set(GUILD_SCOPED_TABLES)
+        assert created == GUILD_SCOPED_TABLES - OPERATIONS_TABLES
     finally:
         async with engine.begin() as conn:
             await drop_guild_schema(conn, _GID_COMPLETE)
@@ -159,7 +159,7 @@ async def test_provision_is_idempotent(engine):
                 ),
                 {"s": schema},
             )
-        assert count == len(GUILD_SCOPED_TABLES)
+        assert count == len(GUILD_SCOPED_TABLES - OPERATIONS_TABLES)
     finally:
         async with engine.begin() as conn:
             await drop_guild_schema(conn, gid)
@@ -632,13 +632,19 @@ async def test_guild_schema_matches_guild_template(engine):
 
     Every key counts, not only the ones that stay inside the schema: since
     20260922_0349 the template holds none that leave either, so the comparison
-    can be whole, and one that came back would read here as the drift it is."""
+    can be whole, and one that came back would read here as the drift it is.
+
+    Provisioned as the operations community, so its own tables are compared
+    too."""
     schema = guild_schema_name(_GID_DRIFT)
     rendered = rendered_trigger_names()
     rendered_cons = rendered_constraint_names()
     try:
         async with engine.begin() as conn:
             await provision_guild_schema(conn, _GID_DRIFT)
+            await schema_provisioning._apply_parts(
+                conn, _GID_DRIFT, schema_provisioning.PARTS, operations=True
+            )
 
         async with engine.connect() as conn:
 
@@ -914,7 +920,9 @@ async def test_backfill_provisions_a_guild_missing_its_schema(engine):
                 ),
                 {"s": missing_schema},
             )
-        assert tables == len(GUILD_SCOPED_TABLES), "schema should be fully back-filled"
+        assert tables == len(GUILD_SCOPED_TABLES - OPERATIONS_TABLES), (
+            "schema should be fully back-filled"
+        )
     finally:
         async with engine.begin() as conn:
             await drop_guild_schema(conn, done)
@@ -1013,7 +1021,7 @@ async def test_backfill_continues_past_a_failing_guild(engine, monkeypatch):
                     ),
                     {"s": guild_schema_name(gid)},
                 )
-                assert tables == len(GUILD_SCOPED_TABLES), (
+                assert tables == len(GUILD_SCOPED_TABLES - OPERATIONS_TABLES), (
                     f"healthy guild {gid} should be provisioned despite a sibling failure"
                 )
             bad_exists = await conn.scalar(

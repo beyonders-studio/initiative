@@ -12,18 +12,6 @@ import { AccessGrantStatusBadge } from "@/components/platform/AccessGrantStatusB
 import { CasePicker } from "@/components/platform/CasePicker";
 import { CommunityPicker, type PickedCommunity } from "@/components/platform/CommunityPicker";
 import { UserHandle } from "@/components/UserHandle";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import {
   flattenGrants,
   useAccessGrantLimits,
@@ -44,10 +32,18 @@ import type { AccessGrantsForm, AccessGrantsSearch } from "@/lib/accessGrantsSea
 import { getErrorMessage } from "@/lib/errorMessage";
 import { minutesLeft } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
-import { assertForBreakGlass, describePasskeyPromptError } from "@/lib/passkeys";
+import { assertForBreakGlass, describePasskeyPromptError, passkeysRunHere } from "@/lib/passkeys";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { classifySecondFactorAnswer } from "@/lib/secondFactorAnswer";
 import { getUserDisplayName } from "@/lib/userDisplay";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { LoadMore } from "@/ui/load-more";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Textarea } from "@/ui/textarea";
 
 // Always surface the community id alongside the name so approvers can
 // disambiguate similarly-named communities (and fall back cleanly when the name
@@ -276,32 +272,6 @@ export const SettingsAccessGrantsPage = () => {
   );
 };
 
-const LoadMore = ({
-  hasNextPage,
-  isFetchingNextPage,
-  onLoadMore,
-}: {
-  hasNextPage: boolean;
-  isFetchingNextPage: boolean;
-  onLoadMore: () => void;
-}) => {
-  const { t } = useTranslation(["settings", "common"]);
-  if (!hasNextPage) return null;
-  return (
-    <div className="flex justify-center pt-1">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={onLoadMore}
-        disabled={isFetchingNextPage}
-      >
-        {isFetchingNextPage ? t("common:loading") : t("accessGrants.loadMore")}
-      </Button>
-    </div>
-  );
-};
-
 // Break-glass duration presets (whole hours), offered up to the window the
 // server says the caller may break glass for — a self-approved grant is
 // deliberately short.
@@ -430,14 +400,13 @@ const BreakGlassSection = () => {
       </CardHeader>
       <CardContent>
         <form className="grid grid-cols-pair gap-4" onSubmit={submit}>
-          <div className="space-y-1">
-            <Label>{t("accessGrants.communityLabel")}</Label>
+          <Field label={t("accessGrants.communityLabel")} className="space-y-1">
             <CommunityPicker
               aria-label={t("accessGrants.communityLabel")}
               value={community}
               onChange={setCommunity}
             />
-          </div>
+          </Field>
           <CaseField choice={caseChoice} community={community} optional />
           <CommunityNoticeField
             id="bg-notice"
@@ -445,10 +414,9 @@ const BreakGlassSection = () => {
             value={notice}
             onChange={setNotice}
           />
-          <div className="space-y-1">
-            <Label htmlFor="bg-duration">{t("accessGrants.durationLabel")}</Label>
+          <Field label={t("accessGrants.durationLabel")} className="space-y-1">
             <Select value={duration} onValueChange={setDuration}>
-              <SelectTrigger id="bg-duration">
+              <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -459,17 +427,15 @@ const BreakGlassSection = () => {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="col-span-full space-y-1">
-            <Label htmlFor="bg-reason">{t("accessGrants.reasonLabel")}</Label>
+          </Field>
+          <Field label={t("accessGrants.reasonLabel")} className="col-span-full space-y-1">
             <Textarea
-              id="bg-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder={t("accessGrants.breakGlass.reasonPlaceholder")}
               required
             />
-          </div>
+          </Field>
           {needsCode && (
             <div className="col-span-full space-y-1">
               <Label htmlFor="bg-code">{t("accessGrants.breakGlass.codeLabel")}</Label>
@@ -499,7 +465,7 @@ const BreakGlassSection = () => {
             >
               {breakGlass.isPending ? t("common:submitting") : t("accessGrants.breakGlass.submit")}
             </Button>
-            {needsCode && hasKey && (
+            {needsCode && hasKey && passkeysRunHere() && (
               <Button
                 type="button"
                 variant="outline"
@@ -611,14 +577,13 @@ const RequestSection = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         <form className="grid grid-cols-pair gap-4" onSubmit={submit}>
-          <div className="space-y-1">
-            <Label>{t("accessGrants.communityLabel")}</Label>
+          <Field label={t("accessGrants.communityLabel")} className="space-y-1">
             <CommunityPicker
               aria-label={t("accessGrants.communityLabel")}
               value={community}
               onChange={setCommunity}
             />
-          </div>
+          </Field>
           <CaseField choice={caseChoice} community={community} optional={false} />
           <CommunityNoticeField
             id="ag-notice"
@@ -648,10 +613,13 @@ const RequestSection = () => {
             <p className="text-muted-foreground text-xs">{t("accessGrants.purposeContentHelp")}</p>
           </div>
           {canAskAny ? (
-            <div className="space-y-1">
-              <Label htmlFor="ag-settings-level">{t("accessGrants.purposeSettings")}</Label>
+            <Field
+              label={t("accessGrants.purposeSettings")}
+              hint={t("accessGrants.purposeSettingsHelp")}
+              className="space-y-1"
+            >
               <Select value={settingsLevel} onValueChange={setSettingsLevel}>
-                <SelectTrigger id="ag-settings-level">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -660,15 +628,11 @@ const RequestSection = () => {
                   <SelectItem value="superadmin">{t("accessGrants.levelSuperadmin")}</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-muted-foreground text-xs">
-                {t("accessGrants.purposeSettingsHelp")}
-              </p>
-            </div>
+            </Field>
           ) : null}
-          <div className="space-y-1">
-            <Label htmlFor="ag-duration">{t("accessGrants.durationLabel")}</Label>
+          <Field label={t("accessGrants.durationLabel")} className="space-y-1">
             <Select value={duration} onValueChange={setDuration}>
-              <SelectTrigger id="ag-duration">
+              <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -679,17 +643,15 @@ const RequestSection = () => {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="col-span-full space-y-1">
-            <Label htmlFor="ag-reason">{t("accessGrants.reasonLabel")}</Label>
+          </Field>
+          <Field label={t("accessGrants.reasonLabel")} className="col-span-full space-y-1">
             <Textarea
-              id="ag-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder={t("accessGrants.reasonPlaceholder")}
               required
             />
-          </div>
+          </Field>
           <div className="col-span-full">
             <Button
               type="submit"
@@ -747,9 +709,10 @@ const RequestSection = () => {
             </ul>
           )}
           <LoadMore
-            hasNextPage={myGrants.hasNextPage}
-            isFetchingNextPage={myGrants.isFetchingNextPage}
-            onLoadMore={() => myGrants.fetchNextPage()}
+            className="pt-1"
+            hasMore={myGrants.hasNextPage}
+            loading={myGrants.isFetchingNextPage}
+            onLoadMore={myGrants.fetchNextPage}
           />
         </div>
       </CardContent>
@@ -828,9 +791,10 @@ const ApprovalQueue = () => {
             </ul>
           )}
           <LoadMore
-            hasNextPage={pending.hasNextPage}
-            isFetchingNextPage={pending.isFetchingNextPage}
-            onLoadMore={() => pending.fetchNextPage()}
+            className="pt-1"
+            hasMore={pending.hasNextPage}
+            loading={pending.isFetchingNextPage}
+            onLoadMore={pending.fetchNextPage}
           />
         </div>
 
@@ -874,9 +838,10 @@ const ApprovalQueue = () => {
             </ul>
           )}
           <LoadMore
-            hasNextPage={active.hasNextPage}
-            isFetchingNextPage={active.isFetchingNextPage}
-            onLoadMore={() => active.fetchNextPage()}
+            className="pt-1"
+            hasMore={active.hasNextPage}
+            loading={active.isFetchingNextPage}
+            onLoadMore={active.fetchNextPage}
           />
         </div>
       </CardContent>

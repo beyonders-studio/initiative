@@ -1,6 +1,6 @@
 import { useBlocker } from "@tanstack/react-router";
 import type { SerializedEditorState } from "lexical";
-import { CalendarClock, Loader2, Vote } from "lucide-react";
+import { CalendarClock, Vote } from "lucide-react";
 import {
   createContext,
   lazy,
@@ -33,11 +33,6 @@ import { PostByline } from "@/components/initiativeTools/posts/PostByline";
 import { PostPoll } from "@/components/initiativeTools/posts/PostPoll";
 import { ReactionBar } from "@/components/reactions/ReactionBar";
 import { TagBadge } from "@/components/tags/TagBadge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import { POST_SAVES, useDeletePostPoll, useSetPostPoll, useUpdatePost } from "@/hooks/usePosts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { normalizeEditorState } from "@/lib/editorState";
@@ -45,14 +40,19 @@ import { formatDateTime, fromLocalDateTimeInput, toLocalDateTimeInput } from "@/
 import { toast } from "@/lib/mascotToast";
 import { MAX_POST_TEXT_CHARS } from "@/lib/posts";
 import { referenceRef } from "@/lib/smartChips";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
+import { Skeleton } from "@/ui/skeleton";
 
 import { type DetailKind, useItemContext } from "./DetailLayoutView";
 import { filledBy } from "./detailLayout";
 import { POST_LAYOUT, postFields } from "./posts";
 
 const Editor = lazy(() =>
-  import("@/components/ui/editor/editor").then((m) => ({ default: m.Editor }))
+  import("@/components/editor/editor").then((m) => ({ default: m.Editor }))
 );
 
 /** What a notice's detail shares with its parts, beside the notice itself. */
@@ -209,10 +209,9 @@ const Body = ({ post }: { post: PostRead }) => {
         <div className="flex justify-end">
           <Button
             size="sm"
-            disabled={update.isPending}
+            pending={update.isPending}
             onClick={() => update.mutate({ body: { ...draft } })}
           >
-            {update.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             {update.isPending ? t("saving") : t("common:save")}
           </Button>
         </div>
@@ -280,10 +279,10 @@ const Poll = ({ post }: { post: PostRead }) => {
               </Button>
               <Button
                 size="sm"
-                disabled={savePoll.isPending || !isPollDraftValid(pollDraft)}
+                disabled={!isPollDraftValid(pollDraft)}
+                pending={savePoll.isPending}
                 onClick={() => savePoll.mutate(pollDraftToWrite(pollDraft))}
               >
-                {savePoll.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {savePoll.isPending ? t("saving") : t("common:save")}
               </Button>
             </div>

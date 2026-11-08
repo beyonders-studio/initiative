@@ -7,10 +7,10 @@
 import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { Label } from "@/components/ui/label";
-import { MultiSelect } from "@/components/ui/multi-select";
 import type { HomeWidgetOptions } from "@/lib/home/layout";
 import { TOOLS, toolNavLabelKey } from "@/lib/tools";
+import { Combobox } from "@/ui/combobox";
+import { Field } from "@/ui/field";
 
 /** The kinds picked, in registry order; none picked is every kind. */
 export const toolsOf = (options: HomeWidgetOptions): Tool[] => {
@@ -42,20 +42,18 @@ export const ToolsSetting = ({
   const { t: tNav } = useTranslation("nav");
   const picked = narrowed(options) ? toolsOf(options) : [];
   return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{t("widgets.tools.label")}</Label>
-      <MultiSelect
-        id={id}
-        selectedValues={picked}
-        options={TOOLS.map((tool) => ({ value: tool, label: tNav(toolNavLabelKey(tool)) }))}
-        onChange={(values) => {
+    <Field label={t("widgets.tools.label")} hint={hint} id={id}>
+      <Combobox
+        multiple
+        value={picked}
+        items={TOOLS.map((tool) => ({ value: tool, label: tNav(toolNavLabelKey(tool)) }))}
+        onValueChange={(values) => {
           const { tools: _dropped, ...rest } = options;
           const kept = TOOLS.filter((tool) => values.includes(tool));
           onChange(kept.length > 0 && kept.length < TOOLS.length ? { ...rest, tools: kept } : rest);
         }}
         placeholder={t("widgets.tools.all")}
       />
-      <p className="text-muted-foreground text-xs">{hint}</p>
-    </div>
+    </Field>
   );
 };

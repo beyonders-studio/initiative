@@ -1,11 +1,10 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
+import { setCollectionFileMetadata } from "@/api/generated/files/files";
 import type {
   PropertyDefinitionBulkDelete,
   PropertyDefinitionCreate,
-  PropertyDefinitionGroups,
   PropertyDefinitionPromote,
   PropertyDefinitionRead,
   PropertyDefinitionUpdate,
@@ -14,16 +13,15 @@ import type {
   PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import { PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
+import { setProperties } from "@/api/generated/properties/properties";
 import {
   createPropertyDefinition,
   deletePropertyDefinition,
   deletePropertyDefinitions,
-  getListPropertyDefinitionsByOwnerQueryKey,
-  getListPropertyDefinitionsQueryKey,
-  listPropertyDefinitions,
-  listPropertyDefinitionsByOwner,
   promotePropertyDefinitions,
   updatePropertyDefinition,
+  useListPropertyDefinitions,
+  useListPropertyDefinitionsByOwner,
 } from "@/api/generated/property-definitions/property-definitions";
 import { invalidate, q } from "@/api/query-keys";
 import { buildUniqueOptionSlug, findOptionByLabel } from "@/components/properties/propertyHelpers";
@@ -72,11 +70,8 @@ export const useProperties = (options?: {
   };
   if (initiativeId !== undefined) params.initiative_id = initiativeId;
   const hasParams = Object.keys(params).length > 0;
-  return useQuery<PropertyDefinitionRead[]>({
-    queryKey: getListPropertyDefinitionsQueryKey(communityId, hasParams ? params : undefined),
-    queryFn: () => listPropertyDefinitions(communityId, hasParams ? params : undefined),
-    enabled: options?.enabled ?? true,
-    staleTime: 60 * 1000,
+  return useListPropertyDefinitions(communityId, hasParams ? params : undefined, {
+    query: { enabled: options?.enabled ?? true, staleTime: 60 * 1000 },
   });
 };
 
@@ -88,10 +83,8 @@ export const useProperties = (options?: {
 export const usePropertyGroups = (initiativeId: number) => {
   const communityId = useActiveCommunityId();
   const params = { initiative_id: initiativeId };
-  return useQuery<PropertyDefinitionGroups>({
-    queryKey: getListPropertyDefinitionsByOwnerQueryKey(communityId, params),
-    queryFn: () => listPropertyDefinitionsByOwner(communityId, params),
-    staleTime: 60 * 1000,
+  return useListPropertyDefinitionsByOwner(communityId, params, {
+    query: { staleTime: 60 * 1000 },
   });
 };
 
@@ -212,14 +205,11 @@ export const usePromoteProperties = (
  */
 export const useAppendPropertyOption = () => {
   const { t } = useTranslation("properties");
-  const communityId = useActiveCommunityId();
-
-  const mutation = useMutation({
-    mutationFn: async (vars: {
-      definition: PropertyDefinitionRead;
-      label: string;
-      color?: string | null;
-    }) => {
+  const mutation = useCommunityMutation({
+    mutationFn: async (
+      communityId: number,
+      vars: { definition: PropertyDefinitionRead; label: string; color?: string | null }
+    ) => {
       const label = vars.label.trim();
       if (!label) {
         throw new Error("Option label cannot be empty");
@@ -248,15 +238,13 @@ export const useAppendPropertyOption = () => {
       }
       return { option: stored, created: true as const };
     },
-    onSuccess: (result) => {
+    invalidate: (result) => {
       void invalidate(q.allProperties(), q.allPropertyHolders());
       if (result.created) {
         toast.success(t("input.optionAdded"));
       }
     },
-    onError: () => {
-      toast.error(t("input.optionAddFailed"));
-    },
+    errorKey: "properties:input.optionAddFailed",
   });
 
   return {
@@ -290,3 +278,28 @@ export const propertySaves = Object.fromEntries(
     ]
   )
 ) as Record<PropertyTarget, FieldSaveKind<PropertyHolder, never>>;
+
+/** A counter on an item a list shows, stepped up or down. */
+export type CounterStep = { itemId: number; definition: PropertyDefinitionRead; up: boolean };
+
+/**
+ * Steps counters on the `target`s a list shows, each from what it holds when
+ * the step lands, and has the reads showing it read it again. A collection's
+ * metadata is the collection's, so it is stepped through the collection.
+ * Answers the item's values as the server then holds them.
+ */
+export const useStepCounter = (target: PropertyTarget) =>
+  useCommunityMutation<PropertySummary[], CounterStep>({
+    mutationFn: (communityId, { itemId, definition, up }) => {
+      const body = { merge: true, steps: [{ property_id: definition.id, up }] };
+      return definition.collection_id === null
+        ? setProperties(communityId, target, itemId, body)
+        : setCollectionFileMetadata(communityId, definition.collection_id, itemId, body);
+    },
+    invalidate: () =>
+      invalidate(
+        q.propertyHolder(target),
+        ...(target === PropertyTarget.file ? [q.allCollections()] : [])
+      ),
+    errorKey: "properties:manager.setValuesError",
+  });

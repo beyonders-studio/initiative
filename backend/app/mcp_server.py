@@ -7,19 +7,19 @@ authentication and the six RLS gates apply by reuse — never re-implemented.
 The surface is curated and default-deny, so a newly added route can't silently
 become a tool:
   * **Reads** — every ``GET`` route for initiatives and for the tools they hold
-    (projects and tasks, files, queues, counters, calendars and their
-    events, wikis and their pages, notices, dashboards), plus the two comment
-    reads that pair with the comment write (a parent's thread and a single
-    comment by id), plus the one relationships read, which answers what a thing
-    is linked to, plus the guild's general search, which finds a thing by name,
+    (projects and tasks, files, counters, calendars and their events, wikis
+    and their pages, notices, dashboards), plus the two comment reads that
+    pair with the comment write (a parent's thread and a single comment by
+    id), plus the one relationships read, which answers what a thing is
+    linked to, plus the guild's general search, which finds a thing by name,
     plus the caller's list of communities, which says what ``community_id``
     every other tool takes. A handful are carved back out: file downloads, who
     voted and who has read, and the dashboard editor's own palette.
   * **Writes** — an explicit allow-list, matched by path shape: create and edit
-    every tool (projects, files, queues, counters, calendars, wikis,
-    notices, dashboards) and the things they hold (tasks, queue items, counters,
-    calendar events, wiki pages, comments), plus the two writes that shape alone
-    doesn't reach — moving a task, and moving a counter's count — plus drawing
+    every tool (projects, files, counters, calendars, wikis, notices,
+    dashboards) and the things they hold (tasks, counters, calendar events,
+    wiki pages, comments), plus the two writes that shape alone doesn't
+    reach — moving a task, and moving a counter's count — plus drawing
     one relationship between two of them. Each is gated client-side by Claude Code's
     per-write permission prompt. Destructive (delete, archive, reset), bulk
     (reorder, batch, archive-all, replacing a thing's links wholesale),
@@ -63,9 +63,9 @@ if TYPE_CHECKING:
 # Every tool an initiative holds is readable, not only the two it starts with.
 # An agent asked "how is this going" was previously answering from tasks alone,
 # which is the shape of the question rather than the shape of the work: the
-# rota is a queue, the write-up is a file, the numbers are counters, and
-# what somebody would actually look at first is a dashboard. The write surface
-# in ``_WRITE_ROUTE_MAPS`` covers the same set, so what an agent can read it can
+# write-up is a file, the numbers are counters, and what somebody would
+# actually look at first is a dashboard. The write surface in
+# ``_WRITE_ROUTE_MAPS`` covers the same set, so what an agent can read it can
 # also author and edit.
 READ_TAGS = (
     # Every tool's own tag, as its list is published under.
@@ -124,13 +124,12 @@ _WRITABLE_SEGMENTS = (
     # Every tool an initiative holds, addressed by its own path segment.
     *((tool.route_segment, tool.route_segment) for tool in Tool),
     # And what those tools hold in turn: a project's tasks, a calendar's
-    # events, a queue's items, a counter group's counters, a wiki's pages. Not
-    # derivable from the enum — each names its parent differently — so each is
-    # spelled out. Tasks and events name their parent in the body; the other
-    # three are added under it, and edited at their own id like the rest.
+    # events, a counter group's counters, a wiki's pages. Not derivable from
+    # the enum — each names its parent differently — so each is spelled out.
+    # Tasks and events name their parent in the body; the other two are added
+    # under it, and edited at their own id like the rest.
     ("tasks", "tasks"),
     ("calendar-events", "calendar-events"),
-    ("queues/" + _ID + "/items", "queue-items"),
     ("counter-groups/" + _ID + "/counters", "counters"),
     ("wikis/" + _ID + "/pages", "wiki-pages"),
     # The comment surface every tool shares.
@@ -185,7 +184,7 @@ _WRITE_ROUTE_MAPS = [
 # The other two stay behind the default-deny catch-all. ``GET /comments/recent``
 # is a guild-wide activity feed rather than a working surface — the same reason
 # ``join-requests`` is carved out of the ``initiatives`` tag — and it reaches
-# comments on parents (files, queues, counters, calendars, dashboards) that
+# comments on parents (files, counters, calendars, dashboards) that
 # the tool surface otherwise doesn't cover, undirected by any task at hand.
 # ``GET /comments/mentions/search`` backs the editor's @-mention picker; the
 # member and task lookups an agent needs are already tools of their own.
@@ -216,10 +215,10 @@ _SEARCH_READ_ROUTE_MAPS = [
 #
 # ``GET /relationships/`` answers what no tool read can: a task's payload
 # carries its status, its people and its tags, but nothing about the task it
-# blocks, the file it was written from, or the queue item it came out of —
-# and that wiring is most of what "what is the state of this" means once a piece
-# of work touches more than one tool. It answers for one thing at a time
-# (``entity=task:12``), from that thing's side.
+# blocks or the file it was written from — and that wiring is most of what
+# "what is the state of this" means once a piece of work touches more than one
+# tool. It answers for one thing at a time (``entity=task:12``), from that
+# thing's side.
 #
 # ``POST /relationships/`` is the same create-and-edit reasoning the tool writes
 # follow: what an agent can read it can also author, and an agent that files a
@@ -281,6 +280,9 @@ _ROUTE_MAPS = [
         pattern=r".*/collections/.*",
         mcp_type=MCPType.EXCLUDE,
     ),
+    # Nor are imports, and importing contacts would otherwise read as creating
+    # one.
+    RouteMap(methods=["POST"], pattern=r".*/imports/.*", mcp_type=MCPType.EXCLUDE),
     *_WRITE_ROUTE_MAPS,
     *_COMMENT_READ_ROUTE_MAPS,
     *_SEARCH_READ_ROUTE_MAPS,
@@ -407,7 +409,7 @@ def _conditions_description(dataset_name: str | None) -> str:
         return _CONDITIONS_SHAPE
     lines = [
         _field_line(field["name"], field["ops"], field["options"])
-        for field in fields_registry.describe(dataset_name)
+        for field in fields_registry.describe(fields_registry.dataset(dataset_name))
     ]
     spec = fields_registry.dataset(dataset_name)
     for name in _EXTRA_FILTER_FIELDS.get(dataset_name, ()):
@@ -430,7 +432,11 @@ def _sorting_description(dataset_name: str | None) -> str:
     # The fields a client offers that also sort, and the ones declared only to
     # be sorted on (a date window, a board column, a tag), which the offered
     # set — a set of filters — never holds.
-    names = [f["name"] for f in fields_registry.describe(dataset_name) if f["sortable"]]
+    names = [
+        f["name"]
+        for f in fields_registry.describe(fields_registry.dataset(dataset_name))
+        if f["sortable"]
+    ]
     names += [
         spec.name
         for spec in fields_registry.dataset(dataset_name).fields

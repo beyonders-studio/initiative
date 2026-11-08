@@ -4,35 +4,20 @@ import { createContext, memo, useCallback, useContext, useEffect, useMemo, useSt
 import { useTranslation } from "react-i18next";
 
 import type { TagSummary, TagRead as TagType } from "@/api/generated/initiativeAPI.schemas";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useDeleteTag, useUpdateTag } from "@/hooks/useTags";
 import { communityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { getItem, setItem } from "@/lib/storage";
 import { buildTagTree, type TagTreeNode } from "@/lib/tagTree";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { cn } from "@/ui/lib/utils";
+import { Skeleton } from "@/ui/skeleton";
 
 // Maximum visual indentation depth (children still render, just don't indent further)
 const MAX_TAG_INDENT = 3;
@@ -83,11 +68,9 @@ export const TagBrowser = ({
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
 
   // Leaving edit mode discards the selection.
-  useEffect(() => {
-    if (!editMode) {
-      setSelectedIds(new Set());
-    }
-  }, [editMode]);
+  if (!editMode && selectedIds.size > 0) {
+    setSelectedIds(new Set());
+  }
 
   // Rename + recolor dialog state.
   const [renameTag, setRenameTag] = useState<TagSummary | null>(null);
@@ -276,67 +259,40 @@ export const TagBrowser = ({
               value={editColor}
               onChange={setEditColor}
               triggerLabel={t("manage.color")}
-              className="h-9 w-auto shrink-0"
+              className="w-auto shrink-0"
             />
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={closeRename}>
-              {t("common:cancel")}
-            </Button>
-            <Button
-              onClick={() => void handleSaveRename()}
-              disabled={!editName.trim() || updateTag.isPending}
-            >
-              {updateTag.isPending ? t("detail.saving") : t("detail.save")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("detail.save")}
+            onSubmit={() => void handleSaveRename()}
+            pending={updateTag.isPending}
+            pendingLabel={t("detail.saving")}
+            disabled={!editName.trim()}
+          />
         </DialogContent>
       </Dialog>
 
       {/* Single-tag delete confirmation */}
-      <AlertDialog
+      <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("detail.deleteTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("detail.deleteDescription", { name: deleteTarget?.name ?? "" })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("common:cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => void handleSingleDelete()}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {t("detail.delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={t("detail.deleteTitle")}
+        description={t("detail.deleteDescription", { name: deleteTarget?.name ?? "" })}
+        confirmLabel={t("detail.delete")}
+        destructive
+        onConfirm={() => void handleSingleDelete()}
+      />
 
       {/* Bulk delete confirmation */}
-      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("manage.bulkDeleteTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("manage.bulkDeleteDescription", { count: selectedCount })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("common:cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => void handleBulkDelete()}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {t("detail.delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        title={t("manage.bulkDeleteTitle")}
+        description={t("manage.bulkDeleteDescription", { count: selectedCount })}
+        confirmLabel={t("detail.delete")}
+        destructive
+        onConfirm={() => void handleBulkDelete()}
+      />
     </div>
   );
 };

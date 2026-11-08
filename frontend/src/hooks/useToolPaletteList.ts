@@ -13,7 +13,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-import type { ToolListParams } from "@/hooks/toolHooks";
+import type { ReadQuery, ToolListParams } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 
 export interface ToolPaletteListOptions {
@@ -22,10 +22,7 @@ export interface ToolPaletteListOptions {
 }
 
 export const useToolPaletteList = <TPage>(
-  listQuery: (
-    communityId: number,
-    params?: ToolListParams
-  ) => { queryKey: readonly unknown[]; queryFn: () => Promise<TPage> },
+  listQuery: (communityId: number, params?: ToolListParams) => ReadQuery<TPage>,
   params: ToolListParams | undefined,
   { enabled }: ToolPaletteListOptions
 ) => {

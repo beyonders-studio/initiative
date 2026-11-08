@@ -17,7 +17,7 @@
 
 import { useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { Download, Loader2 } from "lucide-react";
+import { Download } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -29,26 +29,6 @@ import {
 import { useInstallMarketplaceListing } from "@/api/generated/marketplace/marketplace";
 import { invalidate, q } from "@/api/query-keys";
 import { ListingProvenance } from "@/components/marketplace/ListingProvenance";
-import { Button } from "@/components/ui/button";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCreateDashboard } from "@/hooks/useDashboards";
 import { useToolCreateAccess } from "@/hooks/useInitiativeAccess";
@@ -59,6 +39,20 @@ import { toast } from "@/lib/mascotToast";
 import { projectEnvelopeHasDates, readProjectEnvelope } from "@/lib/projectListing";
 import { toolDetailRoute } from "@/lib/tools";
 import type { DialogProps } from "@/types/dialog";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 export interface InstallListingDialogProps extends DialogProps {
   listing: MarketplaceListingDetail;
@@ -173,10 +167,9 @@ export function InstallListingDialog({
           <p className="text-muted-foreground text-sm">{t("marketplace:install.noInitiatives")}</p>
         ) : (
           <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="install-initiative">{t("marketplace:install.initiative")}</Label>
+            <Field label={t("marketplace:install.initiative")} className="space-y-1.5">
               <Select value={initiativeId} onValueChange={setInitiativeId}>
-                <SelectTrigger id="install-initiative">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -187,18 +180,16 @@ export function InstallListingDialog({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
 
             {isDashboard ? (
-              <div className="space-y-1.5">
-                <Label htmlFor="install-name">{t("marketplace:install.name")}</Label>
+              <Field label={t("marketplace:install.name")} className="space-y-1.5">
                 <Input
-                  id="install-name"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   placeholder={listing.name}
                 />
-              </div>
+              </Field>
             ) : null}
 
             {offersExample ? (
@@ -222,35 +213,28 @@ export function InstallListingDialog({
             ) : null}
 
             {asksForStart ? (
-              <div className="space-y-1.5">
-                <Label htmlFor="install-starts-on">{t("marketplace:install.startsOn")}</Label>
-                <DateTimePicker
-                  id="install-starts-on"
-                  value={startsOn}
-                  onChange={setStartsOn}
-                  includeTime={false}
-                />
-                <p className="text-muted-foreground text-xs">
-                  {t("marketplace:install.startsOnHelp")}
-                </p>
-              </div>
+              <Field
+                label={t("marketplace:install.startsOn")}
+                hint={t("marketplace:install.startsOnHelp")}
+                className="space-y-1.5"
+              >
+                <DateTimePicker value={startsOn} onChange={setStartsOn} includeTime={false} />
+              </Field>
             ) : null}
           </div>
         )}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button onClick={submit} disabled={nowhereToInstall || !initiativeId || isPending}>
-            {isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
+        <DialogFooter
+          submitLabel={
+            <>
               <Download className="h-4 w-4" />
-            )}
-            {t("marketplace:install.action")}
-          </Button>
-        </DialogFooter>
+              {t("marketplace:install.action")}
+            </>
+          }
+          onSubmit={submit}
+          pending={isPending}
+          disabled={nowhereToInstall || !initiativeId}
+        />
       </DialogContent>
     </Dialog>
   );

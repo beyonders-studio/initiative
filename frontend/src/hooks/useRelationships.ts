@@ -5,17 +5,15 @@
  * of things rather than about either: the same hook serves a project's
  * attachments, a task's dependencies and a file's backlinks.
  *
- * The per-tool attach hooks in `useProjects` / `useQueues` stay, because they
- * keep a shape their own callers already expect. What is different here is that
+ * The per-tool attach hooks in `useProjects` stay, because they keep a shape
+ * their own callers already expect. What is different here is that
  * a write says which tool sits at *each* end and refreshes both.
  */
 
-import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import {
   type EndpointRef,
-  type NeighbourhoodRead,
   type RelatedEnd,
   type RelationshipCreate,
   type RelationshipRead,
@@ -24,17 +22,11 @@ import {
   type Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
-  getGetRelationsNeighbourhoodQueryKey,
-  getListRelationshipsQueryKey,
-  getRelationsNeighbourhood,
+  useGetRelationsNeighbourhood,
+  useListRelationships,
 } from "@/api/generated/relationships/relationships";
 import { invalidate, q } from "@/api/query-keys";
-import {
-  createRelationship,
-  listRelated,
-  removeRelationship,
-  setRelated,
-} from "@/api/relationships";
+import { createRelationship, removeRelationship, setRelated } from "@/api/relationships";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { idsByKind, type LinkedRef, sameIds } from "@/lib/relationships";
@@ -55,11 +47,7 @@ export const useRelationshipsFor = (entity: EndpointRef, options?: { enabled?: b
     other_type: null,
     direction: "both" as const,
   };
-  return useQuery<RelationshipRead[]>({
-    queryKey: getListRelationshipsQueryKey(communityId, params),
-    queryFn: () => listRelated(communityId, entity, null, null, "both"),
-    ...options,
-  });
+  return useListRelationships(communityId, params, { query: options });
 };
 
 /** A tool and which one of them — what a cache entry for the shims is keyed by. */
@@ -77,7 +65,7 @@ const toolRefOf = (end: RelatedEnd): ToolRef | null =>
  *
  * Both ends, because a link is a fact about a pair and several tools still
  * serialise their own side of one — a project lists its files, a file
- * lists its projects, a queue item its files and tasks. Those shapes read
+ * lists its projects. Those shapes read
  * differently the moment an edge moves, whichever end was clicked.
  */
 const invalidateEdge = (...ends: (ToolRef | null | undefined)[]) =>
@@ -151,7 +139,7 @@ export interface Neighbourhood {
   walkFailed: boolean;
 }
 
-const keyOf = (ref: { type: SearchEntityType; id: number }) => `${ref.type}:${ref.id}`;
+const keyOf = (ref: EndpointRef) => `${ref.type}:${ref.id}`;
 
 /**
  * Everything within `hops` of one thing.
@@ -184,10 +172,8 @@ export const useRelationsNeighbourhood = (
   const near = useRelationshipsFor(entity, { enabled });
 
   const params = { entity: centre, hops, include_tags: includeTags };
-  const far = useQuery<NeighbourhoodRead>({
-    queryKey: getGetRelationsNeighbourhoodQueryKey(communityId, params),
-    queryFn: () => getRelationsNeighbourhood(communityId, params),
-    enabled: enabled && walks,
+  const far = useGetRelationsNeighbourhood(communityId, params, {
+    query: { enabled: enabled && walks },
   });
 
   const walkFailed = walks && far.isError;
@@ -243,7 +229,7 @@ export const useRelationsNeighbourhood = (
 /** The links an item is set to have, of every kind. */
 interface ItemLinks {
   /** The item, which the tool `useSetItemLinks` was given holds. */
-  item: { type: SearchEntityType; id: number };
+  item: EndpointRef;
   links: LinkedRef[];
   /** What it was last set to, so only the kinds that moved are written. */
   previous: LinkedRef[];

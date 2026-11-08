@@ -1,5 +1,4 @@
 import type {
-  CalendarEventAttendeeRead,
   CalendarEventRead,
   CalendarEventSummary,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -48,17 +47,4 @@ export function buildCalendarEventSummary(
   overrides: Partial<CalendarEventSummary> = {}
 ): CalendarEventSummary {
   return { ...buildCalendarEvent(), attendee_previews: [], ...overrides };
-}
-
-/** One person asked to an event, not yet answered. */
-export function buildEventAttendee(
-  overrides: Partial<CalendarEventAttendeeRead> = {}
-): CalendarEventAttendeeRead {
-  return {
-    user_id: 1,
-    user: null,
-    rsvp_status: "pending",
-    created_at: "2026-10-01T00:00:00.000Z",
-    ...overrides,
-  };
 }

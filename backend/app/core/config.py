@@ -7,6 +7,7 @@ import uuid
 from collections.abc import Sequence
 from enum import Enum
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlsplit
 
@@ -85,6 +86,8 @@ CSP_EMBED_FRAME_ORIGINS = [
     "https://docs.google.com",
     "https://miro.com",
     "https://airtable.com",
+    "https://platform.twitter.com",
+    "https://embed.reddit.com",
 ]
 
 
@@ -360,9 +363,33 @@ def derive_database_password(secret_key: str, role: str) -> str:
     ).hexdigest()
 
 
+#: This checkout's root, the directory above backend/.
+CHECKOUT = Path(__file__).resolve().parents[3]
+
+
+def main_checkout(checkout: Path = CHECKOUT) -> Path:
+    """The main checkout of the repository ``checkout`` is in: ``checkout`` itself,
+    unless it is a linked git worktree. A worktree's ``.git`` is a file naming its
+    directory under the main checkout's ``.git/worktrees/``."""
+    marker = checkout / ".git"
+    if not marker.is_file():
+        return checkout
+    gitdir = marker.read_text().strip().removeprefix("gitdir:").strip()
+    worktrees = (checkout / gitdir).resolve().parent
+    return worktrees.parent.parent if worktrees.name == "worktrees" else checkout
+
+
+# A linked worktree reads the main checkout's backend/.env, then its own on top,
+# so nothing is copied in and a worktree can still set a value of its own (OIDC
+# against a local provider, say).
+ENV_FILES: tuple[str | Path, ...] = (".env",)
+if main_checkout() != CHECKOUT:
+    ENV_FILES = (main_checkout() / "backend" / ".env", ".env")
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=ENV_FILES,
         env_file_encoding="utf-8",
         extra="ignore",
         # A setting that fails is named in the error, never shown.
@@ -653,6 +680,21 @@ class Settings(BaseSettings):
         HTTPS.
         """
         return urlsplit(self.APP_URL.strip()).scheme == "https"
+
+    @property
+    def app_origin(self) -> str | None:
+        """The public app's origin as a browser names it: ``scheme://host`` with
+        a port only where it is not the scheme's default. ``None`` when
+        ``APP_URL`` is not a whole URL."""
+        parts = urlsplit(self.APP_URL.strip())
+        if not parts.scheme or not parts.hostname:
+            return None
+        scheme = parts.scheme.lower()
+        hostname = parts.hostname
+        host = f"[{hostname}]" if ":" in hostname else hostname
+        default = {"https": 443, "http": 80}.get(scheme)
+        port = f":{parts.port}" if parts.port not in (None, default) else ""
+        return f"{scheme}://{host}{port}"
 
     # APP_URL should point to the frontend entry so redirect URIs resolve correctly
     APP_URL: str = "http://localhost:5173"

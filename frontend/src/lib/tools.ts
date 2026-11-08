@@ -32,9 +32,9 @@
 import type { ParseKeys } from "i18next";
 import {
   BookText,
+  BookUser,
   CalendarDays,
   Files,
-  GalleryHorizontalEnd,
   Gauge,
   LayoutDashboard,
   ListTodo,
@@ -52,12 +52,12 @@ import { ListingKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 export const TOOL_ICONS: Record<Tool, LucideIcon> = {
   [Tool.project]: ListTodo,
   [Tool.file]: Files,
-  [Tool.queue]: GalleryHorizontalEnd,
   [Tool.counter_group]: Gauge,
   [Tool.calendar]: CalendarDays,
   [Tool.dashboard]: LayoutDashboard,
   [Tool.post]: Megaphone,
   [Tool.wiki]: BookText,
+  [Tool.contact]: BookUser,
 };
 
 /** Every tool, in canonical enum order. */
@@ -168,10 +168,10 @@ export const toolViewParams = (tool: Tool, view: ToolView): ToolViewParams =>
  */
 export const SIDEBAR_TOOLS: Tool[] = [
   Tool.calendar,
+  Tool.contact,
   Tool.dashboard,
   Tool.file,
   Tool.post,
-  Tool.queue,
   Tool.counter_group,
   Tool.wiki,
   Tool.project,
@@ -268,10 +268,10 @@ export const initiativeRoute = (initiativeId: number): string =>
  * Community-relative list route for a tool inside one initiative — which is also
  * the initiative page with that tool's tab selected, e.g. "/i/12/counter-groups".
  *
- * `initiativeId === null` names a COMMUNITY-LEVEL entity. Calendars are the only
- * tool that has any (an plugin-installed calendar has no `initiative_id`), and
- * they keep their community routes. Treat `null` as "address me at the community
- * route", never as "initiative unknown".
+ * `initiativeId === null` names a COMMUNITY-LEVEL entity. Calendars and contacts
+ * are the tools that have any (one a community plug-in holds has no
+ * `initiative_id`), and they keep their community routes. Treat `null` as
+ * "address me at the community route", never as "initiative unknown".
  */
 export const toolListRoute = (tool: Tool, initiativeId: number | null): string =>
   initiativeId === null
@@ -301,7 +301,7 @@ export const TOOL_SETTINGS_SECTIONS = ["details", "access", "advanced"] as const
 export type ToolSettingsSection = (typeof TOOL_SETTINGS_SECTIONS)[number];
 
 /** The section a tool's settings open on, addressed as `/settings` itself. */
-export const TOOL_SETTINGS_DEFAULT_SECTION: ToolSettingsSection = "details";
+const TOOL_SETTINGS_DEFAULT_SECTION: ToolSettingsSection = "details";
 
 /** Community-relative route for one section of a tool's settings, e.g.
  *  "/i/12/counter-groups/3/settings/access". */
@@ -372,15 +372,10 @@ export const wikiFileRoute = (
  * with the canonical address.
  *
  * Use ONLY where the caller genuinely holds nothing but an id — a @mention, a
- * queue item's linked entity, a stored notification target. Anywhere the parent
- * is already loaded, build the real route: the resolver costs a round trip.
+ * stored notification target. Anywhere the parent is already loaded, build the
+ * real route: the resolver costs a round trip.
  */
 export const entityRefRoute = (refType: string, id: number): string => `/go/${refType}/${id}`;
-
-/** The router path param carrying a tool entity's id, e.g. "counterGroupId".
- *  Every tool's detail/settings route names its param this way, so the shared
- *  settings page reads the id without a per-tool lookup. */
-export const toolParamName = (tool: Tool): string => `${toolCamelSingular(tool)}Id`;
 
 /** "counter_group" → "counter-group". The KEBAB SINGULAR: envelope
  * discriminator and entity-ref segment. */
@@ -389,16 +384,6 @@ export const toolKebabSingular = (tool: Tool): string => tool.replaceAll("_", "-
 /** Export endpoint (relative to /c/{communityId}), e.g. "/exports/counter_group".
  * It takes the selection as `ids`. */
 export const toolExportEndpoint = (tool: Tool): string => `/exports/${tool}`;
-
-/**
- * The `{tool}_id` field that names one tool entity in a payload, e.g.
- * "counter_group_id".
- *
- * One spelling, two uses: the comment column a thread hangs off (backend
- * `_COMMENT_PARENTS`) and the id the realtime bus puts in a comment envelope.
- * They agree because they are this rule.
- */
-export const toolIdParam = (tool: Tool): string => `${tool}_id`;
 
 /** The envelope ``type`` discriminator a tool's single-entity export emits —
  * the same value its importer registers under: the kebab-singular. */
@@ -481,7 +466,6 @@ export const PARENT_TOOL = {
   calendar_event: Tool.calendar,
   counter: Tool.counter_group,
   collection: Tool.file,
-  queue_item: Tool.queue,
   wiki_page: Tool.wiki,
 } as const satisfies Record<string, Tool>;
 
@@ -500,9 +484,6 @@ export const NO_RELATIONS_PANEL: ReadonlySet<Tool> = new Set<Tool>([
   // the one that writes itself is the better answer for a wiki.
   Tool.wiki,
 ]);
-
-/** Whether this tool's own detail page shows a relations panel. */
-export const showsRelations = (tool: Tool): boolean => !NO_RELATIONS_PANEL.has(tool);
 
 /**
  * Tools whose pages do NOT carry the activity drawer, and why. Stated as an

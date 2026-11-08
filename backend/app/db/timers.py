@@ -35,6 +35,7 @@ filer, a migration), arms nothing, and the daily reconcile finds the work.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -218,18 +219,37 @@ _HEADER = """\
 -- ============================================================================"""
 
 
-def render_guild_timer_ddl() -> str:
-    """Per-table timer triggers, applied inside each guild schema."""
+def _triggers(operations: bool) -> Iterator[tuple[str, str, TimerSource]]:
+    """Each timer trigger's name, sweep and source: every community's, or with
+    ``operations`` those of the sweeps only the operations community runs."""
+    from app.services.guild_sweeps import Scope
     from app.services.sweep_timers import sweeps
 
-    blocks = []
     named: dict[str, int] = {}
     for sweep in sweeps():
+        if (sweep.scope is Scope.OPERATIONS) != operations:
+            continue
         for source in sweep.sources:
             name = f"tr_{source.table}_timer_{sweep.kind}"
             # A second source on one table for one sweep is numbered.
             named[name] = named.get(name, 0) + 1
             if named[name] > 1:
                 name = f"{name}_{named[name]}"
-            blocks.append(_trigger(name, sweep.kind, source))
+            yield name, sweep.kind, source
+
+
+def render_guild_timer_ddl(*, operations: bool = False) -> str:
+    """Per-table timer triggers, applied inside each guild schema: every
+    community's, or with ``operations`` the operations community's own."""
+    blocks = [
+        _trigger(name, kind, source) for name, kind, source in _triggers(operations)
+    ]
     return _HEADER + "\n\n" + "\n\n".join(blocks) + "\n"
+
+
+def drop_operations_timers_ddl() -> str:
+    """Removes the triggers only the operations community's schema has."""
+    return "".join(
+        f"DROP TRIGGER IF EXISTS {name} ON {source.table};\n"
+        for name, _kind, source in _triggers(operations=True)
+    )

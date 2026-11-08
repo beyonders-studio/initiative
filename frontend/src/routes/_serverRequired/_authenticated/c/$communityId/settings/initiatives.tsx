@@ -1,11 +1,9 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { SettingsInitiativesPage } from "@/pages/SettingsInitiativesPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/settings/initiatives"
 )({
-  component: lazyRouteComponent(() =>
-    import("@/pages/SettingsInitiativesPage").then((m) => ({
-      default: m.SettingsInitiativesPage,
-    }))
-  ),
+  component: SettingsInitiativesPage,
 });

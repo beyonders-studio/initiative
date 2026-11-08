@@ -94,7 +94,7 @@ describe("ToolCommentsPanel", () => {
 
     const { container } = renderPage(() => (
       <ToolCommentsPanel
-        tool={Tool.queue}
+        tool={Tool.counter_group}
         entity={{ id: 3, initiative_id: 4, comments_enabled: false }}
       />
     ));

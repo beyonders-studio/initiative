@@ -33,6 +33,7 @@ from app.core.tools import (
 )
 from app.models.tenant.metadata import MetadataType
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
+from app.schemas.tenant.property import CounterSettings
 from app.schemas.tenant.import_envelopes import EnvelopePropertyValue, _EnvelopeBase
 from app.schemas.tenant.tool_layout import (
     DetailLayoutWrite,
@@ -99,8 +100,19 @@ class ProjectExportPropertyDefinition(SanitizedBaseModel):
     options: Optional[List[dict]] = None
     #: A money property's currency.
     currency: Optional[str] = None
+    #: A counter's settings; a counter carried without them takes the
+    #: defaults, and every other type drops them.
+    counter: Optional[CounterSettings] = None
     #: The project's own metadata, not one of the initiative's properties.
     project: bool = False
+
+    @model_validator(mode="after")
+    def _counter_settings(self) -> "ProjectExportPropertyDefinition":
+        if self.type is not MetadataType.counter:
+            self.counter = None
+        elif self.counter is None:
+            self.counter = CounterSettings()
+        return self
 
 
 class ProjectExportChecklistItem(SanitizedBaseModel):

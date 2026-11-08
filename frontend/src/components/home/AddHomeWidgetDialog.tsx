@@ -8,16 +8,10 @@ import { Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { HOME_WIDGETS } from "@/components/home/widgets";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { canAddWidget, type HomeLayout } from "@/lib/home/layout";
 import { HOME_WIDGET_TYPES, type HomeWidgetType } from "@/lib/home/widgetTypes";
-import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { WizardOption } from "@/ui/wizard-dialog";
 
 export interface AddHomeWidgetDialogProps {
   open: boolean;
@@ -48,34 +42,31 @@ export function AddHomeWidgetDialog({
             const placed = layout.widgets.some((widget) => widget.type === type);
             return (
               <li key={type}>
-                <button
-                  type="button"
+                <WizardOption
                   disabled={!available}
                   onClick={() => {
                     onAdd(type);
                     onOpenChange(false);
                   }}
-                  className={cn(
-                    "flex h-full w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors",
-                    available ? "hover:bg-accent" : "cursor-not-allowed opacity-60"
-                  )}
-                >
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted">
-                    <Icon className="size-5 text-muted-foreground" aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-medium text-sm">{t(`widgets.${type}.title`)}</span>
-                    <span className="block text-muted-foreground text-xs">
-                      {t(`widgets.${type}.description`)}
+                  className="h-full items-start"
+                  icon={
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted">
+                      <Icon className="size-5 text-muted-foreground" aria-hidden="true" />
                     </span>
-                    {placed && !available ? (
-                      <span className="mt-1 flex items-center gap-1 text-muted-foreground text-xs">
-                        <Check className="size-3" aria-hidden="true" />
-                        {t("picker.onPage")}
-                      </span>
-                    ) : null}
-                  </span>
-                </button>
+                  }
+                  title={t(`widgets.${type}.title`)}
+                  description={
+                    <>
+                      {t(`widgets.${type}.description`)}
+                      {placed && !available ? (
+                        <span className="mt-1 flex items-center gap-1">
+                          <Check className="size-3" aria-hidden="true" />
+                          {t("picker.onPage")}
+                        </span>
+                      ) : null}
+                    </>
+                  }
+                />
               </li>
             );
           })}

@@ -162,17 +162,16 @@
       "events": "Events",
       "project": "Project",
       "file": "File",
-      "queue": "Queue",
       "calendar": "Calendar",
       "post": "Post",
       "wiki": "Wiki",
+      "contact": "Contact",
       "initiative": "Initiative",
       "community": "Community",
       "counter-group": "Counter group",
       "dashboard": "Dashboard"
     },
     "download": "Download",
-    "empty": "No exports yet.",
-    "loadFailed": "Couldn't load exports. Refresh to try again."
+    "empty": "No exports yet."
   }
 }

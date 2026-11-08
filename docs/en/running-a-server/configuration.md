@@ -165,7 +165,7 @@ For any real deployment you'll put Initiative behind a reverse proxy that handle
 
     The one setup that needs more is a proxy on another machine that reaches Initiative over a public address. List it in `FORWARDED_ALLOW_IPS`; the log names the address to add when it sees one.
 
-**Let 50 MB through per request.** A file of any size arrives in pieces of up to 50 MB, so that's the most your proxy ever has to pass in one go. nginx stops at 1 MB unless told otherwise, so add `client_max_body_size 50m;` to the server block. Caddy and Traefik pass it as they are.
+**Let 50 MB through per request.** A file of any size arrives in pieces of up to 50 MB, and a picture put in a page arrives in one go. nginx stops at 1 MB unless told otherwise, so add `client_max_body_size 50m;` to the server block. Caddy and Traefik pass it as they are. Behind a tighter limit, files make do with smaller pieces and take a little longer; a picture over the limit doesn't arrive at all.
 
 ## The app association files
 
@@ -178,7 +178,7 @@ A phone lets an app use a site's passkeys only when the site says, in a file at 
 
 They're served as JSON, at exactly those paths, with no redirect, and only when your address can carry a passkey at all (`https`, a host name rather than an IP address). Anything else under `/.well-known/` answers 404, never the app's page, because Apple and Google read an HTML page there as a broken file.
 
-**If you self-host**, there's nothing to set. Android checks the file on whatever server the app points at, so the Android app signs in with passkeys on yours by itself. An iPhone only reads the file for addresses built into the app (the hosted service's `initiativetasks.com` and `demo.initiativetasks.com`), so on your server the iPhone app sends people to the browser for passkeys, which works for every server.
+**If you self-host**, there's nothing to set. Android checks the file on whatever server the app points at, so the Android app signs in with passkeys on yours by itself. An iPhone only reads the file for addresses built into the app (the hosted service's `initiativetasks.com` and `demo.initiativetasks.com`), so on your server the iPhone app sends people to the browser for passkeys, which works for every server. The Windows app reads neither file and signs in with passkeys on any `https` address.
 
 If your proxy answers anything under `/.well-known/` itself, as some do for certificates, pass `/.well-known/assetlinks.json` through to Initiative. Without it the Android app sends people to the browser for passkeys instead.
 
@@ -319,7 +319,7 @@ Point `targets` at the app's own port, or at your proxy with `scheme: https` add
 | `initiative_http_requests_total` | Requests answered, by `method`, `route` and `status`. `route` is the pattern (`/api/v1/c/{community_id}/initiatives/`), so every community shares one line. |
 | `initiative_http_request_duration_seconds` | How long those took, as a histogram. |
 | `initiative_http_requests_in_progress` | Requests being answered right now. |
-| `initiative_websocket_connections` | Live connections: notifications, live editing, queues and counters. One open tab holds several. |
+| `initiative_websocket_connections` | Live connections: notifications, live editing and counters. One open tab holds several. |
 | `initiative_db_statement_duration_seconds` | How long database statements took, by `engine`. |
 | `initiative_db_slow_statements_total` | Statements that took longer than half a second. |
 | `initiative_db_pool_connections` | Database connections each engine holds, by `state`: `checked_out`, `idle`, `overflow`. |

@@ -297,10 +297,12 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
         guild_scoped=True,
         mutable_channels=_ALL_MUTABLE,
     ),
-    # Somebody else acted on this account. Being told is not a preference.
+    # Somebody else acted on this account, or the platform told it something.
+    # Being told is not a preference.
     NotificationCategory.account: CategorySpec(
         types=frozenset(
             {
+                NotificationType.announcement,
                 NotificationType.avatar_removed,
                 NotificationType.username_changed,
                 NotificationType.profile_field_cleared,
@@ -315,6 +317,7 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
                 NotificationType.access_grant_denied,
                 NotificationType.access_grant_revoked,
                 NotificationType.ticket_updated,
+                NotificationType.idea_updated,
             }
         ),
         group=CategoryGroup.account,
@@ -382,7 +385,3 @@ def category_of(notification_type: NotificationType) -> NotificationCategory:
 
 def spec_of(notification_type: NotificationType) -> CategorySpec:
     return CATEGORY_SPECS[CATEGORY_OF[notification_type]]
-
-
-def is_personal(notification_type: NotificationType) -> bool:
-    return notification_type in PERSONAL_TYPES

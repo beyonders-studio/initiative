@@ -3,7 +3,7 @@
  *
  * Three lists that move together — accepting a connection opens a channel,
  * leaving a community closes one — so every mutation here invalidates all of
- * them, the same set the `contacts` realtime frame invalidates. A tab that
+ * them, the same set the `connections` realtime frame invalidates. A tab that
  * acted and a tab that only watched end up saying the same thing.
  */
 
@@ -37,7 +37,7 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 
 /** Everything a change to one of these lists can affect. */
-export const refreshContactLists = () => {
+export const refreshConnectionLists = () => {
   void invalidate(q.contactGrants(), q.ignoredAccounts(), q.dmSettings());
 };
 
@@ -53,7 +53,7 @@ export const refreshContactLists = () => {
  */
 const reportAndRefresh = {
   mutation: {
-    onSettled: refreshContactLists,
+    onSettled: refreshConnectionLists,
     onError: (error: unknown) =>
       toast.error(getErrorMessage(error, "errors:CONTACT_GRANT_CANNOT_REACH")),
   },
@@ -63,7 +63,7 @@ const reportAndRefresh = {
  * The same, minus the toast: the connect-by-handle field reports next to the
  * input, where the mistake usually is.
  */
-const refreshOnly = { mutation: { onSettled: refreshContactLists } };
+const refreshOnly = { mutation: { onSettled: refreshConnectionLists } };
 
 /**
  * Whether this deployment offers direct messages at all.
@@ -222,7 +222,7 @@ export const parseHandle = (raw: string): { username: string; discriminator: num
  * screen with more on it than the mark admitted. Only incoming — an ask you
  * sent is waiting on them, not on you.
  */
-export const usePendingContactRequests = (): number => {
+export const usePendingConnectionRequests = (): number => {
   const messages = useMessageRequests();
   const connections = useConnections();
   return (messages.data?.incoming?.length ?? 0) + (connections.data?.incoming?.length ?? 0);

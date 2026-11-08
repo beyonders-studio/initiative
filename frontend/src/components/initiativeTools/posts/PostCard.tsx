@@ -16,8 +16,6 @@ import { ReportButton } from "@/components/moderation/ReportButton";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
 import { ReactionBar } from "@/components/reactions/ReactionBar";
 import { TagBadge } from "@/components/tags/TagBadge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { useMarkReadOnScreen, usePostReadTracker } from "@/hooks/usePostReadTracker";
 import { useMarkPostUnread, useUpdatePost } from "@/hooks/usePosts";
@@ -26,7 +24,9 @@ import { useCommunityPath } from "@/lib/communityUrl";
 import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { toolDetailRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { cn } from "@/ui/lib/utils";
 
 interface PostCardProps {
   post: PostRead;
@@ -84,6 +84,8 @@ const PostCardInner = ({ post, canPin = false, canModerate = false, className }:
   return (
     <Card
       ref={cardRef}
+      // What a report of the post pictures.
+      data-report-target
       className={cn(
         // The card is the post's surface — the editor inside it draws no box
         // of its own, so this is what the body sits on.

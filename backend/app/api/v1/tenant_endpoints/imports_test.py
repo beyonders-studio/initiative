@@ -25,7 +25,6 @@ from app.testing.factories import (
     create_file,
     create_import_job,
     create_initiative,
-    create_queue,
     create_tag,
     create_task,
     grant_role_permission,
@@ -33,6 +32,7 @@ from app.testing.factories import (
     route_session_to_guild,
 )
 from app.services.import_engine import limits as import_limits
+from app.services.import_engine.atlassian_test import answered
 from app.schemas.tenant.tag import annotated_tags
 from app.services.tenant import tags as tags_service
 from app.db.request_context import SystemGuild
@@ -67,68 +67,14 @@ async def _second_initiative(session, a, **flags):
     return initiative
 
 
-async def test_envelope_import_roundtrips_queue(client, acting_user, session):
-    """Export a queue as its envelope, import it into another initiative:
-    items, rotation state, and the queue's tags survive; the importer gets an
-    owner grant; tags match-or-create against the guild."""
-    from sqlmodel import select
-
-    from app.models.tenant.queue import Queue, QueueItem
-    from app.models.tenant.resource_grant import ResourceGrant
-
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    queue = await create_queue(session, a.initiative, a.user, name="Turn Order")
-    from app.models.tenant.queue import QueueItem as QI
-
-    for i, label in enumerate(["Aria", "Brock"]):
-        session.add(QI(queue_id=queue.id, label=label, position=float(i)))
-    await assign_tag(session, queue, await create_tag(session, a.guild, name="Raid"))
-    await session.commit()
-
-    envelope = await _export_json(client, a, "/exports/queue", {"ids": [queue.id]})
-    assert envelope["type"] == "initiative-queue"
-    # A name listed again in another case is the same tag, attached once.
-    envelope["tags"].append("raid")
-
-    target = await _second_initiative(session, a, queues_enabled=True)
-    resp = await _import_envelope(client, a, envelope, target.id)
-    assert resp.status_code == 201, resp.text
-    result = resp.json()["result"]
-    assert result["created"]["queues"] == 1
-    assert result["created"]["items"] == 2
-    assert result["matched"]["tags"] == 1
-
-    imported = (
-        await session.exec(
-            select(Queue).where(
-                Queue.initiative_id == target.id, Queue.name == "Turn Order"
-            )
-        )
-    ).one()
-    items = list(
-        await session.exec(select(QueueItem).where(QueueItem.queue_id == imported.id))
-    )
-    assert {i.label for i in items} == {"Aria", "Brock"}
-    await tags_service.annotate_tags(session, [imported])
-    assert [tag.name for tag in annotated_tags(imported)] == ["Raid"]
-    grant = (
-        await session.exec(
-            select(ResourceGrant).where(
-                ResourceGrant.resource_type == "queue",
-                ResourceGrant.resource_id == imported.id,
-                ResourceGrant.user_id == a.user.id,
-            )
-        )
-    ).one()
-    assert str(grant.level) in ("owner", "ResourceAccessLevel.owner")
-
-
 async def test_envelope_import_roundtrips_counter_group(client, acting_user, session):
+    """Export a counter group as its envelope, import it into another
+    initiative: its counters and tags survive; the importer gets an owner
+    grant; tags match-or-create against the guild."""
     from sqlmodel import select
 
     from app.models.tenant.counter import Counter, CounterGroup
+    from app.models.tenant.resource_grant import ResourceGrant
 
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
@@ -154,9 +100,12 @@ async def test_envelope_import_roundtrips_counter_group(client, acting_user, ses
         client, a, "/exports/counter_group", {"ids": [group.id]}
     )
     assert envelope["tags"] == ["Loot"]
+    # A name listed again in another case is the same tag, attached once.
+    envelope["tags"].append("loot")
     target = await _second_initiative(session, a, counter_groups_enabled=True)
     resp = await _import_envelope(client, a, envelope, target.id)
     assert resp.status_code == 201, resp.text
+    assert resp.json()["result"]["matched"]["tags"] == 1
 
     imported = (
         await session.exec(
@@ -175,6 +124,16 @@ async def test_envelope_import_roundtrips_counter_group(client, acting_user, ses
     assert float(counter.count) == 42.5
     await tags_service.annotate_tags(session, [imported])
     assert [tag.name for tag in annotated_tags(imported)] == ["Loot"]
+    grant = (
+        await session.exec(
+            select(ResourceGrant).where(
+                ResourceGrant.resource_type == "counter_group",
+                ResourceGrant.resource_id == imported.id,
+                ResourceGrant.user_id == a.user.id,
+            )
+        )
+    ).one()
+    assert str(grant.level) in ("owner", "ResourceAccessLevel.owner")
 
 
 async def test_envelope_import_roundtrips_file_types(client, acting_user, session):
@@ -334,7 +293,6 @@ async def _tool_with_a_row(session, a, tool):
     "tool",
     [
         "project",
-        "queue",
         "counter_group",
         "calendar",
         "wiki",
@@ -455,9 +413,8 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
     )
     from app.testing.factories import (
         create_property_definition,
+        create_counter,
         create_property_value,
-        create_queue,
-        create_queue_item,
     )
 
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
@@ -468,12 +425,14 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
     await create_property_definition(
         session, target, name="Status", type=MetadataType.number
     )
-    queue = await create_queue(session, a.initiative, a.user)
-    for label in ("First", "Second"):
-        item = await create_queue_item(session, queue, label=label)
-        await create_property_value(session, item, status, value_text=label)
+    group = await create_counter_group(session, a.initiative, a.user)
+    for name in ("First", "Second"):
+        counter = await create_counter(session, group, name=name)
+        await create_property_value(session, counter, status, value_text=name)
 
-    envelope = await _export_json(client, a, "/exports/queue", {"ids": [queue.id]})
+    envelope = await _export_json(
+        client, a, "/exports/counter_group", {"ids": [group.id]}
+    )
     resp = await _import_envelope(client, a, envelope, target.id)
     assert resp.status_code == 201, resp.text
 
@@ -482,7 +441,7 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
             select(MetadataDefinition.name)
             .join(MetadataValue)
             .where(
-                MetadataValue.entity_type == "queue_item",
+                MetadataValue.entity_type == "counter",
                 MetadataDefinition.initiative_id == target.id,
             )
         )
@@ -580,16 +539,16 @@ async def test_envelope_import_authorization_gates(client, acting_user, session)
     assert not_a_link.status_code == 400
     assert not_a_link.json()["detail"] == "FILE_SMART_LINK_URL_INVALID"
 
-    queue_envelope = {
-        "type": "initiative-queue",
+    group_envelope = {
+        "type": "initiative-counter-group",
         "schema_version": 1,
         "name": "Q",
-        "items": [],
+        "counters": [],
     }
-    a.initiative.queues_enabled = False
+    a.initiative.counter_groups_enabled = False
     session.add(a.initiative)
     await session.commit()
-    disabled = await _import_envelope(client, a, queue_envelope, a.initiative.id)
+    disabled = await _import_envelope(client, a, group_envelope, a.initiative.id)
     assert disabled.status_code == 400
     assert disabled.json()["detail"] == "IMPORT_TOOL_DISABLED"
 
@@ -621,17 +580,17 @@ async def test_large_envelope_becomes_job_and_worker_applies_it(
     from sqlmodel import select
 
     from app.models.platform.notification import Notification, NotificationType
-    from app.models.tenant.queue import Queue
+    from app.models.tenant.counter import CounterGroup
 
     monkeypatch.setattr(import_limits, "IMPORT_INLINE_MAX_ROWS", 0)
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     envelope = {
-        "type": "initiative-queue",
+        "type": "initiative-counter-group",
         "schema_version": 1,
-        "name": "Big Queue",
-        "items": [{"label": f"Item {i}", "position": float(i)} for i in range(3)],
+        "name": "Big Tally",
+        "counters": [{"name": f"Counter {i}", "position": float(i)} for i in range(3)],
     }
     resp = await _import_envelope(client, a, envelope, a.initiative.id)
     assert resp.status_code == 202, resp.text
@@ -641,7 +600,7 @@ async def test_large_envelope_becomes_job_and_worker_applies_it(
     assert body["params"] == {"initiative_id": a.initiative.id}
     # The row holds options only — the envelope content is staged in storage,
     # and the storage key itself is not exposed through the API.
-    assert "items" not in json.dumps(body)
+    assert "counters" not in json.dumps(body)
     assert "file_ref" not in body
 
     await _run_import_worker(monkeypatch, role_session)
@@ -649,8 +608,8 @@ async def test_large_envelope_becomes_job_and_worker_applies_it(
     status_resp = await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)
     job = status_resp.json()
     assert job["status"] == DataJobStatus.done.value, job.get("error")
-    assert job["result"]["created"]["queues"] == 1
-    assert job["result"]["created"]["items"] == 3
+    assert job["result"]["created"]["counter_groups"] == 1
+    assert job["result"]["created"]["counters"] == 3
 
     # The staged payload was deleted on the terminal transition.
     from app.testing import route_session_to_guild
@@ -660,7 +619,7 @@ async def test_large_envelope_becomes_job_and_worker_applies_it(
     assert row is not None and row.file_ref is None
 
     imported = (
-        await session.exec(select(Queue).where(Queue.name == "Big Queue"))
+        await session.exec(select(CounterGroup).where(CounterGroup.name == "Big Tally"))
     ).one()
     assert imported.created_by == a.user.id  # applied AS the creator
 
@@ -683,18 +642,18 @@ async def test_worker_fails_closed_on_revoked_permission(
     from sqlalchemy import delete as sa_delete
     from sqlmodel import select
 
+    from app.models.tenant.counter import CounterGroup
     from app.models.tenant.initiative import InitiativeMember
-    from app.models.tenant.queue import Queue
 
     monkeypatch.setattr(import_limits, "IMPORT_INLINE_MAX_ROWS", 0)
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     envelope = {
-        "type": "initiative-queue",
+        "type": "initiative-counter-group",
         "schema_version": 1,
-        "name": "Doomed Queue",
-        "items": [],
+        "name": "Doomed Tally",
+        "counters": [],
     }
     resp = await _import_envelope(client, a, envelope, a.initiative.id)
     assert resp.status_code == 202
@@ -716,7 +675,9 @@ async def test_worker_fails_closed_on_revoked_permission(
     # permission check refuses — both fail closed.
     assert job["error"] in ("IMPORT_PERMISSION_REQUIRED", "IMPORT_INVALID_PARAMS")
     assert (
-        await session.exec(select(Queue).where(Queue.name == "Doomed Queue"))
+        await session.exec(
+            select(CounterGroup).where(CounterGroup.name == "Doomed Tally")
+        )
     ).one_or_none() is None
 
 
@@ -736,7 +697,7 @@ async def test_stale_running_import_fails_closed_not_reapplied(
         session,
         a.guild,
         a.user,
-        source="initiative-queue",
+        source="initiative-counter-group",
         params={"initiative_id": a.initiative.id},
         file_ref="imports/gone.json",
         status=DataJobStatus.running,
@@ -758,10 +719,10 @@ async def test_import_job_cap_and_cancel(client, acting_user, session, monkeypat
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     envelope = {
-        "type": "initiative-queue",
+        "type": "initiative-counter-group",
         "schema_version": 1,
         "name": "Q",
-        "items": [],
+        "counters": [],
     }
     first = await _import_envelope(client, a, envelope, a.initiative.id)
     assert first.status_code == 202
@@ -793,10 +754,10 @@ async def test_import_jobs_are_own_row_isolated(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     envelope = {
-        "type": "initiative-queue",
+        "type": "initiative-counter-group",
         "schema_version": 1,
         "name": "Mine",
-        "items": [],
+        "counters": [],
     }
     resp = await _import_envelope(client, a, envelope, a.initiative.id)
     job_id = resp.json()["id"]
@@ -827,10 +788,10 @@ async def test_envelope_byte_bound_enforced_before_body_is_read(
         {
             "initiative_id": a.initiative.id,
             "envelope": {
-                "type": "initiative-queue",
+                "type": "initiative-counter-group",
                 "schema_version": 1,
                 "name": "Q",
-                "items": [],
+                "counters": [],
                 "padding": "x" * 4096,
             },
         }
@@ -863,7 +824,12 @@ async def test_envelope_byte_bound_enforced_before_body_is_read(
     ok = await _import_envelope(
         client,
         a,
-        {"type": "initiative-queue", "schema_version": 1, "name": "Q", "items": []},
+        {
+            "type": "initiative-counter-group",
+            "schema_version": 1,
+            "name": "Q",
+            "counters": [],
+        },
         a.initiative.id,
     )
     assert ok.status_code == 201
@@ -902,8 +868,8 @@ def _minimal_manifest(initiative_id=1, name="Restored", entries=None, assets=Non
                 "tools": {
                     "project": "included",
                     "file": "included",
-                    "queue": "included",
-                    "counter_group": "disabled",
+                    "counter_group": "included",
+                    "dashboard": "disabled",
                     "calendar_event": "included",
                 },
             }
@@ -914,20 +880,23 @@ def _minimal_manifest(initiative_id=1, name="Restored", entries=None, assets=Non
     }
 
 
-def _queue_entry(initiative_id=1):
+def _counter_group_entry(initiative_id=1):
     envelope = {
-        "type": "initiative-queue",
+        "type": "initiative-counter-group",
         "schema_version": 1,
-        "name": "Restored Queue",
-        "items": [{"label": "Aria", "position": 1.0}],
+        "name": "Restored Tally",
+        "counters": [{"name": "Aria", "position": 1.0}],
     }
     entry = {
-        "path": "initiatives/1-restored/queues/1-restored-queue.initiative-queue.json",
-        "tool": "queue",
-        "type": "initiative-queue",
+        "path": (
+            "initiatives/1-restored/counter_groups/"
+            "1-restored-tally.initiative-counter-group.json"
+        ),
+        "tool": "counter_group",
+        "type": "initiative-counter-group",
         "schema_version": 1,
         "entity_id": 1,
-        "title": "Restored Queue",
+        "title": "Restored Tally",
         "initiative_id": initiative_id,
         "tags": [],
         "properties": [],
@@ -999,7 +968,7 @@ async def _run_import_worker(monkeypatch, role_session):
     monkeypatch.setattr(
         import_worker, "_open_user_session", lambda _guild_id: user_session
     )
-    await import_worker.process_import_jobs()
+    await import_worker.jobs.process()
 
 
 async def test_backup_import_end_to_end_with_assets(
@@ -1011,9 +980,9 @@ async def test_backup_import_end_to_end_with_assets(
     (deduped here — same guild, key already exists) and quota-checked."""
     from sqlmodel import select
 
+    from app.models.tenant.counter import CounterGroup
     from app.models.tenant.file import File
     from app.models.tenant.initiative import Initiative, InitiativeMember
-    from app.models.tenant.queue import Queue
 
     from app.testing.factories import create_upload
 
@@ -1035,7 +1004,7 @@ async def test_backup_import_end_to_end_with_assets(
         content_type="application/pdf",
     )
 
-    entry, envelope = _queue_entry()
+    entry, envelope = _counter_group_entry()
     file_entry = _file_entry("restore-me.pdf", entity_id=2, tags=["restored"])
     manifest = _minimal_manifest(
         entries=[entry, file_entry],
@@ -1064,7 +1033,7 @@ async def test_backup_import_end_to_end_with_assets(
     plan = body["plan"]
     assert plan["source_community_name"] == "Source Guild"
     assert plan["initiatives"][0]["proposed_name"] == "Restored"
-    assert plan["initiatives"][0]["entry_counts"] == {"queue": 1, "file": 1}
+    assert plan["initiatives"][0]["entry_counts"] == {"counter_group": 1, "file": 1}
     assert plan["asset_count"] == 1
     assert plan["asset_bytes"] == len(payload)
 
@@ -1079,7 +1048,7 @@ async def test_backup_import_end_to_end_with_assets(
     job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
     assert job["status"] == DataJobStatus.done.value, job.get("error")
     result = job["result"]
-    assert result["per_tool"]["queue"]["created"] == 1
+    assert result["per_tool"]["counter_group"]["created"] == 1
     assert result["per_tool"]["file"]["created"] == 1
     # Same guild: the storage key already existed, so the blob deduped.
     assert result["assets_deduped"] == 1
@@ -1089,8 +1058,8 @@ async def test_backup_import_end_to_end_with_assets(
         await session.exec(select(Initiative).where(Initiative.name == "Restored"))
     ).one()
     assert restored.description == "from backup"
-    assert restored.queues_enabled is True
-    assert restored.counter_groups_enabled is False  # "disabled" in manifest
+    assert restored.counter_groups_enabled is True
+    assert restored.dashboards_enabled is False  # "disabled" in manifest
     member = (
         await session.exec(
             select(InitiativeMember).where(
@@ -1100,10 +1069,12 @@ async def test_backup_import_end_to_end_with_assets(
     ).one()
     assert member.user_id == a.user.id
 
-    queue = (
-        await session.exec(select(Queue).where(Queue.initiative_id == restored.id))
+    group = (
+        await session.exec(
+            select(CounterGroup).where(CounterGroup.initiative_id == restored.id)
+        )
     ).one()
-    assert queue.name == "Restored Queue"
+    assert group.name == "Restored Tally"
     file_doc = (
         await session.exec(
             select(File).where(
@@ -1152,8 +1123,9 @@ async def test_backup_rejects_invalid_and_bomb_zips(
     assert escaped.status_code == 400
     assert escaped.json()["detail"] == "IMPORT_ZIP_INVALID"
 
-    monkeypatch.setattr(import_limits, "IMPORT_MAX_ZIP_MEMBERS", 1)
-    entry, envelope = _queue_entry()
+    # A backup is held to the bundle bounds.
+    monkeypatch.setattr(import_limits, "IMPORT_MAX_BUNDLE_MEMBERS", 1)
+    entry, envelope = _counter_group_entry()
     bomb = _make_backup_zip(
         _minimal_manifest(entries=[entry]),
         {entry["path"]: json.dumps(envelope).encode()},
@@ -1162,7 +1134,7 @@ async def test_backup_rejects_invalid_and_bomb_zips(
     assert too_many.status_code == 400
     assert too_many.json()["detail"] == "IMPORT_TOO_LARGE"
 
-    monkeypatch.setattr(import_limits, "IMPORT_MAX_ZIP_MEMBERS", 20_000)
+    monkeypatch.undo()
     future = _make_backup_zip({**_minimal_manifest(), "schema_version": 99})
     unsupported = await _upload_backup(client, a, future)
     assert unsupported.status_code == 400
@@ -1286,7 +1258,7 @@ async def test_backup_confirm_include_map_skips_tools(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    entry, envelope = _queue_entry()
+    entry, envelope = _counter_group_entry()
     zip_bytes = _make_backup_zip(
         _minimal_manifest(entries=[entry]),
         {entry["path"]: json.dumps(envelope).encode()},
@@ -1296,15 +1268,15 @@ async def test_backup_confirm_include_map_skips_tools(
     confirmed = await client.post(
         a.g(f"/imports/jobs/{job_id}/confirm"),
         headers=a.headers,
-        json={"include": {"queue": False}},
+        json={"include": {"counter_group": False}},
     )
     assert confirmed.status_code == 200
 
     await _run_import_worker(monkeypatch, role_session)
     job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
     assert job["status"] == DataJobStatus.done.value, job.get("error")
-    assert job["result"]["per_tool"]["queue"]["skipped"] == 1
-    assert job["result"]["per_tool"]["queue"]["created"] == 0
+    assert job["result"]["per_tool"]["counter_group"]["skipped"] == 1
+    assert job["result"]["per_tool"]["counter_group"]["created"] == 0
 
 
 async def test_an_archive_from_before_files_restores_its_documents(
@@ -1719,10 +1691,12 @@ async def test_backup_corrupt_entry_fails_alone(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    good_entry, good_envelope = _queue_entry()
+    good_entry, good_envelope = _counter_group_entry()
     bad_entry = dict(good_entry)
-    bad_entry["path"] = "initiatives/1-restored/queues/2-bad.initiative-queue.json"
-    bad_entry["title"] = "Bad Queue"
+    bad_entry["path"] = (
+        "initiatives/1-restored/counter_groups/2-bad.initiative-counter-group.json"
+    )
+    bad_entry["title"] = "Bad Tally"
     bad_entry["entity_id"] = 2
     zip_bytes = _make_backup_zip(
         _minimal_manifest(entries=[good_entry, bad_entry]),
@@ -1741,13 +1715,13 @@ async def test_backup_corrupt_entry_fails_alone(
 
     job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
     assert job["status"] == DataJobStatus.done.value, job.get("error")
-    assert job["result"]["per_tool"]["queue"] == {
+    assert job["result"]["per_tool"]["counter_group"] == {
         "created": 1,
         "failed": 1,
         "skipped": 0,
     }
     statuses = {e["title"]: e["status"] for e in job["result"]["entries"]}
-    assert statuses == {"Restored Queue": "created", "Bad Queue": "failed"}
+    assert statuses == {"Restored Tally": "created", "Bad Tally": "failed"}
 
 
 async def test_backup_seat_vacated_before_apply_fails_closed(
@@ -1756,7 +1730,7 @@ async def test_backup_seat_vacated_before_apply_fails_closed(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    entry, envelope = _queue_entry()
+    entry, envelope = _counter_group_entry()
     zip_bytes = _make_backup_zip(
         _minimal_manifest(entries=[entry]),
         {entry["path"]: json.dumps(envelope).encode()},
@@ -1869,6 +1843,34 @@ async def test_only_the_seat_may_send_a_backup_in_pieces(client, acting_user):
     assert refused.json()["detail"] == "IMPORT_SUPERADMIN_REQUIRED"
 
 
+@pytest.mark.parametrize("purpose", ["backup", "atlassian_export"])
+async def test_an_import_sent_in_pieces_may_weigh_as_much_as_a_bundle(
+    client, acting_user, purpose
+):
+    from app.testing.resumable import TUS, upload_metadata
+
+    a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+
+    async def create(length: int) -> int:
+        response = await client.post(
+            a.g("/resumable-uploads"),
+            headers={
+                **a.headers,
+                **TUS,
+                "Upload-Length": str(length),
+                "Upload-Metadata": upload_metadata(
+                    purpose=purpose,
+                    filename="import.zip",
+                    initiative_id=str(a.initiative.id),
+                ),
+            },
+        )
+        return response.status_code
+
+    assert await create(import_limits.IMPORT_MAX_BACKUP_UPLOAD_BYTES + 1) == 201
+    assert await create(import_limits.IMPORT_MAX_BUNDLE_BYTES + 1) == 413
+
+
 async def test_a_backup_on_its_way_needs_no_room_in_the_communitys_storage(
     client, acting_user, session
 ):
@@ -1888,6 +1890,28 @@ async def test_a_backup_on_its_way_needs_no_room_in_the_communitys_storage(
     )
 
     assert await attachments.get_guild_storage_usage(a.guild.id) == 0
+
+
+async def test_a_confluence_export_on_its_way_holds_room_in_the_communitys_storage(
+    client, acting_user
+):
+    from app.services.import_engine.confluence_export_test import export_bytes
+    from app.services.tenant import attachments
+    from app.testing.resumable import send_in_pieces
+
+    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    export = export_bytes()
+
+    await send_in_pieces(
+        client,
+        a,
+        export,
+        purpose="atlassian_export",
+        filename="export.zip",
+        initiative_id=str(a.initiative.id),
+    )
+
+    assert await attachments.get_guild_storage_usage(a.guild.id) == len(export)
 
 
 async def test_backup_staged_expiry_and_cancel(
@@ -1950,12 +1974,15 @@ async def test_backup_restores_fresh_assets_into_storage(
     client, acting_user, session, monkeypatch, role_session
 ):
     """A cross-guild restore: the storage key doesn't exist here, so the blob
-    is written into guild storage, an uploads row is registered, and the uploaded file serves from the restored key."""
+    is written into guild storage, an uploads row is registered, and the uploaded file serves from the restored key.
+    A file is restored however large, past what one sent with a request may be."""
+    import hashlib
     from pathlib import Path
 
     from sqlmodel import select
 
     from app.models.tenant.upload import Upload
+    from app.services.tenant import attachments
 
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
@@ -1973,6 +2000,7 @@ async def test_backup_restores_fresh_assets_into_storage(
         ],
     )
     zip_bytes = _make_backup_zip(manifest, {"assets/from-elsewhere.pdf": payload})
+    monkeypatch.setattr(attachments, "MAX_FILE_SIZE", len(payload) - 1)
 
     resp = await _upload_backup(client, a, zip_bytes)
     job_id = resp.json()["id"]
@@ -2000,6 +2028,7 @@ async def test_backup_restores_fresh_assets_into_storage(
     ).one()
     assert upload.size_bytes == len(payload)
     assert upload.content_type == "application/pdf"
+    assert upload.content_hash == hashlib.sha256(payload).hexdigest()
 
 
 async def test_backup_quota_uses_zip_sizes_not_manifest_claims(
@@ -2199,18 +2228,18 @@ async def test_backup_entry_past_the_json_cap_fails_alone(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    good_entry, good_envelope = _queue_entry()
+    good_entry, good_envelope = _counter_group_entry()
     big_entry = {
         **good_entry,
-        "path": "initiatives/1-restored/queues/2-big.initiative-queue.json",
-        "title": "Big Queue",
+        "path": "initiatives/1-restored/counter_groups/2-big.initiative-counter-group.json",
+        "title": "Big Tally",
         "entity_id": 2,
     }
     big_envelope = {
         **good_envelope,
-        "name": "Big Queue",
-        "items": [
-            {"label": f"Member {index}", "position": float(index)}
+        "name": "Big Tally",
+        "counters": [
+            {"name": f"Member {index}", "position": float(index)}
             for index in range(400)
         ],
     }
@@ -2229,8 +2258,8 @@ async def test_backup_entry_past_the_json_cap_fails_alone(
     )
     assert job["status"] == DataJobStatus.done.value, job.get("error")
     entries = {entry["title"]: entry for entry in job["result"]["entries"]}
-    assert entries["Restored Queue"]["status"] == "created"
-    assert (entries["Big Queue"]["status"], entries["Big Queue"]["error"]) == (
+    assert entries["Restored Tally"]["status"] == "created"
+    assert (entries["Big Tally"]["status"], entries["Big Tally"]["error"]) == (
         "failed",
         "IMPORT_TOO_LARGE",
     )
@@ -2607,8 +2636,8 @@ async def test_backup_applies_into_an_existing_initiative(
     """
     from sqlmodel import select
 
+    from app.models.tenant.counter import CounterGroup
     from app.models.tenant.initiative import Initiative
-    from app.models.tenant.queue import Queue
 
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
@@ -2616,7 +2645,7 @@ async def test_backup_applies_into_an_existing_initiative(
     target = await _second_initiative(session, a)
     before = len((await session.exec(select(Initiative.id))).all())
 
-    entry, envelope = _queue_entry()
+    entry, envelope = _counter_group_entry()
     manifest = _minimal_manifest(entries=[entry])
     manifest["initiatives"][0]["target_initiative_id"] = target.id
     zip_bytes = _make_backup_zip(
@@ -2640,10 +2669,12 @@ async def test_backup_applies_into_an_existing_initiative(
         await session.exec(select(Initiative).where(Initiative.name == "Restored"))
     ).one_or_none() is None
 
-    queue = (
-        await session.exec(select(Queue).where(Queue.initiative_id == target.id))
+    group = (
+        await session.exec(
+            select(CounterGroup).where(CounterGroup.initiative_id == target.id)
+        )
     ).one()
-    assert queue.name == "Restored Queue"
+    assert group.name == "Restored Tally"
 
 
 async def test_backup_into_an_unreachable_initiative_fails_the_job(
@@ -2655,7 +2686,7 @@ async def test_backup_into_an_unreachable_initiative_fails_the_job(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
 
-    entry, envelope = _queue_entry()
+    entry, envelope = _counter_group_entry()
     manifest = _minimal_manifest(entries=[entry])
     manifest["initiatives"][0]["target_initiative_id"] = 10_000_000
     zip_bytes = _make_backup_zip(
@@ -3356,7 +3387,7 @@ async def test_the_plan_lists_the_people_and_suggests_the_exact_matches(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    entry, envelope = _queue_entry()
+    entry, envelope = _counter_group_entry()
     manifest = _minimal_manifest(entries=[entry])
     manifest["people"] = [
         {"handle": handle_of(a.user), "name": "The Importer", "comment_count": 4},
@@ -4190,9 +4221,11 @@ async def test_a_zip_is_refused_from_the_wrong_tool_or_without_an_export(
                 archive.writestr(name, content)
         return buffer.getvalue()
 
-    queue = json.dumps({"type": "initiative-queue", "schema_version": 1, "name": "Q"})
+    group = json.dumps(
+        {"type": "initiative-counter-group", "schema_version": 1, "name": "Q"}
+    )
     wrong = await _import_archive(
-        client, a, zipped(**{"q.json": queue}), a.initiative.id, "initiative-wiki"
+        client, a, zipped(**{"q.json": group}), a.initiative.id, "initiative-wiki"
     )
     assert wrong.status_code == 400
     assert wrong.json()["detail"] == "IMPORT_WRONG_TOOL"
@@ -4311,7 +4344,7 @@ async def test_confirm_refuses_a_malformed_people_map(client, acting_user, sessi
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    entry, envelope = _queue_entry()
+    entry, envelope = _counter_group_entry()
     zip_bytes = _make_backup_zip(
         _minimal_manifest(entries=[entry]),
         {entry["path"]: json.dumps(envelope).encode()},
@@ -4692,7 +4725,9 @@ def _jira_site(
         if "/attachment/content/" in url and files:
             attachment_id = url.split("/attachment/content/")[1].split("?")[0]
             if attachment_id in files:
-                return httpx.Response(200, content=files[attachment_id])
+                return await answered(
+                    method, url, httpx.Response(200, content=files[attachment_id]), kw
+                )
         if url.endswith("/rest/api/3/field") and catalog is not None:
             return httpx.Response(200, json=catalog)
         if "/rest/agile/1.0/board/" in url and boards:
@@ -5784,7 +5819,8 @@ def _confluence_site(
                 302, headers={"location": f"https://media.example.com/{att_id}"}
             )
         if url.startswith("https://media.example.com/"):
-            return httpx.Response(200, content=blobs[url.rsplit("/", 1)[1]])
+            blob = blobs[url.rsplit("/", 1)[1]]
+            return await answered(method, url, httpx.Response(200, content=blob), kw)
         if "/wiki/api/v2/spaces?keys=" in url:
             return httpx.Response(
                 200,
@@ -6558,7 +6594,7 @@ async def test_an_apply_touches_its_row_as_it_goes(
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    entry, envelope = _queue_entry()
+    entry, envelope = _counter_group_entry()
     zip_bytes = _make_backup_zip(
         _minimal_manifest(entries=[entry]),
         {entry["path"]: json.dumps(envelope).encode()},
@@ -6573,17 +6609,17 @@ async def test_an_apply_touches_its_row_as_it_goes(
 # --- running imports side by side -------------------------------------------
 
 
-_QUEUE_ENVELOPE = {
-    "type": "initiative-queue",
+_COUNTER_GROUP_ENVELOPE = {
+    "type": "initiative-counter-group",
     "schema_version": 1,
     "name": "Side by side",
-    "items": [{"label": "Aria", "position": 1.0}],
+    "counters": [{"name": "Aria", "position": 1.0}],
 }
 
 
 async def _queued(client, actor) -> int:
     response = await _import_envelope(
-        client, actor, _QUEUE_ENVELOPE, actor.initiative.id
+        client, actor, _COUNTER_GROUP_ENVELOPE, actor.initiative.id
     )
     assert response.status_code == 202, response.text
     return response.json()["id"]
@@ -6647,7 +6683,7 @@ async def test_a_community_runs_one_import_at_a_time(
     assert await _status(client, a, first) == DataJobStatus.done.value
     assert await _status(client, a, second) == DataJobStatus.queued.value
 
-    await import_worker.process_import_jobs()
+    await import_worker.jobs.process()
     assert await _status(client, a, second) == DataJobStatus.done.value
 
 
@@ -6672,7 +6708,7 @@ async def test_a_process_starts_no_more_than_its_slots(
 
     assert len(started) == 1
     await asyncio.gather(*started)
-    await import_worker.process_import_jobs()
+    await import_worker.jobs.process()
 
 
 async def test_the_sweep_leaves_a_job_this_process_is_running(
@@ -6691,7 +6727,7 @@ async def test_the_sweep_leaves_a_job_this_process_is_running(
         session,
         a.guild,
         a.user,
-        source="initiative-queue",
+        source="initiative-counter-group",
         params={"initiative_id": a.initiative.id},
         file_ref="imports/elsewhere.json",
         status=DataJobStatus.running,

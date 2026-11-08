@@ -1,10 +1,10 @@
 import { Check } from "lucide-react";
-import { useTranslation } from "react-i18next";
 
 import { PixelSparkle } from "@/components/effects/svg/PixelSparkle";
 import { ContinueButton, SkipButton } from "@/components/start/stepParts";
 import type { CatalogTier } from "@/hooks/useBillingCatalog";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 /** The catalog's plans as cards, the entry plan picked until another is. */
 export const PlanStep = ({
@@ -26,10 +26,13 @@ export const PlanStep = ({
   onSkip: () => void;
   disabled?: boolean;
 }) => {
-  const { t } = useTranslation("auth");
   return (
     <>
-      {loading ? <p className="text-muted-foreground text-sm">{t("start.plan.loading")}</p> : null}
+      {loading ? (
+        <SkeletonRegion>
+          <ListSkeleton rows={3} avatar={false} rowClassName="rounded-lg border p-4" />
+        </SkeletonRegion>
+      ) : null}
       <div className="grid gap-3">
         {tiers.map((tier) => {
           const picked = tier === chosen;

@@ -2,10 +2,11 @@
 
 Three shapes, and the difference is what the plug-in brings with it.
 
-A **tool instance** mounts one of this build's own tools at guild scope.
-Installing creates an ordinary row in that tool's ordinary table with no
-initiative — a guild-level calendar is a `calendars` row with `initiative_id`
-NULL — owned by the install, so the sidebar can link straight to it. Nothing
+A **tool instance** mounts one of this build's own tools at guild scope. Its
+rows are ordinary rows in that tool's ordinary table with no initiative — a
+guild-level calendar is a `calendars` row with `initiative_id` NULL — owned
+by the install. Installing the calendar plug-in creates one, so the sidebar
+can link straight to it; the community contacts plug-in starts empty. Nothing
 about the tool changes: same table, same UI, same sharing, same trash. The
 content is seeded shared with everyone in the guild, which is what makes a plug-in
 useful the moment it lands. From there the guild admin decides its sharing:
@@ -46,9 +47,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.audit_events import AuditEventType
 from app.core.messages import GuildPluginMessages
 from app.core.plugin_scopes import ordered_scopes, plugin_scope, plugin_scope_target
+from app.core.tools import Tool
 from app.db.session import routed_guild_id
 from app.models.platform.marketplace import MarketplaceListing
 from app.models.tenant.calendar import Calendar
+from app.models.tenant.contact import Contact
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.guild_plugin_secret import GuildPluginSecret
 from app.models.tenant.initiative import (
@@ -70,7 +73,7 @@ from app.services.marketplace import (
 from app.services.marketplace.manifest_values import is_unique_setting_value
 from app.services.marketplace.service_plugins import is_admin_only
 from app.services.platform import guilds as guilds_service
-from app.services.tenant import calendars as calendars_service
+from app.services.tenant import ownership as ownership_service
 from app.services.tenant import plugin_config as plugin_config_service
 from app.services.tenant import plugin_connections as connections_service
 from app.services.tenant import plugin_member_consents as consents_service
@@ -134,14 +137,15 @@ __all__ = [
 class ArtifactHandler:
     """How one kind of artifact is made and unmade.
 
-    ``create`` makes the row, owned by the install; ``remove`` disposes of it.
-    Removal is soft wherever the tool has a trash, because what a plug-in created
-    is guild content — the events someone put in a guild calendar should survive
-    an admin removing the plug-in.
+    ``create`` makes the row, owned by the install, or is ``None`` where
+    installing makes nothing (contacts arrive one at a time); ``remove``
+    disposes of one. Removal is soft wherever the tool has a trash, because
+    what a plug-in holds is guild content — the events someone put in a guild
+    calendar should survive an admin removing the plug-in.
     """
 
-    create: Callable[..., Awaitable[None]]
     remove: Callable[..., Awaitable[None]]
+    create: Optional[Callable[..., Awaitable[None]]] = None
 
 
 async def _create_calendar(
@@ -158,8 +162,9 @@ async def _create_calendar(
     await session.flush()
     # Shared with the guild from the start — a plug-in nobody can see is not
     # useful, and narrowing it afterwards is one edit to its sharing.
-    await calendars_service.give_to_install(
+    await ownership_service.give_to_install(
         session,
+        Tool.calendar,
         calendar,
         install_id=plugin.id,
         guild_id=guild_id,
@@ -167,24 +172,27 @@ async def _create_calendar(
     )
 
 
-async def _remove_calendar(
-    session: AsyncSession,
-    artifact_id: int,
-    *,
-    deleted_by_user_id: Optional[int],
-    retention_days: Optional[int],
-) -> None:
-    calendar = (
-        await session.exec(select(Calendar).where(Calendar.id == artifact_id))
-    ).first()
-    if calendar is None:
-        return
-    await soft_delete_entity(
-        session,
-        calendar,
-        deleted_by_user_id=deleted_by_user_id,
-        retention_days=retention_days,
-    )
+def _trash(model: type[Calendar] | type[Contact]) -> Callable[..., Awaitable[None]]:
+    """Removal that sends one of ``model``'s rows to the trash."""
+
+    async def remove(
+        session: AsyncSession,
+        artifact_id: int,
+        *,
+        deleted_by_user_id: Optional[int],
+        retention_days: Optional[int],
+    ) -> None:
+        row = (await session.exec(select(model).where(model.id == artifact_id))).first()
+        if row is None:
+            return
+        await soft_delete_entity(
+            session,
+            row,
+            deleted_by_user_id=deleted_by_user_id,
+            retention_days=retention_days,
+        )
+
+    return remove
 
 
 #: One entry per tool a plug-in may mount at guild scope, keyed by the artifact
@@ -192,7 +200,10 @@ async def _remove_calendar(
 #: every entry in ``MOUNTABLE_TOOLS``, so a tool added to the manifest
 #: vocabulary cannot ship without a way to unmake what it created.
 ARTIFACT_HANDLERS: dict[str, ArtifactHandler] = {
-    "calendar": ArtifactHandler(create=_create_calendar, remove=_remove_calendar),
+    Tool.calendar.value: ArtifactHandler(
+        create=_create_calendar, remove=_trash(Calendar)
+    ),
+    Tool.contact.value: ArtifactHandler(remove=_trash(Contact)),
 }
 
 
@@ -351,7 +362,10 @@ async def create_plugin_artifacts(
         # teaching about a new one.
         raise ValueError(f"cannot mount {tool!r} at guild scope")
 
-    await handler.create(session, plugin=plugin, name=plugin.name, guild_id=guild_id)
+    if handler.create is not None:
+        await handler.create(
+            session, plugin=plugin, name=plugin.name, guild_id=guild_id
+        )
 
 
 class ErasePendingError(Exception):

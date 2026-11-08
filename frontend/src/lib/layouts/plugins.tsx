@@ -21,9 +21,14 @@ import type { PluginDataParam } from "@/api/pluginData";
 import { PluginParamControl } from "@/components/plugins/PluginParamControl";
 import type { PluginFilterField } from "@/components/properties/PropertyFilter";
 import { PropertyValueCell, ScaleValue } from "@/components/properties/PropertyValueCell";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import contract from "@/contract/manifest.contract.json";
+import { useCommunityPlugins, useRunPluginAction } from "@/hooks/useCommunityPlugins";
+import { formatDate, formatDateTime } from "@/lib/formatDate";
+import { withParamAnswer } from "@/lib/widgets/pluginParams";
+import { type LocalizedText, localized } from "@/lib/widgets/widgetMeta";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -31,15 +36,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import contract from "@/contract/manifest.contract.json";
-import { useCommunityPlugins, useRunPluginAction } from "@/hooks/useCommunityPlugins";
-import { formatDate, formatDateTime } from "@/lib/formatDate";
-import { numberFormat } from "@/lib/intl";
-import { cn } from "@/lib/utils";
-import { withParamAnswer } from "@/lib/widgets/pluginParams";
-import { type LocalizedText, localized } from "@/lib/widgets/widgetMeta";
+} from "@/ui/dialog";
+import { DropdownMenuItem } from "@/ui/dropdown-menu";
+import { numberFormat } from "@/ui/lib/intl";
+import { cn } from "@/ui/lib/utils";
 
 import type { FieldDef, FieldRendererProps } from "./fields";
 import { Section } from "./section";
@@ -47,6 +47,8 @@ import { Section } from "./section";
 /** What a plug-in draws on an item from: the item, and the values it carries,
  *  a plug-in's among them by its install and key. */
 export type PluginItem = { id: number; properties?: PropertySummary[] };
+
+import { sanitizeUrl } from "@/ui/lib/safeUrl";
 
 import type { LayoutNode } from "./tree";
 
@@ -503,6 +505,7 @@ const PluginScalar = ({
             key: field.key,
             options: kept?.options ?? null,
             currency: kept?.currency ?? null,
+            counter: null,
             value,
           }}
         />
@@ -529,7 +532,7 @@ const PluginScalar = ({
         const link = value as { url: string; text?: unknown };
         return (
           <a
-            href={link.url}
+            href={sanitizeUrl(link.url)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex min-w-0 items-center gap-1 text-primary underline-offset-4 hover:underline"
@@ -778,7 +781,7 @@ const PluginActionDialog = ({
 /** Runs a plug-in's actions on an item, asking first when the action says
  *  to, or asks for something. */
 const useActionRunner = (kind: PluginItemKind, itemId: number) => {
-  const { t, i18n } = useTranslation("common");
+  const { i18n } = useTranslation("common");
   const run = useRunPluginAction();
   const [asking, setAsking] = useState<Asking | null>(null);
   const start = (plugin: PluginOnItems, action: PluginActionDecl, element?: string) => {
@@ -816,7 +819,6 @@ const useActionRunner = (kind: PluginItemKind, itemId: number) => {
         confirmLabel={
           asking ? (localized(asking.action.name, i18n.language) ?? asking.action.id) : ""
         }
-        cancelLabel={t("cancel")}
         onConfirm={() => {
           if (asking) {
             run.mutate({

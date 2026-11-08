@@ -5,20 +5,6 @@ import type {
   PluginServicePublishedKey,
   PluginServiceRegistrationRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { CopyButton } from "@/components/ui/copy-button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import {
   useConnectPluginService,
   usePluginServiceKeys,
@@ -28,6 +14,21 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { parseAllowedOrigins, postToVendor } from "@/lib/pluginServices";
 import { localized } from "@/lib/widgets/widgetMeta";
+import { Button } from "@/ui/button";
+import { CopyButton } from "@/ui/copy-button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Switch } from "@/ui/switch";
+import { Textarea } from "@/ui/textarea";
 
 /** What the operator stated, before it is shaped into a create or a patch. */
 export interface PluginServiceFormValues {
@@ -264,10 +265,11 @@ export const PluginServiceFormDialog = ({
         </DialogHeader>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="plugin-service-public-id">{t("pluginServices.publicIdLabel")}</Label>
+          <Field
+            label={t("pluginServices.publicIdLabel")}
+            hint={editing ? t("pluginServices.publicIdHelpEdit") : t("pluginServices.publicIdHelp")}
+          >
             <Input
-              id="plugin-service-public-id"
               value={form.publicId}
               onChange={(event) => setForm((prev) => ({ ...prev, publicId: event.target.value }))}
               placeholder={t("pluginServices.publicIdPlaceholder")}
@@ -276,10 +278,7 @@ export const PluginServiceFormDialog = ({
               required={!editing}
               autoComplete="off"
             />
-            <p className="text-muted-foreground text-xs">
-              {editing ? t("pluginServices.publicIdHelpEdit") : t("pluginServices.publicIdHelp")}
-            </p>
-          </div>
+          </Field>
 
           {/* A declarative plug-in runs nowhere and signs nothing: only its
               vendor values and its switches apply. */}
@@ -310,10 +309,11 @@ export const PluginServiceFormDialog = ({
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="plugin-service-base-url">{t("pluginServices.baseUrlLabel")}</Label>
+              <Field
+                label={t("pluginServices.baseUrlLabel")}
+                hint={t("pluginServices.baseUrlHelp")}
+              >
                 <Input
-                  id="plugin-service-base-url"
                   value={form.baseUrl}
                   onChange={(event) =>
                     setForm((prev) => ({ ...prev, baseUrl: event.target.value }))
@@ -322,15 +322,13 @@ export const PluginServiceFormDialog = ({
                   maxLength={1000}
                   required
                 />
-                <p className="text-muted-foreground text-xs">{t("pluginServices.baseUrlHelp")}</p>
-              </div>
+              </Field>
 
-              <div className="space-y-2">
-                <Label htmlFor="plugin-service-page-origin">
-                  {t("pluginServices.pageOriginLabel")}
-                </Label>
+              <Field
+                label={t("pluginServices.pageOriginLabel")}
+                hint={t("pluginServices.pageOriginHelp")}
+              >
                 <Input
-                  id="plugin-service-page-origin"
                   value={form.pageOrigin}
                   onChange={(event) =>
                     setForm((prev) => ({ ...prev, pageOrigin: event.target.value }))
@@ -338,17 +336,17 @@ export const PluginServiceFormDialog = ({
                   placeholder={t("pluginServices.pageOriginPlaceholder")}
                   maxLength={1000}
                 />
-                <p className="text-muted-foreground text-xs">
-                  {t("pluginServices.pageOriginHelp")}
-                </p>
-              </div>
+              </Field>
 
-              <div className="space-y-2">
-                <Label htmlFor="plugin-service-origins">
-                  {t("pluginServices.allowedOriginsLabel")}
-                </Label>
+              <Field
+                label={t("pluginServices.allowedOriginsLabel")}
+                hint={
+                  editing
+                    ? t("pluginServices.allowedOriginsHelpEdit")
+                    : t("pluginServices.allowedOriginsHelp")
+                }
+              >
                 <Textarea
-                  id="plugin-service-origins"
                   value={form.allowedOrigins}
                   onChange={(event) =>
                     setForm((prev) => ({ ...prev, allowedOrigins: event.target.value }))
@@ -356,12 +354,7 @@ export const PluginServiceFormDialog = ({
                   placeholder={t("pluginServices.allowedOriginsPlaceholder")}
                   rows={3}
                 />
-                <p className="text-muted-foreground text-xs">
-                  {editing
-                    ? t("pluginServices.allowedOriginsHelpEdit")
-                    : t("pluginServices.allowedOriginsHelp")}
-                </p>
-              </div>
+              </Field>
 
               <fieldset className="rounded-md border p-3">
                 {/* Floated so the legend sits inside the border like the other headings. */}
@@ -442,10 +435,12 @@ export const PluginServiceFormDialog = ({
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="plugin-service-jwks">{t("pluginServices.jwksLabel")}</Label>
+                  <Field
+                    label={t("pluginServices.jwksLabel")}
+                    hint={t("pluginServices.jwksHelp")}
+                    error={jwksError}
+                  >
                     <Textarea
-                      id="plugin-service-jwks"
                       value={form.jwks}
                       onChange={(event) =>
                         setForm((prev) => ({ ...prev, jwks: event.target.value }))
@@ -454,16 +449,13 @@ export const PluginServiceFormDialog = ({
                       className="font-mono text-xs"
                       placeholder={'{\n  "keys": [ … ]\n}'}
                     />
-                    <p className="text-muted-foreground text-xs">{t("pluginServices.jwksHelp")}</p>
-                    {jwksError && <p className="text-destructive text-xs">{jwksError}</p>}
-                  </div>
+                  </Field>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="plugin-service-jwks-uri">
-                      {t("pluginServices.jwksUriLabel")}
-                    </Label>
+                  <Field
+                    label={t("pluginServices.jwksUriLabel")}
+                    hint={t("pluginServices.jwksUriHelp")}
+                  >
                     <Input
-                      id="plugin-service-jwks-uri"
                       value={form.jwksUri}
                       onChange={(event) =>
                         setForm((prev) => ({ ...prev, jwksUri: event.target.value }))
@@ -472,10 +464,7 @@ export const PluginServiceFormDialog = ({
                       maxLength={1000}
                       autoComplete="off"
                     />
-                    <p className="text-muted-foreground text-xs">
-                      {t("pluginServices.jwksUriHelp")}
-                    </p>
-                  </div>
+                  </Field>
                 </div>
               </fieldset>
             </>
@@ -498,21 +487,19 @@ export const PluginServiceFormDialog = ({
                     <p className="text-muted-foreground text-xs">
                       {t("pluginServices.vendorSetupHelp")}
                     </p>
-                    <Label htmlFor="plugin-service-vendor-organization">
-                      {t("pluginServices.vendorSetupOrganizationLabel")}
-                    </Label>
-                    <Input
-                      id="plugin-service-vendor-organization"
-                      value={organization}
-                      onChange={(event) => setOrganization(event.target.value)}
-                      placeholder={t("pluginServices.vendorSetupOrganizationPlaceholder")}
-                      maxLength={39}
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                    <p className="text-muted-foreground text-xs">
-                      {t("pluginServices.vendorSetupOrganizationHelp")}
-                    </p>
+                    <Field
+                      label={t("pluginServices.vendorSetupOrganizationLabel")}
+                      hint={t("pluginServices.vendorSetupOrganizationHelp")}
+                    >
+                      <Input
+                        value={organization}
+                        onChange={(event) => setOrganization(event.target.value)}
+                        placeholder={t("pluginServices.vendorSetupOrganizationPlaceholder")}
+                        maxLength={39}
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                    </Field>
                     <div className="flex justify-end">
                       <Button
                         type="button"
@@ -593,36 +580,30 @@ export const PluginServiceFormDialog = ({
                   <p className="text-muted-foreground text-xs">
                     {t("pluginServices.redirectHelp")}
                   </p>
-                  <Label htmlFor="plugin-service-callback-url">
-                    {t("pluginServices.callbackUrlLabel")}
-                  </Label>
-                  <Input
-                    id="plugin-service-callback-url"
-                    value={editing.connection_callback_url}
-                    readOnly
-                    className="font-mono text-xs"
-                    onFocus={(event) => event.target.select()}
-                  />
-                  <Label htmlFor="plugin-service-setup-url">
-                    {t("pluginServices.setupUrlLabel")}
-                  </Label>
-                  <Input
-                    id="plugin-service-setup-url"
-                    value={editing.connection_setup_url}
-                    readOnly
-                    className="font-mono text-xs"
-                    onFocus={(event) => event.target.select()}
-                  />
-                  <Label htmlFor="plugin-service-webhook-url">
-                    {t("pluginServices.webhookUrlLabel")}
-                  </Label>
-                  <Input
-                    id="plugin-service-webhook-url"
-                    value={editing.webhook_url}
-                    readOnly
-                    className="font-mono text-xs"
-                    onFocus={(event) => event.target.select()}
-                  />
+                  <Field label={t("pluginServices.callbackUrlLabel")}>
+                    <Input
+                      value={editing.connection_callback_url}
+                      readOnly
+                      className="font-mono text-xs"
+                      onFocus={(event) => event.target.select()}
+                    />
+                  </Field>
+                  <Field label={t("pluginServices.setupUrlLabel")}>
+                    <Input
+                      value={editing.connection_setup_url}
+                      readOnly
+                      className="font-mono text-xs"
+                      onFocus={(event) => event.target.select()}
+                    />
+                  </Field>
+                  <Field label={t("pluginServices.webhookUrlLabel")}>
+                    <Input
+                      value={editing.webhook_url}
+                      readOnly
+                      className="font-mono text-xs"
+                      onFocus={(event) => event.target.select()}
+                    />
+                  </Field>
                 </div>
 
                 <div className="flex items-start justify-between gap-3">
@@ -685,19 +666,11 @@ export const PluginServiceFormDialog = ({
             </div>
           </div>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={saving}
-            >
-              {t("pluginServices.cancel")}
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? t("pluginServices.saving") : t("pluginServices.save")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("pluginServices.save")}
+            pendingLabel={t("pluginServices.saving")}
+            pending={saving}
+          />
         </form>
       </DialogContent>
     </Dialog>

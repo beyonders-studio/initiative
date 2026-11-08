@@ -1,6 +1,6 @@
 /**
  * THE index page a tool's entities are browsed from — one initiative's shelf of
- * projects, files, wikis, queues, counter groups or dashboards.
+ * projects, files, wikis, counter groups or dashboards.
  *
  * Each of those pages carried its own copy of the same thing: the view toggle,
  * the filter panel, the create button and its dialog, the loading, error,
@@ -23,7 +23,7 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import { Link, useRouter, useSearch } from "@tanstack/react-router";
 import type { SortingState } from "@tanstack/react-table";
 import type { FlatNamespace } from "i18next";
-import { LayoutGrid, List, Plus, Tags } from "lucide-react";
+import { FileSpreadsheet, LayoutGrid, List, Plus, Tags } from "lucide-react";
 import {
   type ComponentType,
   type ReactNode,
@@ -46,10 +46,13 @@ import { AddToCollectionButton } from "@/components/files/collections/AddToColle
 import { CollectionFilterField } from "@/components/files/collections/CollectionFilterField";
 import { FileCard } from "@/components/files/FileCard";
 import { useFileColumns } from "@/components/files/fileColumns";
+import { ImportWizard } from "@/components/imports/ImportWizard";
 import { ToolImportAction, useToolImportAction } from "@/components/imports/ToolImportAction";
+import { ContactCard, ContactMark } from "@/components/initiativeTools/contacts/ContactCard";
+import { CreateContactDialog } from "@/components/initiativeTools/contacts/CreateContactDialog";
+import { useContactColumns } from "@/components/initiativeTools/contacts/contactColumns";
 import { CounterGroupCard } from "@/components/initiativeTools/counters/CounterGroupCard";
 import { DashboardCard } from "@/components/initiativeTools/dashboards/DashboardCard";
-import { QueueCard } from "@/components/initiativeTools/queues/QueueCard";
 import { CreateToolDialog } from "@/components/initiativeTools/shared/CreateToolDialog";
 import { ToolFilterPanel } from "@/components/initiativeTools/shared/ToolFilterPanel";
 import { ToolListToolbar } from "@/components/initiativeTools/shared/ToolListToolbar";
@@ -61,12 +64,10 @@ import {
 } from "@/components/marketplace/BrowseMarketplaceButton";
 import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
-import { PaginationBar } from "@/components/PaginationBar";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { useProjectColumns } from "@/components/projects/projectColumns";
 import { parsePropertyFilters } from "@/components/properties/PropertyFilter";
-import { CardGridSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { TagBrowseLayout } from "@/components/tags/TagBrowseLayout";
 import {
@@ -80,14 +81,9 @@ import {
   ToolIndexTable,
   toolTableStorageKey,
 } from "@/components/tools/ToolIndexTable";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DropOverlay } from "@/components/ui/file-drop";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCreateFromSearchParam } from "@/hooks/useCreateFromSearchParam";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { useFileDrop } from "@/hooks/useFileDrop";
 import { useGridSelection } from "@/hooks/useGridSelection";
 import { useToolCreateAccess } from "@/hooks/useInitiativeAccess";
 import {
@@ -104,7 +100,6 @@ import { useTagTreeSelection } from "@/hooks/useTagTreeSelection";
 import { useToolCounts } from "@/hooks/useToolCounts";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { useCommunityPath } from "@/lib/communityUrl";
-import type { AppColumnDef } from "@/lib/table";
 import {
   isToolView,
   TOOL_ICONS,
@@ -119,6 +114,16 @@ import {
 } from "@/lib/tools";
 import type { DialogProps } from "@/types/dialog";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { DropdownMenuItem } from "@/ui/dropdown-menu";
+import { DropOverlay } from "@/ui/file-drop";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { useFileDrop } from "@/ui/lib/useFileDrop";
+import { CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { PaginationBar } from "@/ui/pagination-bar";
+import { StatusMessage } from "@/ui/status-message";
 
 // ---------------------------------------------------------------------------
 // What a tool contributes
@@ -139,6 +144,9 @@ export type ToolIndexRow = BulkAccessItem & {
   /** The initiative's properties, as the table's property columns read them. */
   properties?: PropertySummary[];
   card: ReactNode;
+  /** What the row is, in front of its name where the tool's icon would be: a
+   *  contact's person or organization. */
+  mark?: ReactNode;
 };
 
 type ToolIndexLayout = "grid" | "list" | "tags";
@@ -167,6 +175,7 @@ export type ToolIndexList = {
   rows: ToolIndexRow[];
   isLoading: boolean;
   isError: boolean;
+  refetch: () => void;
   /** The rows are the previous request's, shown while this one loads. */
   isPlaceholderData: boolean;
   /** Rows the server holds for this archive state — what the pager counts. */
@@ -176,8 +185,8 @@ export type ToolIndexList = {
 
 /** Everything one tool adds to the shared page. */
 export type ToolIndexEntry = {
-  /** Reads this tool's list and draws its cards. */
-  useList: (initiativeId: number, filters: ToolIndexFilters) => ToolIndexList;
+  /** Reads this tool's list and draws its cards; null reads the community's own. */
+  useList: (initiativeId: number | null, filters: ToolIndexFilters) => ToolIndexList;
   /**
    * The keys this tool spells its own way — the page's and its create
    * dialog's. Kept per tool rather than folded into one generic string: "No
@@ -199,13 +208,26 @@ export type ToolIndexEntry = {
   cardHasBookmark?: true;
   /** The layout a reader starts on, before they pick one. Cards otherwise. */
   defaultLayout?: ToolIndexLayout;
+  /** The list opens in name order, as an address book does, rather than with
+   *  the last changed first. */
+  byName?: true;
   /** Cards are small tiles, several to a row, rather than three across. */
   tiles?: true;
   /** A create dialog of the tool's own, for a tool made from more than a name. */
   CreateDialog?: ComponentType<ToolIndexCreateDialogProps>;
+  /**
+   * The tool has rows of the community's own, which a community plug-in holds:
+   * listed with no initiative (`fixedInitiativeId` null), and made by this
+   * dialog, which is handed none.
+   */
+  community?: { CreateDialog: ComponentType<Omit<ToolIndexCreateDialogProps, "initiativeId">> };
   /** Files dropped anywhere on the list open the create dialog holding the
    *  first; `label` is the overlay's key in the tool's namespace. */
   fileDrop?: { label: string };
+  /** Rows come in from a spreadsheet too, through the import wizard's CSV
+   *  step, here and in the community's own list; `label` is the menu entry's
+   *  key in the tool's namespace. */
+  csvImport?: { label: string };
   /** The list layout as a sortable table, with these columns after the shared
    *  ones. Without it the list layout is one line a row. */
   table?: { useColumns: () => AppColumnDef<ToolIndexRow>[] };
@@ -267,7 +289,9 @@ export const toolIndexEntry = (tool: Tool): ToolIndexEntry | null => {
 /** What the shared page asks every tool's list for. */
 type ToolIndexParams = ToolIndexFilters["list"] &
   ToolIndexFilters["sort"] & {
-    initiative_id: number;
+    initiative_id?: number;
+    /** The community's own rows, for a tool that has them. */
+    scope?: "community";
     page: number;
     page_size: number;
     /** What each card shows of what is inside it, read with the page. */
@@ -280,7 +304,7 @@ type ToolIndexItem = Omit<ToolIndexRow, "card">;
 /**
  * A tool's list hook, from its `TOOL_HOOKS` list and how one of its rows is
  * drawn as a card. `extra` is what the tool asks its list for beyond the
- * shared narrowing.
+ * shared narrowing, and `drawMark` what goes in front of a row's name.
  */
 const makeRows =
   <TItem extends ToolIndexItem>(
@@ -288,12 +312,15 @@ const makeRows =
       params: ToolIndexParams
     ) => UseQueryResult<{ items: TItem[]; total_count: number; has_next: boolean }>,
     drawCard: (item: TItem) => ReactNode,
-    extra?: Pick<ToolIndexParams, "include_preview">
+    extra?: Pick<ToolIndexParams, "include_preview">,
+    drawMark?: (item: TItem) => ReactNode
   ) =>
-  (initiativeId: number, filters: ToolIndexFilters): ToolIndexList => {
+  (initiativeId: number | null, filters: ToolIndexFilters): ToolIndexList => {
     const query = useList({
       ...filters.list,
-      initiative_id: initiativeId,
+      ...(initiativeId === null
+        ? { scope: "community" as const }
+        : { initiative_id: initiativeId }),
       ...filters.view,
       ...filters.sort,
       page: filters.page,
@@ -302,7 +329,12 @@ const makeRows =
     });
 
     const rows = useMemo(
-      () => (query.data?.items ?? []).map((item) => ({ ...item, card: drawCard(item) })),
+      () =>
+        (query.data?.items ?? []).map((item) => ({
+          ...item,
+          card: drawCard(item),
+          mark: drawMark?.(item),
+        })),
       [query.data]
     );
 
@@ -310,6 +342,7 @@ const makeRows =
       rows,
       isLoading: query.isLoading,
       isError: query.isError,
+      refetch: query.refetch,
       isPlaceholderData: query.isPlaceholderData,
       totalCount: query.data?.total_count ?? 0,
       hasNext: query.data?.has_next ?? false,
@@ -376,21 +409,6 @@ const TOOL_INDEX: Record<Tool, ToolIndexEntry | ToolIndexOwnPage> = {
     ),
   },
 
-  [Tool.queue]: {
-    useList: makeRows(
-      TOOL_HOOKS[Tool.queue].useList,
-      (queue) => <QueueCard queue={queue} />,
-      WITH_PREVIEW
-    ),
-    text: {
-      create: "createQueue",
-      createDescription: "noQueuesDescription",
-      noMatches: "filters.noMatchingQueues",
-      emptyTitle: "noQueues",
-      emptyBody: "noQueuesDescription",
-    },
-  },
-
   [Tool.counter_group]: {
     useList: makeRows(
       TOOL_HOOKS[Tool.counter_group].useList,
@@ -419,6 +437,31 @@ const TOOL_INDEX: Record<Tool, ToolIndexEntry | ToolIndexOwnPage> = {
       emptyTitle: "noDashboards",
       emptyBody: "noDashboardsDescription",
     },
+  },
+
+  [Tool.contact]: {
+    useList: makeRows(
+      TOOL_HOOKS[Tool.contact].useList,
+      (contact) => <ContactCard contact={contact} />,
+      undefined,
+      (contact) => <ContactMark contact={contact} />
+    ),
+    text: {
+      create: "newContact",
+      noMatches: "filters.noMatchingContacts",
+      emptyTitle: "noContacts",
+      emptyBody: "noContactsDescription",
+    },
+    // An address book is read as a list, by name.
+    defaultLayout: "list",
+    byName: true,
+    // Made with how to reach them, not just a name.
+    CreateDialog: CreateContactDialog,
+    community: { CreateDialog: CreateContactDialog },
+    // An address book is often kept in a spreadsheet first.
+    csvImport: { label: "importCsv" },
+    // The rows are contacts, which is what these columns read.
+    table: { useColumns: useContactColumns as unknown as () => AppColumnDef<ToolIndexRow>[] },
   },
 
   [Tool.wiki]: {
@@ -465,15 +508,12 @@ const useListPage = (tool: Tool) => {
   }, [search.page]);
 
   const setPage = useCallback(
-    (updater: number | ((prev: number) => number)) => {
-      setPageState((prev) => {
-        const next = typeof updater === "function" ? updater(prev) : updater;
-        void router.navigate({
-          to: ".",
-          search: { ...searchRef.current, page: next <= 1 ? undefined : next },
-          replace: true,
-        });
-        return next;
+    (next: number) => {
+      setPageState(next);
+      void router.navigate({
+        to: ".",
+        search: { ...searchRef.current, page: next <= 1 ? undefined : next },
+        replace: true,
       });
     },
     [router]
@@ -503,6 +543,8 @@ const NO_TAGS: number[] = [];
 
 /** Newest first, the way a table opens until its reader picks an order. */
 const NEWEST_FIRST: SortingState = [{ id: "updated_at", desc: true }];
+/** A to Z, for a list read by name. */
+const BY_NAME: SortingState = [{ id: "name", desc: false }];
 
 /**
  * Where one person's view of an initiative's tool list is kept: how it is
@@ -514,13 +556,20 @@ const NEWEST_FIRST: SortingState = [{ id: "updated_at", desc: true }];
 const toolListViewSpec = (
   tool: Tool,
   communityId: number,
-  initiativeId: number,
-  reorders: boolean
+  initiativeId: number | null,
+  entry: ToolIndexEntry
 ): ListViewSpec<ToolListFilters> => ({
-  key: viewKey("initiative", initiativeId, toolRouteSegment(tool)),
+  key:
+    initiativeId === null
+      ? viewKey("community", toolRouteSegment(tool))
+      : viewKey("initiative", initiativeId, toolRouteSegment(tool)),
   communityId,
   read: readToolListFilters,
-  defaults: { filters: {}, ...NO_PART_VIEW, sorting: reorders ? [] : NEWEST_FIRST },
+  defaults: {
+    filters: {},
+    ...NO_PART_VIEW,
+    sorting: entry.reorder ? [] : entry.byName ? BY_NAME : NEWEST_FIRST,
+  },
   carryOver: (_items, account) => {
     const layout = account[`${tool}:view-mode`];
     const order = deviceJSON(toolTableStorageKey(tool, "order")) as { sorting?: unknown } | null;
@@ -549,9 +598,11 @@ const countFilters = ({ tag_ids: _tags, ...narrowing }: ToolIndexFilters["list"]
 
 export type ToolIndexPageProps = {
   tool: Tool;
-  /** The initiative this list belongs to. Required: a tool's entities are only
-   *  ever browsed inside one, and the URL says which. */
-  fixedInitiativeId: number;
+  /** The initiative this list belongs to, as the URL says. Null lists the
+   *  community's own rows, for a tool whose entry has `community`. */
+  fixedInitiativeId: number | null;
+  /** Whether the reader may add one here. Required for the community's own
+   *  rows, which no initiative's role answers for. */
   canCreate?: boolean;
 };
 
@@ -570,8 +621,8 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
 
   // This person's view of the list. A typed search is for this visit only.
   const viewSpec = useMemo(
-    () => toolListViewSpec(tool, communityId, fixedInitiativeId, Boolean(entry.reorder)),
-    [tool, communityId, fixedInitiativeId, entry.reorder]
+    () => toolListViewSpec(tool, communityId, fixedInitiativeId, entry),
+    [tool, communityId, fixedInitiativeId, entry]
   );
   const listView = useListView(viewSpec);
   const [searchText, setSearchText] = useState("");
@@ -596,7 +647,11 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
   const { view, setView, page, pageSize, setPage, setPageSize } = useListPage(tool);
   // How the list is drawn — cards, rows or by tag — remembered per tool.
   const defaultLayout = entry.defaultLayout ?? "grid";
-  const layout: ToolIndexLayout = isLayout(listView.layout) ? listView.layout : defaultLayout;
+  // The tag tree is counted per initiative, so the community's own rows are
+  // drawn as cards or rows.
+  const community = fixedInitiativeId === null;
+  const kept = isLayout(listView.layout) ? listView.layout : defaultLayout;
+  const layout: ToolIndexLayout = community && kept === "tags" ? defaultLayout : kept;
   const setLayout = listView.rememberLayout;
   const tagTree = useTagTreeSelection(layout === "tags");
 
@@ -632,12 +687,18 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
   // view, how much carries each tag under the list's own filters, so the tree
   // and the list beside it agree.
   const tagCountFilters = layout === "tags" ? countFilters(listFilters) : undefined;
-  const countsQuery = useToolCounts(tool, {
-    initiative_id: fixedInitiativeId,
-    ...(layout === "tags"
-      ? { view, include_tags: true, ...(tagCountFilters ? { filters: tagCountFilters } : {}) }
-      : {}),
-  });
+  const countsQuery = useToolCounts(
+    tool,
+    {
+      initiative_id: fixedInitiativeId,
+      ...(layout === "tags"
+        ? { view, include_tags: true, ...(tagCountFilters ? { filters: tagCountFilters } : {}) }
+        : {}),
+    },
+    // Counted across the community's initiatives, which the community's own
+    // rows are not.
+    { enabled: !community }
+  );
 
   // A page past the end (its rows deleted, a link to one that is gone) has
   // nothing on it and no pager to leave by, so the list moves to its last page.
@@ -650,12 +711,14 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
   }, [list.isLoading, list.isError, list.rows.length, page, lastPage, setPage]);
 
   // Canonical create answer: this initiative's server-computed create flag. An
-  // explicit canCreate prop (e.g. from InitiativeDetailPage) wins.
+  // explicit canCreate prop (e.g. from InitiativeDetailPage) wins, and is the
+  // only answer for the community's own rows.
   const { canCreate: canCreateDerived } = useToolCreateAccess(tool, {
     initiativeId: fixedInitiativeId,
+    enabled: !community,
   });
   // Nothing is made into the archive: its view offers no way to create.
-  const canCreateHere = (canCreate ?? canCreateDerived) && view !== "archived";
+  const canCreateHere = (canCreate ?? (!community && canCreateDerived)) && view !== "archived";
 
   const {
     open: createOpen,
@@ -688,11 +751,15 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
     exitSelection();
   }, [view, layout, exitSelection]);
 
+  // An import lands in an initiative.
   const importAction = useToolImportAction({
     tool,
-    canImport: canCreateHere,
-    fixedInitiativeId,
+    canImport: canCreateHere && !community,
+    fixedInitiativeId: fixedInitiativeId ?? undefined,
   });
+  // A spreadsheet lands where the list is, the community's own included.
+  const csvImport = entry.csvImport && canCreateHere ? entry.csvImport : null;
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
 
   // A file dragged in from the desktop lands wherever the cursor is, in any
   // layout, and opens the create dialog holding it. Off while a dialog is up:
@@ -836,21 +903,36 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
           options: [
             { value: "grid", label: t("common:toolbar.viewGrid"), icon: LayoutGrid },
             { value: "list", label: t("common:toolbar.viewList"), icon: List },
-            { value: "tags", label: t("common:toolbar.viewTags"), icon: Tags },
+            ...(community
+              ? []
+              : [{ value: "tags" as const, label: t("common:toolbar.viewTags"), icon: Tags }]),
           ],
           label: t("common:toolbar.view"),
         }}
         menuItems={
-          (canCreateHere && toolListingKind(tool)) || importAction.menuItem ? (
+          (canCreateHere && toolListingKind(tool)) || importAction.menuItem || csvImport ? (
             <>
               {canCreateHere ? <BrowseMarketplaceMenuItem tool={tool} /> : null}
               {importAction.menuItem}
+              {csvImport ? (
+                <DropdownMenuItem onSelect={() => setCsvImportOpen(true)}>
+                  <FileSpreadsheet className="h-4 w-4" />
+                  {t(csvImport.label)}
+                </DropdownMenuItem>
+              ) : null}
             </>
           ) : null
         }
         onEnterSelection={!selection.active && list.rows.length > 0 ? selection.enter : undefined}
       />
       {importAction.dialog}
+      {csvImport ? (
+        <ImportWizard
+          open={csvImportOpen}
+          onOpenChange={setCsvImportOpen}
+          contactsInto={{ initiativeId: fixedInitiativeId }}
+        />
+      ) : null}
 
       <ToolFilterPanel
         open={filtersOpen}
@@ -862,9 +944,9 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
           tool={tool}
           value={filters}
           onChange={changeFilters}
-          initiativeId={fixedInitiativeId}
+          initiativeId={fixedInitiativeId ?? undefined}
         >
-          {entry.FilterField ? (
+          {entry.FilterField && fixedInitiativeId !== null ? (
             <entry.FilterField
               value={filters}
               onChange={changeFilters}
@@ -879,7 +961,7 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
           <CardGridSkeleton />
         </SkeletonRegion>
       ) : list.isError ? (
-        <p className="text-destructive text-sm">{t("loadError")}</p>
+        <StatusMessage onRetry={list.refetch} />
       ) : list.rows.length > 0 ||
         (layout === "tags" && (tagTree.selectedPaths.size > 0 || activeFilterCount > 0)) ? (
         // In the tags view a narrowed list that matches nothing keeps the tree
@@ -890,7 +972,7 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
             tool={tool}
             invalidate={() => invalidate(q.toolList(tool))}
             actions={
-              entry.BulkActions ? (
+              entry.BulkActions && fixedInitiativeId !== null ? (
                 <entry.BulkActions
                   initiativeId={fixedInitiativeId}
                   rows={selection.selectedItems}
@@ -948,7 +1030,12 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
                         to={gp(toolDetailRoute(tool, row.initiative_id, row.id))}
                         className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-3"
                       >
-                        <ToolIcon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                        {row.mark ?? (
+                          <ToolIcon
+                            className="h-4 w-4 shrink-0 text-muted-foreground"
+                            aria-hidden
+                          />
+                        )}
                         <span className="min-w-0 truncate font-medium text-sm">{row.name}</span>
                         {unread.hasResource(communityId, tool, row.id) ? <UnreadDot /> : null}
                         <span className="flex-1" />
@@ -1025,8 +1112,8 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
             </Button>
             <ToolImportAction
               tool={tool}
-              canImport={canCreateHere}
-              fixedInitiativeId={fixedInitiativeId}
+              canImport={canCreateHere && !community}
+              fixedInitiativeId={fixedInitiativeId ?? undefined}
               variant="button"
             />
             {canCreateHere ? <BrowseMarketplaceButton tool={tool} /> : null}
@@ -1034,7 +1121,16 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
         </Card>
       )}
 
-      {entry.CreateDialog ? (
+      {fixedInitiativeId === null ? (
+        entry.community ? (
+          <entry.community.CreateDialog
+            open={createOpen}
+            onOpenChange={onCreateOpenChange}
+            onSuccess={openCreated}
+            initialFile={droppedFile}
+          />
+        ) : null
+      ) : entry.CreateDialog ? (
         <entry.CreateDialog
           open={createOpen}
           onOpenChange={onCreateOpenChange}

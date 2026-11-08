@@ -21,6 +21,7 @@ const { FakeWindow, FakeNotification, Emitter } = vi.hoisted(() => {
     restore = vi.fn();
     isMinimized = () => false;
     setOverlayIcon = vi.fn();
+    setTitleBarOverlay = vi.fn();
   }
 
   class FakeNotification extends Emitter {
@@ -181,6 +182,26 @@ describe("the badge", () => {
 
     await desktop.setBadge({ count: 0, tooltip });
     expect(window.setOverlayIcon).toHaveBeenLastCalledWith(null, tooltip);
+  });
+});
+
+describe("the title bar's window buttons", () => {
+  const colors = { color: "#f8fafc", symbolColor: "#020618" };
+
+  it("take the page's colours on Windows and Linux", async () => {
+    onPlatform("linux");
+    const { desktop, window } = started();
+
+    await desktop.setTitleBarColors(colors);
+    expect(window.setTitleBarOverlay).toHaveBeenCalledWith(colors);
+  });
+
+  it("are left alone on a Mac", async () => {
+    onPlatform("darwin");
+    const { desktop, window } = started();
+
+    await desktop.setTitleBarColors(colors);
+    expect(window.setTitleBarOverlay).not.toHaveBeenCalled();
   });
 });
 

@@ -21,11 +21,9 @@ from app.services.storage import (
     LocalFilesystemStorage,
     ReadableBlob,
     S3Storage,
-    StorageBackend,
     build_upload_response,
     requested_range,
     get_guild_storage,
-    get_storage,
     open_seekable,
 )
 
@@ -90,13 +88,6 @@ def test_empty_key_is_rejected(tmp_path):
     with pytest.raises(ValueError):
         storage.write("", b"data")
     assert storage.resolve_readable("") is None
-
-
-def test_get_storage_returns_local_singleton():
-    backend = get_storage()
-    assert isinstance(backend, StorageBackend)
-    # Process-wide singleton.
-    assert get_storage() is backend
 
 
 # --- S3Storage (in-memory fake boto3 client) ---------------------------------
@@ -458,10 +449,6 @@ def test_resolver_namespaces_by_guild_for_s3(monkeypatch):
     assert isinstance(scoped, S3Storage)
     assert scoped._prefix == "guild_42/"
     assert scoped._bucket == "bucket"
-    # There is no unscoped S3 backend (it would write at the bucket root, outside
-    # any guild namespace), so get_storage() refuses under s3.
-    with pytest.raises(NotImplementedError):
-        get_storage()
 
 
 def test_resolver_requires_bucket_for_s3(monkeypatch):

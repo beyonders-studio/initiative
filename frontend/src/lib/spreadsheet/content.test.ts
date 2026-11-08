@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_COLS, DEFAULT_ROWS } from "@/lib/spreadsheet/bounds";
-import {
-  emptySpreadsheetContent,
-  parseSpreadsheetContent,
-  SPREADSHEET_SCHEMA_VERSION,
-} from "@/lib/spreadsheet/content";
+import { parseSpreadsheetContent, SPREADSHEET_SCHEMA_VERSION } from "@/lib/spreadsheet/content";
 import fixture from "@/lib/spreadsheet/sheet-schema.fixture.json";
 
 describe("parseSpreadsheetContent — upcast", () => {
@@ -110,15 +106,6 @@ describe("parseSpreadsheetContent — v3", () => {
       sheets: [{ id: "a", name: "S", cells: { "01:02": "x", "0:0": { nested: 1 }, "1:1": "" } }],
     });
     expect(out.sheets[0].cells).toEqual({ "1:2": "x" });
-  });
-});
-
-describe("emptySpreadsheetContent", () => {
-  it("is a one-sheet workbook at the default canvas size", () => {
-    const out = emptySpreadsheetContent();
-    expect(out.sheets).toHaveLength(1);
-    expect(out.sheets[0].name).toBe("Sheet1");
-    expect(out.sheets[0].cells).toEqual({});
   });
 });
 

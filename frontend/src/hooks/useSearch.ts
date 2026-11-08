@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 
 import type {
   SearchCommunityParams,
@@ -7,12 +7,9 @@ import type {
   SuggestCommunityParams,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
-  getRecentCommunityQueryKey,
-  getSearchCommunityQueryKey,
-  getSuggestCommunityQueryKey,
-  recentCommunity,
-  searchCommunity,
-  suggestCommunity,
+  useRecentCommunity,
+  useSearchCommunity,
+  useSuggestCommunity,
 } from "@/api/generated/search/search";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import type { QueryOpts } from "@/types/query";
@@ -29,11 +26,8 @@ export const useCommunitySearch = (
   options?: QueryOpts<SearchResults>
 ) => {
   const communityId = useActiveCommunityId();
-  return useQuery<SearchResults>({
-    queryKey: getSearchCommunityQueryKey(communityId, params),
-    queryFn: () => searchCommunity(communityId, params),
-    placeholderData: keepPreviousData,
-    ...options,
+  return useSearchCommunity(communityId, params, {
+    query: { placeholderData: keepPreviousData, ...options },
   });
 };
 
@@ -86,7 +80,7 @@ const splitFilters = <TData>(
  * reader is still typing.
  *
  * This is the ONE lookup behind every picker in the app — the command palette,
- * a mention, a wikilink, a queue link, a template. They differ only in what
+ * a mention, a wikilink, a link, a template. They differ only in what
  * they narrow to: `types` for what kind of thing, `initiative_id` for where,
  * and `is_template` for whether it is a blueprint. A picker built on this gets
  * ranking, prefix matching and every access gate without asking for them.
@@ -101,11 +95,8 @@ export const useCommunitySearchSuggest = (
   const communityId = useActiveCommunityId();
   const { filters, queryOptions } = splitFilters<SearchSuggestion[]>(options);
   const params: SuggestCommunityParams = { search: query, ...filters };
-  return useQuery<SearchSuggestion[]>({
-    queryKey: getSuggestCommunityQueryKey(communityId, params),
-    queryFn: () => suggestCommunity(communityId, params),
-    placeholderData: keepPreviousData,
-    ...queryOptions,
+  return useSuggestCommunity(communityId, params, {
+    query: { placeholderData: keepPreviousData, ...queryOptions },
   });
 };
 
@@ -125,11 +116,7 @@ const useCommunityRecentSuggestions = (
   const communityId = useActiveCommunityId();
   const { filters, queryOptions } = splitFilters<SearchSuggestion[]>(options);
   const params = { ...filters };
-  return useQuery<SearchSuggestion[]>({
-    queryKey: getRecentCommunityQueryKey(communityId, params),
-    queryFn: () => recentCommunity(communityId, params),
-    ...queryOptions,
-  });
+  return useRecentCommunity(communityId, params, { query: queryOptions });
 };
 
 // One stable empty answer, so a picker's own memos do not recompute on every

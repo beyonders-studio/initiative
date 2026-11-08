@@ -4,22 +4,13 @@
  * its own modals rather than a shared bundle carrying everyone's.
  */
 
-import { Loader2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { InitiativeRoleRead } from "@/api/generated/initiativeAPI.schemas";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+import { useCreateRole, useDeleteRole, useUpdateRole } from "@/hooks/useInitiativeRoles";
+import { toast } from "@/lib/mascotToast";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -27,11 +18,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useCreateRole, useDeleteRole, useUpdateRole } from "@/hooks/useInitiativeRoles";
-import { toast } from "@/lib/mascotToast";
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
 
 export interface InitiativeRoleDialogsProps {
   initiativeId: number;
@@ -60,14 +49,16 @@ export const InitiativeRoleDialogs = ({
   const roleNameTouchedRef = useRef(false);
 
   // Rename role dialog state
-  const [renameDisplayName, setRenameDisplayName] = useState("");
+  const [renameDisplayName, setRenameDisplayName] = useState(roleToRename?.display_name ?? "");
 
   // Sync renameDisplayName when roleToRename changes
-  useEffect(() => {
+  const [prevRoleToRename, setPrevRoleToRename] = useState(roleToRename);
+  if (prevRoleToRename !== roleToRename) {
+    setPrevRoleToRename(roleToRename);
     if (roleToRename) {
       setRenameDisplayName(roleToRename.display_name);
     }
-  }, [roleToRename]);
+  }
 
   const createRoleMutation = useCreateRole(initiativeId);
   const updateRoleMutation = useUpdateRole(initiativeId);
@@ -126,10 +117,8 @@ export const InitiativeRoleDialogs = ({
             <DialogDescription>{t("settings.createRoleDescription")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="new-role-display-name">{t("settings.roleDisplayNameLabel")}</Label>
+            <Field label={t("settings.roleDisplayNameLabel")}>
               <Input
-                id="new-role-display-name"
                 value={newRoleDisplayName}
                 onChange={(e) => {
                   const display = e.target.value;
@@ -146,11 +135,12 @@ export const InitiativeRoleDialogs = ({
                 }}
                 placeholder={t("settings.roleDisplayNamePlaceholder")}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="new-role-name">{t("settings.roleInternalNameLabel")}</Label>
+            </Field>
+            <Field
+              label={t("settings.roleInternalNameLabel")}
+              hint={t("settings.roleInternalNameHint")}
+            >
               <Input
-                id="new-role-name"
                 value={newRoleName}
                 onChange={(e) => {
                   const snakeCase = e.target.value
@@ -166,55 +156,30 @@ export const InitiativeRoleDialogs = ({
                 }}
                 placeholder={t("settings.roleInternalNamePlaceholder")}
               />
-              <p className="text-muted-foreground text-xs">{t("settings.roleInternalNameHint")}</p>
-            </div>
+            </Field>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewRoleDialog(false)}>
-              {t("common:cancel")}
-            </Button>
-            <Button
-              onClick={handleCreateRole}
-              disabled={
-                createRoleMutation.isPending || !newRoleName.trim() || !newRoleDisplayName.trim()
-              }
-            >
-              {createRoleMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("settings.creatingRole")}
-                </>
-              ) : (
-                t("settings.createRole")
-              )}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("settings.createRole")}
+            pendingLabel={t("settings.creatingRole")}
+            onSubmit={handleCreateRole}
+            pending={createRoleMutation.isPending}
+            disabled={!newRoleName.trim() || !newRoleDisplayName.trim()}
+          />
         </DialogContent>
       </Dialog>
 
       {/* Delete Role Confirmation Dialog */}
-      <AlertDialog open={!!roleToDelete} onOpenChange={(open) => !open && setRoleToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("settings.deleteRoleTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("settings.deleteRoleDescription", { roleName: roleToDelete?.display_name })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteRoleMutation.isPending}>
-              {t("common:cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDeleteRole}
-              disabled={deleteRoleMutation.isPending}
-              className="bg-destructive text-white hover:bg-destructive/90"
-            >
-              {deleteRoleMutation.isPending ? t("settings.deletingRole") : t("common:delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!roleToDelete}
+        onOpenChange={(open) => !open && setRoleToDelete(null)}
+        title={t("settings.deleteRoleTitle")}
+        description={t("settings.deleteRoleDescription", { roleName: roleToDelete?.display_name })}
+        confirmLabel={t("common:delete")}
+        loadingLabel={t("settings.deletingRole")}
+        isLoading={deleteRoleMutation.isPending}
+        destructive
+        onConfirm={confirmDeleteRole}
+      />
 
       {/* Rename Role Dialog */}
       <Dialog open={!!roleToRename} onOpenChange={(open) => !open && setRoleToRename(null)}>
@@ -226,34 +191,21 @@ export const InitiativeRoleDialogs = ({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="rename-role-display-name">{t("settings.roleDisplayNameLabel")}</Label>
+            <Field label={t("settings.roleDisplayNameLabel")}>
               <Input
-                id="rename-role-display-name"
                 value={renameDisplayName}
                 onChange={(e) => setRenameDisplayName(e.target.value)}
                 placeholder={t("settings.roleDisplayNamePlaceholder")}
               />
-            </div>
+            </Field>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRoleToRename(null)}>
-              {t("common:cancel")}
-            </Button>
-            <Button
-              onClick={confirmRenameRole}
-              disabled={updateRoleMutation.isPending || !renameDisplayName.trim()}
-            >
-              {updateRoleMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("settings.savingRole")}
-                </>
-              ) : (
-                t("common:save")
-              )}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("common:save")}
+            pendingLabel={t("settings.savingRole")}
+            onSubmit={confirmRenameRole}
+            pending={updateRoleMutation.isPending}
+            disabled={!renameDisplayName.trim()}
+          />
         </DialogContent>
       </Dialog>
     </>

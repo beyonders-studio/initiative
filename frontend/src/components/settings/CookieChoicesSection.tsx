@@ -1,10 +1,10 @@
 import { useTranslation } from "react-i18next";
 
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { Button } from "@/components/ui/button";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useConsent } from "@/hooks/useConsent";
 import { reopenConsent } from "@/lib/consent";
+import { Button } from "@/ui/button";
 
 /**
  * What this browser is currently allowing, and the way to change it.

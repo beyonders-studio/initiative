@@ -20,8 +20,6 @@ import type {
   PluginDataParam,
   PluginDataResponse,
   PluginEndpointRead,
-  PluginParamOption,
-  PluginParamOptionSource,
   PluginParamOptionsResponse,
   PluginWidgetCatalogEntry,
   PluginWidgetCatalogResponse,
@@ -32,39 +30,31 @@ export type {
   PluginDataParam,
   PluginDataResponse,
   PluginEndpointRead,
-  PluginParamOption,
-  PluginParamOptionSource,
   PluginParamOptionsResponse,
   PluginWidgetCatalogEntry,
   PluginWidgetCatalogResponse,
   PluginWidgetRead,
 };
 
-export const getPluginWidgetCatalog = (communityId: number) =>
-  apiClient
-    .get<PluginWidgetCatalogResponse>(`/c/${communityId}/plugins/widget-catalog`)
-    .then((r) => r.data);
-
 export interface PluginDataRequest {
   communityId: number;
   pluginId: number;
   endpointId: string;
-  /** The dashboard the widget sits on. Required: it is the surface whose gates
-   *  decide this read. */
+  /** The dashboard the widget is being configured for. Required: previewing a
+   *  widget takes write access to it. */
   dashboardId: number;
+  /** The parameters on the form. */
   params?: Record<string, unknown>;
-  /** Which widget on that dashboard is asking. The server runs the statement
-   *  stored on it, if it has one; nothing here says what to run. */
-  widgetId?: string;
 }
 
+/** A plug-in widget's preview: one read endpoint, with the parameters on the
+ *  config dialog's form. A placed widget is answered by its canvas instead. */
 export const getPluginData = ({
   communityId,
   pluginId,
   endpointId,
   dashboardId,
   params,
-  widgetId,
 }: PluginDataRequest) =>
   apiClient
     .get<PluginDataResponse>(
@@ -75,7 +65,6 @@ export const getPluginData = ({
           // Sent as one encoded object so the server validates it against the
           // endpoint's own `params` rather than reading loose query keys.
           ...(params && Object.keys(params).length ? { params: JSON.stringify(params) } : {}),
-          ...(widgetId ? { widget_id: widgetId } : {}),
         },
       }
     )
@@ -134,6 +123,32 @@ export const resolvePluginBinding = (
   const source = (entry?.endpoints ?? []).find((candidate) => candidate.id === endpointId);
   return entry && source ? { entry, source } : undefined;
 };
+
+/** An install a statement may read with `plugin()`, and its read endpoints. */
+export interface QueryablePlugin {
+  entry: PluginWidgetCatalogEntry;
+  /** `<publisher>.<slug>`: a call's first argument. */
+  publicId: string;
+  /** Each read endpoint with the name a call gives it, its second argument. */
+  endpoints: (PluginEndpointRead & { name: string })[];
+}
+
+/** The installs a statement may read with `plugin()`: those with a public id
+ *  and a read endpoint. A call names an endpoint by its id after
+ *  `plugin.<public id>.`, so an endpoint whose id does not start so is left
+ *  out. */
+export const queryablePlugins = (
+  catalog: PluginWidgetCatalogResponse | undefined
+): QueryablePlugin[] =>
+  (catalog?.items ?? []).flatMap((entry) => {
+    const publicId = entry.public_id;
+    if (!publicId) return [];
+    const prefix = `plugin.${publicId}.`;
+    const endpoints = (entry.endpoints ?? [])
+      .filter((endpoint) => endpoint.id.startsWith(prefix))
+      .map((endpoint) => ({ ...endpoint, name: endpoint.id.slice(prefix.length) }));
+    return endpoints.length ? [{ entry, publicId, endpoints }] : [];
+  });
 
 /** The install a namespaced widget type belongs to, and that widget's own entry.
  *  `undefined` for a type this community has no install for — an imported

@@ -1,0 +1,30 @@
+{
+  "unreachable": {
+    "age": {
+      "title": "Les messages privés sont désactivés pour ce compte"
+    },
+    "private": {
+      "body": "Vous êtes en mode Privé. Vous pouvez toujours vous connecter à quelqu'un via son identifiant exact, et une connexion vous permet de vous écrire quel que soit ce réglage. Pour être joignable ici, autorisez vos communautés à vous écrire.",
+      "open": "Autoriser mes communautés à m'écrire",
+      "settings": "Paramètres de confidentialité"
+    }
+  },
+  "actions": {
+    "label": "Actions pour {{handle}}",
+    "connect": "Se connecter",
+    "acceptConnection": "Accepter la connexion",
+    "connectPending": "Demande envoyée",
+    "ask": "Demander à écrire",
+    "asked": "Demande envoyée",
+    "askSent": "Demande envoyée.",
+    "ignore": "Ignorer",
+    "stopIgnoring": "Ne plus ignorer",
+    "removeConnection": "Supprimer la connexion",
+    "removeConnectionTitle": "Supprimer cette connexion ?",
+    "removeConnectionBody": "Vous ne serez plus connectés. Si rien d'autre ne vous permet de vous écrire — une communauté commune, ou le fait que vous soyez tous deux ouverts aux messages —, cela prend fin aussi.",
+    "message": "Message",
+    "viewProfile": "Voir le profil",
+    "copyHandle": "Copier l'identifiant",
+    "handleCopied": "Identifiant copié."
+  }
+}

@@ -1,7 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { isAxiosError } from "axios";
 import { Loader2 } from "lucide-react";
-import { type FormEvent, useEffect, useId, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { redeemDemoLink, useReadDemoCopy } from "@/api/generated/demo/demo";
@@ -9,22 +9,15 @@ import { CaptchaWidget } from "@/components/auth/CaptchaWidget";
 import { LegalNotice } from "@/components/auth/LegalNotice";
 import { ServerChip } from "@/components/auth/ServerChoice";
 import { SignInFrame } from "@/components/auth/SignInFrame";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useDemoCopy } from "@/hooks/useDemoCopy";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
 
 /** Why the last start did not work: no copy free, which passes, or something
  *  else, said in its own words. */
@@ -67,7 +60,6 @@ export const DemoPage = () => {
   const [redeemed, setRedeemed] = useState<Awaited<ReturnType<typeof redeemDemoLink>> | null>(null);
   // Leaving a copy that could not be filled, for the link this page was opened with.
   const [replacing, setReplacing] = useState(false);
-  const emailId = useId();
 
   useEffect(() => {
     if (window.location.hash) {
@@ -244,17 +236,14 @@ export const DemoPage = () => {
               >
                 {starting ? t("demo.starting") : refusal?.busy ? t("demo.retry") : t("demo.start")}
               </Button>
-              <div className="space-y-2">
-                <Label htmlFor={emailId}>{t("demo.lead.optionalLabel")}</Label>
+              <Field label={t("demo.lead.optionalLabel")} hint={t("demo.lead.pitch")}>
                 <Input
-                  id={emailId}
                   type="email"
                   autoComplete="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                 />
-                <p className="text-muted-foreground text-sm">{t("demo.lead.pitch")}</p>
-              </div>
+              </Field>
             </form>
           </CardContent>
         )}

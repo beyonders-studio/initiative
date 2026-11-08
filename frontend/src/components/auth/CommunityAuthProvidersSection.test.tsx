@@ -1,10 +1,13 @@
 /**
- * What a community does with an arrangement it did not make.
+ * What a community does with its connections, and with an arrangement it did
+ * not make.
  *
  * An inherited row is the deployment's answer for a provider this community
- * has said nothing about. It has no row of its own to switch or disconnect —
- * what it has is the offer to take the arrangement over, which writes a
- * connection that shadows the default from then on.
+ * has said nothing about. It has nothing of the community's own to switch or
+ * disconnect — what it has is the offer to take the arrangement over, which
+ * writes a connection that shadows the default from then on. A connection of
+ * the community's own carries one menu: edit, placement, on or off,
+ * disconnect.
  */
 
 import { screen } from "@testing-library/react";
@@ -15,7 +18,6 @@ import { buildUser } from "@/__tests__/factories";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import type { CommunityProviderConnectionRead } from "@/api/generated/initiativeAPI.schemas";
 
-const connect = vi.fn();
 const updateConnection = vi.fn();
 
 const row = (
@@ -45,33 +47,55 @@ vi.mock("@/hooks/useCommunityAuthPolicy", () => ({
     data: [{ id: 11, display_name: "Entra", icon: null, login_ready: true }],
     isLoading: false,
   }),
-  useConnectProvider: () => ({ mutate: connect, isPending: false }),
-  useUpdateProviderConnection: () => ({ mutate: updateConnection, isPending: false }),
+  useConnectProvider: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useCreateClaimRule: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateCommunityAuthSettings: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateProviderConnection: () => ({
+    mutate: updateConnection,
+    mutateAsync: updateConnection,
+    isPending: false,
+  }),
   useDisconnectProvider: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 import { CommunityAuthProvidersSection } from "./CommunityAuthProvidersSection";
 
-const onConnect = vi.fn();
-
 const render = () =>
-  renderWithProviders(<CommunityAuthProvidersSection communityId={1} onConnect={onConnect} />, {
+  renderWithProviders(<CommunityAuthProvidersSection communityId={1} communityName="Larkspur" />, {
     auth: { user: buildUser() },
   });
+
+/** Open a connection's menu. */
+const openMenu = async (user: ReturnType<typeof userEvent.setup>) =>
+  user.click(screen.getByRole("button", { name: "Actions for Entra" }));
 
 describe("CommunityAuthProvidersSection", () => {
   beforeEach(() => {
     connections = [];
-    connect.mockReset();
     updateConnection.mockReset();
   });
 
-  it("marks an inherited arrangement as the deployment's", () => {
+  it("marks an inherited arrangement as the server's, naming its claim", () => {
     connections = [row({ id: null, inherited: true, claim: "tid", claim_values: ["acme-tenant"] })];
     render();
 
-    expect(screen.getByText(/from the deployment/i)).toBeInTheDocument();
-    expect(screen.getByText(/only accounts whose tid is acme-tenant/i)).toBeInTheDocument();
+    expect(screen.getByText("From your server")).toBeInTheDocument();
+    expect(screen.getByText("Microsoft Entra tenant: acme-tenant")).toBeInTheDocument();
+  });
+
+  it("says a connection of its own is on, and that new arrivals join", () => {
+    connections = [
+      row({ claim: "hd", claim_values: ["acme.com"], auto_join: true, narrowing_approved: true }),
+    ];
+    render();
+
+    expect(screen.getByText("On")).toBeInTheDocument();
+    expect(
+      screen.getByText("Google Workspace domain: acme.com · new arrivals join")
+    ).toBeInTheDocument();
+    // The sign-in link sits under the providers it offers.
+    expect(screen.getByText(/\/community\/1\/login$/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy" })).toBeInTheDocument();
   });
 
   it("offers to take an inherited arrangement over, rather than to switch it off", () => {
@@ -79,56 +103,60 @@ describe("CommunityAuthProvidersSection", () => {
     render();
 
     expect(screen.getByRole("button", { name: /make it ours/i })).toBeInTheDocument();
-    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Actions for Entra" })).not.toBeInTheDocument();
   });
 
-  it("opens the wizard on the provider it is taking over", async () => {
+  it("opens the wizard on the arrangement it is taking over", async () => {
     const user = userEvent.setup();
     connections = [row({ id: null, inherited: true, claim: "tid", claim_values: ["acme-tenant"] })];
     render();
 
     await user.click(screen.getByRole("button", { name: /make it ours/i }));
 
-    // One flow, not two: this card used to carry its own shorter copy of the
-    // wizard's first steps. It now asks for the wizard, opened on the
-    // provider being taken over, and the wizard seeds itself from what the
-    // deployment answered.
-    expect(onConnect).toHaveBeenCalledWith(connections[0].provider_id);
+    // One flow, not two: the wizard opens past the picker, seeded from what
+    // the deployment answered.
+    expect(await screen.findByText("Whose people")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("acme-tenant")).toBeInTheDocument();
   });
 
-  it("switches and disconnects a connection the community made itself", () => {
-    connections = [row({ id: 5, inherited: false })];
-    render();
-
-    expect(screen.getByRole("switch", { name: "Enabled" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /make it ours/i })).not.toBeInTheDocument();
-  });
-
-  it("lets a connection of its own accept the deployment's placement rules", async () => {
+  it("edits a connection of its own in the same wizard", async () => {
     const user = userEvent.setup();
-    connections = [row({ id: 5, inherited: false, accepts_provider_placement: false })];
+    connections = [row({ id: 5, claim: "tid", claim_values: ["acme-tenant"] })];
     render();
 
-    const accepts = screen.getByRole("switch", {
-      name: /let the deployment place people from this provider/i,
-    });
-    expect(accepts).not.toBeChecked();
+    await openMenu(user);
+    await user.click(screen.getByRole("menuitem", { name: "Edit" }));
 
+    expect(await screen.findByText("Whose people")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("acme-tenant")).toBeInTheDocument();
+  });
+
+  it("turns a connection of its own off from its menu", async () => {
+    const user = userEvent.setup();
+    connections = [row({ id: 5 })];
+    render();
+
+    await openMenu(user);
+    expect(screen.getByRole("menuitem", { name: "Disconnect" })).toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "Turn off" }));
+
+    expect(updateConnection).toHaveBeenCalledWith({ connectionId: 5, data: { enabled: false } });
+  });
+
+  it("lets a connection of its own accept the server's placement rules", async () => {
+    const user = userEvent.setup();
+    connections = [row({ id: 5, accepts_provider_placement: false })];
+    render();
+
+    await openMenu(user);
+    const accepts = screen.getByRole("menuitemcheckbox", { name: "Let your server place people" });
+    expect(accepts).not.toBeChecked();
     await user.click(accepts);
 
-    expect(updateConnection).toHaveBeenCalledWith(
-      { connectionId: 5, data: { accepts_provider_placement: true } },
-      expect.anything()
-    );
-  });
-
-  it("offers no placement answer on an inherited arrangement", () => {
-    connections = [row({ id: null, inherited: true })];
-    render();
-
-    expect(
-      screen.queryByText(/let the deployment place people from this provider/i)
-    ).not.toBeInTheDocument();
+    expect(updateConnection).toHaveBeenCalledWith({
+      connectionId: 5,
+      data: { accepts_provider_placement: true },
+    });
   });
 
   it("still offers a provider it only inherits in the picker", () => {

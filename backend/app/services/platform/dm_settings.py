@@ -79,7 +79,7 @@ async def _rail_ordered_communities(
 ) -> list[tuple[int, str]]:
     """The reader's communities in the order they dragged the rail into.
 
-    Same rule My Contacts uses, so the toggle list and the contacts page name
+    Same rule the people roster uses, so the toggle list and the roster name
     the same communities in the same order. A suspended community is left out:
     it does not count towards ``can_ask`` either.
     """

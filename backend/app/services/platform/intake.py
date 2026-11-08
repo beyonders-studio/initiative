@@ -68,6 +68,7 @@ from app.db.request_context import SystemGuild
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from app.schemas.platform.ticket import DeviceContext
     from app.services.platform.evidence import PreparedEvidence
 
 #: How long a repeat is folded into the open case before the writer says so
@@ -81,7 +82,7 @@ DEFAULT_RECURRENCE_WINDOW = timedelta(hours=1)
 #: without a link. Mirrors ``RESOLVERS`` in the client's ``entityResolver.ts``.
 LINKED_KINDS: frozenset[str] = frozenset(
     {tool.value for tool in Tool}
-    | {"task", "wiki_page", "calendar_event", "queue_item", "comment", "collection"}
+    | {"task", "wiki_page", "calendar_event", "comment", "collection"}
 )
 
 
@@ -153,6 +154,32 @@ class CaseFiler:
     #: the stream's own name stands for it.
     subject: Optional[str]
     words: str
+
+
+#: A device context's fields, in the order the team reads them, with their
+#: labels.
+_DEVICE_LABELS = (
+    ("app_version", "App version"),
+    ("platform", "Platform"),
+    ("locale", "Language"),
+    ("theme", "Theme"),
+    ("route", "Page"),
+    ("viewport", "Window"),
+)
+
+
+def _with_device(
+    body: Optional[str], device: Optional["DeviceContext"]
+) -> Optional[str]:
+    """A new case's description: ``body``, then what ``device`` holds."""
+    sent = [
+        f"- {label}: `{value}`"
+        for name, label in _DEVICE_LABELS
+        if device is not None and (value := getattr(device, name))
+    ]
+    if not sent:
+        return body
+    return "\n".join([*([body, ""] if body else []), "Where the app was:", *sent])
 
 
 @dataclass(frozen=True)
@@ -481,6 +508,7 @@ async def open_case(
     evidence: Sequence["PreparedEvidence"] = (),
     evidence_by: Optional[int] = None,
     topic: Optional[str] = None,
+    device: Optional["DeviceContext"] = None,
 ) -> Optional[CaseOutcome]:
     """File ``stream``'s work as a task in the project bound to it.
 
@@ -492,8 +520,10 @@ async def open_case(
 
     ``filer`` names the person filing, when a person is. A new case records
     them and opens with their words, said to them; a repeat that lands in a
-    case already open says what was new on the case instead. The stream's cap
-    on one filer's open cases is checked under a lock on that filer, in the
+    case already open says what was new on the case instead. ``device`` is
+    the device and page a person sent it from, where they chose to send it,
+    listed under a new case's description for the people working it. The stream's cap on one
+    filer's open cases is checked under a lock on that filer, in the
     transaction that opens the case, and ``CaseCapReached`` is raised past it.
 
     ``detail`` is what this occurrence brings beyond the description — a new
@@ -620,11 +650,12 @@ async def open_case(
 
         # A case starts as its type starts a task, under the body it came with.
         task_type = await _case_type(session, binding, project)
-        fields: dict[str, object] = {"title": title, "description": body}
+        description = _with_device(body, device)
+        fields: dict[str, object] = {"title": title, "description": description}
         lines = task_creation_service.start_from_type(
             task_type,
             fields,
-            sent={"title", "description"} if body else {"title"},
+            sent={"title", "description"} if description else {"title"},
         )
         task = await task_creation_service.create_task_row(
             session,

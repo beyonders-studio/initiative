@@ -8,13 +8,13 @@
     "projects": "Projekte",
     "tasks": "Aufgaben",
     "files": "Dateien",
-    "queues": "Abläufe (Queues)",
     "counterGroups": "Zähler",
     "calendars": "Kalender",
     "dashboards": "Dashboards",
     "results": "Ergebnisse",
     "posts": "Beiträge",
-    "wikis": "Wikis"
+    "wikis": "Wikis",
+    "contacts": "Kontakte"
   },
   "actions": {
     "addTask": "Aufgabe hinzufügen",

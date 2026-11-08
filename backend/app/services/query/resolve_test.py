@@ -8,12 +8,22 @@ what a client shows the person who has to change the query.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from pglast import ast, parse_sql
 
 from app.core.messages import QueryMessages
 from app.services.fields.spec import FieldType
 from app.services.query import QueryError, resolve
+from app.core.search import SearchEntityType
+from app.services.query.resolve import (
+    PluginCall,
+    PluginRows,
+    Sheet,
+    SheetCall,
+    remap_ids,
+)
 
 #: The function spellings this surface supports, as a reader writes them.
 #: Postgres reports the name it resolved, so a spelling that is really a node
@@ -758,3 +768,195 @@ def test_a_rounded_date_says_what_it_is_rounded_to(sql, grains):
     """A chart labels a period by the unit the statement rounded to, not by
     guessing from the dates that came back."""
     assert resolve(sql).column_grains == grains
+
+
+_BUDGET = SheetCall("Budget", "Q3!A1:C")
+_READ = {
+    _BUDGET: Sheet.from_range(
+        _BUDGET,
+        {
+            "columns": [
+                {"name": "Region", "type": "text"},
+                {"name": "Amount", "type": "number"},
+                {"name": "Due", "type": "date"},
+            ],
+            "rows": [["North", 10, "2026-01-05"], ["South", 20, None]],
+            "sheets": ["Q3"],
+        },
+    )
+}
+
+
+def test_a_sheet_is_read_like_a_dataset_once_its_cells_are():
+    """Before its cells are read a sheet holds any name and the statement is not
+    runnable; once read, its header names its columns ignoring case, the cells
+    are one bound parameter, and an output keeps the header it named."""
+    sql = (
+        "SELECT region, sum(amount) AS total, date_trunc('month', s.due) AS m "
+        "FROM sheet('Budget', 'Q3!A1:C') AS s GROUP BY region, m"
+    )
+    unread = resolve(sql)
+    assert unread.unread == (_BUDGET,)
+    assert unread.relations == ("files",)
+
+    read = resolve(sql, _READ)
+    assert read.unread == ()
+    assert "json_to_recordset($1) AS s(c1 text, c2 numeric, c3 date)" in read.sql
+    assert 's.c1 AS "Region"' in read.sql
+    assert json.loads(read.parameters[-1])[0] == {
+        "c1": "North",
+        "c2": 10,
+        "c3": "2026-01-05",
+    }
+    assert read.column_types[0] is FieldType.text
+    assert read.column_grains[2] == "month"
+
+
+@pytest.mark.parametrize(
+    ("sql", "code"),
+    [
+        ("SELECT a FROM sheet('Budget', 'Q3!A1:C', 3)", QueryMessages.SHEET_ARGUMENTS),
+        ("SELECT a FROM sheet(1.5)", QueryMessages.SHEET_ARGUMENTS),
+        ("SELECT a FROM sheet(region)", QueryMessages.SHEET_ARGUMENTS),
+        ("SELECT a FROM sheet('Budget', 7)", QueryMessages.SHEET_ARGUMENTS),
+        ("SELECT a FROM generate_series(1, 2)", QueryMessages.UNSUPPORTED_FUNCTION),
+        ("SELECT a FROM LATERAL sheet('Budget')", QueryMessages.UNSUPPORTED_SYNTAX),
+        (
+            "SELECT a FROM sheet('Budget') WITH ORDINALITY",
+            QueryMessages.UNSUPPORTED_SYNTAX,
+        ),
+        ("SELECT a FROM sheet('Budget') AS s(a, b)", QueryMessages.UNSUPPORTED_SYNTAX),
+        ("SELECT nope FROM sheet('Budget', 'Q3!A1:C')", QueryMessages.UNKNOWN_FIELD),
+        (
+            "SELECT region FROM sheet('Budget', 'Q3!A1:C') AS a "
+            "JOIN sheet('Budget', 'Q3!A1:C') AS b ON a.region = b.region",
+            QueryMessages.AMBIGUOUS_FIELD,
+        ),
+        (
+            "SELECT a FROM sheet('Budget'), sheet('Budget')",
+            QueryMessages.JOIN_WITHOUT_CONDITION,
+        ),
+    ],
+)
+def test_a_sheet_call_says_what_it_got_wrong(sql, code):
+    with pytest.raises(QueryError) as refused:
+        resolve(sql, _READ)
+    assert refused.value.code == code
+
+
+_ORDERS = PluginCall("acme.shop", "orders", (("range", "30d"), ("tags", ("a", "b"))))
+
+
+def test_a_plugin_endpoint_is_read_like_a_dataset_once_it_answers():
+    """Its parameters are named arguments; its rows are one bound parameter
+    under the columns the endpoint declares, a value of another type read as
+    nothing; and it joins what any relation joins."""
+    sql = (
+        "SELECT t.title, o.status, sum(o.total) AS total "
+        "FROM plugin('acme.shop', 'orders', tags => ARRAY['a', 'b'], range => '30d') AS o "
+        "JOIN tasks AS t ON t.title = o.status GROUP BY t.title, o.status"
+    )
+    unread = resolve(sql)
+    assert unread.unread == (_ORDERS,)
+    assert unread.relations == ("plugins", "tasks")
+
+    rows = PluginRows.from_rows(
+        _ORDERS,
+        (("status", "string"), ("total", "int"), ("at", "datetime"), ("ok", "bool")),
+        [
+            {"status": "open", "total": 4, "at": "2026-11-01T10:00:00Z", "ok": True},
+            {"status": "shut", "total": "four", "at": "soon", "ok": "yes"},
+        ],
+    )
+    read = resolve(sql, {_ORDERS: rows})
+    assert read.unread == ()
+    assert (
+        "json_to_recordset($1) AS o(c1 text, c2 numeric, c3 timestamptz, c4 boolean)"
+        in read.sql
+    )
+    assert json.loads(read.parameters[-1]) == [
+        {"c1": "open", "c2": 4, "c3": "2026-11-01T10:00:00Z", "c4": True},
+        {"c1": "shut", "c2": None, "c3": None, "c4": None},
+    ]
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT a FROM plugin('acme.shop')",
+        "SELECT a FROM plugin('acme.shop', 'orders', 'positional')",
+        "SELECT a FROM plugin('acme.shop', range => '30d', 'orders')",
+        "SELECT a FROM plugin('acme.shop', 'orders', range => status)",
+        "SELECT a FROM plugin('acme.shop', 'orders', range => NULL)",
+        "SELECT a FROM plugin('acme.shop', 'orders', tags => ARRAY[ARRAY['a']])",
+        "SELECT a FROM plugin(1, 'orders')",
+    ],
+)
+def test_a_plugin_call_takes_constants_by_name(sql):
+    with pytest.raises(QueryError) as refused:
+        resolve(sql)
+    assert refused.value.code == QueryMessages.PLUGIN_ARGUMENTS
+
+
+def test_a_name_both_a_dataset_and_a_read_sheet_hold_is_ambiguous():
+    with pytest.raises(QueryError) as refused:
+        resolve(
+            "SELECT title FROM sheet('Budget', 'Q3!A1:C') AS s "
+            "JOIN tasks AS t ON t.title = s.region",
+            {
+                _BUDGET: Sheet.from_range(
+                    _BUDGET,
+                    {
+                        "columns": [
+                            {"name": "title", "type": "text"},
+                            {"name": "region", "type": "text"},
+                        ]
+                    },
+                )
+            },
+        )
+    assert refused.value.code == QueryMessages.AMBIGUOUS_FIELD
+
+
+def test_a_statement_names_rows_by_id_where_a_column_holds_one():
+    """Each constant a key column is compared with, and the file ``sheet()``
+    reads, is put through the mapping in place; a person, a constant in a
+    shape it does not read, and a statement that does not resolve are left
+    as they were."""
+    moved = {
+        (SearchEntityType.project, 12): 120,
+        (SearchEntityType.task, 7): 70,
+        (SearchEntityType.file, 42): 420,
+    }
+
+    def remap(kind: SearchEntityType, entity_id: int) -> int:
+        return moved.get((kind, entity_id), 0)
+
+    for sql, expected in (
+        (
+            "SELECT count(*) AS n FROM tasks WHERE project_id = 12 AND created_by = 12",
+            "SELECT count(*) AS n FROM tasks WHERE project_id = 120 AND created_by = 12",
+        ),
+        (
+            "SELECT t.title FROM tasks t WHERE t.id IN (7, 8) LIMIT 12",
+            "SELECT t.title FROM tasks t WHERE t.id IN (70, 0) LIMIT 12",
+        ),
+        (
+            "SELECT title FROM tasks WHERE project.id <> 12 -- the old one",
+            "SELECT title FROM tasks WHERE project.id <> 120 -- the old one",
+        ),
+        (
+            "SELECT b.x FROM sheet(42, 'Q3!A1:D') AS b JOIN projects p ON p.name = b.x",
+            "SELECT b.x FROM sheet(420, 'Q3!A1:D') AS b JOIN projects p ON p.name = b.x",
+        ),
+        (
+            "SELECT title FROM tasks WHERE project_id = CAST(12 AS integer)",
+            "SELECT title FROM tasks WHERE project_id = CAST(12 AS integer)",
+        ),
+        (
+            "SELECT title FROM tasks WHERE project_id IN (1 + 12, NULL, 12)",
+            "SELECT title FROM tasks WHERE project_id IN (1 + 12, NULL, 120)",
+        ),
+        ("SELECT a FROM nowhere WHERE id = 12", "SELECT a FROM nowhere WHERE id = 12"),
+    ):
+        assert remap_ids(sql, remap) == expected, sql

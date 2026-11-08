@@ -1,18 +1,12 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { useFilesList } from "@/hooks/useFiles";
 import { fileIcon } from "@/lib/fileIcon";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { cn } from "@/ui/lib/utils";
 
 interface FileChooserDialogProps {
   initiativeId: number;

@@ -225,7 +225,7 @@ async def test_a_grant_is_reported_against_the_resource_it_shares(session, actin
     """Sharing is polymorphic: the event lands on whichever tool was shared.
 
     ``resource_grants`` rows have their own ids and no route, so a grant reports
-    against the project (or file, queue, …) named in the row — which the
+    against the project (or file, calendar, …) named in the row — which the
     subscriber can fetch, and which is the thing that actually changed.
     """
 

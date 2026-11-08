@@ -11,7 +11,7 @@ import type {
   TagSummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import { localDayKey } from "@/lib/formatDate";
-import { dateTimeFormat } from "@/lib/intl";
+import { dateTimeFormat } from "@/ui/lib/intl";
 
 /** The mark a collection is drawn with, wherever one is named. */
 export const COLLECTION_ICON = Layers;

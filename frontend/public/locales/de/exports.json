@@ -162,17 +162,16 @@
       "events": "Termine",
       "project": "Projekt",
       "file": "Datei",
-      "queue": "Warteschlange",
       "calendar": "Kalender",
       "post": "Beitrag",
       "wiki": "Wiki",
+      "contact": "Kontakt",
       "initiative": "Initiative",
       "community": "Community",
       "counter-group": "Zählergruppe",
       "dashboard": "Dashboard"
     },
     "download": "Herunterladen",
-    "empty": "Noch keine Exporte.",
-    "loadFailed": "Exporte konnten nicht geladen werden. Aktualisiere, um es erneut zu versuchen."
+    "empty": "Noch keine Exporte."
   }
 }

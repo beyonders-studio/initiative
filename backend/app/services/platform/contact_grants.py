@@ -37,7 +37,7 @@ from app.models.platform.contact_grant import (
 )
 from app.models.platform.user_ignore import UserIgnore
 from app.services.platform import contact_notifications
-from app.services.platform import contacts_stream, user_stream
+from app.services.platform import connections_stream, user_stream
 from app.services.platform import presence as presence_service
 from app.services.platform import user_ignores
 from app.schemas.platform.dm import (
@@ -224,8 +224,8 @@ async def request(
     if not await user_ignores.ignores(
         session, user_id=target_id, other_user_id=actor_id
     ):
-        contacts_stream.queue_contacts_signal(session, target_id)
-    contacts_stream.queue_contacts_signal(session, actor_id)
+        connections_stream.queue_connections_signal(session, target_id)
+    connections_stream.queue_connections_signal(session, actor_id)
     await session.commit()
     await session.refresh(grant)
     # A stream frame only reaches a client that is already open. The request is
@@ -266,8 +266,8 @@ async def accept(
     if kind is ContactGrantKind.connection:
         await _open_message_grant(session, actor_id, other_id, grant.requested_by)
 
-    contacts_stream.queue_contacts_signal(session, actor_id)
-    contacts_stream.queue_contacts_signal(session, other_id)
+    connections_stream.queue_connections_signal(session, actor_id)
+    connections_stream.queue_connections_signal(session, other_id)
     await session.commit()
     await session.refresh(grant)
     # The one who asked is the one waiting for an answer, so they are the one
@@ -329,8 +329,8 @@ async def remove(
     await session.flush()
     if kind is ContactGrantKind.connection:
         await _revoke_pair_if_stale(session, actor_id, other_id)
-    contacts_stream.queue_contacts_signal(session, actor_id)
-    contacts_stream.queue_contacts_signal(session, other_id)
+    connections_stream.queue_connections_signal(session, actor_id)
+    connections_stream.queue_connections_signal(session, other_id)
     await session.commit()
 
 
@@ -399,7 +399,9 @@ async def revoke_stale_message_grants(
             # Both sides of every pair that actually went — which is already
             # the bound worth having: a community's worth of revocations costs
             # the pairs revoked, not the size of the membership.
-            user_stream.queue_signals(system_session, touched, contacts_stream.RESOURCE)
+            user_stream.queue_signals(
+                system_session, touched, connections_stream.RESOURCE
+            )
             await system_session.commit()
     return dropped
 

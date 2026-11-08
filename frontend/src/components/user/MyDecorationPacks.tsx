@@ -3,15 +3,15 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { DecorationPack, OwnedDecoration } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
 import { DecorationSwatch } from "@/components/user/DecorationSwatch";
 import { PackContentsDialog, packPieces } from "@/components/user/PackContents";
 import { useDecorationPacks, useRemoveDecorationPack } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { type Decoration, resolveDecoration } from "@/lib/profileDecorations";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Input } from "@/ui/input";
 
 /** Above this many, finding one by eye stops working and the filter appears. */
 const FILTER_THRESHOLD = 8;
@@ -68,13 +68,12 @@ const PackRow = ({
         variant="destructive"
         size="sm"
         className="shrink-0"
-        disabled={busy}
+        pending={busy}
         onClick={onRemove}
         // Every row's button says the same three words; in a list this long the
         // name is the only thing that tells them apart when they are read out.
         aria-label={t("myPacks.removeNamed", { name: entry.name })}
       >
-        {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
         {t("myPacks.remove")}
       </Button>
     </li>
@@ -175,7 +174,6 @@ export const MyDecorationPacks = () => {
         title={t("profiles:myPacks.confirmTitle", { name: pending?.name ?? "" })}
         description={t("profiles:myPacks.confirmBody")}
         confirmLabel={t("profiles:myPacks.remove")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("profiles:myPacks.removing")}
         isLoading={remove.isPending}
         onConfirm={() => {

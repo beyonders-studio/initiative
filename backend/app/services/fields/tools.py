@@ -14,12 +14,12 @@ from __future__ import annotations
 
 from app.core.tools import Tool
 from app.models.tenant.calendar import Calendar
+from app.models.tenant.contact import Contact
 from app.models.tenant.counter import Counter, CounterGroup
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.file import File, FileVersion
 from app.models.tenant.collection import Collection
 from app.models.tenant.post import Post
-from app.models.tenant.queue import Queue, QueueItem
 from app.models.tenant.wiki import Wiki, WikiPage
 from app.services.fields.derive import derive_fields
 from app.services.fields.spec import Dataset, Hop, Relation
@@ -61,27 +61,6 @@ def build_file_versions() -> Dataset:
     )
 
 
-def build_queues() -> Dataset:
-    return Dataset(model=Queue, tool=Tool.queue, fields=derive_fields(Queue))
-
-
-def build_queue_items() -> Dataset:
-    """One item in a queue. Its own dataset because the question worth asking
-    is about the items, and the queue is what they are grouped by."""
-    return Dataset(
-        model=QueueItem,
-        tool=Tool.queue,
-        name_override="queue_items",
-        fields=derive_fields(QueueItem),
-        relations=(
-            Relation(
-                name="queue",
-                hops=(Hop(dataset="queues", left="queue_id", right="id"),),
-            ),
-        ),
-    )
-
-
 def build_counter_groups() -> Dataset:
     return Dataset(
         model=CounterGroup,
@@ -91,9 +70,9 @@ def build_counter_groups() -> Dataset:
 
 
 def build_counters() -> Dataset:
-    """One counter in a group. Its own dataset for the reason queue items
-    have one: what one counter reads is a question about the counters, and the
-    group is what they are grouped by."""
+    """One counter in a group. Its own dataset because what one counter reads
+    is a question about the counters, and the group is what they are grouped
+    by."""
     return Dataset(
         model=Counter,
         tool=Tool.counter_group,
@@ -147,9 +126,13 @@ def build_wikis() -> Dataset:
     return Dataset(model=Wiki, tool=Tool.wiki, fields=derive_fields(Wiki))
 
 
+def build_contacts() -> Dataset:
+    return Dataset(model=Contact, tool=Tool.contact, fields=derive_fields(Contact))
+
+
 def build_wiki_pages() -> Dataset:
-    """One page of a wiki. Its own dataset for the reason queue items have
-    one: what somebody asks about a wiki — how many pages are still drafts,
+    """One page of a wiki. Its own dataset for the reason counters have one:
+    what somebody asks about a wiki — how many pages are still drafts,
     what has not been touched since spring — is a question about the pages,
     and the wiki is what they are grouped by.
 

@@ -1,4 +1,4 @@
-import { parseLocalCalendarDate, resolveLocalDateTime } from "@/lib/localDateTime";
+import { parseLocalCalendarDate, resolveLocalDateTime } from "@/ui/lib/localDateTime";
 
 // Shared date/time helpers for the event create dialog and edit page so both
 // use the identical pickers, half-hour slots, and duration-preserving logic.

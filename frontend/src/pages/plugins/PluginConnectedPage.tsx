@@ -11,7 +11,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { LogoIcon } from "@/components/LogoIcon";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 /**
  * How a vendor flow ended, in the seven ways it can.
@@ -64,7 +64,7 @@ export function PluginConnectedPage() {
   const { icon: Icon, tone } = OUTCOMES[outcome];
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="flex min-h-app items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="items-center text-center">
           <LogoIcon className="mb-2 h-8 w-8" />

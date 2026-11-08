@@ -8,17 +8,19 @@
  */
 
 import { Link, useParams } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ChangelogEntry } from "@/api/generated/initiativeAPI.schemas";
 import { Markdown } from "@/components/Markdown";
-import { Button } from "@/components/ui/button";
 import { useChangelog } from "@/hooks/useSettings";
-import { dateTimeFormat } from "@/lib/intl";
 import { DOCS_URL, REPO_URL } from "@/lib/links";
 import { RELEASE_IMAGE_DIR } from "@/lib/releaseImages";
+import { Button } from "@/ui/button";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { ListSkeleton, SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 import { DarkBand } from "./DarkBand";
 import { LandingShell } from "./LandingShell";
@@ -123,7 +125,7 @@ const PostCard = ({ entry }: { entry: ChangelogEntry }) => {
 export const WhatsNewPage = () => {
   const { t } = useTranslation("landing");
   const [limit, setLimit] = useState(PAGE_SIZE);
-  const { data, isLoading, isError, isFetching } = useChangelog({ limit });
+  const { data, isLoading, isError, isFetching, refetch } = useChangelog({ limit });
   const entries = data?.entries ?? [];
   usePageMeta(t("whatsNew.metaTitle"), t("whatsNew.description"));
 
@@ -132,14 +134,11 @@ export const WhatsNewPage = () => {
       <Header title={t("whatsNew.title")} description={t("whatsNew.description")} />
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-8 sm:py-14">
         {isLoading ? (
-          <p className="flex items-center justify-center gap-2 text-muted-foreground" role="status">
-            <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-            {t("whatsNew.loading")}
-          </p>
+          <SkeletonRegion>
+            <ListSkeleton rows={3} avatar={false} rowClassName="rounded-2xl border bg-card p-5" />
+          </SkeletonRegion>
         ) : isError ? (
-          <p className="text-center text-muted-foreground" role="alert">
-            {t("whatsNew.error")}
-          </p>
+          <StatusMessage onRetry={refetch} />
         ) : entries.length === 0 ? (
           <p className="text-center text-muted-foreground">{t("whatsNew.empty")}</p>
         ) : (
@@ -171,7 +170,7 @@ export const WhatsNewPage = () => {
 export const WhatsNewPostPage = () => {
   const { t } = useTranslation("landing");
   const { version } = useParams({ strict: false }) as { version: string };
-  const { data, isLoading, isError } = useChangelog({ version });
+  const { data, isLoading, isError, refetch } = useChangelog({ version });
   const entry = data?.entries[0];
   const formatDate = useReleaseDate();
   const title = t("whatsNew.postTitle", { version });
@@ -194,14 +193,11 @@ export const WhatsNewPostPage = () => {
           {t("whatsNew.back")}
         </Link>
         {isLoading ? (
-          <p className="flex items-center gap-2 text-muted-foreground" role="status">
-            <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-            {t("whatsNew.loading")}
-          </p>
+          <SkeletonRegion>
+            <SkeletonLines lines={8} />
+          </SkeletonRegion>
         ) : isError ? (
-          <p className="text-muted-foreground" role="alert">
-            {t("whatsNew.error")}
-          </p>
+          <StatusMessage onRetry={refetch} />
         ) : entry ? (
           <article>
             <Markdown surface="release" remoteImages content={asPost(entry.changes)} />

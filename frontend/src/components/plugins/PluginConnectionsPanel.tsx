@@ -26,23 +26,11 @@
  * definition declares — a new plug-in needs no code here.
  */
 
-import { KeyRound, Loader2, Plug, ShieldCheck, TriangleAlert } from "lucide-react";
+import { KeyRound, Plug, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Fragment, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CommunityPluginConnectionRead } from "@/api/generated/initiativeAPI.schemas";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import {
   useConnectPlugin,
   useDisconnectPlugin,
@@ -50,7 +38,15 @@ import {
 } from "@/hooks/useCommunityPluginDetail";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { openExternal } from "@/lib/openExternal";
 import { localized } from "@/lib/widgets/widgetMeta";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 /** One typed input in a connection's form, as the pinned definition declares
  *  it. The read carries fields and the access hint untyped, because their shape
@@ -196,11 +192,10 @@ function CommunityConnection({
     connect.mutate(connection.id, {
       onSuccess: (started) => {
         // A new tab rather than a redirect, so the admin comes back to where
-        // they were; `noopener` keeps the vendor's page from reaching into
-        // this one. The address is the server's to build — see
+        // they were. The address is the server's to build — see
         // PersonalConnection.
         if (started.connect_url) {
-          window.open(started.connect_url, "_blank", "noopener,noreferrer");
+          openExternal(started.connect_url);
           toast.success(t("plugins:connections.connectOpened"));
           return;
         }
@@ -262,16 +257,19 @@ function CommunityConnection({
           )}
           <div className="flex flex-wrap items-center gap-2">
             {vendorFlow && (
-              <Button size="sm" onClick={start} disabled={connect.isPending}>
-                {connect.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              <Button size="sm" onClick={start} pending={connect.isPending}>
                 {connection.satisfied
                   ? t("plugins:connections.reconnect")
                   : t("plugins:connections.connect")}
               </Button>
             )}
             {typed.length > 0 && (
-              <Button size="sm" onClick={submit} disabled={!touched.length || save.isPending}>
-                {save.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              <Button
+                size="sm"
+                onClick={submit}
+                disabled={!touched.length}
+                pending={save.isPending}
+              >
                 {t("common:save")}
               </Button>
             )}
@@ -336,10 +334,9 @@ function ConnectionFieldInput({
   if (field.type === "select") {
     const current = typeof value === "string" ? value : (stored as string | undefined);
     return (
-      <div className="space-y-1.5">
-        <Label htmlFor={id}>{label}</Label>
+      <Field label={label} id={id} className="space-y-1.5">
         <Select value={current ?? ""} onValueChange={onChange}>
-          <SelectTrigger id={id}>
+          <SelectTrigger>
             <SelectValue placeholder={t("plugins:connections.choose")} />
           </SelectTrigger>
           <SelectContent>
@@ -350,7 +347,7 @@ function ConnectionFieldInput({
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </Field>
     );
   }
 
@@ -411,10 +408,9 @@ function PersonalConnection({
       onSuccess: (started) => {
         // The server builds the vendor's address; the client never does. A
         // new tab rather than a redirect, so the member comes back to where
-        // they were, and `noopener` keeps the vendor's page from reaching into
-        // this one.
+        // they were.
         if (started.connect_url) {
-          window.open(started.connect_url, "_blank", "noopener,noreferrer");
+          openExternal(started.connect_url);
           toast.success(t("plugins:connections.connectOpened"));
           return;
         }
@@ -456,8 +452,7 @@ function PersonalConnection({
             </span>
           ) : null}
 
-          <Button size="sm" onClick={start} disabled={connect.isPending}>
-            {connect.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          <Button size="sm" onClick={start} pending={connect.isPending}>
             {connection.status
               ? t("plugins:connections.reconnect")
               : t("plugins:connections.connect")}

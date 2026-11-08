@@ -23,15 +23,10 @@ import type {
   TaskListRead,
   TaskStatusRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
 import { TaskAssigneesCell } from "@/components/projects/TaskQuickActions";
-import { SortHeader } from "@/components/SortIcon";
 import { sharedTaskColumns } from "@/components/tasks/globalTaskColumns";
 import { statusTriggerStyle, TaskStatusOption } from "@/components/tasks/TaskStatusOption";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { DataTable, type DataTableRowWrapperProps } from "@/components/ui/data-table";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import { TableRow } from "@/components/ui/table";
 import { type ColumnLimits, NO_COLUMN_LIMITS } from "@/hooks/useColumnLimits";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
 import type { useProjectTaskTableState } from "@/hooks/useProjectTaskView";
@@ -41,13 +36,19 @@ import { useMoveTaskToGroup } from "@/hooks/useTasks";
 import { useTaskTypeChange } from "@/hooks/useTaskTypeChange";
 import { fieldColumnId } from "@/lib/layouts/columns";
 import { columnsOf } from "@/lib/layouts/draft";
-import { useProjectLayoutEnv, withDisplays } from "@/lib/layouts/fields";
+import { useCounterSteps, useProjectLayoutEnv, withDisplays } from "@/lib/layouts/fields";
 import { groupRowId, groupRows, NO_GROUP, uniqueTasksFromRows } from "@/lib/layouts/grouping";
 import { pluginFields, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { taskFields } from "@/lib/layouts/tasks";
-import type { AppColumnDef, AppRow } from "@/lib/table";
 import { flattenTaskTree, nestTaskRows, type TaskTreeRow, treeParents } from "@/lib/taskTree";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { DataTable, type DataTableRowWrapperProps } from "@/ui/data-table";
+import type { AppColumnDef, AppRow } from "@/ui/lib/table";
+import { cn } from "@/ui/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
+import { SortHeader } from "@/ui/sort-icon";
+import { TableRow } from "@/ui/table";
 
 type ProjectTasksListViewProps = {
   projectId: number;
@@ -112,14 +113,12 @@ const rowTone = (task: TaskTreeRow) =>
 const PlainRowWrapper = ({
   row,
   children,
-  virtualStyle,
   virtualIndex,
   measureRef,
 }: DataTableRowWrapperProps<TaskTreeRow>) => {
   return (
     <TableRow
       ref={measureRef}
-      style={virtualStyle}
       className={rowTone(row.original)}
       data-state={row.getIsSelected() && "selected"}
       data-index={virtualIndex}
@@ -136,7 +135,6 @@ const PlainRowWrapper = ({
 const SortableRowWrapperInner = ({
   row,
   children,
-  virtualStyle,
   virtualIndex,
   measureRef,
 }: DataTableRowWrapperProps<TaskTreeRow>) => {
@@ -154,8 +152,7 @@ const SortableRowWrapperInner = ({
   });
 
   const style: React.CSSProperties = {
-    ...virtualStyle,
-    transform: CSS.Transform.toString(transform) || virtualStyle?.transform,
+    transform: CSS.Transform.toString(transform),
     transition,
   };
 
@@ -199,7 +196,6 @@ const SortableRowWrapperInner = ({
 const GroupDragRowWrapper = ({
   row,
   children,
-  virtualStyle,
   virtualIndex,
   measureRef,
 }: DataTableRowWrapperProps<TaskTreeRow>) => {
@@ -225,10 +221,7 @@ const GroupDragRowWrapper = ({
     <SortableRowContext.Provider value={contextValue}>
       <TableRow
         ref={setRefs}
-        style={{
-          ...virtualStyle,
-          transform: CSS.Translate.toString(transform) || virtualStyle?.transform,
-        }}
+        style={{ transform: CSS.Translate.toString(transform) }}
         className={cn(
           rowTone(row.original),
           isDragging && "relative z-10 bg-muted/60",
@@ -356,7 +349,12 @@ const ProjectTasksTableViewComponent = ({
 }: ProjectTasksListViewProps) => {
   const { t, i18n } = useTranslation(["projects", "comments", "tasks"]);
   const statusDisabled = !canEditTaskDetails || taskActionsDisabled;
-  const env = useProjectLayoutEnv(taskHref);
+  const projectEnv = useProjectLayoutEnv(taskHref);
+  const stepCounter = useCounterSteps(
+    PropertyTarget.task,
+    useCallback(() => !statusDisabled, [statusDisabled])
+  );
+  const env = useMemo(() => ({ ...projectEnv, stepCounter }), [projectEnv, stepCounter]);
   const { mutate: moveTask, mutateAsync: moveTaskNow } = useMoveTaskToGroup();
   // A drop into another type asks first for what that type's page requires.
   const typeChange = useTaskTypeChange(projectId, initiativeId);
@@ -730,9 +728,6 @@ const ProjectTasksTableViewComponent = ({
           columns={orderedColumns}
           data={rows}
           enableVirtualization
-          // The screen below the page's header, but never so short that a
-          // landscape phone shows the column headings and no rows.
-          virtualContainerHeight="h-[max(calc(100dvh-20rem),20rem)]"
           virtualRowHeight={52}
           groupingOptions={groupingOptions}
           // The layout editor offers it above the preview.

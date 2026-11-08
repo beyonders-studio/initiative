@@ -12,7 +12,7 @@
  * and the settings alike.
  */
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   type DetailLayoutDefinitionInput,
@@ -27,13 +27,13 @@ import {
   type ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
-  getGetInitiativeLayoutsQueryKey,
   getGetLayoutsQueryKey,
-  getInitiativeLayouts,
-  getLayouts,
+  getGetLayoutsQueryOptions,
   putDefaultLayout,
   putLayout,
   resetLayout,
+  useGetInitiativeLayouts,
+  useGetLayouts,
 } from "@/api/generated/layouts/layouts";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -42,14 +42,10 @@ import type { MutationOpts } from "@/types/mutation";
 
 /** The tools whose every instance lays out its own items: the backend's
  *  per-instance layout tools that draw a detail. */
-export const INSTANCE_LAYOUT_TOOLS: ReadonlySet<Tool> = new Set([
-  Tool.project,
-  Tool.queue,
-  Tool.counter_group,
-]);
+export const INSTANCE_LAYOUT_TOOLS: ReadonlySet<Tool> = new Set([Tool.project, Tool.counter_group]);
 
-/** The layouts one instance of a tool keeps as its own: a project's, a
- *  queue's, or a collection's, which lays out its files as an instance does. */
+/** The layouts one instance of a tool keeps as its own: a project's, or a
+ *  collection's, which lays out its files as an instance does. */
 export const instanceTarget = (tool: LayoutTarget, id: number): GetLayoutsParams => ({
   tool,
   tool_id: id,
@@ -62,22 +58,18 @@ export const sharedTarget = (tool: Tool, initiativeId: number): GetLayoutsParams
   initiative_id: initiativeId,
 });
 
-export const toolLayoutsQuery = (communityId: number, target: GetLayoutsParams) => ({
-  queryKey: getGetLayoutsQueryKey(communityId, target),
-  queryFn: () => getLayouts(communityId, target),
-});
-
 /** A target's layouts, or nothing while `target` is null. */
 export const useToolLayouts = (target: GetLayoutsParams | null) => {
   const communityId = useActiveCommunityId();
-  return useQuery<ToolLayoutSetRead>({
-    ...toolLayoutsQuery(communityId, target ?? instanceTarget(Tool.project, 0)),
-    enabled: target !== null,
-    // The client keeps previous data by default, which across a target switch
-    // would show the last target's layouts — and its `can_configure`, which
-    // gates the editor. Showing one target's permissions while another loads
-    // is not a stale list, it is the wrong answer.
-    placeholderData: undefined,
+  return useGetLayouts(communityId, target ?? instanceTarget(Tool.project, 0), {
+    query: {
+      enabled: target !== null,
+      // The client keeps previous data by default, which across a target switch
+      // would show the last target's layouts — and its `can_configure`, which
+      // gates the editor. Showing one target's permissions while another loads
+      // is not a stale list, it is the wrong answer.
+      placeholderData: undefined,
+    },
   });
 };
 
@@ -92,7 +84,7 @@ export const useReadToolLayouts = () => {
   const communityId = useActiveCommunityId();
   const queryClient = useQueryClient();
   return (target: GetLayoutsParams) =>
-    queryClient.fetchQuery(toolLayoutsQuery(communityId, target));
+    queryClient.fetchQuery(getGetLayoutsQueryOptions(communityId, target));
 };
 
 /** Every project's layouts in an initiative the reader can open, for its
@@ -100,12 +92,10 @@ export const useReadToolLayouts = () => {
 export const useInitiativeLayouts = (initiativeId: number) => {
   const communityId = useActiveCommunityId();
   const params = { initiative_id: initiativeId };
-  return useQuery({
-    queryKey: getGetInitiativeLayoutsQueryKey(communityId, params),
-    queryFn: () => getInitiativeLayouts(communityId, params),
+  return useGetInitiativeLayouts(communityId, params, {
     // Another initiative's projects, while this one's load, would be listed
     // under this one's addresses.
-    placeholderData: undefined,
+    query: { placeholderData: undefined },
   });
 };
 

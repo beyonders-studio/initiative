@@ -9,7 +9,7 @@ import {
   sellsWith,
   storeSellingNow,
   toAlpha2,
-  useStoreSelling,
+  useStoreSellingAnswer,
 } from "./storeSelling";
 
 const environment = vi.hoisted(() => ({
@@ -187,18 +187,18 @@ describe("sellsOnThisDevice", () => {
   });
 });
 
-describe("useStoreSelling", () => {
+describe("useStoreSellingAnswer", () => {
   it("is true at once on the web", () => {
-    const { result } = renderHook(() => useStoreSelling());
+    const { result } = renderHook(() => useStoreSellingAnswer());
     expect(result.current).toBe(true);
   });
 
-  it("is false on a phone until the store answers", async () => {
+  it("is undefined on a phone until the store answers", async () => {
     onPlatform("ios");
     let answer: (value: { country?: string }) => void = () => {};
     environment.storeCountry.mockReturnValue(new Promise((resolve) => (answer = resolve)));
-    const { result } = renderHook(() => useStoreSelling());
-    expect(result.current).toBe(false);
+    const { result } = renderHook(() => useStoreSellingAnswer());
+    expect(result.current).toBeUndefined();
     await act(async () => answer({ country: "USA" }));
     await waitFor(() => expect(result.current).toBe(true));
   });

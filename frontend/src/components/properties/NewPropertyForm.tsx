@@ -3,18 +3,20 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  type CounterSettingsInput,
   type CurrencyCode,
   MetadataType,
   type PropertyDefinitionCreate,
   type PropertyDefinitionRead,
   type PropertyOption,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { type MetadataOwner, ownerColumns, useCreateProperty } from "@/hooks/useProperties";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
 
+import { CounterSettingsFields, counterSettingsValid } from "./CounterSettingsFields";
 import { CurrencySelect, useDefaultCurrency } from "./CurrencySelect";
 import { normalizeOptionList, typeRequiresOptions } from "./propertyHelpers";
 import { iconForPropertyType } from "./propertyTypeIcons";
@@ -33,13 +35,17 @@ export const PROPERTY_TYPES: MetadataType[] = [
   MetadataType.user_reference,
   MetadataType.currency,
   MetadataType.scale,
+  MetadataType.counter,
+  MetadataType.file,
+  MetadataType.signature,
 ];
 
 /**
  * A new property for an initiative, or metadata of one of its projects or
  * collections: its name, its type and, for a select, its options, for money
- * its currency. Where an item's properties are added to, and where a layout
- * adds a field, it is the one way either is made there.
+ * its currency, for a counter its step and bounds. Where an item's properties
+ * are added to, and where a layout adds a field, it is the one way either is
+ * made there.
  *
  * Given an `owner` that may also hold it, it asks whose it is: the owner's
  * metadata, or the initiative's property.
@@ -76,6 +82,7 @@ export const NewPropertyForm = ({
   );
   const defaultCurrency = useDefaultCurrency();
   const [newCurrency, setNewCurrency] = useState<CurrencyCode>(defaultCurrency);
+  const [newCounter, setNewCounter] = useState<CounterSettingsInput>({});
   const createPropertyMutation = useCreateProperty();
 
   const handleAddOption = () => setNewOptions((prev) => [...prev, { value: "", label: "" }]);
@@ -101,6 +108,7 @@ export const NewPropertyForm = ({
       ...ownerColumns(owned ? owner : undefined),
       options,
       ...(newType === MetadataType.currency ? { currency: newCurrency } : {}),
+      ...(newType === MetadataType.counter ? { counter: newCounter } : {}),
     };
     onPendingChange?.(true);
     try {
@@ -117,8 +125,9 @@ export const NewPropertyForm = ({
     if (typeRequiresOptions(newType)) {
       return normalizeOptionList(newOptions).length > 0;
     }
+    if (newType === MetadataType.counter) return counterSettingsValid(newCounter);
     return true;
-  }, [newName, newType, newOptions]);
+  }, [newName, newType, newOptions, newCounter]);
 
   return (
     <div className="space-y-3 p-3">
@@ -207,6 +216,10 @@ export const NewPropertyForm = ({
           <Label className="font-normal text-xs">{t("properties:currency.label")}</Label>
           <CurrencySelect value={newCurrency} onChange={setNewCurrency} />
         </div>
+      ) : null}
+
+      {newType === MetadataType.counter ? (
+        <CounterSettingsFields value={newCounter} onChange={setNewCounter} />
       ) : null}
 
       {typeRequiresOptions(newType) ? (

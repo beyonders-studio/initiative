@@ -44,6 +44,7 @@ from app.core import recurrence
 from app.core.file_types import FileType
 from app.core.references import REFERENCE_NODES, reference_as_text, text_node
 from app.core.tools import Tool, tool_export_source
+from app.models.tenant.metadata import PERSON_TYPES
 
 __all__ = [
     "DATE_ANCHOR",
@@ -59,7 +60,7 @@ DATE_ANCHOR = date(2000, 1, 3)
 
 #: Property types whose value is a person, and whose value therefore stays
 #: behind.
-_PERSON_PROPERTY_TYPES = frozenset({"user_reference"})
+_PERSON_PROPERTY_TYPES = frozenset(kind.value for kind in PERSON_TYPES)
 
 #: Property types whose value is a date the item plans with.
 _DATE_PROPERTY_TYPES = frozenset({"date", "datetime"})
@@ -234,27 +235,21 @@ def _strip_calendar(env: dict[str, Any]) -> None:
         event["created_at"] = None
 
 
-def _strip_queue(env: dict[str, Any]) -> None:
-    for item in env.get("items") or []:
-        if isinstance(item, dict):
-            item["member"] = None
-
-
 def _strip_nothing(env: dict[str, Any]) -> None:
-    """A counter group and a dashboard name nobody and point at nothing a
-    listing could carry. (A dashboard's configuration, which does, is dropped
-    by the dashboard's own canonical form.)"""
+    """A counter group, a dashboard and a contact name nobody in the community
+    and point at nothing a listing could carry. (A dashboard's configuration,
+    which does, is dropped by the dashboard's own canonical form.)"""
 
 
 _STRIPPERS: dict[Tool, Callable[[dict[str, Any]], None]] = {
     Tool.project: _strip_project,
     Tool.file: _strip_file,
-    Tool.queue: _strip_queue,
     Tool.counter_group: _strip_nothing,
     Tool.calendar: _strip_calendar,
     Tool.dashboard: _strip_nothing,
     Tool.post: _strip_post,
     Tool.wiki: _strip_wiki,
+    Tool.contact: _strip_nothing,
 }
 
 

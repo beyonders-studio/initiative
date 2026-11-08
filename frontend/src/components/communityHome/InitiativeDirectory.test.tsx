@@ -225,20 +225,20 @@ describe("InitiativeDirectory", () => {
 
   it("counts what is inside an initiative you're in, tool by tool", async () => {
     const user = stubMembership({
-      queues_enabled: true,
+      counter_groups_enabled: true,
       // Calendars stay off for this reader, so they get no stat.
-      can: initiativeCan({ view: [Tool.project, Tool.queue] }),
+      can: initiativeCan({ view: [Tool.project, Tool.counter_group] }),
     });
     server.use(
       communityHttp.get("/tools/counts/by-initiative", () =>
-        HttpResponse.json({ counts: { project: { "7": 3 }, queue: { "7": 2 } } })
+        HttpResponse.json({ counts: { project: { "7": 3 }, counter_group: { "7": 2 } } })
       )
     );
 
     renderDirectory([memberEntry()], user);
 
     expect(await screen.findByText("Projects: 3")).toBeInTheDocument();
-    expect(screen.getByText("Queues: 2")).toBeInTheDocument();
+    expect(screen.getByText("Counters: 2")).toBeInTheDocument();
     // A tool this member can't view has no number to report.
     expect(screen.queryByText(/^Calendar:/)).not.toBeInTheDocument();
   });

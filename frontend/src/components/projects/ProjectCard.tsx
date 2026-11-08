@@ -6,12 +6,12 @@ import { BookmarkButton } from "@/components/BookmarkButton";
 import { PinProjectButton } from "@/components/projects/PinProjectButton";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { ToolIndexDragHandle } from "@/components/tools/ToolIndexSortable";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { formatDate } from "@/lib/formatDate";
 import { toolDetailRoute } from "@/lib/tools";
+import { Badge } from "@/ui/badge";
+import { Card, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { Progress } from "@/ui/progress";
 
 /** A project on its initiative's list. The unread mark is the list's to draw,
  *  in the card's top corner, so the controls stop short of it. */
@@ -43,7 +43,7 @@ export const ProjectCard = ({ project }: { project: ProjectRead }) => {
         to={gp(toolDetailRoute(Tool.project, project.initiative_id, project.id))}
         className="block"
       >
-        <Card className="overflow-hidden">
+        <Card variant="tile">
           <CardHeader className="pr-34">
             <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
               {project.icon ? <span className="text-2xl leading-none">{project.icon}</span> : null}

@@ -2,23 +2,13 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CommunityStatus, SupportTopic } from "@/api/generated/initiativeAPI.schemas";
-import { ContactDialog } from "@/components/tickets/ContactDialog";
-import { FileTicketDialog } from "@/components/tickets/FileTicketDialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { openHelp } from "@/components/help/helpStore";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import type { CommunityEntry } from "@/hooks/useCommunities";
 import { useCommunityPaymentIssue } from "@/hooks/useCommunityPaymentIssue";
 import { useTicketAvailability } from "@/hooks/useTickets";
 import { getSessionItem, setSessionItem } from "@/lib/storage";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 
 // The key keeps its old name, so a notice already seen stays dismissed.
 const SEEN_KEY_PREFIX = "guild-status-notice:";
@@ -32,7 +22,7 @@ export const communityStatusNoticeApplies = (community: CommunityEntry): boolean
   community.can.seat &&
   community.status === CommunityStatus.read_only;
 
-type Stage = "notice" | "help" | "closed";
+type Stage = "notice" | "closed";
 
 export const CommunityStatusNotice = ({ community }: { community: CommunityEntry }) => {
   const { t } = useTranslation(["communities", "common"]);
@@ -49,7 +39,7 @@ export const CommunityStatusNotice = ({ community }: { community: CommunityEntry
 
   const askSupport = noticeOpen && (!askBilling || issue.isFetched) && !paymentFailed;
   const support = useTicketAvailability(community.id, {
-    enabled: askSupport || stage === "help",
+    enabled: askSupport,
     retry: false,
   });
   const offered = support.data?.support;
@@ -60,20 +50,6 @@ export const CommunityStatusNotice = ({ community }: { community: CommunityEntry
 
   if (stage === "closed") return null;
 
-  if (stage === "help") {
-    const close = (open: boolean) => !open && setStage("closed");
-    return contact ? (
-      <ContactDialog open onOpenChange={close} contact={contact} />
-    ) : (
-      <FileTicketDialog
-        open
-        onOpenChange={close}
-        ticket={{ stream: "support", topic: SupportTopic.community }}
-        communityId={community.id}
-      />
-    );
-  }
-
   if ((askBilling && issue.isPending) || (askSupport && support.isPending)) return null;
 
   const dismiss = () => {
@@ -81,55 +57,46 @@ export const CommunityStatusNotice = ({ community }: { community: CommunityEntry
     setStage("closed");
   };
 
+  const offersPayment = paymentFailed && canSell;
+
+  // Closing the notice, by either button, is what marks it seen.
   return (
-    <AlertDialog open onOpenChange={(open) => !open && dismiss()}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>
-            {paymentFailed
-              ? t("statusNotice.paymentTitle", { name: community.name })
-              : t("statusNotice.title")}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
+    <ConfirmDialog
+      open
+      onOpenChange={(open) => !open && dismiss()}
+      title={
+        paymentFailed
+          ? t("statusNotice.paymentTitle", { name: community.name })
+          : t("statusNotice.title")
+      }
+      description={
+        <>
+          <span className="block">
             {paymentFailed
               ? canSell
                 ? t("statusNotice.paymentDescription")
                 : t("statusNotice.paymentDescriptionInApp")
               : t("statusNotice.description")}
-          </AlertDialogDescription>
-          <AlertDialogDescription>{t("statusNotice.readOnly")}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          {paymentFailed && canSell ? (
-            <>
-              <AlertDialogCancel onClick={dismiss}>{t("statusNotice.notNow")}</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  markSeenThisSession(seenKey);
-                  void openPortal(community.id, "manage");
-                }}
-              >
-                {t("statusNotice.updatePayment")}
-              </AlertDialogAction>
-            </>
-          ) : canAskForHelp ? (
-            <>
-              <AlertDialogCancel onClick={dismiss}>{t("common:ok")}</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={(event) => {
-                  event.preventDefault();
-                  markSeenThisSession(seenKey);
-                  setStage("help");
-                }}
-              >
-                {t("statusNotice.contactSupport")}
-              </AlertDialogAction>
-            </>
-          ) : (
-            <AlertDialogAction onClick={dismiss}>{t("common:ok")}</AlertDialogAction>
-          )}
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </span>
+          <span className="mt-2 block">{t("statusNotice.readOnly")}</span>
+        </>
+      }
+      cancelLabel={offersPayment ? t("statusNotice.notNow") : t("common:ok")}
+      confirmLabel={
+        offersPayment ? t("statusNotice.updatePayment") : t("statusNotice.contactSupport")
+      }
+      onConfirm={
+        offersPayment
+          ? () => void openPortal(community.id, "manage")
+          : canAskForHelp
+            ? () =>
+                // Asked about this community where it takes requests; its
+                // address, at the foot of Help's search, where it gave one.
+                contact
+                  ? openHelp()
+                  : openHelp({ topic: SupportTopic.community, communityId: community.id })
+            : undefined
+      }
+    />
   );
 };

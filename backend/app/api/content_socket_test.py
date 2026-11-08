@@ -20,7 +20,7 @@ from app.core.security import SESSION_COOKIE_NAME
 from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.services.content_sockets import resource_room, sockets
-from app.testing import create_queue, get_auth_token
+from app.testing import create_counter_group, get_auth_token
 from app.testing.sockets import settle
 
 
@@ -149,11 +149,11 @@ async def test_hanging_up_before_the_first_frame_closes_nothing() -> None:
 # ── a tool row's stream ─────────────────────────────────────────────────────
 
 
-async def _watch(guild_id: int, queue_id: int, token: str) -> InboundWebSocket:
-    """Open a queue's stream and hold it until the handshake is done."""
+async def _watch(guild_id: int, group_id: int, token: str) -> InboundWebSocket:
+    """Open a counter group's stream and hold it until the handshake is done."""
     websocket = InboundWebSocket([_binary({"token": token})])
     serving = asyncio.create_task(
-        serve_tool_stream(websocket, guild_id, Tool.queue, queue_id)  # type: ignore[arg-type]
+        serve_tool_stream(websocket, guild_id, Tool.counter_group, group_id)  # type: ignore[arg-type]
     )
     done, _ = await asyncio.wait(
         {serving, asyncio.create_task(websocket.seated.wait())},
@@ -163,59 +163,60 @@ async def _watch(guild_id: int, queue_id: int, token: str) -> InboundWebSocket:
     return websocket
 
 
-async def test_a_reader_of_the_queue_is_seated_and_told_of_changes(
+async def test_a_reader_of_the_counter_group_is_seated_and_told_of_changes(
     session: AsyncSession, acting_user
 ) -> None:
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    queue = await create_queue(session, a.initiative, a.user)
+    group = await create_counter_group(session, a.initiative, a.user)
 
-    websocket = await _watch(a.guild.id, queue.id, get_auth_token(a.user))
+    websocket = await _watch(a.guild.id, group.id, get_auth_token(a.user))
     assert websocket.closed is None
-    assert sockets.room_size(resource_room(a.guild.id, "queue", queue.id)) == 1
+    room = resource_room(a.guild.id, "counter_group", group.id)
+    assert sockets.room_size(room) == 1
 
-    sockets.signal(a.guild.id, Tool.queue, queue.id, "turn_advance")
+    sockets.signal(a.guild.id, Tool.counter_group, group.id, "counter_updated")
     await settle()
     await websocket.serving  # type: ignore[attr-defined]
 
-    assert [frame["type"] for frame in websocket.sent] == ["turn_advance"]
-    assert sockets.room_size(resource_room(a.guild.id, "queue", queue.id)) == 0
+    assert [frame["type"] for frame in websocket.sent] == ["counter_updated"]
+    assert sockets.room_size(room) == 0
 
 
 async def test_a_revoked_sign_in_is_refused(session: AsyncSession, acting_user) -> None:
     """A sign-in ended by bumping ``token_version`` opens no socket."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    queue = await create_queue(session, a.initiative, a.user)
+    group = await create_counter_group(session, a.initiative, a.user)
     token = get_auth_token(a.user)
     a.user.token_version += 1
     session.add(a.user)
     await session.commit()
 
-    websocket = await _watch(a.guild.id, queue.id, token)
+    websocket = await _watch(a.guild.id, group.id, token)
     await websocket.serving  # type: ignore[attr-defined]
 
     assert websocket.closed == status.WS_1008_POLICY_VIOLATION
 
 
-async def test_a_queue_whose_tool_is_switched_off_is_not_streamed(
+async def test_a_counter_group_whose_tool_is_switched_off_is_not_streamed(
     session: AsyncSession, acting_user
 ) -> None:
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    queue = await create_queue(session, a.initiative, a.user)
-    a.initiative.queues_enabled = False
+    group = await create_counter_group(session, a.initiative, a.user)
+    a.initiative.counter_groups_enabled = False
     session.add(a.initiative)
     await session.commit()
 
-    websocket = await _watch(a.guild.id, queue.id, get_auth_token(a.user))
+    websocket = await _watch(a.guild.id, group.id, get_auth_token(a.user))
     await websocket.serving  # type: ignore[attr-defined]
 
     assert websocket.closed == status.WS_1008_POLICY_VIOLATION
 
 
-async def test_a_member_the_queue_is_not_shared_with_is_refused(
+async def test_a_member_the_counter_group_is_not_shared_with_is_refused(
     session: AsyncSession, acting_user
 ) -> None:
     owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    queue = await create_queue(session, owner.initiative, owner.user)
+    group = await create_counter_group(session, owner.initiative, owner.user)
     outsider = await acting_user(
         guild_role=CommunityRole.member,
         guild=owner.guild,
@@ -224,7 +225,7 @@ async def test_a_member_the_queue_is_not_shared_with_is_refused(
     )
     await session.commit()
 
-    websocket = await _watch(owner.guild.id, queue.id, get_auth_token(outsider.user))
+    websocket = await _watch(owner.guild.id, group.id, get_auth_token(outsider.user))
     await websocket.serving  # type: ignore[attr-defined]
 
     assert websocket.closed == status.WS_1008_POLICY_VIOLATION

@@ -1,7 +1,10 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
+import { useSetMemberDisplayName } from "@/hooks/useUsers";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import type { DialogProps } from "@/types/dialog";
 import {
   Dialog,
   DialogContent,
@@ -9,13 +12,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useSetMemberDisplayName } from "@/hooks/useUsers";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
-import type { DialogProps } from "@/types/dialog";
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
 
 /** The longest name the server takes (`MEMBER_DISPLAY_NAME_MAX_LENGTH`). */
 const MAX_LENGTH = 64;
@@ -49,9 +48,11 @@ export const MemberDisplayNameDialog = ({
     onError: (error) => toast.error(getErrorMessage(error, "communities:displayName.saveFailed")),
   });
 
-  useEffect(() => {
+  const [prev, setPrev] = useState({ open, current });
+  if (prev.open !== open || prev.current !== current) {
+    setPrev({ open, current });
     if (open) setValue(current ?? "");
-  }, [open, current]);
+  }
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -76,24 +77,15 @@ export const MemberDisplayNameDialog = ({
           </DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="member-display-name">{t("displayName.label")}</Label>
+          <Field label={t("displayName.label")}>
             <Input
-              id="member-display-name"
               value={value}
               maxLength={MAX_LENGTH}
               onChange={(event) => setValue(event.target.value)}
               autoFocus
             />
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              {t("common:cancel")}
-            </Button>
-            <Button type="submit" disabled={setDisplayName.isPending}>
-              {t("common:save")}
-            </Button>
-          </DialogFooter>
+          </Field>
+          <DialogFooter submitLabel={t("common:save")} pending={setDisplayName.isPending} />
         </form>
       </DialogContent>
     </Dialog>

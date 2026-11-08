@@ -12,8 +12,8 @@ import {
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { formatCompactTime as formatTime } from "@/lib/timeFormat";
-import { cn } from "@/lib/utils";
+import { formatCompactTime as formatTime } from "@/ui/lib/timeFormat";
+import { cn } from "@/ui/lib/utils";
 
 import {
   type CalendarGridViewProps,

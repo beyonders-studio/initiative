@@ -23,22 +23,15 @@ import type { EmailOtpRegister, Token } from "@/api/generated/initiativeAPI.sche
 import { CaptchaWidget } from "@/components/auth/CaptchaWidget";
 import { LegalNotice } from "@/components/auth/LegalNotice";
 import { ServerChip } from "@/components/auth/ServerChoice";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useLegalIndex } from "@/hooks/useLegalDocuments";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { browserTimezone } from "@/lib/timezones";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
 
 type Step = "address" | "code" | "handle";
 
@@ -186,10 +179,8 @@ export const EmailOtpCard = ({ onCancel, onSignedIn, inviteCode, registration }:
 
         {step === "address" ? (
           <form className="space-y-4" onSubmit={askForCode}>
-            <div className="space-y-2">
-              <Label htmlFor="email-otp-address">{t("emailOtp.addressLabel")}</Label>
+            <Field label={t("emailOtp.addressLabel")}>
               <Input
-                id="email-otp-address"
                 type="email"
                 autoComplete="email"
                 autoFocus
@@ -198,7 +189,7 @@ export const EmailOtpCard = ({ onCancel, onSignedIn, inviteCode, registration }:
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder={t("emailOtp.addressPlaceholder")}
               />
-            </div>
+            </Field>
             {captcha ? (
               <CaptchaWidget key={captchaKey} config={captcha} onToken={setCaptchaToken} />
             ) : null}
@@ -217,10 +208,8 @@ export const EmailOtpCard = ({ onCancel, onSignedIn, inviteCode, registration }:
 
         {step === "code" ? (
           <form className="space-y-4" onSubmit={answerCode}>
-            <div className="space-y-2">
-              <Label htmlFor="email-otp-code">{t("emailOtp.codeLabel")}</Label>
+            <Field label={t("emailOtp.codeLabel")}>
               <Input
-                id="email-otp-code"
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 autoCapitalize="none"
@@ -232,7 +221,7 @@ export const EmailOtpCard = ({ onCancel, onSignedIn, inviteCode, registration }:
                 onChange={(event) => setCode(event.target.value)}
                 placeholder={t("emailOtp.codePlaceholder")}
               />
-            </div>
+            </Field>
             <Button type="submit" className="w-full" disabled={busy}>
               {busy ? t("login.submitting") : t("emailOtp.codeAction")}
             </Button>
@@ -254,10 +243,8 @@ export const EmailOtpCard = ({ onCancel, onSignedIn, inviteCode, registration }:
 
         {step === "handle" ? (
           <form className="space-y-4" onSubmit={chooseHandle}>
-            <div className="space-y-2">
-              <Label htmlFor="email-otp-username">{t("emailOtp.usernameLabel")}</Label>
+            <Field label={t("emailOtp.usernameLabel")}>
               <Input
-                id="email-otp-username"
                 autoComplete="username"
                 autoFocus
                 required
@@ -265,7 +252,7 @@ export const EmailOtpCard = ({ onCancel, onSignedIn, inviteCode, registration }:
                 onChange={(event) => setUsername(event.target.value)}
                 placeholder={t("emailOtp.usernamePlaceholder")}
               />
-            </div>
+            </Field>
             {/* Pressing the button below is the agreement, so the notice sits
               right above it. */}
             <LegalNotice />

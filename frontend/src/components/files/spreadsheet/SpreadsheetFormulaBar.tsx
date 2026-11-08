@@ -1,4 +1,4 @@
-import { type FocusEvent, type KeyboardEvent, type RefObject, useEffect, useState } from "react";
+import { type FocusEvent, type KeyboardEvent, type RefObject, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type DraftStore, useDraft } from "@/components/files/spreadsheet/draftStore";
@@ -54,9 +54,11 @@ export const SpreadsheetFormulaBar = ({
   // Local name-box draft, synced to the selection unless the user is editing it.
   const [nameDraft, setNameDraft] = useState(selectionLabel);
   const [nameFocused, setNameFocused] = useState(false);
-  useEffect(() => {
+  const [prevSelectionLabel, setPrevSelectionLabel] = useState(selectionLabel);
+  if (prevSelectionLabel !== selectionLabel) {
+    setPrevSelectionLabel(selectionLabel);
     if (!nameFocused) setNameDraft(selectionLabel);
-  }, [selectionLabel, nameFocused]);
+  }
 
   const handleNameKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {

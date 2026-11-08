@@ -1,10 +1,12 @@
 import { screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 
 import { buildPropertySummary } from "@/__tests__/factories/properties";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
-import { numberFormat } from "@/lib/intl";
+import { formatDateTime } from "@/lib/formatDate";
+import { numberFormat } from "@/ui/lib/intl";
 
 import { PropertyValueCell } from "./PropertyValueCell";
 
@@ -23,6 +25,35 @@ describe("PropertyValueCell", () => {
     expect(screen.getByText(expected)).toBeInTheDocument();
   });
 
+  it("names the file a file field holds, or says the reader cannot open it", () => {
+    const field = buildPropertySummary({
+      type: MetadataType.file,
+      value: { id: 7, name: "Mockup", file_type: "url", smart_link_url: null },
+    });
+    const { rerender } = renderWithProviders(<PropertyValueCell summary={field} />);
+    expect(screen.getByText("Mockup")).toBeInTheDocument();
+
+    rerender(<PropertyValueCell summary={{ ...field, value: { id: 7 } }} />);
+    expect(screen.getByText("A file you can't open")).toBeInTheDocument();
+  });
+
+  it("says who signed and when, and on the item's page whether it changed since", () => {
+    const signedAt = "2026-11-06T18:00:00Z";
+    const field = buildPropertySummary({
+      type: MetadataType.signature,
+      value: { user: { id: 3, display_name: "Ada" }, name: "Ada L.", signed_at: signedAt },
+    });
+    const signed = `Ada L., ${formatDateTime(signedAt)}`;
+    const { rerender } = renderWithProviders(
+      <PropertyValueCell summary={field} updatedAt="2026-11-06T17:00:00Z" />
+    );
+    expect(screen.getByText(signed)).toBeInTheDocument();
+    expect(screen.queryByText("Updated after signing")).not.toBeInTheDocument();
+
+    rerender(<PropertyValueCell summary={field} updatedAt="2026-11-06T19:00:00Z" />);
+    expect(screen.getByText("Updated after signing")).toBeInTheDocument();
+  });
+
   it("draws a scale as a number, stars or a bar, as its layout says", () => {
     const scale = buildPropertySummary({ type: MetadataType.scale, value: 61 });
     const { rerender } = renderWithProviders(<PropertyValueCell summary={scale} />);
@@ -37,6 +68,59 @@ describe("PropertyValueCell", () => {
     rerender(<PropertyValueCell summary={scale} display="bar" />);
     const bar = screen.getByRole("img", { name: percent });
     expect(bar.firstElementChild).toHaveStyle({ width: "61%" });
+  });
+
+  it("draws a counter as a number, a bar or a clock, from its initial value", () => {
+    const counter = buildPropertySummary({
+      type: MetadataType.counter,
+      counter: { step: 1, min: 0, max: 4, initial: 3 },
+      value: null,
+    });
+    const { rerender } = renderWithProviders(<PropertyValueCell summary={counter} />);
+    expect(screen.getByText("3")).toBeInTheDocument();
+
+    rerender(<PropertyValueCell summary={{ ...counter, value: 1 }} display="bar" />);
+    expect(screen.getByRole("img", { name: "1 / 4" }).firstElementChild).toHaveStyle({
+      width: "25%",
+    });
+
+    rerender(<PropertyValueCell summary={counter} display="clock" />);
+    const clock = screen.getByRole("img", { name: "3 / 4" });
+    // One segment a step, three of the four filled.
+    expect(clock.querySelectorAll("path")).toHaveLength(4);
+    expect(clock.querySelectorAll("path.fill-primary")).toHaveLength(3);
+  });
+
+  it("steps a counter it may change, showing the step at once and then the server's", async () => {
+    const counter = buildPropertySummary({
+      type: MetadataType.counter,
+      name: "Seats",
+      counter: { step: 1, min: 0, max: 4, initial: 3 },
+      value: null,
+    });
+    let answer: (values: (typeof counter)[]) => void = () => undefined;
+    const onStep = vi.fn(
+      () =>
+        new Promise<(typeof counter)[]>((resolve) => {
+          answer = resolve;
+        })
+    );
+    const onRow = vi.fn();
+    renderWithProviders(
+      <div onClick={onRow}>
+        <PropertyValueCell summary={counter} onStep={onStep} />
+      </div>
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Step Seats up" }));
+    expect(onStep).toHaveBeenCalledWith(true);
+    expect(onRow).not.toHaveBeenCalled();
+    expect(screen.getByText("4")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Step Seats up" })).toBeDisabled();
+
+    // Somebody else stepped it down meanwhile.
+    answer([{ ...counter, value: 3 }]);
+    expect(await screen.findByText("3")).toBeInTheDocument();
   });
 
   it("reads a scale kept with a state beside it by its figure", () => {

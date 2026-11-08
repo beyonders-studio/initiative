@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { BetaBadge } from "@/components/BetaBadge";
 import { LogoIcon } from "@/components/LogoIcon";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 /**
  * The ground every signed-out card sits on: the hex backdrop and the
@@ -32,7 +33,7 @@ export const SignInFrame = ({
     >
       <div
         className={cn(
-          "flex min-h-screen flex-col items-center justify-center gap-3 bg-muted/60 px-4 py-12",
+          "flex min-h-app flex-col items-center justify-center gap-3 bg-muted/60 px-4 py-12",
           fillPhone && "max-sm:justify-start max-sm:p-0"
         )}
       >
@@ -44,6 +45,7 @@ export const SignInFrame = ({
         >
           <LogoIcon className="h-12 w-12" aria-hidden="true" focusable="false" />
           <span className="pride-wordmark">{t("appName")}</span>
+          <BetaBadge className="self-center" />
         </div>
         {children}
       </div>

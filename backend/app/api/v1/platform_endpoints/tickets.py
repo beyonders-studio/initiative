@@ -9,7 +9,7 @@ Two routes, both the signed-in person's own:
 
 And the cases they filed, which they follow: the list, one case with what has
 been said to them about it, and their answer. What a filer reads is decided by
-the operations community's filer role (``app.db.filer_access``), which these
+the operations community's filer role (``app.db.operations_schema``), which these
 routes read through.
 
 A suspended account reaches these too, for one shape: it may appeal its
@@ -34,6 +34,7 @@ from fastapi import (
 )
 from fastapi.exceptions import RequestValidationError
 from pydantic import TypeAdapter, ValidationError
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
     TicketHolder,
@@ -216,7 +217,7 @@ async def file_ticket(
     elif isinstance(ticket, SecurityTicketCreate):
         accepted = await _report_security_problem(current_user, ticket, attached)
     elif isinstance(ticket, FeedbackTicketCreate):
-        accepted = await _send_feedback(current_user, ticket, attached)
+        accepted = await _send_feedback(session, current_user, ticket, attached)
     elif isinstance(ticket, AppealTicketCreate):
         accepted = await _appeal(current_user, ticket, attached)
     else:
@@ -239,15 +240,22 @@ async def file_ticket(
 
 
 async def _send_feedback(
+    session: AsyncSession,
     sender: User,
     payload: FeedbackTicketCreate,
     attached: list[evidence_service.PreparedEvidence],
 ) -> TicketAccepted:
+    if await tickets_service.feedback_goes(session) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=FeedbackMessages.NOWHERE_TO_SEND,
+        )
     try:
         await feedback_service.send(
-            filer=sender,
+            sender=sender,
             topic=payload.type,
             body=payload.body,
+            contactable=payload.contactable,
             context=payload.context,
             evidence=attached,
         )
@@ -324,6 +332,7 @@ async def _ask_for_help(
             subject=payload.subject,
             body=payload.body,
             topic=payload.type,
+            context=payload.context,
             evidence=attached,
         )
     except support_service.SupportUnavailable as exc:

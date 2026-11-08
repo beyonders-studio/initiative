@@ -162,17 +162,16 @@
       "events": "Eventos",
       "project": "Proyecto",
       "file": "Archivo",
-      "queue": "Cola",
       "calendar": "Calendario",
       "post": "Publicación",
       "wiki": "Wiki",
+      "contact": "Contacto",
       "initiative": "Iniciativa",
       "community": "Comunidad",
       "counter-group": "Grupo de contadores",
       "dashboard": "Panel"
     },
     "download": "Descargar",
-    "empty": "Aún no hay exportaciones.",
-    "loadFailed": "No se pudieron cargar las exportaciones. Actualiza para volver a intentarlo."
+    "empty": "Aún no hay exportaciones."
   }
 }

@@ -1,6 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 import { type PageSearch, validatePage } from "@/lib/routeSearch";
+import { HomePage } from "@/pages/user/HomePage";
 
 /**
  * Home. There is deliberately no loader here.
@@ -18,7 +19,5 @@ export const Route = createFileRoute("/_serverRequired/_authenticated/")({
   validateSearch: (search: Record<string, unknown>): PageSearch => ({
     page: validatePage(search.page),
   }),
-  component: lazyRouteComponent(() =>
-    import("@/pages/user/HomePage").then((m) => ({ default: m.HomePage }))
-  ),
+  component: HomePage,
 });

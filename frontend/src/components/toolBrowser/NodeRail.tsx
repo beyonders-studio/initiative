@@ -33,7 +33,7 @@
 import { Link } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 /**
  * What the tray is made of. The rail renders its top and the page renders the

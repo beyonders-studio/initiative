@@ -1,13 +1,13 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolCreateLabelKey, toolCreateTarget } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { DropdownMenuItem } from "@/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 
 /**
  * The single source of "how do I create this tool" — derived entirely from the
@@ -16,7 +16,6 @@ import { toolCreateLabelKey, toolCreateTarget } from "@/lib/tools";
  */
 export function useToolCreate(tool: Tool, initiativeId: number) {
   const gp = useCommunityPath();
-  const _navigate = useNavigate();
   const { t } = useTranslation("nav");
 
   const target = toolCreateTarget(tool, initiativeId);

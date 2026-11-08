@@ -5,7 +5,7 @@
  * follow, an organisation they run, work somebody handed them — so the page is
  * a canvas of widgets the reader arranges, starting from one of a few layouts
  * made for those reasons. Someone who is here for more than one keeps several
- * views — work on one, the scout group on another — and moves between them
+ * views — work on one, the soccer league on another — and moves between them
  * with tabs. It began as My Tasks, and with nothing arranged it still is: a
  * greeting over the focus card and the tasks table.
  */
@@ -23,21 +23,9 @@ import { HomeViewBanner } from "@/components/home/HomeViewBanner";
 import { HomeViewTabs } from "@/components/home/HomeViewTabs";
 import { HomeWidgetSettingsDialog } from "@/components/home/HomeWidgetSettingsDialog";
 import { HomeActionsContext } from "@/components/home/homeActions";
-import { PullToRefresh } from "@/components/PullToRefresh";
-import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { useHomeViews } from "@/hooks/useHomeViews";
 import { useMyDecorations } from "@/hooks/useUsers";
-import { atLeast, useRegionWidthClass } from "@/hooks/useWidthClass";
 import {
   addWidget,
   applyGrid,
@@ -50,7 +38,19 @@ import {
 } from "@/lib/home/layout";
 import { presetLayout } from "@/lib/home/presets";
 import { decorationSrc, resolveDecoration } from "@/lib/profileDecorations";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/ui/empty";
+import { atLeast, useRegionWidthClass } from "@/ui/lib/useWidthClass";
+import { cn } from "@/ui/lib/utils";
+import { PullToRefresh } from "@/ui/pull-to-refresh";
+import { Skeleton } from "@/ui/skeleton";
 
 export const HomePage = () => {
   const { t } = useTranslation(["home", "common"]);

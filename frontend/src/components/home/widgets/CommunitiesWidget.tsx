@@ -13,8 +13,8 @@ import { useTranslation } from "react-i18next";
 import type { DirectoryCommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { CommunityCard } from "@/components/communities/CommunityCard";
 import { HomeWidgetCard, HomeWidgetNotice } from "@/components/home/HomeWidgetCard";
-import { Button } from "@/components/ui/button";
 import { useCommunities } from "@/hooks/useCommunities";
+import { Button } from "@/ui/button";
 
 export const CommunitiesWidget = () => {
   const { t } = useTranslation("home");

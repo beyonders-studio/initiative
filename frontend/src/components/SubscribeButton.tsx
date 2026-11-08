@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import type { ContentKind } from "@/api/generated/initiativeAPI.schemas";
 import { useSubscription } from "@/hooks/usePersonalItems";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 interface SubscribeButtonProps {
   kind: ContentKind;

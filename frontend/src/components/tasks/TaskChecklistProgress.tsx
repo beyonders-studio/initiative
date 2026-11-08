@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 
 import type { ChecklistProgress } from "@/api/generated/initiativeAPI.schemas";
-import { Progress } from "@/components/ui/progress";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
+import { Progress } from "@/ui/progress";
 
 type TaskChecklistProgressProps = {
   progress?: ChecklistProgress | null;

@@ -15,22 +15,23 @@
  * for the choice to move.
  */
 
-import { ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CommunityPluginDetail } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSetPluginPlacementRoles, useUpdateCommunityPlugin } from "@/hooks/useCommunityPlugins";
 import { useInitiativeRoles } from "@/hooks/useInitiativeRoles";
 import { useCommunityInitiatives } from "@/hooks/useInitiatives";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { declaredPages, hasInitiativeSurfaces } from "@/lib/pluginSurfaces";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { Label } from "@/ui/label";
+import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 
 export interface PluginPlacementPanelProps {
   plugin: CommunityPluginDetail;
@@ -170,10 +171,9 @@ export function PluginPlacementPanel({ plugin }: PluginPlacementPanelProps) {
       {mode === "some" && (
         <div className="space-y-2 border-l pl-4">
           {initiatives.isLoading ? (
-            <div className="flex items-center gap-2 text-muted-foreground text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              {t("common:loading")}
-            </div>
+            <SkeletonRegion>
+              <SkeletonLines lines={3} />
+            </SkeletonRegion>
           ) : (
             roster.map((initiative) => (
               <div key={initiative.id} className="flex items-center gap-2">
@@ -260,7 +260,6 @@ function PlacementRoleChoices({
   initiativeId,
   roleIds,
 }: Omit<PlacementRolesProps, "initiativeName">) {
-  const { t } = useTranslation(["plugins", "common"]);
   const roles = useInitiativeRoles(initiativeId);
   const setRoles = useSetPluginPlacementRoles(pluginId);
   // Seeded from the stored placement each time the chooser opens, then kept
@@ -282,10 +281,9 @@ function PlacementRoleChoices({
 
   if (roles.isLoading) {
     return (
-      <div className="flex items-center gap-2 text-muted-foreground text-sm">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        {t("common:loading")}
-      </div>
+      <SkeletonRegion>
+        <SkeletonLines lines={3} />
+      </SkeletonRegion>
     );
   }
 

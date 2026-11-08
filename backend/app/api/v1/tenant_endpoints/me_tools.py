@@ -155,11 +155,6 @@ MY_TOOL_LISTS: dict[Tool, MyToolList] = {
             "``created_by_me`` to the ones the caller wrote."
         ),
     ),
-    Tool.queue: MyToolList(
-        default_key=lambda model: model.updated_at,
-        page_size=page_size_param(20, ge=0, le=100),
-        list_doc="Queues that reach the caller across every guild they belong to.",
-    ),
     Tool.counter_group: MyToolList(
         default_key=lambda model: model.updated_at,
         page_size=page_size_param(20, ge=0, le=100),
@@ -214,6 +209,13 @@ MY_TOOL_LISTS: dict[Tool, MyToolList] = {
         default_key=lambda model: model.updated_at,
         page_size=page_size_param(20, ge=0, le=100),
         list_doc=("Wikis that reach the caller across every guild they belong to."),
+    ),
+    Tool.contact: MyToolList(
+        # By name, as an address book is read.
+        default_key=my_tools_service.name_key,
+        default_desc=False,
+        page_size=page_size_param(20, ge=0, le=100),
+        list_doc="Contacts that reach the caller across every guild they belong to.",
     ),
 }
 

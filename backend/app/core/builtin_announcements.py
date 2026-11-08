@@ -352,12 +352,12 @@ BUILTIN_ANNOUNCEMENTS: tuple[BuiltinAnnouncement, ...] = (
         ),
     ),
     BuiltinAnnouncement(
-        slug="0-78-galleries-are-collections",
-        title="Galleries are now collections",
+        slug="0-78-galleries-and-queues",
+        title="Galleries are now collections, and queues projects",
         category=AnnouncementCategory.info,
         published_at=datetime(2026, 10, 27, tzinfo=timezone.utc),
-        # For the people who had galleries. A new account and a fresh install
-        # start with collections and nothing to look for.
+        # For the people who had galleries or queues. A new account and a fresh
+        # install start with neither and have nothing to look for.
         audience_accounts=AnnouncementAudienceAccounts.existing,
         only_upgrading_from_below="0.78.0",
         trigger_route="/c/**",
@@ -402,14 +402,30 @@ BUILTIN_ANNOUNCEMENTS: tuple[BuiltinAnnouncement, ...] = (
                     "Programs and scripts are the one thing refused."
                 ),
             ),
+            AnnouncementSection(
+                starts_page=True,
+                heading="Queues are now projects",
+                body=(
+                    "We want Initiative to stay focused on project management. "
+                    "Projects now have task types, statuses, properties and "
+                    "board, table, Gantt and calendar views, so most of what we "
+                    "built queues for is done better in a project.\n\n"
+                    "Each queue is now a **project** in the same initiative, and "
+                    "each of its items a task, in the order the queue showed "
+                    "them. The item it was on is **Up now**, held items are "
+                    "**Held**, hidden ones **Sitting out** and the rest "
+                    "**Waiting**. An item's member is linked to its task, and its "
+                    "comments, sharing, tags and links came with it."
+                ),
+            ),
+            AnnouncementSection(
+                heading="Taking turns",
+                body=(
+                    "A project has no **Next** button or rounds. Move a task to "
+                    "**Up now** when it's someone's turn, and to **Done** once "
+                    "it's finished."
+                ),
+            ),
         ),
     ),
 )
-
-
-def builtin_by_key(key: str) -> BuiltinAnnouncement | None:
-    """The builtin a read receipt's key names, if this version still has it."""
-    for announcement in BUILTIN_ANNOUNCEMENTS:
-        if announcement.key == key:
-            return announcement
-    return None

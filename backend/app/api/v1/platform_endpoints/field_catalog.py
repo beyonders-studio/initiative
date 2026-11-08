@@ -30,7 +30,7 @@ from app.schemas.sql_query import QueryVocabulary
 from app.services import fields as fields_registry
 from app.services.fields.grouping import describe_groupings
 from app.services.fields.registry import DatasetName, dataset_names
-from app.services.query.resolve import ALLOWED_FUNCTIONS, VIEWER
+from app.services.query.resolve import ALLOWED_FUNCTIONS, PLUGIN, SHEET, VIEWER
 
 router = APIRouter()
 
@@ -51,7 +51,9 @@ def read_field_catalog(dataset: DatasetName) -> FieldCatalogResponse:
         dataset=dataset.value,
         fields=[
             FieldDescription(**entry)
-            for entry in fields_registry.describe(dataset.value)
+            for entry in fields_registry.describe(
+                fields_registry.dataset(dataset.value)
+            )
         ],
         relations=[
             RelationDescription(name=relation.name, dataset=relation.dataset)
@@ -77,10 +79,11 @@ def read_query_vocabulary() -> QueryVocabulary:
 
     Both read from the validator's own allow-lists, so a word offered here is
     one it accepts. Beside a dataset's fields (above), this is everything a
-    client needs to complete a statement somebody is writing.
+    client needs to complete a statement somebody is writing. ``sheet`` is
+    among the functions: it is called in ``FROM``, to read a spreadsheet.
     """
     return QueryVocabulary(
         datasets=sorted(dataset_names()),
-        functions=sorted(ALLOWED_FUNCTIONS),
+        functions=sorted(ALLOWED_FUNCTIONS | {SHEET, PLUGIN}),
         tokens=[VIEWER],
     )

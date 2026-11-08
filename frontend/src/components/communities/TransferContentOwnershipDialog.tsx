@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import type {
   OwnedContentResponse,
   OwnershipTransferRequest,
-  OwnershipTransferResponse,
   Tool,
   UserCommunityMember,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -17,8 +16,16 @@ import {
 } from "@/api/generated/users/users";
 import { invalidate, q } from "@/api/query-keys";
 import type { MemberLike } from "@/components/members/MemberSearchSelect";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
-import { Button } from "@/components/ui/button";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useApiMutation } from "@/hooks/useApiMutation";
+import { USER_ID_LOOKUP_MAX, useUserSearch } from "@/hooks/useUsers";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import { isAdminRole } from "@/lib/permissions";
+import { toolCamelPlural } from "@/lib/tools";
+import { getUserDisplayName } from "@/lib/userDisplay";
+import { Button } from "@/ui/button";
+import { Combobox, type ComboboxItem } from "@/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -26,16 +33,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import type { SearchableComboboxItem } from "@/components/ui/searchable-combobox";
-import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { USER_ID_LOOKUP_MAX, useUserSearch } from "@/hooks/useUsers";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
-import { isAdminRole } from "@/lib/permissions";
-import { toolCamelPlural } from "@/lib/tools";
-import { getUserDisplayName } from "@/lib/userDisplay";
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
 
 /**
  * Counts keyed by tool, rendered as "3 projects · 1 calendar". The label comes
@@ -101,7 +100,6 @@ export const TransferContentOwnershipDialog = ({
   const [recipientLabel, setRecipientLabel] = useState<string | null>(null);
   const [content, setContent] = useState<OwnedContentResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
 
   const isClaim = member === null;
 
@@ -150,7 +148,7 @@ export const TransferContentOwnershipDialog = ({
     pageSize: USER_ID_LOOKUP_MAX,
     enabled: open && pickerOpen,
   });
-  const recipients = useMemo<SearchableComboboxItem[]>(() => {
+  const recipients = useMemo<ComboboxItem[]>(() => {
     const term = search.trim().toLowerCase();
     return [
       ...(adminSearch.data?.items ?? [])
@@ -172,29 +170,36 @@ export const TransferContentOwnershipDialog = ({
       ? getUserDisplayName(defaultRecipientUser)
       : null);
 
-  const handleSubmit = async () => {
-    if (!recipientId) return;
-    setSubmitting(true);
-    try {
-      const body = transferBody(recipientId);
-      const result = (member === null
-        ? await claimUnownedContent(communityId, body)
-        : await transferOwnership(
-            communityId,
-            member.id,
-            body
-          )) as unknown as OwnershipTransferResponse;
-      void invalidate(q.communityMembers());
-      toast.success(t("transferOwnership.moved", { count: result.total }));
-      onSuccess?.();
-      onOpenChange(false);
-    } catch (err) {
-      console.error("Failed to transfer ownership", err);
-      toast.error(getErrorMessage(err, "communities:transferOwnership.failed"));
-    } finally {
-      setSubmitting(false);
+  // The request carries the community, whose content and where it goes, so
+  // closing the dialog while it waits for the connection cannot change what it
+  // moves.
+  const transfer = useApiMutation(
+    {
+      mutationFn: ({
+        community,
+        from,
+        recipient,
+      }: {
+        community: number;
+        from: number | null;
+        recipient: string;
+      }) => {
+        const body = transferBody(recipient);
+        return from === null
+          ? claimUnownedContent(community, body)
+          : transferOwnership(community, from, body);
+      },
+      invalidate: () => invalidate(q.communityMembers()),
+      errorKey: "communities:transferOwnership.failed",
+    },
+    {
+      onSuccess: (result) => {
+        toast.success(t("transferOwnership.moved", { count: result.total }));
+        onSuccess?.();
+        onOpenChange(false);
+      },
     }
-  };
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -235,7 +240,7 @@ export const TransferContentOwnershipDialog = ({
 
             <div className="space-y-2">
               <Label>{t("transferOwnership.recipientLabel")}</Label>
-              <AsyncCombobox
+              <Combobox
                 items={recipients}
                 value={recipientId}
                 onValueChange={(value) => {
@@ -259,19 +264,28 @@ export const TransferContentOwnershipDialog = ({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={transfer.isPending}
+          >
             {t("common:cancel")}
           </Button>
           {!nothingToMove && !loading && (
-            <Button onClick={handleSubmit} disabled={submitting || !recipientId}>
-              {submitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("transferOwnership.transferring")}
-                </>
-              ) : (
-                t("transferOwnership.confirm")
-              )}
+            <Button
+              onClick={() =>
+                transfer.mutate({
+                  community: communityId,
+                  from: member?.id ?? null,
+                  recipient: recipientId,
+                })
+              }
+              pending={transfer.isPending}
+              disabled={!recipientId}
+            >
+              {transfer.isPending
+                ? t("transferOwnership.transferring")
+                : t("transferOwnership.confirm")}
             </Button>
           )}
         </DialogFooter>

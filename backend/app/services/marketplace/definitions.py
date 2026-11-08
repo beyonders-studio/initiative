@@ -165,10 +165,10 @@ PLUGIN_KINDS: frozenset[str] = frozenset({"tool_instance", "service"})
 GUILD_INSTALLABLE_PLUGIN_KINDS: frozenset[str] = frozenset({"tool_instance", "service"})
 
 #: Tools a plug-in may mount at guild scope. A tool qualifies when its content is
-#: meaningful without an initiative — a calendar of the guild's own events is;
-#: a dashboard, which binds to one initiative's data, is not (and is not
-#: planned to be).
-MOUNTABLE_TOOLS: frozenset[str] = frozenset({"calendar"})
+#: meaningful without an initiative — a calendar of the guild's own events is,
+#: and so is the guild's address book; a dashboard, which binds to one
+#: initiative's data, is not (and is not planned to be).
+MOUNTABLE_TOOLS: frozenset[str] = frozenset({"calendar", "contact"})
 
 #: The namespace this repository's own listings publish under.
 RESERVED_PUBLIC_ID_PREFIX = "core."

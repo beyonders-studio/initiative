@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 
 import type {
   EntityType,
@@ -10,13 +10,15 @@ import type {
 import {
   getListCommunityTrashQueryKey,
   getListMyTrashQueryKey,
-  listCommunityTrash,
-  listMyTrash,
   purgeTrashEntity,
   restoreTrashEntity,
+  useListCommunityTrash,
+  useListMyTrash,
 } from "@/api/generated/trash/trash";
 import { invalidate, q, type Spec } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useApiMutation } from "@/hooks/useApiMutation";
+import { queryClient } from "@/lib/queryClient";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
@@ -29,12 +31,7 @@ import type { QueryOpts } from "@/types/query";
  * per item via its `community_id`.
  */
 export const useMyTrashList = (params: ListMyTrashParams, options?: QueryOpts<TrashListResponse>) =>
-  useQuery<TrashListResponse>({
-    queryKey: getListMyTrashQueryKey(params),
-    queryFn: () => listMyTrash(params),
-    placeholderData: keepPreviousData,
-    ...options,
-  });
+  useListMyTrash(params, { query: { placeholderData: keepPreviousData, ...options } });
 
 /**
  * One page of the active community's trash, newest deletion first — the
@@ -46,11 +43,8 @@ export const useCommunityTrashList = (
   options?: QueryOpts<TrashListResponse>
 ) => {
   const communityId = useActiveCommunityId();
-  return useQuery<TrashListResponse>({
-    queryKey: getListCommunityTrashQueryKey(communityId, params),
-    queryFn: () => listCommunityTrash(communityId, params),
-    placeholderData: keepPreviousData,
-    ...options,
+  return useListCommunityTrash(communityId, params, {
+    query: { placeholderData: keepPreviousData, ...options },
   });
 };
 
@@ -58,7 +52,7 @@ export const useCommunityTrashList = (
 
 // Maps entity_type -> what a restore makes stale, so the row reappears in
 // active lists across the app without an explicit reload. Child entities (task,
-// comment, queue_item, counter) name their parent tool's lists.
+// comment, counter) name their parent tool's lists.
 const RESTORED: Record<EntityType, () => Spec> = {
   project: q.allProjects,
   wiki: q.allWikis,
@@ -68,8 +62,6 @@ const RESTORED: Record<EntityType, () => Spec> = {
   comment: q.allComments,
   initiative: q.allInitiatives,
   tag: q.allTags,
-  queue: q.allQueues,
-  queue_item: q.allQueues,
   calendar: q.allCalendars,
   calendar_event: q.allCalendarEvents,
   counter_group: q.allCounterGroups,
@@ -77,6 +69,7 @@ const RESTORED: Record<EntityType, () => Spec> = {
   post: q.allPosts,
   collection: q.allCollections,
   dashboard: q.allDashboards,
+  contact: q.allContacts,
 };
 
 export type RestoreTrashVars = {
@@ -87,39 +80,27 @@ export type RestoreTrashVars = {
   entityId: number;
 };
 
-export const useRestoreTrashEntity = (
-  options?: MutationOpts<RestoreResponse, RestoreTrashVars>
-) => {
-  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    ...rest,
-    mutationFn: async ({
-      communityId,
-      entityType,
-      entityId,
-    }: RestoreTrashVars): Promise<RestoreResponse> =>
-      restoreTrashEntity(communityId, entityType, entityId),
-    onSuccess: (...args) => {
-      const [, variables] = args;
-      // Invalidate both trash views (personal /me and the item's community), every
-      // page of each (the keys without params are prefixes), so the restored
-      // row disappears from both.
-      void queryClient.invalidateQueries({ queryKey: getListMyTrashQueryKey() });
-      void queryClient.invalidateQueries({
-        queryKey: getListCommunityTrashQueryKey(variables.communityId),
-      });
-      const restored = RESTORED[variables.entityType];
-      if (restored) void invalidate(restored());
-      onSuccess?.(...args);
-    },
-    onError: (...args) => {
-      onError?.(...args);
-    },
-    onSettled,
-  });
+// Both trash views (personal /me and the item's community), every page of each
+// (the keys without params are prefixes), so the row disappears from both.
+const invalidateTrash = (communityId: number) => {
+  void queryClient.invalidateQueries({ queryKey: getListMyTrashQueryKey() });
+  void queryClient.invalidateQueries({ queryKey: getListCommunityTrashQueryKey(communityId) });
 };
+
+export const useRestoreTrashEntity = (options?: MutationOpts<RestoreResponse, RestoreTrashVars>) =>
+  useApiMutation<RestoreResponse, RestoreTrashVars>(
+    {
+      mutationFn: ({ communityId, entityType, entityId }) =>
+        restoreTrashEntity(communityId, entityType, entityId),
+      invalidate: (_restored, { communityId, entityType }) => {
+        invalidateTrash(communityId);
+        const restored = RESTORED[entityType];
+        if (restored) void invalidate(restored());
+      },
+      errorKey: "trash:restoreError",
+    },
+    options
+  );
 
 export type PurgeTrashVars = {
   // Purge is community-scoped + admin-only; only reachable from the community view,
@@ -129,26 +110,14 @@ export type PurgeTrashVars = {
   entityId: number;
 };
 
-export const usePurgeTrashEntity = (options?: MutationOpts<void, PurgeTrashVars>) => {
-  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    ...rest,
-    mutationFn: async ({ communityId, entityType, entityId }: PurgeTrashVars) => {
-      await purgeTrashEntity(communityId, entityType, entityId);
+export const usePurgeTrashEntity = (options?: MutationOpts<void, PurgeTrashVars>) =>
+  useApiMutation<void, PurgeTrashVars>(
+    {
+      mutationFn: async ({ communityId, entityType, entityId }) => {
+        await purgeTrashEntity(communityId, entityType, entityId);
+      },
+      invalidate: (_none, { communityId }) => invalidateTrash(communityId),
+      errorKey: "trash:purgeError",
     },
-    onSuccess: (...args) => {
-      const [, variables] = args;
-      void queryClient.invalidateQueries({ queryKey: getListMyTrashQueryKey() });
-      void queryClient.invalidateQueries({
-        queryKey: getListCommunityTrashQueryKey(variables.communityId),
-      });
-      onSuccess?.(...args);
-    },
-    onError: (...args) => {
-      onError?.(...args);
-    },
-    onSettled,
-  });
-};
+    options
+  );

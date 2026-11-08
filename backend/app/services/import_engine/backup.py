@@ -32,7 +32,7 @@ import logging
 import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, BinaryIO, Callable, Optional
 
 from pydantic import ConfigDict
 
@@ -169,7 +169,7 @@ logger = logging.getLogger(__name__)
 def read_manifest(archive: zipfile.ZipFile, *, fetched: bool = False) -> BackupManifest:
     """The backup's manifest, read up to the JSON cap and checked.
 
-    ``fetched`` is as for :func:`zip_bounds.open_zip`."""
+    ``fetched`` is as for :func:`zip_bounds.json_cap`."""
     try:
         raw = read_json_member(
             archive,
@@ -211,7 +211,7 @@ def _reject_non_flat_asset_keys(manifest: BackupManifest) -> None:
 
 
 def plan_backup(
-    payload: bytes | Path,
+    payload: bytes | Path | BinaryIO,
     *,
     existing_initiative_names: set[str],
     member_ids_by_handle: dict[str, int] | None = None,
@@ -226,12 +226,12 @@ def plan_backup(
     reading of one file, and the roster is a fact about the community it is
     being read into.
 
-    ``fetched`` is as for :func:`zip_bounds.open_zip`. Blocking; run it in a
+    ``fetched`` is as for :func:`zip_bounds.json_cap`. Blocking; run it in a
     thread from async code.
     """
     from app.services.import_engine.importers import IMPORTERS
 
-    with open_zip(payload, fetched=fetched) as archive:
+    with open_zip(payload, bundle=True) as archive:
         manifest = read_manifest(archive, fetched=fetched)
 
     unknown_types = sorted(
@@ -298,7 +298,7 @@ async def stage_backup_job(
     *,
     guild_id: int,
     user: User,
-    payload: Path,
+    payload: Path | BinaryIO,
     status: DataJobStatus,
     anchor: datetime | None = None,
     people_map: dict[str, int] | None = None,
@@ -307,7 +307,8 @@ async def stage_backup_job(
 ) -> DataJob:
     """Plan the backup zip at ``payload``, stage it in the community's storage
     and add its job, created by ``user``, to ``session`` without committing.
-    ``payload_ref`` names it where it is already there (a resumable upload).
+    ``payload_ref`` names it where it is already there (a resumable upload),
+    and ``payload`` may then be the stored file, read where it is.
 
     ``session`` is routed into the community, and the plan suggests who each
     name in the archive is from the roster it reads there. A ``staged`` job
@@ -325,6 +326,7 @@ async def stage_backup_job(
     )
     await import_engine.count_active_jobs_locked(session, user=user)
     if payload_ref is None:
+        assert isinstance(payload, Path)
         payload_ref = await asyncio.to_thread(
             import_engine.stage_payload_file, guild_id, payload, suffix="zip"
         )
@@ -392,7 +394,7 @@ async def apply_backup(
 
     ``heartbeat`` is called after each asset and each entry, so the job can
     show it is still being applied. ``fetched`` is as for
-    :func:`zip_bounds.open_zip`. ``anchor``, when given, moves every date the
+    :func:`zip_bounds.json_cap`. ``anchor``, when given, moves every date the
     envelopes carry by the whole days from it to now, so a bundle reads as if
     it had been exported today (a repeat by its own rule, :func:`shift_dates`).
     ``join`` names members of the community who join every initiative the
@@ -404,7 +406,7 @@ async def apply_backup(
     from app.services.platform import guilds as guilds_service
     from app.services.tenant import initiatives as initiatives_service
 
-    with await asyncio.to_thread(open_zip, payload, fetched=fetched) as archive:
+    with await asyncio.to_thread(open_zip, payload, bundle=True) as archive:
         manifest = await asyncio.to_thread(read_manifest, archive, fetched=fetched)
         max_json_bytes = json_cap(fetched=fetched)
         result = BackupImportResult()

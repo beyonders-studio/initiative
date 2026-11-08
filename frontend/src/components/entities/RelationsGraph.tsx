@@ -10,16 +10,25 @@ import { animateNodes } from "sigma/utils";
 
 import "@react-sigma/core/lib/style.css";
 
-import type { EndpointRef } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import {
+  EndpointKind,
+  type EndpointRef,
+  type RelatedEnd,
+} from "@/api/generated/initiativeAPI.schemas";
 import { type GraphEdge, type GraphNode, MAX_HOPS } from "@/hooks/useRelationships";
 import { useTheme } from "@/hooks/useTheme";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { themeColor, withAlpha } from "@/lib/cssColor";
 import { iconDataUri } from "@/lib/iconSvg";
-import { groupOf, type RelationGroup, relatedTarget } from "@/lib/relationships";
-import { hitIcon, searchHitPath } from "@/lib/searchResults";
+import { getInitials } from "@/lib/initials";
+import { groupOf, isItem, type RelationGroup, relatedTarget } from "@/lib/relationships";
+import { entityIcon, hitIcon, searchHitPath } from "@/lib/searchResults";
+import { resolveUploadUrl } from "@/lib/uploadUrl";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { getUserColorStyle } from "@/ui/lib/userColor";
+import { SkeletonRegion } from "@/ui/page-skeletons";
+import { Skeleton } from "@/ui/skeleton";
 
 /** How far out each ring of neighbours sits before the layout takes over. */
 const RING = 10;
@@ -84,6 +93,19 @@ const iconUri = (
 };
 
 /**
+ * A person's face, or their initials in their own colour where they have no
+ * picture — the same two an avatar anywhere else falls between.
+ */
+const faceUri = (end: RelatedEnd): string => {
+  const picture = resolveUploadUrl(end.image_urls[0]);
+  if (picture) return picture;
+  const { backgroundColor, color } = getUserColorStyle(end.id);
+  const initials = getInitials(end.title).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const markup = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="${backgroundColor}"/><text x="12" y="12" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="9" font-weight="600" fill="${color}">${initials}</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
+};
+
+/**
  * Icons inside their nodes.
  *
  * `keepWithinCircle` with room to spare: the mark is drawn into the circle
@@ -93,6 +115,13 @@ const iconUri = (
 const NODE_PROGRAM = createNodeImageProgram({
   keepWithinCircle: true,
   padding: 0.28,
+  drawingMode: "background",
+});
+
+/** A face fills its node but for a ring in the link's colour. */
+const FACE_PROGRAM = createNodeImageProgram({
+  keepWithinCircle: true,
+  padding: 0.12,
   drawingMode: "background",
 });
 
@@ -147,6 +176,8 @@ interface NodeAttrs {
   color: string;
   image: string;
   href?: string;
+  /** Which program draws it: an icon, unless it is somebody's face. */
+  type?: "face";
 }
 
 interface RelationsGraphProps {
@@ -340,20 +371,17 @@ export const RelationsGraph = ({
       if (!groupFor.has(edge.to)) groupFor.set(edge.to, groupOf(edge, groups)?.key);
     }
 
-    const centreIcon = hitIcon({
-      entity_type: entity.type,
-      entity_id: entity.id,
-      initiative_id: null,
-      tool: null,
-      tool_id: null,
-    });
     built.addNode(CENTRE_KEY, {
       label: title,
       x: 0,
       y: 0,
       size: 18,
       color: palette.centre,
-      image: iconUri(centreIcon, palette.centreMark, `centre:${entity.type}`),
+      // The middle is what the links are read from, which is never a person.
+      image:
+        entity.type === EndpointKind.user
+          ? ""
+          : iconUri(entityIcon(entity.type), palette.centreMark, `centre:${entity.type}`),
     });
 
     const byDepth = new Map<number, GraphNode[]>();
@@ -375,7 +403,9 @@ export const RelationsGraph = ({
           Math.PI / 2 +
           (depth % 2 === 0 ? Math.PI / Math.max(sorted.length, 1) : 0);
         const key = `${node.ref.type}:${node.ref.id}`;
-        const path = searchHitPath(relatedTarget(node.end));
+        const colour = colourFor(groupFor.get(key));
+        const target = isItem(node.end) ? relatedTarget(node.end) : null;
+        const path = target ? searchHitPath(target) : null;
         built.addNode(key, {
           label: node.end.title?.trim() || t("untitled"),
           x: Math.cos(angle) * RING * depth,
@@ -383,16 +413,23 @@ export const RelationsGraph = ({
           // Further out is smaller: the middle is the subject and a third hop
           // is context.
           size: Math.max(9, 15 - (depth - 1) * 3),
-          // The circle takes the theme's own surface and the mark inside it
-          // takes the link's colour, so the kind and the link both read whether
-          // the page is light or dark.
-          color: palette.node,
-          image: iconUri(
-            hitIcon(relatedTarget(node.end)),
-            colourFor(groupFor.get(key)),
-            node.ref.type
-          ),
-          href: path ? gp(path) : undefined,
+          ...(target
+            ? {
+                // The circle takes the theme's own surface and the mark inside
+                // it takes the link's colour, so the kind and the link both
+                // read whether the page is light or dark.
+                color: palette.node,
+                image: iconUri(hitIcon(target), colour, node.ref.type),
+                href: path ? gp(path) : undefined,
+              }
+            : {
+                // A person is their face, ringed in the link's colour, and
+                // opens their profile, which is outside any community.
+                type: "face" as const,
+                color: colour,
+                image: faceUri(node.end),
+                href: node.end.handle ? `/u/${node.end.handle}` : undefined,
+              }),
         });
       });
     }
@@ -424,7 +461,13 @@ export const RelationsGraph = ({
   const version = `${graph.order}:${graph.size}:${resolvedTheme}`;
 
   if (nodes.length === 0) {
-    return <p className="text-muted-foreground text-sm">{loading ? t("loading") : t("empty")}</p>;
+    return loading ? (
+      <SkeletonRegion>
+        <Skeleton className="h-[28rem] w-full rounded-xl" />
+      </SkeletonRegion>
+    ) : (
+      <p className="text-muted-foreground text-sm">{t("empty")}</p>
+    );
   }
 
   return (
@@ -491,7 +534,7 @@ export const RelationsGraph = ({
             defaultDrawNodeHover: drawHover(palette.surface, palette.border),
             defaultEdgeType: "line",
             defaultNodeType: "image",
-            nodeProgramClasses: { image: NODE_PROGRAM },
+            nodeProgramClasses: { image: NODE_PROGRAM, face: FACE_PROGRAM },
             zIndex: true,
           }}
         >

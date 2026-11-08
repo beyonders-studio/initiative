@@ -14,19 +14,19 @@ import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { BookmarkButton } from "@/components/BookmarkButton";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
 import { buildPropertyColumns, propertyColumnIds } from "@/components/properties/propertyColumns";
-import { SortHeader } from "@/components/SortIcon";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import type { ToolIndexRow } from "@/components/tools/ToolIndexPage";
-import { Checkbox } from "@/components/ui/checkbox";
-import { DataTable } from "@/components/ui/data-table";
-import { RelativeTime } from "@/components/ui/relative-time";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
 import { useProperties } from "@/hooks/useProperties";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { useCommunityPath } from "@/lib/communityUrl";
-import type { AppColumnDef } from "@/lib/table";
 import { toolDetailRoute, toolRouteSegment } from "@/lib/tools";
+import { Checkbox } from "@/ui/checkbox";
+import { DataTable } from "@/ui/data-table";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { RelativeTime } from "@/ui/relative-time";
+import { SortHeader } from "@/ui/sort-icon";
 
 /** The list fields a table header sorts by, as its column ids. */
 export const TABLE_SORT_FIELDS: ReadonlySet<string> = new Set(["name", "updated_at"]);
@@ -47,7 +47,8 @@ interface TableSelection {
 
 type ToolIndexTableProps = {
   tool: Tool;
-  initiativeId: number;
+  /** Null for the community's own rows, which carry no properties. */
+  initiativeId: number | null;
   rows: ToolIndexRow[];
   /** The tool's own columns, after the shared ones (its entry's `table`). */
   useColumns?: () => AppColumnDef<ToolIndexRow>[];
@@ -57,6 +58,9 @@ type ToolIndexTableProps = {
   /** Opens a row followed by its name here instead of on its page; a click
    *  that asks for a new tab or window still goes there. */
   onOpen?: (row: ToolIndexRow) => void;
+  /** Mounts only the rows near the view, for a list that keeps loading as
+   *  it is scrolled. */
+  virtualize?: boolean;
   selection: TableSelection;
   sorting: SortingState;
   onSortingChange: (sorting: SortingState) => void;
@@ -77,6 +81,7 @@ export const ToolIndexTable = ({
   useColumns = useNoColumns,
   laidOut,
   onOpen,
+  virtualize,
   selection,
   sorting,
   onSortingChange,
@@ -89,7 +94,10 @@ export const ToolIndexTable = ({
   const communityId = useActiveCommunityId();
   const unread = useUnreadTree();
 
-  const { data: definitions = [] } = useProperties({ initiativeId, enabled: !laidOut });
+  const { data: definitions = [] } = useProperties({
+    initiativeId: initiativeId ?? undefined,
+    enabled: !laidOut && initiativeId !== null,
+  });
   // Property columns start hidden; the column menu turns them on.
   const hiddenByDefault = useMemo(() => propertyColumnIds(definitions), [definitions]);
   // A property column nobody chose about starts hidden.
@@ -114,6 +122,7 @@ export const ToolIndexTable = ({
       header: ({ column }) => <SortHeader column={column} label={t("name")} />,
       cell: ({ row }) => (
         <div className="flex min-w-[220px] items-center gap-2 sm:min-w-0">
+          {row.original.mark}
           <Link
             to={gp(toolDetailRoute(tool, row.original.initiative_id, row.original.id))}
             className="font-medium text-primary hover:underline"
@@ -138,6 +147,10 @@ export const ToolIndexTable = ({
       ),
       enableSorting: true,
       enableHiding: false,
+      // For a virtualized table's fixed layout, which shares out spare width
+      // by size: the widest column, and wide enough for the name's minimum on
+      // a narrow screen.
+      size: 240,
     };
     return [
       ...(active
@@ -164,6 +177,7 @@ export const ToolIndexTable = ({
               ),
               enableSorting: false,
               enableHiding: false,
+              size: 40,
             } satisfies AppColumnDef<ToolIndexRow>,
           ]
         : []),
@@ -234,6 +248,7 @@ export const ToolIndexTable = ({
       onSortingChange={onSortingChange}
       enableResetSorting
       getRowId={(row) => String(row.id)}
+      enableVirtualization={virtualize}
     />
   );
 };

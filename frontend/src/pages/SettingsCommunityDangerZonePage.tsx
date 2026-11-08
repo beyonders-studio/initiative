@@ -3,23 +3,15 @@ import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
 import { deleteCommunity } from "@/api/generated/communities/communities";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useApiMutation } from "@/hooks/useApiMutation";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
 
 export const SettingsCommunityDangerZonePage = () => {
   const { activeCommunity, communities, refreshCommunities, switchCommunity } = useCommunities();
@@ -27,9 +19,7 @@ export const SettingsCommunityDangerZonePage = () => {
   const navigate = useNavigate();
   const { t } = useTranslation(["communities", "common"]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [password, setPassword] = useState("");
-  const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Some accounts are not asked for a password — they hold none, or the
@@ -43,51 +33,48 @@ export const SettingsCommunityDangerZonePage = () => {
   const expectedPhrase = activeCommunity
     ? `DELETE COMMUNITY ${activeCommunity.name.toUpperCase()}`
     : "";
-  const canConfirmDelete =
-    deleteConfirmText === expectedPhrase && (passwordless || password.length > 0);
 
   const resetDialog = () => {
-    setDeleteConfirmText("");
     setPassword("");
     setDeleteError(null);
   };
 
-  const confirmDeleteCommunity = async () => {
-    if (!activeCommunity) {
-      return;
+  const removal = useApiMutation(
+    {
+      mutationFn: (communityId: number) =>
+        // The dialog's confirm is enabled only once the typed phrase matches this
+        // one exactly, so it is the phrase that was typed.
+        deleteCommunity(communityId, {
+          password,
+          confirmation_text: expectedPhrase,
+        }),
+    },
+    {
+      onMutate: () => setDeleteError(null),
+      // Deletion is confirmed (204) and irreversible. Move off the deleted community's
+      // URL onto a surviving community: switchCommunity updates the active-community context +
+      // storage, so we never land on (or reload into) the now-dangling community id —
+      // which is what produced the blank "not a member" screen. Best-effort — a
+      // refresh hiccup must not surface a misleading "unable to delete" for a community
+      // that is already gone. SPA navigation (not window.location) avoids racing the
+      // storage write that a full reload would re-read.
+      onSuccess: async (_data, deletedId) => {
+        const nextCommunity = communities.find((g) => g.id !== deletedId);
+        try {
+          if (nextCommunity) {
+            await switchCommunity(nextCommunity.id);
+          } else {
+            await refreshCommunities();
+          }
+        } catch (error) {
+          console.error(error);
+        }
+        await navigate({ to: "/" });
+      },
+      onError: (error) =>
+        setDeleteError(getErrorMessage(error, "communities:settings.unableToDelete")),
     }
-    setDeleting(true);
-    setDeleteError(null);
-    try {
-      await deleteCommunity(activeCommunity.id, {
-        password,
-        confirmation_text: deleteConfirmText,
-      });
-    } catch (error) {
-      console.error(error);
-      setDeleteError(getErrorMessage(error, "communities:settings.unableToDelete"));
-      setDeleting(false);
-      return;
-    }
-    // Deletion is confirmed (204) and irreversible. Move off the deleted community's
-    // URL onto a surviving community: switchCommunity updates the active-community context +
-    // storage, so we never land on (or reload into) the now-dangling community id —
-    // which is what produced the blank "not a member" screen. Best-effort — a
-    // refresh hiccup must not surface a misleading "unable to delete" for a community
-    // that is already gone. SPA navigation (not window.location) avoids racing the
-    // storage write that a full reload would re-read.
-    const nextCommunity = communities.find((g) => g.id !== activeCommunity.id);
-    try {
-      if (nextCommunity) {
-        await switchCommunity(nextCommunity.id);
-      } else {
-        await refreshCommunities();
-      }
-    } catch (error) {
-      console.error(error);
-    }
-    void navigate({ to: "/" });
-  };
+  );
 
   if (!activeCommunity) {
     return (
@@ -132,84 +119,62 @@ export const SettingsCommunityDangerZonePage = () => {
               resetDialog();
               setShowDeleteConfirm(true);
             }}
-            disabled={deleting}
+            disabled={removal.isPending}
           >
-            {deleting ? t("settings.deleting") : t("settings.deleteCommunity")}
+            {removal.isPending ? t("settings.deleting") : t("settings.deleteCommunity")}
           </Button>
         </CardContent>
       </Card>
 
-      <AlertDialog
+      <ConfirmDialog
         open={showDeleteConfirm}
         onOpenChange={(open) => {
           setShowDeleteConfirm(open);
           if (!open) resetDialog();
         }}
+        title={t("settings.deleteConfirmTitle")}
+        description={
+          <Trans
+            i18nKey="settings.deleteConfirmDescription"
+            ns="communities"
+            values={{ name: activeCommunity.name }}
+            components={{ bold: <strong /> }}
+          />
+        }
+        confirmationText={expectedPhrase}
+        confirmationLabel={
+          <Trans
+            i18nKey="settings.deleteConfirmLabel"
+            ns="communities"
+            values={{ phrase: expectedPhrase }}
+            components={{ bold: <strong /> }}
+          />
+        }
+        confirmLabel={t("common:delete")}
+        loadingLabel={t("settings.deleting")}
+        isLoading={removal.isPending}
+        confirmDisabled={!passwordless && password.length === 0}
+        destructive
+        onConfirm={(e) => {
+          // Keep the dialog open so inline errors (wrong password)
+          // stay visible; the confirm button closes it by default.
+          e.preventDefault();
+          removal.mutate(activeCommunity.id);
+        }}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("settings.deleteConfirmTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              <Trans
-                i18nKey="settings.deleteConfirmDescription"
-                ns="communities"
-                values={{ name: activeCommunity.name }}
-                components={{ bold: <strong /> }}
-              />
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-4 py-2">
-            {!passwordless && (
-              <div className="space-y-2">
-                <Label htmlFor="delete-community-password">
-                  {t("settings.deleteConfirmPasswordLabel")}
-                </Label>
-                <Input
-                  id="delete-community-password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={t("settings.deleteConfirmPasswordPlaceholder")}
-                  autoComplete="current-password"
-                />
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="delete-community-confirm-input">
-                <Trans
-                  i18nKey="settings.deleteConfirmLabel"
-                  ns="communities"
-                  values={{ phrase: expectedPhrase }}
-                  components={{ bold: <strong /> }}
-                />
-              </Label>
-              <Input
-                id="delete-community-confirm-input"
-                value={deleteConfirmText}
-                onChange={(e) => setDeleteConfirmText(e.target.value)}
-                placeholder={expectedPhrase}
-                autoComplete="off"
-              />
-            </div>
-            {deleteError ? <p className="text-destructive text-sm">{deleteError}</p> : null}
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>{t("common:cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                // Keep the dialog open so inline errors (wrong password)
-                // stay visible; AlertDialogAction closes on click by default.
-                e.preventDefault();
-                void confirmDeleteCommunity();
-              }}
-              disabled={!canConfirmDelete || deleting}
-              className="bg-destructive text-white hover:bg-destructive/90"
-            >
-              {deleting ? t("settings.deleting") : t("common:delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        {!passwordless && (
+          <Field label={t("settings.deleteConfirmPasswordLabel")}>
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={t("settings.deleteConfirmPasswordPlaceholder")}
+              autoComplete="current-password"
+            />
+          </Field>
+        )}
+        {deleteError ? <p className="text-destructive text-sm">{deleteError}</p> : null}
+      </ConfirmDialog>
     </div>
   );
 };

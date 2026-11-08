@@ -9,8 +9,7 @@
  * Every list keeps its view here, in one shape:
  *
  * - `layout`: which way they were last looking at it, where it offers several
- *   (a project's list layouts; a queue's list or on-deck; a collection's
- *   masonry, grid or timeline);
+ *   (a project's list layouts; a collection's masonry, grid or timeline);
  * - `mode`: a calendar's month, week, day or list, or a Gantt's scale;
  * - `parts`: for each layout (one, `LIST`, where there is only one), their
  *   filters, sort, grouping and hidden columns.
@@ -160,7 +159,7 @@ export const keptView = <F>(
 };
 
 /** A list inside `communityId` whose view is only which way it is shown (a
- *  queue's list or on-deck, a counter group's rows or grid): its spec,
+ *  counter group's rows or grid): its spec,
  *  carrying over what `older` reads where an older release kept it, on the
  *  account or the device. */
 export const layoutViewSpec = (

@@ -5,8 +5,8 @@ carries the same mention syntax: ``@[Name](id)`` for a person,
 ``#kind[Title](id)`` for a thing. Saving one does two things with those:
 
 * the ``#`` references become the thing's ``references`` edges, recomputed
-  from the description and its comments together
-  (:mod:`app.services.tenant.content_references`);
+  from the description and its comments together, and so do the people the
+  description itself mentions (:mod:`app.services.tenant.content_references`);
 * each person the description names *for the first time* hears about it. A
   mention that was already there when the description was last saved is not
   news, so editing a sentence around it does not notify again.

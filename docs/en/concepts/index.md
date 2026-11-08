@@ -15,7 +15,7 @@ graph TD
   I2["Initiative"]
   P1["Project<br/>(a task board)"]
   D1["File"]
-  T1["Calendar · Queue · Counter<br/>Dashboard · Posts · Wiki"]
+  T1["Calendar · Counter · Dashboard<br/>Posts · Wiki · Contacts"]
   TASK["Tasks"]
 
   G --> I1
@@ -83,16 +83,16 @@ A **task** carries a description, a status, a priority, dates, the people doing 
 ### The rest, when you grow into them
 
 - **Calendar & events** — things that happen at a time.
-- **Queues** — whose turn it is.
 - **Counters** — numbers that move.
 - **Dashboards** — one screen that answers "how are we doing?"
 - **Posts** — a noticeboard, for the things that need saying rather than doing.
 - **Wikis** — linked pages, for the things your group knows rather than the things it is doing.
+- **Contacts** — the people and places your work involves, and how to reach them.
 
 Use none of these and nothing is missing. They aren't sitting there judging you. See [Tools](../guides/tools.md).
 
-!!! info "Nine today"
-    The list of tools is a real, defined thing in the app rather than a loose category, and it has grown before — Wikis is the most recent. When a tenth arrives it'll turn up here, in the roles you can hand out, and in everything else that treats a tool as a tool, because there's one list and everything reads from it.
+!!! info "Eight today"
+    The list of tools is a real, defined thing in the app rather than a loose category, and it has grown before — Contacts is the most recent. When a ninth arrives it'll turn up here, in the roles you can hand out, and in everything else that treats a tool as a tool, because there's one list and everything reads from it.
 
 ## Plug-ins — what other groups already built
 

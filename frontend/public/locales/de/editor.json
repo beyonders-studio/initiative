@@ -154,9 +154,6 @@
       "total_one": "{{count}} Aufgabe",
       "total_other": "{{count}} Aufgaben",
       "none": "Keine Aufgaben entsprechen dem Filter.",
-      "previous": "Zurück",
-      "next": "Weiter",
-      "page": "Seite {{page}} von {{pages}}",
       "label": "Bezeichnung",
       "labelPlaceholder": "Offene Aufgaben für den Start",
       "from": "Aus",
@@ -183,12 +180,17 @@
       "assignee": "Zuständige Person",
       "checklist": "Erledigt",
       "due": "Fälligkeitsdatum",
+      "email": "E-Mail",
+      "phone": "Telefon",
       "priority": "Priorität",
       "progress": "Fortschritt",
       "status": "Status",
       "value": "Wert",
       "when": "Datum"
     },
+    "callHint": "Klicken zum Anrufen",
+    "contactEmail": "Kontakt-E-Mail",
+    "contactPhone": "Kontakt-Telefon",
     "counterValue": "Zählerstand",
     "eventWhen": "Termindatum",
     "insert": "Smart-Chip",
@@ -207,7 +209,8 @@
     "taskDue": "Fälligkeitsdatum",
     "taskPriority": "Priorität",
     "taskStatus": "Aufgabenstatus",
-    "whichFact": "Welchen Wert soll der Chip anzeigen?"
+    "whichFact": "Welchen Wert soll der Chip anzeigen?",
+    "writeHint": "Klicken zum Schreiben"
   },
   "summary": {
     "title": "Zusammenfassung",

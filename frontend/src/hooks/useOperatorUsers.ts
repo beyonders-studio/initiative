@@ -1,13 +1,11 @@
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import type {
   AccountDeletionResponse,
-  DeletionEligibilityResponse,
   ExportPlatformUsersCsvParams,
   ListAllUsersParams,
   OperatorAccountCaseRead,
-  OperatorDeletionEligibilityResponse,
   OperatorUserDeleteRequest,
   OperatorUserListResponse,
   OperatorUserRead,
@@ -15,18 +13,13 @@ import type {
   VerificationSendResponse,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
-  checkUserDeletionEligibility,
   clearAgeBlock,
   clearProfileField,
   clearSecondFactor,
   deleteUser,
   exportPlatformUsersCsv,
   getCheckUserDeletionEligibilityQueryKey,
-  getListAccountCasesQueryKey,
-  getListAllUsersQueryKey,
   liftSignInLock,
-  listAccountCases,
-  listAllUsers,
   reactivateUser,
   removeUserAvatar,
   resendVerificationEmail,
@@ -37,10 +30,13 @@ import {
   signUserOutEverywhere,
   triggerPasswordReset,
   updatePlatformRole,
+  useCheckUserDeletionEligibility,
+  useListAccountCases,
+  useListAllUsers,
 } from "@/api/generated/operator/operator";
 import {
-  checkDeletionEligibility,
   getCheckDeletionEligibilityQueryKey,
+  useCheckDeletionEligibility,
 } from "@/api/generated/users/users";
 import { invalidate, q } from "@/api/query-keys";
 import { useApiMutation } from "@/hooks/useApiMutation";
@@ -56,12 +52,7 @@ export const usePlatformUsers = (
   params: ListAllUsersParams,
   options?: QueryOpts<OperatorUserListResponse>
 ) => {
-  return useQuery<OperatorUserListResponse>({
-    queryKey: getListAllUsersQueryKey(params),
-    queryFn: () => listAllUsers(params),
-    placeholderData: keepPreviousData,
-    ...options,
-  });
+  return useListAllUsers(params, { query: { placeholderData: keepPreviousData, ...options } });
 };
 
 /**
@@ -73,11 +64,7 @@ export const useOperatorAccountCases = (
   userId: number,
   options?: QueryOpts<OperatorAccountCaseRead[]>
 ) => {
-  return useQuery<OperatorAccountCaseRead[]>({
-    queryKey: getListAccountCasesQueryKey(userId),
-    queryFn: () => listAccountCases(userId),
-    ...options,
-  });
+  return useListAccountCases(userId, { query: options });
 };
 
 /**
@@ -94,11 +81,7 @@ export const useUserDeletionEligibility = (userId: number, open: boolean) => {
       void queryClient.resetQueries({ queryKey: getCheckUserDeletionEligibilityQueryKey(userId) });
     }
   }, [open, queryClient, userId]);
-  return useQuery<OperatorDeletionEligibilityResponse>({
-    queryKey: getCheckUserDeletionEligibilityQueryKey(userId),
-    queryFn: () => checkUserDeletionEligibility(userId),
-    enabled: false,
-  });
+  return useCheckUserDeletionEligibility(userId, { query: { enabled: false } });
 };
 
 /**
@@ -115,11 +98,7 @@ export const useMyDeletionEligibility = (open: boolean) => {
       void queryClient.resetQueries({ queryKey: getCheckDeletionEligibilityQueryKey() });
     }
   }, [open, queryClient]);
-  return useQuery<DeletionEligibilityResponse>({
-    queryKey: getCheckDeletionEligibilityQueryKey(),
-    queryFn: () => checkDeletionEligibility(),
-    enabled: false,
-  });
+  return useCheckDeletionEligibility({ query: { enabled: false } });
 };
 
 // ── Mutations ─────────────────────────────────────────────────────────────────

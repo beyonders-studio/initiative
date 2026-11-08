@@ -30,10 +30,13 @@ from app.models.tenant.initiative import (
     InitiativeMember,
     InitiativeRoleModel,
     InitiativeRule,
+    BUILTIN_MEMBER_ROLE,
     BUILTIN_ROLE_PERMISSIONS,
+    DEFAULT_PERMISSION_VALUES,
     JoinRequestStatus,
     PermissionKey,
 )
+from app.core.tools import Tool
 from app.models.platform.guild import GUILD_ADMIN_ROLES, GuildMembership
 from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
@@ -292,46 +295,6 @@ async def get_initiative_membership(
     return result.one_or_none()
 
 
-async def initiative_roster(
-    session: AsyncSession, initiative_id: int, *, with_users: bool = False
-) -> list[InitiativeMember]:
-    """The initiative's members, for a caller whose question is the roster
-    itself: who to notify, whose access to copy, whom to offer in a picker.
-
-    A read of a resource does not carry it; what a reader may do with a row is
-    the database's answer, and the roster is read here, where it is the point.
-    """
-    stmt = select(InitiativeMember).where(
-        InitiativeMember.initiative_id == initiative_id
-    )
-    if with_users:
-        stmt = stmt.options(selectinload(InitiativeMember.user))
-    return list((await session.exec(stmt)).all())
-
-
-async def get_initiative_membership_with_role(
-    session: AsyncSession,
-    *,
-    initiative_id: int,
-    user_id: int,
-) -> InitiativeMember | None:
-    """Get membership with role eagerly loaded."""
-    stmt = (
-        select(InitiativeMember)
-        .options(
-            selectinload(InitiativeMember.role_ref).selectinload(
-                InitiativeRoleModel.permissions
-            )
-        )
-        .where(
-            InitiativeMember.initiative_id == initiative_id,
-            InitiativeMember.user_id == user_id,
-        )
-    )
-    result = await session.exec(stmt)
-    return result.one_or_none()
-
-
 async def ensure_managers_remain(
     session: AsyncSession,
     *,
@@ -371,9 +334,9 @@ async def remove_user_from_guild_initiatives(
 
     Deleting each membership row runs ``tr_initiative_members_departure``,
     which drops every grant naming them in that initiative, owner rows
-    included, and takes them off its tasks, events, person fields and queue
-    items. ``member_departs`` with no initiative does the same for content
-    that belongs to the community itself. What they owned is left **unowned**
+    included, and takes them off its tasks, events and person fields.
+    ``member_departs`` with no initiative does the same for content that
+    belongs to the community itself. What they owned is left **unowned**
     rather than handed to anyone; guild admins can claim it whenever they
     choose (``app.services.tenant.ownership``). What they kept about its items
     (opens, bookmarks, subscriptions) goes too.
@@ -1190,7 +1153,7 @@ async def create_imported_initiative(
     master switches and join policy taken from the backup manifest.
     ``member_ids`` join it with the built-in member role. Flush-only — the
     backup orchestrator owns its per-chunk transaction."""
-    from app.core.tools import DEFAULT_ENABLED_TOOLS, Tool
+    from app.core.tools import DEFAULT_ENABLED_TOOLS
     from app.services.import_engine.common import unique_name
 
     existing = {row for row in (await session.exec(select(Initiative.name))).all()}
@@ -1253,11 +1216,15 @@ async def _community_rows(session: AsyncSession) -> dict[str, InitiativeRule]:
     return {row.key: row for row in rows.all()}
 
 
-async def community_defaults(session: AsyncSession) -> InitiativeDefaultsRead:
-    """What the community sets for every initiative in it."""
+async def community_defaults(
+    session: AsyncSession, *, with_own: bool = False
+) -> InitiativeDefaultsRead:
+    """What the community sets for every initiative in it. ``with_own`` adds,
+    for whoever sets it, which live initiatives have each tool and each member
+    permission on of their own, beneath anything the community set."""
     rows = await _community_rows(session)
     custom_roles = rows.get(INITIATIVE_CUSTOM_ROLES)
-    return InitiativeDefaultsRead(
+    defaults = InitiativeDefaultsRead(
         tools={
             tool: rows[key].enabled
             for tool, key in INITIATIVE_TOOL_KEYS.items()
@@ -1270,6 +1237,45 @@ async def community_defaults(session: AsyncSession) -> InitiativeDefaultsRead:
         },
         custom_roles=custom_roles is None or custom_roles.enabled,
     )
+    if not with_own:
+        return defaults
+
+    live = {
+        initiative.id: initiative
+        for initiative in (
+            await session.exec(
+                select(Initiative).where(Initiative.archived_at.is_(None))
+            )
+        ).all()
+        if initiative.id is not None
+    }
+    member_rules = (
+        await session.exec(
+            select(InitiativeRule)
+            .join(
+                InitiativeRoleModel,
+                InitiativeRoleModel.id == InitiativeRule.initiative_role_id,  # type: ignore[arg-type]
+            )
+            .where(
+                InitiativeRoleModel.is_builtin.is_(True),  # type: ignore[attr-defined]
+                InitiativeRoleModel.name == BUILTIN_MEMBER_ROLE,
+            )
+        )
+    ).all()
+    member = {(rule.initiative_id, rule.key): rule.enabled for rule in member_rules}
+    defaults.own_tools = {
+        tool: [iid for iid, i in live.items() if getattr(i, tool.view_permission)]
+        for tool in Tool
+    }
+    defaults.own_member_permissions = {
+        key: [
+            iid
+            for iid in live
+            if member.get((iid, key.value), DEFAULT_PERMISSION_VALUES[key])
+        ]
+        for key in PermissionKey
+    }
+    return defaults
 
 
 async def set_community_defaults(

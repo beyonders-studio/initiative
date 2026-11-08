@@ -26,18 +26,22 @@ from sqlalchemy import Select, Table, case, func, literal, null, select, text
 from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlmodel import SQLModel
 
+from app.core import usernames
 from app.core.references import NOT_REFERENCEABLE
+from app.core.relationships import PERSON, EndpointKind
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
+from app.core.user_display import display_name
 from app.db.blocking import open_expr
 from app.db.initiative_rls import INITIATIVE_PATHS
 from app.db.search_index import SEARCH_SOURCES
 from app.db.authorization import standing_arg
+from app.models.platform.user_profile_view import MemberProfile
 
 
 def _table_for(entity_type: SearchEntityType) -> str:
     for table, source in SEARCH_SOURCES.items():
-        if source.entity_type is entity_type:
+        if source.entity_type == entity_type:
             return table
     raise KeyError(entity_type)
 
@@ -114,7 +118,6 @@ VISUALS: dict[str, Visual] = {
     "projects": Visual(icon="icon"),
     "calendars": Visual(color="color"),
     "counters": Visual(color="color"),
-    "queue_items": Visual(color="color"),
     "tags": Visual(color="color"),
 }
 
@@ -319,7 +322,7 @@ def _container_title(table_name: str, table: Table, tool: Tool | None):
 class Resolved:
     """What a reference turned out to name."""
 
-    entity_type: SearchEntityType
+    entity_type: EndpointKind
     id: int
     title: str | None
     #: The initiative the row belongs to. None means one of two different
@@ -359,14 +362,20 @@ class Resolved:
     mime_type: str | None = None
     original_filename: str | None = None
     smart_link_url: str | None = None
+    #: A person's handle as their profile is addressed by. Only a person
+    #: reports one.
+    handle: str | None = None
     #: Whether this row is still outstanding — still capable of holding
     #: something else up. None for a kind that never finishes, which is most of
     #: them; see :mod:`app.db.blocking`.
     is_open: bool | None = None
+    #: When it starts, for a kind that happens at a time: an event. None for
+    #: every other kind.
+    starts_at: datetime | None = None
 
 
 async def resolve_many(
-    session, entity_type: SearchEntityType, ids: Sequence[int], *, user_id: int | None
+    session, entity_type: EndpointKind, ids: Sequence[int], *, user_id: int | None
 ) -> dict[int, Resolved]:
     """The rows of one kind this reader may open, keyed by id.
 
@@ -374,10 +383,34 @@ async def resolve_many(
     ``INITIATIVE_PATHS`` entry that renders the kind's RLS, so a surface asking
     "are these two in one initiative" and the policy deciding who may read them
     are working from one declaration rather than two.
+
+    A person is read as the community shows them, by name, avatar and handle,
+    whoever they are to it now: a link outlives a membership, as a comment by
+    them does. They belong to no initiative and are never archived.
     """
     wanted = [int(i) for i in dict.fromkeys(ids)]
     if not wanted:
         return {}
+
+    if entity_type == PERSON.value:
+        people = await session.exec(
+            select(MemberProfile).where(MemberProfile.id.in_(wanted))
+        )
+        return {
+            person.id: Resolved(
+                entity_type=entity_type,
+                id=person.id,
+                title=display_name(person),
+                initiative_id=None,
+                scoped_kind=False,
+                archived=False,
+                image_urls=[person.avatar_url] if person.avatar_url else [],
+                # ``/u/jordan1234``: the name and its four digits run together.
+                handle=f"{person.username}"
+                f"{person.discriminator:0{usernames.DISCRIMINATOR_DIGITS}d}",
+            )
+            for person in people.scalars().all()
+        }
 
     table_name = _table_for(entity_type)
     table = SQLModel.metadata.tables[table_name]
@@ -389,6 +422,7 @@ async def resolve_many(
         else literal(False)
     )
     updated = table.c["updated_at"] if "updated_at" in table.c else null()
+    starts = table.c["start_at"] if "start_at" in table.c else null()
     images, icon, color, doc_type, mime, filename, link_url = _visual_exprs(
         table_name, table
     )
@@ -412,6 +446,7 @@ async def resolve_many(
         link_url,
         tool_title,
         is_open,
+        starts,
     ).select_from(table)
     if container is not None:
         # Left: a container this reader cannot see leaves the name blank rather
@@ -443,13 +478,14 @@ async def resolve_many(
             smart_link_url=row[12],
             tool_title=row[13],
             is_open=None if row[14] is None else bool(row[14]),
+            starts_at=row[15],
         )
         for row in rows.all()
     }
 
 
 async def resolve_one(
-    session, entity_type: SearchEntityType, entity_id: int, *, user_id: int | None
+    session, entity_type: EndpointKind, entity_id: int, *, user_id: int | None
 ) -> Resolved | None:
     """:func:`resolve_many` for one id."""
     found = await resolve_many(session, entity_type, [entity_id], user_id=user_id)

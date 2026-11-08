@@ -407,6 +407,7 @@ async def set_collection_file_metadata(
             initiative_id=collection.initiative_id,
             removed=payload.removed if payload.merge else None,
             options=payload.options,
+            steps=payload.steps,
             collection_id=collection.id,
         )
         await required_fields.refuse_emptied(session, required)

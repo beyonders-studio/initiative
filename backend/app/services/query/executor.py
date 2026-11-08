@@ -45,8 +45,9 @@ from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.request_context import QUERYABLE, ContentGrantee, Member, RequestContext
 from app.db.session import set_rls_context
 from app.services.fields.spec import FieldType
+from app.services.query import sheets
 from app.services.query.canvas import compile_canvas
-from app.services.query.resolve import QueryError, ResolvedQuery, resolve
+from app.services.query.resolve import QueryError, ResolvedQuery, SheetCall, resolve
 
 
 @dataclass(frozen=True)
@@ -304,6 +305,21 @@ def _as_query(
     )
 
 
+async def _with_cells(
+    session: Any, statement: ResolvedQuery, guild_id: int
+) -> ResolvedQuery:
+    """*statement*, resolved again with what its sheets read, in *session*'s
+    routed transaction: the files are found as the statement's own rows are.
+    What its other calls already read is kept."""
+    unread = [call for call in statement.unread if isinstance(call, SheetCall)]
+    if not unread:
+        return statement
+    return resolve(
+        statement.source,
+        {**statement.read, **await sheets.read(session, unread, guild_id)},
+    )
+
+
 async def execute(
     statement: ResolvedQuery,
     *,
@@ -323,6 +339,7 @@ async def execute(
     rather than a scope, so an initiative-scoped surface says which initiative
     it is asking about and the policies on the tables it reads answer for that
     one. It removes rows and never adds any, so a caller may always pass it.
+    The spreadsheets a statement reads are read under the same narrowing.
     """
     routed = _as_query(context, initiative_id)
     guild_id = routed.guild_id
@@ -340,6 +357,7 @@ async def execute(
             if not await _claim_a_slot(sqlalchemy_connection, guild_id):
                 raise QueryError(QueryMessages.BUSY, str(guild_id))
             await set_rls_context(session, routed)
+            statement = await _with_cells(session, statement, guild_id)
 
             cost = await _estimated_cost(connection, statement)
             if cost > QUERY_MAX_COST:
@@ -382,9 +400,13 @@ async def run(
 
 
 async def describe(
-    sql: str, *, context: RequestContext, initiative_id: int | None = None
-) -> tuple[tuple[QueryColumn, ...], tuple[str, ...]]:
-    """What *sql* would return, without returning it.
+    statement: ResolvedQuery,
+    *,
+    context: RequestContext,
+    initiative_id: int | None = None,
+) -> tuple[tuple[QueryColumn, ...], ResolvedQuery]:
+    """What *statement* would return, without returning it, and the statement
+    it resolved to once its sheets were read, which says what each read.
 
     The statement is prepared and its description read back. Preparing plans;
     it does not execute, so this costs a plan and no rows however much data the
@@ -394,7 +416,6 @@ async def describe(
     It runs in the same transaction and role as the real thing, because a
     statement is only preparable against the schema its reader is routed to.
     """
-    statement = resolve(sql)
     routed = _as_query(context, initiative_id)
     guild_id = routed.guild_id
 
@@ -407,10 +428,11 @@ async def describe(
 
             await _bound_transaction(sqlalchemy_connection)
             await set_rls_context(session, routed)
+            statement = await _with_cells(session, statement, guild_id)
             prepared = await connection.prepare(statement.sql)
             columns = await _described(connection, prepared, statement)
             await session.rollback()
-            return columns, statement.relations
+            return columns, statement
 
 
 def _from_json(value: Any, type_name: str) -> Any:
@@ -446,10 +468,11 @@ async def _run_compiled(
     *,
     guild_id: int,
     routed: RequestContext,
-) -> dict[str, QueryResult]:
+) -> dict[str, QueryResult | QueryError]:
     """Every statement in *statements*, as one compiled statement, in one
-    transaction holding one slot."""
-    keys = list(statements)
+    transaction holding one slot. A statement whose sheet cannot be read
+    answers with that refusal, and the rest run without it."""
+    outcomes: dict[str, QueryResult | QueryError] = {}
     async with cohorts.query_sessionmaker(guild_id)() as session:
         await session.begin()
         sqlalchemy_connection = await session.connection()
@@ -462,6 +485,18 @@ async def _run_compiled(
         if not await _claim_a_slot(sqlalchemy_connection, guild_id):
             raise QueryError(QueryMessages.BUSY, str(guild_id))
         await set_rls_context(session, routed)
+
+        runnable: dict[str, ResolvedQuery] = {}
+        for key, statement in statements.items():
+            try:
+                runnable[key] = await _with_cells(session, statement, guild_id)
+            except QueryError as refused:
+                outcomes[key] = refused
+        statements = runnable
+        keys = list(statements)
+        if not keys:
+            await session.rollback()
+            return outcomes
 
         # Each widget is prepared — planned, not run — for the columns it
         # returns, which the JSON the compiled statement answers with does not
@@ -487,13 +522,12 @@ async def _run_compiled(
         record = await connection.fetchrow(compiled.sql, *compiled.parameters)
         await session.rollback()
 
-    results: dict[str, QueryResult] = {}
     for index, key in enumerate(keys):
         columns, type_names = shapes[index]
         answered = record[index] if record is not None else None
         rows = json.loads(answered) if isinstance(answered, str) else (answered or [])
         truncated = len(rows) > QUERY_MAX_ROWS
-        results[key] = QueryResult(
+        outcomes[key] = QueryResult(
             columns=columns,
             rows=tuple(
                 tuple(
@@ -506,7 +540,7 @@ async def _run_compiled(
             truncated=truncated,
             relations=statements[key].relations,
         )
-    return results
+    return outcomes
 
 
 async def execute_canvas(

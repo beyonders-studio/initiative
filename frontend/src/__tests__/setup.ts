@@ -147,8 +147,8 @@ vi.mock("@capacitor/app", () => ({
 // ---------------------------------------------------------------------------
 
 // The breakpoints, which useWidthClass reads from :root. jsdom
-// loads no stylesheet, so they are set here from the one styles.css declares.
-const stylesheet = readFileSync(path.join(import.meta.dirname, "../styles.css"), "utf8");
+// loads no stylesheet, so they are set here from the ones ui/styles.css declares.
+const stylesheet = readFileSync(path.join(import.meta.dirname, "../ui/styles.css"), "utf8");
 for (const [, name, value] of stylesheet.matchAll(/--breakpoint-([a-z-]+):\s*([^;]+);/g)) {
   document.documentElement.style.setProperty(`--breakpoint-${name}`, value);
 }
@@ -270,6 +270,24 @@ if (typeof Blob.prototype.stream !== "function") {
 }
 
 // ---------------------------------------------------------------------------
+// The UI kit's host, filled as the app fills it at boot
+// ---------------------------------------------------------------------------
+
+// Imported once the test file has registered its mocks and imported what it
+// tests, so the host is filled from the modules that file mocked (a native
+// camera, native storage) rather than from copies this setup loaded first. A
+// file that mocks those modules too thinly for them to load (a router without
+// `Link`, Capacitor without `isNativePlatform`) keeps the kit's own defaults.
+beforeAll(async () => {
+  try {
+    const { connectKit } = await import("@/lib/kitHost");
+    connectKit();
+  } catch {
+    // The kit's defaults stand.
+  }
+});
+
+// ---------------------------------------------------------------------------
 // MSW lifecycle
 // ---------------------------------------------------------------------------
 
@@ -302,3 +320,11 @@ beforeEach(() => {
   // Whether this device may sell is asked once per app run; each test is a run.
   resetStoreSelling();
 });
+
+// jsdom has no object URLs; a browser makes one for every chosen picture it
+// shows before sending.
+if (typeof URL.createObjectURL !== "function") {
+  let made = 0;
+  URL.createObjectURL = () => `blob:test/${++made}`;
+  URL.revokeObjectURL = () => undefined;
+}

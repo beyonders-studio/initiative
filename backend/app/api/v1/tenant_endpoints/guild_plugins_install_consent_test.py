@@ -11,7 +11,7 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.messages import GuildPluginMessages, GuildMessages
+from app.core.messages import GuildPluginMessages, GuildMessages, MarketplaceMessages
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.services.tenant.initiatives import get_role_by_name
@@ -487,7 +487,7 @@ class TestUpgradeConsent:
         )
         return response.json()["id"]
 
-    async def test_the_detail_says_what_the_version_asks_for(
+    async def test_the_detail_says_what_the_version_asks_for_or_why_it_cannot_run(
         self, client: AsyncClient, acting_user, session: AsyncSession, listing
     ):
         a = await acting_user(guild_role=CommunityRole.superadmin)
@@ -505,6 +505,27 @@ class TestUpgradeConsent:
             "added_scopes": ["tags:read"],
             "added_surfaces": [{"id": "planner", "name": {"en": "Planner"}}],
             "declined": False,
+        }
+        assert read["update_refused"] is None
+
+        await create_marketplace_listing(
+            session,
+            uid=SERVICE_UID,
+            public_id=SERVICE_ID,
+            kind="plugin",
+            name="ConsentCo",
+            version="1.2.0",
+            definition=_wider(surfaces=True),
+            min_plugin_api="99.0",
+        )
+        read = (
+            await client.get(a.g(f"/plugins/{plugin_id}"), headers=a.headers)
+        ).json()
+
+        assert (read["update_version"], read["pending_update"]) == (None, None)
+        assert read["update_refused"] == {
+            "version": "1.2.0",
+            "reason": MarketplaceMessages.LISTING_PLUGIN_API_INCOMPATIBLE,
         }
 
     async def test_without_consent_it_answers_with_what_it_asks(

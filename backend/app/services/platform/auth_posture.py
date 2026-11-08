@@ -37,8 +37,8 @@ from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
 from fastapi import HTTPException, status
-from sqlalchemy import select as sa_select
-from sqlmodel import func, select
+from sqlalchemy import or_, select as sa_select
+from sqlmodel import col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import rules as rule_catalog
@@ -55,11 +55,13 @@ from app.core.messages import AuthMessages, GuildMessages, SettingsMessages
 from app.core.security import AUTH_POLICY_UNMET_HEADER, has_usable_password
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.auth_provider import AuthProvider
-from app.models.platform.guild import Guild
+from app.models.platform.federated_identity import FederatedIdentity
+from app.models.platform.guild import CommunityRole, Guild, GuildMembership
 from app.models.platform.rule import CommunityRule
 from app.models.platform.user import User, UserRole, UserStatus
 from app.models.platform.user_passkey import UserPasskey
 from app.models.platform.user_totp import UserTotp
+from app.schemas.platform.guild import CommunityPeopleFigures, CommunityProviderReach
 from app.services import audit as audit_service
 from app.services import email as email_service
 from app.services.auth import guild_provider_connections as guild_connections
@@ -119,6 +121,10 @@ def rule_covers(level: SecondFactorRequirement, role: UserRole) -> bool:
     )
 
 
+def _holds_a_passkey_clause():
+    return select(UserPasskey.id).where(UserPasskey.user_id == User.id).exists()
+
+
 def _holds_a_factor_clause():
     """Accounts holding a second factor: a confirmed authenticator, or a key.
 
@@ -130,7 +136,7 @@ def _holds_a_factor_clause():
         select(UserTotp.user_id)
         .where(UserTotp.user_id == User.id, UserTotp.confirmed_at.is_not(None))
         .exists()
-        | select(UserPasskey.id).where(UserPasskey.user_id == User.id).exists()
+        | _holds_a_passkey_clause()
     )
 
 
@@ -196,6 +202,74 @@ async def account_figures(
     row = (await session.exec(sa_select(*columns).select_from(User))).one()
     stranding = dict.fromkeys(LoginMethod, 0) | dict(zip(withdrawable, row))
     return stranding, dict(zip(_FACTOR_LEVELS, row[len(withdrawable) :]))
+
+
+async def community_figures(
+    session: AsyncSession, *, guild_id: int, provider_ids: list[int]
+) -> tuple[CommunityPeopleFigures, CommunityPeopleFigures]:
+    """What the community's sign-in rules would ask of its members and of its
+    guests, in one pass over its memberships: how many each holds, and how
+    many of them hold no second factor, no passkey, or no link to each of
+    ``provider_ids`` yet.
+
+    Read on every load of the seat's page, so a rule's dialog states what it
+    asks before it is written. On the system engine: the credential stores and
+    the identity links are ``app_admin``-only.
+    """
+
+    def linked(ids: list[int]):
+        return (
+            select(FederatedIdentity.id)
+            .where(
+                FederatedIdentity.user_id == User.id,
+                FederatedIdentity.provider_id.in_(ids),  # type: ignore[attr-defined]
+            )
+            .exists()
+        )
+
+    is_guest = GuildMembership.role == CommunityRole.guest
+    rows = (
+        await session.exec(
+            sa_select(
+                is_guest,
+                func.count(),
+                func.count().filter(~_holds_a_factor_clause()),
+                func.count().filter(~_holds_a_passkey_clause()),
+                func.count().filter(~linked(provider_ids)),
+                *[func.count().filter(~linked([pid])) for pid in provider_ids],
+            )
+            .select_from(GuildMembership)
+            .join(User, User.id == GuildMembership.user_id)  # type: ignore[arg-type]
+            .where(
+                GuildMembership.guild_id == guild_id,
+                User.status == UserStatus.active,
+                # A guest whose time has ended reaches nothing, before the
+                # sweep removes the row.
+                or_(
+                    col(GuildMembership.guest_until).is_(None),
+                    col(GuildMembership.guest_until) > func.now(),
+                ),
+            )
+            .group_by(is_guest)
+        )
+    ).all()
+    figures = {
+        guest: CommunityPeopleFigures(
+            total=total,
+            without_factor=without_factor,
+            without_passkey=without_passkey,
+            never_through_any=never_through_any,
+            never_through=[
+                CommunityProviderReach(provider_id=pid, count=count)
+                for pid, count in zip(provider_ids, per_provider)
+            ],
+        )
+        for guest, total, without_factor, without_passkey, never_through_any, *per_provider in rows
+    }
+    return (
+        figures.get(False, CommunityPeopleFigures()),
+        figures.get(True, CommunityPeopleFigures()),
+    )
 
 
 #: The rule keys that hold a community's sign-in requirements.
@@ -448,6 +522,15 @@ async def _ai_mode_moved(ctx: RuleContext, before: Any, after: Any) -> None:
 
     await ai_settings.bump_ai_config_version(ctx.system)
     ai_settings.invalidate_platform_ai_cache()
+
+
+async def _community_connections_off(ctx: RuleContext, before: Any, after: Any) -> None:
+    # Its own connections go off with it, so turning AI back on starts from
+    # none in use until each is turned on again.
+    from app.services import ai_settings
+
+    if before and not after and ctx.guild_id is not None:
+        await ai_settings.turn_off_guild_connections(ctx.guild_id)
 
 
 async def _drop_push_tokens(ctx: RuleContext, before: Any, after: Any) -> None:
@@ -740,10 +823,18 @@ def _platform(key: str, area: str, follow_up: FollowUp | None = None) -> Rule:
     return Rule(key, area=area, loose=stored.default, follow_up=follow_up)
 
 
-def _community(key: str, area: str, cls: type[Rule] = Rule) -> Rule:
+def _community(
+    key: str, area: str, cls: type[Rule] = Rule, follow_up: FollowUp | None = None
+) -> Rule:
     """A stored rule of a community, with the option it needs."""
     stored = rule_catalog.COMMUNITY_RULES[key]
-    return cls(key, area=area, loose=stored.default, entitlement=stored.entitlement)
+    return cls(
+        key,
+        area=area,
+        loose=stored.default,
+        entitlement=stored.entitlement,
+        follow_up=follow_up,
+    )
 
 
 #: The deployment's rules, by the field that names each.
@@ -781,6 +872,7 @@ PLATFORM_RULES: dict[str, Rule] = {
         ),
         _platform("marketplace_members_publish_directly", "marketplace"),
         _platform("marketplace_registry_enabled", "marketplace_registry"),
+        _platform("feedback_enabled", "feedback"),
         _platform("public_registration_enabled", "community"),
         _platform(
             "community_creation_enabled",
@@ -814,7 +906,7 @@ COMMUNITY_RULES: dict[str, Rule] = {
         _community("allow_email_notifications", "notifications"),
         _community("redact_notification_content", "notifications"),
         _community("allow_engagement_ranking", "engagement_ranking"),
-        _community("allow_ai", "ai"),
+        _community("allow_ai", "ai", follow_up=_community_connections_off),
         # The longest a guest may stay. It bounds the guests made or extended
         # after it changes, and no others.
         _community("guest_max_days", "guests"),

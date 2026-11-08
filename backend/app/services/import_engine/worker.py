@@ -50,9 +50,10 @@ from app.db.advisory_locks import LockNamespace
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import UserStatus
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
+from app.schemas.tenant.import_job import ContactCsvImportRequest
 from app.services import data_jobs
 from app.services.data_jobs import JobOutcome
-from app.services.import_engine import atlassian_job
+from app.services.import_engine import atlassian_job, contacts_csv
 from app.services.import_engine.atlassian import throttled
 from app.services.import_engine import engine as import_engine
 from app.services.platform import accounts as accounts_service
@@ -67,9 +68,9 @@ logger = logging.getLogger(__name__)
 STALE_RUNNING = timedelta(minutes=15)
 
 # A ``fetching`` row untouched this long is a crashed fetch. A live one
-# touches its row every few seconds between calls to the site, and no single
-# call outlasts this (see ``atlassian.RetryPolicy``), so a row this quiet has
-# nobody behind it.
+# touches its row every few seconds, between calls to the site and during a
+# long download (``data_jobs.while_beating``), so a row this quiet has nobody
+# behind it.
 STALE_FETCHING = timedelta(minutes=15)
 
 
@@ -194,12 +195,6 @@ jobs = data_jobs.Dispatcher(
     sweep=_sweep,
     run=_run,
 )
-
-
-async def process_import_jobs() -> None:
-    """Run passes until one starts nothing, waiting for each pass's jobs.
-    Everything queued is dealt with by the time this returns."""
-    await jobs.process()
 
 
 async def _apply(session: AsyncSession, job: DataJob, *, guild_id: int) -> JobOutcome:
@@ -384,8 +379,8 @@ async def _execute(session: AsyncSession, job: DataJob, *, guild_id: int) -> dic
                     people_map=(job.params or {}).get("people_map"),
                     exclude_properties=(job.params or {}).get("exclude_properties"),
                     heartbeat=throttled(touch),
-                    # A fetched bundle is one this app wrote, and is held to
-                    # the fetch's bounds rather than an upload's.
+                    # A fetched bundle is one this app wrote, and its
+                    # envelopes may run larger than an upload's.
                     fetched=job.source == atlassian_job.SOURCE,
                     anchor=datetime.fromisoformat(anchor) if anchor else None,
                     join=(job.params or {}).get("join"),
@@ -397,6 +392,26 @@ async def _execute(session: AsyncSession, job: DataJob, *, guild_id: int) -> dic
     )
     if payload is None:
         raise ImportEngineError(ImportEngineMessages.IMPORT_INVALID_PARAMS)
+    if job.source == contacts_csv.SOURCE:
+        # The request as it was made; where it goes is asked again as the
+        # creator, as an envelope's target is.
+        request = ContactCsvImportRequest.model_validate_json(payload)
+        async with _open_user_session(guild_id) as user_session:
+            context = await establish_guild_access(
+                user_session, user, guild_id, on_behalf=True
+            )
+            result = await contacts_csv.apply(
+                user_session,
+                context=context,
+                user=user,
+                place=await contacts_csv.place(
+                    user_session, context=context, user=user, request=request
+                ),
+                columns=request.columns,
+                rows=contacts_csv.rows_of(request),
+            )
+            await user_session.commit()
+        return result.model_dump(mode="json")
     importer = import_engine.get_importer(job.source)
     envelope = importer.validate(await asyncio.to_thread(json.loads, payload))
 

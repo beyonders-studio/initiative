@@ -1,12 +1,4 @@
-import {
-  type DragEndEvent,
-  type DragOverEvent,
-  type DragStartEvent,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
+import type { DragEndEvent, DragOverEvent, DragStartEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { AlertTriangle, Archive, Plus } from "lucide-react";
@@ -22,6 +14,7 @@ import type {
   TaskUpdate,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
+import { invalidate, q } from "@/api/query-keys";
 import {
   buildTaskCalendarEntries,
   type CalendarEntry,
@@ -49,19 +42,15 @@ import {
   shouldInsertAfter,
 } from "@/components/projects/taskOrdering";
 import { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
-import { StatusMessage } from "@/components/StatusMessage";
-import { BulkEditTaskTagsDialog } from "@/components/tasks/BulkEditTaskTagsDialog";
+import { BulkEditTagsDialog } from "@/components/shared/BulkEditTagsDialog";
 import { ExportTasksButton } from "@/components/tasks/ExportTasksButton";
 import { TaskBulkEditDialog } from "@/components/tasks/TaskBulkEditDialog";
 import { TaskBulkEditPanel } from "@/components/tasks/TaskBulkEditPanel";
 import { TaskFilters } from "@/components/tasks/TaskFilters";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Dialog } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useColumnLimits } from "@/hooks/useColumnLimits";
+import { useDragSensors } from "@/hooks/useDragSensors";
 import { useFieldCatalog } from "@/hooks/useFieldCatalog";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
@@ -99,6 +88,12 @@ import { getProjectColor } from "@/lib/projectColor";
 import { getItem, setItem } from "@/lib/storage";
 import { taskReadToListRow } from "@/lib/taskUtils";
 import { browserTimezone } from "@/lib/timezones";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Dialog } from "@/ui/dialog";
+import { useWeekStart } from "@/ui/host";
+import { StatusMessage } from "@/ui/status-message";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 /** A status change on screen whose request has not answered yet. */
 type PendingStatus = { vars: UpdateTaskVariables; status: TaskStatusRead };
@@ -225,11 +220,13 @@ export const ProjectTasksSection = ({
   const [isComposerOpen, setIsComposerOpen] = useState(initialComposerOpen ?? false);
   // An archived project takes no new tasks until it is unarchived.
   const canAddTasks = canEditTaskDetails && !projectIsArchived;
-  useEffect(() => {
+  const [prevInitialComposerOpen, setPrevInitialComposerOpen] = useState(initialComposerOpen);
+  if (prevInitialComposerOpen !== initialComposerOpen) {
+    setPrevInitialComposerOpen(initialComposerOpen);
     if (initialComposerOpen) {
       setIsComposerOpen(true);
     }
-  }, [initialComposerOpen]);
+  }
   useEffect(() => {
     onComposerOpenChange?.(isComposerOpen);
   }, [isComposerOpen, onComposerOpenChange]);
@@ -280,12 +277,13 @@ export const ProjectTasksSection = ({
   }, [kind, sorting, grouping, layout, groupingCatalog, exportFields]);
   const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = useState(false);
   const [isBulkEditTagsDialogOpen, setIsBulkEditTagsDialogOpen] = useState(false);
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
   const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
   const [archiveDialogStatusId, setArchiveDialogStatusId] = useState<number | undefined>(undefined);
   const lastKanbanOverRef = useRef<DragOverEvent["over"] | null>(null);
 
   const { user } = useAuth();
-  const weekStartsOn = (user?.week_starts_on ?? 0) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  const weekStartsOn = useWeekStart();
   // How much of the calendar the Gantt or the calendar shows is one choice in
   // this person's view of the project.
   const ganttScale = isGanttScale(mode) ? mode : "week";
@@ -327,9 +325,13 @@ export const ProjectTasksSection = ({
     return explicit?.id ?? sortedTaskStatuses[0]?.id ?? null;
   }, [sortedTaskStatuses]);
 
-  useEffect(() => {
+  // Rows changed here stand in for the server's until its next answer, which
+  // replaces them.
+  const [prevProjectTasks, setPrevProjectTasks] = useState(projectTasks);
+  if (prevProjectTasks !== projectTasks) {
+    setPrevProjectTasks(projectTasks);
     setLocalOverride(null);
-  }, [projectTasks]);
+  }
 
   useEffect(() => {
     if (!collapsedStorageKey) {
@@ -756,20 +758,7 @@ export const ProjectTasksSection = ({
     [persistMove, projectTasks]
   );
 
-  const mouseSensorConfig = useMemo(() => ({ activationConstraint: { distance: 4 } }), []);
-  const touchSensorConfig = useMemo(
-    () => ({ activationConstraint: { delay: 200, tolerance: 8 } }),
-    []
-  );
-
-  const kanbanSensors = useSensors(
-    useSensor(MouseSensor, mouseSensorConfig),
-    useSensor(TouchSensor, touchSensorConfig)
-  );
-  const listSensors = useSensors(
-    useSensor(MouseSensor, mouseSensorConfig),
-    useSensor(TouchSensor, touchSensorConfig)
-  );
+  const sensors = useDragSensors();
 
   const handleTaskDragStart = (event: DragStartEvent) => {
     const taskType = event.active.data.current?.type;
@@ -1006,7 +995,7 @@ export const ProjectTasksSection = ({
             canEditTasks={canEditTaskDetails}
             onStatusChange={changeTaskStatus}
             taskHref={taskHref}
-            sensors={kanbanSensors}
+            sensors={sensors}
             activeTask={activeTask}
             onDragStart={handleTaskDragStart}
             onDragOver={handleKanbanDragOver}
@@ -1052,11 +1041,7 @@ export const ProjectTasksSection = ({
                 onEdit={() => setIsBulkEditDialogOpen(true)}
                 onEditTags={() => setIsBulkEditTagsDialogOpen(true)}
                 onArchive={() => bulkArchiveTasks.mutate(selectedTasks.map((t) => t.id))}
-                onDelete={() => {
-                  if (confirm(t("tasks.bulkDeleteConfirm", { count: selectedTasks.length }))) {
-                    bulkDeleteTasks.mutate(selectedTasks.map((t) => t.id));
-                  }
-                }}
+                onDelete={() => setIsBulkDeleteDialogOpen(true)}
                 isArchiving={bulkArchiveTasks.isPending}
               />
             )}
@@ -1071,7 +1056,7 @@ export const ProjectTasksSection = ({
                 tasks={statusFilteredTasks}
                 listParams={taskListParams}
                 taskStatuses={sortedTaskStatuses}
-                sensors={listSensors}
+                sensors={sensors}
                 canReorderTasks={canReorderTasks}
                 canEditTaskDetails={canEditTaskDetails}
                 taskActionsDisabled={taskActionsDisabled}
@@ -1200,18 +1185,29 @@ export const ProjectTasksSection = ({
                   changes: changes as Parameters<typeof bulkUpdateTasks.mutate>[0]["changes"],
                 });
               }}
-              onCancel={() => setIsBulkEditDialogOpen(false)}
             />
           </Dialog>
 
-          <BulkEditTaskTagsDialog
+          <BulkEditTagsDialog
             open={isBulkEditTagsDialogOpen}
             onOpenChange={setIsBulkEditTagsDialogOpen}
-            tasks={selectedTasks}
+            items={selectedTasks}
+            targetType="task"
+            communityId={communityId}
+            onInvalidate={() => void invalidate(q.allTasks())}
             onSuccess={() => {}}
           />
         </>
       ) : null}
+
+      <ConfirmDialog
+        open={isBulkDeleteDialogOpen}
+        onOpenChange={setIsBulkDeleteDialogOpen}
+        title={t("tasks.bulkDeleteConfirm", { count: selectedTasks.length })}
+        confirmLabel={t("common:delete")}
+        destructive
+        onConfirm={() => bulkDeleteTasks.mutate(selectedTasks.map((t) => t.id))}
+      />
 
       <ConfirmDialog
         open={isArchiveDialogOpen}

@@ -26,12 +26,3 @@ export const readOptionalWholeNumber = (
     valid: value === null || (Number.isInteger(value) && value >= min && value <= max),
   };
 };
-
-/** Markdown as a one-line excerpt: its words, without the emphasis and heading
- *  marks. */
-export const markdownExcerpt = (markdown: string): string =>
-  markdown
-    .replace(/[*_`#>]/g, "")
-    .split(/\s+/)
-    .join(" ")
-    .trim();

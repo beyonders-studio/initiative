@@ -598,5 +598,5 @@ async def _linked_file_ids(session: AsyncSession, wiki_id: int) -> list[int]:
     return [
         entity_id
         for kind, entity_id in (decode_node_id(edge.source_node) for edge in edges)
-        if kind is SearchEntityType.file
+        if kind == SearchEntityType.file
     ]

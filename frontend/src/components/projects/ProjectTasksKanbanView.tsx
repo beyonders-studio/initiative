@@ -12,7 +12,7 @@ import {
   type UniqueIdentifier,
 } from "@dnd-kit/core";
 import type { GroupingState } from "@tanstack/react-table";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -24,13 +24,12 @@ import type {
   TaskListRead,
   TaskStatusRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
 import { KanbanBands } from "@/components/projects/KanbanBands";
 import { type ColumnFill, KanbanColumn } from "@/components/projects/KanbanColumn";
 import { priorityVariant } from "@/components/projects/projectTasksConfig";
 import { resolveKanbanDropTarget } from "@/components/projects/taskOrdering";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
-import { Badge } from "@/components/ui/badge";
-import { GroupBySelect } from "@/components/ui/data-table";
 import { MentionText } from "@/components/user/MentionText";
 import { type ColumnLimits, NO_COLUMN_LIMITS } from "@/hooks/useColumnLimits";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
@@ -40,12 +39,14 @@ import { useMoveTaskToGroup } from "@/hooks/useTasks";
 import { useTaskTypeChange } from "@/hooks/useTaskTypeChange";
 import { formatDateTime } from "@/lib/formatDate";
 import { cardOf } from "@/lib/layouts/draft";
-import { useProjectLayoutEnv, withDisplays } from "@/lib/layouts/fields";
+import { useCounterSteps, useProjectLayoutEnv, withDisplays } from "@/lib/layouts/fields";
 import { boardBands } from "@/lib/layouts/grouping";
 import { pluginFields, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { taskFields } from "@/lib/layouts/tasks";
 import { type LayoutContext, type LayoutNode, namesField } from "@/lib/layouts/tree";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/ui/badge";
+import { GroupBySelect } from "@/ui/data-table";
+import { cn } from "@/ui/lib/utils";
 
 import { TaskAssigneeList } from "./TaskAssigneeList";
 import { type BoardActions, BoardActionsContext, TaskCardActions } from "./TaskQuickActions";
@@ -157,9 +158,14 @@ export const ProjectTasksKanbanView = ({
   // renderers share is held apart, so a change of fields redraws the cards but
   // not the values on them.
   const projectEnv = useProjectLayoutEnv(taskHref);
+  const stepCounter = useCounterSteps(
+    PropertyTarget.task,
+    useCallback(() => canEditTasks, [canEditTasks])
+  );
   const env = useMemo(
-    () => (canEditTasks ? { ...projectEnv, itemActions: TaskCardActions } : projectEnv),
-    [projectEnv, canEditTasks]
+    () =>
+      canEditTasks ? { ...projectEnv, itemActions: TaskCardActions, stepCounter } : projectEnv,
+    [projectEnv, canEditTasks, stepCounter]
   );
   // The handler changes with every list of tasks; the cards' menus hold one
   // that doesn't, so a refetch neither redraws every card nor closes a menu.

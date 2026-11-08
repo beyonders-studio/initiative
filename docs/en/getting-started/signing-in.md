@@ -56,7 +56,7 @@ Haven't got it yet? [Installing the app](install-the-app.md) covers the iPhone, 
 The app needs one extra step the first time, because it has to be told *which* Initiative it's talking to. There are a lot of them out there and it has no way of guessing which one is yours.
 
 1. Open the app. Under the title it says **Sign in to**, followed by a server. Tap that, choose **Your own server**, type in your group's Initiative address — the same one you use in a browser — and tap **Connect**.
-2. Sign in with your email and password, single sign-on, or a passkey. On Android a passkey works right inside the app; on iPhone the browser opens for a moment and hands you back.
+2. Sign in with your email and password, single sign-on, or a passkey. On Android and Windows a passkey works right inside the app; on iPhone, Mac and Linux the browser opens for a moment and hands you back.
 
 After that it remembers, and stays signed in. Moving to a different server works the same way, from the sign-in or sign-up card: tap the server's name, then a new address and another **Connect**. The app keeps the last address you used, in case you want to go back.
 

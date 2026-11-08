@@ -384,6 +384,13 @@ class ToolExportAdapter:
         beside it — an uploaded file's bytes ride next to its envelope."""
         return (self.item(entity, ctx),)
 
+    def batch(
+        self, entities: list[Any], ctx: BuildContext, /
+    ) -> tuple[RenderItem, ...]:
+        """Every file a selection becomes: each entity's own, unless the
+        format writes them all as one."""
+        return tuple(item for entity in entities for item in self.items(entity, ctx))
+
     async def reach(
         self, session: AsyncSession, params: dict, entities: list[Any], /
     ) -> set[int]:
@@ -480,7 +487,7 @@ class ToolExportAdapter:
             filters=parse_filters(self.tool, params.get("filters")),
         )
         ctx = replace(ctx, prepared=await self.prepare(session, entities, ctx))
-        batch = tuple(item for entity in entities for item in self.items(entity, ctx))
+        batch = self.batch(entities, ctx)
         if format == "json":
             # An envelope names people by handle, never by id — including the
             # people its body mentions, which the item builders cannot look

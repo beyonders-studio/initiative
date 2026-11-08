@@ -40,20 +40,19 @@ In a busy community the sidebar gets long. Initiatives collapse, and there's a *
 
 Your bits, tucked underneath.
 
-**Your name and picture** opens your account menu — your profile, **My Settings**, **Theme**, and signing out.
+**Your name and picture** opens your account menu — your profile, **My Settings**, **Help**, **Theme**, and signing out.
 
 The small **dot** on your picture is your presence: online, idle, busy, or offline. Offline means offline. You can sit in Initiative at two in the morning with six files open and that dot will say offline the entire time, because you asked it to and it is nobody's business. See [Saying how you're around](../account/profile-and-preferences.md#saying-how-youre-around).
 
 **Theme**, in that menu, does Light, Dark, or System. "System" is for those of us who lost the argument with our laptop some time ago and have made peace with it.
 
-**The bell**, beside your name, is your notifications.
+**The bell**, beside your name, is your notifications. Announcements you've closed land there too, already read, so you can open one again.
 
-Under all of it, one small row:
+**Update** appears beside the bell only when there's a newer version waiting, and stays until you take it. On the web and phones it reloads. The desktop app keeps it in the window's title bar instead, where it restarts into the new app, or tells you where to get it.
 
-- **The version number** opens the changelog, for anyone who likes to know what changed and when.
-- **Past announcements** (the info icon), for when you dismiss something at speed and experience immediate regret.
-- **Documentation** (the question mark) opens these pages.
-- **Ask for help** (the lifebuoy) appears wherever there's somebody to ask: a community that takes help requests, or a server that has given an address to write to.
+**Help**, in your account menu and in [search](#the-one-thing-genuinely-worth-learning-today), searches these pages without leaving the app, starting with answers for the page you're on. The desktop app also has it as the question mark in its title bar. Where there's somebody to ask (a server that takes help requests, or one that has given an address to write to), the way to ask sits under the results.
+
+Which version you're on, and what changed lately, is at the foot of **My Settings**, for anyone who likes to know what changed and when.
 
 ## The middle
 

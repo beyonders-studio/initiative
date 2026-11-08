@@ -61,10 +61,6 @@
     "selectPeople": "Seleccionar personas…",
     "selectPeopleToRevoke": "Seleccionar personas para revocar…",
     "permissionLevel": "Nivel de permiso",
-    "rolesSelected_one": "{{count}} rol seleccionado",
-    "rolesSelected_other": "{{count}} roles seleccionados",
-    "peopleSelected_one": "{{count}} persona seleccionada",
-    "peopleSelected_other": "{{count}} personas seleccionadas",
     "grantRoles_one": "Otorgar {{count}} rol",
     "grantRoles_other": "Otorgar {{count}} roles",
     "revokeRoles_one": "Revocar {{count}} rol",
@@ -102,8 +98,6 @@
     "resource_project_other": "proyectos",
     "resource_file_one": "archivo",
     "resource_file_other": "archivos",
-    "resource_queue_one": "cola",
-    "resource_queue_other": "colas",
     "resource_counter_group_one": "grupo de contadores",
     "resource_counter_group_other": "grupos de contadores",
     "resource_calendar_one": "calendario",
@@ -113,7 +107,9 @@
     "resource_post_one": "publicación",
     "resource_post_other": "publicaciones",
     "resource_wiki_one": "wiki",
-    "resource_wiki_other": "wikis"
+    "resource_wiki_other": "wikis",
+    "resource_contact_one": "contacto",
+    "resource_contact_other": "contactos"
   },
   "request": {
     "needAccess": "Necesitas acceso",
@@ -160,8 +156,6 @@
     "batchTitle": "Solicitudes de acceso",
     "answered": "Ya respondida",
     "answeredDescription": "Aquí ya no queda nada por responder.",
-    "loading": "Cargando solicitudes…",
-    "loadError": "No se pudieron cargar estas solicitudes.",
     "error": "No se pudo enviar tu respuesta. Inténtalo de nuevo."
   }
 }

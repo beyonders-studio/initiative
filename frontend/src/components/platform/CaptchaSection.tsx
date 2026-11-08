@@ -12,21 +12,15 @@ import { useTranslation } from "react-i18next";
 
 import type { CaptchaSettingsUpdate } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useServerForm } from "@/hooks/useServerForm";
 import { useCaptchaSettings, useUpdateCaptchaSettings } from "@/hooks/useSettings";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 const PROVIDERS = ["hcaptcha", "turnstile", "recaptcha"] as const;
 type Provider = (typeof PROVIDERS)[number];
@@ -85,8 +79,7 @@ export const CaptchaSection = () => {
       }
     >
       <form className="space-y-4" onSubmit={handleSubmit}>
-        <div className="space-y-2">
-          <Label htmlFor="captcha-provider">{t("captcha.providerLabel")}</Label>
+        <Field label={t("captcha.providerLabel")}>
           <Select
             value={form.values.provider}
             onValueChange={(value) => {
@@ -95,7 +88,7 @@ export const CaptchaSection = () => {
               }
             }}
           >
-            <SelectTrigger id="captcha-provider" className="w-full sm:w-72">
+            <SelectTrigger className="w-full sm:w-72">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -107,28 +100,23 @@ export const CaptchaSection = () => {
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </Field>
         <div className="grid grid-cols-pair gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="captcha-site-key">{t("captcha.siteKeyLabel")}</Label>
+          <Field label={t("captcha.siteKeyLabel")}>
             <Input
-              id="captcha-site-key"
               value={form.values.site_key}
               onChange={(event) => form.set({ site_key: event.target.value })}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="captcha-secret-key">{t("captcha.secretKeyLabel")}</Label>
+          </Field>
+          <Field label={t("captcha.secretKeyLabel")} hint={t("captcha.secretKeyHelp")}>
             <Input
-              id="captcha-secret-key"
               type="password"
               autoComplete="off"
               value={secret}
               onChange={(event) => setSecret(event.target.value)}
               placeholder={saved.has_secret_key ? t("captcha.secretKeySet") : ""}
             />
-            <p className="text-muted-foreground text-xs">{t("captcha.secretKeyHelp")}</p>
-          </div>
+          </Field>
         </div>
         {!saved.enforcing && form.values.provider !== OFF && (
           <p className="text-muted-foreground text-sm">{t("captcha.incomplete")}</p>

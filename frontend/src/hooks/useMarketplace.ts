@@ -12,7 +12,7 @@
  * dashboards and plug-ins endpoints answer; the surface merges those in client-side.
  */
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 
 import type {
   ListMarketplaceListingsParams,
@@ -20,12 +20,9 @@ import type {
   MarketplaceListingPage,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
-  getListMarketplaceListingsQueryKey,
-  getReadMarketplaceListingQueryKey,
-  getResolveMarketplaceListingQueryKey,
-  listMarketplaceListings,
-  readMarketplaceListing,
-  resolveMarketplaceListing,
+  useListMarketplaceListings,
+  useReadMarketplaceListing,
+  useResolveMarketplaceListing,
 } from "@/api/generated/marketplace/marketplace";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import type { QueryOpts } from "@/types/query";
@@ -39,14 +36,14 @@ export const useMarketplaceListings = (
   options?: QueryOpts<MarketplaceListingPage>
 ) => {
   const communityId = useActiveCommunityId();
-  return useQuery<MarketplaceListingPage>({
-    queryKey: getListMarketplaceListingsQueryKey(communityId, params),
-    queryFn: () => listMarketplaceListings(communityId, params),
-    // Typing keeps the previous page on screen while the next one loads, so the
-    // grid does not blank out on every keystroke.
-    placeholderData: keepPreviousData,
-    staleTime: CATALOG_STALE_MS,
-    ...options,
+  return useListMarketplaceListings(communityId, params, {
+    query: {
+      // Typing keeps the previous page on screen while the next one loads, so the
+      // grid does not blank out on every keystroke.
+      placeholderData: keepPreviousData,
+      staleTime: CATALOG_STALE_MS,
+      ...options,
+    },
   });
 };
 
@@ -56,12 +53,8 @@ export const useMarketplaceListing = (
 ) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<MarketplaceListingDetail>({
-    queryKey: getReadMarketplaceListingQueryKey(communityId, publicId ?? ""),
-    queryFn: () => readMarketplaceListing(communityId, publicId as string),
-    enabled: Boolean(publicId) && userEnabled,
-    staleTime: CATALOG_STALE_MS,
-    ...rest,
+  return useReadMarketplaceListing(communityId, publicId ?? "", {
+    query: { enabled: Boolean(publicId) && userEnabled, staleTime: CATALOG_STALE_MS, ...rest },
   });
 };
 
@@ -78,15 +71,15 @@ export const useMarketplaceListingByUid = (
 ) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<MarketplaceListingDetail>({
-    queryKey: getResolveMarketplaceListingQueryKey(communityId, uid ?? ""),
-    queryFn: () => resolveMarketplaceListing(communityId, uid as string),
-    enabled: Boolean(uid) && userEnabled,
-    staleTime: CATALOG_STALE_MS,
-    // A listing this community cannot take is a real answer for an installed
-    // dashboard — withdrawn, or a plug-in it no longer has — not something to
-    // retry.
-    retry: false,
-    ...rest,
+  return useResolveMarketplaceListing(communityId, uid ?? "", {
+    query: {
+      enabled: Boolean(uid) && userEnabled,
+      staleTime: CATALOG_STALE_MS,
+      // A listing this community cannot take is a real answer for an installed
+      // dashboard — withdrawn, or a plug-in it no longer has — not something to
+      // retry.
+      retry: false,
+      ...rest,
+    },
   });
 };

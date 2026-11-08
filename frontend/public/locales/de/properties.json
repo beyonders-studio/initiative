@@ -21,6 +21,9 @@
     "user_reference": "Person",
     "currency": "Geldbetrag",
     "scale": "Skala",
+    "counter": "Zähler",
+    "file": "Datei",
+    "signature": "Unterschrift",
     "link": "Link",
     "badge": "Abzeichen",
     "json": "Daten"
@@ -59,11 +62,23 @@
     "optionAddFailed": "Option konnte nicht hinzugefügt werden",
     "scalePlaceholder": "0–100",
     "stars_one": "{{count}} Stern",
-    "stars_other": "{{count}} Sterne"
+    "stars_other": "{{count}} Sterne",
+    "stepDown": "{{name}} einen Schritt verringern",
+    "stepUp": "{{name}} einen Schritt erhöhen",
+    "reset": "{{name}} zurücksetzen",
+    "newFile": "Neue Datei",
+    "fileUnavailable": "Eine Datei, die du nicht öffnen kannst",
+    "sign": "Unterschreiben",
+    "signTitle": "{{name}} unterschreiben",
+    "signStatement": "Wenn du deinen Namen eingibst und unterschreibst, setzt du deine Unterschrift unter dieses Element, so wie es jetzt ist. Sie wird unter deinem Konto festgehalten.",
+    "signNameLabel": "Dein Name",
+    "signingAs": "Unterschrift als {{name}}"
   },
   "cell": {
     "emptyValue": "—",
-    "none": "Keine"
+    "none": "Keine",
+    "signed": "{{name}}, {{date}}",
+    "updatedAfterSigning": "Nach der Unterschrift geändert"
   },
   "manager": {
     "title": "Metadaten",
@@ -132,5 +147,17 @@
     "label": "Währung",
     "none": "Keine Währung passt",
     "default": "EUR"
+  },
+  "counter": {
+    "step": "Schrittweite",
+    "min": "Minimum",
+    "max": "Maximum",
+    "initial": "Anfangswert",
+    "stepPlaceholder": "1",
+    "minPlaceholder": "Keins",
+    "maxPlaceholder": "Keins",
+    "initialPlaceholder": "0",
+    "stepPositive": "Die Schrittweite muss größer als null sein",
+    "minAboveMax": "Das Minimum darf nicht größer als das Maximum sein"
   }
 }

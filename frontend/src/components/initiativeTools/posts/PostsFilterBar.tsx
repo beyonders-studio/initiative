@@ -3,14 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { ToolFilterPanel } from "@/components/initiativeTools/shared/ToolFilterPanel";
 import { ToolFilterFields, type ToolFilterFieldsProps } from "@/components/tools/ToolFilterFields";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** What a board is showing: everything, or only what is still waiting. */
 export type ReadFilter = "all" | "unread";

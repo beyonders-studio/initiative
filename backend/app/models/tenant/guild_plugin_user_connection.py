@@ -48,13 +48,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
 
-#: Where a connection has got to, as far as this side can tell.
-#:
-#: ``pending`` — the member started the vendor flow and the plug-in has not written
-#: a result back yet. ``connected`` — values are present. ``blocked`` — an admin
-#: stopped this member reconnecting, and the row is a tombstone.
-CONNECTION_STATUSES: frozenset[str] = frozenset({"pending", "connected", "blocked"})
-
 #: How wide a manifest connection id is stored, and therefore the widest one
 #: any caller can name.
 CONNECTION_ID_LENGTH = 64
@@ -119,6 +112,11 @@ class GuildPluginUserConnection(SQLModel, table=True):
         sa_column=Column(JSONB, nullable=False, server_default="{}"),
     )
 
+    #: Where a connection has got to, as far as this side can tell.
+    #:
+    #: ``pending`` — the member started the vendor flow and the plug-in has not
+    #: written a result back yet. ``connected`` — values are present. ``blocked``
+    #: — an admin stopped this member reconnecting, and the row is a tombstone.
     status: str = Field(
         default="pending",
         sa_column=Column(String(16), nullable=False, server_default="pending"),

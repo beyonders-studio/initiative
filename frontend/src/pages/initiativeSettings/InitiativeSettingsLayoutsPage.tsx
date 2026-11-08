@@ -1,7 +1,7 @@
 /**
  * `/settings/layouts` — how each tool in this initiative draws what it holds,
  * in the sidebar's order: the calendar's and the notices' details, and each
- * project's, queue's and counter group's layouts. Each layout says when it was last changed, and a project which list
+ * project's and counter group's layouts. Each layout says when it was last changed, and a project which list
  * it opens on; each has a way into its layout editor.
  */
 
@@ -10,11 +10,9 @@ import { Pencil } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { type InitiativeToolLayoutsRead, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { InitiativeSettingsPermissionRequired } from "@/components/initiatives/settings/InitiativeSettingsGuard";
 import { SHARED_LAYOUTS } from "@/components/layouts/details";
 import { LayoutList } from "@/components/layouts/LayoutList";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
 import {
   INSTANCE_LAYOUT_TOOLS,
@@ -23,7 +21,6 @@ import {
   useInitiativeLayouts,
   useToolLayouts,
 } from "@/hooks/useToolLayouts";
-import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
 import { useCommunityPath } from "@/lib/communityUrl";
 import {
   isToolEnabled,
@@ -32,10 +29,14 @@ import {
   toolListRoute,
   toolNavLabelKey,
 } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
+import { StatusMessage } from "@/ui/status-message";
 
 export const InitiativeSettingsLayoutsPage = () => {
   const { initiativeId, initiative, canManageMembers } = useInitiativeSettings();
-  if (!canManageMembers) return <InitiativeSettingsPermissionRequired />;
+  if (!canManageMembers) return <SettingsPermissionRequired scope="initiative" />;
   return (
     <InitiativeLayouts
       initiativeId={initiativeId}
@@ -58,7 +59,7 @@ const InitiativeLayouts = ({
   enabled: (tool: Tool) => boolean;
 }) => {
   const { t } = useTranslation("initiatives");
-  const { data, isError } = useInitiativeLayouts(initiativeId);
+  const { data, isError, refetch } = useInitiativeLayouts(initiativeId);
   // Each tool's instances; an initiative with no project yet says so.
   const instances = (tool: Tool) => {
     const entries = data?.filter((entry) => entry.tool === tool);
@@ -76,9 +77,7 @@ const InitiativeLayouts = ({
         <CardDescription>{t("settings.layouts.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {isError ? (
-          <p className="text-destructive text-sm">{t("settings.layouts.loadError")}</p>
-        ) : null}
+        {isError ? <StatusMessage onRetry={refetch} /> : null}
         {TOOLS_WITH_LAYOUTS.map((tool) =>
           tool in SHARED_LAYOUTS ? (
             enabled(tool) ? (
@@ -95,8 +94,8 @@ const InitiativeLayouts = ({
   );
 };
 
-/** One instance's layouts (a project's, a queue's), opening its editor where
- *  the reader may change them and has the room the editor needs. */
+/** One instance's layouts (a project's, a counter group's), opening its editor
+ *  where the reader may change them and has the room the editor needs. */
 const InstanceLayouts = ({
   initiativeId,
   entry,

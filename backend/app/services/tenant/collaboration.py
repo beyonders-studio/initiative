@@ -766,12 +766,6 @@ class CollaborationManager:
                     "collaboration persistence sweep failed (%s)", type(exc).__name__
                 )
 
-    def has_active_collaborators(
-        self, guild_id: int, resource_type: str, resource_id: int
-    ) -> bool:
-        """Check if a document has any live connection."""
-        return self.live_room(guild_id, resource_type, resource_id) is not None
-
     def live_room(
         self, guild_id: int, resource_type: str, resource_id: int
     ) -> Optional[CollaborationRoom]:

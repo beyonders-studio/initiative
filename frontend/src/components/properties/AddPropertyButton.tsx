@@ -1,19 +1,11 @@
 import { Plus } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { type MetadataOwner, useOwnedDefinitions } from "@/hooks/useProperties";
+import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
 
 import { NewPropertyForm } from "./NewPropertyForm";
 import { iconForPropertyType } from "./propertyTypeIcons";
@@ -48,53 +40,54 @@ export const AddPropertyButton = ({
 }: AddPropertyButtonProps) => {
   const { t } = useTranslation(["properties", "common"]);
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-
-  // The inline "create a property" form, in place of the list.
-  const [isCreating, setIsCreating] = useState(false);
+  // The new property's name while it is being made, in place of the list.
+  const [newName, setNewName] = useState<string | null>(null);
 
   const propertiesQuery = useOwnedDefinitions({ initiativeId, owner });
 
-  const currentIdSet = useMemo(() => new Set(currentPropertyIds), [currentPropertyIds]);
-
-  const candidates = useMemo(() => {
-    const all = propertiesQuery.data ?? [];
-    return all.filter((definition) => !currentIdSet.has(definition.id));
-  }, [propertiesQuery.data, currentIdSet]);
-
-  const filteredCandidates = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return candidates;
-    return candidates.filter((definition) => definition.name.toLowerCase().includes(term));
-  }, [candidates, search]);
   // The owner's metadata, then the initiative's properties, each under its
   // own heading where there are both.
-  const groups = [
-    {
-      key: "metadata",
-      heading: owner ? t(`properties:picker.owner.${owner.kind}`) : undefined,
-      items: filteredCandidates.filter((definition) => isOwned(definition)),
-    },
-    {
-      key: "properties",
-      heading: owner ? t("properties:picker.owner.initiative") : undefined,
-      items: filteredCandidates.filter((definition) => !isOwned(definition)),
-    },
-  ].filter((group) => group.items.length > 0);
+  const candidates = useMemo(() => {
+    const all = (propertiesQuery.data ?? []).filter(
+      (definition) => !currentPropertyIds.includes(definition.id)
+    );
+    return [...all.filter(isOwned), ...all.filter((definition) => !isOwned(definition))];
+  }, [propertiesQuery.data, currentPropertyIds]);
 
-  const handleOpenChange = useCallback((next: boolean) => {
+  const handleOpenChange = (next: boolean) => {
     setOpen(next);
-    if (!next) {
-      setSearch("");
-      setIsCreating(false);
-    }
-  }, []);
-
-  const startCreating = useCallback(() => setIsCreating(true), []);
+    if (!next) setNewName(null);
+  };
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
+    <Combobox
+      items={candidates.map((definition) => ({
+        value: String(definition.id),
+        label: definition.name,
+        icon: iconForPropertyType(definition.type),
+        sublabel: t(`properties:types.${definition.type}`),
+        group: owner
+          ? t(
+              isOwned(definition)
+                ? `properties:picker.owner.${owner.kind}`
+                : "properties:picker.owner.initiative"
+            )
+          : undefined,
+      }))}
+      onValueChange={(value) => {
+        const definition = candidates.find((each) => String(each.id) === value);
+        if (definition) onAdd(definition);
+      }}
+      open={open}
+      onOpenChange={handleOpenChange}
+      // Offered whatever was typed: a new property starts from the search.
+      typedLabel={() => t("properties:picker.createHeading")}
+      onCreate={setNewName}
+      loading={propertiesQuery.isLoading}
+      searchPlaceholder={t("properties:picker.placeholder")}
+      emptyMessage={t("properties:picker.empty")}
+      disabled={disabled}
+      trigger={
         <Button
           type="button"
           variant="ghost"
@@ -105,83 +98,20 @@ export const AddPropertyButton = ({
           <Plus className="h-4 w-4" />
           {t(owner ? "properties:addPropertyOrMetadata" : "properties:addMetadata")}
         </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="start">
-        {isCreating ? (
-          <NewPropertyForm
-            initiativeId={initiativeId}
-            owner={owner}
-            name={search.trim()}
-            onCreated={(created) => {
-              onAdd(created);
-              handleOpenChange(false);
-            }}
-            onCancel={() => setIsCreating(false)}
-          />
-        ) : (
-          <Command shouldFilter={false}>
-            <CommandInput
-              placeholder={t("properties:picker.placeholder")}
-              value={search}
-              onValueChange={setSearch}
-            />
-            <CommandList>
-              {propertiesQuery.isLoading ? (
-                <div className="py-6 text-center text-muted-foreground text-sm">
-                  {t("common:loading")}
-                </div>
-              ) : (
-                <>
-                  {filteredCandidates.length === 0 ? (
-                    <div className="py-6 text-center text-muted-foreground text-sm">
-                      {t("properties:picker.empty")}
-                    </div>
-                  ) : (
-                    groups.map((group) => (
-                      <CommandGroup key={group.key} heading={group.heading}>
-                        {group.items.map((definition) => {
-                          const Icon = iconForPropertyType(definition.type);
-                          return (
-                            <CommandItem
-                              key={definition.id}
-                              value={`property-${definition.id}`}
-                              onSelect={() => {
-                                onAdd(definition);
-                                handleOpenChange(false);
-                              }}
-                              className="cursor-pointer"
-                            >
-                              <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                              <div className="flex flex-col">
-                                <span>{definition.name}</span>
-                                <span className="text-muted-foreground text-xs">
-                                  {t(`properties:types.${definition.type}`)}
-                                </span>
-                              </div>
-                            </CommandItem>
-                          );
-                        })}
-                      </CommandGroup>
-                    ))
-                  )}
-                  <CommandSeparator />
-                  <CommandGroup>
-                    <CommandItem
-                      key="create-new"
-                      value="create-new"
-                      onSelect={startCreating}
-                      className="cursor-pointer"
-                    >
-                      <Plus className="h-4 w-4" />
-                      {t("properties:picker.createHeading")}
-                    </CommandItem>
-                  </CommandGroup>
-                </>
-              )}
-            </CommandList>
-          </Command>
-        )}
-      </PopoverContent>
-    </Popover>
+      }
+    >
+      {newName !== null ? (
+        <NewPropertyForm
+          initiativeId={initiativeId}
+          owner={owner}
+          name={newName}
+          onCreated={(created) => {
+            onAdd(created);
+            handleOpenChange(false);
+          }}
+          onCancel={() => setNewName(null)}
+        />
+      ) : null}
+    </Combobox>
   );
 };

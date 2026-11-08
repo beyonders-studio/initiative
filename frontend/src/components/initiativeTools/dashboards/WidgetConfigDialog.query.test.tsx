@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { buildPluginCatalogEntry } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
@@ -64,7 +65,22 @@ const serve = () => {
     communityHttp.post("/query/build", async ({ request }) => {
       asked.build += 1;
       described.build = (await request.json()) as Record<string, unknown>;
-      return HttpResponse.json({ sql: BUILT_SQL, columns: [], relations: ["tasks"] });
+      return HttpResponse.json({
+        sql: BUILT_SQL,
+        columns: [],
+        relations: ["tasks"],
+        // An endpoint's columns, as its plug-in declares them.
+        ...(described.build.plugin
+          ? {
+              plugins: [
+                {
+                  alias: "plugin",
+                  fields: [FIELD("status", "text"), FIELD("total", "number", "number")],
+                },
+              ],
+            }
+          : {}),
+      });
     }),
     communityHttp.post("/query/describe", async ({ request }) => {
       asked.describe += 1;
@@ -491,5 +507,90 @@ describe("a target", () => {
     await user.clear(screen.getByLabelText("Target date"));
     await user.click(saveButton());
     expect(onSave.mock.lastCall?.[0].options).toBeUndefined();
+  });
+});
+
+describe("reading a plug-in", () => {
+  const ORDERS = { plugin: "acme.shop", endpoint: "orders" };
+
+  beforeEach(() => {
+    server.use(
+      communityHttp.get("/plugins/widget-catalog", () =>
+        HttpResponse.json({ items: [buildPluginCatalogEntry()] })
+      )
+    );
+  });
+
+  /** Chooses Plug-in data, which is offered once the catalog says a plug-in is
+   *  installed. */
+  const choosePluginData = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(await screen.findByRole("combobox", { name: "Show data from" }));
+    const option = await screen.findByRole("option", { name: "Plug-in data" });
+    await waitFor(() => expect(option).not.toHaveAttribute("aria-disabled", "true"));
+    await user.click(option);
+  };
+
+  it("is a statement, with no other source to choose", async () => {
+    mount(widget({ source: "query" }));
+    await screen.findByRole("tab", { name: /build/i });
+    expect(screen.queryByRole("combobox", { name: /data source/i })).not.toBeInTheDocument();
+  });
+
+  it("is built from what was clicked, starting with every column it returns", async () => {
+    const user = userEvent.setup();
+    mount(widget({ source: "query" }));
+
+    await choosePluginData(user);
+
+    await waitFor(() => expect(described.build?.plugin).toEqual(ORDERS));
+    await waitFor(() =>
+      expect(described.build?.columns).toEqual([{ field: "status" }, { field: "total" }])
+    );
+    // Narrowed on its own columns, as a range is.
+    await user.click(await screen.findByRole("button", { name: /add filter/i }));
+    await waitFor(() => {
+      const where = described.build?.where as { field: string }[] | undefined;
+      expect(where?.[0]?.field).toBe("status");
+    });
+  });
+
+  it("sends the endpoint's settings with it", async () => {
+    const user = userEvent.setup();
+    mount(widget({ source: "query" }));
+
+    await choosePluginData(user);
+    await user.type(await screen.findByLabelText("Range"), "30d");
+
+    await waitFor(() =>
+      expect(described.build?.plugin).toEqual({ ...ORDERS, params: { range: "30d" } })
+    );
+  });
+
+  it("reopens on the plug-in it was built from", async () => {
+    mount(
+      widget({
+        source: "query",
+        sql: BUILT_SQL,
+        spec: { plugin: ORDERS, columns: [{ field: "status" }], where: [], group_by: [] },
+      })
+    );
+
+    // Named once the catalog says what is installed.
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Plug-in" })).toHaveTextContent("Shop")
+    );
+    expect(screen.getByRole("combobox", { name: "What it reads" })).toHaveTextContent("orders");
+  });
+
+  it("offers the installed plug-ins inside plugin('", async () => {
+    const user = userEvent.setup();
+    mount(widget({ source: "query", sql: "SELECT * FROM " }));
+
+    await waitFor(() => expect(sqlBox()).toHaveValue("SELECT * FROM "));
+    await user.click(sqlBox());
+    await user.type(sqlBox(), "plugin('");
+    await user.click(await screen.findByRole("button", { name: /acme\.shop/i }));
+
+    await waitFor(() => expect(sqlBox()).toHaveValue("SELECT * FROM plugin('acme.shop'"));
   });
 });

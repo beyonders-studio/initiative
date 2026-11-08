@@ -51,15 +51,34 @@ class CaseView:
     resource_id: Optional[int] = None
     #: What it is about within its stream, as its filer chose.
     topic: Optional[str] = None
+    #: How many voted for it, on a published idea; ``None`` on any other case.
+    votes: Optional[int] = None
+
+
+async def holds_cases(session: AsyncSession) -> bool:
+    """Whether the community ``session`` is routed into has cases: only the
+    operations community's schema has their tables."""
+    from app.db.operations_schema import holds_operations
+    from app.db.schema_provisioning import guild_schema_name
+    from app.db.session import routed_guild_id
+
+    guild_id = routed_guild_id(session)
+    return guild_id is not None and await holds_operations(
+        session, guild_schema_name(guild_id)
+    )
 
 
 async def read_case(session: AsyncSession, task_id: int) -> Optional[CaseView]:
-    """The case behind ``task_id``, or ``None`` where the task is not one."""
+    """The case behind ``task_id``, or ``None`` where the task is not one. A
+    published idea is the ``ideas`` stream's case, which nobody filed: its
+    type on the Ideas board is what makes it one."""
+    if not await holds_cases(session):
+        return None
     case = (
         await session.exec(select(IntakeCase).where(IntakeCase.task_id == task_id))
     ).first()
     if case is None:
-        return None
+        return await _idea(session, task_id)
     stream = IntakeStream(case.stream)
     binding = (
         await session.exec(
@@ -107,6 +126,29 @@ async def read_case(session: AsyncSession, task_id: int) -> Optional[CaseView]:
     )
 
 
+async def _idea(session: AsyncSession, task_id: int) -> Optional[CaseView]:
+    """``task_id`` as the ``ideas`` stream's case, where it is a published
+    idea."""
+    from app.services.platform import ideas as ideas_service
+
+    found = await ideas_service.published(session, task_id)
+    if found is None:
+        return None
+    opened_at, votes = found
+    return CaseView(
+        stream=IntakeStream.ideas,
+        opened_at=opened_at,
+        filer=None,
+        filer_subject=None,
+        conversation=Conversation.none,
+        awaiting_filer_status_id=None,
+        active_status_id=None,
+        messages=[],
+        evidence=[],
+        votes=votes,
+    )
+
+
 async def _subject(session: AsyncSession, task_id: int) -> dict[str, object]:
     """The case's subject, from the references it was opened with: the task's
     values for the case fields that name it."""
@@ -146,6 +188,8 @@ async def take(session: AsyncSession, task: Task, user_id: int) -> Optional[bool
     """
     from app.services.tenant import task_creation
 
+    if not await holds_cases(session):
+        return None
     found = (
         await session.exec(
             select(IntakeCase.id, IntakeBinding.active_status_id)

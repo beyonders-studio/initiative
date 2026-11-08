@@ -19,7 +19,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import ColumnElement, Table, and_, func, true
@@ -38,6 +38,7 @@ from app.core.user_display import display_name
 from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.calendar_event import CalendarEvent
+from app.models.tenant.contact import Contact
 from app.models.tenant.counter import Counter
 from app.core.file_types import FileType
 from app.models.tenant.project import Project
@@ -320,6 +321,28 @@ async def _project_progress(
     return values
 
 
+def _first_detail(column: Any) -> Reader:
+    """A contact's first value of one of its fixed fields, the one a table
+    shows. A contact with none answers muted, as an unassigned task does."""
+
+    async def read(session: AsyncSession, ids: list[int]) -> dict[int, SmartChipValue]:
+        rows = (
+            await session.exec(
+                select(Contact.id, column).where(
+                    Contact.id.in_(ids), Contact.deleted_at.is_(None)
+                )
+            )
+        ).all()
+        return {
+            contact_id: SmartChipValue(text=values[0]["value"])
+            if values
+            else SmartChipValue(text="", tone=SmartChipTone.muted)
+            for contact_id, values in rows
+        }
+
+    return read
+
+
 def _plain(value: Decimal) -> str:
     """A stored number as a person writes it — ``7`` rather than ``7.0000``."""
     trimmed = value.normalize()
@@ -338,6 +361,8 @@ SMART_CHIP_SOURCES: dict[tuple[SearchEntityType, SmartChipAspect], Reader] = {
     (SearchEntityType.project, SmartChipAspect.progress): _project_progress,
     (SearchEntityType.calendar_event, SmartChipAspect.when): _event_when,
     (SearchEntityType.task, SmartChipAspect.checklist): _task_checklist,
+    (SearchEntityType.contact, SmartChipAspect.phone): _first_detail(Contact.phones),
+    (SearchEntityType.contact, SmartChipAspect.email): _first_detail(Contact.emails),
 }
 
 
@@ -379,8 +404,8 @@ async def _titles(
 ) -> dict[int, str]:
     """What these things are called right now.
 
-    The column is whichever one the kind calls its name — derived, so a queue
-    item answers with its label and a task with its title without either being
+    The column is whichever one the kind calls its name — derived, so a counter
+    answers with its name and a task with its title without either being
     written down here.
     """
     table = reference_targets.id_column(entity_type).table

@@ -266,7 +266,7 @@ async def list_tasks(
 ) -> TaskListResponse:
     q = await task_queries.parse_task_list_query(session, conditions, sorting, tz)
     if current_user is None:
-        task_queries.refuse_person_filters(q)
+        task_queries.read_person_filters(q)
 
     # Guild-scoped list. Cross-guild "my tasks" aggregates live under
     # /me/tasks (see list_my_tasks above).
@@ -451,7 +451,7 @@ async def list_task_groups(
     list shows them, and the groups each task is in."""
     q = await task_queries.parse_task_list_query(session, conditions, None, tz)
     if current_user is None:
-        task_queries.refuse_person_filters(q)
+        task_queries.read_person_filters(q)
     build = await task_queries.guild_task_query_builder(
         session, current_user, guild_context, q=q, include_archived=include_archived
     )
@@ -565,6 +565,7 @@ async def read_task_case(
             for item in case.evidence
         ],
         grants=await _case_grants(guild_context.guild_id, task_id),
+        votes=case.votes,
     )
 
 

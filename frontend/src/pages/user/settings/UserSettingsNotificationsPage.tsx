@@ -16,31 +16,25 @@ import {
   type NotificationPreferencesUpdate,
   type UserRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { useReadMyNotificationPreferences } from "@/api/generated/notifications/notifications";
 import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import {
-  useNotificationPreferences,
-  useUpdateNotificationPreferences as useWritePreferences,
-} from "@/hooks/useNotificationPreferences";
+import { useUpdateNotificationPreferences as useWritePreferences } from "@/hooks/useNotificationPreferences";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useServerForm } from "@/hooks/useServerForm";
 import { useFcmConfig } from "@/hooks/useSettings";
 import { useUpdateNotificationPreferences } from "@/hooks/useUsers";
 import { formatDate } from "@/lib/formatDate";
-import { listFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { listFormat } from "@/ui/lib/intl";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 // Lead-time presets (minutes) for the event reminder. 0 = "at the time of the
 // event"; reminders are turned off with the channel switches, not here.
@@ -101,7 +95,7 @@ export const UserSettingsNotificationsPage = ({
   const { data: fcmConfig } = useFcmConfig();
   const showPushColumn = fcmConfig?.enabled ?? false;
 
-  const { data: preferences, isLoading } = useNotificationPreferences();
+  const { data: preferences, isLoading } = useReadMyNotificationPreferences();
   const writePreferences = useWritePreferences();
 
   // The lead time the account holds, or the one just picked until its save
@@ -402,7 +396,9 @@ export const UserSettingsNotificationsPage = ({
         description={t("notifications.channelsDescription")}
       >
         {isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("common:loading")}</p>
+          <SkeletonRegion>
+            <TableSkeleton rows={5} columns={4} toolbar={false} />
+          </SkeletonRegion>
         ) : (
           renderGrid()
         )}
@@ -457,10 +453,7 @@ export const UserSettingsNotificationsPage = ({
                 </div>
               </div>
               <div className="grid grid-cols-fill-48/3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor={`${row.category}-cadence`}>
-                    {t("notifications.digests.frequency")}
-                  </Label>
+                <Field label={t("notifications.digests.frequency")}>
                   <Select
                     disabled={writePreferences.isPending}
                     value={digest?.cadence ?? "daily"}
@@ -468,7 +461,7 @@ export const UserSettingsNotificationsPage = ({
                       writeDigest(row.category, { cadence: value as DigestCadence })
                     }
                   >
-                    <SelectTrigger id={`${row.category}-cadence`}>
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -479,12 +472,9 @@ export const UserSettingsNotificationsPage = ({
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </Field>
                 {digest?.cadence === "weekly" && (
-                  <div className="space-y-2">
-                    <Label htmlFor={`${row.category}-weekday`}>
-                      {t("notifications.timing.day")}
-                    </Label>
+                  <Field label={t("notifications.timing.day")}>
                     <Select
                       disabled={writePreferences.isPending}
                       value={String(digest.weekday)}
@@ -492,7 +482,7 @@ export const UserSettingsNotificationsPage = ({
                         writeDigest(row.category, { weekday: Number(value) })
                       }
                     >
-                      <SelectTrigger id={`${row.category}-weekday`}>
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -503,13 +493,11 @@ export const UserSettingsNotificationsPage = ({
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
+                  </Field>
                 )}
-                <div className="space-y-2">
-                  <Label htmlFor={`${row.category}-time`}>{t("notifications.timing.time")}</Label>
+                <Field label={t("notifications.timing.time")} id={`${row.category}-time`}>
                   <Input
                     key={digest?.at}
-                    id={`${row.category}-time`}
                     type="time"
                     disabled={writePreferences.isPending}
                     defaultValue={digest?.at}
@@ -519,7 +507,7 @@ export const UserSettingsNotificationsPage = ({
                       }
                     }}
                   />
-                </div>
+                </Field>
               </div>
             </div>
           );
@@ -533,14 +521,13 @@ export const UserSettingsNotificationsPage = ({
             </p>
           </div>
           <div className="grid grid-cols-fill-48/3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="email-cadence">{t("notifications.timing.cadence.label")}</Label>
+            <Field label={t("notifications.timing.cadence.label")}>
               <Select
                 disabled={writePreferences.isPending}
                 value={schedule?.cadence ?? "instant"}
                 onValueChange={(value) => writeEmail({ cadence: value as EmailCadence })}
               >
-                <SelectTrigger id="email-cadence">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -551,16 +538,15 @@ export const UserSettingsNotificationsPage = ({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
             {schedule?.cadence === "weekly" && (
-              <div className="space-y-2">
-                <Label htmlFor="email-weekday">{t("notifications.timing.day")}</Label>
+              <Field label={t("notifications.timing.day")}>
                 <Select
                   disabled={writePreferences.isPending}
                   value={String(schedule.weekday)}
                   onValueChange={(value) => writeEmail({ weekday: Number(value) })}
                 >
-                  <SelectTrigger id="email-weekday">
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -571,14 +557,12 @@ export const UserSettingsNotificationsPage = ({
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
             )}
             {(schedule?.cadence === "daily" || schedule?.cadence === "weekly") && (
-              <div className="space-y-2">
-                <Label htmlFor="email-time">{t("notifications.timing.time")}</Label>
+              <Field label={t("notifications.timing.time")} id="email-time">
                 <Input
                   key={schedule.at}
-                  id="email-time"
                   type="time"
                   disabled={writePreferences.isPending}
                   defaultValue={schedule.at}
@@ -588,7 +572,7 @@ export const UserSettingsNotificationsPage = ({
                     }
                   }}
                 />
-              </div>
+              </Field>
             )}
           </div>
           {schedule && schedule.cadence !== "instant" && (
@@ -632,26 +616,22 @@ export const UserSettingsNotificationsPage = ({
           below={
             preferences?.quiet_hours ? (
               <div className="grid grid-cols-pair gap-4 sm:max-w-md">
-                <div className="space-y-2">
-                  <Label htmlFor="quiet-start">{t("notifications.quietHours.from")}</Label>
+                <Field label={t("notifications.quietHours.from")}>
                   <Input
-                    id="quiet-start"
                     type="time"
                     value={quietHours.values.start}
                     onChange={(event) => quietHours.set({ start: event.target.value })}
                     onBlur={() => saveQuietHours(true)}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="quiet-end">{t("notifications.quietHours.to")}</Label>
+                </Field>
+                <Field label={t("notifications.quietHours.to")}>
                   <Input
-                    id="quiet-end"
                     type="time"
                     value={quietHours.values.end}
                     onChange={(event) => quietHours.set({ end: event.target.value })}
                     onBlur={() => saveQuietHours(true)}
                   />
-                </div>
+                </Field>
               </div>
             ) : null
           }
@@ -694,26 +674,22 @@ export const UserSettingsNotificationsPage = ({
             below={
               <div className="space-y-2">
                 <div className="flex flex-wrap items-end gap-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="pause-from">{t("notifications.timing.pause.from")}</Label>
+                  <Field label={t("notifications.timing.pause.from")} className="space-y-1">
                     <DateTimePicker
-                      id="pause-from"
                       value={pauseFromDay}
                       onChange={setPauseFromDay}
                       disabled={writePreferences.isPending}
                       placeholder={t("notifications.timing.pause.fromPlaceholder")}
                     />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="pause-until">{t("notifications.timing.pause.until")}</Label>
+                  </Field>
+                  <Field label={t("notifications.timing.pause.until")} className="space-y-1">
                     <DateTimePicker
-                      id="pause-until"
                       value={pauseUntilDay}
                       onChange={setPauseUntilDay}
                       disabled={writePreferences.isPending}
                       placeholder={t("notifications.timing.pause.untilPlaceholder")}
                     />
-                  </div>
+                  </Field>
                   <Button
                     type="button"
                     variant="outline"

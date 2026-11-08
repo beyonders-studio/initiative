@@ -1,30 +1,119 @@
 {
-  "unreachable": {
-    "age": {
-      "title": "Los mensajes directos están desactivados en esta cuenta"
-    },
-    "private": {
-      "body": "Tienes la opción Privado. Aún puedes conectar con cualquiera mediante su identificador exacto, y una conexión os permite escribiros sea cual sea tu ajuste. Para que puedan encontrarte aquí, permite que tus comunidades te escriban.",
-      "open": "Permitir que mis comunidades me escriban",
-      "settings": "Ajustes de privacidad"
-    }
+  "title": "Contactos",
+  "newContact": "Nuevo contacto",
+  "importCsv": "Importar contactos desde CSV",
+  "createDescription": "Una persona o una organización, y cómo contactar con ella.",
+  "addPersonDescription": "Alguien de {{name}}, y cómo contactar con esa persona.",
+  "creating": "Creando...",
+  "name": "Nombre",
+  "namePlaceholder": "Hotel del Lago, Priya Shah...",
+  "kind": "Persona u organización",
+  "person": "Persona",
+  "organization": "Organización",
+  "partOf": "Organización",
+  "noOrganization": "Ninguna",
+  "searchOrganizations": "Buscar organizaciones...",
+  "noOrganizations": "Ninguna organización coincide.",
+  "communityHint": "Comunidad",
+  "fields": {
+    "phones": "Teléfono",
+    "emails": "Correo",
+    "addresses": "Dirección",
+    "websites": "Sitio web"
   },
-  "actions": {
-    "label": "Acciones para {{handle}}",
-    "connect": "Conectar",
-    "acceptConnection": "Aceptar conexión",
-    "connectPending": "Solicitud enviada",
-    "ask": "Pedir escribir",
-    "asked": "Solicitud enviada",
-    "askSent": "Solicitud enviada.",
-    "ignore": "Ignorar",
-    "stopIgnoring": "Dejar de ignorar",
-    "removeConnection": "Eliminar conexión",
-    "removeConnectionTitle": "¿Eliminar esta conexión?",
-    "removeConnectionBody": "Dejaréis de estar conectados. Si nada más os permite escribiros —una comunidad que compartáis, o que ambos estéis abiertos a mensajes—, eso también termina.",
-    "message": "Mensaje",
-    "viewProfile": "Ver perfil",
-    "copyHandle": "Copiar identificador",
-    "handleCopied": "Identificador copiado."
+  "add": {
+    "phones": "Añadir teléfono",
+    "emails": "Añadir correo",
+    "addresses": "Añadir dirección",
+    "websites": "Añadir sitio web"
+  },
+  "placeholders": {
+    "phones": "+34 600 000 000",
+    "emails": "nombre@ejemplo.com",
+    "addresses": "Calle del Puerto 12\n28001 Madrid",
+    "websites": "ejemplo.com"
+  },
+  "label": "Etiqueta",
+  "labelOf": "Etiqueta de {{field}}",
+  "removeOf": "Quitar {{field}}",
+  "labels": {
+    "mobile": "Móvil",
+    "work": "Trabajo",
+    "home": "Casa",
+    "office": "Oficina",
+    "main": "Principal",
+    "billing": "Facturación",
+    "venue": "Local",
+    "booking": "Reservas",
+    "other": "Otro"
+  },
+  "noContacts": "Aún no hay contactos",
+  "noContactsDescription": "Guarda a las personas y empresas para las que o con las que trabajáis: el cliente, el local, el proveedor. Enlázalas con las tareas, eventos y archivos de los que forman parte.",
+  "createFirst": "Añadir el primer contacto",
+  "loading": "Cargando contactos...",
+  "error": "Algo salió mal",
+  "notFound": "Contacto no encontrado",
+  "notFoundDescription": "El contacto que buscas no existe o se ha eliminado.",
+  "noAccess": "Acceso denegado",
+  "noAccessDescription": "No tienes permiso para ver este contacto.",
+  "backToContacts": "Volver a Contactos",
+  "filters": {
+    "searchLabel": "Nombre",
+    "searchContacts": "Buscar contactos...",
+    "kind": "Personas u organizaciones",
+    "allKinds": "Todos",
+    "people": "Personas",
+    "organizations": "Organizaciones",
+    "noMatchingContacts": "Ningún contacto coincide con tus filtros."
+  },
+  "columns": {
+    "phone": "Teléfono",
+    "email": "Correo",
+    "organization": "Organización"
+  },
+  "reach": {
+    "copy": "Copiar",
+    "copied": "Dirección copiada"
+  },
+  "details": {
+    "title": "Cómo contactar",
+    "edit": "Editar",
+    "saved": "Contacto guardado",
+    "empty": "Aún no hay teléfono, correo, dirección ni sitio web."
+  },
+  "standing": {
+    "title": "Cómo van las cosas",
+    "openTasks": "Tareas abiertas",
+    "upcoming": "Próximamente",
+    "files": "Archivos",
+    "empty": "Aún no hay nada abierto, próximo ni archivado con ellos."
+  },
+  "newTask": "Nueva tarea",
+  "newEvent": "Nuevo evento",
+  "linked": "Enlazado con {{name}}",
+  "task": {
+    "description": "Se añade a un proyecto de aquí y se enlaza con {{name}}.",
+    "project": "Proyecto",
+    "change": "Cambiar",
+    "title": "Título",
+    "titlePlaceholder": "Enviar la señal, Confirmar el menú...",
+    "create": "Añadir tarea"
+  },
+  "people": {
+    "title": "Personas",
+    "add": "Añadir persona",
+    "empty": "Aún no hay nadie."
+  },
+  "move": {
+    "action": "Mover a los contactos de la comunidad",
+    "title": "¿Mover a {{name}} a los contactos de la comunidad?",
+    "description": "Todos en la comunidad podrán consultarlo, y sus enlaces se mantienen. Se descartan las propiedades de esta iniciativa.",
+    "confirm": "Mover",
+    "moving": "Moviendo...",
+    "moved": "Movido a los contactos de la comunidad"
+  },
+  "community": {
+    "title": "Contactos de la comunidad",
+    "description": "La agenda propia de la comunidad. Enlázalos desde el trabajo de cualquier iniciativa."
   }
 }

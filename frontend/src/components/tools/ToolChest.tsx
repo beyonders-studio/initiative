@@ -26,21 +26,15 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { ownProperties } from "@/components/properties/propertyHelpers";
 import { TagBadge, TagPicker } from "@/components/tags";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useArchiveEntity, useUnarchiveEntity } from "@/hooks/useArchive";
 import { propertySaves } from "@/hooks/useProperties";
 import { useSetToolTags } from "@/hooks/useToolTags";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { PropertiesField } from "@/lib/layouts/fieldEditors";
 import { toast } from "@/lib/mascotToast";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
+import { ScrollArea, ScrollBar } from "@/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 export interface ToolChestEntity {
   id: number;
@@ -49,6 +43,7 @@ export interface ToolChestEntity {
   archived_at: string | null;
   tags: TagSummary[];
   properties?: PropertySummary[];
+  updated_at?: string;
   can: Pick<ToolCan, "edit" | "unarchive">;
 }
 
@@ -188,6 +183,7 @@ export const ToolChest = ({ tool, entity, template, kind, children }: ToolChestP
             readOnly={!canEdit}
             initiativeId={entity.initiative_id as number}
             canOpen={kind ? undefined : { tool, id: entity.id }}
+            updatedAt={entity.updated_at}
             hideLabel
           />
         </div>

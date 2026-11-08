@@ -30,7 +30,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from typing import AsyncIterator, Awaitable, Callable
+from typing import AsyncIterator, Awaitable, BinaryIO, Callable
 from urllib.parse import urlsplit
 
 import httpx
@@ -97,7 +97,7 @@ class RetryPolicy:
     bounds each read of the answer; this bounds the answer as a whole, so a
     site that sends its body a few bytes at a time still ends. A call past it
     is ``IMPORT_SOURCE_UNREACHABLE``. A download gets longer in proportion to
-    its size (see :func:`get_bytes`).
+    its size (see :func:`get_file`).
     """
 
     attempts: int
@@ -290,15 +290,17 @@ async def get_json(
     return _parse(response, path)
 
 
-async def get_bytes(
+async def get_file(
     credential: AtlassianCredential,
     path: str,
+    target: BinaryIO,
     *,
     max_bytes: int,
     retry: RetryPolicy = BACKGROUND,
     follow_redirect: bool = False,
-) -> bytes:
-    """A file from the site — an attachment's content — as raw bytes.
+) -> int:
+    """A file from the site — an attachment's content — written to
+    ``target`` as it arrives, never held whole; answers its size.
 
     Throttling is waited out exactly as for :func:`get_json`. A body over
     ``max_bytes`` raises ``IMPORT_TOO_LARGE``: the caller checked the size the
@@ -324,11 +326,12 @@ async def get_bytes(
             retry=retry,
             accept="*/*",
             max_bytes=max_bytes,
+            sink=target,
         )
         if response.status_code in (401, 403):
             raise ImportEngineError(ImportEngineMessages.IMPORT_SOURCE_AUTH)
         if follow_redirect and response.status_code in (301, 302, 303, 307, 308):
-            response = await _follow(response, path, max_bytes=max_bytes)
+            response = await _follow(response, path, max_bytes=max_bytes, sink=target)
     if response.status_code >= 300:
         # A redirect is not followed: the attachment endpoint is asked for its
         # content directly, and anything else is not an answer.
@@ -336,14 +339,11 @@ async def get_bytes(
             "atlassian download failed status=%s path=%s", response.status_code, path
         )
         raise ImportEngineError(ImportEngineMessages.IMPORT_SOURCE_UNREACHABLE)
-    data = response.content
-    if len(data) > max_bytes:
-        raise ImportEngineError(ImportEngineMessages.IMPORT_TOO_LARGE)
-    return data
+    return target.tell()
 
 
 async def _follow(
-    response: httpx.Response, path: str, *, max_bytes: int
+    response: httpx.Response, path: str, *, max_bytes: int, sink: BinaryIO
 ) -> httpx.Response:
     """The one redirect a download is allowed, fetched without credentials."""
     location = response.headers.get("location") or ""
@@ -357,6 +357,7 @@ async def _follow(
             headers={"Accept": "*/*"},
             timeout=REQUEST_TIMEOUT_SECONDS,
             max_bytes=max_bytes,
+            sink=sink,
         )
     except ResponseTooLargeError:
         raise ImportEngineError(ImportEngineMessages.IMPORT_TOO_LARGE)
@@ -375,8 +376,10 @@ async def _send(
     retry: RetryPolicy,
     accept: str = "application/json",
     max_bytes: int,
+    sink: BinaryIO | None = None,
 ) -> httpx.Response:
-    """One call, with a ``429`` waited out under ``retry``.
+    """One call, with a ``429`` waited out under ``retry``; ``sink`` is as for
+    :func:`request_public_target`.
 
     Returns whatever the site answered other than "slow down"; the caller
     decides what that answer means.
@@ -389,6 +392,7 @@ async def _send(
             json=json,
             accept=accept,
             max_bytes=max_bytes,
+            sink=sink,
         )
         if response.status_code != 429:
             return response
@@ -418,6 +422,7 @@ async def _request(
     json: object | None,
     accept: str = "application/json",
     max_bytes: int,
+    sink: BinaryIO | None = None,
 ) -> httpx.Response:
     """Send one request, with the transport's failures turned into codes."""
     url = f"{credential.site_url}{path}"
@@ -432,6 +437,7 @@ async def _request(
             json=json,
             timeout=REQUEST_TIMEOUT_SECONDS,
             max_bytes=max_bytes,
+            sink=sink,
         )
     except ResponseTooLargeError:
         raise ImportEngineError(ImportEngineMessages.IMPORT_TOO_LARGE)

@@ -26,17 +26,21 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.file_types import FileType
 from app.core.tools import KINDS
 from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.metadata import MetadataType, MetadataValue
 from app.models.tenant.task import Task
+from app.services import audit as audit_service
 from app.services.tenant.metadata import PROPERTY_LINKS
 from app.testing import (
     Actor,
     create_calendar,
     create_calendar_event,
+    create_counter,
+    create_counter_group,
     create_file,
     create_collection,
     create_guild,
@@ -45,8 +49,6 @@ from app.testing import (
     create_project,
     create_property_definition,
     create_property_value,
-    create_queue,
-    create_queue_item,
     create_resource_grant,
     create_task,
     create_tool_entity,
@@ -356,6 +358,51 @@ async def test_option_changes_apply_to_what_the_value_holds(
     assert _values(response.json()) == {sprint.id: ["b", "c"]}
 
 
+async def test_steps_apply_to_what_the_counter_holds(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A counter with no value steps from its initial value, by its step, and
+    neither a step nor a value written goes past its bounds. Only a counter
+    steps."""
+    a, parent = await _scene(TASKS, session, acting_user)
+    entity = await TASKS.make(session, a, parent, "E")
+    seats = await create_property_definition(
+        session,
+        a.initiative,
+        name="Seats",
+        type=MetadataType.counter,
+        counter={"step": 2, "min": 0, "max": 5, "initial": 1},
+    )
+    note = await create_property_definition(
+        session, a.initiative, name="Note", type=MetadataType.number
+    )
+
+    async def step(property_id: int, up: bool) -> Any:
+        return await _write(
+            client,
+            a,
+            TASKS,
+            entity,
+            [],
+            merge=True,
+            steps=[{"property_id": property_id, "up": up}],
+        )
+
+    counted = [
+        _values((await step(seats.id, up)).json())[seats.id]
+        for up in (True, True, False, False, False, False)
+    ]
+    assert counted == [3, 5, 3, 1, 0, 0]
+    written = await _write(
+        client, a, TASKS, entity, [{"property_id": seats.id, "value": 99}], merge=True
+    )
+    assert _values(written.json())[seats.id] == 5
+
+    refused = await step(note.id, True)
+    assert refused.status_code == 400
+    assert refused.json()["detail"] == "PROPERTY_INVALID_VALUE_FOR_TYPE"
+
+
 @pytest.mark.parametrize(
     ("type_", "add", "detail"),
     [
@@ -518,6 +565,117 @@ async def test_put_refuses_a_person_who_cannot_open_it(
     assert response.json()["detail"] == "PERSON_CANNOT_READ"
 
 
+async def test_a_file_field_holds_one_file_of_its_initiative_until_it_is_purged(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A file field names a file of the item's initiative, which reads back
+    as what draws it, then as its id alone once it is in the trash, and is
+    emptied when the file is purged."""
+    a, project = await _scene(TASKS, session, acting_user)
+    task = await TASKS.make(session, a, project, "E")
+    defn = await create_property_definition(
+        session, a.initiative, name="Design files", type=MetadataType.file
+    )
+    url = "https://example.com/designs/mockup"
+    design = await create_file(
+        session,
+        a.initiative,
+        a.user,
+        name="Mockup",
+        file_type=FileType.url,
+        content={"url": url},
+    )
+    elsewhere = await create_initiative(session, a.guild, a.user, name="B")
+    foreign = await create_file(session, elsewhere, a.user, name="Foreign")
+
+    refused = await _write(
+        client, a, TASKS, task, [{"property_id": defn.id, "value": foreign.id}]
+    )
+    assert refused.status_code == 400
+    assert refused.json()["detail"] == "PROPERTY_INVALID_VALUE_FOR_TYPE"
+
+    written = await _write(
+        client, a, TASKS, task, [{"property_id": defn.id, "value": design.id}]
+    )
+    assert written.status_code == 200, written.text
+    assert _values(written.json())[defn.id] == {
+        "id": design.id,
+        "name": "Mockup",
+        "file_type": "url",
+        "smart_link_url": url,
+    }
+
+    trashed = await client.delete(a.g(f"/files/{design.id}"), headers=a.headers)
+    assert trashed.status_code in (200, 204), trashed.text
+    read = await client.get(a.g(f"/tasks/{task}"), headers=a.headers)
+    assert _values(read.json()["properties"])[defn.id] == {"id": design.id}
+
+    purged = await client.delete(
+        a.g(f"/trash/file/{design.id}/purge"), headers=a.headers
+    )
+    assert purged.status_code == 204, purged.text
+    [held] = await _stored(session, TASKS, task)
+    await session.refresh(held)
+    assert held.value_file_id is None
+
+
+async def test_a_signature_is_its_writers_and_stays_until_it_is_cleared(
+    client: AsyncClient, session: AsyncSession, acting_user, monkeypatch
+):
+    """Writing a signature's typed name signs it as the writer, now, without
+    the item reading as updated, and records the signing. A replace of every
+    value that doesn't name it keeps it, someone else signing replaces it,
+    and null clears it."""
+    lines: list[dict] = []
+    monkeypatch.setattr(audit_service, "_write", lines.append)
+    a, project = await _scene(TASKS, session, acting_user)
+    b = await acting_user(guild_role=CommunityRole.admin, guild=a.guild)
+    task = await TASKS.make(session, a, project, "E")
+    defn = await create_property_definition(
+        session, a.initiative, name="Approved", type=MetadataType.signature
+    )
+    before = await client.get(a.g(f"/tasks/{task}"), headers=a.headers)
+
+    signed = await _write(
+        client,
+        a,
+        TASKS,
+        task,
+        [{"property_id": defn.id, "value": " Ada L. "}],
+        merge=True,
+    )
+    assert signed.status_code == 200, signed.text
+    value = _values(signed.json())[defn.id]
+    assert (value["user"]["id"], value["name"]) == (a.user.id, "Ada L.")
+    after = await client.get(a.g(f"/tasks/{task}"), headers=a.headers)
+    assert after.json()["updated_at"] == before.json()["updated_at"]
+    assert after.json()["updated_at"] < value["signed_at"]
+    [line] = [x for x in lines if x["event_type"] == "signature.signed"]
+    assert (line["actor_user_id"], line["target"], line["detail"]) == (
+        a.user.id,
+        {"type": "task", "id": task},
+        {"property_id": defn.id},
+    )
+
+    kept = await _write(client, a, TASKS, task, [])
+    assert _values(kept.json())[defn.id] == value
+
+    resigned = await _write(
+        client,
+        b,
+        TASKS,
+        task,
+        [{"property_id": defn.id, "value": "Grace H."}],
+        merge=True,
+    )
+    assert _values(resigned.json())[defn.id]["user"]["id"] == b.user.id
+
+    cleared = await _write(
+        client, b, TASKS, task, [{"property_id": defn.id, "value": None}], merge=True
+    )
+    assert _values(cleared.json())[defn.id] is None
+
+
 # ---------------------------------------------------------------------------
 # A definition stays in its initiative; an entity stays in its community
 # ---------------------------------------------------------------------------
@@ -668,8 +826,8 @@ async def test_list_filters_by_a_selected_option(
 async def test_every_tool_and_its_sub_tools_read_back_what_they_carry(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """Every tool, a queue's items and a wiki's pages are written like any
-    other target, and each one's own read returns its values."""
+    """Every tool, a counter group's counters and a wiki's pages are written
+    like any other target, and each one's own read returns its values."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await enable_all_tools(session, a.initiative)
     defn = await create_property_definition(session, a.initiative, name="Note")
@@ -692,16 +850,16 @@ async def test_every_tool_and_its_sub_tools_read_back_what_they_carry(
         assert read.status_code == 200, (tool, read.text)
         assert _values(read.json()["properties"]) == {defn.id: tool.value}, tool
 
-    queue = await create_queue(session, a.initiative, a.user)
-    item = await create_queue_item(session, queue)
+    group = await create_counter_group(session, a.initiative, a.user)
+    counter = await create_counter(session, group)
     page = await create_wiki_page(
         session, await create_wiki(session, a.initiative, a.user), a.user
     )
-    await write("queue_item", item.id)
+    await write("counter", counter.id)
     await write("wiki_page", page.id)
-    queue_read = await client.get(a.g(f"/queues/{queue.id}"), headers=a.headers)
-    [item_read] = queue_read.json()["items"]
-    assert _values(item_read["properties"]) == {defn.id: "queue_item"}
+    group_read = await client.get(a.g(f"/counter-groups/{group.id}"), headers=a.headers)
+    [counter_read] = group_read.json()["counters"]
+    assert _values(counter_read["properties"]) == {defn.id: "counter"}
     page_read = await client.get(a.g(f"/wiki-pages/{page.id}"), headers=a.headers)
     assert page_read.status_code == 200, page_read.text
     assert _values(page_read.json()["properties"]) == {defn.id: "wiki_page"}
@@ -727,8 +885,8 @@ async def test_every_tool_and_its_sub_tools_read_back_what_they_carry(
 async def test_a_create_writes_its_values_with_the_row(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """A create carries its values in its own transaction: a queue and an item
-    in it come back holding them, and a task naming a person who cannot open
+    """A create carries its values in its own transaction: a counter group and
+    a counter in it come back holding them, and a task naming a person who cannot open
     its project is refused whole — no task is left without its values. A
     task's update does the same."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
@@ -738,27 +896,27 @@ async def test_a_create_writes_its_values_with_the_row(
         session, a.initiative, name="Owner", type=MetadataType.user_reference
     )
 
-    queue = await client.post(
-        a.g("/queues/"),
+    group = await client.post(
+        a.g("/counter-groups/"),
         headers=a.headers,
         json={
             "initiative_id": a.initiative.id,
-            "name": "Rota",
-            "properties": [{"property_id": note.id, "value": "queue"}],
+            "name": "Tally",
+            "properties": [{"property_id": note.id, "value": "group"}],
         },
     )
-    assert queue.status_code == 201, queue.text
-    assert _values(queue.json()["properties"]) == {note.id: "queue"}
-    item = await client.post(
-        a.g(f"/queues/{queue.json()['id']}/items"),
+    assert group.status_code == 201, group.text
+    assert _values(group.json()["properties"]) == {note.id: "group"}
+    counter = await client.post(
+        a.g(f"/counter-groups/{group.json()['id']}/counters"),
         headers=a.headers,
         json={
-            "label": "First",
-            "properties": [{"property_id": note.id, "value": "item"}],
+            "name": "First",
+            "properties": [{"property_id": note.id, "value": "counter"}],
         },
     )
-    assert item.status_code == 201, item.text
-    assert _values(item.json()["properties"]) == {note.id: "item"}
+    assert counter.status_code == 201, counter.text
+    assert _values(counter.json()["properties"]) == {note.id: "counter"}
 
     outsider = await create_user(session)
     await create_guild_membership(
@@ -927,7 +1085,20 @@ async def test_duplicating_a_task_in_its_project_carries_its_values(
     defn = await create_property_definition(
         session, a.initiative, name="Tag", type=MetadataType.text
     )
-    await _write(client, a, TASKS, task, [{"property_id": defn.id, "value": "carry"}])
+    # The copy was never signed.
+    signature = await create_property_definition(
+        session, a.initiative, name="Approved", type=MetadataType.signature
+    )
+    await _write(
+        client,
+        a,
+        TASKS,
+        task,
+        [
+            {"property_id": defn.id, "value": "carry"},
+            {"property_id": signature.id, "value": "Ada L."},
+        ],
+    )
 
     duplicated = await client.post(a.g(f"/tasks/{task}/duplicate"), headers=a.headers)
 
@@ -1108,8 +1279,8 @@ async def test_purging_an_initiative_takes_every_value_in_it_with_it(
         session, a.initiative, name="Topic", type=MetadataType.text
     )
     await _write(client, a, EVENTS, event, [{"property_id": defn.id, "value": "hold"}])
-    queue = await create_queue(session, a.initiative, a.user)
-    for row in (queue, await create_queue_item(session, queue)):
+    group = await create_counter_group(session, a.initiative, a.user)
+    for row in (group, await create_counter(session, group)):
         await create_property_value(session, row, defn, value_text="hold")
 
     deleted = await client.delete(

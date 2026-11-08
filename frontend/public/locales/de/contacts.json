@@ -1,30 +1,119 @@
 {
-  "unreachable": {
-    "age": {
-      "title": "Direktnachrichten sind für dieses Konto deaktiviert"
-    },
-    "private": {
-      "body": "Du bist auf „Privat“ eingestellt. Du kannst dich weiterhin über den genauen Handle mit anderen verbinden, und eine Verbindung erlaubt euch unabhängig von dieser Einstellung, einander zu schreiben. Damit man dich hier erreichen kann, erlaube deinen Communitys, dir zu schreiben.",
-      "open": "Meine Communitys dürfen mir schreiben",
-      "settings": "Privatsphäre-Einstellungen"
-    }
+  "title": "Kontakte",
+  "newContact": "Neuer Kontakt",
+  "importCsv": "Kontakte aus CSV importieren",
+  "createDescription": "Eine Person oder eine Organisation, und wie man sie erreicht.",
+  "addPersonDescription": "Jemand bei {{name}}, und wie man die Person erreicht.",
+  "creating": "Wird erstellt...",
+  "name": "Name",
+  "namePlaceholder": "Seehotel am Ufer, Priya Shah...",
+  "kind": "Person oder Organisation",
+  "person": "Person",
+  "organization": "Organisation",
+  "partOf": "Organisation",
+  "noOrganization": "Keine",
+  "searchOrganizations": "Organisationen suchen...",
+  "noOrganizations": "Keine Organisation passt.",
+  "communityHint": "Community",
+  "fields": {
+    "phones": "Telefon",
+    "emails": "E-Mail",
+    "addresses": "Adresse",
+    "websites": "Website"
   },
-  "actions": {
-    "label": "Aktionen für {{handle}}",
-    "connect": "Verbinden",
-    "acceptConnection": "Verbindung annehmen",
-    "connectPending": "Anfrage gesendet",
-    "ask": "Um Nachricht bitten",
-    "asked": "Anfrage gesendet",
-    "askSent": "Anfrage gesendet.",
-    "ignore": "Ignorieren",
-    "stopIgnoring": "Nicht mehr ignorieren",
-    "removeConnection": "Verbindung entfernen",
-    "removeConnectionTitle": "Diese Verbindung entfernen?",
-    "removeConnectionBody": "Ihr seid dann nicht mehr verbunden. Wenn euch sonst nichts erlaubt, einander zu schreiben – eine gemeinsame Community oder dass ihr beide für Nachrichten offen seid –, endet auch das.",
-    "message": "Nachricht",
-    "viewProfile": "Profil ansehen",
-    "copyHandle": "Handle kopieren",
-    "handleCopied": "Handle kopiert."
+  "add": {
+    "phones": "Telefon hinzufügen",
+    "emails": "E-Mail hinzufügen",
+    "addresses": "Adresse hinzufügen",
+    "websites": "Website hinzufügen"
+  },
+  "placeholders": {
+    "phones": "+49 30 1234567",
+    "emails": "name@beispiel.de",
+    "addresses": "Hafenstraße 12\n20457 Hamburg",
+    "websites": "beispiel.de"
+  },
+  "label": "Bezeichnung",
+  "labelOf": "Bezeichnung für {{field}}",
+  "removeOf": "{{field}} entfernen",
+  "labels": {
+    "mobile": "Mobil",
+    "work": "Arbeit",
+    "home": "Privat",
+    "office": "Büro",
+    "main": "Zentrale",
+    "billing": "Rechnung",
+    "venue": "Veranstaltungsort",
+    "booking": "Buchung",
+    "other": "Sonstiges"
+  },
+  "noContacts": "Noch keine Kontakte",
+  "noContactsDescription": "Halte die Menschen und Firmen fest, für die oder mit denen ihr arbeitet: die Kundin, den Veranstaltungsort, den Lieferanten. Verknüpfe sie mit den Aufgaben, Terminen und Dateien, zu denen sie gehören.",
+  "createFirst": "Den ersten Kontakt hinzufügen",
+  "loading": "Kontakte werden geladen...",
+  "error": "Etwas ist schiefgelaufen",
+  "notFound": "Kontakt nicht gefunden",
+  "notFoundDescription": "Der gesuchte Kontakt existiert nicht oder wurde entfernt.",
+  "noAccess": "Zugriff verweigert",
+  "noAccessDescription": "Du hast keine Berechtigung, diesen Kontakt anzusehen.",
+  "backToContacts": "Zurück zu den Kontakten",
+  "filters": {
+    "searchLabel": "Name",
+    "searchContacts": "Kontakte suchen...",
+    "kind": "Personen oder Organisationen",
+    "allKinds": "Alle",
+    "people": "Personen",
+    "organizations": "Organisationen",
+    "noMatchingContacts": "Keine Kontakte passen zu deinen Filtern."
+  },
+  "columns": {
+    "phone": "Telefon",
+    "email": "E-Mail",
+    "organization": "Organisation"
+  },
+  "reach": {
+    "copy": "Kopieren",
+    "copied": "Adresse kopiert"
+  },
+  "details": {
+    "title": "So erreichst du sie",
+    "edit": "Bearbeiten",
+    "saved": "Kontakt gespeichert",
+    "empty": "Noch kein Telefon, keine E-Mail, Adresse oder Website."
+  },
+  "standing": {
+    "title": "Stand der Dinge",
+    "openTasks": "Offene Aufgaben",
+    "upcoming": "Demnächst",
+    "files": "Dateien",
+    "empty": "Noch nichts Offenes, Anstehendes oder Abgelegtes mit ihnen."
+  },
+  "newTask": "Neue Aufgabe",
+  "newEvent": "Neuer Termin",
+  "linked": "Mit {{name}} verknüpft",
+  "task": {
+    "description": "Wird einem Projekt hier hinzugefügt und mit {{name}} verknüpft.",
+    "project": "Projekt",
+    "change": "Ändern",
+    "title": "Titel",
+    "titlePlaceholder": "Anzahlung senden, Menü bestätigen...",
+    "create": "Aufgabe hinzufügen"
+  },
+  "people": {
+    "title": "Personen",
+    "add": "Person hinzufügen",
+    "empty": "Hier ist noch niemand."
+  },
+  "move": {
+    "action": "Zu den Community-Kontakten verschieben",
+    "title": "{{name}} zu den Kontakten der Community verschieben?",
+    "description": "Alle in der Community können den Kontakt dann nachschlagen, und seine Verknüpfungen bleiben. Eigenschaften aus dieser Initiative entfallen.",
+    "confirm": "Verschieben",
+    "moving": "Wird verschoben...",
+    "moved": "Zu den Kontakten der Community verschoben"
+  },
+  "community": {
+    "title": "Community-Kontakte",
+    "description": "Das eigene Adressbuch der Community. Verknüpfe sie mit der Arbeit in jeder Initiative."
   }
 }

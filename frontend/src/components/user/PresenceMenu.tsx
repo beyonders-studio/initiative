@@ -2,14 +2,14 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Presence } from "@/api/generated/initiativeAPI.schemas";
+import { PresenceMenuItems } from "@/components/user/PresenceMenuItems";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { PresenceMenuItems } from "@/components/user/PresenceMenuItems";
+} from "@/ui/dropdown-menu";
 
 interface PresenceMenuProps {
   /** What the account is set to — the choice, not what a reader is shown. */

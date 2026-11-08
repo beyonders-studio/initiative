@@ -8,7 +8,7 @@
  */
 
 import { Link } from "@tanstack/react-router";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -18,27 +18,12 @@ import type {
   ShareRequestScope,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { RelativeTime } from "@/components/ui/relative-time";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   type ShareRequestReply,
   useAnswerShareRequests,
   useShareRequests,
 } from "@/hooks/useShareRequests";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { dateTimeFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
 import { entityRefRoute, TOOL_ICONS, toolKebabSingular } from "@/lib/tools";
 import {
@@ -47,6 +32,17 @@ import {
   getUserDisplayName,
   isAnonymizedUser,
 } from "@/lib/userDisplay";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Checkbox } from "@/ui/checkbox";
+import { Label } from "@/ui/label";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { RelativeTime } from "@/ui/relative-time";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { StatusMessage } from "@/ui/status-message";
 
 type GiveLevel = Exclude<ResourceAccessLevel, "owner">;
 
@@ -203,8 +199,8 @@ const AnswerButtons = ({
         <X />
         {many ? t("answer.declineAll") : t("answer.decline")}
       </Button>
-      <Button size="sm" disabled={pending} onClick={() => onAnswer(true)}>
-        {pending ? <Loader2 className="animate-spin" /> : <Check />}
+      <Button size="sm" pending={pending} onClick={() => onAnswer(true)}>
+        <Check />
         {many ? t("answer.shareAll") : t("answer.share")}
       </Button>
     </div>
@@ -292,16 +288,13 @@ export const ShareRequestBatchView = ({ batchId }: { batchId: string }) => {
 
   if (query.isLoading) {
     return (
-      <div className="flex justify-center p-8">
-        <Loader2
-          className="size-5 animate-spin text-muted-foreground"
-          aria-label={t("answer.loading")}
-        />
-      </div>
+      <SkeletonRegion>
+        <FormSkeleton card={false} fields={2} />
+      </SkeletonRegion>
     );
   }
   if (query.isError) {
-    return <p className="text-destructive text-sm">{t("answer.loadError")}</p>;
+    return <StatusMessage onRetry={query.refetch} />;
   }
   if (requests.length === 0) {
     return (
@@ -352,9 +345,10 @@ export const ShareRequestBatchView = ({ batchId }: { batchId: string }) => {
                       size="icon-sm"
                       disabled={answer.isPending}
                       aria-label={t("answer.shareOne", { name: request.resource_name })}
+                      pending={busy}
                       onClick={() => answer.mutate(reply([request], true, current))}
                     >
-                      {busy ? <Loader2 className="animate-spin" /> : <Check />}
+                      <Check />
                     </Button>
                   </div>
                 ) : null}

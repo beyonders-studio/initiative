@@ -1,6 +1,6 @@
 import { Trans, useTranslation } from "react-i18next";
 
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 
 interface DeleteInitiativeDialogProps {
   open: boolean;
@@ -12,7 +12,7 @@ interface DeleteInitiativeDialogProps {
 
 /**
  * The single delete-initiative confirmation flow: a type-the-name-to-confirm
- * guard before the whole tree (projects, docs, queues, events) is soft-deleted
+ * guard before the whole tree (projects, docs, events) is soft-deleted
  * to trash. Shared by the per-initiative settings page and the community settings
  * Initiatives table so there is exactly one delete workflow to maintain. The
  * caller owns the mutation (via onConfirm/isDeleting); this only gates it.
@@ -52,7 +52,6 @@ export const DeleteInitiativeDialog = ({
       }
       confirmLabel={t("common:delete")}
       loadingLabel={t("settings.deletingInitiative")}
-      cancelLabel={t("common:cancel")}
       onConfirm={onConfirm}
       isLoading={isDeleting}
       destructive

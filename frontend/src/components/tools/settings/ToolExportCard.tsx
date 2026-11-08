@@ -15,9 +15,9 @@ import { useTranslation } from "react-i18next";
 import { EntitiesExportButton } from "@/components/exports/BulkExportButton";
 import { TOOL_EXPORT_FORMATS } from "@/components/exports/formats";
 import { useToolSettings } from "@/components/tools/settings/ToolSettingsContext";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { exportFilenameStem } from "@/lib/exportDownload";
 import { toolEnvelopeType, toolKebabSingular } from "@/lib/tools";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 export const ToolExportCard = () => {
   const { t } = useTranslation(["common", "exports"]);

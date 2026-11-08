@@ -1,0 +1,30 @@
+{
+  "unreachable": {
+    "age": {
+      "title": "Direktnachrichten sind für dieses Konto deaktiviert"
+    },
+    "private": {
+      "body": "Du bist auf „Privat“ eingestellt. Du kannst dich weiterhin über den genauen Handle mit anderen verbinden, und eine Verbindung erlaubt euch unabhängig von dieser Einstellung, einander zu schreiben. Damit man dich hier erreichen kann, erlaube deinen Communitys, dir zu schreiben.",
+      "open": "Meine Communitys dürfen mir schreiben",
+      "settings": "Privatsphäre-Einstellungen"
+    }
+  },
+  "actions": {
+    "label": "Aktionen für {{handle}}",
+    "connect": "Verbinden",
+    "acceptConnection": "Verbindung annehmen",
+    "connectPending": "Anfrage gesendet",
+    "ask": "Um Nachricht bitten",
+    "asked": "Anfrage gesendet",
+    "askSent": "Anfrage gesendet.",
+    "ignore": "Ignorieren",
+    "stopIgnoring": "Nicht mehr ignorieren",
+    "removeConnection": "Verbindung entfernen",
+    "removeConnectionTitle": "Diese Verbindung entfernen?",
+    "removeConnectionBody": "Ihr seid dann nicht mehr verbunden. Wenn euch sonst nichts erlaubt, einander zu schreiben – eine gemeinsame Community oder dass ihr beide für Nachrichten offen seid –, endet auch das.",
+    "message": "Nachricht",
+    "viewProfile": "Profil ansehen",
+    "copyHandle": "Handle kopieren",
+    "handleCopied": "Handle kopiert."
+  }
+}

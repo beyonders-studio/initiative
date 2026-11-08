@@ -21,27 +21,31 @@ from enum import Enum
 from typing import TYPE_CHECKING, AsyncIterator, Optional, Sequence
 
 from limits import parse
-from sqlalchemy import String, cast
+from sqlalchemy import String, cast, func, or_
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.intake import (
+    STREAMS,
     Conversation,
     FeedbackTopic,
     IntakeStream,
     SecurityTopic,
+    Source,
     conversation_for,
     meta,
+    offered_streams,
 )
 from app.core.rate_limit import take_allowance
 from app.db import cohorts
 from app.db.session import routed_guild_id
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.user import User
-from app.models.tenant.comment import Comment
+from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.evidence import Evidence
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
+from app.services.platform import app_settings as app_settings_service
 from app.services.platform import intake as intake_service
 from app.services.tenant import support as support_service
 
@@ -59,6 +63,8 @@ class TicketMode(str, Enum):
     form = "form"
     #: The stream's contact address, and nothing to fill in.
     email = "email"
+    #: Initiative Cloud takes it: people send it there, signed in to Cloud.
+    cloud = "cloud"
     #: Nothing at all: no form and nobody to write to.
     none = "none"
 
@@ -101,6 +107,18 @@ def _fallback(contact: Optional[str]) -> StreamAvailability:
     )
 
 
+async def feedback_goes(session: AsyncSession) -> Optional[TicketMode]:
+    """Where feedback goes from here, when it isn't this server's own to take:
+    nowhere while the deployment's switch is off, and to Initiative Cloud from
+    any other server. ``None`` on Cloud with the switch on, where the stream
+    answers for itself."""
+    if not await app_settings_service.feedback_enabled(session):
+        return TicketMode.none
+    if IntakeStream.feedback not in offered_streams():
+        return TicketMode.cloud
+    return None
+
+
 async def availability(
     session: AsyncSession, *, user: User, guild_id: Optional[int]
 ) -> dict[IntakeStream, StreamAvailability]:
@@ -112,6 +130,9 @@ async def availability(
     contacts = await _contacts(session)
     offered: dict[IntakeStream, StreamAvailability] = {}
     for stream in IntakeStream:
+        # A stream nobody files into offers nothing to file.
+        if Source.submitted not in meta(stream).sources:
+            continue
         contact = contacts[stream]
         if stream is IntakeStream.moderation:
             # A report about a community's own content goes to that
@@ -119,6 +140,11 @@ async def availability(
             # form is always there; a report the platform would have to take
             # falls back to the address when nothing is bound.
             offered[stream] = StreamAvailability(TicketMode.form, contact)
+        elif (
+            stream is IntakeStream.feedback
+            and (goes := await feedback_goes(session)) is not None
+        ):
+            offered[stream] = StreamAvailability(goes, None)
         elif not await intake_service.stream_is_bound(stream):
             offered[stream] = _fallback(contact)
         elif stream is IntakeStream.support:
@@ -334,12 +360,43 @@ def _ticket_from(row) -> FiledTicket:
     )
 
 
+def latest_reply():
+    """The newest comment said to a case's filer by anybody but the filer."""
+    return (
+        select(func.max(Comment.id))
+        .where(Comment.task_id == IntakeCase.task_id)
+        .where(Comment.audience == CommentAudience.filer)
+        .where(Comment.deleted_at.is_(None))  # type: ignore[union-attr]
+        .where(Comment.created_by.is_distinct_from(IntakeCase.filer_user_id))  # type: ignore[union-attr]
+        .correlate(IntakeCase)
+        .scalar_subquery()
+    )
+
+
+#: The streams whose conversation the team starts.
+_TEAM_STARTS = tuple(
+    stream.value
+    for stream, declared in STREAMS.items()
+    if declared.conversation is Conversation.staff_first
+)
+
+
+def reaches_filer():
+    """Whether a case is its filer's to follow: from the start, or, where the
+    team starts the conversation, once the team has written to them."""
+    return or_(
+        IntakeCase.stream.not_in(_TEAM_STARTS),  # type: ignore[attr-defined]
+        latest_reply().is_not(None),
+    )
+
+
 def _tickets_query():
     return (
         select(*_ticket_columns())
         .join(Task, Task.id == IntakeCase.task_id)
         .join(TaskStatus, TaskStatus.id == Task.task_status_id)
         .outerjoin(IntakeBinding, IntakeBinding.stream == IntakeCase.stream)
+        .where(reaches_filer())
     )
 
 

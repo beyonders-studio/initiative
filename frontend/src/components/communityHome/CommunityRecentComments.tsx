@@ -17,14 +17,15 @@ import { CommentContent } from "@/components/comments/CommentContent";
 import { CommentReferences } from "@/components/comments/CommentReferences";
 import { FeedCardSkeleton } from "@/components/communityHome/CommunityActivityFeed";
 import { ReactionBar } from "@/components/reactions/ReactionBar";
-import { Card } from "@/components/ui/card";
-import { RelativeTime } from "@/components/ui/relative-time";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { useRecentComments } from "@/hooks/useComments";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { entityRefRoute, TOOLS, taskRoute, toolDetailRoute } from "@/lib/tools";
 import { getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Card } from "@/ui/card";
+import { cn } from "@/ui/lib/utils";
+import { RelativeTime } from "@/ui/relative-time";
+import { StatusMessage } from "@/ui/status-message";
 
 const RECENT_COMMENTS_PARAMS = { limit: 10 };
 
@@ -164,7 +165,7 @@ const CommentEntry = ({ entry }: { entry: RecentActivityEntry }) => {
 
 export const CommunityRecentComments = () => {
   const { t } = useTranslation(["communityHome", "comments"]);
-  const { data: comments, isLoading, isError } = useRecentComments(RECENT_COMMENTS_PARAMS);
+  const { data: comments, isLoading, isError, refetch } = useRecentComments(RECENT_COMMENTS_PARAMS);
   const contents = useMemo(() => (comments ?? []).map((entry) => entry.content), [comments]);
 
   if (isLoading) {
@@ -178,7 +179,7 @@ export const CommunityRecentComments = () => {
     );
   }
   if (isError) {
-    return <p className="p-2 text-destructive text-sm">{t("recentComments.loadError")}</p>;
+    return <StatusMessage onRetry={refetch} />;
   }
   if (!comments || comments.length === 0) {
     return (

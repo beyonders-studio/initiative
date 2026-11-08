@@ -1,4 +1,4 @@
-import { type ChangeEvent, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -10,23 +10,6 @@ import {
 import type { DataJobRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { ImportPeopleStep, type PlanPerson } from "@/components/imports/ImportPeopleStep";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { liveInitiatives } from "@/hooks/useInitiativeAccess";
@@ -34,6 +17,17 @@ import { useInitiatives } from "@/hooks/useInitiatives";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { toolEnvelopeType, toolForEnvelopeType } from "@/lib/tools";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { FileDropArea } from "@/ui/file-drop";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 // The real upload cap is server-owned and arrives via /api/v1/config
 // (max_upload_bytes). Until it has loaded, file.text()/JSON.parse below still
@@ -167,7 +161,7 @@ export function EnvelopeImportDialog({
     );
   }, [people]);
 
-  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (file: File) => {
     const generation = ++readGeneration.current;
     // Only write state if this is still the most recent pick — a slower read
     // of an earlier file must not clobber a newer selection's result.
@@ -175,11 +169,6 @@ export function EnvelopeImportDialog({
     setParseError(null);
     setEnvelope(null);
     setArchive(null);
-    const file = e.target.files?.[0];
-    if (!file) {
-      setFileName("");
-      return;
-    }
     if (isZip(file)) {
       // The server holds the size limit for zips and reads them itself.
       setFileName(file.name);
@@ -327,7 +316,7 @@ export function EnvelopeImportDialog({
   };
 
   const isSubmitting = importMutation.isPending || archiveMutation.isPending;
-  const canSubmit = (!!envelope || !!archive) && !!initiativeId && !isSubmitting;
+  const canSubmit = (!!envelope || !!archive) && !!initiativeId;
   // Every tool's envelope names its entity `name`; file exports taken
   // before the rename spelled it `title`, which the server still accepts.
   const envelopeTitle = envelope?.name ?? envelope?.title ?? "";
@@ -344,25 +333,12 @@ export function EnvelopeImportDialog({
             <DialogDescription>{t("imports:wizard.people.prompt")}</DialogDescription>
           </DialogHeader>
           <ImportPeopleStep people={people} value={peopleMap} onChange={setPeopleMap} />
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void handleDiscard()}
-              disabled={confirmMutation.isPending}
-            >
-              {t("common:cancel")}
-            </Button>
-            <Button
-              type="button"
-              onClick={() => void handleConfirm()}
-              disabled={confirmMutation.isPending}
-            >
-              {confirmMutation.isPending
-                ? t("imports:envelope.importing")
-                : t("imports:envelope.importButton")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("imports:envelope.importButton")}
+            pendingLabel={t("imports:envelope.importing")}
+            pending={confirmMutation.isPending}
+            onSubmit={() => void handleConfirm()}
+          />
         </DialogContent>
       </Dialog>
     );
@@ -377,17 +353,11 @@ export function EnvelopeImportDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="envelope-import-file">{t("imports:envelope.selectFile")}</Label>
-            <input
-              id="envelope-import-file"
-              type="file"
+            <FileDropArea
               accept=".json,.zip,application/json,application/zip"
-              onChange={handleFileChange}
-              className="block w-full text-sm"
+              onFile={(file) => void handleFile(file)}
+              prompt={fileName || t("imports:envelope.selectFile")}
             />
-            {fileName && !parseError ? (
-              <p className="text-muted-foreground text-xs">{fileName}</p>
-            ) : null}
             {parseError ? <p className="text-destructive text-sm">{parseError}</p> : null}
           </div>
 
@@ -405,15 +375,12 @@ export function EnvelopeImportDialog({
           ) : null}
 
           {fixedInitiativeId == null && (
-            <div className="space-y-2">
-              <Label htmlFor="envelope-import-initiative">
-                {t("imports:envelope.targetInitiative")}
-              </Label>
+            <Field label={t("imports:envelope.targetInitiative")}>
               <Select
                 value={initiativeId ?? undefined}
                 onValueChange={(value) => setInitiativeId(value)}
               >
-                <SelectTrigger id="envelope-import-initiative">
+                <SelectTrigger>
                   <SelectValue placeholder={t("imports:envelope.selectInitiative")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -424,22 +391,15 @@ export function EnvelopeImportDialog({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           )}
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
-            >
-              {t("common:cancel")}
-            </Button>
-            <Button type="submit" disabled={!canSubmit}>
-              {isSubmitting ? t("imports:envelope.importing") : t("imports:envelope.importButton")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("imports:envelope.importButton")}
+            pendingLabel={t("imports:envelope.importing")}
+            pending={isSubmitting}
+            disabled={!canSubmit}
+          />
         </form>
       </DialogContent>
     </Dialog>

@@ -36,6 +36,7 @@ from app.api.v1.tenant_endpoints import (
     guild_plugins,
     collaboration,
     comments,
+    contacts,
     counters,
     files,
     events,
@@ -51,7 +52,6 @@ from app.api.v1.tenant_endpoints import (
     projects,
     property_definitions,
     property_values,
-    queues,
     reactions,
     personal_items,
     relationships,
@@ -94,11 +94,12 @@ from app.api.v1.platform_endpoints import (
     provider_placement,
     billing,
     config,
-    contacts,
     demo,
     guild_provider_connections,
     guilds,
     health,
+    help_center,
+    ideas,
     legal,
     marketplace,
     native,
@@ -108,6 +109,7 @@ from app.api.v1.platform_endpoints import (
     push,
     intake,
     passkeys,
+    people,
     email_otp,
     passwordless,
     second_factor,
@@ -136,6 +138,9 @@ api_router.include_router(config.router, tags=["config"])
 # This deployment's terms and privacy policy, if it has any.
 # Unauthenticated: the signup form links to them.
 api_router.include_router(legal.router, tags=["legal"])
+api_router.include_router(ideas.router, prefix="/ideas", tags=["ideas"])
+# The help center's search index. Unauthenticated, like the help center.
+api_router.include_router(help_center.router, prefix="/help", tags=["help"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 # The demo deployment's routes; 404 unless the deployment runs as the demo.
 api_router.include_router(demo.router, prefix="/demo", tags=["demo"])
@@ -329,18 +334,17 @@ guild_router.include_router(demo.community_router, prefix="/demo", tags=["demo"]
 guild_router.include_router(demo.sales_router, prefix="/demo", tags=["demo"])
 guild_router.include_router(imports.router, prefix="/imports", tags=["imports"])
 guild_router.include_router(resumable_uploads.router, prefix="/resumable-uploads")
-guild_router.include_router(queues.router, **_tool_mount(Tool.queue))
-# Flat read-back routes, at the guild root: an event envelope names a
-# resource by its own id, so every evented resource must resolve from one.
-guild_router.include_router(queues.items_router, tags=_tool_mount(Tool.queue)["tags"])
 
 guild_router.include_router(counters.router, **_tool_mount(Tool.counter_group))
+# Flat read-back routes, at the guild root: an event envelope names a
+# resource by its own id, so every evented resource must resolve from one.
 guild_router.include_router(counters.counters_router, tags=["counters"])
 guild_router.include_router(calendars.router, **_tool_mount(Tool.calendar))
 guild_router.include_router(dashboards.router, **_tool_mount(Tool.dashboard))
 guild_router.include_router(posts.router, **_tool_mount(Tool.post))
 guild_router.include_router(wikis.router, **_tool_mount(Tool.wiki))
 guild_router.include_router(wikis.pages_router, tags=_tool_mount(Tool.wiki)["tags"])
+guild_router.include_router(contacts.router, **_tool_mount(Tool.contact))
 # Plug-ins installed at guild scope. Every member reads them (the sidebar needs to
 # know what is there); installing and removing are guild-admin actions.
 #
@@ -440,7 +444,7 @@ me_router.include_router(personal_items.me_router, tags=["personal-items"])
 me_router.include_router(calendar_entries.me_router, tags=["calendar-entries"])
 me_router.include_router(me_trash.me_router, tags=["trash"])
 me_router.include_router(notification_prefs.me_router, tags=["notifications"])
-me_router.include_router(contacts.me_router, tags=["contacts"])
+me_router.include_router(people.me_router, tags=["people"])
 me_router.include_router(
     dm.me_router, tags=["direct-messages"], dependencies=[DirectMessagesEnabledDep]
 )

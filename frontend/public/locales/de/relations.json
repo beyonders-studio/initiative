@@ -3,7 +3,6 @@
   "description": "Alles, womit dies verbunden ist — und wie.",
   "untitled": "Ohne Titel",
   "empty": "Noch nichts verknüpft.",
-  "loadFailed": "Verknüpfungen antworten nicht. Versuch es gleich noch einmal.",
   "add": "Verknüpfung hinzufügen",
   "graph": {
     "alt": "{{title}} und die {{count}} damit verknüpften Dinge",
@@ -29,11 +28,13 @@
   "removed": "Verknüpfung entfernt.",
   "dialog": {
     "title": "Verknüpfung hinzufügen",
-    "description": "Such zuerst das Objekt, sag dann, wie die beiden zusammenhängen.",
-    "descriptionUpload": "Such zuerst das Objekt oder lade eine Datei hoch, sag dann, wie die beiden zusammenhängen.",
+    "description": "Such zuerst das Objekt oder die Person, sag dann, wie die beiden zusammenhängen.",
+    "descriptionUpload": "Such zuerst das Objekt oder die Person oder lade eine Datei hoch, sag dann, wie die beiden zusammenhängen.",
     "entity": "Objekt",
     "entityPlaceholder": "Nach Namen suchen…",
     "noResults": "Keine Treffer.",
+    "person": "Person",
+    "noPeople": "Niemand gefunden.",
     "relationship": "Beziehung",
     "sentenceLabel": "Wie die beiden zusammenhängen",
     "submit": "Verknüpfung hinzufügen",
@@ -49,6 +50,7 @@
   },
   "card": {
     "kindLinked": "{{kind}} · verknüpft {{date}}",
+    "person": "Person",
     "unreachable": "Diese Version der App kann das nicht öffnen.",
     "remove": "Verknüpfung zu {{title}} entfernen"
   },
@@ -92,7 +94,6 @@
       "option": "ist markiert"
     }
   },
-  "loading": "Wird geladen…",
   "empty_task": "Noch nichts verknüpft. Verknüpfe die Datei, die diese Aufgabe beschreibt, oder die Aufgabe, von der sie blockiert wird.",
   "empty_file": "Noch nichts verknüpft. Verknüpfe das Projekt, das dies erklärt, oder die Aufgabe, aus der es entstanden ist.",
   "empty_project": "Noch nichts verknüpft. Häng die Dateien an, auf denen dieses Projekt aufbaut.",
@@ -114,11 +115,10 @@
     "generic": "Dies",
     "post": "Dieser Beitrag",
     "project": "Dieses Projekt",
-    "queue": "Diese Warteschlange",
-    "queue_item": "Dieser Eintrag",
     "task": "Diese Aufgabe",
     "wiki": "Dieses Wiki",
     "wiki_page": "Diese Seite",
+    "contact": "Dieser Kontakt",
     "collection": "Diese Sammlung"
   },
   "blockers": {
@@ -132,8 +132,7 @@
   "empty_counter_group": "Noch nichts verknüpft. Verknüpfe das Projekt, um dessen Zahlen es geht.",
   "empty_dashboard": "Noch nichts verknüpft. Verknüpfe das Projekt, über das dies berichtet, oder die Datei, die es auswertet.",
   "empty_post": "Noch nichts verknüpft. Verknüpfe das Projekt, das hier angekündigt wird, oder die Datei dahinter.",
-  "empty_queue": "Noch nichts verknüpft. Verknüpfe das Projekt, das diese Warteschlange speist.",
-  "empty_queue_item": "Noch nichts verknüpft. Verknüpfe die Aufgabe, die daraus wurde, oder die Datei, aus der es stammt.",
   "empty_wiki_page": "Noch nichts verknüpft. Erwähne diese Seite mit [[ von irgendwo – dann erscheint sie hier.",
+  "empty_contact": "Noch nichts verknüpft. Verknüpfe die Aufgabe für sie, den Termin, bei dem sie dabei sind, oder ihren Vertrag.",
   "empty_collection": "Noch nichts verknüpft. Verknüpfe das Projekt, für das diese Dateien sind."
 }

@@ -78,9 +78,6 @@
     "notFoundDescription": "Este archivo puede haber sido eliminado o el enlace está roto.",
     "noAccess": "Acceso denegado",
     "backToFiles": "← Volver a archivos",
-    "closePanel": "Cerrar panel",
-    "openPanel": "Abrir panel",
-    "togglePanel": "Alternar panel lateral",
     "titlePlaceholder": "Título del archivo",
     "imageFileRequired": "Por favor selecciona un archivo de imagen.",
     "imageUploaded": "Imagen subida.",
@@ -105,17 +102,18 @@
   },
   "featuredImage": {
     "label": "Imagen destacada",
-    "upload": "Subir imagen",
-    "fromFiles": "Desde Archivos",
-    "replace": "Reemplazar",
-    "remove": "Quitar",
+    "add": "Añadir imagen destacada",
+    "upload": "Subir una imagen",
+    "fromFiles": "Elegir de Archivos",
+    "replace": "Subir otra imagen",
+    "replaceFromFiles": "Elegir otra de Archivos",
+    "remove": "Quitar la imagen destacada",
     "uploading": "Subiendo…"
   },
   "imageChooser": {
     "title": "Elegir una imagen de Archivos",
     "description": "Se inserta tal como está ahora: una versión más reciente del archivo no la cambia.",
-    "none": "No hay imágenes aquí.",
-    "more": "Mostrar más"
+    "none": "No hay imágenes aquí."
   },
   "outline": {
     "show": "Mostrar contenido",
@@ -342,7 +340,6 @@
     "error": "No se pudo convertir este archivo."
   },
   "viewer": {
-    "loadError": "No se pudo cargar el archivo",
     "openNewTab": "Abrir en nueva pestaña",
     "download": "Descargar",
     "pageCount_one": "{{count}} página",
@@ -371,7 +368,6 @@
   "createFirst": "Comenzar a escribir",
   "dropToUpload": "Suelta para subir un archivo",
   "error": "Algo salió mal",
-  "loadError": "No se pudieron cargar los archivos en este momento.",
   "loading": "Cargando archivos…",
   "newFile": "Nuevo archivo",
   "noFiles": "Aún no hay archivos",

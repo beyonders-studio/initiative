@@ -5,18 +5,13 @@ import type { LoginProviderEntry } from "@/api/generated/initiativeAPI.schemas";
 import { ProviderMark } from "@/components/auth/ProviderMark";
 import { ServerChip } from "@/components/auth/ServerChoice";
 import { SignInFrame } from "@/components/auth/SignInFrame";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { useCommunityLoginProviders } from "@/hooks/useCommunityAuthPolicy";
 import { useServer } from "@/hooks/useServer";
 import { providerSignInHref } from "@/lib/returnPath";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { SkeletonRegion } from "@/ui/page-skeletons";
+import { Skeleton } from "@/ui/skeleton";
 
 /**
  * A community's sign-in page — the URL its admins share with members.
@@ -59,7 +54,9 @@ export const CommunityLoginPage = () => {
               {t("communityLogin.nativeUnsupported")}
             </p>
           ) : providersQuery.isLoading ? (
-            <p className="text-center text-muted-foreground text-sm">{t("common:loading")}</p>
+            <SkeletonRegion>
+              <Skeleton className="h-10 w-full" />
+            </SkeletonRegion>
           ) : providers.length === 0 ? (
             <p className="text-center text-muted-foreground text-sm">
               {t("communityLogin.noProviders")}

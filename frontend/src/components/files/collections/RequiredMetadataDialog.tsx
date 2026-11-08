@@ -1,5 +1,4 @@
-import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CollectionRead, PropertyValueInput } from "@/api/generated/initiativeAPI.schemas";
@@ -9,7 +8,7 @@ import {
   RequiredValues,
   valuesOf,
 } from "@/components/layouts/RequiredValues";
-import { Button } from "@/components/ui/button";
+import type { DialogProps } from "@/types/dialog";
 import {
   Dialog,
   DialogContent,
@@ -17,8 +16,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import type { DialogProps } from "@/types/dialog";
+} from "@/ui/dialog";
 
 /** Whether files going into the collection need values from whoever puts
  *  them there: its file page requires metadata it still has. */
@@ -48,9 +46,11 @@ export const RequiredMetadataDialog = ({
 }) => {
   const { t } = useTranslation(["files", "common"]);
   const [draft, setDraft] = useState(EMPTY_REQUIRED);
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (!open) setDraft(EMPTY_REQUIRED);
-  }, [open]);
+  }
   const missing = missingIn(keys, draft, collection.metadata);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -69,19 +69,12 @@ export const RequiredMetadataDialog = ({
             idPrefix="collection-required"
           />
         </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            type="button"
-            disabled={missing.length > 0 || pending}
-            onClick={() => onConfirm(valuesOf(draft))}
-          >
-            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {t("collections.required.confirm")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("collections.required.confirm")}
+          onSubmit={() => onConfirm(valuesOf(draft))}
+          pending={pending}
+          disabled={missing.length > 0}
+        />
       </DialogContent>
     </Dialog>
   );

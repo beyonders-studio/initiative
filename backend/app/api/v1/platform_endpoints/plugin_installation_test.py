@@ -1151,7 +1151,7 @@ class TestMetadata:
         assert await _stored(session, installed.guild.id) == []
 
 
-#: A field on tasks, one on queue items only, and a list on tasks.
+#: A field on tasks, one on counters only, and a list on tasks.
 _FIELDS = {
     "fields": [
         {
@@ -1160,7 +1160,7 @@ _FIELDS = {
             "kind": "number",
             "on": ["task"],
         },
-        {"key": "lane", "name": {"en": "Lane"}, "kind": "text", "on": ["queue_item"]},
+        {"key": "lane", "name": {"en": "Lane"}, "kind": "text", "on": ["counter"]},
         PULLS_FIELD,
     ]
 }
@@ -1260,7 +1260,7 @@ class TestShownValues:
                     **installed.plugin.definition,
                     "fields": [
                         {**_FIELDS["fields"][1], "key": "sync.etag", "on": ["task"]},
-                        {**_FIELDS["fields"][1], "on": ["queue_item", "task"]},
+                        {**_FIELDS["fields"][1], "on": ["counter", "task"]},
                     ],
                 }
             )

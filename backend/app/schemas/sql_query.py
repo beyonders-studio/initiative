@@ -5,11 +5,12 @@ query may name two columns the same thing — ``SELECT t.id, p.id`` is legal and
 gives both the name ``id``. A mapping would keep one of the two.
 """
 
-from typing import Any, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import Field
 
 from app.schemas.base import SanitizedBaseModel
+from app.schemas.field_catalog import FieldDescription
 from app.schemas.query import FilterOp
 from app.services.fields.spec import FieldType
 
@@ -44,12 +45,37 @@ class QueryColumnDescription(SanitizedBaseModel):
     date_only: bool = False
 
 
+class QuerySheetDescription(SanitizedBaseModel):
+    """A range a statement reads with ``sheet()``, as the file holds it now."""
+
+    #: The name the statement reads it under.
+    alias: str
+    #: The workbook's visible sheets, for picking one.
+    sheets: List[str]
+    #: Its columns, described as a dataset's fields are.
+    fields: List[FieldDescription]
+
+
+class QueryPluginDescription(SanitizedBaseModel):
+    """A plug-in's endpoint a statement reads with ``plugin()``, as the
+    install's pinned definition declares it."""
+
+    #: The name the statement reads it under.
+    alias: str
+    #: Its columns, described as a dataset's fields are.
+    fields: List[FieldDescription]
+
+
 class QueryShapeResponse(SanitizedBaseModel):
     """What a statement would return, without returning it."""
 
     columns: List[QueryColumnDescription]
     #: The datasets the statement reads.
     relations: List[str]
+    #: The ranges of spreadsheets it reads.
+    sheets: List[QuerySheetDescription] = []
+    #: The plug-in endpoints it reads.
+    plugins: List[QueryPluginDescription] = []
 
 
 class QueryResponse(SanitizedBaseModel):
@@ -114,15 +140,41 @@ class QuerySortSpec(SanitizedBaseModel):
     descending: bool = False
 
 
+class QuerySheetSpec(SanitizedBaseModel):
+    """A range of a spreadsheet a built query reads."""
+
+    #: The spreadsheet's id.
+    file: int = Field(gt=0)
+    #: The range in A1 notation, its sheet before the last ``!``. Omitted
+    #: reads the first visible sheet's filled area.
+    range: Optional[str] = Field(default=None, min_length=1, max_length=200)
+
+
+class QueryPluginSpec(SanitizedBaseModel):
+    """A plug-in's read endpoint a built query reads."""
+
+    #: The plug-in's public id, ``<publisher>.<slug>``.
+    plugin: str = Field(min_length=1, max_length=100)
+    #: The endpoint's name after the plug-in's prefix.
+    endpoint: str = Field(min_length=1, max_length=100)
+    #: Its parameters by name: a value, or a list of them.
+    params: Dict[str, Union[str, int, bool, List[Union[str, int, bool]]]] = Field(
+        default_factory=dict, max_length=12
+    )
+
+
 class QueryBuildRequest(SanitizedBaseModel):
     """What somebody clicked, before it is a statement.
 
     The builder describes; the server writes the SQL. A statement built by
     clicking is therefore always one this surface will run, because it is built
-    in the parse tree rather than assembled as text.
+    in the parse tree rather than assembled as text. It reads one dataset, one
+    range of a spreadsheet, or one of a plug-in's read endpoints.
     """
 
-    dataset: str = Field(min_length=1, max_length=100)
+    dataset: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    sheet: Optional[QuerySheetSpec] = None
+    plugin: Optional[QueryPluginSpec] = None
     columns: List[QueryColumnSpec] = Field(min_length=1, max_length=20)
     where: List[QueryFilterNode] = Field(default_factory=list, max_length=20)
     # As many as there are columns: what a statement is grouped by is drawn
@@ -162,3 +214,7 @@ class QueryBuildResponse(SanitizedBaseModel):
     sql: str
     columns: List[QueryColumnDescription]
     relations: List[str]
+    #: The range it reads, when it reads one.
+    sheets: List[QuerySheetDescription] = []
+    #: The plug-in endpoint it reads, when it reads one.
+    plugins: List[QueryPluginDescription] = []

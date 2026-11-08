@@ -3,8 +3,6 @@
   "subtitle": "Open an initiative to manage files, projects, and membership.",
   "newInitiative": "New initiative",
   "selectCommunity": "Select a community",
-  "loading": "Loading initiatives…",
-  "loadError": "Unable to load initiatives right now.",
   "noDescription": "No description yet.",
   "members": "Members:",
   "createInitiative": "Create initiative",
@@ -24,7 +22,6 @@
     "requestError": "Unable to send this request right now.",
     "queueTitle": "Requests to join",
     "queueDescription": "People who asked to join this initiative. Approving adds them as a member.",
-    "queueLoadError": "Unable to load the join requests right now.",
     "noMessage": "No message",
     "unknownRequester": "Someone",
     "priorDenials_one": "Denied {{count}} time before",
@@ -36,34 +33,26 @@
     "resolveError": "Unable to answer this request right now."
   },
   "manage": {
-    "description": "Assign an initiative's project managers, archive one to hide it from the sidebar without deleting it, grant project managers full access, or delete an initiative into the trash. Make yourself a project manager to work in an initiative from your own sidebar.",
+    "description": "Every initiative in this community and who runs it. Make someone a project manager to put them in charge of one; make yourself one to work in it from your own sidebar.",
     "adminRequired": "You need to be a community admin to manage initiatives.",
-    "loading": "Loading initiatives…",
-    "loadError": "Unable to load initiatives right now.",
     "filterByName": "Filter by name",
-    "idColumn": "ID",
     "nameColumn": "Initiative",
-    "membersColumn": "Members",
     "managersColumn": "Project managers",
-    "statusColumn": "Status",
     "actionsColumn": "Actions",
     "memberCount_one": "{{count}} member",
     "memberCount_other": "{{count}} members",
-    "managerCount_one": "{{count}} manager",
-    "managerCount_other": "{{count}} managers",
-    "noManagers": "None",
+    "noManagers": "No manager",
     "noCandidates": "No members found.",
     "managersUpdated": "Project managers updated.",
     "managersError": "Unable to update project managers right now.",
     "managersUnavailable": "Couldn't load this initiative's roles — try refreshing.",
-    "active": "Active",
-    "archived": "Archived",
     "archive": "Archive",
     "unarchive": "Unarchive",
     "delete": "Delete",
     "archivedToast": "Initiative \"{{name}}\" archived.",
     "unarchivedToast": "Initiative \"{{name}}\" restored.",
-    "deletedToast": "Initiative \"{{name}}\" moved to trash."
+    "deletedToast": "Initiative \"{{name}}\" moved to trash.",
+    "openSettings": "Open settings"
   },
   "createDialog": {
     "title": "Create initiative",
@@ -93,12 +82,12 @@
     "initiativeSettings": "Initiative settings",
     "files": "Files",
     "projects": "Projects",
-    "queues": "Queues",
     "calendars": "Calendar",
     "dashboards": "Dashboards",
     "counterGroups": "Counters",
     "posts": "Posts",
-    "wikis": "Wikis"
+    "wikis": "Wikis",
+    "contacts": "Contacts"
   },
   "settings": {
     "title": "Initiative settings",
@@ -172,7 +161,6 @@
     "roleUpdateError": "Unable to update role right now.",
     "rolesTitle": "Role permissions",
     "rolesDescription": "What each role can see, and what it can make. Managers hold everything.",
-    "loadingRoles": "Loading roles...",
     "addCustomRole": "Add custom role",
     "setByCommunity": "Your community sets this for every initiative.",
     "customRolesOff": "Your community keeps initiatives to their built-in roles.",
@@ -191,7 +179,7 @@
     "deleted": "Initiative deleted.",
     "deleteError": "Unable to delete initiative right now.",
     "deleteConfirmTitle": "Delete initiative?",
-    "deleteConfirmDescription": "<bold>{{name}}</bold> and everything inside it (projects, tasks, files, queues, events) will be sent to the trash. You can restore the whole tree from Settings → Trash before the retention period ends.",
+    "deleteConfirmDescription": "<bold>{{name}}</bold> and everything inside it (projects, tasks, files, events) will be sent to the trash. You can restore the whole tree from Settings → Trash before the retention period ends.",
     "deleteConfirmLabel": "Type <bold>{{name}}</bold> to confirm:",
     "createRoleTitle": "Create custom role",
     "createRoleDescription": "Add a new role with custom permissions for this initiative.",
@@ -223,20 +211,18 @@
     "permissionGroups": {
       "files": "Files",
       "projects": "Projects",
-      "queues": "Queues",
       "calendars": "Events",
       "dashboards": "Dashboards",
       "counterGroups": "Counters",
       "posts": "Posts",
-      "wikis": "Wikis"
+      "wikis": "Wikis",
+      "contacts": "Contacts"
     },
     "permissions": {
       "viewFiles": "View Files",
       "viewProjects": "View Projects",
       "createFiles": "Create Files",
       "createProjects": "Create Projects",
-      "viewQueues": "View Queues",
-      "createQueues": "Create Queues",
       "viewCalendars": "View Events",
       "createCalendars": "Create Events",
       "viewDashboards": "View Dashboards",
@@ -249,6 +235,8 @@
       "createShort": "Create",
       "viewWikis": "View Wikis",
       "createWikis": "Create Wikis",
+      "viewContacts": "View Contacts",
+      "createContacts": "Create Contacts",
       "dashboards_run_as_initiative": "Run dashboards as Initiative"
     },
     "handleColumn": "Handle",
@@ -276,14 +264,13 @@
     "layouts": {
       "heading": "Layouts",
       "description": "How each tool in this initiative draws what it holds: each layout, when it was last changed, and which list a project opens on. They are changed in each one's editor.",
-      "noProjects": "This initiative has no projects yet.",
-      "loadError": "Couldn't load the layouts."
-    }
+      "noProjects": "This initiative has no projects yet."
+    },
+    "fixedOn": "On",
+    "fixedOff": "Off"
   },
   "advancedTools": "Tools",
   "advancedToolsDescription": "Choose what this initiative is made of. Projects and files are on to begin with; the rest are yours to add.",
-  "queuesFeature": "Queues",
-  "queuesFeatureDescription": "Whose turn it is. Rotas, running orders, chore wheels, initiative order — and it is never nobody's turn.",
   "calendarsFeature": "Calendar",
   "calendarsFeatureDescription": "Things that happen at a time. RSVPs, reminders, and one place to look before anyone asks whether it's this Thursday.",
   "dashboardsFeature": "Dashboards",
@@ -326,19 +313,95 @@
   },
   "wikisFeature": "Wikis",
   "wikisFeatureDescription": "Pages that link to each other. Handbooks, references, the thing everyone keeps asking about.",
+  "contactsFeature": "Contacts",
+  "contactsFeatureDescription": "The people and businesses the work is for or with: the client, the venue, the supplier, one tap from a call.",
   "communityDefaults": {
-    "title": "Every initiative",
-    "description": "Set a tool or a member permission here and it applies in every initiative in this community; their managers see it as set. Left to each initiative, it stays theirs.",
-    "toolsHeading": "Tools",
-    "memberHeading": "What members can do",
-    "memberHelp": "For the built-in Member role in every initiative.",
-    "choice": {
-      "initiative": "Each initiative decides",
-      "on": "On everywhere",
-      "off": "Off everywhere"
+    "title": "Rules for every initiative",
+    "description": "Each initiative decides its own tools and what its members can do. A rule here decides it for all of them, and their managers see it set. Managers and moderators can always do everything.",
+    "add": "Add a rule",
+    "empty": "No rules. Each initiative decides its own tools and what its members can do.",
+    "editLabel": "Edit the {{tool}} rule",
+    "removeLabel": "Remove the {{tool}} rule",
+    "items": {
+      "calendars": "events",
+      "contacts": "contacts",
+      "dashboards": "dashboards",
+      "files": "files",
+      "posts": "posts",
+      "counterGroups": "counters",
+      "wikis": "wikis",
+      "projects": "projects"
     },
+    "rule": {
+      "toolOn": "Turned on in every initiative.",
+      "toolOff": "Turned off in every initiative.",
+      "viewCreate": "Members can view and create {{items}}.",
+      "viewNotCreate": "Members can view {{items}} but not create them.",
+      "view": "Members can view {{items}}.",
+      "notView": "Members can't view {{items}}.",
+      "create": "Members can create {{items}}.",
+      "notCreate": "Members can't create {{items}}."
+    },
+    "extra": {
+      "dashboards_run_as_initiative": {
+        "on": "Members can run a dashboard as the initiative.",
+        "off": "Only managers can run a dashboard as the initiative."
+      }
+    },
+    "addTitle": "Add a rule",
+    "editTitle": "Rule for {{tool}}",
+    "dialogDescription": "Pick what holds in every initiative, including ones added later. Anything left to each initiative stays theirs.",
+    "toolLabel": "Tool",
+    "question": {
+      "tool": "Is {{tool}} turned on?",
+      "view": "Can members view {{items}}?",
+      "create": "Can members create {{items}}?",
+      "extra": {
+        "dashboards_run_as_initiative": "Can members run a dashboard as the initiative?"
+      }
+    },
+    "answer": {
+      "tool": {
+        "each": "Each initiative decides",
+        "on": "On in every initiative",
+        "off": "Off in every initiative"
+      },
+      "member": {
+        "each": "Each initiative decides",
+        "on": "Yes, in every initiative",
+        "off": "No, only managers"
+      }
+    },
+    "createNeedsView": "Members can't create what they can't view.",
+    "offNote": "With {{tool}} off everywhere there is nothing for members to view or create, so their answers stay with each initiative.",
+    "reads": "The rule reads:",
+    "noRule": "No rule. Each initiative decides.",
+    "changesHeading": "Who it changes today",
+    "changesNone": "No initiative today.",
+    "changes": {
+      "tool": {
+        "on": "Turns {{tool}} on in {{names}}.",
+        "off": "Turns {{tool}} off in {{names}}. Nothing in it is deleted."
+      },
+      "view": {
+        "on": "Lets members view {{items}} in {{names}}.",
+        "off": "Stops members viewing {{items}} in {{names}}."
+      },
+      "create": {
+        "on": "Lets members create {{items}} in {{names}}.",
+        "off": "Stops members creating {{items}} in {{names}}."
+      },
+      "extra": {
+        "dashboards_run_as_initiative": {
+          "on": "Lets members run a dashboard as the initiative in {{names}}.",
+          "off": "Stops members running a dashboard as the initiative in {{names}}."
+        }
+      }
+    },
+    "save": "Save rule",
+    "remove": "Remove rule",
+    "customRolesHelp": "Lets each initiative's managers add roles of their own beside Moderator, Project Manager and Member. Turning it off holds the roles they already added to what members can do.",
     "customRolesLabel": "Managers can add roles",
-    "customRolesHelp": "Off, initiatives can't add roles, and any custom roles they already have can do no more than members.",
     "saved": "Saved for every initiative",
     "error": "Could not save"
   }

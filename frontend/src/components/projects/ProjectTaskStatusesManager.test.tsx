@@ -166,3 +166,35 @@ describe("ProjectTaskStatusesManager delete dialog", () => {
     expect(deletes).toHaveLength(0);
   });
 });
+
+describe("ProjectTaskStatusesManager table", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("saves a column moved to another category, with that category's look", async () => {
+    const updates: unknown[] = [];
+    server.use(
+      communityHttp.patch("/projects/:projectId/task-statuses/:statusId", async ({ request }) => {
+        updates.push(await request.json());
+        return HttpResponse.json(buildProjectTaskStatus({ id: 3, project_id: PROJECT_ID }));
+      })
+    );
+    const statuses = buildLegacyStatuses();
+    // Blocked still wears the To Do look, so it takes In Progress's.
+    statuses[2] = { ...statuses[2], color: "#94A3B8", icon: "circle" };
+    renderManager(statuses);
+    const user = userEvent.setup();
+
+    const row = (await screen.findByDisplayValue("Blocked")).closest("tr");
+    if (!row) {
+      throw new Error("no row for status Blocked");
+    }
+    await user.click(within(row).getByRole("combobox"));
+    await user.click(await screen.findByRole("option", { name: "In Progress" }));
+    await user.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => expect(updates).toHaveLength(1));
+    expect(updates[0]).toEqual({ category: "in_progress", color: "#60A5FA", icon: "circle-play" });
+  });
+});

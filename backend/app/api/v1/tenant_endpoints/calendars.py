@@ -53,6 +53,7 @@ from app.services.tenant import metadata as metadata_service
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import calendars as calendars_service
 from app.services.tenant import guild_plugins as guild_plugins_service
+from app.services.tenant import ownership as ownership_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.ical_service import ical_from_export_dicts
 
@@ -231,8 +232,9 @@ async def create_calendar(
         )
     else:
         # The plug-in is the container, so it owns this.
-        await calendars_service.give_to_install(
+        await ownership_service.give_to_install(
             session,
+            Tool.calendar,
             calendar,
             install_id=plugin.id,
             guild_id=guild_context.guild_id,

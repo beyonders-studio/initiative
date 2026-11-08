@@ -3,11 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type AIStreamRequest, readAIStream } from "@/api/aiStream";
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
 import { getItem, setItem } from "@/lib/storage";
+import { Button } from "@/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
 
 /** A summary as it has been written so far. */
 export interface AISummary {
@@ -212,14 +212,10 @@ const SummaryBody = ({
           size="icon"
           className="h-8 w-8"
           onClick={() => void write()}
-          disabled={writing}
+          pending={writing}
           title={t("summary.regenerate")}
         >
-          {writing ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
+          <RefreshCw className="h-4 w-4" />
         </Button>
       </div>
       {since}

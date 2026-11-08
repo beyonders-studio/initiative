@@ -14,7 +14,6 @@
       "comments": "Diese Woche hat niemand kommentiert."
     },
     "loadError": "Was zuletzt passiert ist, konnte nicht geladen werden. Bitte versuche es später erneut.",
-    "loadMore": "Mehr anzeigen",
     "new": "Neu",
     "others_one": "{{count}} weitere Person",
     "others_other": "{{count}} weitere Personen",
@@ -42,8 +41,6 @@
     "expand": "Aktivitäts-Seitenleiste ausklappen",
     "collapse": "Aktivitäts-Seitenleiste einklappen"
   },
-  "loading": "Wird geladen…",
-  "loadError": "Dieses Werkzeug konnte nicht geladen werden. Bitte versuche es später erneut.",
   "communityWide": "Community-weit",
   "searchPlaceholder": "Nach Namen suchen…",
   "empty": {
@@ -82,8 +79,7 @@
       "open": "Offen für alle Community-Mitglieder",
       "request": "Beitritt auf Anfrage",
       "private": "Nur auf Einladung"
-    },
-    "loadError": "Das Angebot dieser Community konnte nicht geladen werden. Bitte versuche es später erneut."
+    }
   },
   "columns": {
     "name": "Name",
@@ -96,11 +92,13 @@
       "files": "Typ",
       "calendars": "Beschreibung",
       "dashboards": "Herkunft",
-      "posts": "Vorschau"
+      "posts": "Vorschau",
+      "contacts": "Telefon oder E-Mail"
     }
   },
   "detail": {
     "tasksDone": "{{completed}} von {{total}} Aufgaben",
+    "projectProgress": "Projektfortschritt",
     "fromMarketplace": "Marktplatz",
     "builtHere": "Selbst erstellt",
     "fileKind": {
@@ -127,7 +125,6 @@
   },
   "recentComments": {
     "noComments": "Noch keine Kommentare",
-    "loadError": "Neueste Kommentare konnten nicht geladen werden. Bitte später erneut versuchen.",
     "unknownAuthor": "Unbekannt",
     "onEntity": "zu {{entityName}}",
     "inProject": "in {{projectName}}",
@@ -138,7 +135,6 @@
     "title": "Demnächst",
     "description": "Alles in der Community mit einem Datum in den nächsten sieben Tagen.",
     "empty": "Diese Woche steht nichts an",
-    "loadError": "Die anstehenden Einträge konnten nicht geladen werden. Bitte versuche es später erneut.",
     "today": "Heute",
     "tomorrow": "Morgen",
     "kind": {

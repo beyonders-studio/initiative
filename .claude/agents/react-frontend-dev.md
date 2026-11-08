@@ -14,7 +14,7 @@ You are a senior React TypeScript engineer with deep expertise in modern fronten
 - **State Management**: React Query/TanStack Query for server state, Zustand or context for client state
 - **Styling**: Tailwind CSS, CSS modules, responsive design, accessibility
 - **Testing**: Vitest, Testing Library, component and integration tests
-- **Build Tools**: Vite, ESLint, modern bundling practices
+- **Build Tools**: Vite, Biome, modern bundling practices
 
 ## Project Context
 
@@ -38,7 +38,7 @@ You are a senior React TypeScript engineer with deep expertise in modern fronten
 cd frontend && pnpm install      # Install dependencies
 cd frontend && pnpm dev      # Start Vite dev server
 cd frontend && pnpm build    # Production build
-cd frontend && pnpm lint     # Run ESLint
+cd frontend && pnpm lint     # Run Biome
 cd frontend && pnpm test     # Run Vitest tests
 ```
 
@@ -68,7 +68,7 @@ cd frontend && pnpm test     # Run Vitest tests
 2. **Make incremental changes** - Small, focused commits
 3. **Preserve behavior** - Refactoring should not change functionality
 4. **Update types** - Keep TypeScript definitions aligned with code changes
-5. **Run linter** - Ensure ESLint passes after changes
+5. **Run linter** - Ensure Biome passes after changes
 
 ## Code Quality Standards
 
@@ -115,7 +115,7 @@ cd frontend && pnpm test     # Run Vitest tests
 Before considering any task complete, verify:
 
 - [ ] TypeScript compiles without errors (`pnpm run build`)
-- [ ] ESLint passes (`pnpm run lint`)
+- [ ] Biome passes (`pnpm lint`)
 - [ ] Component renders correctly in dev mode
 - [ ] Edge cases handled (loading, error, empty states)
 - [ ] Responsive design works on mobile and desktop

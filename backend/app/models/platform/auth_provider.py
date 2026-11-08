@@ -28,11 +28,6 @@ class AuthProviderKind(str, Enum):
     broker = "broker"
 
 
-# Mirror the CHECK constraint declared in the migration. Keep in sync with
-# ``20260705_0131_create_auth_identity_tables.py``.
-AUTH_PROVIDER_KINDS: tuple[str, ...] = tuple(k.value for k in AuthProviderKind)
-
-
 class AuthProvider(SQLModel, table=True):
     """A configured identity source Initiative acts as a relying party to.
 

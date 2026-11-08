@@ -29,7 +29,6 @@
  * regardless.
  */
 
-import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -39,22 +38,22 @@ import yonderTalking from "@/assets/yonder/talking.svg";
 import { JoinPolicySection } from "@/components/initiatives/JoinPolicySection";
 import { ToolsSection } from "@/components/initiatives/ToolsToggles";
 import { Markdown } from "@/components/Markdown";
-import { Button } from "@/components/ui/button";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Textarea } from "@/components/ui/textarea";
-import { WizardBackButton, WizardDialog } from "@/components/ui/wizard-dialog";
 import { useGrantToolsToMembers } from "@/hooks/useInitiativeRoles";
 import { useCreateInitiative } from "@/hooks/useInitiatives";
 import { useWizard } from "@/hooks/useWizard";
+import { DEFAULT_COLOR } from "@/lib/initiativeColors";
 import { docsUrl } from "@/lib/links";
 import { toast } from "@/lib/mascotToast";
 import { DEFAULT_ENABLED_TOOLS, TOOLS, toolViewPermission } from "@/lib/tools";
-
-const DEFAULT_INITIATIVE_COLOR = "#6366F1";
+import { Button } from "@/ui/button";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { DialogFooter } from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
+import { Textarea } from "@/ui/textarea";
+import { WizardBackButton, WizardDialog } from "@/ui/wizard-dialog";
 
 /** Where the idea is explained properly, for somebody who wants more than a
  *  paragraph. Opens in its own tab: the wizard is half-filled by this point. */
@@ -91,6 +90,7 @@ interface NextAction {
   label: string;
   onClick?: () => void;
   disabled?: boolean;
+  pending?: boolean;
   /** Submits the enclosing form (so Enter in a field advances) instead of
    *  calling `onClick`. */
   submit?: boolean;
@@ -107,7 +107,7 @@ export const CreateInitiativeWizard = ({
   const { step, go, back, canGoBack, reset } = useWizard<Step>("details");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [color, setColor] = useState(DEFAULT_INITIATIVE_COLOR);
+  const [color, setColor] = useState(DEFAULT_COLOR);
   const [joinPolicy, setJoinPolicy] = useState<InitiativeJoinPolicy>(InitiativeJoinPolicy.private);
   const [selected, setSelected] = useState<Record<string, boolean>>(defaultSelection);
   const [audience, setAudience] = useState<MemberAudience>("view");
@@ -127,7 +127,7 @@ export const CreateInitiativeWizard = ({
     reset();
     setName("");
     setDescription("");
-    setColor(DEFAULT_INITIATIVE_COLOR);
+    setColor(DEFAULT_COLOR);
     setJoinPolicy(InitiativeJoinPolicy.private);
     setSelected(defaultSelection());
     setAudience("view");
@@ -184,9 +184,8 @@ export const CreateInitiativeWizard = ({
         audience,
       });
     } catch {
-      // The initiative exists and is correct; only the widening failed, and
-      // saying "could not create" about it would be false.
-      toast.error(t("createWizard.memberGrantFailed"));
+      // The initiative exists and is correct; only the widening failed, which
+      // the grant reports as its own failure rather than "could not create".
     }
     onOpenChange(false);
     onCreated?.(created);
@@ -220,6 +219,7 @@ export const CreateInitiativeWizard = ({
         type={next.submit ? "submit" : "button"}
         onClick={next.onClick}
         disabled={next.disabled}
+        pending={next.pending}
       >
         {next.label}
       </Button>
@@ -272,37 +272,26 @@ export const CreateInitiativeWizard = ({
               </div>
             </div>
           ) : null}
-          <div className="space-y-2">
-            <Label htmlFor="new-initiative-name">{t("createDialog.nameLabel")}</Label>
+          <Field label={t("createDialog.nameLabel")}>
             <Input
-              id="new-initiative-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder={t("createDialog.namePlaceholder")}
               maxLength={255}
               required
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="new-initiative-description">{t("createDialog.descriptionLabel")}</Label>
+          </Field>
+          <Field label={t("createDialog.descriptionLabel")}>
             <Textarea
-              id="new-initiative-description"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder={t("createDialog.descriptionPlaceholder")}
               rows={3}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="new-initiative-color">{t("createDialog.colorLabel")}</Label>
-            <ColorPickerPopover
-              id="new-initiative-color"
-              value={color}
-              onChange={setColor}
-              triggerLabel="Adjust"
-            />
-            <p className="text-muted-foreground text-xs">{t("createDialog.colorHint")}</p>
-          </div>
+          </Field>
+          <Field label={t("createDialog.colorLabel")} hint={t("createDialog.colorHint")}>
+            <ColorPickerPopover value={color} onChange={setColor} />
+          </Field>
           {footer({ label: t("createWizard.nextTools"), disabled: !trimmedName, submit: true })}
         </form>
       ) : null}
@@ -375,9 +364,8 @@ export const CreateInitiativeWizard = ({
           {footer({
             label: busy ? t("createDialog.creating") : t("createWizard.create"),
             onClick: handleSubmit,
-            disabled: busy,
+            pending: busy,
           })}
-          {busy ? <Loader2 className="sr-only h-4 w-4 animate-spin" /> : null}
         </div>
       ) : null}
     </WizardDialog>

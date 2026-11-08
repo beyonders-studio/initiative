@@ -4,8 +4,8 @@
  * server fills them in; this is where a project says what they are.
  */
 
-import { ArrowDown, ArrowUp, Loader2, Plus, X } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -15,7 +15,9 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
 import { TaskPriorityOption } from "@/components/tasks/TaskPriorityOption";
-import { Button } from "@/components/ui/button";
+import { fromStored, type TaskRecurrenceValue, toRRule } from "@/lib/recurrence";
+import { PRIORITY_ORDER } from "@/lib/sorting";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -23,19 +25,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { fromStored, type TaskRecurrenceValue, toRRule } from "@/lib/recurrence";
-import { PRIORITY_ORDER } from "@/lib/sorting";
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Textarea } from "@/ui/textarea";
 
 const NO_PRIORITY = "none";
 
@@ -102,9 +96,11 @@ export const TaskTypeStartsWithDialog = ({
   const [draft, setDraft] = useState<Draft>(() => draftOf(type?.starting_values));
 
   // Each type opened starts from what it holds.
-  useEffect(() => {
+  const [prevType, setPrevType] = useState(type);
+  if (prevType !== type) {
+    setPrevType(type);
     if (type) setDraft(draftOf(type.starting_values));
-  }, [type]);
+  }
 
   const setLine = (index: number, value: string) =>
     setDraft((prev) => ({
@@ -137,18 +133,14 @@ export const TaskTypeStartsWithDialog = ({
             <DialogDescription>{t("taskTypes.startsWith.description")}</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-2">
-            <Label htmlFor="starts-with-description">
-              {t("taskTypes.startsWith.descriptionLabel")}
-            </Label>
+          <Field label={t("taskTypes.startsWith.descriptionLabel")}>
             <Textarea
-              id="starts-with-description"
               value={draft.description}
               onChange={(event) => setDraft({ ...draft, description: event.target.value })}
               placeholder={t("taskTypes.startsWith.descriptionPlaceholder")}
               rows={5}
             />
-          </div>
+          </Field>
 
           <fieldset className="space-y-2">
             <legend className="font-medium text-sm">
@@ -206,8 +198,7 @@ export const TaskTypeStartsWithDialog = ({
             </Button>
           </fieldset>
 
-          <div className="space-y-2">
-            <Label htmlFor="starts-with-priority">{t("taskTypes.startsWith.priorityLabel")}</Label>
+          <Field label={t("taskTypes.startsWith.priorityLabel")}>
             <Select
               value={draft.priority ?? NO_PRIORITY}
               onValueChange={(value) =>
@@ -217,7 +208,7 @@ export const TaskTypeStartsWithDialog = ({
                 })
               }
             >
-              <SelectTrigger id="starts-with-priority">
+              <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -229,7 +220,7 @@ export const TaskTypeStartsWithDialog = ({
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
 
           <div className="space-y-2">
             <RecurrenceEditor
@@ -243,15 +234,7 @@ export const TaskTypeStartsWithDialog = ({
             <p className="text-muted-foreground text-xs">{t("taskTypes.startsWith.repeatHint")}</p>
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              {t("common:cancel")}
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {t("common:save")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter submitLabel={t("common:save")} pending={saving} />
         </form>
       </DialogContent>
     </Dialog>

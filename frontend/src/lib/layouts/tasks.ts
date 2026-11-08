@@ -6,7 +6,7 @@ import {
   type PropertyDefinitionRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { namePropertyColumns } from "@/components/properties/propertyColumns";
-import { isEmptyPropertyValue } from "@/components/properties/propertyHelpers";
+import { listedValue } from "@/components/properties/propertyHelpers";
 import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
 
 import { at, detailLayoutSpec, type Region, storedLayout } from "./detailLayout";
@@ -114,10 +114,7 @@ export const taskFields = (
       value: (task) => task.blocked_by_open_count || null,
     }),
     builtin({ id: "tags", kind: "tags", requireable: true, value: (task) => task.tags }),
-    ...propertyFields(definitions, (task, id) => {
-      const summary = task.properties?.find((s) => s.property_id === id);
-      return summary && !isEmptyPropertyValue(summary.value) ? summary : null;
-    }),
+    ...propertyFields(definitions, (task, definition) => listedValue(task.properties, definition)),
     ...plugins,
   ];
   return new Map(fields.map((field) => [field.id, field]));
@@ -127,7 +124,7 @@ export const taskFields = (
  *  apart in their labels; `read` reads one's value off an item. */
 export const propertyFields = (
   definitions: PropertyDefinitionRead[],
-  read: (item: Parameters<FieldDef["value"]>[0], definitionId: number) => unknown
+  read: (item: Parameters<FieldDef["value"]>[0], definition: PropertyDefinitionRead) => unknown
 ): FieldDef[] =>
   namePropertyColumns(definitions).map(({ definition, label }) => ({
     id: propertyFieldId(definition.id),
@@ -138,7 +135,7 @@ export const propertyFields = (
     // A checkbox is always on or off, so never empty.
     requireable: definition.type !== MetadataType.checkbox,
     icon: iconForPropertyType(definition.type),
-    value: (item) => read(item, definition.id),
+    value: (item) => read(item, definition),
     property: definition,
   }));
 

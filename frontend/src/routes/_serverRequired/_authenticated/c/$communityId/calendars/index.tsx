@@ -1,9 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { CommunityCalendarsPage } from "@/pages/initiativeTools/events/CalendarsPage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communityId/calendars/")({
-  component: lazyRouteComponent(() =>
-    import("@/pages/initiativeTools/events/CalendarsPage").then((m) => ({
-      default: m.CommunityCalendarsPage,
-    }))
-  ),
+  component: CommunityCalendarsPage,
 });

@@ -49,9 +49,6 @@ from app.services import notifications as notifications_service
 from app.services import permissions as permissions_service
 from app.services.tenant import initiatives as initiatives_service
 
-#: The rungs a person may ask for. Owner is given, never asked for.
-ASKABLE = (ResourceAccessLevel.read, ResourceAccessLevel.write)
-
 
 @dataclass(frozen=True)
 class Standing:

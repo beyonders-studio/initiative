@@ -82,7 +82,7 @@ describe("TicketPage", () => {
     const photo = new File(["png"], "screen.png", { type: "image/png" });
     const script = new File(["#!"], "run.sh", { type: "text/x-sh" });
     await user.upload(input, [photo, script]);
-    expect(screen.getByText("screen.png")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "screen.png" })).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("run.sh");
     await user.type(screen.getByRole("textbox"), "This one.");
     await user.click(screen.getByRole("button", { name: "Send reply" }));
@@ -96,13 +96,13 @@ describe("TicketPage", () => {
     const photo = new File(["png"], "screen.png", { type: "image/png" });
     await user.upload(await screen.findByTestId("evidence-input"), photo);
     await user.type(screen.getByRole("textbox"), "Half an answer");
-    expect(screen.getByText("screen.png")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "screen.png" })).toBeInTheDocument();
 
     state.ticket = ticket({ task_id: 8, subject: "Another one" });
     await router.navigate({ to: "/my-tickets/$taskId", params: { taskId: "8" } });
 
     expect(await screen.findByRole("heading", { name: "Another one" })).toBeInTheDocument();
-    expect(screen.queryByText("screen.png")).toBeNull();
+    expect(screen.queryByRole("img", { name: "screen.png" })).toBeNull();
     expect(screen.getByRole("textbox")).toHaveValue("");
   });
 
@@ -135,19 +135,6 @@ describe("TicketPage", () => {
     state.ticket = ticket({ state: "closed", can_reply: false });
     open();
     expect(await screen.findByText(/This ticket is closed/)).toBeInTheDocument();
-    expect(screen.queryByRole("textbox")).toBeNull();
-  });
-
-  it("waits for the team to speak first on feedback", async () => {
-    state.ticket = ticket({
-      stream: "feedback",
-      state: "received",
-      conversation: "staff_first",
-      can_reply: false,
-      messages: [{ id: 1, mine: true, content: "Dark mode?", created_at: now }],
-    });
-    open();
-    expect(await screen.findByText(/once the team has followed up/)).toBeInTheDocument();
     expect(screen.queryByRole("textbox")).toBeNull();
   });
 });

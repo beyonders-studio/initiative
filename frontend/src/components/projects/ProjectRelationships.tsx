@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
 import { CreateFileDialog } from "@/components/files/CreateFileDialog";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/ui/button";
 
 type ProjectRelationshipsProps = {
   projectId: number;

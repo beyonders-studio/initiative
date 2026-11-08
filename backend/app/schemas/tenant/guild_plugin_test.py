@@ -72,6 +72,7 @@ def _plugin(**overrides) -> SimpleNamespace:
             # Tracking its listing, which is what an install that never opted
             # out says and what the serializer reads.
             "auto_update": True,
+            "pending_version": None,
             "definition": DEFINITION,
             "config": {},
             "secret_fields": {"admin": {"admin_token": SECRET_DIGEST}},

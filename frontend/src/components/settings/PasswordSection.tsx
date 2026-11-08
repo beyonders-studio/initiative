@@ -12,17 +12,6 @@ import type { UserRead, UserSelfUpdate } from "@/api/generated/initiativeAPI.sch
 import { NewPasswordFields } from "@/components/auth/NewPasswordFields";
 import { RecoveryCodesPanel } from "@/components/settings/RecoveryCodesPanel";
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useServer } from "@/hooks/useServer";
 import { useUpdateCurrentUser } from "@/hooks/useUsers";
@@ -30,6 +19,18 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { checkNewPassword } from "@/lib/passwordPolicy";
 import { queryClient } from "@/lib/queryClient";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 interface PasswordSectionProps {
   user: UserRead;
@@ -292,35 +293,23 @@ export const PasswordSection = ({ user, refreshUser }: PasswordSectionProps) => 
                   instead, and the dialog that asks for one is raised on
                   refusal. */}
               {user.password_required ? (
-                <div className="space-y-2">
-                  <Label htmlFor="remove-current-password">
-                    {t("profile.currentPasswordLabel")}
-                  </Label>
+                <Field label={t("profile.currentPasswordLabel")} id="remove-current-password">
                   <Input
-                    id="remove-current-password"
                     type="password"
                     autoComplete="current-password"
                     value={removeCurrentPassword}
                     onChange={(event) => setRemoveCurrentPassword(event.target.value)}
                     required
                   />
-                </div>
+                </Field>
               ) : null}
               {removeError ? <p className="text-destructive text-sm">{removeError}</p> : null}
-              <DialogFooter className="gap-2">
-                <Button type="button" variant="outline" onClick={closeRemove}>
-                  {t("common:cancel")}
-                </Button>
-                <Button
-                  type="submit"
-                  variant="destructive"
-                  disabled={
-                    removePassword.isPending || (user.password_required && !removeCurrentPassword)
-                  }
-                >
-                  {t("account.removePassword")}
-                </Button>
-              </DialogFooter>
+              <DialogFooter
+                submitLabel={t("account.removePassword")}
+                pending={removePassword.isPending}
+                disabled={user.password_required && !removeCurrentPassword}
+                destructive
+              />
             </form>
           )}
         </DialogContent>

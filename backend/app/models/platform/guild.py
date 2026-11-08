@@ -242,9 +242,6 @@ DEFAULT_BANNER: dict[str, str] = {
     "fade": BannerFade.strong.value,
 }
 
-#: The keys a banner has, and the only ones it may have.
-BANNER_KEYS: tuple[str, ...] = tuple(DEFAULT_BANNER)
-
 
 class Guild(SQLModel, table=True):
     __tablename__ = "guilds"
@@ -451,6 +448,8 @@ class AdminSurface(str, Enum):
     initiatives = "initiatives"
     #: Calendars that belong to the whole community.
     community_calendars = "community_calendars"
+    #: Contacts that belong to the whole community.
+    community_contacts = "community_contacts"
     #: Webhook subscriptions that report on the whole community.
     webhooks = "webhooks"
     #: Restoring anybody's deletions, and purging.
@@ -472,6 +471,7 @@ MEMBER_ROLE_SURFACES: frozenset[AdminSurface] = frozenset(
         AdminSurface.invites,
         AdminSurface.members,
         AdminSurface.community_calendars,
+        AdminSurface.community_contacts,
         AdminSurface.usage,
     }
 )

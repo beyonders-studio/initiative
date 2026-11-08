@@ -9,7 +9,6 @@
     "delete": "Delete",
     "deleteTitle": "Delete tag?",
     "deleteDescription": "The tag \"{{name}}\" will be sent to the trash and hidden from all tasks, projects, and files that use it. You can restore it from Settings → Trash before the retention period ends.",
-    "deleted": "Tag deleted",
     "saving": "Saving…",
     "save": "Save",
     "toolTab": "{{tool}} ({{count}})",
@@ -17,14 +16,12 @@
     "children": {
       "task": "Tasks",
       "calendar_event": "Events",
-      "queue_item": "Queue items",
       "wiki_page": "Pages",
       "collection": "Collections"
     },
     "columns": {
       "in": "In"
-    },
-    "loadError": "Couldn't load what carries this tag."
+    }
   },
   "manage": {
     "edit": "Edit tags",
@@ -50,11 +47,7 @@
     "creating": "Creating…",
     "create": "Create",
     "searchPlaceholder": "Search or create tags...",
-    "loading": "Loading…",
-    "existingTags": "Existing tags",
-    "noTagsFound": "No tags found.",
     "createTag": "Create \"{{name}}\"",
-    "selected": "{{count}} selected",
     "filterLabel": "Tags",
     "anyTag": "Any tag"
   },

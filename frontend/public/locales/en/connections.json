@@ -1,0 +1,30 @@
+{
+  "unreachable": {
+    "age": {
+      "title": "Direct messages are off for this account"
+    },
+    "private": {
+      "body": "You're set to Private. You can still connect with anyone by their exact handle, and a connection lets you message each other whatever your setting is. To be reachable here, let your communities message you.",
+      "open": "Let my communities message me",
+      "settings": "Privacy settings"
+    }
+  },
+  "actions": {
+    "label": "Actions for {{handle}}",
+    "connect": "Connect",
+    "acceptConnection": "Accept connection",
+    "connectPending": "Request sent",
+    "ask": "Ask to message",
+    "asked": "Request sent",
+    "askSent": "Request sent.",
+    "ignore": "Ignore",
+    "stopIgnoring": "Stop ignoring",
+    "removeConnection": "Remove connection",
+    "removeConnectionTitle": "Remove this connection?",
+    "removeConnectionBody": "You will no longer be connected. If nothing else lets the two of you message each other — a community you both belong to, or both of you being open to messages — that ends with it.",
+    "message": "Message",
+    "viewProfile": "View profile",
+    "copyHandle": "Copy handle",
+    "handleCopied": "Handle copied."
+  }
+}

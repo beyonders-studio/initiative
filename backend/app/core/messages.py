@@ -12,7 +12,7 @@ class CommonMessages:
     UNKNOWN_TIMEZONE = "UNKNOWN_TIMEZONE"
 
     #: Somebody named on the content (an assignee, an attendee, a person
-    #: property, a queue item's person) cannot open what it sits in.
+    #: property) cannot open what it sits in.
     PERSON_CANNOT_READ = "PERSON_CANNOT_READ"
 
     #: The write reached content that is archived or in the trash, or something
@@ -548,11 +548,15 @@ class PropertyMessages:
     DUPLICATE_OPTION_VALUE = "PROPERTY_DUPLICATE_OPTION_VALUE"
     #: A money property names the currency its amounts are in.
     CURRENCY_REQUIRED = "PROPERTY_CURRENCY_REQUIRED"
+    #: A counter's minimum is at most its maximum.
+    COUNTER_MIN_GREATER_THAN_MAX = "PROPERTY_COUNTER_MIN_GREATER_THAN_MAX"
     #: Properties merged into one metadata field are of one type, and money in
     #: one currency.
     PROMOTE_TYPES_DIFFER = "PROPERTY_PROMOTE_TYPES_DIFFER"
     #: A value to move sits on something the request may not edit.
     PROMOTE_VALUE_NOT_EDITABLE = "PROPERTY_PROMOTE_VALUE_NOT_EDITABLE"
+    #: A signature is written only by a person signing as themselves.
+    SIGNER_ONLY = "PROPERTY_SIGNER_ONLY"
 
 
 class AttachmentMessages:
@@ -645,6 +649,11 @@ class RelationshipMessages:
     #: that end. Refused here with a name, rather than left to arrive as the
     #: database declining the write.
     SOURCE_NOT_WRITABLE = "RELATIONSHIP_SOURCE_NOT_WRITABLE"
+    #: A link to a person says something about the item on its other end, so
+    #: making one asks to change that item, whichever side it is on.
+    ITEM_NOT_WRITABLE = "RELATIONSHIP_ITEM_NOT_WRITABLE"
+    #: A link has an item on at least one end.
+    BETWEEN_PEOPLE = "RELATIONSHIP_BETWEEN_PEOPLE"
     ENDPOINT_NOT_FOUND = "RELATIONSHIP_ENDPOINT_NOT_FOUND"
     CROSS_INITIATIVE = "RELATIONSHIP_CROSS_INITIATIVE"
     ENDPOINT_ARCHIVED = "RELATIONSHIP_ENDPOINT_ARCHIVED"
@@ -812,6 +821,14 @@ class TicketMessages:
     TOO_MANY_OPEN = "TICKET_TOO_MANY_OPEN"
     NOT_FOUND = "TICKET_NOT_FOUND"
     REPLY_NOT_TAKEN = "TICKET_REPLY_NOT_TAKEN"
+
+
+class IdeaMessages:
+    """Reading the published ideas, and voting."""
+
+    NOT_FOUND = "IDEA_NOT_FOUND"
+    #: A closed idea keeps its votes and takes no change to them.
+    CLOSED = "IDEA_CLOSED"
 
 
 class IntakeMessages:
@@ -1108,9 +1125,6 @@ class QueryMessages:
     #: A field that exists but is computed rather than stored, so there is no
     #: column for a query to name yet.
     FIELD_NOT_SELECTABLE = "QUERY_FIELD_NOT_SELECTABLE"
-    #: A column read beside an aggregate without being grouped, so there is no
-    #: one value of it per row of the answer.
-    UNGROUPED_FIELD = "QUERY_UNGROUPED_FIELD"
     #: An unqualified column that more than one relation in scope could mean.
     AMBIGUOUS_FIELD = "QUERY_AMBIGUOUS_FIELD"
     #: The same alias used for two relations.
@@ -1127,6 +1141,31 @@ class QueryMessages:
     #: ``me`` somewhere it says nothing: the reader is a person, so the only
     #: thing to compare them with is a field that holds one.
     VIEWER_NEEDS_A_PERSON = "QUERY_VIEWER_NEEDS_A_PERSON"
+
+    # Spreadsheets.
+
+    #: ``sheet()`` takes a spreadsheet's id or name, then a range as text.
+    SHEET_ARGUMENTS = "QUERY_SHEET_ARGUMENTS"
+    #: No spreadsheet by that id or name that this statement can read.
+    SHEET_NOT_FOUND = "QUERY_SHEET_NOT_FOUND"
+    #: Several spreadsheets have that name; the id says which.
+    SHEET_NAME_AMBIGUOUS = "QUERY_SHEET_NAME_AMBIGUOUS"
+    #: The id names a file that is not a spreadsheet.
+    SHEET_NOT_A_SPREADSHEET = "QUERY_SHEET_NOT_A_SPREADSHEET"
+    #: The range names a sheet the workbook does not have.
+    SHEET_UNKNOWN = "QUERY_SHEET_UNKNOWN"
+    #: The range is not one A1 notation can say.
+    SHEET_RANGE_INVALID = "QUERY_SHEET_RANGE_INVALID"
+    #: The range covers more cells than one range reads.
+    SHEET_RANGE_TOO_LARGE = "QUERY_SHEET_RANGE_TOO_LARGE"
+    #: The spreadsheet's cells could not be read just now.
+    SHEET_UNREADABLE = "QUERY_SHEET_UNREADABLE"
+
+    # Plug-ins.
+
+    #: ``plugin()`` takes a plug-in's public id and an endpoint's name, then
+    #: parameters by name, each a constant or an ``ARRAY`` of them.
+    PLUGIN_ARGUMENTS = "QUERY_PLUGIN_ARGUMENTS"
 
     # Execution.
 
@@ -1168,6 +1207,21 @@ class CalendarMessages:
     # is recorded on the calendar plug-in's install, which is the community's own
     # configuration.
     PLUGIN_INITIATIVE_REQUIRED = "CALENDAR_PLUGIN_INITIATIVE_REQUIRED"
+
+
+class ContactMessages:
+    # A community contact lives inside the community contacts plug-in, which is
+    # what reaches it and what its removal takes with it.
+    PLUGIN_REQUIRED = "CONTACT_COMMUNITY_PLUGIN_REQUIRED"
+    # An installed plug-in creates a contact in an initiative; a community one
+    # is recorded on the community contacts plug-in's install.
+    PLUGIN_INITIATIVE_REQUIRED = "CONTACT_PLUGIN_INITIATIVE_REQUIRED"
+    # Moving a contact into the community's contacts, when it is there already.
+    ALREADY_IN_COMMUNITY = "CONTACT_ALREADY_IN_COMMUNITY"
+    # A phone number is digits and the marks people group them with.
+    PHONE_INVALID = "CONTACT_PHONE_INVALID"
+    # A website is an http or https address.
+    WEBSITE_INVALID = "CONTACT_WEBSITE_INVALID"
 
 
 class CalendarEventMessages:
@@ -1374,12 +1428,6 @@ class MarketplaceRegistryMessages:
     #: A package's terms for a listing are not in the expected format, or name
     #: a combination terms never take. The listing keeps the terms it had.
     TERMS_INVALID = "MARKETPLACE_REGISTRY_TERMS_INVALID"
-
-
-class QueueMessages:
-    NO_ITEMS = "QUEUE_NO_ITEMS"
-    NO_CURRENT_ITEM = "QUEUE_NO_CURRENT_ITEM"
-    ITEM_NOT_HELD = "QUEUE_ITEM_NOT_HELD"
 
 
 class CounterMessages:

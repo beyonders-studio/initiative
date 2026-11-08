@@ -34,7 +34,6 @@ from app.models.tenant.file import File
 from app.models.tenant.initiative import InitiativeMember
 from app.models.tenant.project import Project
 from app.models.tenant.metadata import MetadataType, MetadataValue
-from app.models.tenant.queue import QueueItem
 from app.models.tenant.personal_item import PersonalItem
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.models.tenant.task import TaskAssignee
@@ -48,7 +47,6 @@ from app.services.permissions import (
     granted_scope_clause,
     listing_scope_clause,
     require_access,
-    writable_scope_clause,
 )
 from app.services.tenant import named_people
 from app.services.tenant.archive import archive_entity
@@ -61,8 +59,6 @@ from app.testing import (
     create_project,
     create_property_definition,
     create_property_value,
-    create_queue,
-    create_queue_item,
     create_resource_grant,
     create_task,
     create_user,
@@ -519,7 +515,7 @@ async def test_a_frozen_guild_caps_everyone_at_read(session, role_session, actin
 # A statement confined to one initiative asks nothing: the table's own policy
 # already applied the sharing gate. What is left here is the listing rule for a
 # statement that SPANS initiatives, which is narrower than the policy on
-# purpose, and the writable rule, which is narrower than any read policy.
+# purpose.
 
 
 def _compiled(clause: ColumnElement[bool]) -> str:
@@ -606,29 +602,6 @@ def test_no_standing_at_all_narrows_rather_than_opens():
         _compiled(granted_scope_clause(Tool.project, Project.id, 1, context=None))
         != "true"
     )
-
-
-def test_the_writable_clause_asks_the_gate_when_confined():
-    """Unlike the read listing, this one still has something to ask.
-
-    A read policy admits a row shared at any level, so "which of these may I
-    change" is a narrower question than the one already answered. Confined to
-    one initiative it is the table's own gate, asked at write.
-    """
-    sql = _compiled(
-        writable_scope_clause(
-            Tool.project, Project.id, 1, context=standing(7), initiative_id=3
-        )
-    )
-    assert sql != "true"
-    assert "resource_access(" in sql
-    assert ", true, (SELECT current_standing()" in sql
-
-
-def test_the_writable_clause_spanning_initiatives_asks_the_grants_at_write():
-    sql = _compiled(writable_scope_clause(Tool.project, Project.id, 1, context=None))
-    assert "resource_granted(" in sql
-    assert ", true, (SELECT current_standing()" in sql
 
 
 @pytest.mark.parametrize("tool", list(Tool))
@@ -735,8 +708,8 @@ async def test_only_the_owner_changes_who_it_is_shared_with(
 
 
 async def _named_on(session, initiative, owner, person, **calendar) -> dict:
-    """``person`` named on a task, an event, a person field and a queue item
-    of ``initiative`` (the event on a calendar of the community itself with
+    """``person`` named on a task, an event and a person field of
+    ``initiative`` (the event on a calendar of the community itself with
     ``initiative_id=None``)."""
     project = await create_project(session, initiative, owner)
     task = await create_task(session, project, assignees=[person])
@@ -748,8 +721,6 @@ async def _named_on(session, initiative, owner, person, **calendar) -> dict:
         session, initiative, type=MetadataType.user_reference
     )
     await create_property_value(session, file, field, value_user_id=person.id)
-    queue = await create_queue(session, initiative, owner)
-    item = await create_queue_item(session, queue, user_id=person.id)
     await session.commit()
     return {
         "project": project,
@@ -757,7 +728,6 @@ async def _named_on(session, initiative, owner, person, **calendar) -> dict:
         "task": task.id,
         "event": event.id,
         "file": file.id,
-        "item": item.id,
     }
 
 
@@ -773,9 +743,6 @@ async def _still_named(session, person_id: int, named: dict) -> list[str]:
             CalendarEventAttendee.user_id == person_id,
         ),
         "field": select(MetadataValue).where(MetadataValue.value_user_id == person_id),
-        "queue item": select(QueueItem).where(
-            QueueItem.id == named["item"], QueueItem.user_id == person_id
-        ),
         "grant": select(ResourceGrant).where(ResourceGrant.user_id == person_id),
     }
     return [name for name, q in checks.items() if (await session.exec(q)).first()]
@@ -806,7 +773,7 @@ async def test_leaving_an_initiative_takes_you_off_its_content(
     await s.commit()
 
     assert await _still_named(session, member_id, named) == []
-    # A person field and a queue item stay, with the person cleared.
+    # A person field stays, with the person cleared.
     value = (
         await session.exec(
             select(MetadataValue).where(
@@ -816,7 +783,6 @@ async def test_leaving_an_initiative_takes_you_off_its_content(
         )
     ).one()
     assert value.value_user_id is None
-    assert (await session.get(QueueItem, named["item"])).user_id is None
 
 
 async def test_leaving_the_community_takes_you_off_its_own_content(

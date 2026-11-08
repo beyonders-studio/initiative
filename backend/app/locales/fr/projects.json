@@ -88,7 +88,8 @@
         "location": "Lieu",
         "link": "Lien",
         "amount": "Montant",
-        "cost": "Coût"
+        "cost": "Coût",
+        "design_files": "Fichiers de conception"
       },
       "outlines": {
         "bug": "**Ce qui s’est passé**\n\n\n**Ce qui aurait dû se passer**\n\n\n**Comment le reproduire**\n\n",

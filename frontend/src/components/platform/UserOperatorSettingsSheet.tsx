@@ -29,7 +29,7 @@ import {
   Trash2,
   UserCheck,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -40,20 +40,6 @@ import {
 import { CasePicker } from "@/components/platform/CasePicker";
 import { OperatorDeleteUserDialog } from "@/components/platform/OperatorDeleteUserDialog";
 import { Section, SettingRow } from "@/components/platform/SettingRow";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { useGrantCases } from "@/hooks/useAccessGrants";
 import { useAuth } from "@/hooks/useAuth";
@@ -81,6 +67,16 @@ import { toast } from "@/lib/mascotToast";
 import { Capability, hasAnyCapability } from "@/lib/permissions";
 import { getUserHandle } from "@/lib/userDisplay";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui/sheet";
+import { StatusMessage } from "@/ui/status-message";
+import { Switch } from "@/ui/switch";
+import { Textarea } from "@/ui/textarea";
 
 /** Platform roles ordered least → most privileged. */
 export const PLATFORM_ROLE_ORDER: UserRole[] = [
@@ -135,9 +131,11 @@ const AccountCases = ({ user, open }: { user: OperatorUserRead; open: boolean })
           {t("platformUsers.sheet.cases.count", { count: user.open_case_count })}
         </p>
         {cases.isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("platformUsers.sheet.cases.loading")}</p>
+          <SkeletonRegion>
+            <ListSkeleton rows={2} avatar={false} />
+          </SkeletonRegion>
         ) : cases.isError ? (
-          <p className="text-destructive text-sm">{t("platformUsers.sheet.cases.loadError")}</p>
+          <StatusMessage onRetry={cases.refetch} />
         ) : (
           <ul className="divide-y rounded-md border">
             {(cases.data ?? []).map((item) => (
@@ -209,9 +207,11 @@ export const UserOperatorSettingsSheet = ({
   const grantCases = useGrantCases({ enabled: open && mayNameCase });
   const [caseTaskId, setCaseTaskId] = useState<number | null>(null);
   // A new account starts with no case.
-  useEffect(() => {
+  const [prevUserId, setPrevUserId] = useState(user?.id);
+  if (prevUserId !== user?.id) {
+    setPrevUserId(user?.id);
     setCaseTaskId(null);
-  }, [user?.id]);
+  }
 
   const setUsername = useOperatorSetUsername(
     {
@@ -422,8 +422,11 @@ export const UserOperatorSettingsSheet = ({
           </SheetHeader>
 
           {mayNameCase && (grantCases.data?.items.length ?? 0) > 0 ? (
-            <div className="space-y-1 pt-4">
-              <Label htmlFor="operator-user-case">{t("platformUsers.sheet.forCase")}</Label>
+            <Field
+              label={t("platformUsers.sheet.forCase")}
+              hint={t("platformUsers.sheet.forCaseHelp")}
+              className="space-y-1 pt-4"
+            >
               <CasePicker
                 cases={grantCases.data?.items ?? []}
                 value={caseTaskId}
@@ -432,10 +435,7 @@ export const UserOperatorSettingsSheet = ({
                 loading={grantCases.isLoading}
                 aria-label={t("platformUsers.sheet.forCase")}
               />
-              <p className="text-muted-foreground text-xs">
-                {t("platformUsers.sheet.forCaseHelp")}
-              </p>
-            </div>
+            </Field>
           ) : null}
 
           <div className="space-y-6 py-6">
@@ -789,7 +789,6 @@ export const UserOperatorSettingsSheet = ({
         title={t("platformUsers.suspendTitle", { handle: getUserHandle(user) })}
         description={t("platformUsers.suspendBody")}
         confirmLabel={t("platformUsers.suspend")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={setSuspension.isPending}
@@ -801,15 +800,13 @@ export const UserOperatorSettingsSheet = ({
           })
         }
       >
-        <div className="space-y-2">
-          <Label htmlFor="operator-suspend-reason">{t("platformUsers.suspendReasonLabel")}</Label>
+        <Field label={t("platformUsers.suspendReasonLabel")}>
           <Textarea
-            id="operator-suspend-reason"
             value={suspendReason}
             onChange={(event) => setSuspendReason(event.target.value)}
             rows={3}
           />
-        </div>
+        </Field>
       </ConfirmDialog>
 
       <ConfirmDialog
@@ -821,7 +818,6 @@ export const UserOperatorSettingsSheet = ({
           role: roleConfirm ? platformRoleLabel(roleConfirm, t as TranslateFn) : "",
         })}
         confirmLabel={t("common:confirm")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         isLoading={updateRole.isPending}
         onConfirm={() => roleConfirm && updateRole.mutate({ userId: user.id, role: roleConfirm })}
@@ -835,7 +831,6 @@ export const UserOperatorSettingsSheet = ({
           handle: getUserHandle(user),
         })}
         confirmLabel={t("platformUsers.sheet.avatarRemove")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={removeAvatar.isPending}
@@ -851,7 +846,6 @@ export const UserOperatorSettingsSheet = ({
           count: user.api_key_count,
         })}
         confirmLabel={t("platformUsers.sheet.apiKeysRevoke")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={revokeApiKeys.isPending}
@@ -866,7 +860,6 @@ export const UserOperatorSettingsSheet = ({
           handle: getUserHandle(user),
         })}
         confirmLabel={t("platformUsers.sheet.signOut")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={signOut.isPending}
@@ -879,7 +872,6 @@ export const UserOperatorSettingsSheet = ({
         title={t("platformUsers.resetPassword")}
         description={t("platformUsers.resetDescription", { handle })}
         confirmLabel={t("common:send")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         isLoading={resetPassword.isPending}
         onConfirm={() => resetPassword.mutate(user.id)}
@@ -891,7 +883,6 @@ export const UserOperatorSettingsSheet = ({
         title={t("platformUsers.clearSecondFactor")}
         description={t("platformUsers.clearSecondFactorDescription", { handle })}
         confirmLabel={t("platformUsers.clearSecondFactorConfirm")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={clearSecondFactor.isPending}
@@ -922,7 +913,6 @@ export const UserOperatorSettingsSheet = ({
             : ""
         }
         confirmLabel={t("platformUsers.sheet.clear.button")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={clearField.isPending}

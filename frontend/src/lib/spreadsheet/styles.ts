@@ -16,7 +16,7 @@
 
 import type { CSSProperties } from "react";
 
-import { numberFormat } from "@/lib/intl";
+import { numberFormat } from "@/ui/lib/intl";
 
 import type { CellValue } from "./coords";
 

@@ -1,4 +1,6 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { ProjectSettingsPage } from "@/pages/initiativeTools/projects/ProjectSettingsPage";
 
 /**
  * Layout for one project's settings: the header, the tab bar, and whichever
@@ -8,9 +10,5 @@ import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/projects/$projectId/settings"
 )({
-  component: lazyRouteComponent(() =>
-    import("@/pages/initiativeTools/projects/ProjectSettingsPage").then((m) => ({
-      default: m.ProjectSettingsPage,
-    }))
-  ),
+  component: ProjectSettingsPage,
 });

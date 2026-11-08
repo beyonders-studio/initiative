@@ -4,26 +4,25 @@ Thanks for your interest in contributing! This guide covers what you need to kno
 
 ## Getting Set Up
 
-### One-Click Dev Environment (Recommended)
+### One Command (Recommended)
 
-The project includes a VS Code task configuration that starts everything with a single command:
+You need Docker, [uv](https://docs.astral.sh/uv/) and Node.js 26.12.1+ with pnpm (`corepack enable pnpm`). From a clone, run:
 
-1. **Prerequisites**: Docker, Python 3.10+ venv at `backend/.venv/`, Node.js 26.12.1+ with pnpm, PostgreSQL client tools (`pg_isready`)
-2. **Configure**: Copy `backend/.env.example` to `backend/.env` and set `DATABASE_URL` / `SECRET_KEY`
-3. **Launch**: Open the VS Code Command Palette (`Ctrl+Shift+P`) and run **Tasks: Run Task** → **`dev:setup`**
+```bash
+bash scripts/dev-pre-launch.sh
+```
 
-This will:
-- Start PostgreSQL via Docker
-- Run migrations and create a dev superuser (`admin@example.com` / `changeme`)
-- Seed TTRPG-themed test data (campaigns, quests, NPCs, files, tags)
-- Start the backend (uvicorn) and frontend (Vite) dev servers
-- Open the app in your browser
+It says what's missing if anything is, then:
+- Writes `backend/.env` from `backend/.env.example` with a key of its own, the first time
+- Starts PostgreSQL in Docker (`docker-compose.dev.yml`)
+- Runs migrations and creates the dev owner (`admin@example.com` / `changeme`)
+- Seeds TTRPG-themed test data (campaigns, quests, NPCs, files, tags)
+- Starts the backend (uvicorn) and frontend (Vite) dev servers
+- Opens the app in your browser
 
-When you're done, run **`dev:cleanup`** from the task palette to remove all seeded test data. Stopping the debug session (if launched via F5) also triggers cleanup automatically.
+Press Ctrl+C to stop it; that also removes the seeded data. If something else already listens on port 5432, run it the first time as `POSTGRES_PORT=5433 bash scripts/dev-pre-launch.sh`; later runs use the port in `backend/.env`.
 
-**What gets seeded:**
-
-A realistic, TTRPG-themed dataset that exercises the whole app. See `scripts/seed/` (one module per area, run in order by `scripts/seed_dev_data.py`) for the exact contents.
+In VS Code, the **Dev Environment** launch configuration (F5) starts the same environment under the debugger, and stopping the debug session cleans up the same way.
 
 **Seeded logins** — every account below uses the password **`changeme`**:
 
@@ -33,17 +32,13 @@ A realistic, TTRPG-themed dataset that exercises the whole app. See `scripts/see
 | `user1@example.com` … `user8@example.com` | Regular **guild members** (never guild admins) |
 | `owner@` · `operator@` · `moderator@` · `support@` · `member@example.com` | One user per **platform-role** tier, for exercising the privilege ladder |
 
-The bootstrap owner from your `.env` (`FIRST_OWNER_EMAIL`) is also available with its configured password.
-
-The seeder records the accounts it created in `.vscode/.dev_seed_ids.json` (gitignored). Cleanup does not need it: it drops every community schema and wipes the shared rows.
-
 ### Manual Setup
 
 If you prefer not to use VS Code tasks, you can start each service by hand.
 
 #### Prerequisites
 
-- Python 3.11+
+- Python 3.12+ and [uv](https://docs.astral.sh/uv/)
 - Node.js 26.12.1+ with pnpm
 - PostgreSQL 17
 
@@ -81,33 +76,16 @@ cd frontend
 # Install dependencies
 pnpm install
 
-# Configure API URL (optional, defaults to http://localhost:8000/api/v1)
-echo "VITE_API_URL=http://localhost:8000/api/v1" > .env
-
 # Start development server
 pnpm dev
 # Frontend available at http://localhost:5173
 ```
 
-See the [Key Environment Variables](./README.md#key-environment-variables) section in the README for full configuration options.
+`backend/.env.example` lists every setting; [Configuration](https://beyonders-studio.github.io/initiative/en/running-a-server/configuration/) explains them.
 
-## Running Tests
+## Working in the Code
 
-```bash
-# All backend tests
-cd backend && pytest
-
-# All frontend tests
-cd frontend && pnpm test:run
-
-# Only tests related to files you've changed (vs dev)
-cd backend && ./scripts/test-changed.sh
-cd frontend && ./scripts/test-changed.sh
-
-# Only tests for staged files
-cd backend && ./scripts/test-changed.sh --staged
-cd frontend && ./scripts/test-changed.sh --staged
-```
+[AGENTS.md](AGENTS.md) is the guide to the code for people and coding agents alike: layout, commands, tests, generated API types, migrations, and the rules each part follows. `scripts/ci/check` runs the checks CI runs; the pre-push hook runs it for you.
 
 ## Testing the Android App Against `dev`
 
@@ -118,52 +96,9 @@ The published app only installs updates signed with the release key, so it stays
 
 Install a newer dev APK when `dev` changes native code (a Capacitor plugin, anything under `frontend/android`), since an update can only swap web assets. The two apps share the `initiative://` sign-in link, so Android asks which one to open it with.
 
-The dev app and dev images trust the dev key (`.github/ota-dev-key.pub`); its private half is `OTA_SIGNING_KEY` in the `ota-dev` environment, beside the dev Android keystore. Both are released only to the `dev` branch. The published app never trusts the dev key.
-
-## Code Style
-
-- **Python**: 4-space indent, full type hints, `snake_case` functions, `PascalCase` models/schemas. Lint with `ruff check app`.
-- **TypeScript/React**: `PascalCase` components, `useThing` hooks. Lint with `pnpm lint`.
-
-Both linters must pass before merging.
-
-## Project Layout
-
-- `backend/app/api/` — FastAPI routers
-- `backend/app/models/` — SQLModel domain models
-- `backend/app/schemas/` — Request/response payloads
-- `backend/app/services/` — Business logic
-- `frontend/src/pages/` — Route-level React components
-- `frontend/src/features/` — Feature-specific components and logic
-- `frontend/src/hooks/` — Shared React hooks
-- `frontend/src/api/` — API client and query hooks
-
-Tests are co-located next to source files (`_test.py` for backend, `.test.ts` for frontend). Shared test factories live in `backend/app/testing/` and `frontend/src/__tests__/factories/`.
-
-## Generated API Types
-
-Frontend TypeScript types and React Query hooks are auto-generated from the backend's OpenAPI spec using [Orval](https://orval.dev). The generated files live in `frontend/src/api/generated/` and are committed to the repo.
-
-**When you change backend schemas** (`backend/app/schemas/`), you must regenerate the frontend types:
-
-```bash
-# With the backend running locally:
-cd frontend && pnpm generate:api
-
-# Or without a running backend (export spec directly):
-cd backend && python scripts/export_openapi.py ../frontend/openapi.json
-cd frontend && pnpm orval
-```
-
-Commit the updated generated files alongside your schema changes. CI will fail if generated types are out of date.
-
-**Important:** Do not hand-edit files in `frontend/src/api/generated/` — they will be overwritten on the next generation run.
-
-**Breaking the API.** CI compares the API with the last release's and fails on a change that would break a client written against that release: a removed route or field, a newly required parameter, a narrower type. Run the same check with `scripts/ci/api-compat` (needs Docker and the GitHub CLI). If the break is intended, add the method, path and message it printed to [`backend/api-breaking-changes.md`](backend/api-breaking-changes.md) under the release it ships in, and say why in the pull request. Each release publishes its spec as `openapi.json` on its GitHub release.
-
 ## Submitting Changes
 
-**Agree the shape before you build something new.** A change that adds a new kind of thing (a new option on a model, an enum value, a table, a setting) starts as an issue, and the pull request follows once a maintainer has agreed how it should work. Extend what's already there before adding something beside it: a new way for a task to repeat belongs in the existing repeat rules, not in a second schedule next to them.
+**Agree the shape before you build something new.** A change that adds a new kind of thing (a new option on a model, an enum value, a table, a setting) starts as an issue, and the pull request follows once a maintainer has agreed how it should work.
 
 1. Fork the repo and create a branch from **`dev`**
 2. Make your changes
@@ -173,8 +108,6 @@ Commit the updated generated files alongside your schema changes. CI will fail i
 6. Include screenshots or GIFs for UI changes
 
 **Actions in your fork.** With Actions turned on in a fork, nothing there runs on its own: pushes to the fork's `main` and `dev` and the scheduled runs check nothing, and the workflows that publish images, apps, docs or releases skip. A pull request inside your fork runs CI as it would here, and you can start the nightly (browser journeys included) or the security scan by hand. Your pull request to this repository runs every check it needs here. The checks live in the workflows, so they reach your fork when you sync it; scheduled runs read them from its default branch, so sync that one too if it isn't `dev`.
-
-**Important:** Do not open PRs against `main`. The `main` branch is restricted to project maintainers (@jordandrako, @LeeJMorel) who promote changes from `dev` using the release tooling below. PRs targeting `main` from non-maintainers will be closed.
 
 ## Releases (Maintainers)
 
@@ -190,8 +123,6 @@ Only project maintainers (@jordandrako, @LeeJMorel) have admin access to `main`.
 | `promote/YYYY-MM-DD` | Code-only promotion (no version change) |
 | `hotfix/YYYY-MM-DD` | Cherry-pick urgent fixes to main without a version bump |
 | `rollback/vX.Y.Z` | Revert a bad release |
-
-Contributors open PRs to `dev`. Maintainers promote `dev` to `main` when ready to release.
 
 ### Using `promote.sh`
 
@@ -219,26 +150,9 @@ The `scripts/promote.sh` script handles the full release lifecycle. It validates
 
 ### Post-Merge Automation
 
-When a `release/v*` PR merges to `main`:
+When a `release/v*` PR merges to `main`, **tag-release.yml** creates the `vX.Y.Z` tag. The tag push triggers **docker-publish.yml**, which publishes the image `release-candidate.yml` built and checked for that tree (building and checking one if there is none), attaches the Android APK or desktop installers when `MIN_NATIVE_VERSION` or `MIN_DESKTOP_VERSION` moved, creates the GitHub Release and sends a Discord notification. No manual tagging is required.
 
-1. **tag-release.yml** extracts the version from the branch name and creates a `vX.Y.Z` tag
-2. The tag push triggers **docker-publish.yml** which builds the Docker image, creates a GitHub Release with the Android APK, and sends a Discord notification
-
-No manual tagging is required.
-
-## Database Migrations
-
-When modifying SQLModel classes:
-
-```bash
-cd backend
-
-# Generate migration from model changes
-alembic revision --autogenerate -m "Description of changes"
-
-# Apply pending migrations
-alembic upgrade head
-```
+**Retiring the app update key.** The owners hold a backup key offline, which every installed app already trusts. To retire the release key, set `OTA_SIGNING_KEY` in the `ota-release` environment to the backup private key, then ship an app update whose `frontend/src/lib/otaTrust.ts` replaces the retired public key with a new backup. No APK is needed, and servers do nothing.
 
 ## Mobile App Development
 
@@ -252,20 +166,20 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 # Build the web app and sync to native projects
 cd frontend
 pnpm build:capacitor
-npx cap sync
+pnpm exec cap sync
 
 # Open in Android Studio
-npx cap open android
+pnpm exec cap open android
 
 # Open in Xcode (macOS only)
-npx cap open ios
+pnpm exec cap open ios
 ```
 
 **Requirements:**
 - Android: Android Studio with SDK installed
 - iOS: Xcode on macOS
 
-In the Android emulator the local backend is available at `http://10.0.0.2:8000`.
+In the Android emulator the local backend is available at `http://10.0.2.2:8000`.
 
 ## Desktop App Development
 

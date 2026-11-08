@@ -9,19 +9,10 @@
 import { Trans, useTranslation } from "react-i18next";
 
 import type { InitiativeMemberRead } from "@/api/generated/initiativeAPI.schemas";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useRemoveInitiativeMember } from "@/hooks/useInitiatives";
 import { toast } from "@/lib/mascotToast";
 import { getUserDisplayName } from "@/lib/userDisplay";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 
 export interface RemoveInitiativeMemberDialogProps {
   initiativeId: number;
@@ -48,42 +39,35 @@ export const RemoveInitiativeMemberDialog = ({
   });
 
   return (
-    <AlertDialog open={!!member} onOpenChange={(open) => !open && onOpenChange(null)}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{t("settings.removeMemberTitle")}</AlertDialogTitle>
-          <AlertDialogDescription className="space-y-2">
-            <span className="block">
-              <Trans
-                i18nKey="settings.removeMemberDescription"
-                ns="initiatives"
-                values={{ name: getUserDisplayName(member?.user) }}
-                components={{ bold: <strong /> }}
-              />
-            </span>
-            <span className="block text-destructive">{t("settings.removeMemberWarning")}</span>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={removeMember.isPending}>
-            {t("common:cancel")}
-          </AlertDialogCancel>
-          <AlertDialogAction
-            onClick={() => {
-              if (member) {
-                removeMember.mutate(
-                  { initiativeId, userId: member.user.id },
-                  { onSuccess: () => onOpenChange(null) }
-                );
-              }
-            }}
-            disabled={removeMember.isPending}
-            className="bg-destructive text-white hover:bg-destructive/90"
-          >
-            {removeMember.isPending ? t("settings.removing") : t("settings.removeMember")}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialog
+      open={!!member}
+      onOpenChange={(open) => !open && onOpenChange(null)}
+      title={t("settings.removeMemberTitle")}
+      description={
+        <>
+          <span className="block">
+            <Trans
+              i18nKey="settings.removeMemberDescription"
+              ns="initiatives"
+              values={{ name: getUserDisplayName(member?.user) }}
+              components={{ bold: <strong /> }}
+            />
+          </span>
+          <span className="mt-2 block text-destructive">{t("settings.removeMemberWarning")}</span>
+        </>
+      }
+      confirmLabel={t("settings.removeMember")}
+      loadingLabel={t("settings.removing")}
+      isLoading={removeMember.isPending}
+      destructive
+      onConfirm={() => {
+        if (member) {
+          removeMember.mutate(
+            { initiativeId, userId: member.user.id },
+            { onSuccess: () => onOpenChange(null) }
+          );
+        }
+      }}
+    />
   );
 };

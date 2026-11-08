@@ -1,4 +1,4 @@
-import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 
 import type {
   GetPostTimelineParams,
@@ -19,14 +19,8 @@ import type {
 import { PropertyTarget, Tool } from "@/api/generated/initiativeAPI.schemas";
 import {
   deletePostPoll,
-  getGetPostTimelineQueryKey,
-  getListPostPollVotersQueryKey,
-  getListPostReadersQueryKey,
   getListPostsQueryKey,
-  getPostTimeline,
   getReadPostQueryKey,
-  listPostPollVoters,
-  listPostReaders,
   listPosts,
   markPostsRead,
   markPostUnread,
@@ -34,6 +28,9 @@ import {
   setPostPin,
   setPostPoll,
   updatePost,
+  useGetPostTimeline,
+  useListPostPollVoters,
+  useListPostReaders,
   voteOnPostPoll,
 } from "@/api/generated/posts/posts";
 import { invalidate, patchCachedPost, q } from "@/api/query-keys";
@@ -52,8 +49,6 @@ const posts = TOOL_HOOKS[Tool.post];
 export const usePost = posts.useDetail;
 export const useCreatePost = posts.useCreate;
 export const useUpdatePost = posts.useUpdate;
-export const useDeletePost = posts.useDelete;
-export const useSetPostGrants = posts.useSetGrants;
 
 // ── Queries ─────────────────────────────────────────────────────────────────
 
@@ -85,11 +80,7 @@ export const usePostsFeed = (params?: ListPostsParams) => {
  */
 export const usePostReaders = (postId: number, options?: QueryOpts<PostReaders>) => {
   const communityId = useActiveCommunityId();
-  return useQuery<PostReaders>({
-    queryKey: getListPostReadersQueryKey(communityId, postId),
-    queryFn: () => listPostReaders(communityId, postId),
-    ...options,
-  });
+  return useListPostReaders(communityId, postId, { query: options });
 };
 
 /**
@@ -105,11 +96,7 @@ export const usePostsTimeline = (
   options?: QueryOpts<TimelineResponse>
 ) => {
   const communityId = useActiveCommunityId();
-  return useQuery<TimelineResponse>({
-    queryKey: getGetPostTimelineQueryKey(communityId, params),
-    queryFn: () => getPostTimeline(communityId, params),
-    ...options,
-  });
+  return useGetPostTimeline(communityId, params, { query: options });
 };
 
 // ── Mutations ───────────────────────────────────────────────────────────────
@@ -234,11 +221,7 @@ export const useMarkPostUnread = (options?: MutationOpts<void, number>) =>
  */
 export const usePostPollVoters = (postId: number, options?: QueryOpts<PollVoters>) => {
   const communityId = useActiveCommunityId();
-  return useQuery<PollVoters>({
-    queryKey: getListPostPollVotersQueryKey(communityId, postId),
-    queryFn: () => listPostPollVoters(communityId, postId),
-    ...options,
-  });
+  return useListPostPollVoters(communityId, postId, { query: options });
 };
 
 /**

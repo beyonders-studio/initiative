@@ -4,16 +4,6 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { DateBucket, LayoutGrouping } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useGroupables } from "@/hooks/useTaskGroupings";
 import type { ListLayout } from "@/lib/layouts/draft";
 import { type FieldDef, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
@@ -25,8 +15,13 @@ import {
   MAX_HIDDEN_GROUPS,
   type OfferedGrouping,
 } from "@/lib/layouts/grouping";
-import { cn } from "@/lib/utils";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { Field } from "@/ui/field";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 import type { LayoutEdits } from "./LayoutEditor";
 
@@ -165,13 +160,12 @@ export const LayoutGroupings = ({
           {translate("layouts:groupings.full", { count: MAX_GROUPINGS })}
         </p>
       ) : null}
-      <div className="space-y-1">
-        <Label htmlFor="layout-group-by">{translate("layouts:groupings.startsOn")}</Label>
+      <Field label={translate("layouts:groupings.startsOn")} className="space-y-1">
         <Select
           value={groupBy ?? NOT_GROUPED}
           onValueChange={(value) => change(entries, value === NOT_GROUPED ? null : value)}
         >
-          <SelectTrigger id="layout-group-by">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -183,7 +177,7 @@ export const LayoutGroupings = ({
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </Field>
     </div>
   );
 };

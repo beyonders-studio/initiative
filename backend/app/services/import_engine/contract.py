@@ -35,6 +35,14 @@ class ImportEngineError(CodedError):
     """
 
 
+class ImportRowFailure(SanitizedBaseModel):
+    """A row of a spreadsheet that was left out, and the field that stopped
+    it. ``row`` is the row a spreadsheet shows it on, the header being 1."""
+
+    row: int
+    field: str
+
+
 class EnvelopeImportResult(SanitizedBaseModel):
     """One envelope's apply outcome — JSON-serializable because it is
     persisted verbatim into ``data_jobs.result`` and rendered by the UI."""
@@ -48,9 +56,9 @@ class EnvelopeImportResult(SanitizedBaseModel):
     # Rows that failed inside a partial-success apply (per-event savepoints),
     # by noun — structured so the UI never parses warning strings for counts.
     failed: dict[str, int] = {}
-    # Property definitions that collided by name and were created renamed
-    # (names when known, count always).
-    renamed_properties: list[str] = []
+    # The rows behind ``failed`` where the import reads rows (a spreadsheet).
+    failed_rows: list[ImportRowFailure] = []
+    # Property definitions that collided by name and were created renamed.
     renamed_property_count: int = 0
     # Edges the deferred pass wrote for this envelope, and the ones whose far
     # end was never imported. Zero on every importer that reads no links.

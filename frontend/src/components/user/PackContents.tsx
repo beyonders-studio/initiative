@@ -1,15 +1,9 @@
 import { useTranslation } from "react-i18next";
 
 import type { DecorationPack, OwnedDecoration } from "@/api/generated/initiativeAPI.schemas";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { DecorationSwatch } from "@/components/user/DecorationSwatch";
 import { type Decoration, type DecorationKind, resolveDecoration } from "@/lib/profileDecorations";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
 
 /** The slots, in the order a profile wears them. */
 const SLOTS = ["banner", "frame", "trophy"] as const;

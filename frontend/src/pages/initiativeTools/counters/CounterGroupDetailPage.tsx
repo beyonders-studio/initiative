@@ -1,12 +1,4 @@
-import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
+import { closestCenter, DndContext, type DragEndEvent } from "@dnd-kit/core";
 import {
   rectSortingStrategy,
   SortableContext,
@@ -26,22 +18,9 @@ import { EditCounterDialog } from "@/components/initiativeTools/counters/EditCou
 import { AddItemDialog } from "@/components/layouts/AddItemDialog";
 import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
 import { computeMidpoint } from "@/components/projects/taskOrdering";
-import {
-  CardGridSkeleton,
-  DetailPageSkeleton,
-  SkeletonRegion,
-} from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { ToolChest, ToolChestSegment } from "@/components/tools/ToolChest";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCanonicalInitiativeId } from "@/hooks/useCanonicalInitiativeId";
 import {
@@ -57,6 +36,7 @@ import {
   useUpdateCounter,
   useUpdateCounterGroup,
 } from "@/hooks/useCounters";
+import { useDragSensors } from "@/hooks/useDragSensors";
 import { layoutViewSpec, useListView, viewKey } from "@/hooks/useListView";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
@@ -67,6 +47,15 @@ import { pickRandomCounterColor } from "@/lib/counter-color";
 import { blankCounter, COUNTER_DETAIL, counterReady } from "@/lib/layouts/counterLayout";
 import { toast } from "@/lib/mascotToast";
 import { counterRoute, toolListRoute, toolSettingsRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { CardGridSkeleton, DetailPageSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 /** Where an older release kept a group's rows or grid. */
 const layoutStorageKey = (groupId: number) => `counter-group-${groupId}-layout`;
@@ -82,10 +71,7 @@ export function CounterGroupDetailPage() {
   const groupQuery = useCounterGroup(groupId);
   useToolRealtime(Tool.counter_group, groupId);
 
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { distance: 8 } })
-  );
+  const sensors = useDragSensors();
 
   const updateCounter = useUpdateCounter(groupId ?? 0);
   const setCount = useSetCount(groupId ?? 0);

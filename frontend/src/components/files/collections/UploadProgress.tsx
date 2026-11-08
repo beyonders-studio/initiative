@@ -1,9 +1,9 @@
 import { CheckCircle2, Loader2, X, XCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import type { UploadJob } from "@/hooks/useCollectionUploader";
+import { Button } from "@/ui/button";
+import { Progress } from "@/ui/progress";
 
 interface UploadProgressProps {
   jobs: UploadJob[];

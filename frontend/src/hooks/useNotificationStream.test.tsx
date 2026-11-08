@@ -12,6 +12,7 @@ import type { NotificationListResponse, UserRead } from "@/api/generated/initiat
 import { getListNotificationsQueryKey } from "@/api/generated/notifications/notifications";
 import { q } from "@/api/query-keys";
 import { AuthContext } from "@/hooks/useAuth";
+import { CommunityContext } from "@/hooks/useCommunities";
 import { setAlertHandler } from "@/lib/desktopAlerts";
 import { queryClient } from "@/lib/queryClient";
 
@@ -155,22 +156,29 @@ describe("useNotificationStream", () => {
 
   it("re-reads the account when the server says its standing changed", () => {
     const refreshUser = vi.fn();
-    renderWithProviders(<Probe />, { auth: { refreshUser } });
+    const refreshCommunities = vi.fn().mockResolvedValue([]);
+    renderWithProviders(<Probe />, { auth: { refreshUser }, communities: { refreshCommunities } });
     const socket = latestSocket();
     socket.open();
     // The catch-up on connect pokes every channel; this test is about the frame.
     refreshUser.mockClear();
+    refreshCommunities.mockClear();
     invalidations.mockClear();
 
     socket.receive({ resource: "account", action: "membership", ids: {} });
+    // A community's plan moved: its members' lists carry it.
+    socket.receive({ resource: "account", action: "community", ids: {} });
+    // A change to the account alone leaves the community list as it is.
+    socket.receive({ resource: "account", action: "profile", ids: {} });
 
-    expect(refreshUser).toHaveBeenCalledTimes(1);
+    expect(refreshUser).toHaveBeenCalledTimes(3);
+    expect(refreshCommunities).toHaveBeenCalledTimes(2);
     // Three channels over one socket: none answers for the others.
     expect(timesNamed(q.notifications())).toBe(0);
     expect(timesNamed(q.contactGrants())).toBe(0);
   });
 
-  it("re-reads the contact lists when the server says they moved", () => {
+  it("re-reads the connection lists when the server says they moved", () => {
     const refreshUser = vi.fn();
     renderWithProviders(<Probe />, { auth: { refreshUser } });
     const socket = latestSocket();
@@ -178,7 +186,7 @@ describe("useNotificationStream", () => {
     refreshUser.mockClear();
     invalidations.mockClear();
 
-    socket.receive({ resource: "contacts", action: "changed", ids: {} });
+    socket.receive({ resource: "connections", action: "changed", ids: {} });
 
     // All three move together: accepting a connection opens a channel, and
     // leaving a community closes one.
@@ -227,13 +235,15 @@ describe("useNotificationStream", () => {
 
   it("catches up on both channels after the socket was down", () => {
     const refreshUser = vi.fn();
-    renderWithProviders(<Probe />, { auth: { refreshUser } });
+    const refreshCommunities = vi.fn().mockResolvedValue([]);
+    renderWithProviders(<Probe />, { auth: { refreshUser }, communities: { refreshCommunities } });
 
     latestSocket().open();
 
     // Anything that happened while it was down was never signalled, and that
-    // includes being added to a community.
+    // includes being added to a community or its plan changing.
     expect(refreshUser).toHaveBeenCalledTimes(1);
+    expect(refreshCommunities).toHaveBeenCalledTimes(1);
     expect(timesNamed(q.notifications())).toBe(1);
     expect(timesNamed(q.contactGrants())).toBe(1);
   });
@@ -368,9 +378,14 @@ describe("useNotificationStream", () => {
         loading: false,
         refreshUser: vi.fn(),
       }) as unknown as React.ComponentProps<typeof AuthContext.Provider>["value"];
+    const communities = { refreshCommunities: vi.fn() } as unknown as React.ComponentProps<
+      typeof CommunityContext.Provider
+    >["value"];
     const tree = (user: UserRead) => (
       <AuthContext.Provider value={authValue(user)}>
-        <Probe />
+        <CommunityContext.Provider value={communities}>
+          <Probe />
+        </CommunityContext.Provider>
       </AuthContext.Provider>
     );
 

@@ -12,8 +12,6 @@
     "noMatchingDashboards": "No dashboards match your filters."
   },
   "loading": "Loading dashboards...",
-  "loadError": "Failed to load dashboards.",
-  "loadingDashboard": "Loading dashboard...",
   "creating": "Creating...",
   "notFound": "Dashboard not found",
   "notFoundDescription": "The dashboard you're looking for does not exist or has been removed.",
@@ -46,7 +44,6 @@
   },
   "bindingSource": {
     "query": "SQL query",
-    "sheet_range": "Sheet range",
     "plugin": "Plug-in data"
   },
   "gallery": {
@@ -87,8 +84,6 @@
     "description": "Choose what this widget displays. Dashboards only ever read your data.",
     "widgetTitle": "Title",
     "widgetTitlePlaceholder": "Leave blank to use the widget's own name",
-    "source": "Data source",
-    "choose": "Choose…",
     "preview": "Preview",
     "previewHint": "Your own data, exactly as this widget will draw it.",
     "sectionBinding": "Data",
@@ -98,17 +93,14 @@
     "all_calendar": "All calendars",
     "all_counter_group": "All counter groups",
     "all_counter": "All counters",
-    "all_file": "All spreadsheets",
     "pluginEndpoint": "What it reads",
-    "plugin": "Plug-in",
-    "pluginPlaceholder": "Choose a plug-in",
     "pluginEndpointPlaceholder": "Choose a read…",
     "pluginNotInstalled": "This plug-in is not installed in this community.",
     "pluginParamPlaceholder": "Choose…",
     "pluginParamNeedsSibling": "Choose the value above first.",
     "pluginParamListHint": "Separate values with commas.",
     "all_property": "No metadata or property",
-    "sqlHelp": "A read-only SELECT over this community's data. It runs as you, so it returns what you can already see."
+    "sqlHelp": "A read-only SELECT over this community's data. It runs as you, so it returns what you can already see. sheet('Budget', 'Sheet1!A1:D') reads a range of a spreadsheet, and plugin('acme.shop', 'orders') reads data from a plug-in."
   },
   "picker": {
     "title": "Add a widget",
@@ -136,7 +128,6 @@
     "display": "Display",
     "refresh": "Refresh",
     "open": "Show where this data comes from",
-    "restricted": "Restricted",
     "me": "Me",
     "cappedHint": "More rows match than a widget reads at once, so this shows the first {{count}}.",
     "rows_task_one": "{{count}} task",
@@ -194,7 +185,6 @@
     "absolute": "On a date",
     "relativeDays": "Days from today",
     "relativeHint": "Counts from whenever the dashboard is opened, so it never goes stale.",
-    "loading": "Loading filters…",
     "noFields": "Nothing to filter on here yet.",
     "matchPrefix": "Match",
     "match": "Match all or any",
@@ -238,14 +228,6 @@
     "ilike": "contains",
     "is_null": "is empty"
   },
-  "bindingParam": {
-    "file": "Spreadsheet",
-    "sheet": "Sheet",
-    "range": "Range",
-    "plugin_uid": "Plug-in",
-    "source_id": "Plug-in data source",
-    "sql": "Statement"
-  },
   "slot": {
     "label": "Label",
     "value": "Value",
@@ -262,6 +244,14 @@
   },
   "builder": {
     "dataset": "Show data from",
+    "spreadsheet": "Spreadsheet",
+    "sheet": "Sheet",
+    "firstSheet": "First visible sheet",
+    "range": "Range",
+    "rangeHelp": "Leave it empty for the whole sheet. A:D reads columns A to D, down to the last filled row.",
+    "pluginData": "Plug-in data",
+    "plugin": "Plug-in",
+    "endpoint": "What it reads",
     "columns": "Show",
     "addColumn": "Add a column",
     "removeColumn": "Remove this column",

@@ -36,6 +36,9 @@ class IntakeBindingRead(SanitizedBaseModel):
     #: What the stream allows with whoever filed a case: with ``none`` there
     #: is nobody to wait on, and the status roles mean nothing.
     conversation: Conversation = Conversation.none
+    #: Whether people file into the stream. One nobody files into, which the
+    #: team fills by hand, has no contact address.
+    filed: bool = True
     #: The stream keeps its initiative to itself.
     isolated: bool = False
     #: Another stream lands in the same initiative while one of the two keeps
@@ -67,6 +70,14 @@ class IntakeSettingsRead(SanitizedBaseModel):
     #: Each stream's own contact address, for the streams that have one. A
     #: stream absent here falls back to the general address.
     contact_emails: Dict[IntakeStream, str] = Field(default_factory=dict)
+    #: Whether people here may send feedback to the Initiative team.
+    feedback_enabled: bool
+
+
+class FeedbackSwitchUpdate(SanitizedBaseModel):
+    """Let people here send feedback to the Initiative team, or stop."""
+
+    enabled: bool
 
 
 class IntakeContactUpdate(SanitizedBaseModel):

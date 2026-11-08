@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Loader2, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -15,24 +15,6 @@ import {
 } from "@/components/files/collections/RequiredMetadataDialog";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { ReadyMadeGallery } from "@/components/shared/ReadyMadeGallery";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   useAddCollectionFiles,
   useCollectionShapes,
@@ -43,10 +25,22 @@ import { detailLayoutOf, instanceTarget, useReadToolLayouts } from "@/hooks/useT
 import { COLLECTION_ICON } from "@/lib/collections";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { listFormat } from "@/lib/intl";
 import { requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
 import { toast } from "@/lib/mascotToast";
 import { collectionRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { listFormat } from "@/ui/lib/intl";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 interface AddToCollectionDialogProps {
   initiativeId: number;
@@ -163,15 +157,13 @@ export const AddToCollectionDialog = ({
         {making ? (
           <form onSubmit={submitNew} className="flex min-h-0 flex-1 flex-col">
             <div className="relative min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="new-collection-name">{t("collections.shapes.name")}</Label>
+              <Field label={t("collections.shapes.name")}>
                 <Input
-                  id="new-collection-name"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   maxLength={255}
                 />
-              </div>
+              </Field>
               <ReadyMadeGallery
                 blank={{
                   name: t("collections.shapes.blank"),
@@ -200,15 +192,15 @@ export const AddToCollectionDialog = ({
                 }
               />
               {all.length > 0 ? (
-                <div className="space-y-2">
-                  <Label htmlFor="new-collection-shape-from">
-                    {t("collections.shapes.copyLabel")}
-                  </Label>
+                <Field
+                  label={t("collections.shapes.copyLabel")}
+                  hint={t("collections.shapes.copyHint")}
+                >
                   <Select
                     value={start.kind === "copy" ? String(start.id) : ""}
                     onValueChange={(value) => setStart({ kind: "copy", id: Number(value) })}
                   >
-                    <SelectTrigger id="new-collection-shape-from">
+                    <SelectTrigger>
                       <SelectValue placeholder={t("collections.shapes.copyPlaceholder")} />
                     </SelectTrigger>
                     <SelectContent>
@@ -219,18 +211,14 @@ export const AddToCollectionDialog = ({
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-muted-foreground text-xs">
-                    {t("collections.shapes.copyHint")}
-                  </p>
-                </div>
+                </Field>
               ) : null}
             </div>
             <DialogFooter className="border-t px-5 py-3">
               <Button type="button" variant="ghost" onClick={() => setMaking(false)}>
                 {t("common:back")}
               </Button>
-              <Button type="submit" disabled={!trimmed || create.isPending}>
-                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              <Button type="submit" pending={create.isPending} disabled={!trimmed}>
                 {t("collections.shapes.create")}
               </Button>
             </DialogFooter>

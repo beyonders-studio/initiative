@@ -11,15 +11,9 @@ import { useTranslation } from "react-i18next";
 
 import type { DashboardRead } from "@/api/generated/initiativeAPI.schemas";
 import { DashboardViewMode } from "@/api/generated/initiativeAPI.schemas";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useSetDashboardViewMode } from "@/hooks/useDashboards";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 export function DashboardViewModeField({ dashboard }: { dashboard: DashboardRead }) {
   const { t } = useTranslation("dashboards");

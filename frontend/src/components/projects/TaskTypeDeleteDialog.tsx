@@ -4,13 +4,15 @@
  * says so instead.
  */
 
-import { Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { TaskTypeRead } from "@/api/generated/initiativeAPI.schemas";
+import { byPosition } from "@/components/projects/DefinitionTable";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
-import { Button } from "@/components/ui/button";
+import { useDeleteTaskType, useProjectTaskTypes } from "@/hooks/useProjects";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
 import {
   Dialog,
   DialogContent,
@@ -18,18 +20,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useDeleteTaskType, useProjectTaskTypes } from "@/hooks/useProjects";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** Where a deleted type's tasks go unless the reader picks another: the
  *  project's default, or, when the default is the one going, the first type
@@ -51,10 +44,7 @@ export const TaskTypeDeleteDialog = ({
   const types = useProjectTaskTypes(projectId, { enabled: typeId !== null }).data;
   const target = types?.find((type) => type.id === typeId);
   const others = useMemo(
-    () =>
-      (types ?? [])
-        .filter((type) => type.id !== typeId)
-        .sort((a, b) => a.position - b.position || a.id - b.id),
+    () => byPosition((types ?? []).filter((type) => type.id !== typeId)),
     [types, typeId]
   );
   // The reader's pick holds for the type it was made for.
@@ -85,13 +75,12 @@ export const TaskTypeDeleteDialog = ({
         {isOnlyType ? (
           <p className="text-muted-foreground text-sm">{t("taskTypes.onlyType")}</p>
         ) : (
-          <div className="space-y-2">
-            <Label htmlFor="fallback-task-type">{t("taskTypes.fallbackLabel")}</Label>
+          <Field label={t("taskTypes.fallbackLabel")}>
             <Select
               value={fallbackId}
               onValueChange={(value) => typeId !== null && setPicked({ typeId, value })}
             >
-              <SelectTrigger id="fallback-task-type">
+              <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -102,27 +91,21 @@ export const TaskTypeDeleteDialog = ({
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
         )}
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() =>
-              target &&
-              deleteType.mutate({
-                typeId: target.id,
-                data: { fallback_type_id: Number(fallbackId) },
-              })
-            }
-            disabled={!target || deleteType.isPending || isOnlyType || !fallbackId}
-          >
-            {deleteType.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {t("common:delete")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("common:delete")}
+          onSubmit={() =>
+            target &&
+            deleteType.mutate({
+              typeId: target.id,
+              data: { fallback_type_id: Number(fallbackId) },
+            })
+          }
+          pending={deleteType.isPending}
+          disabled={!target || isOnlyType || !fallbackId}
+          destructive
+        />
       </DialogContent>
     </Dialog>
   );

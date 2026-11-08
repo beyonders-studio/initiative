@@ -2,12 +2,12 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { FileSummary } from "@/api/generated/initiativeAPI.schemas";
-import { Badge } from "@/components/ui/badge";
 import { fileIcon } from "@/lib/fileIcon";
 import { isStoredFileType } from "@/lib/fileTypes";
-import { getFileTypeLabel } from "@/lib/fileUtils";
-import type { AppColumnDef } from "@/lib/table";
 import { getUserDisplayName } from "@/lib/userDisplay";
+import { Badge } from "@/ui/badge";
+import { getFileTypeLabel } from "@/ui/lib/fileUtils";
+import type { AppColumnDef } from "@/ui/lib/table";
 
 /** What kind of file it is: its stored format, or a template or a file of the
  *  app's own. */

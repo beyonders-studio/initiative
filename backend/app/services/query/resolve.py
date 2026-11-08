@@ -12,6 +12,14 @@ model behind them; columns resolve to the field's own column. The statement
 handed back is written out from the parsed tree rather than forwarded, so it
 carries only names the registry produced.
 
+**Read spreadsheets and plug-ins as relations.** ``sheet(file, range)`` in
+``FROM`` names a range of a spreadsheet the way a dataset is named, and
+``plugin(public id, endpoint, name => value, …)`` one of an installed plug-in's
+read endpoints. Their columns are what was read, so a statement that names one
+resolves fully only once its rows are read (:mod:`app.services.query.sheets`,
+:mod:`app.services.query.plugins`); the rows are then bound into the statement
+as one parameter, and nothing of them reaches the SQL text.
+
 **Refuse what is structurally expensive.** A join whose condition pairs nothing
 pairs every row with every row; a statement may name only so many relations.
 Both are answered from the parsed statement, before anything is planned.
@@ -29,22 +37,34 @@ server reads it is what lets the rules below be written against what will run.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from typing import Any
+from datetime import datetime
+from itertools import islice
+from typing import Any, Callable, Mapping, Optional, Sequence
 
 from fastapi import status
 from pglast import ast, parse_sql
 from pglast.enums import A_Expr_Kind, SetOperation
-from pglast.parser import ParseError
+from pglast.parser import ParseError, scan
 from pglast.stream import RawStream
 from pglast.visitors import Visitor
+from sqlalchemy import column as sql_column
 
 from app.core.errors import CodedError
 from app.core.messages import QueryMessages
+from app.core.search import SearchEntityType
+from app.core.tools import Tool
 from app.db import gucs
 from app.services.fields import dataset
 from app.services.fields.registry import dataset_names
-from app.services.fields.spec import ControlKind, FieldType
+from app.services.fields.spec import (
+    ControlKind,
+    Dataset,
+    FieldSpec,
+    FieldType,
+    column,
+)
 
 #: ``EXPLAIN``'s options, as the grammar spells them.
 _EXPLAIN_JSON = (ast.DefElem(defname="format", arg=ast.String(sval="json")),)
@@ -75,6 +95,213 @@ class QueryError(CodedError):
         return f"{self.code}: {self.subject}" if self.subject else self.code
 
 
+#: The functions a statement reads a spreadsheet and a plug-in with, and the
+#: name each is read under when the call gives itself no alias, as Postgres
+#: names a function in ``FROM`` after itself.
+SHEET = "sheet"
+PLUGIN = "plugin"
+
+#: What each type a range's column may hold is in the statement: the control
+#: that filters it, and the Postgres type its cells are read as.
+_SHEET_TYPES: dict[str, tuple[ControlKind, str]] = {
+    "number": (ControlKind.number, "numeric"),
+    "date": (ControlKind.date, "date"),
+    "datetime": (ControlKind.date, "timestamp"),
+    "boolean": (ControlKind.boolean, "boolean"),
+    "text": (ControlKind.text, "text"),
+}
+
+
+#: The same for each type a plug-in endpoint's return may declare.
+_PLUGIN_TYPES: dict[str, tuple[ControlKind, str]] = {
+    "bool": _SHEET_TYPES["boolean"],
+    "datetime": (ControlKind.date, "timestamptz"),
+    "int": _SHEET_TYPES["number"],
+    "string": _SHEET_TYPES["text"],
+    "url": _SHEET_TYPES["text"],
+}
+
+
+@dataclass(frozen=True)
+class SheetCall:
+    """``sheet(file, range)`` as a statement wrote it: the spreadsheet by id or
+    by name, and the range, or none for the first visible sheet."""
+
+    file: int | str
+    range: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class PluginCall:
+    """``plugin(public id, endpoint, name => value, …)`` as a statement wrote
+    it: the plug-in by its public id, its read endpoint by the name after the
+    plug-in's prefix, and the parameters, by name. A list parameter's values
+    are a tuple."""
+
+    plugin: str
+    endpoint: str
+    params: tuple[tuple[str, Any], ...] = ()
+
+    @property
+    def endpoint_id(self) -> str:
+        """The endpoint's id, as the plug-in's manifest declares it."""
+        return f"plugin.{self.plugin}.{self.endpoint}"
+
+
+class _SheetNames(dict):
+    """A recordset's columns by name, matched ignoring case.
+
+    A name two columns share is refused when a statement names it. A
+    recordset not read yet holds every name, as text, so a statement can be
+    checked before its rows are read.
+    """
+
+    def __init__(self, fields: Sequence[FieldSpec], read: bool) -> None:
+        super().__init__()
+        self.read = read
+        self.shared: set[str] = set()
+        for spec in fields:
+            key = spec.name.lower()
+            if dict.__contains__(self, key):
+                self.shared.add(key)
+            dict.__setitem__(self, key, spec)
+
+    def __contains__(self, key: object) -> bool:
+        return not self.read or (
+            isinstance(key, str) and dict.__contains__(self, key.lower())
+        )
+
+    def get(self, key: Any, default: Any = None, /) -> Any:
+        if not self.read:
+            return column(key, sql_column(key), kind=ControlKind.text)
+        if key.lower() in self.shared:
+            raise QueryError(QueryMessages.AMBIGUOUS_FIELD, key)
+        return dict.get(self, key.lower(), default)
+
+
+@dataclass(frozen=True)
+class Recordset(Dataset):
+    """Rows a statement reads that are not a table's, as a dataset it names.
+
+    Each column is read as ``c1``, ``c2``, … of the recordset the rows are
+    bound into, so a name a column was given never reaches the SQL.
+    """
+
+    call: Any = None
+    #: The Postgres type each column's values are read as, in order.
+    types: tuple[str, ...] = ()
+    rows: tuple[tuple[Any, ...], ...] = ()
+    #: Whether the rows were read. A statement is checked before they are, and
+    #: runs only after.
+    read: bool = True
+
+    @property
+    def by_name(self) -> dict[str, FieldSpec]:
+        return _SheetNames(self.fields, self.read)
+
+    @property
+    def offered(self) -> tuple[FieldSpec, ...]:
+        """Every column, in order."""
+        return self.fields
+
+
+def _columns(
+    names: Sequence[str], kinds: Sequence[ControlKind]
+) -> tuple[FieldSpec, ...]:
+    return tuple(
+        column(str(name), sql_column(f"c{index}"), kind=kind, sortable=True)
+        for index, (name, kind) in enumerate(zip(names, kinds), start=1)
+    )
+
+
+@dataclass(frozen=True)
+class Sheet(Recordset):
+    """A range of a spreadsheet: its columns named by its header row or by
+    their letters. Governed by the files tool, whose rows it is read from."""
+
+    #: The workbook's visible sheets, for somebody picking one.
+    sheet_names: tuple[str, ...] = ()
+
+    @classmethod
+    def unread(cls, call: SheetCall) -> "Sheet":
+        return cls(model=None, fields=(), tool=Tool.file, call=call, read=False)
+
+    @classmethod
+    def from_range(cls, call: SheetCall, answer: Mapping[str, Any]) -> "Sheet":
+        """The sheet a range read (``lib/spreadsheet/range.ts``)."""
+        columns = answer.get("columns") or ()
+        kinds = [_SHEET_TYPES[entry["type"]] for entry in columns]
+        return cls(
+            model=None,
+            fields=_columns(
+                [entry["name"] for entry in columns], [kind for kind, _ in kinds]
+            ),
+            tool=Tool.file,
+            call=call,
+            types=tuple(postgres for _, postgres in kinds),
+            rows=tuple(tuple(row) for row in answer.get("rows") or ()),
+            sheet_names=tuple(answer.get("sheets") or ()),
+        )
+
+
+def _plugin_value(value: Any, postgres: str) -> Any:
+    """One value a plug-in answered with, as its column reads it: ``None``
+    where it is not of the column's type."""
+    if value is None:
+        return None
+    if postgres == "boolean":
+        return value if isinstance(value, bool) else None
+    if postgres == "numeric":
+        return (
+            value
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
+            else None
+        )
+    if postgres == "timestamptz":
+        try:
+            datetime.fromisoformat(value)
+        except (TypeError, ValueError):
+            return None
+        return value
+    return value if isinstance(value, str) else json.dumps(value)
+
+
+@dataclass(frozen=True)
+class PluginRows(Recordset):
+    """The rows one of a plug-in's read endpoints answered with: a column for
+    each return it declares as a list, named by its key."""
+
+    @classmethod
+    def unread(cls, call: PluginCall) -> "PluginRows":
+        return cls(
+            model=None, fields=(), name_override="plugins", call=call, read=False
+        )
+
+    @classmethod
+    def from_rows(
+        cls,
+        call: PluginCall,
+        columns: Sequence[tuple[str, str]],
+        rows: Sequence[Mapping[str, Any]],
+    ) -> "PluginRows":
+        """The rows, under *columns*: each return's key and declared type."""
+        kinds = [_PLUGIN_TYPES.get(kind, _SHEET_TYPES["text"]) for _, kind in columns]
+        return cls(
+            model=None,
+            fields=_columns([key for key, _ in columns], [kind for kind, _ in kinds]),
+            name_override="plugins",
+            call=call,
+            types=tuple(postgres for _, postgres in kinds),
+            rows=tuple(
+                tuple(
+                    _plugin_value(row.get(key), postgres)
+                    for (key, _), (_, postgres) in zip(columns, kinds)
+                )
+                for row in rows
+            ),
+        )
+
+
 @dataclass(frozen=True)
 class ResolvedQuery:
     """A statement built from declared names, ready to be planned."""
@@ -100,6 +327,34 @@ class ResolvedQuery:
     #: thing in the language that makes a statement answer differently per
     #: person.
     names_the_reader: bool = False
+    #: The spreadsheets and plug-ins the statement reads, by the name each is
+    #: read under. Until every one is :attr:`Recordset.read`, the statement is
+    #: checked but not runnable.
+    sheets: tuple[tuple[str, Sheet], ...] = ()
+    plugins: tuple[tuple[str, PluginRows], ...] = ()
+    #: The statement as written, kept while it has rows to read: once they are
+    #: read it is resolved again with what they read.
+    source: str = ""
+
+    @property
+    def unread(self) -> tuple[SheetCall | PluginCall, ...]:
+        """The calls whose rows still have to be read before it runs."""
+        return tuple(
+            dict.fromkeys(
+                recordset.call
+                for _, recordset in (*self.sheets, *self.plugins)
+                if not recordset.read
+            )
+        )
+
+    @property
+    def read(self) -> dict[Any, Recordset]:
+        """What the calls already read, by call."""
+        return {
+            recordset.call: recordset
+            for _, recordset in (*self.sheets, *self.plugins)
+            if recordset.read
+        }
 
     def explain(self) -> str:
         """This statement, asking for its plan instead of its rows.
@@ -259,14 +514,16 @@ def _physical_table(dataset_name: str) -> tuple[str | None, str]:
     return table.schema, table.name
 
 
-def _physical_column(dataset_name: str, field_name: str) -> str:
-    spec = dataset(dataset_name).by_name.get(field_name)
+def _physical_column(source: Dataset, field_name: str) -> str:
+    spec = source.by_name.get(field_name)
     if spec is None:
-        raise QueryError(QueryMessages.UNKNOWN_FIELD, f"{dataset_name}.{field_name}")
+        raise QueryError(QueryMessages.UNKNOWN_FIELD, f"{source.name}.{field_name}")
     if spec.column is None:
         raise QueryError(
-            QueryMessages.FIELD_NOT_SELECTABLE, f"{dataset_name}.{field_name}"
+            QueryMessages.FIELD_NOT_SELECTABLE, f"{source.name}.{field_name}"
         )
+    if isinstance(source, Recordset):
+        return spec.column.name
     return spec.column.property.columns[0].name
 
 
@@ -303,6 +560,130 @@ def _check_select_shape(select: ast.SelectStmt) -> None:
             # An output column called ``me`` would make ``order by me`` mean
             # two things, and the word already means one.
             raise QueryError(QueryMessages.RESERVED_NAME, VIEWER)
+
+
+def _swap(node: Any, swaps: Mapping[int, ast.Node]) -> Any:
+    """*node*, with the relations in *swaps* replaced wherever a join holds
+    them."""
+    if id(node) in swaps:
+        return swaps[id(node)]
+    if isinstance(node, ast.JoinExpr):
+        node.larg = _swap(node.larg, swaps)
+        node.rarg = _swap(node.rarg, swaps)
+    return node
+
+
+def _sheet_call(args: Sequence[Any]) -> SheetCall:
+    """``sheet()``'s arguments: the file, and the range if there is one."""
+    values = [
+        _value(arg) for arg in args if isinstance(arg, ast.A_Const) and not arg.isnull
+    ]
+    if (
+        not 1 <= len(args) <= 2
+        or len(values) != len(args)
+        or isinstance(values[0], (bool, float))
+        or (len(values) == 2 and not isinstance(values[1], str))
+    ):
+        raise QueryError(QueryMessages.SHEET_ARGUMENTS, SHEET)
+    return SheetCall(file=values[0], range=values[1] if len(values) == 2 else None)
+
+
+def _plugin_call(args: Sequence[Any]) -> PluginCall:
+    """``plugin()``'s arguments: the plug-in's public id and the endpoint's
+    name, then its parameters by name, each a constant or an ``ARRAY`` of
+    them."""
+
+    def constant(node: Any, *, listed: bool = False) -> Any:
+        if isinstance(node, ast.A_Const) and not node.isnull:
+            return _value(node)
+        if listed and isinstance(node, ast.A_ArrayExpr) and node.elements:
+            return tuple(constant(element) for element in node.elements)
+        raise QueryError(QueryMessages.PLUGIN_ARGUMENTS, PLUGIN)
+
+    named = [arg for arg in args[2:] if isinstance(arg, ast.NamedArgExpr)]
+    if len(args) < 2 or len(named) != len(args) - 2:
+        raise QueryError(QueryMessages.PLUGIN_ARGUMENTS, PLUGIN)
+    plugin, endpoint = (constant(arg) for arg in args[:2])
+    params = {arg.name: constant(arg.arg, listed=True) for arg in named}
+    if (
+        not isinstance(plugin, str)
+        or not isinstance(endpoint, str)
+        or len(params) != len(named)
+    ):
+        raise QueryError(QueryMessages.PLUGIN_ARGUMENTS, PLUGIN)
+    return PluginCall(plugin, endpoint, tuple(sorted(params.items())))
+
+
+def _take_calls(
+    select: ast.SelectStmt,
+) -> dict[int, tuple[str, SheetCall | PluginCall]]:
+    """The ``sheet()`` and ``plugin()`` calls in ``FROM``, each replaced by a
+    relation named after its function under the call's own alias, so the rest
+    of the statement is read the way any other is. Keyed by that relation,
+    which is how the call is found again once its rows are read, with the
+    handle it is read under.
+
+    They are the only functions ``FROM`` takes, called plainly with constants.
+    """
+    calls: dict[int, tuple[str, SheetCall | PluginCall]] = {}
+    swaps: dict[int, ast.Node] = {}
+
+    def walk(node: Any) -> None:
+        if isinstance(node, ast.JoinExpr):
+            walk(node.larg)
+            walk(node.rarg)
+        if not isinstance(node, ast.RangeFunction):
+            return
+        functions: tuple[Any, ...] = node.functions or ()
+        for flag, name in (
+            (node.lateral, "LATERAL"),
+            (node.ordinality, "WITH ORDINALITY"),
+            (node.is_rowsfrom or len(functions) != 1, "ROWS FROM"),
+            (node.coldeflist or (node.alias and node.alias.colnames), "column list"),
+        ):
+            if flag:
+                raise QueryError(QueryMessages.UNSUPPORTED_SYNTAX, name)
+        call, definitions = functions[0]
+        names = _name_parts(call.funcname) if isinstance(call, ast.FuncCall) else []
+        if names not in ([SHEET], [PLUGIN]):
+            raise QueryError(
+                QueryMessages.UNSUPPORTED_FUNCTION,
+                ".".join(names) or type(call).__name__,
+            )
+        name = names[0]
+        if (
+            definitions
+            or call.agg_star
+            or call.agg_distinct
+            or call.func_variadic
+            or call.agg_order is not None
+            or call.agg_filter is not None
+            or call.over is not None
+        ):
+            raise QueryError(
+                QueryMessages.SHEET_ARGUMENTS
+                if name == SHEET
+                else QueryMessages.PLUGIN_ARGUMENTS,
+                name,
+            )
+        args = tuple(call.args or ())
+        handle = node.alias.aliasname if node.alias else name
+        standing = ast.RangeVar(
+            relname=name, inh=True, alias=ast.Alias(aliasname=handle)
+        )
+        calls[id(standing)] = (
+            handle,
+            _sheet_call(args) if name == SHEET else _plugin_call(args),
+        )
+        swaps[id(node)] = standing
+
+    for node in select.fromClause or ():
+        walk(node)
+    if swaps:
+        select.fromClause = tuple(
+            _swap(node, swaps) for node in select.fromClause or ()
+        )
+    return calls
 
 
 def _column_refs(node: Any) -> list[ast.ColumnRef]:
@@ -408,12 +789,18 @@ def _expand_relations(select: ast.SelectStmt) -> None:
     select.fromClause = (node,)
 
 
-def _relations(select: ast.SelectStmt) -> dict[str, str]:
+def _relations(
+    select: ast.SelectStmt, recordsets: Mapping[int, Recordset] | None = None
+) -> dict[str, Dataset]:
     """The relations in scope, by the name a column may qualify with.
 
-    Rewrites each to the table behind it as it goes, so the tree carries
-    physical names by the time it is written out.
+    Rewrites each dataset to the table behind it as it goes, so the tree
+    carries physical names by the time it is written out. *recordsets* holds the
+    relations :func:`_take_calls` stood in for ``sheet()`` and ``plugin()``
+    calls, and what
+    each read.
     """
+    recordsets = recordsets or {}
     if not select.fromClause:
         raise QueryError(QueryMessages.MISSING_RELATION)
     if len(select.fromClause) > 1:
@@ -421,7 +808,7 @@ def _relations(select: ast.SelectStmt) -> dict[str, str]:
         raise QueryError(QueryMessages.JOIN_WITHOUT_CONDITION, "FROM")
 
     known = set(dataset_names())
-    scope: dict[str, str] = {}
+    scope: dict[str, Dataset] = {}
 
     # Each join, with the relations on either side of it. A join is bound by a
     # condition relating what it *adds* to what was already there, so knowing
@@ -443,14 +830,18 @@ def _relations(select: ast.SelectStmt) -> dict[str, str]:
             raise QueryError(QueryMessages.UNSUPPORTED_SYNTAX, type(node).__name__)
         if node.schemaname or node.catalogname:
             raise QueryError(QueryMessages.QUALIFIED_RELATION, node.relname)
-        if node.relname not in known:
+        recordset = recordsets.get(id(node))
+        if recordset is None and node.relname not in known:
             raise QueryError(QueryMessages.UNKNOWN_RELATION, node.relname)
         handle = node.alias.aliasname if node.alias else node.relname
         if handle == VIEWER:
             raise QueryError(QueryMessages.RESERVED_NAME, VIEWER)
         if handle in scope:
             raise QueryError(QueryMessages.DUPLICATE_ALIAS, handle)
-        scope[handle] = node.relname
+        if recordset is not None:
+            scope[handle] = recordset
+            return {handle}
+        scope[handle] = dataset(node.relname)
         node.schemaname, node.relname = _physical_table(node.relname)
         return {handle}
 
@@ -536,7 +927,9 @@ def _check_nodes(select: ast.SelectStmt) -> None:
     Check()(select)
 
 
-def _alias_ordinals(select: ast.SelectStmt, scope: dict[str, str]) -> dict[int, int]:
+def _alias_ordinals(
+    select: ast.SelectStmt, scope: dict[str, Dataset]
+) -> dict[int, int]:
     """The names that are an output column, and the position of that column.
 
     Postgres reads a name as an output column in two places only: standing
@@ -567,7 +960,7 @@ def _alias_ordinals(select: ast.SelectStmt, scope: dict[str, str]) -> dict[int, 
     for entry in select.groupClause or ():
         named = output(entry)
         if named is not None and not any(
-            named[1] in dataset(name).by_name for name in scope.values()
+            named[1] in source.by_name for source in scope.values()
         ):
             found.append(named)
 
@@ -579,22 +972,33 @@ def _alias_ordinals(select: ast.SelectStmt, scope: dict[str, str]) -> dict[int, 
     return ordinals
 
 
-def _holder(scope: dict[str, str], field_name: str) -> str | None:
-    """The dataset in scope that has this field, where exactly one does.
+def _holder(scope: dict[str, Dataset], field_name: str) -> str | None:
+    """The relation in scope that has this field, where exactly one does, by
+    its handle.
 
     An unqualified name is resolved the way the server resolves one: against
     whichever relation actually has it. ``None`` where none does or more than
     one does — the caller says which of those it is.
 
     Counted per relation in scope, not per dataset: the same table joined to
-    itself is two relations, and a bare column of it names both.
+    itself is two relations, and a bare column of it names both. A recordset
+    not read yet holds every name, so it holds one only when nothing read does.
     """
-    holders = [name for name in scope.values() if field_name in dataset(name).by_name]
-    return holders[0] if len(holders) == 1 else None
+    holders = [
+        handle for handle, source in scope.items() if field_name in source.by_name
+    ]
+    read = [
+        handle
+        for handle in holders
+        if not (isinstance(scope[handle], Recordset) and not scope[handle].read)
+    ]
+    if read:
+        return read[0] if len(read) == 1 else None
+    return holders[0] if holders else None
 
 
 def _output_types(
-    select: ast.SelectStmt, scope: dict[str, str]
+    select: ast.SelectStmt, scope: dict[str, Dataset]
 ) -> tuple[FieldType | None, ...]:
     """What the registry calls each output column.
 
@@ -636,29 +1040,40 @@ def _target_grain(target: ast.ResTarget) -> str | None:
     return unit.lower() if isinstance(unit, str) and unit.lower() in GRAINS else None
 
 
-def _target_type(target: ast.ResTarget, scope: dict[str, str]) -> FieldType | None:
-    spec = _target_spec(target, scope)
+def _target_type(target: ast.ResTarget, scope: dict[str, Dataset]) -> FieldType | None:
+    spec = _field_named(scope, target.val)
     return spec.type if spec is not None else None
 
 
-def _target_spec(target: ast.ResTarget, scope: dict[str, str]) -> Any:
-    """The field an output target is, or ``None`` when it is built from one."""
-    if not isinstance(target.val, ast.ColumnRef):
+def _field_named(scope: dict[str, Dataset], node: Any) -> Any:
+    """The field a column reference names, or ``None`` when it is not one."""
+    if not isinstance(node, ast.ColumnRef):
         return None
-    names = _name_parts(target.val.fields)
+    names = _name_parts(node.fields)
     if len(names) == 2:
-        dataset_name, field_name = scope.get(names[0]), names[1]
+        handle, field_name = names[0], names[1]
     elif len(names) == 1:
-        dataset_name, field_name = _holder(scope, names[0]), names[0]
+        handle, field_name = _holder(scope, names[0]), names[0]
     else:
         return None
-    if dataset_name is None:
-        return None
-    return dataset(dataset_name).by_name.get(field_name)
+    source = scope.get(handle) if handle is not None else None
+    return source.by_name.get(field_name) if source is not None else None
 
 
-def _resolve_columns(select: ast.SelectStmt, scope: dict[str, str]) -> None:
+def _resolve_columns(select: ast.SelectStmt, scope: dict[str, Dataset]) -> None:
     ordinals = _alias_ordinals(select, scope)
+    for target in select.targetList or ():
+        # A recordset's column is read as ``c1``, so an output that is one
+        # keeps the name it was given.
+        if not isinstance(target, ast.ResTarget) or target.name is not None:
+            continue
+        names = _name_parts(getattr(target.val, "fields", None))
+        handle = names[0] if len(names) == 2 else None
+        if len(names) == 1:
+            handle = _holder(scope, names[0])
+        spec = _field_named(scope, target.val)
+        if spec is not None and isinstance(scope.get(handle or ""), Recordset):
+            target.name = spec.name
 
     class Resolve(Visitor):
         def visit_ColumnRef(self, ancestors: Any, node: ast.ColumnRef) -> Any:
@@ -668,10 +1083,10 @@ def _resolve_columns(select: ast.SelectStmt, scope: dict[str, str]) -> None:
             if len(names) > 2:
                 raise QueryError(QueryMessages.QUALIFIED_RELATION, ".".join(names))
             if len(names) == 2:
-                dataset_name = scope.get(names[0])
-                if dataset_name is None:
+                source = scope.get(names[0])
+                if source is None:
                     raise QueryError(QueryMessages.UNKNOWN_RELATION, names[0])
-                column = _physical_column(dataset_name, names[1])
+                column = _physical_column(source, names[1])
                 node.fields = (ast.String(sval=names[0]), ast.String(sval=column))
                 return
             if names[0] == VIEWER:
@@ -686,16 +1101,24 @@ def _resolve_columns(select: ast.SelectStmt, scope: dict[str, str]) -> None:
             if holder is None:
                 # Nothing in scope has it, or more than one does. Which of
                 # those it is decides what the reader has to change.
-                known = any(
-                    names[0] in dataset(name).by_name for name in scope.values()
-                )
+                known = any(names[0] in source.by_name for source in scope.values())
                 raise QueryError(
                     QueryMessages.AMBIGUOUS_FIELD
                     if known
                     else QueryMessages.UNKNOWN_FIELD,
                     names[0],
                 )
-            node.fields = (ast.String(sval=_physical_column(holder, names[0])),)
+            column = _physical_column(scope[holder], names[0])
+            # A recordset's columns are all named ``c<n>``, so one is always
+            # written with the handle it is read under.
+            node.fields = tuple(
+                ast.String(sval=part)
+                for part in (
+                    (holder, column)
+                    if isinstance(scope[holder], Recordset)
+                    else (column,)
+                )
+            )
 
     Resolve()(select)
 
@@ -704,29 +1127,18 @@ def _is_viewer(node: Any) -> bool:
     return isinstance(node, ast.ColumnRef) and _name_parts(node.fields) == [VIEWER]
 
 
-def _holds_a_person(node: Any, scope: dict[str, str]) -> bool:
+def _holds_a_person(node: Any, scope: dict[str, Dataset]) -> bool:
     """Whether *node* is a field that holds a person.
 
     Read by the name the reader wrote, so this is asked before the names are
     rewritten — the registry answers about ``assignee.id``, not about whatever
     column the members view keeps it in.
     """
-    if not isinstance(node, ast.ColumnRef):
-        return False
-    names = _name_parts(node.fields)
-    if len(names) == 2:
-        dataset_name, field_name = scope.get(names[0]), names[1]
-    elif len(names) == 1:
-        dataset_name, field_name = _holder(scope, names[0]), names[0]
-    else:
-        return False
-    if dataset_name is None:
-        return False
-    spec = dataset(dataset_name).by_name.get(field_name)
+    spec = _field_named(scope, node)
     return spec is not None and spec.kind is ControlKind.member
 
 
-def _check_viewer(select: ast.SelectStmt, scope: dict[str, str]) -> None:
+def _check_viewer(select: ast.SelectStmt, scope: dict[str, Dataset]) -> None:
     """That ``me`` is somewhere it means something.
 
     The reader is a person, so the only thing to say about them is which person
@@ -963,26 +1375,169 @@ def _value(node: ast.A_Const) -> Any:
     raise QueryError(QueryMessages.UNSUPPORTED_SYNTAX, type(held).__name__)
 
 
-def resolve(sql: str) -> ResolvedQuery:
+def resolve(
+    sql: str, read: Mapping[SheetCall | PluginCall, Recordset] | None = None
+) -> ResolvedQuery:
     """Read *sql*, and return the statement this surface will run instead.
+
+    *read* holds what each ``sheet()`` and ``plugin()`` call read. A call it
+    does not hold is left unread: its columns are taken on trust and the
+    statement is checked but not runnable (:attr:`ResolvedQuery.unread`).
 
     Raises :class:`QueryError` naming what has to change.
     """
     select = _parse(sql)
+    calls = _take_calls(select)
+    recordsets = {key: _read_by(read, call) for key, (_, call) in calls.items()}
     _check_nodes(select)
     _expand_relations(select)
-    scope = _relations(select)
+    scope = _relations(select, recordsets)
     column_types = _output_types(select, scope)
     column_grains = _output_grains(select)
     _check_viewer(select, scope)
     _resolve_columns(select, scope)
-    parameters = _bind_literals(select)
+    parameters = list(_bind_literals(select))
     names_the_reader = _resolve_viewer(select)
+    # A read recordset is its rows, bound as one parameter and read as a
+    # recordset of ``c1``, ``c2``, … typed as its columns. An empty one is one
+    # column and no rows.
+    swaps: dict[int, ast.Node] = {}
+    for key, recordset in recordsets.items():
+        if not recordset.read:
+            continue
+        parameters.append(
+            json.dumps(
+                [
+                    {f"c{index}": value for index, value in enumerate(row, start=1)}
+                    for row in recordset.rows
+                ]
+            )
+        )
+        columns = ", ".join(
+            f"c{index} {postgres}"
+            for index, postgres in enumerate(recordset.types or ("text",), start=1)
+        )
+        bound = parse_sql(
+            f"SELECT FROM pg_catalog.json_to_recordset(${len(parameters)}) "
+            f"AS h({columns})"
+        )[0].stmt.fromClause[0]
+        bound.alias.aliasname = calls[key][0]
+        swaps[key] = bound
+    if swaps:
+        select.fromClause = tuple(
+            _swap(node, swaps) for node in select.fromClause or ()
+        )
+    named = [(calls[key][0], recordset) for key, recordset in recordsets.items()]
     return ResolvedQuery(
         sql=RawStream()(select),
-        parameters=parameters,
-        relations=tuple(sorted(set(scope.values()))),
+        parameters=tuple(parameters),
+        relations=tuple(sorted({source.name for source in scope.values()})),
         column_types=column_types,
         column_grains=column_grains,
         names_the_reader=names_the_reader,
+        sheets=tuple(entry for entry in named if isinstance(entry[1], Sheet)),
+        plugins=tuple(entry for entry in named if isinstance(entry[1], PluginRows)),
+        source=sql if any(not entry.read for entry in recordsets.values()) else "",
     )
+
+
+def _read_by(
+    read: Mapping[SheetCall | PluginCall, Recordset] | None,
+    call: SheetCall | PluginCall,
+) -> Recordset:
+    """What *call* read, or the call unread."""
+    found = (read or {}).get(call)
+    if found is not None:
+        return found
+    return (
+        Sheet.unread(call) if isinstance(call, SheetCall) else PluginRows.unread(call)
+    )
+
+
+def remap_ids(sql: str, remap: Callable[[SearchEntityType, int], int]) -> str:
+    """*sql*, with each row id it names as a constant put through *remap*.
+
+    A constant names a row where it is compared with ``=``, ``<>`` or ``IN`` to
+    a column that is a table's own id or a key into one, and where it is the
+    file ``sheet()`` reads; the row is of the kind that table holds
+    (:data:`~app.db.search_index.SEARCH_SOURCES`), so a person, who is not one,
+    is left alone. Each constant is replaced where it is written, so the rest
+    of the text, comments included, stays as it was. A statement that does not
+    resolve, and a constant written in a shape this does not read (a cast, a
+    comparison with the constant first), come back unchanged.
+    """
+    from app.db.search_index import SEARCH_SOURCES
+
+    numbers = [token for token in scan(sql) if token.name == "ICONST"]
+    # Where each constant to replace starts, its kind, and its value: found by
+    # what it is written after, since a parsed constant keeps no position.
+    found: list[tuple[int, SearchEntityType, int]] = []
+
+    def after(location: Any, values: Sequence[Any], kind: SearchEntityType) -> None:
+        if not isinstance(location, int):
+            # A join the resolver wrote in, which nobody typed.
+            return
+        # Each integer a value holds is written as one number token, in order,
+        # so a value takes as many tokens as it holds integers, and only a
+        # value that is one integer names a row.
+        tokens = iter([token for token in numbers if token.start > location])
+        for value in values:
+            held = 0
+
+            class Count(Visitor):
+                def visit_A_Const(self, ancestors: Any, constant: ast.A_Const) -> None:
+                    nonlocal held
+                    held += isinstance(constant.val, ast.Integer)
+
+            Count()(value)
+            taken = list(islice(tokens, held))
+            if (
+                isinstance(value, ast.A_Const)
+                and isinstance(value.val, ast.Integer)
+                and len(taken) == 1
+                and sql[taken[0].start : taken[0].end + 1] == str(value.val.ival)
+            ):
+                found.append((taken[0].start, kind, value.val.ival))
+
+    class Sheets(Visitor):
+        def visit_FuncCall(self, ancestors: Any, call: ast.FuncCall) -> None:
+            if _name_parts(call.funcname) == [SHEET] and call.args:
+                after(call.location, call.args[:1], SearchEntityType.file)
+
+    try:
+        select = _parse(sql)
+        Sheets()(select)
+        recordsets = {
+            key: _read_by(None, call) for key, (_, call) in _take_calls(select).items()
+        }
+        _expand_relations(select)
+        scope = _relations(select, recordsets)
+    except QueryError:
+        return sql
+
+    class Ids(Visitor):
+        def visit_A_Expr(self, ancestors: Any, node: ast.A_Expr) -> None:
+            if node.kind == A_Expr_Kind.AEXPR_IN:
+                values = tuple(node.rexpr or ())
+            elif _name_parts(node.name) in (["="], ["<>"]):
+                values = (node.rexpr,)
+            else:
+                return
+            spec = _field_named(scope, node.lexpr)
+            try:
+                column = spec.column.property.columns[0]
+            except AttributeError:
+                return
+            tables = (
+                [column.table.name]
+                if column.primary_key
+                else [key.column.table.name for key in column.foreign_keys]
+            )
+            source = SEARCH_SOURCES.get(tables[0]) if len(tables) == 1 else None
+            if source is not None:
+                after(node.lexpr.location, values, source.entity_type)
+
+    Ids()(select)
+    for start, kind, value in sorted(found, key=lambda entry: entry[0], reverse=True):
+        sql = f"{sql[:start]}{remap(kind, value)}{sql[start + len(str(value)) :]}"
+    return sql

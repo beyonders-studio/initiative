@@ -1,4 +1,6 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { WikiReadingSettingsPage } from "@/pages/initiativeTools/wikis/WikiReadingSettingsPage";
 
 // How the wiki reads: the order its pages sit in, how wide they run, what sits
 // beside them, and the colour it is recognised by. Too many to sit as a card on
@@ -6,9 +8,5 @@ import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/wikis/$wikiId/settings/reading"
 )({
-  component: lazyRouteComponent(() =>
-    import("@/pages/initiativeTools/wikis/WikiReadingSettingsPage").then((m) => ({
-      default: m.WikiReadingSettingsPage,
-    }))
-  ),
+  component: WikiReadingSettingsPage,
 });

@@ -10,9 +10,9 @@ import { useTranslation } from "react-i18next";
 
 import { FeedView } from "@/api/generated/initiativeAPI.schemas";
 import { CommunityActivityFeed } from "@/components/communityHome/CommunityActivityFeed";
-import { Button } from "@/components/ui/button";
 import type { ActivityScope } from "@/lib/recentRoute";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
 
 interface ActivityDrawerProps {
   /** What the page is about, or null for a page with no drawer. */
@@ -34,7 +34,7 @@ export const ActivityDrawer = ({ scope }: ActivityDrawerProps) => {
   return (
     <aside
       className={cn(
-        "sticky top-0 right-0 z-20 hidden h-screen shrink-0 transition-all duration-200 lg:flex",
+        "sticky top-0 right-0 z-20 hidden h-app shrink-0 transition-all duration-200 lg:flex",
         collapsed ? "w-15" : "w-80"
       )}
     >

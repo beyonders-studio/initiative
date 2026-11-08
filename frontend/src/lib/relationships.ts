@@ -28,13 +28,12 @@ import {
 } from "lucide-react";
 
 import {
+  EndpointKind,
   type EndpointRef,
   type RelatedEnd,
   type RelationshipCreate,
   type RelationshipRead,
   RelationshipType,
-  type SearchEntityType,
-  SearchEntityType as SearchEntityTypeValues,
 } from "@/api/generated/initiativeAPI.schemas";
 import type { Direction } from "@/api/relationships";
 import type { SearchTarget } from "@/lib/searchResults";
@@ -172,10 +171,7 @@ export const ASSERTABLE_GROUPS: RelationGroup[] = RELATION_GROUP_ORDER.map(
  * rather than a step in it, so a link touching one reads as "attached" unless
  * somebody says otherwise.
  */
-const FILE_LIKE: ReadonlySet<SearchEntityType> = new Set([
-  SearchEntityTypeValues.file,
-  SearchEntityTypeValues.collection,
-]);
+const FILE_LIKE: ReadonlySet<EndpointKind> = new Set([EndpointKind.file, EndpointKind.collection]);
 
 /**
  * The link to offer first, given what was picked.
@@ -193,11 +189,11 @@ const FILE_LIKE: ReadonlySet<SearchEntityType> = new Set([
  * teaches nothing, and a guess that is wrong is worse than a default.
  * {@link groupOrderFor} promotes it in the list instead, where choosing it is
  * one click and still a choice.
+ *
+ * A person is related to a thing rather than attached to it.
  */
-export const defaultGroupFor = (
-  anchor: SearchEntityType,
-  picked: SearchEntityType
-): RelationGroupKey => {
+export const defaultGroupFor = (anchor: EndpointKind, picked: EndpointKind): RelationGroupKey => {
+  if (picked === EndpointKind.user) return "related";
   if (FILE_LIKE.has(picked) || FILE_LIKE.has(anchor)) return "attached";
   if (anchor === picked) return "related";
   return "attached";
@@ -212,8 +208,8 @@ export const defaultGroupFor = (
  * menu.
  */
 export const groupOrderFor = (
-  anchor: SearchEntityType,
-  picked: SearchEntityType,
+  anchor: EndpointKind,
+  picked: EndpointKind,
   groups: RelationGroup[]
 ): RelationGroup[] => {
   const promoted: RelationGroupKey[] =
@@ -291,6 +287,23 @@ export const groupEdges = <T extends Pick<RelationshipRead, "relationship_type" 
 };
 
 /**
+ * What a link end is when it is not a person: the kinds search and links share.
+ * Search also finds comments, which are never an end; a link can also end at a
+ * person, who is never a search hit.
+ */
+export type ItemEndKind = Exclude<EndpointKind, typeof EndpointKind.user>;
+
+/**
+ * Whether a link end is an item rather than a person.
+ *
+ * What reads a kind's tool, page, icon or state reads items only. A person has
+ * none of those: they are drawn by their face and reached by their profile.
+ */
+export const isItem = <T extends { type: EndpointKind }>(
+  end: T
+): end is T & { type: ItemEndKind } => end.type !== EndpointKind.user;
+
+/**
  * A far end as the search helpers take it.
  *
  * `hitIcon` and `searchHitPath` already know how every kind is drawn and
@@ -298,7 +311,7 @@ export const groupEdges = <T extends Pick<RelationshipRead, "relationship_type" 
  * through its wiki. An edge's far end carries the same five facts under its
  * own names, so it is adapted rather than having that knowledge restated here.
  */
-export const relatedTarget = (end: RelatedEnd): SearchTarget => ({
+export const relatedTarget = (end: RelatedEnd & { type: ItemEndKind }): SearchTarget => ({
   entity_type: end.type,
   entity_id: end.id,
   initiative_id: end.initiative_id,
@@ -308,7 +321,7 @@ export const relatedTarget = (end: RelatedEnd): SearchTarget => ({
 
 /** One linked thing, as a compact chip or form value needs it. */
 export interface LinkedRef {
-  type: SearchEntityType;
+  type: ItemEndKind;
   id: number;
   title: string | null;
   /**
@@ -324,8 +337,8 @@ export interface LinkedRef {
 export const refKey = (ref: Pick<LinkedRef, "type" | "id">) => `${ref.type}:${ref.id}`;
 
 /** The ids in a set of links, grouped by kind. */
-export const idsByKind = (rows: LinkedRef[]): Map<SearchEntityType, number[]> => {
-  const map = new Map<SearchEntityType, number[]>();
+export const idsByKind = (rows: LinkedRef[]): Map<ItemEndKind, number[]> => {
+  const map = new Map<ItemEndKind, number[]>();
   for (const row of rows) {
     map.set(row.type, [...(map.get(row.type) ?? []), row.id]);
   }

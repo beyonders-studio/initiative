@@ -1,0 +1,216 @@
+import { Camera, ImagePlus, Images, Paperclip } from "lucide-react";
+import { type ChangeEvent, type ReactNode, useCallback, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+
+import { Button } from "@/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { host, PhotoCaptureError, type PhotoSource } from "@/ui/host";
+import { Input } from "@/ui/input";
+
+/**
+ * One way to hand the app a picture, wherever the app runs.
+ *
+ * In a browser this is the file field it has always been. On the native app it
+ * becomes a menu offering the camera first, because the phone in someone's hand
+ * is usually where the picture they want does not exist yet — the alternative is
+ * take a photo, save it, come back, and find it in a picker.
+ */
+
+const IMAGE_EXTENSIONS = new Set([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".svg",
+  ".avif",
+  ".heic",
+  ".heif",
+  ".bmp",
+]);
+
+const tokensOf = (accept: string) =>
+  accept
+    .split(",")
+    .map((token) => token.trim().toLowerCase())
+    .filter(Boolean);
+
+const isImage = (token: string) => token.startsWith("image/") || IMAGE_EXTENSIONS.has(token);
+const isAnything = (token: string) => token === "*" || token === "*/*";
+
+/** Whether this accept list would also take something that is not an image.
+ *  An empty one takes anything. */
+export const acceptsNonImages = (accept: string): boolean =>
+  !accept.trim() || tokensOf(accept).some((token) => !isImage(token) && !isAnything(token));
+
+/** Whether this accept list takes a picture at all. An empty one takes anything. */
+const acceptsImages = (accept: string): boolean =>
+  !accept.trim() || tokensOf(accept).some((token) => isImage(token) || isAnything(token));
+
+/**
+ * Taking a picture with the camera, or choosing one from the photo library, on
+ * the native app — what every picture control there offers before a file
+ * dialog. Only meaningful where the host has a camera.
+ */
+export function usePhotoCapture(onSelect: (file: File) => void | Promise<void>) {
+  const { t } = useTranslation("ui");
+  const [capturing, setCapturing] = useState(false);
+  // Read at the moment a picture arrives, so a caller passing a fresh function
+  // each render does not make `capture` a new function each render too.
+  const latestOnSelect = useRef(onSelect);
+  latestOnSelect.current = onSelect;
+
+  const capture = useCallback(
+    async (source: PhotoSource) => {
+      setCapturing(true);
+      try {
+        if (!host.camera) throw new PhotoCaptureError("unavailable");
+        const file = await host.camera.capture(source);
+        // No file means the person backed out, which needs no announcement.
+        if (file) await latestOnSelect.current(file);
+      } catch (error) {
+        console.error(error);
+        const reason = error instanceof PhotoCaptureError ? error.reason : "failed";
+        host.toast.error(t(`imagePicker.${reason}`));
+      } finally {
+        setCapturing(false);
+      }
+    },
+    [t]
+  );
+
+  return { capturing, capture };
+}
+
+interface ImagePickerProps {
+  /** Called with the chosen picture — from the camera, the library, or a file. */
+  onSelect: (file: File) => void | Promise<void>;
+  /** Same meaning as the attribute it replaces. */
+  accept?: string;
+  disabled?: boolean;
+  /** Lands on whichever control is rendered, so a `<Label htmlFor>` still points at it. */
+  id?: string;
+  className?: string;
+  /**
+   * Off-native shape: the file field itself, or a button that opens the file
+   * dialog. On native, where the field takes pictures, both become the same
+   * menu button.
+   */
+  variant?: "input" | "button";
+  /** Button content. Ignored by `variant="input"` off-native, where there is no button. */
+  children?: ReactNode;
+  buttonVariant?: React.ComponentProps<typeof Button>["variant"];
+  buttonSize?: React.ComponentProps<typeof Button>["size"];
+  "data-test-id"?: string;
+}
+
+export const ImagePicker = ({
+  onSelect,
+  accept = "image/*",
+  disabled = false,
+  id,
+  className,
+  variant = "input",
+  children,
+  buttonVariant = "outline",
+  buttonSize,
+  "data-test-id": dataTestId,
+}: ImagePickerProps) => {
+  const { t } = useTranslation("ui");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { capturing, capture } = usePhotoCapture(onSelect);
+  // The camera is offered only where a picture is something the field takes.
+  const camera = Boolean(host.camera) && acceptsImages(accept);
+
+  const handleInput = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // Clear it so picking the same file twice in a row still fires a change.
+    event.target.value = "";
+    if (file) void onSelect(file);
+  };
+
+  const fileInput = (
+    <Input
+      ref={inputRef}
+      id={variant === "input" ? id : undefined}
+      type="file"
+      accept={accept}
+      disabled={disabled}
+      onChange={handleInput}
+      className={variant === "button" || camera ? "hidden" : className}
+      data-test-id={dataTestId}
+      // A control the person never sees should not be a tab stop of its own.
+      tabIndex={variant === "button" || camera ? -1 : undefined}
+      aria-hidden={variant === "button" || camera ? true : undefined}
+    />
+  );
+
+  const label = children ?? (
+    <>
+      <ImagePlus className="h-4 w-4" />
+      {t("imagePicker.chooseImage")}
+    </>
+  );
+
+  if (!camera) {
+    if (variant === "input") return fileInput;
+    return (
+      <>
+        {fileInput}
+        <Button
+          type="button"
+          id={id}
+          variant={buttonVariant}
+          size={buttonSize}
+          disabled={disabled}
+          className={className}
+          onClick={() => inputRef.current?.click()}
+        >
+          {label}
+        </Button>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {fileInput}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            id={id}
+            variant={buttonVariant}
+            size={buttonSize}
+            disabled={disabled || capturing}
+            className={className}
+            data-test-id={dataTestId ? `${dataTestId}-menu` : undefined}
+          >
+            {label}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem onSelect={() => void capture("camera")}>
+            <Camera className="h-4 w-4" />
+            {t("imagePicker.takePhoto")}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => void capture("library")}>
+            <Images className="h-4 w-4" />
+            {t("imagePicker.chooseFromLibrary")}
+          </DropdownMenuItem>
+          {acceptsNonImages(accept) ? (
+            <DropdownMenuItem onSelect={() => inputRef.current?.click()}>
+              <Paperclip className="h-4 w-4" />
+              {t("imagePicker.chooseFile")}
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  );
+};

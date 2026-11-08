@@ -5,7 +5,6 @@
   "footer": {
     "tasks": "Tasks export",
     "project": "{{name}} — project report",
-    "queue": "{{name}} — queue export",
     "counters": "{{name}} — counters export"
   },
   "summary": {
@@ -102,6 +101,23 @@
   },
   "values": {
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "signed": "Signed by {{name}}, {{date}}"
+  },
+  "contacts": {
+    "name": "Name",
+    "type": "Type",
+    "person": "Person",
+    "organization": "Organization",
+    "emails": "Email {{n}}",
+    "emailsLabel": "Email {{n}} label",
+    "phones": "Phone {{n}}",
+    "phonesLabel": "Phone {{n}} label",
+    "addresses": "Address {{n}}",
+    "addressesLabel": "Address {{n}} label",
+    "websites": "Website {{n}}",
+    "websitesLabel": "Website {{n}} label",
+    "partOf": "Organization",
+    "metadata": "Metadata: {{name}}"
   }
 }

@@ -1,10 +1,10 @@
 """Import-side pydantic mirrors of the export envelopes.
 
 Each model parses the dict shape its export adapter emits (see
-``services/export/adapters/{file,queue,counter_group,calendar,post}.py``)
-with ``extra="ignore"``: informational export fields (queue member/file/
-task display text, event ids and timestamps, linked file titles) parse
-and drop — they reference guild-local state an import cannot rebind.
+``services/export/adapters/{file,counter_group,calendar,post,contact}.py``)
+with ``extra="ignore"``: informational export fields (event ids and
+timestamps, linked file titles) parse and drop — they reference guild-local
+state an import cannot rebind.
 
 Every envelope is schema version 1. There is no support for reading an
 earlier shape: the app imports what this build exports, and nothing else. The
@@ -21,6 +21,13 @@ from pydantic import ConfigDict, Field, model_validator
 from app.models.tenant.metadata import MetadataType
 from app.models.tenant.wiki import WikiPageOrder, WikiReadingWidth
 from app.schemas.base import SanitizedBaseModel
+from app.schemas.tenant.contact import (
+    MAX_DETAILS,
+    ContactAddress,
+    ContactEmail,
+    ContactPhone,
+    ContactWebsite,
+)
 
 CURRENT_SCHEMA_VERSION = 1
 MIN_SUPPORTED_IMPORT_VERSION = 1
@@ -197,37 +204,6 @@ class WikiEnvelope(_EnvelopeBase):
     files: list[WikiFiledFile] = []
 
 
-class QueueEnvelopeItem(SanitizedBaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    label: str
-    position: float = 0.0
-    color: Optional[str] = None
-    notes: Optional[str] = None
-    is_visible: bool = True
-    held_at_round: Optional[int] = None
-    is_current: bool = False
-    tags: list[str] = []
-    properties: list[EnvelopePropertyValue] = []
-    # `member`, `files`, `tasks` are informational display text in the
-    # export — ignored here (extra="ignore"), counted as a warning on apply.
-    member: Optional[str] = None
-    #: What this item was called where it came from — a thing a reference
-    #: elsewhere in the same import can name. Refs live for one job.
-    external_ref: Optional[str] = None
-
-
-class QueueEnvelope(_EnvelopeBase):
-    type: Literal["initiative-queue"]
-    name: str
-    description: Optional[str] = None
-    is_active: bool = False
-    current_round: int = 1
-    tags: list[str] = []
-    properties: list[EnvelopePropertyValue] = []
-    items: list[QueueEnvelopeItem] = []
-
-
 class CounterEnvelopeItem(SanitizedBaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -360,6 +336,24 @@ class PostEnvelope(_EnvelopeBase):
         if post_body_too_long(self.body):
             raise ValueError("post body exceeds the limits a post is held to")
         return self
+
+
+class ContactEnvelope(_EnvelopeBase):
+    """A contact: its name, whether it is an organization, and how to reach
+    it, held to the rules a contact's create holds them to, since a file is
+    not a trusted source."""
+
+    type: Literal["initiative-contact"]
+    name: str = Field(min_length=1, max_length=255)
+    is_organization: bool = False
+    emails: list[ContactEmail] = Field(default_factory=list, max_length=MAX_DETAILS)
+    phones: list[ContactPhone] = Field(default_factory=list, max_length=MAX_DETAILS)
+    addresses: list[ContactAddress] = Field(
+        default_factory=list, max_length=MAX_DETAILS
+    )
+    websites: list[ContactWebsite] = Field(default_factory=list, max_length=MAX_DETAILS)
+    tags: list[str] = []
+    properties: list[EnvelopePropertyValue] = []
 
 
 class EventEnvelopeAttendee(SanitizedBaseModel):

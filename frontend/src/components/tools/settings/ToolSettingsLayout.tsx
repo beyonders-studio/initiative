@@ -18,7 +18,7 @@
  * every tool.
  */
 
-import { Outlet, useLocation, useRouter } from "@tanstack/react-router";
+import { Outlet } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { Suspense } from "react";
@@ -26,7 +26,6 @@ import { useTranslation } from "react-i18next";
 
 import type { ResourceGrantSchema, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsTabsNav } from "@/components/settings/SettingsTabsNav";
-import { SettingsPaneSkeleton } from "@/components/skeletons/PageSkeletons";
 import { canUseArchiveCard } from "@/components/tools/settings/ToolArchiveCard";
 import { canUseDuplicateCard } from "@/components/tools/settings/ToolDuplicateCard";
 import {
@@ -37,13 +36,9 @@ import {
 } from "@/components/tools/settings/ToolSettingsContext";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import { INSTANCE_LAYOUT_TOOLS, useInstanceLayouts } from "@/hooks/useToolLayouts";
-import { extractSubPath, isCommunityScopedPath, useCommunityPath } from "@/lib/communityUrl";
-import { matchActiveTab } from "@/lib/tabs";
-import {
-  TOOL_SETTINGS_DEFAULT_SECTION,
-  toolDetailRoute,
-  toolSettingsSectionRoute,
-} from "@/lib/tools";
+import { useCommunityPath } from "@/lib/communityUrl";
+import { toolDetailRoute, toolSettingsSectionRoute } from "@/lib/tools";
+import { SettingsPaneSkeleton } from "@/ui/page-skeletons";
 
 export type { ToolMutation, ToolSettingsEntity };
 
@@ -100,9 +95,7 @@ export const ToolSettingsLayout = ({
   children,
 }: ToolSettingsLayoutProps) => {
   const { t } = useTranslation(["common", "nav", "access", "layouts"]);
-  const router = useRouter();
   const gp = useCommunityPath();
-  const location = useLocation();
   // A tool that lays out its own items offers its layouts to whoever may
   // change them; the server says who on the set.
   const layouts = useInstanceLayouts(
@@ -130,18 +123,18 @@ export const ToolSettingsLayout = ({
     { value: "details", label: t("common:toolSettings.tabDetails"), path: sectionPath("details") },
     // Whoever may edit it sees who it is shared with; only the owner changes
     // that, which the section asks itself.
-    ...(entity.can.edit
-      ? [
-          {
-            value: "access",
-            label: t("common:toolSettings.tabAccess"),
-            path: sectionPath("access"),
-          },
-        ]
-      : []),
-    ...(layouts?.can_configure
-      ? [{ value: "layouts", label: t("layouts:tab"), path: sectionPath("layouts") }]
-      : []),
+    {
+      value: "access",
+      label: t("common:toolSettings.tabAccess"),
+      path: sectionPath("access"),
+      visible: entity.can.edit,
+    },
+    {
+      value: "layouts",
+      label: t("layouts:tab"),
+      path: sectionPath("layouts"),
+      visible: Boolean(layouts?.can_configure),
+    },
     ...extraTabs.map((tab) => ({
       value: tab.value,
       label: tab.label,
@@ -150,32 +143,18 @@ export const ToolSettingsLayout = ({
     // Advanced holds a tool's own extra operations, duplicating, archiving,
     // exporting and deletion, so it is offered only when this entity has one
     // of them to offer.
-    ...(advancedExtra ||
-    entity.can.export ||
-    entity.can.delete ||
-    canUseArchiveCard(entity) ||
-    canUseDuplicateCard(tool, entity)
-      ? [
-          {
-            value: "advanced",
-            label: t("common:toolSettings.tabAdvanced"),
-            path: sectionPath("advanced"),
-          },
-        ]
-      : []),
+    {
+      value: "advanced",
+      label: t("common:toolSettings.tabAdvanced"),
+      path: sectionPath("advanced"),
+      visible:
+        Boolean(advancedExtra) ||
+        entity.can.export ||
+        entity.can.delete ||
+        canUseArchiveCard(entity) ||
+        canUseDuplicateCard(tool, entity),
+    },
   ];
-
-  // The tab paths are community-prefixed; matching happens on the sub-path, so a
-  // community id in the address never decides which tab is lit.
-  const currentPath = location.pathname;
-  const normalizedPath = isCommunityScopedPath(currentPath)
-    ? extractSubPath(currentPath).replace(/\/+$/, "") || "/"
-    : currentPath.replace(/\/+$/, "") || "/";
-  const activeTab = matchActiveTab(
-    tabs.map((tab) => ({ value: tab.value, path: extractSubPath(tab.path) })),
-    normalizedPath,
-    TOOL_SETTINGS_DEFAULT_SECTION
-  );
 
   return (
     <div className="space-y-6">
@@ -186,11 +165,7 @@ export const ToolSettingsLayout = ({
         title={t("common:toolSettings.title")}
       />
 
-      <SettingsTabsNav
-        tabs={tabs}
-        activeTab={activeTab}
-        onNavigate={(path) => router.navigate({ to: path })}
-      />
+      <SettingsTabsNav tabs={tabs} />
 
       <ToolSettingsProvider
         value={{

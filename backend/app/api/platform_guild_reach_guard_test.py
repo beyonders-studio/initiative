@@ -205,6 +205,10 @@ _ALLOWED: dict[tuple[str, str], str] = {
         "intake: settles the community a case is about, as an access grant for "
         "it is asked for"
     ),
+    (f"{_SERVICES}/ideas.py", "vote"): (
+        "ideas: writes a vote into the operations community once a read "
+        "through the ideas role has shown the idea is published and open"
+    ),
     (f"{_SERVICES}/grant_cases.py", "_as_reader"): (
         "grant cases: routes the person naming a case into the operations "
         "community through the seam, as themselves, to read it"
@@ -298,7 +302,7 @@ _ALLOWED: dict[tuple[str, str], str] = {
         "checks and writes the initiative a new or changed sign-in rule "
         "places people in, in the community it names"
     ),
-    (f"{_SERVICES}/provider_placement.py", "update_rule"): (
+    (f"{_SERVICES}/provider_placement.py", "rewrite_rule"): (
         "reads a provider placement rule's initiative before a change, and "
         "drops it when the rule no longer names one"
     ),

@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { invalidate, q } from "@/api/query-keys";
 import { MyCalendar } from "@/components/calendar/MyCalendar";
 import { ToolListToolbar } from "@/components/initiativeTools/shared/ToolListToolbar";
-import { PullToRefresh } from "@/components/PullToRefresh";
+import { PullToRefresh } from "@/ui/pull-to-refresh";
 
 export const MyCalendarPage = () => {
   const { t } = useTranslation("tasks");

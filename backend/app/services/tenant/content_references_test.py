@@ -45,10 +45,10 @@ def test_a_hash_reference_is_a_reference():
 def test_a_reference_to_something_that_is_not_a_file_counts_too():
     """The whole of what this phase adds: a page about a task refers to that
     task, and until now only the files were kept."""
-    content = _doc(_reference("task", 12), _reference("queue", 4))
+    content = _doc(_reference("task", 12), _reference("counter_group", 4))
     assert references_in_body(content) == {
         (TASK, 12),
-        (SearchEntityType.queue, 4),
+        (SearchEntityType.counter_group, 4),
     }
 
 
@@ -60,8 +60,10 @@ def test_a_chip_refers_to_the_thing_it_reads():
 
 
 def test_an_embed_refers_to_the_thing_it_shows():
-    content = _doc({"type": "reference-embed", "entityType": "queue", "entityId": 4})
-    assert references_in_body(content) == {(SearchEntityType.queue, 4)}
+    content = _doc(
+        {"type": "reference-embed", "entityType": "counter_group", "entityId": 4}
+    )
+    assert references_in_body(content) == {(SearchEntityType.counter_group, 4)}
 
 
 def test_references_are_found_however_deep_they_sit():
@@ -107,8 +109,9 @@ def test_a_hash_naming_no_known_kind_is_not_a_reference():
     assert references_in_text("#widget[Nope](3)") == set()
 
 
-def test_a_user_mention_is_not_a_reference():
-    """People are not things an edge connects."""
+def test_a_user_mention_is_not_a_hash_reference():
+    """A person is not a thing ``#`` names: a body's mentions of people are
+    read on their own."""
     assert references_in_text("thanks @[Ada](4)") == set()
 
 

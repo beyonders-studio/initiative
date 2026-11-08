@@ -221,3 +221,34 @@ class IntakeCase(SQLModel, table=True):
     filer_notified_comment_id: Optional[int] = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
+
+
+class IdeaVote(SQLModel, table=True):
+    """One account's vote for one idea, and the status they were last told it
+    was in."""
+
+    __tablename__ = "idea_votes"
+    __table_args__ = (
+        UniqueConstraint("task_id", "user_id", name="uq_idea_votes_task_user"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    task_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("tasks.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
+    #: Who voted: a weak ref like ``filer_user_id``. They are not a member of
+    #: the community that keeps the idea.
+    user_id: int = Field(sa_column=Column(Integer, nullable=False))
+    voted_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True), nullable=False)
+    )
+    #: The status the voter was last told the idea was in. The vote sweep
+    #: tells them when the idea's status is another.
+    notified_status_id: Optional[int] = Field(
+        default=None, sa_column=Column(Integer, nullable=True)
+    )

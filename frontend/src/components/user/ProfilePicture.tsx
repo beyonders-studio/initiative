@@ -8,17 +8,18 @@ import type {
   UserSelfUpdate,
 } from "@/api/generated/initiativeAPI.schemas";
 import { deleteMyAvatar, uploadMyAvatar } from "@/api/generated/users/users";
-import { Button } from "@/components/ui/button";
-import { ImagePicker } from "@/components/ui/image-picker";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
+import { useApiMutation } from "@/hooks/useApiMutation";
 import { useUpdateCurrentUser } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { ImageRenditionError, renderAvatar } from "@/lib/imageRenditions";
 import { toast } from "@/lib/mascotToast";
 import type { AvatarSourceUser, DisplayableUser } from "@/lib/userDisplay";
+import { Button } from "@/ui/button";
+import { ImagePicker } from "@/ui/image-picker";
+import { Input } from "@/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/ui/tabs";
 
 /** Where this server serves an uploaded picture from. A linked one — from a
  *  single sign-on account — is any other URL. */
@@ -63,7 +64,6 @@ export const ProfilePicture = ({
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"upload" | "url">(linked(user.avatar_url) ? "url" : "upload");
   const [url, setUrl] = useState(linked(user.avatar_url) ? (user.avatar_url ?? "") : "");
-  const [busy, setBusy] = useState(false);
 
   // Follow the saved picture when it changes. Without this the field keeps the
   // URL it was mounted with, so uploading a picture and then saving the URL tab
@@ -84,28 +84,26 @@ export const ProfilePicture = ({
       toast.error(getErrorMessage(error, "settings:profile.updateError")),
   });
 
-  const run = async (work: () => Promise<unknown>) => {
-    setBusy(true);
-    try {
-      await work();
-      setOpen(false);
-      await onChanged?.();
-    } catch (error) {
-      console.error(error);
+  const picture = useApiMutation(
+    { mutationFn: (work: () => Promise<unknown>) => work() },
+    {
+      onSuccess: async () => {
+        setOpen(false);
+        await onChanged?.();
+      },
       // A picture the browser could not make sense of never reached the
       // server, so it has its own message rather than an API code.
-      toast.error(
-        error instanceof ImageRenditionError
-          ? t(`settings:profile.avatar.${error.code}`)
-          : getErrorMessage(error, "settings:profile.avatar.failed")
-      );
-    } finally {
-      setBusy(false);
+      onError: (error) =>
+        toast.error(
+          error instanceof ImageRenditionError
+            ? t(`settings:profile.avatar.${error.code}`)
+            : getErrorMessage(error, "settings:profile.avatar.failed")
+        ),
     }
-  };
+  );
 
   const pick = (file: File) => {
-    void run(async () => uploadMyAvatar({ file: await renderAvatar(file) }));
+    picture.mutate(async () => uploadMyAvatar({ file: await renderAvatar(file) }));
   };
 
   const avatar = (
@@ -145,7 +143,7 @@ export const ProfilePicture = ({
             <TabsTrigger value="url">{t("settings:profile.avatarUrlTab")}</TabsTrigger>
           </TabsBar>
           <TabsContent value="upload" className="space-y-2">
-            <ImagePicker accept="image/*" disabled={busy} onSelect={pick} />
+            <ImagePicker accept="image/*" disabled={picture.isPending} onSelect={pick} />
             <p className="text-muted-foreground text-xs">
               {t("settings:profile.avatarUploadHelp")}
             </p>
@@ -154,8 +152,8 @@ export const ProfilePicture = ({
                 type="button"
                 variant="ghost"
                 size="sm"
-                disabled={busy}
-                onClick={() => void run(() => deleteMyAvatar())}
+                disabled={picture.isPending}
+                onClick={() => picture.mutate(() => deleteMyAvatar())}
               >
                 {t("settings:profile.removeUploadedAvatar")}
               </Button>

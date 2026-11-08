@@ -12,12 +12,12 @@
 import { useTranslation } from "react-i18next";
 
 import { LayoutsOverview } from "@/components/layouts/LayoutList";
+import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { useToolSettings } from "@/components/tools/settings/ToolSettingsContext";
-import { ToolSettingsPermissionRequired } from "@/components/tools/settings/ToolSettingsGuard";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { instanceTarget, useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolDetailRoute } from "@/lib/tools";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 export const ToolSettingsLayoutsPage = () => {
   const { tool, entity } = useToolSettings();
@@ -26,7 +26,7 @@ export const ToolSettingsLayoutsPage = () => {
   const set = useInstanceLayouts(tool, entity.id).data;
 
   if (!set) return null;
-  if (!set.can_configure) return <ToolSettingsPermissionRequired />;
+  if (!set.can_configure) return <SettingsPermissionRequired scope="tool" />;
 
   const editor = gp(`${toolDetailRoute(tool, entity.initiative_id, entity.id)}/layouts`);
   return (

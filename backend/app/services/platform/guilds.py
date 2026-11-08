@@ -1337,7 +1337,7 @@ async def update_guild(
         # Listing a community — or taking it back off the shelf — changes what
         # is asked of everybody already in it, none of whom did anything. The
         # one fan-out this channel has, and it is addressed to the roster.
-        await _signal_members_present(session, guild_id=guild.id)
+        await signal_members_present(session, guild_id=guild.id)
     if categories_provided:
         normalized = normalize_categories(categories)
         if guild.categories != normalized:
@@ -1431,6 +1431,11 @@ async def update_guild(
                 session, key, value, guild_id=guild_id, set_by=SetBy.deployment
             )
         await session.flush()
+        # The plan is on every member's community list: each one reads it again.
+        await signal_members_present(session, guild_id=guild_id)
+        from app.services import ai_settings
+
+        ai_settings.turn_off_guild_connections_once_committed(session, guild_id)
     if retention_days_provided:
         from app.services.platform.app_settings import get_or_create_guild_settings
 
@@ -1810,7 +1815,7 @@ async def delete_guild(
     reached.
     """
     guild_id = guild.id
-    await _signal_members_present(session, guild_id=guild_id, action="membership")
+    await signal_members_present(session, guild_id=guild_id, action="membership")
     if actor_user_id is not None:
         await audit_service.record(
             session,
@@ -2174,7 +2179,7 @@ async def soft_delete_guild(
     guild_id = guild.id
     # Read while the roster is still there: a community of one loses it below.
     recipients = await _deletion_recipients(session, guild)
-    await _signal_members_present(session, guild_id=guild_id, action="membership")
+    await signal_members_present(session, guild_id=guild_id, action="membership")
     members = await count_members(session, guild_id=guild_id)
     clear_roster = not keep_roster and members <= 1
     await audit_service.record(
@@ -2443,10 +2448,17 @@ async def redeem_invite_for_user(
     return guild
 
 
-async def _signal_members_present(
-    session: AsyncSession, *, guild_id: int, action: str = "community"
+async def signal_members_present(
+    session: AsyncSession,
+    *,
+    guild_id: int,
+    action: str = "community",
+    reader: AsyncSession | None = None,
 ) -> None:
     """Poke this guild's members: what their account says about it has changed.
+
+    The frames go when ``session`` commits. The members are read on ``reader``
+    where ``session``'s role cannot read the membership, as billing's cannot.
 
     Addressed to the whole membership rather than to the sockets this process
     holds. A frame is published on the cross-worker bus, so narrowing to the
@@ -2459,7 +2471,7 @@ async def _signal_members_present(
     no socket. That is the price of the question being unanswerable from one
     process; they would re-read their account on arriving anyway.
     """
-    rows = await session.exec(
+    rows = await (reader or session).exec(
         select(GuildMembership.user_id).where(GuildMembership.guild_id == guild_id)
     )
     user_stream.queue_signals(session, rows.all(), account_stream.RESOURCE, action)

@@ -15,6 +15,12 @@ no string to escape, and a node that would not parse cannot be constructed.
 The cutover migration writes its statements through the same functions, so the
 SQL a stored definition was rewritten to and the SQL the builder produces are
 the same SQL.
+
+A description reads one of the registry's datasets, a range of a spreadsheet
+(``sheet(file, range)``), or one of a plug-in's read endpoints
+(``plugin(public id, endpoint, name => value, …)``). Their columns are what the
+file holds and what the endpoint declares, so they are not checked here: the
+description of the statement that follows refuses a column they do not have.
 """
 
 from __future__ import annotations
@@ -22,7 +28,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional, Sequence, Union
 
-from pglast import ast
+from pglast import ast, parse_sql
 from pglast.enums import A_Expr_Kind, BoolExprType, LimitOption, SortByDir
 from pglast.enums.parsenodes import (
     FRAMEOPTION_END_CURRENT_ROW,
@@ -36,7 +42,14 @@ from app.schemas.query import FilterOp
 from app.services.fields import dataset
 from app.services.fields.registry import dataset_names
 from app.services.fields.spec import ControlKind
-from app.services.query.resolve import VIEWER, QueryError
+from app.services.query.resolve import (
+    PLUGIN,
+    SHEET,
+    VIEWER,
+    PluginCall,
+    QueryError,
+    SheetCall,
+)
 
 #: What a column may be reduced to. Aggregates only — a window function is a
 #: different question and the validator does not admit one.
@@ -129,9 +142,12 @@ class Sort:
 
 @dataclass(frozen=True)
 class QuerySpec:
-    """What somebody clicked, before it is a statement."""
+    """What somebody clicked, before it is a statement: about one dataset, one
+    range of a spreadsheet, or one of a plug-in's read endpoints."""
 
-    dataset: str
+    dataset: Optional[str] = None
+    sheet: Optional[SheetCall] = None
+    plugin: Optional[PluginCall] = None
     columns: Sequence[Column] = field(default_factory=tuple)
     where: Sequence[Node] = field(default_factory=tuple)
     #: Columns to group by, named the way the select list names them.
@@ -146,7 +162,9 @@ def _split(name: str) -> tuple[Optional[str], str]:
     return (relation or None), field_name
 
 
-def _column_ref(name: str, base: Optional[str] = None) -> ast.ColumnRef:
+def _column_ref(
+    name: str, base: Optional[str] = None, whole: bool = False
+) -> ast.ColumnRef:
     """One column, qualified by the relation it belongs to where it names one.
 
     A related field is written ``assignee.display_name``, and reaches the tree
@@ -161,8 +179,11 @@ def _column_ref(name: str, base: Optional[str] = None) -> ast.ColumnRef:
     Postgres refuses. Naming the base says which side is meant. It is left off
     when nothing is joined, where there is no second side and the qualification
     would only make the stored statement longer to read.
+
+    *whole* is for a range's column, which reaches through no relation: its
+    header is its name, dots and all (``No.``).
     """
-    relation, field_name = _split(name)
+    relation, field_name = (None, name) if whole else _split(name)
     parts = (
         (relation, field_name)
         if relation
@@ -211,10 +232,12 @@ def _relative(days: Any) -> ast.Node:
     )
 
 
-def _expression(column: Column, base: Optional[str] = None) -> ast.Node:
+def _expression(
+    column: Column, base: Optional[str] = None, whole: bool = False
+) -> ast.Node:
     """The select-list expression for one column, innermost first: the field,
     rounded if it is bucketed, reduced if it is aggregated."""
-    inner: ast.Node = _column_ref(column.field, base)
+    inner: ast.Node = _column_ref(column.field, base, whole)
     if column.bucket:
         if column.bucket not in BUCKETS:
             raise QueryError(QueryMessages.UNSUPPORTED_SYNTAX, column.bucket)
@@ -285,6 +308,8 @@ def _viewer_value(dataset_name: str, condition: Condition) -> bool:
 
 
 def _names_a_person(dataset_name: str, field_name: str) -> bool:
+    if dataset_name in (SHEET, PLUGIN):
+        return False
     relation_name, plain = _split(field_name)
     holder = dataset_name
     if relation_name is not None:
@@ -307,7 +332,7 @@ def _predicate(
     dataset_name: str, condition: Condition, base: Optional[str] = None
 ) -> ast.Node:
     viewer = _viewer_value(dataset_name, condition)
-    left = _column_ref(condition.field, base)
+    left = _column_ref(condition.field, base, whole=dataset_name in (SHEET, PLUGIN))
     if condition.op is FilterOp.is_null:
         # The DSL's is_null carries whether it means null or not-null.
         return ast.NullTest(arg=left, nulltesttype=0 if condition.value else 1)
@@ -433,6 +458,8 @@ def _leaves(nodes: Sequence[Node]) -> list[Condition]:
 
 def _relations_named(spec: QuerySpec) -> list[str]:
     """The relations this description reads through, in the order first met."""
+    if spec.dataset is None:
+        return []
     named: list[str] = []
     for name in (
         [column.field for column in spec.columns]
@@ -456,6 +483,31 @@ def _from(spec: QuerySpec, relations: Sequence[str]) -> ast.Node:
     The last hop of a relation is aliased to the relation's own name, so a
     reader's ``assignee.display_name`` is what the statement says.
     """
+    if spec.sheet is not None:
+        reading = parse_sql(f"SELECT FROM {SHEET}()")[0].stmt.fromClause[0]
+        reading.functions[0][0].args = tuple(
+            _literal(value)
+            for value in (spec.sheet.file, spec.sheet.range)
+            if value is not None
+        )
+        return reading
+    if spec.plugin is not None:
+        reading = parse_sql(f"SELECT FROM {PLUGIN}()")[0].stmt.fromClause[0]
+        reading.functions[0][0].args = (
+            _literal(spec.plugin.plugin),
+            _literal(spec.plugin.endpoint),
+            *(
+                ast.NamedArgExpr(
+                    name=name,
+                    arg=ast.A_ArrayExpr(elements=tuple(map(_literal, value)))
+                    if isinstance(value, tuple)
+                    else _literal(value),
+                    argnumber=-1,
+                )
+                for name, value in spec.plugin.params
+            ),
+        )
+        return reading
     declared = dataset(spec.dataset).by_relation
     node: ast.Node = ast.RangeVar(relname=spec.dataset, inh=True)
     for name in relations:
@@ -499,18 +551,21 @@ def build(spec: QuerySpec) -> str:
     reader sees — so what is stored is what they built, and resolution to
     physical names happens when it runs, like any other statement.
     """
-    if spec.dataset not in dataset_names():
+    if sum(read is not None for read in (spec.dataset, spec.sheet, spec.plugin)) != 1:
+        raise QueryError(QueryMessages.MISSING_RELATION)
+    if spec.dataset is not None and spec.dataset not in dataset_names():
         raise QueryError(QueryMessages.UNKNOWN_RELATION, spec.dataset)
     if not spec.columns:
         raise QueryError(QueryMessages.UNSUPPORTED_SYNTAX, "no columns")
     for column in spec.columns:
-        if column.field != "*":
+        if column.field != "*" and spec.dataset is not None:
             _check_field(spec.dataset, column.field)
         if column.running and column.aggregate not in RUNNING:
             raise QueryError(QueryMessages.UNSUPPORTED_FUNCTION, "running")
     _check_depth(spec.where)
-    for condition in _leaves(spec.where):
-        _check_field(spec.dataset, condition.field)
+    if spec.dataset is not None:
+        for condition in _leaves(spec.where):
+            _check_field(spec.dataset, condition.field)
 
     # A bare column is already named after itself, so an alias there would read
     # as "priority AS priority". Anything computed needs one, because Postgres
@@ -520,13 +575,14 @@ def build(spec: QuerySpec) -> str:
     # about one table reads better without it.
     joined = bool(_relations_named(spec))
     base = spec.dataset if joined else None
+    whole = spec.dataset is None
 
     targets = tuple(
         ast.ResTarget(
             name=None
             if column.alias is None and not column.aggregate and not column.bucket
             else _alias(column),
-            val=_expression(column, base),
+            val=_expression(column, base, whole),
         )
         for column in spec.columns
     )
@@ -537,7 +593,9 @@ def build(spec: QuerySpec) -> str:
     select = ast.SelectStmt(
         targetList=targets,
         fromClause=(_from(spec, _relations_named(spec)),),
-        whereClause=_where(spec.dataset, spec.where, base=base),
+        whereClause=_where(
+            spec.dataset or (SHEET if spec.sheet else PLUGIN), spec.where, base=base
+        ),
         op=0,
     )
 
@@ -574,7 +632,7 @@ def build(spec: QuerySpec) -> str:
             # Each window gets expressions of its own: a node is not shared
             # between two places in a tree.
             keys = [
-                _expression(spec.columns[position - 1], base)
+                _expression(spec.columns[position - 1], base, whole)
                 for position in grouped
                 if not spec.columns[position - 1].aggregate
             ]

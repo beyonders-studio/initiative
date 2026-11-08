@@ -24,17 +24,6 @@ import { useTranslation } from "react-i18next";
 
 import type { PlatformCommunityStorageRead } from "@/api/generated/initiativeAPI.schemas";
 import { CommunityStatus } from "@/api/generated/initiativeAPI.schemas";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import { usePlatformUsers } from "@/hooks/useOperatorUsers";
 import { useRestoreCommunity } from "@/hooks/useSettings";
 import { useWizard } from "@/hooks/useWizard";
@@ -42,6 +31,12 @@ import { OPERATOR_SETTABLE_STATUSES } from "@/lib/communityStatus";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { getUserHandle } from "@/lib/userDisplay";
+import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
+import { Field } from "@/ui/field";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { WizardDialog } from "@/ui/wizard-dialog";
 
 type Step = "seat" | "status";
 
@@ -106,9 +101,8 @@ export const CommunityRestoreWizard = ({
         description={t("communities.restore.seatDescription")}
         progress={{ current: 1, total: 2 }}
       >
-        <div className="space-y-2">
-          <Label htmlFor="community-restore-seat">{t("communities.restore.seatLabel")}</Label>
-          <AsyncCombobox
+        <Field label={t("communities.restore.seatLabel")} hint={t("communities.restore.seatHelp")}>
+          <Combobox
             className="w-full"
             value={seatUserId || null}
             selectedLabel={seatLabel}
@@ -124,8 +118,7 @@ export const CommunityRestoreWizard = ({
             emptyMessage={t("communities.restore.seatEmpty")}
             aria-label={t("communities.restore.seatLabel")}
           />
-          <p className="text-muted-foreground text-xs">{t("communities.restore.seatHelp")}</p>
-        </div>
+        </Field>
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t("common:cancel")}

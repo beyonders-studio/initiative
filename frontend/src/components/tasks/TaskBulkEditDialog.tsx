@@ -1,4 +1,3 @@
-import { Loader2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -14,29 +13,6 @@ import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
 import { TaskPriorityOption } from "@/components/tasks/TaskPriorityOption";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import {
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { useListedMissingAsType } from "@/lib/layouts/taskLayout";
 import {
@@ -46,6 +22,18 @@ import {
   type TaskRecurrenceValue,
 } from "@/lib/recurrence";
 import { PRIORITY_ORDER } from "@/lib/sorting";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import {
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** The type option that takes a picked type back: the tasks keep theirs. */
 const KEEP_TYPE = "keep";
@@ -75,7 +63,6 @@ interface TaskBulkEditDialogProps {
   initiativeId: number;
   isSubmitting: boolean;
   onApply: (changes: Partial<TaskBulkUpdate>) => void;
-  onCancel: () => void;
 }
 
 export const TaskBulkEditDialog = ({
@@ -87,7 +74,6 @@ export const TaskBulkEditDialog = ({
   initiativeId,
   isSubmitting,
   onApply,
-  onCancel,
 }: TaskBulkEditDialogProps) => {
   const { t } = useTranslation(["tasks", "common", "projects"]);
   const { user: currentUser } = useAuth();
@@ -179,30 +165,27 @@ export const TaskBulkEditDialog = ({
           <AccordionItem value="dates">
             <AccordionTrigger>{t("bulkEdit.datesSection")}</AccordionTrigger>
             <AccordionContent className="space-y-4 pb-4">
-              <div className="space-y-2">
-                <Label htmlFor="bulk-start-date">{t("bulkEdit.startDateLabel")}</Label>
+              <Field label={t("bulkEdit.startDateLabel")}>
                 <DateTimePicker
                   value={startDate}
                   onChange={setStartDate}
                   placeholder={t("bulkEdit.startDatePlaceholder")}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="bulk-due-date">{t("bulkEdit.dueDateLabel")}</Label>
+              </Field>
+              <Field label={t("bulkEdit.dueDateLabel")}>
                 <DateTimePicker
                   value={dueDate}
                   onChange={setDueDate}
                   placeholder={t("bulkEdit.dueDatePlaceholder")}
                 />
-              </div>
+              </Field>
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="assignment">
             <AccordionTrigger>{t("bulkEdit.assignmentSection")}</AccordionTrigger>
             <AccordionContent className="space-y-4 pb-4">
-              <div className="space-y-2">
-                <Label>{t("bulkEdit.assigneesLabel")}</Label>
+              <Field label={t("bulkEdit.assigneesLabel")}>
                 <MemberMultiSelect
                   scope={{ type: "canOpen", tool: Tool.project, id: projectId }}
                   selectedIds={assigneeIds}
@@ -210,7 +193,7 @@ export const TaskBulkEditDialog = ({
                   emptyMessage={t("bulkEdit.noUsersAvailable")}
                   currentUserId={currentUser?.id}
                 />
-              </div>
+              </Field>
             </AccordionContent>
           </AccordionItem>
 
@@ -218,14 +201,13 @@ export const TaskBulkEditDialog = ({
             <AccordionTrigger>{t("bulkEdit.detailsSection")}</AccordionTrigger>
             <AccordionContent className="space-y-4 pb-4">
               {taskTypes.length > 1 ? (
-                <div className="space-y-2">
-                  <Label htmlFor="bulk-type">{t("bulkEdit.typeLabel")}</Label>
+                <Field label={t("bulkEdit.typeLabel")}>
                   <Select
                     value={typeId}
                     onValueChange={(value) => setTypeId(value === KEEP_TYPE ? "" : value)}
                     disabled={!typeCheck.ready}
                   >
-                    <SelectTrigger id="bulk-type">
+                    <SelectTrigger>
                       <SelectValue placeholder={t("bulkEdit.selectType")} />
                     </SelectTrigger>
                     <SelectContent>
@@ -252,13 +234,12 @@ export const TaskBulkEditDialog = ({
                       })}
                     </SelectContent>
                   </Select>
-                </div>
+                </Field>
               ) : null}
 
-              <div className="space-y-2">
-                <Label htmlFor="bulk-status">{t("bulkEdit.statusLabel")}</Label>
+              <Field label={t("bulkEdit.statusLabel")}>
                 <Select value={statusId} onValueChange={setStatusId}>
-                  <SelectTrigger id="bulk-status">
+                  <SelectTrigger>
                     <SelectValue placeholder={t("bulkEdit.selectStatus")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -274,12 +255,11 @@ export const TaskBulkEditDialog = ({
                     })}
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
 
-              <div className="space-y-2">
-                <Label htmlFor="bulk-priority">{t("bulkEdit.priorityLabel")}</Label>
+              <Field label={t("bulkEdit.priorityLabel")}>
                 <Select value={priority} onValueChange={setPriority}>
-                  <SelectTrigger id="bulk-priority">
+                  <SelectTrigger>
                     <SelectValue placeholder={t("bulkEdit.selectPriority")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -290,7 +270,7 @@ export const TaskBulkEditDialog = ({
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
             </AccordionContent>
           </AccordionItem>
 
@@ -313,21 +293,13 @@ export const TaskBulkEditDialog = ({
           </AccordionItem>
         </Accordion>
 
-        <DialogFooter className="mt-6">
-          <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
-            {t("common:cancel")}
-          </Button>
-          <Button type="submit" disabled={!hasChanges || typeBlocked || isSubmitting}>
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("bulkEdit.applying")}
-              </>
-            ) : (
-              t("bulkEdit.applyChanges")
-            )}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          className="mt-6"
+          submitLabel={t("bulkEdit.applyChanges")}
+          pending={isSubmitting}
+          pendingLabel={t("bulkEdit.applying")}
+          disabled={!hasChanges || typeBlocked}
+        />
       </form>
     </DialogContent>
   );

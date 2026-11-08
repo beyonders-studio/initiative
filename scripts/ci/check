@@ -50,23 +50,21 @@ check_biome() { frontend lint; }
 check_tsc() { frontend typecheck; }
 
 check_migrations() {
-  # A revision at or before RELEASED_MIGRATION has run on somebody's database
-  # and is fixed; edit, rename or delete one and this fails. --no-renames
-  # reports a rename as the old path deleted, so the frozen name is checked.
-  local frozen touched edited
+  # A revision already on the base branch is fixed; edit, rename or delete
+  # one and this fails. --no-renames reports a rename as the old path deleted,
+  # so the merged name is checked.
+  local edited
   if ! git rev-parse --verify --quiet "$BASE_REF^{commit}" >/dev/null; then
     error "Cannot compare against $BASE_REF: it does not exist here. Run 'git fetch origin dev', or set BASE_REF."
     return 1
   fi
-  frozen=$(tr -d '[:space:]' < RELEASED_MIGRATION)
-  touched=$(git diff --name-only --no-renames --diff-filter=MDT "$BASE_REF...HEAD" -- backend/alembic/versions)
-  edited=$(grep -oE '[0-9]{8}_[0-9]{4}' <<<"$touched" | awk -v frozen="$frozen" '$0 <= frozen' || true)
+  edited=$(git diff --name-only --no-renames --diff-filter=MDT "$BASE_REF...HEAD" -- backend/alembic/versions)
   if [[ -n "$edited" ]]; then
-    error "Edited, renamed or removed a released migration (freeze line $frozen): $(tr '\n' ' ' <<<"$edited")"
-    echo "Add a new revision that converges both histories instead (CLAUDE.md, \"Never edit a migration that has shipped\")."
+    error "Edited, renamed or removed a merged migration: $(tr '\n' ' ' <<<"$edited")"
+    echo "Add a new revision instead (AGENTS.md, \"Never edit a migration\")."
     return 1
   fi
-  echo "No released migration edited (freeze line $frozen)."
+  echo "No merged migration edited."
 
   # get_current_head() raises when the revisions have more than one head.
   backend python -c "

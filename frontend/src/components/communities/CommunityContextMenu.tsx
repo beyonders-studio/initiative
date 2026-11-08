@@ -16,6 +16,12 @@ import { createCommunityInvite } from "@/api/generated/communities/communities";
 import { AdminSurface, type CommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { InitiativeMark } from "@/components/icons/InitiativeMark";
+import { useApiMutation } from "@/hooks/useApiMutation";
+import { useBillingPortal } from "@/hooks/useBillingPortal";
+import { useCommunities } from "@/hooks/useCommunities";
+import { useHeldSurfaces } from "@/hooks/useCustomRoles";
+import { holdsBillingSeat } from "@/lib/billingSummary";
+import { toast } from "@/lib/mascotToast";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -23,13 +29,7 @@ import {
   ContextMenuLabel,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { useBillingPortal } from "@/hooks/useBillingPortal";
-import { useCommunities } from "@/hooks/useCommunities";
-import { useHeldSurfaces } from "@/hooks/useCustomRoles";
-import { holdsBillingSeat } from "@/lib/billingSummary";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
+} from "@/ui/context-menu";
 
 import { LeaveCommunityDialog } from "./LeaveCommunityDialog";
 
@@ -63,7 +63,6 @@ export const CommunityContextMenu = ({
   const [menuOpen, setMenuOpen] = useState(false);
   const held = useHeldSurfaces(community, { enabled: menuOpen && !closed });
   const runsAnyPart = community.can.administer || held.holdsAny;
-  const [creatingInvite, setCreatingInvite] = useState(false);
   // A community at its seat cap mints no invite (the server refuses), so the item
   // says so rather than handing back an error toast. Both fields are
   // admin-only on the payload, and null max_users means uncapped.
@@ -74,21 +73,21 @@ export const CommunityContextMenu = ({
   // "community is full" wording instead.
   const upgradeForSeats = atUserLimit && canSell && community.can.seat;
 
-  const handleInviteMembers = async () => {
-    if (creatingInvite || atUserLimit) return;
-    setCreatingInvite(true);
-    try {
-      const data = await createCommunityInvite(community.id, {});
-      void invalidate(q.communityInvites(community.id));
-      const inviteLink = `${window.location.origin}/invite/${data.code}`;
-      await navigator.clipboard.writeText(inviteLink);
-      toast.success(t("inviteLinkCopied"));
-    } catch (err) {
-      console.error("Failed to create invite", err);
-      toast.error(getErrorMessage(err, "communities:failedToCreateInvite"));
-    } finally {
-      setCreatingInvite(false);
-    }
+  const copyInvite = useApiMutation(
+    {
+      mutationFn: async () => {
+        const data = await createCommunityInvite(community.id, {});
+        void invalidate(q.communityInvites(community.id));
+        await navigator.clipboard.writeText(`${window.location.origin}/invite/${data.code}`);
+      },
+      errorKey: "communities:failedToCreateInvite",
+    },
+    { onSuccess: () => toast.success(t("inviteLinkCopied")) }
+  );
+
+  const handleInviteMembers = () => {
+    if (copyInvite.isPending || atUserLimit) return;
+    copyInvite.mutate();
   };
 
   const handleViewMembers = async () => {
@@ -172,10 +171,10 @@ export const CommunityContextMenu = ({
                       ? () => void openPortal(community.id, "upgrade")
                       : handleInviteMembers
                   }
-                  disabled={creatingInvite || (atUserLimit && !upgradeForSeats)}
+                  disabled={copyInvite.isPending || (atUserLimit && !upgradeForSeats)}
                 >
                   <UserPlus className="mr-2 h-4 w-4" />
-                  {creatingInvite ? t("creatingInvite") : inviteLabel}
+                  {copyInvite.isPending ? t("creatingInvite") : inviteLabel}
                 </ContextMenuItem>
               )}
               {held.holds(AdminSurface.initiatives) && (

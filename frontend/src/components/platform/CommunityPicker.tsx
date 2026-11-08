@@ -14,8 +14,8 @@ import {
   CommunityStatus,
   ListPlatformCommunityStorageSortBy,
 } from "@/api/generated/initiativeAPI.schemas";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
 import { usePlatformCommunities } from "@/hooks/useSettings";
+import { Combobox } from "@/ui/combobox";
 
 export interface PickedCommunity {
   id: number;
@@ -56,7 +56,7 @@ export const CommunityPicker = ({
   const rows = communities.data?.items ?? [];
 
   return (
-    <AsyncCombobox
+    <Combobox
       className={className}
       aria-label={ariaLabel}
       value={value ? String(value.id) : null}

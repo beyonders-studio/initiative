@@ -114,7 +114,7 @@ Every initiative comes with three: **Manager** (think project lead) and **Modera
 
 Name them after how your group actually talks about itself, not after anything Initiative expects. Nobody has ever introduced themselves at a committee meeting as a view-only contributor.
 
-Permissions are grouped by tool — **Projects**, **Files**, **Queues**, **Counters**, **Events**, **Dashboards**, **Posts**, **Wikis** — each offering **View** and **Create**. So "Volunteer" might view projects and files but create nothing, while "Coordinator" creates everything.
+Permissions are grouped by tool — **Projects**, **Files**, **Counters**, **Events**, **Dashboards**, **Posts**, **Wikis**, **Contacts** — each offering **View** and **Create**. So "Volunteer" might view projects and files but create nothing, while "Coordinator" creates everything.
 
 ![Setting permissions for an initiative role](../images/initiatives/roles.png)
 
@@ -145,7 +145,7 @@ Open the reported thing to see it where it lives, then come back and settle it, 
 
 A report of something illegal shows **Platform notified**: it went to whoever runs the server as well, and they look at it whatever you decide here.
 
-You don't need a report to act. Moderators and community admins get a shield menu on comments, posts, pictures, wiki pages, queue items, events and tasks:
+You don't need a report to act. Moderators and community admins get a shield menu on comments, posts, pictures, wiki pages, events and tasks:
 
 - **Remove…**, as above.
 - **Warn…** — sends whoever wrote it what you type, as above, and leaves it up.
@@ -198,14 +198,17 @@ Something only one project or one collection cares about is a **property** of th
 | **Person** | Somebody who can open the thing it's on. |
 | **Money** | An amount, in the one currency it names. |
 | **Scale** | 0 to 100. A layout draws it as a percentage, stars or a bar. |
+| **Counter** | A number you tap up and down by its step, never past the minimum or maximum you give it. **Reset** sends it back to its initial value. A layout draws it as a number, a bar or a clock. |
+| **File** | One file from the initiative's Files: pick one, or make one with **New file**, which uploads a file, starts a document or saves a smart link. On the item's page a document, whiteboard, spreadsheet or smart link shows in place; any other file is a link to it. For several files, add them as links instead. |
+| **Signature** | Who signed and when. **Sign** asks for your name under a statement of what signing means, and you only ever sign as yourself: never for somebody else, and never through a plug-in. A copy of the thing comes unsigned. The thing's page says if it was updated after it was signed. |
 
-Typing a new option into a select adds it to the list. Deleting metadata deletes every value set for it in the initiative, so it asks first.
+Typing a new option into a select adds it to the list. Two people tapping the same counter at once both count. Anyone who can edit something can sign its signature field or clear it. Clearing has no undo: putting a signature back takes its signer signing again. Deleting metadata deletes every value set for it in the initiative, so it asks first.
 
 #### Everything in one place
 
 Under the initiative's metadata, the page lists the properties of each project and collection, under its name. You see the ones you're allowed to edit: those of the projects and collections you can change. A community admin sees them all.
 
-- **Edit** one with the pencil: its name, its options and their colours, its colour, its currency.
+- **Edit** one with the pencil: its name, its options and their colours, its colour, its currency, a counter's step and bounds.
 - **Tick** several to delete them in one go. Each takes all its values with it, so it asks first.
 - **Promote to metadata** is for the day four projects each grow a "Budget" box and somebody notices. Tick properties of one type, from as many projects and collections as you like, and name the result. They become one piece of the initiative's metadata, or join the one already called that, if it's the same type.
 

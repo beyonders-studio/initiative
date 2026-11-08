@@ -9,12 +9,10 @@ import type {
   Presence,
   ProfileDecorationsOutput,
 } from "@/api/generated/initiativeAPI.schemas";
-import { ContactActionsMenu } from "@/components/contacts/ContactActionsMenu";
-import { PrivatePanel, unreachableReason } from "@/components/contacts/UnreachableEmptyState";
+import { ConnectionActionsMenu } from "@/components/connections/ConnectionActionsMenu";
+import { PrivatePanel, unreachableReason } from "@/components/connections/UnreachableEmptyState";
 import { NewConversationDialog } from "@/components/messages/NewConversationDialog";
 import { UserHandle } from "@/components/UserHandle";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import {
   useAcceptConnection,
@@ -29,7 +27,10 @@ import {
 import { useConversations, useLatestMessages, useUnreadMessages } from "@/hooks/useMyMessages";
 import { groupName, isGroup, roster } from "@/lib/conversationName";
 import { getUrlHandle, getUserHandle } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { cn } from "@/ui/lib/utils";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 const ROW = "flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-2 text-sm";
 
@@ -176,7 +177,7 @@ interface PendingRequest {
  * what a back button, a middle click and a shared address all understand.
  */
 export const ConversationList = ({ explain = false }: { explain?: boolean } = {}) => {
-  const { t } = useTranslation(["messages", "contacts"]);
+  const { t } = useTranslation(["messages", "connections"]);
   const { with: openHandle, thread: openThread } = useSearch({ strict: false }) as {
     with?: string;
     thread?: string;
@@ -400,7 +401,7 @@ export const ConversationList = ({ explain = false }: { explain?: boolean } = {}
         {/* Outside the link, because acting on somebody is not the same
                 gesture as opening what they said. The ways in are left out:
                 the row is one, and clicking it is the conversation. */}
-        <ContactActionsMenu
+        <ConnectionActionsMenu
           user={{
             id: them.user_id,
             username: them.username,
@@ -469,7 +470,9 @@ export const ConversationList = ({ explain = false }: { explain?: boolean } = {}
       </div>
 
       {conversations.isLoading ? (
-        <p className="px-2 py-1 text-muted-foreground text-sm">{t("loading")}</p>
+        <SkeletonRegion className="px-2 py-1">
+          <ListSkeleton rows={4} />
+        </SkeletonRegion>
       ) : (
         <>
           {waiting.length > 0 ? (
@@ -570,7 +573,7 @@ export const ConversationList = ({ explain = false }: { explain?: boolean } = {}
               <div className="space-y-2 px-2 py-1">
                 <p className="text-muted-foreground text-sm">{t("ageLocked")}</p>
                 <Button variant="outline" size="sm" asChild>
-                  <Link to="/profile/privacy">{t("contacts:unreachable.private.settings")}</Link>
+                  <Link to="/profile/privacy">{t("connections:unreachable.private.settings")}</Link>
                 </Button>
               </div>
             ) : reason === "private" && explain ? (

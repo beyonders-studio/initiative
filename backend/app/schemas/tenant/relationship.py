@@ -2,8 +2,8 @@
 
 An endpoint is named the way a ``#`` link names one — ``task:12``, the string
 ``core.references.format_ref`` produces — so one spelling addresses a thing
-across references, search and this. Node ids are an internal addressing detail
-and never appear here.
+across references, search and this; a person is ``user:42``. Node ids are an
+internal addressing detail and never appear here.
 """
 
 from __future__ import annotations
@@ -11,12 +11,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field
 
 from app.core.references import REF_SEPARATOR
-from app.core.relationships import ENDPOINT_KINDS, RelationshipType
+from app.core.relationships import EndpointKind, RelationshipType
 from app.core.tools import Tool
-from app.core.search import SearchEntityType
 from app.schemas.base import SanitizedBaseModel
 
 
@@ -25,15 +24,8 @@ class EndpointRef(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    type: SearchEntityType
+    type: EndpointKind
     id: int
-
-    @field_validator("type")
-    @classmethod
-    def _must_be_an_endpoint(cls, value: SearchEntityType) -> SearchEntityType:
-        if value not in ENDPOINT_KINDS:
-            raise ValueError(f"{value.value} cannot sit on a relationship")
-        return value
 
     @property
     def ref(self) -> str:
@@ -59,7 +51,7 @@ class RelatedEnd(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    type: SearchEntityType
+    type: EndpointKind
     id: int
     title: Optional[str] = None
     initiative_id: Optional[int] = None
@@ -80,7 +72,8 @@ class RelatedEnd(SanitizedBaseModel):
     #: What it shows of itself besides its name: a picture, an emoji, or a
     #: colour. At most one is set, and most kinds set none — those draw as their
     #: kind's own icon. A caller renders what it is given.
-    #: Pictures to draw. A file has its featured image at most.
+    #: Pictures to draw. A file has its featured image at most, a person their
+    #: avatar.
     image_urls: List[str] = Field(default_factory=list)
     icon: Optional[str] = None
     color: Optional[str] = None
@@ -93,11 +86,17 @@ class RelatedEnd(SanitizedBaseModel):
     mime_type: Optional[str] = None
     original_filename: Optional[str] = None
     smart_link_url: Optional[str] = None
+    #: A person's handle as their profile is addressed by, ``/u/<handle>``.
+    #: None for every other kind.
+    handle: Optional[str] = None
     #: Whether the far end is still outstanding — whether, were this a
     #: ``depends_on`` edge, it would still be holding the anchor up. None for a
     #: kind that has no notion of finishing, which is most of them: a file
     #: is never "done". See :mod:`app.db.blocking`.
     is_open: Optional[bool] = None
+    #: When the far end starts, for an event: what a contact's page orders
+    #: what is coming up by. None for every other kind.
+    starts_at: Optional[datetime] = None
 
 
 class RelationshipRead(SanitizedBaseModel):

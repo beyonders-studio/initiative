@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { DEFAULT_CALENDAR_COLOR } from "@/components/calendar";
 import {
   CreateToolDialog,
   type CreateToolDialogProps,
 } from "@/components/initiativeTools/shared/CreateToolDialog";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { Label } from "@/components/ui/label";
+import { DEFAULT_COLOR } from "@/lib/initiativeColors";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { Field } from "@/ui/field";
 
 /**
  * The shared create dialog with the one thing a calendar asks for beside it:
@@ -18,11 +18,13 @@ export const CreateCalendarDialog = (
   props: Omit<CreateToolDialogProps, "tool" | "text" | "extra">
 ) => {
   const { t } = useTranslation("calendars");
-  const [color, setColor] = useState(DEFAULT_CALENDAR_COLOR);
+  const [color, setColor] = useState(DEFAULT_COLOR);
 
-  useEffect(() => {
-    if (!props.open) setColor(DEFAULT_CALENDAR_COLOR);
-  }, [props.open]);
+  const [wasOpen, setWasOpen] = useState(props.open);
+  if (wasOpen !== props.open) {
+    setWasOpen(props.open);
+    if (!props.open) setColor(DEFAULT_COLOR);
+  }
 
   return (
     <CreateToolDialog
@@ -37,15 +39,13 @@ export const CreateCalendarDialog = (
       extra={{
         payload: { color },
         field: (
-          <div className="space-y-2">
-            <Label htmlFor="create-calendar-color">{t("calendarColor")}</Label>
+          <Field label={t("calendarColor")}>
             <ColorPickerPopover
-              id="create-calendar-color"
               value={color}
               onChangeComplete={setColor}
               triggerLabel={t("calendarColor")}
             />
-          </div>
+          </Field>
         ),
       }}
     />

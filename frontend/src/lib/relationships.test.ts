@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  EndpointKind,
   type RelatedEnd,
   RelationshipType,
   SearchEntityType,
@@ -14,6 +15,7 @@ import {
   groupEdges,
   groupOf,
   groupOrderFor,
+  type ItemEndKind,
   idsByKind,
   RELATION_GROUP_ORDER,
   RELATION_GROUPS,
@@ -164,7 +166,7 @@ describe("canAssert", () => {
 
 describe("relatedTarget", () => {
   it("renames a far end's five facts into what the search helpers read", () => {
-    const end: RelatedEnd = {
+    const end: RelatedEnd & { type: ItemEndKind } = {
       type: SearchEntityType.task,
       id: 7,
       title: "Ship it",
@@ -181,6 +183,8 @@ describe("relatedTarget", () => {
       original_filename: null,
       smart_link_url: null,
       is_open: null,
+      starts_at: null,
+      handle: null,
     };
     expect(relatedTarget(end)).toEqual({
       entity_type: SearchEntityType.task,
@@ -194,8 +198,6 @@ describe("relatedTarget", () => {
 
 describe("comparing sets of links", () => {
   it("reads a reorder as no change", () => {
-    // The old queue dialog compared these position by position, so reordering
-    // the same files counted as a change and a straight swap did not.
     expect(sameIds([1, 2, 3], [3, 1, 2])).toBe(true);
     expect(sameIds([1, 2], [1, 3])).toBe(false);
     expect(sameIds([1], [1, 2])).toBe(false);
@@ -235,7 +237,7 @@ describe("comparing sets of links", () => {
       // It is not a claim to make on a reader's behalf because they picked a
       // task, and a sentence that is visibly not quite right is what teaches
       // them the verb is theirs to change.
-      const kinds = Object.values(SearchEntityType);
+      const kinds = Object.values(EndpointKind);
       for (const anchor of kinds) {
         for (const picked of kinds) {
           const proposed = defaultGroupFor(anchor, picked);
@@ -247,8 +249,8 @@ describe("comparing sets of links", () => {
 
     it("proposes something a reader is actually offered", () => {
       const assertable = ASSERTABLE_GROUPS.map((group) => group.key);
-      for (const anchor of Object.values(SearchEntityType)) {
-        for (const picked of Object.values(SearchEntityType)) {
+      for (const anchor of Object.values(EndpointKind)) {
+        for (const picked of Object.values(EndpointKind)) {
           expect(assertable).toContain(defaultGroupFor(anchor, picked));
         }
       }
@@ -278,7 +280,7 @@ describe("comparing sets of links", () => {
 
     it("takes nothing away, whatever the pair", () => {
       const every = new Set(ASSERTABLE_GROUPS.map((group) => group.key));
-      for (const anchor of Object.values(SearchEntityType)) {
+      for (const anchor of Object.values(EndpointKind)) {
         const ordered = groupOrderFor(anchor, SearchEntityType.task, ASSERTABLE_GROUPS);
         expect(new Set(ordered.map((group) => group.key))).toEqual(every);
       }

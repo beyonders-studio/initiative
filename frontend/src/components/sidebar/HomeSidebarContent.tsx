@@ -7,11 +7,10 @@ import {
   LifeBuoy,
   MessageSquare,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { MessagesSidebarContent } from "@/components/sidebar/MessagesSidebarContent";
-import { Badge } from "@/components/ui/badge";
 import {
   SidebarContent,
   SidebarGroup,
@@ -20,25 +19,28 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from "@/components/sidebar/sidebar";
 import { useDirectMessagesEnabled } from "@/hooks/useDirectMessages";
 import { useMessagesWaiting } from "@/hooks/useMyMessages";
 import { useHasFiledTickets } from "@/hooks/useTickets";
+import { Badge } from "@/ui/badge";
 
 export const HomeSidebarContent = () => {
   const { t } = useTranslation("nav");
-  const location = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
 
   // My Messages is a list of people and then one of them, so it drills rather
   // than sharing the column: opening it puts the conversations here and the
   // arrow in that header climbs back out to this list. Climbing out is a look
   // rather than a move -- the thread stays open beside it -- so it is state
   // here, and arriving at the route again drills back in.
-  const onMessages = location.pathname.startsWith("/messages");
+  const onMessages = pathname.startsWith("/messages");
   const [climbedOut, setClimbedOut] = useState(false);
-  useEffect(() => {
+  const [wasOnMessages, setWasOnMessages] = useState(onMessages);
+  if (wasOnMessages !== onMessages) {
+    setWasOnMessages(onMessages);
     setClimbedOut(false);
-  }, [onMessages]);
+  }
 
   // Somebody asking to message you, or a message you have not read: the same
   // thing to whoever sees the mark, and counted in one place because the logo
@@ -101,9 +103,7 @@ export const HomeSidebarContent = () => {
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => {
-                const isActive = item.exact
-                  ? location.pathname === item.to
-                  : location.pathname.startsWith(item.to);
+                const isActive = item.exact ? pathname === item.to : pathname.startsWith(item.to);
                 return (
                   <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton asChild isActive={isActive}>

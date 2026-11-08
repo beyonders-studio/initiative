@@ -1,5 +1,5 @@
 import { CounterValueInput } from "@/components/initiativeTools/counters/CounterValueInput";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 interface CounterSegmentedClockViewProps {
   count: string;

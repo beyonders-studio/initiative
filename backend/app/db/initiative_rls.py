@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, replace
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Optional
 
 from app.db import gucs
 from app.core.plugin_scopes import tool_resource
@@ -33,6 +33,7 @@ from app.core.reactions import ReactionTarget
 from app.core.relationships import (
     ENDPOINT_KINDS,
     FACETS,
+    PERSON,
     SYMMETRIC_TYPES,
     Provenance,
     RelationshipType,
@@ -51,6 +52,7 @@ from app.models.platform.guild import AdminSurface
 from app.models.tenant.batched_notice import BatchedNoticeKind
 from app.db.presence import present, present_to_member
 from app.db.authorization import (
+    COMMUNITY_ROWS,
     IN_POLICY,
     POLICY_SETTINGS_ADMIN,
     STANDING,
@@ -458,22 +460,34 @@ def direct() -> InitiativePath:
     )
 
 
-def direct_or_guild() -> InitiativePath:
+def direct_or_guild(tool: Tool) -> InitiativePath:
     """Own ``initiative_id`` column, or none: a tool made for the whole guild.
 
     A row naming an initiative is gated like any :func:`direct` row. A row
     naming none belongs to the guild, where the initiative gate has nothing to
-    decide: every member reads it as its sharing allows, and writing it is the
-    guild admin's (or a live write grant's), or the installed plug-in's on a token
-    not narrowed to one initiative. Sharing still applies on top, which is how
-    the admin decides who writes what the row holds. ``resource_actions``
-    asks the same writer for ``edit``.
+    decide: every member reads it as its sharing allows, and making or
+    changing it is for the holders of its tool's surface (or a live write
+    grant), or the installed plug-in's on a token not narrowed to one
+    initiative — and, where the tool says so (``COMMUNITY_ROWS``), for whoever
+    its sharing lets write it. Sharing still applies on top, which is how the
+    admin decides who writes what the row holds. ``resource_actions`` asks the
+    same writer for ``edit``.
     """
-    writer = _P.guild_row_writer
+    rows = COMMUNITY_ROWS[tool]
+    writer = _P.guild_row_writer(rows.surface)
+
+    def writes(t: str) -> str:
+        if not rows.granted_writes_row:
+            return writer
+        return (
+            f"({writer} OR resource_access('{tool.value}', {t}.id, {gucs.USER_ID},"
+            f" {t}.initiative_id, true, {STANDING}))"
+        )
+
     return InitiativePath(
         predicate=lambda t, w: (
             f"({_access(f'{t}.initiative_id', w)}"
-            f" AND ({t}.initiative_id IS NOT NULL OR {writer}))"
+            f" AND ({t}.initiative_id IS NOT NULL OR {writes(t)}))"
             if w
             else _access(f"{t}.initiative_id", w)
         ),
@@ -973,6 +987,10 @@ def render_entity_access_fn() -> str:
     whose writes are edits passes the same flag twice; one whose writes are
     responses passes read for the second whatever the command. ``p_st`` is the
     statement's standing, which each arm hands on to the gates it calls.
+
+    A person on an edge's end (:data:`~app.core.relationships.PERSON`) is no
+    kind and has no table here. Like a tag, it asks nothing of the reader: the
+    edge is read and written through the item on its other end.
     """
     arms = "\n".join(
         f"        WHEN '{kind}' THEN\n"
@@ -991,6 +1009,8 @@ CREATE OR REPLACE FUNCTION {ENTITY_ACCESS_FN}(
 BEGIN
     CASE p_kind
 {arms}
+        WHEN '{PERSON.value}' THEN
+            RETURN true;
         ELSE
             RETURN false;
     END CASE;
@@ -1255,6 +1275,10 @@ def relationships_path() -> InitiativePath:
       path read it out of a body, and the authority for it was the authority to
       put those words there, which that body's own gate already asked. READ on
       both, and the endpoint refuses to unlink one by hand at all.
+    * a person on one end, whatever its type — the edge says something about
+      the item on the other end, so making one is editing that item: WRITE on
+      the item, whichever side it is on. The person's end asks nothing, and an
+      edge between two people is not written at all.
 
     Those distinctions are per ROW, and they ride as the function's
     ``need_write`` argument — plain boolean expressions over the row's own
@@ -1264,20 +1288,30 @@ def relationships_path() -> InitiativePath:
     """
 
     def build(t: str, w: bool) -> str:
-        # A write asks write of the source only where the edge describes it AND
-        # a person is the one saying so.
-        need_write = (
-            f"({t}.relationship_type NOT IN ({_SYMMETRIC_SQL})"
-            f" AND {t}.provenance <> {_FROM_CONTENT})"
+        # A write asks write of the end the edge describes, where somebody is
+        # the one saying so: the source, or the item beside a person.
+        person = f"'{PERSON.value}'"
+        asserted = f"{t}.provenance <> {_FROM_CONTENT}"
+        source_write: WriteFlag = (
+            f"(({t}.relationship_type NOT IN ({_SYMMETRIC_SQL})"
+            f" OR {t}.target_type = {person}) AND {asserted})"
             if w
             else "false"
         )
-        source = _entity_call(
-            f"{t}.source_type", f"{t}.source_id", need_write, need_write
+        target_write: WriteFlag = (
+            f"({t}.source_type = {person} AND {asserted})" if w else False
         )
-        target = _entity_call(f"{t}.target_type", f"{t}.target_id", False, False)
+        source = _entity_call(
+            f"{t}.source_type", f"{t}.source_id", source_write, source_write
+        )
+        target = _entity_call(
+            f"{t}.target_type", f"{t}.target_id", target_write, target_write
+        )
         if w:
-            return f"({source} AND {target})"
+            between_people = (
+                f"({t}.source_type = {person} AND {t}.target_type = {person})"
+            )
+            return f"({source} AND {target} AND NOT {between_people})"
         # What files a thing under a place reads wherever the place does, even
         # where the thing is only known to be there (``app.db.presence``): a
         # wiki can say how many of its files a member can't open.
@@ -1641,10 +1675,10 @@ def content_kind_path() -> InitiativePath:
 # source of truth: INITIATIVE_SCOPED_TABLES and the rendered RLS DDL (app.db.guild_ddl) both derive from
 # this dict, so a new initiative-scoped table is declared here exactly once.
 INITIATIVE_PATHS: dict[str, InitiativePath] = {
-    # Every tool's table: its own initiative_id column. A calendar may name no
-    # initiative, being made for the whole guild.
+    # Every tool's table: its own initiative_id column. A calendar or a contact
+    # may name no initiative, being made for the whole guild.
     **{
-        tool.plural: direct_or_guild() if tool is Tool.calendar else direct()
+        tool.plural: direct_or_guild(tool) if tool in COMMUNITY_ROWS else direct()
         for tool in Tool
     },
     "metadata_definitions": metadata_definitions_path(),
@@ -1688,8 +1722,6 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     "task_types": via("projects", "project_id"),
     # One hop -> files
     "file_versions": via("files", "file_id"),
-    # One hop -> queues
-    "queue_items": via("queues", "queue_id"),
     # One hop -> counter_groups
     "counters": via("counter_groups", "counter_group_id"),
     # One hop -> wikis. The page tree is a column on this table, not a
@@ -1710,9 +1742,10 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     # A case is read exactly as hard as the task it describes, so it hangs off
     # the task rather than off the project column it is keyed by.
     "intake_cases": via_task_project("task_id"),
+    # The votes for an idea are read as hard as the task that is the idea.
+    "idea_votes": via_task_project("task_id"),
     # What a person attached: reached as its report or its case is.
     "evidence": evidence_path(),
-    # Two hops -> queue_items -> queues
     # Two hops -> post_polls -> posts
     "post_poll_options": via_post_poll("poll_id"),
     "post_poll_votes": via_post_poll("poll_id"),
@@ -1750,14 +1783,23 @@ class NamedPerson:
     column: str
     #: The row stays and the column is emptied, rather than the row deleted.
     clear: bool = False
+    #: The rows that keep the person, as a condition on ``t``, where ``%1$I``
+    #: is the schema: what records something they did, rather than names them.
+    kept: Optional[str] = None
 
 
 NAMED_PEOPLE: tuple[NamedPerson, ...] = (
     NamedPerson("task_assignees", "user_id"),
     NamedPerson("calendar_event_attendees", "user_id"),
     NamedPerson("calendar_event_answers", "user_id"),
-    NamedPerson("metadata_values", "value_user_id", clear=True),
-    NamedPerson("queue_items", "user_id", clear=True),
+    # A signature says who signed, so it keeps them.
+    NamedPerson(
+        "metadata_values",
+        "value_user_id",
+        clear=True,
+        kept="t.property_id IN (SELECT d.id FROM %1$I.metadata_definitions d"
+        " WHERE d.type::text = 'signature')",
+    ),
     # What somebody asked for goes with them: nobody is left to answer for.
     NamedPerson("share_requests", "user_id"),
 )
@@ -1949,7 +1991,7 @@ def grants_report_on_their_resource() -> ReportsAs:
     """A grant is sharing ON something — report it against that something.
 
     ``resource_type`` holds the Tool value and ``resource_id`` its id, so the
-    event lands on the project (or file, queue, …) whose access changed.
+    event lands on the project (or file, counter group, …) whose access changed.
     That is both what a subscriber wants to hear and already resolvable, where
     the grant row's own id resolves nowhere.
 
@@ -2014,9 +2056,10 @@ def relationships_report_on_both_ends() -> tuple[ReportsAs, ...]:
     changed and re-reads it through RLS, which ANDs both ends and hands back
     only what that reader may have.
 
-    An end that belongs to no initiative — a tag — resolves NULL, and the
-    capture function writes no event it cannot scope. The other end still
-    reports, so the change is heard once, by the initiative it happened in.
+    An end that belongs to no initiative — a tag, a person — resolves NULL,
+    and the capture function writes no event it cannot scope. The other end
+    still reports, so the change is heard once, by the initiative it happened
+    in.
 
     **The label comes from the primitive**, read per row: a ``tagged_with`` edge
     reports ``changed = ['tags']`` whatever the two things are, which is what a
@@ -2201,6 +2244,7 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
     "moderation_report_reporters": Silent("the reporters behind one report"),
     "moderation_actions": Silent("the moderation log, read on its own surface"),
     "intake_cases": Silent("the key -> task map; the task is what a subscriber hears"),
+    "idea_votes": Silent("who voted; the vote sweep tells voters what moved"),
     "uploads": Silent("a stored file; the content showing it is what changed"),
     "evidence": Silent("an attached file; its case or report is what changed"),
     # -- Guild-level tables that emit ---------------------------------------

@@ -10,6 +10,8 @@ COPY frontend .
 COPY VERSION /VERSION
 COPY MIN_NATIVE_VERSION /MIN_NATIVE_VERSION
 COPY MIN_DESKTOP_VERSION /MIN_DESKTOP_VERSION
+# Initiative Cloud's address, which the build bakes into the app.
+COPY CLOUD_ORIGIN /CLOUD_ORIGIN
 # The artwork credits, which every build writes into THIRD_PARTY_NOTICES.txt
 # (frontend/scripts/third-party-notices.mjs reads ../NOTICE.md).
 COPY NOTICE.md /NOTICE.md
@@ -58,12 +60,31 @@ WORKDIR /app
 COPY backend/pyproject.toml backend/uv.lock backend/.python-version ./
 RUN uv sync --frozen --no-dev
 
-# The stages that depend on the lockfiles alone, which is all the CI build cache
-# keeps (docker-image.yml): every other layer differs from one build to the
-# next. Nothing ships from here, and an image build never builds it.
+# Zensical, at the version that publishes the help center
+# (.github/workflows/docs.yml installs the same one; change the two together).
+FROM python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS help-deps
+RUN pip install --no-cache-dir --disable-pip-version-check --root-user-action=ignore \
+        --only-binary=:all: zensical==0.1.0
+
+# The help center's search index, which the app's Help panel searches: the
+# pages built as the published site is, then trimmed to what the panel shows.
+# The script stops the build when the search index is not the shape it reads.
+FROM help-deps AS help-index
+WORKDIR /help
+COPY zensical.toml ./
+COPY docs ./docs
+RUN zensical build --clean
+COPY backend/scripts/build_help_index.py ./
+RUN python build_help_index.py site/search.json /help-index.json
+
+# The stages that depend on the lockfiles and pinned tools alone, which is all
+# the CI build cache keeps (docker-image.yml): every other layer differs from
+# one build to the next. Nothing ships from here, and an image build never
+# builds it.
 FROM scratch AS dependencies
 COPY --from=frontend-deps /frontend/package.json /frontend/
 COPY --from=backend-deps /app/pyproject.toml /backend/
+COPY --from=help-deps /usr/local/bin/zensical /help/
 
 FROM python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS backend-runtime
 ARG VERSION=0.1.0
@@ -117,11 +138,13 @@ ENV PATH="/app/.venv/bin:$PATH"
 COPY VERSION ./VERSION
 COPY MIN_NATIVE_VERSION ./MIN_NATIVE_VERSION
 COPY MIN_DESKTOP_VERSION ./MIN_DESKTOP_VERSION
+COPY CLOUD_ORIGIN ./CLOUD_ORIGIN
 # Which build this is. The dev build passes `dev`, and only a dev image names the
 # dev app in its passkey association files (app/core/native_apps.py).
 ARG IMAGE_CHANNEL=release
 RUN echo "$IMAGE_CHANNEL" > ./IMAGE_CHANNEL
 COPY CHANGELOG.md ./CHANGELOG.md
+COPY --from=help-index /help-index.json ./help-index.json
 COPY --from=frontend-build /frontend/dist ./static
 COPY --from=frontend-build /frontend/dist-editor/editor.js ./editor/editor.js
 COPY --from=frontend-build /ota/ ./ota/

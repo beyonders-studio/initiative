@@ -6,19 +6,13 @@ import { resetPassword } from "@/api/generated/auth/auth";
 import { NewPasswordFields } from "@/components/auth/NewPasswordFields";
 import { ServerChip } from "@/components/auth/ServerChoice";
 import { SignInFrame } from "@/components/auth/SignInFrame";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { useApiMutation } from "@/hooks/useApiMutation";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useEmailLinkToken } from "@/hooks/useEmailLinkToken";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { checkNewPassword } from "@/lib/passwordPolicy";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
 
 export const ResetPasswordPage = () => {
   // Include ``errors`` so ``getErrorMessage`` can map server codes
@@ -30,10 +24,18 @@ export const ResetPasswordPage = () => {
   const token = useEmailLinkToken();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [status, setStatus] = useState<"idle" | "submitting" | "success">("idle");
   const [error, setError] = useState<string | null>(null);
+  const reset = useApiMutation(
+    { mutationFn: resetPassword },
+    {
+      // ``getErrorMessage`` maps server codes like ``PASSWORD_BREACHED``
+      // to the localized string from ``errors.json``; falls back to the
+      // generic reset-page error when the code isn't recognized.
+      onError: (err) => setError(getErrorMessage(err, "auth:resetPassword.error")),
+    }
+  );
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!token) {
       setError(t("resetPassword.missingToken"));
@@ -44,18 +46,8 @@ export const ResetPasswordPage = () => {
       setError(passwordError);
       return;
     }
-    setStatus("submitting");
     setError(null);
-    try {
-      await resetPassword({ token, password });
-      setStatus("success");
-    } catch (err) {
-      // ``getErrorMessage`` maps server codes like ``PASSWORD_BREACHED``
-      // to the localized string from ``errors.json``; falls back to the
-      // generic reset-page error when the code isn't recognized.
-      setError(getErrorMessage(err, "auth:resetPassword.error"));
-      setStatus("idle");
-    }
+    reset.mutate({ token, password });
   };
 
   // A link mailed before passwords were withdrawn still arrives here, and
@@ -109,7 +101,7 @@ export const ResetPasswordPage = () => {
           <CardTitle>{t("resetPassword.title")}</CardTitle>
         </CardHeader>
         <CardContent>
-          {status === "success" ? (
+          {reset.isSuccess ? (
             <div className="space-y-4 text-primary text-sm">
               <p>{t("resetPassword.success")}</p>
               <Button className="w-full" onClick={() => router.navigate({ to: "/login" })}>
@@ -126,16 +118,14 @@ export const ResetPasswordPage = () => {
                 onPasswordChange={setPassword}
                 onConfirmChange={setConfirmPassword}
               />
-              <Button className="w-full" type="submit" disabled={status === "submitting"}>
-                {status === "submitting"
-                  ? t("resetPassword.submitting")
-                  : t("resetPassword.submit")}
+              <Button className="w-full" type="submit" disabled={reset.isPending}>
+                {reset.isPending ? t("resetPassword.submitting") : t("resetPassword.submit")}
               </Button>
               {error ? <p className="text-destructive text-sm">{error}</p> : null}
             </form>
           )}
         </CardContent>
-        {status !== "success" ? (
+        {!reset.isSuccess ? (
           <CardFooter className="text-muted-foreground text-sm">
             <Link className="text-primary underline-offset-4 hover:underline" to="/forgot-password">
               {t("resetPassword.needNewLink")}

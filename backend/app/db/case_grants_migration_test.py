@@ -18,11 +18,7 @@ from typing import Any
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
-from sqlmodel import select
 
-from app.db.request_context import Unattributed
-from app.db.session import set_rls_context
-from app.models.platform.app_setting import AppSetting
 from app.testing import (
     create_access_grant,
     create_guild,
@@ -30,6 +26,7 @@ from app.testing import (
     create_project,
     create_task,
     create_user,
+    make_operations_community,
 )
 
 _MIGRATION = (
@@ -68,13 +65,7 @@ async def test_the_links_move_into_the_operations_community(session) -> None:
     initiative = await create_initiative(session, operations, user)
     project = await create_project(session, initiative, user)
     case_id = (await create_task(session, project)).id
-    await set_rls_context(session, Unattributed())
-    setting = (
-        await session.exec(select(AppSetting).where(AppSetting.id == 1))
-    ).first() or AppSetting(id=1)
-    setting.operations_guild_id = operations.id
-    session.add(setting)
-    await session.commit()
+    await make_operations_community(session, operations.id)
 
     for purpose, level in (("content", "read"), ("settings", "admin")):
         await create_access_grant(

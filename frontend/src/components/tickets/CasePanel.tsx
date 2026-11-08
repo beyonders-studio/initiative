@@ -4,7 +4,8 @@
  * Who filed it and what they called it, and — where the case's stream holds a
  * conversation with them — that conversation and a way to answer it. It is
  * kept apart from the task's comments: everything here is what the requester
- * reads, and nothing in the thread below ever reaches them.
+ * reads, and nothing in the thread below ever reaches them. A published idea
+ * is a case nobody filed: it shows how many voted for it.
  */
 import { Link } from "@tanstack/react-router";
 import { Inbox, KeyRound, Send, UserCheck } from "lucide-react";
@@ -23,20 +24,20 @@ import { AccessGrantStatusBadge } from "@/components/platform/AccessGrantStatusB
 import { CaseHolds } from "@/components/tickets/CaseHolds";
 import { communityEvidenceUrl, EvidenceList } from "@/components/tickets/Evidence";
 import { UserHandle } from "@/components/UserHandle";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { UserHoverLink } from "@/components/user/UserHoverLink";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useCreateComment } from "@/hooks/useComments";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { useUpdateTask } from "@/hooks/useTasks";
 import { refreshTaskCase, useTakeCase, useTaskCase } from "@/hooks/useTickets";
 import { minutesLeft } from "@/lib/formatDate";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { cn } from "@/ui/lib/utils";
+import { Textarea } from "@/ui/textarea";
 
 interface CasePanelProps {
   taskId: number;
@@ -197,10 +198,14 @@ export const CasePanel = ({ taskId, canEdit, assigneeIds }: CasePanelProps) => {
   const updateTask = useUpdateTask();
   const filed = useRelativeTime(caseQuery.data?.opened_at ?? null);
 
-  const found = caseQuery.data;
+  // A 404 keeps the last answer cached: a published idea put back to a draft
+  // is no longer a case, though it was one a moment ago.
+  const found = caseQuery.isError ? undefined : caseQuery.data;
   if (!found) return null;
 
   const filerName = found.filer ? getUserDisplayName(found.filer) : null;
+  // A published idea: the board's, not a ticket somebody takes or asks access for.
+  const idea = found.votes != null;
   const mine = user != null && assigneeIds.includes(user.id);
   const awaiting = found.awaiting_filer_status_id ?? null;
   const messages = found.messages ?? [];
@@ -244,7 +249,9 @@ export const CasePanel = ({ taskId, canEdit, assigneeIds }: CasePanelProps) => {
           ) : null}
         </CardTitle>
         <p className="text-muted-foreground text-sm">
-          {filerName ? (
+          {idea ? (
+            <>{t("case.votes", { count: found.votes })} · </>
+          ) : filerName ? (
             <>
               {t("case.filedBy")}{" "}
               <UserHoverLink user={found.filer ?? null} className="font-medium text-foreground">
@@ -253,7 +260,8 @@ export const CasePanel = ({ taskId, canEdit, assigneeIds }: CasePanelProps) => {
               {" · "}
             </>
           ) : (
-            <>{t("case.noFiler")} · </>
+            // Feedback has no filer where its sender did not offer to be contacted.
+            <>{t(found.stream === "feedback" ? "case.noContact" : "case.noFiler")} · </>
           )}
           {filed}
         </p>
@@ -263,7 +271,7 @@ export const CasePanel = ({ taskId, canEdit, assigneeIds }: CasePanelProps) => {
             {found.filer_subject}
           </p>
         ) : null}
-        {mine ? (
+        {idea ? null : mine ? (
           <p className="flex items-center gap-1.5 text-muted-foreground text-sm">
             <UserCheck className="h-4 w-4" aria-hidden="true" />
             {t("case.taken")}
@@ -297,11 +305,13 @@ export const CasePanel = ({ taskId, canEdit, assigneeIds }: CasePanelProps) => {
           resourceId={found.resource_id}
         />
       ) : null}
-      <CaseAccess
-        taskId={taskId}
-        grants={found.grants ?? []}
-        subjectCommunityId={found.subject_community_id ?? null}
-      />
+      {idea ? null : (
+        <CaseAccess
+          taskId={taskId}
+          grants={found.grants ?? []}
+          subjectCommunityId={found.subject_community_id ?? null}
+        />
+      )}
       {found.filer && (
         <CardContent className="space-y-3">
           {messages.length > 0 ? (

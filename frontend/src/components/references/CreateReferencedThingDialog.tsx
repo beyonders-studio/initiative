@@ -2,7 +2,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
+import { useCreateTool } from "@/hooks/useCreateTool";
+import { useInitiative } from "@/hooks/useInitiatives";
+import { TOOL_ICONS, TOOLS, toolNavLabelKey } from "@/lib/tools";
 import {
   Dialog,
   DialogContent,
@@ -10,11 +12,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useCreateTool } from "@/hooks/useCreateTool";
-import { useInitiative } from "@/hooks/useInitiatives";
-import { TOOL_ICONS, TOOLS, toolNavLabelKey } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+} from "@/ui/dialog";
+import { cn } from "@/ui/lib/utils";
 
 /** What a made thing answers with, so the caller can link it. */
 export interface CreatedThing {
@@ -104,14 +103,12 @@ export function CreateReferencedThingDialog({
           <p className="text-muted-foreground text-sm">{t("createNothingAllowed")}</p>
         )}
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
-            {t("common:cancel")}
-          </Button>
-          <Button disabled={chosen === null || createTool.isPending} onClick={() => void create()}>
-            {t("common:create")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("common:create")}
+          onSubmit={() => void create()}
+          pending={createTool.isPending}
+          disabled={chosen === null}
+        />
       </DialogContent>
     </Dialog>
   );
