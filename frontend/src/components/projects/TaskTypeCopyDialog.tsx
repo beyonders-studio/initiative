@@ -10,8 +10,9 @@ import { useTranslation } from "react-i18next";
 
 import { type TaskTypeRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { useProjects, useProjectTaskTypes } from "@/hooks/useProjects";
+import { toolViewParams } from "@/lib/tools";
+import { Checkbox } from "@/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -19,17 +20,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useProjects, useProjectTaskTypes } from "@/hooks/useProjects";
-import { toolViewParams } from "@/lib/tools";
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 interface TaskTypeCopyDialogProps {
   open: boolean;
@@ -42,30 +36,28 @@ interface TaskTypeCopyDialogProps {
   onCopy: (sourceProjectId: number, typeIds: number[]) => void;
 }
 
-export const TaskTypeCopyDialog = ({
-  open,
-  onOpenChange,
+export const TaskTypeCopyDialog = ({ open, onOpenChange, ...props }: TaskTypeCopyDialogProps) => (
+  <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="flex max-h-[90dvh] flex-col bg-card">
+      <TaskTypeCopyForm {...props} />
+    </DialogContent>
+  </Dialog>
+);
+
+// Drawn only while the dialog is open, so each opening starts with no project
+// chosen.
+const TaskTypeCopyForm = ({
   projectId,
   types,
   room,
   saving,
   onCopy,
-}: TaskTypeCopyDialogProps) => {
+}: Omit<TaskTypeCopyDialogProps, "open" | "onOpenChange">) => {
   const { t } = useTranslation(["projects", "common"]);
-  const projects = useProjects(
-    { slim: true, ...toolViewParams(Tool.project, "active") },
-    { enabled: open }
-  );
+  const projects = useProjects({ slim: true, ...toolViewParams(Tool.project, "active") });
   const [sourceId, setSourceId] = useState<number | null>(null);
   const [chosen, setChosen] = useState<Set<number>>(new Set());
-  const sourceTypes = useProjectTaskTypes(sourceId, { enabled: open && sourceId !== null });
-
-  useEffect(() => {
-    if (open) {
-      setSourceId(null);
-      setChosen(new Set());
-    }
-  }, [open]);
+  const sourceTypes = useProjectTaskTypes(sourceId, { enabled: sourceId !== null });
 
   const others = (projects.data?.items ?? []).filter((project) => project.id !== projectId);
   const here = useMemo(() => new Set(types.map((type) => type.name.toLocaleLowerCase())), [types]);
@@ -104,79 +96,70 @@ export const TaskTypeCopyDialog = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90dvh] flex-col bg-card">
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-col gap-4">
-          <DialogHeader>
-            <DialogTitle>{t("taskTypes.copy.title")}</DialogTitle>
-            <DialogDescription>{t("taskTypes.copy.description")}</DialogDescription>
-          </DialogHeader>
+    <form onSubmit={handleSubmit} className="flex min-h-0 flex-col gap-4">
+      <DialogHeader>
+        <DialogTitle>{t("taskTypes.copy.title")}</DialogTitle>
+        <DialogDescription>{t("taskTypes.copy.description")}</DialogDescription>
+      </DialogHeader>
 
-          <div className="space-y-2">
-            <Label htmlFor="copy-types-from">{t("taskTypes.copy.fromLabel")}</Label>
-            <Select value={sourceId === null ? "" : String(sourceId)} onValueChange={pickSource}>
-              <SelectTrigger id="copy-types-from">
-                <SelectValue placeholder={t("taskTypes.copy.fromPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                {others.map((project) => (
-                  <SelectItem key={project.id} value={String(project.id)}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      <Field label={t("taskTypes.copy.fromLabel")}>
+        <Select value={sourceId === null ? "" : String(sourceId)} onValueChange={pickSource}>
+          <SelectTrigger>
+            <SelectValue placeholder={t("taskTypes.copy.fromPlaceholder")} />
+          </SelectTrigger>
+          <SelectContent>
+            {others.map((project) => (
+              <SelectItem key={project.id} value={String(project.id)}>
+                {project.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
 
-          {/* Positioned, so the hidden inputs Radix adds to form controls
+      {/* Positioned, so the hidden inputs Radix adds to form controls
               scroll with the list instead of stretching the dialog. */}
-          {sourceId !== null ? (
-            <fieldset className="relative min-h-0 flex-1 space-y-2 overflow-y-auto">
-              <legend className="font-medium text-sm">{t("taskTypes.copy.typesLabel")}</legend>
-              {sourceTypes.isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              ) : null}
-              {(sourceTypes.data ?? []).map((type) => {
-                const already = isHere(type);
-                const checked = chosen.has(type.id);
-                const full = !checked && chosen.size >= room;
-                const id = `copy-type-${type.id}`;
-                return (
-                  <div key={type.id} className="flex items-center gap-2">
-                    <Checkbox
-                      id={id}
-                      checked={checked}
-                      disabled={already || full}
-                      onCheckedChange={(value) => toggle(type.id, value === true)}
-                    />
-                    <Label htmlFor={id} className="flex items-center gap-2 font-normal">
-                      <TaskTypeOption type={type} />
-                      {already ? (
-                        <span className="text-muted-foreground text-xs">
-                          {t("taskTypes.copy.alreadyHere")}
-                        </span>
-                      ) : null}
-                    </Label>
-                  </div>
-                );
-              })}
-              {room === 0 ? (
-                <p className="text-muted-foreground text-sm">{t("taskTypes.copy.noRoom")}</p>
-              ) : null}
-            </fieldset>
+      {sourceId !== null ? (
+        <fieldset className="relative min-h-0 flex-1 space-y-2 overflow-y-auto">
+          <legend className="font-medium text-sm">{t("taskTypes.copy.typesLabel")}</legend>
+          {sourceTypes.isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           ) : null}
+          {(sourceTypes.data ?? []).map((type) => {
+            const already = isHere(type);
+            const checked = chosen.has(type.id);
+            const full = !checked && chosen.size >= room;
+            const id = `copy-type-${type.id}`;
+            return (
+              <div key={type.id} className="flex items-center gap-2">
+                <Checkbox
+                  id={id}
+                  checked={checked}
+                  disabled={already || full}
+                  onCheckedChange={(value) => toggle(type.id, value === true)}
+                />
+                <Label htmlFor={id} className="flex items-center gap-2 font-normal">
+                  <TaskTypeOption type={type} />
+                  {already ? (
+                    <span className="text-muted-foreground text-xs">
+                      {t("taskTypes.copy.alreadyHere")}
+                    </span>
+                  ) : null}
+                </Label>
+              </div>
+            );
+          })}
+          {room === 0 ? (
+            <p className="text-muted-foreground text-sm">{t("taskTypes.copy.noRoom")}</p>
+          ) : null}
+        </fieldset>
+      ) : null}
 
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              {t("common:cancel")}
-            </Button>
-            <Button type="submit" disabled={sourceId === null || chosen.size === 0 || saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {t("taskTypes.copy.submit", { count: chosen.size })}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+      <DialogFooter
+        submitLabel={t("taskTypes.copy.submit", { count: chosen.size })}
+        pending={saving}
+        disabled={sourceId === null || chosen.size === 0}
+      />
+    </form>
   );
 };

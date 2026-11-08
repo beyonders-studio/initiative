@@ -14,7 +14,7 @@ from typing import Any
 
 from sqlmodel import select
 
-from app.core.messages import PluginMessages, QueryMessages
+from app.core.messages import PluginMessages
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
 from app.models.platform.notification import Notification, NotificationType
@@ -152,8 +152,15 @@ async def test_lists_with_the_filters_a_scan_sends(
     installed = await install_plugin(session, acting_user, role_session, granted=READ)
     project = await create_project(session, installed.placed, installed.seat.user)
     await create_resource_grant(session, project, all_initiative_members=True)
-    await create_task(session, project, title="Late", due_date=_at("2026-01-02"))
+    await create_task(
+        session,
+        project,
+        title="Late",
+        due_date=_at("2026-01-02"),
+        assignees=[installed.seat.user],
+    )
     await create_task(session, project, title="Later", due_date=_at("2026-03-02"))
+    await create_task(session, project, title="Nobody's", due_date=_at("2026-01-03"))
     headers = install_headers(installed, READ)
     conditions = [
         {"field": "due_date", "op": "gte", "value": "2026-01-01T00:00:00+00:00"},
@@ -178,20 +185,41 @@ async def test_lists_with_the_filters_a_scan_sends(
         },
     )
     assert listed.status_code == 200, listed.text
-    assert [t["title"] for t in listed.json()["items"]] == ["Late"]
+    assert [t["title"] for t in listed.json()["items"]] == ["Late", "Nobody's"]
 
-    # A filter whose values are people's row ids is a person's to send.
+    # A filter names a person by what the install calls them.
+    [seat] = listed.json()["items"][0]["assignees"]
+
+    def _assigned_to(value: Any) -> dict[str, str]:
+        return {
+            "conditions": json.dumps(
+                [{"field": "assignee_ids", "op": "in_", "value": [value]}]
+            )
+        }
+
     by_person = await client.get(
         guild_url(installed.guild.id, "/tasks/"),
         headers=headers,
-        params={
-            "conditions": json.dumps(
-                [{"field": "assignee_ids", "op": "in_", "value": ["me"]}]
-            )
-        },
+        params=_assigned_to(seat["id"]),
     )
-    assert by_person.status_code == 400, by_person.text
-    assert by_person.json()["detail"] == QueryMessages.INVALID_CONDITIONS
+    assert by_person.status_code == 200, by_person.text
+    assert [t["title"] for t in by_person.json()["items"]] == ["Late"]
+    # JSON that leads with whitespace names the same person.
+    padded = await client.get(
+        guild_url(installed.guild.id, "/tasks/"),
+        headers=headers,
+        params={"conditions": " \n\t" + _assigned_to(seat["id"])["conditions"]},
+    )
+    assert padded.status_code == 200, padded.text
+    assert [t["title"] for t in padded.json()["items"]] == ["Late"]
+    for named in (installed.seat.user.id, "uplu_" + "x" * 32):
+        refused = await client.get(
+            guild_url(installed.guild.id, "/tasks/"),
+            headers=headers,
+            params=_assigned_to(named),
+        )
+        assert refused.status_code == 422, (named, refused.text)
+        assert refused.json()["detail"] == PluginMessages.REFERENCE_UNKNOWN
 
 
 # ---------------------------------------------------------------------------

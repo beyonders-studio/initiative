@@ -16,7 +16,7 @@
     "titleAria": "Tu grupo tiene mucho entre manos. Es hora de tomar la Initiative.",
     "subtitle": "Los proyectos, tareas, archivos y planes de tu grupo, en un solo sitio. En vez de repartidos entre un chat de grupo, dos hojas de cálculo, un hilo de correos de marzo y la cabeza de quien lleva más tiempo haciendo esto.",
     "freeTitle": "Registrarse es gratis",
-    "freeBody": "Tu cuenta y tu primera comunidad son gratis, y cada plan de pago empieza con 14 días de prueba gratis.",
+    "freeBody": "Tu cuenta y las comunidades solo para ti son gratis, y cada plan de pago empieza con 14 días de prueba gratis.",
     "signUp": "Registrarse",
     "signIn": "Iniciar sesión",
     "download": "Descargar",
@@ -62,12 +62,12 @@
     "note": "Activa las que necesite tu grupo. Desactivar una más tarde no borra nada.",
     "projects": "Tableros, tablas y calendarios con las mismas tareas, con confeti si quieres.",
     "files": "Páginas, hojas de cálculo y pizarras que editáis juntos en directo.",
-    "queues": "Lleva la cuenta de a quién le toca, porque al parecer nunca le toca a nadie.",
     "counterGroups": "Entradas vendidas, pasteles prometidos, sillas que siguen faltando.",
     "calendars": "Eventos con confirmaciones y recordatorios, para que no tengas que recordárselo tú a todo el mundo.",
     "dashboards": "Tus números en una sola pantalla, y cada persona solo ve lo que puede ver.",
     "wikis": "Escribe lo que sabe el grupo, con enlaces que siguen funcionando aunque cambies un nombre.",
-    "posts": "Anuncios que no quedan enterrados, con encuestas y confirmaciones de lectura."
+    "posts": "Anuncios que no quedan enterrados, con encuestas y confirmaciones de lectura.",
+    "contacts": "Todas las personas para las que o con las que trabajáis, a un toque de una llamada, con lo pendiente de cada una."
   },
   "together": {
     "titleStart": "Hecho para hacerlo",
@@ -155,10 +155,6 @@
       "rsvpMaybe": "Quizá",
       "rsvpNo": "No puedo",
       "reminder": "Recordatorio una hora antes"
-    },
-    "rota": {
-      "title": "Turno de snacks",
-      "detail": "Ronda 6, esta semana le toca a Luis"
     },
     "points": {
       "planTitle": "Organizad cosas juntos",
@@ -384,10 +380,8 @@
     "readMoreAria": "Leer la entrada completa sobre Initiative {{version}}",
     "older": "Ver entradas anteriores",
     "back": "Todas las entradas",
-    "loading": "Cargando…",
     "empty": "Todavía no hay nada.",
-    "notFound": "No encontramos esa versión. Puede que aún no haya salido.",
-    "error": "No se han podido cargar las novedades. Espera un momento y vuelve a intentarlo."
+    "notFound": "No encontramos esa versión. Puede que aún no haya salido."
   },
   "meta": {
     "homeTitle": "Initiative: tu grupo tiene mucho entre manos, y es hora de tomar la Initiative",

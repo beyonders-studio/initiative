@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import { AdminSurface, FeedView } from "@/api/generated/initiativeAPI.schemas";
 import { CatchUpButton } from "@/components/activity/CatchUpButton";
 import { CommunityLocationLine } from "@/components/communities/CommunityLocationLine";
+import { InviteMembersDialog } from "@/components/communities/InviteMembersDialog";
 import { CommunityActivityFeed } from "@/components/communityHome/CommunityActivityFeed";
 import { CommunityBannerBadges } from "@/components/communityHome/CommunityBannerBadges";
 import { CommunityComingUp } from "@/components/communityHome/CommunityComingUp";
@@ -38,7 +39,7 @@ import { activityLastVisitKey } from "@/lib/activityLastVisit";
 import { renderableBanner } from "@/lib/banner";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { readableTextShadow } from "@/lib/contrastColor";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 /** The rail's circles, in order; the first is the default. All and Yours are
  *  views of the activity feed; Comments shows the comments themselves. */
@@ -81,6 +82,12 @@ export function CommunityHomePage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const openCreateDialog = useCallback(() => setCreateDialogOpen(true), []);
   const onCreate = canCreateInitiatives ? openCreateDialog : undefined;
+  // Inviting people takes the invites surface, and may be all somebody holds:
+  // the banner offers it beside the member count.
+  const [inviting, setInviting] = useState(false);
+  const openInviteDialog = useCallback(() => setInviting(true), []);
+  const onInvite =
+    heldSurfaces.writes && heldSurfaces.holds(AdminSurface.invites) ? openInviteDialog : undefined;
 
   // `?create=true` opens the dialog once — the deep link the sidebar and the
   // retired initiatives page both point at. Consumed once so dismissing the
@@ -149,6 +156,7 @@ export function CommunityHomePage() {
               memberCount={activeCommunity.member_count}
               onlineCount={activeCommunity.online_count}
               ink={banner.text_color}
+              onInvite={onInvite}
             />
           ) : null
         }
@@ -214,6 +222,8 @@ export function CommunityHomePage() {
             }}
           />
         ) : null}
+
+        {inviting ? <InviteMembersDialog open onOpenChange={setInviting} /> : null}
 
         {canCreateInitiatives ? (
           <CreateInitiativeWizard

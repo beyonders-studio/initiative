@@ -210,12 +210,6 @@ def encrypt(
     return bytes(out)
 
 
-def ciphertext_size(plaintext_size: int, chunk_size: int = CHUNK_SIZE) -> int:
-    """How many bytes :func:`encrypt` writes for ``plaintext_size`` bytes."""
-    count = max(1, -(-plaintext_size // chunk_size))
-    return _HEADER.size + plaintext_size + count * _TAG_LEN
-
-
 def decrypt_stream(
     stored: Iterable[bytes],
     dek: bytes,

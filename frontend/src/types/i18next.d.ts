@@ -9,6 +9,7 @@ import type comments from "../../public/locales/en/comments.json";
 import type common from "../../public/locales/en/common.json";
 import type communities from "../../public/locales/en/communities.json";
 import type communityHome from "../../public/locales/en/communityHome.json";
+import type connections from "../../public/locales/en/connections.json";
 import type contacts from "../../public/locales/en/contacts.json";
 import type counterGroups from "../../public/locales/en/counterGroups.json";
 import type dashboards from "../../public/locales/en/dashboards.json";
@@ -34,7 +35,6 @@ import type posts from "../../public/locales/en/posts.json";
 import type profiles from "../../public/locales/en/profiles.json";
 import type projects from "../../public/locales/en/projects.json";
 import type properties from "../../public/locales/en/properties.json";
-import type queues from "../../public/locales/en/queues.json";
 import type relations from "../../public/locales/en/relations.json";
 import type search from "../../public/locales/en/search.json";
 import type settings from "../../public/locales/en/settings.json";
@@ -43,6 +43,7 @@ import type stats from "../../public/locales/en/stats.json";
 import type tags from "../../public/locales/en/tags.json";
 import type tasks from "../../public/locales/en/tasks.json";
 import type trash from "../../public/locales/en/trash.json";
+import type ui from "../../public/locales/en/ui.json";
 import type wikis from "../../public/locales/en/wikis.json";
 
 declare module "i18next" {
@@ -66,6 +67,7 @@ declare module "i18next" {
       messages: typeof messages;
       myTools: typeof myTools;
       home: typeof home;
+      connections: typeof connections;
       contacts: typeof contacts;
       files: typeof files;
       editor: typeof editor;
@@ -87,7 +89,6 @@ declare module "i18next" {
       properties: typeof properties;
       posts: typeof posts;
       wikis: typeof wikis;
-      queues: typeof queues;
       relations: typeof relations;
       search: typeof search;
       settings: typeof settings;
@@ -96,6 +97,7 @@ declare module "i18next" {
       tags: typeof tags;
       tasks: typeof tasks;
       trash: typeof trash;
+      ui: typeof ui;
     };
   }
 }

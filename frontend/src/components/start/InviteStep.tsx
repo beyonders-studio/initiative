@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 
-import { StepField } from "@/components/start/stepParts";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
 
 /** The invite code or link, and what checking it found. */
 export const InviteStep = ({
@@ -32,15 +32,14 @@ export const InviteStep = ({
         onSubmit();
       }}
     >
-      <StepField id="start-invite-code" label={t("start.invite.codeLabel")}>
+      <Field label={t("start.invite.codeLabel")}>
         <Input
-          id="start-invite-code"
           value={code}
           onChange={(event) => onCodeChange(event.target.value)}
           autoCapitalize="none"
           autoComplete="off"
         />
-      </StepField>
+      </Field>
       {status ? <p className="text-muted-foreground text-sm">{status}</p> : null}
       {error ? <p className="text-destructive text-sm">{error}</p> : null}
       <Button type="submit" className="w-full" disabled={checking || !canContinue}>

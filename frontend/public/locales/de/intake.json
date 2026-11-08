@@ -40,6 +40,10 @@
     "feedback": {
       "title": "Feedback",
       "description": "Was Menschen sich von uns wünschen."
+    },
+    "ideas": {
+      "title": "Ideen",
+      "description": "Die Ideen, die alle lesen und für die alle stimmen können, auf Initiative Cloud."
     }
   },
   "stream": {
@@ -58,6 +62,8 @@
     "landingStatusDefault": "Standard des Projekts",
     "caseTypeLabel": "Neue Vorgänge sind vom Typ",
     "caseTypeDefault": "Standardtyp des Projekts",
+    "ideaTypeLabel": "Der Typ, der eine Aufgabe auf die Seite „Ideen“ bringt",
+    "ideaTypeNone": "Keiner: Es wird nichts veröffentlicht",
     "enabledLabel": "Empfängt neue Vorgänge",
     "lastCase": "Letzter Vorgang {{when}} geöffnet.",
     "noCasesYet": "Noch keine Vorgänge.",
@@ -79,25 +85,40 @@
     "sharesIsolated": "Ein anderer Kanal landet ebenfalls in dieser Initiative. Sicherheits- und Moderationsfälle sollten eine eigene Initiative haben, damit nur die Bearbeitenden sie lesen können.",
     "sharesWithIsolated": "Diese Initiative enthält auch Sicherheits- oder Moderationsfälle, die eine eigene Initiative haben sollten. Leite einen der Kanäle woandershin."
   },
-  "loadFailed": {
-    "title": "Diese Einstellungen konnten nicht geladen werden",
-    "description": "Es wurde nichts geändert. Versuche es erneut; wenn es weiter fehlschlägt, steht der Grund im Server-Log.",
-    "retry": "Erneut versuchen"
-  },
   "help": {
     "action": "Hilfe anfordern",
-    "title": "Hilfe anfordern",
-    "description": "Schreib uns, was los ist, und jemand kümmert sich darum.",
+    "panel": {
+      "search": "Benutzerhandbuch durchsuchen",
+      "guide": "Benutzerhandbuch",
+      "guideBody": "So nutzt du jeden Teil von Initiative, vom ersten Projekt an.",
+      "back": "Zurück zur Suche",
+      "forThisPage": "Zu dieser Seite",
+      "noMatch": "Im Benutzerhandbuch passt nichts zu „{{query}}“.",
+      "noMatchAsk": "Versuch es mit anderen Wörtern, oder frag unten das Team. Deine Suche kommt in die Anfrage.",
+      "noMatchWrite": "Versuch es mit anderen Wörtern, oder schreib an die Adresse unten.",
+      "noMatchBrowse": "Versuch es mit anderen Wörtern, oder stöbere im Benutzerhandbuch.",
+      "unavailable": "Die Suche ist auf diesem Server nicht eingerichtet. Über den Link zum Benutzerhandbuch oben findest du alles.",
+      "noAnswer": "Keine Antwort dabei?",
+      "openRequests_one": "{{count}} offene Anfrage",
+      "openRequests_other": "{{count}} offene Anfragen",
+      "askTeam": "Das Team fragen",
+      "writeTo": "Keine Antwort dabei? Schreib den Leuten, die diesen Server betreiben:",
+      "needsText": "Schreib, worum es geht, um zu senden.",
+      "needsTopic": "Wähl ein Thema, um zu senden.",
+      "sendShortcut": "Strg+Enter sendet",
+      "discard": "Verwerfen",
+      "sent": "An das Team gesendet",
+      "sentBody": "Die Leute, die diesen Server betreiben, kümmern sich darum. Ihre Antwort kommt in deine Benachrichtigungen, und die Anfrage bleibt unter Meine Tickets.",
+      "openTickets": "Meine Tickets öffnen"
+    },
     "subjectLabel": "Titel",
     "subjectPlaceholder": "Eine Zeile, damit es wiederzufinden ist",
     "bodyLabel": "Was ist passiert?",
     "bodyPlaceholder": "Was du getan hast, was du erwartet hast und was stattdessen passiert ist.",
-    "browseFaq": "FAQ durchsehen",
     "submit": "Senden",
     "thanks": "Gesendet. Jemand kümmert sich darum.",
     "error": "Das konnte nicht gesendet werden. Versuch es gleich noch einmal.",
     "topicLabel": "Worum geht es?",
-    "topicPlaceholder": "Wähle eins aus",
     "topics": {
       "account": "Mein Konto",
       "community": "Diese Community",
@@ -133,13 +154,14 @@
     "replyError": "Deine Antwort konnte nicht gesendet werden. Versuche es gleich noch einmal.",
     "closedNote": "Dieses Ticket ist geschlossen. Wenn etwas anderes ansteht, bitte erneut um Hilfe.",
     "noConversation": "Danke für die Meldung. Das Team sieht sich jede an, antwortet hier aber nicht auf Meldungen.",
-    "staffFirst": "Danke für deine Rückmeldung. Du kannst hier antworten, sobald sich das Team gemeldet hat.",
-    "empty": "Du hast noch keine Tickets eingereicht. Wenn du um Hilfe bittest, erscheint sie hier, damit du sie verfolgen kannst.",
-    "loadError": "Deine Tickets konnten nicht geladen werden."
+    "empty": "Du hast noch keine Tickets eingereicht. Wenn du um Hilfe bittest, erscheint sie hier, damit du sie verfolgen kannst."
   },
   "case": {
     "filedBy": "Eingereicht von",
     "noFiler": "Automatisch eröffnet",
+    "votes_one": "{{count}} Stimme",
+    "votes_other": "{{count}} Stimmen",
+    "noContact": "Möchte nicht kontaktiert werden",
     "theyCalledIt": "Ihr Betreff:",
     "noConversation": "Diese Art von Fall eröffnet kein Gespräch mit der einreichenden Person.",
     "staffFirst": "Sie kann antworten, sobald das Team ihr etwas geschrieben hat.",
@@ -211,6 +233,7 @@
   },
   "evidence": {
     "attach": "Dateien anhängen",
+    "dropHere": "Zum Anhängen ablegen",
     "limits_one": "Bis zu {{count}} Datei, höchstens {{size}}.",
     "limits_other": "Bis zu {{count}} Dateien, je höchstens {{size}}.",
     "remove": "{{name}} entfernen",
@@ -221,9 +244,7 @@
     "heading": "Angehängt",
     "reveal": "{{name}} anzeigen",
     "view": "{{name}} ansehen",
-    "open": "{{name}} öffnen",
-    "dropped_one": "{{names}} wurde entfernt: Das wird hier nicht angenommen.",
-    "dropped_other": "{{names}} wurden entfernt: Sie werden hier nicht angenommen."
+    "open": "{{name}} öffnen"
   },
   "security": {
     "action": "Sicherheitsproblem melden",
@@ -246,28 +267,34 @@
     "error": "Das konnte nicht gesendet werden. Versuch es gleich noch einmal."
   },
   "feedback": {
-    "action": "Feedback senden",
-    "title": "Feedback senden",
-    "description": "Sag den Leuten, die diesen Server betreiben, was du denkst. Du kannst es unter „Meine Tickets“ verfolgen.",
-    "typeLabel": "Was für Feedback ist es?",
-    "typePlaceholder": "Wähle eins aus",
-    "topics": {
-      "idea": "Eine Idee",
-      "problem": "Ein Problem",
-      "praise": "Lob",
-      "other": "Etwas anderes"
+    "title": "Sag uns, was du denkst",
+    "kindLabel": "Art des Feedbacks",
+    "kinds": {
+      "idea": {
+        "label": "Idee vorschlagen",
+        "question": "Was soll Initiative können?",
+        "placeholder": "Die Idee, und wobei sie dir helfen würde."
+      },
+      "problem": {
+        "label": "Etwas stimmt nicht",
+        "question": "Was war dir im Weg?",
+        "placeholder": "Was du gerade gemacht hast, und was passiert ist."
+      },
+      "praise": {
+        "label": "Ein Lob aussprechen",
+        "question": "Was gefällt dir daran?",
+        "placeholder": "Das, was du weiterempfehlen würdest."
+      }
     },
-    "bodyLabel": "Was möchtest du ihnen sagen?",
-    "bodyPlaceholder": "Was du dir wünschst, was dich gestört hat oder was dir gefallen hat.",
-    "needsAnswer": "Ich brauche eine Antwort",
-    "needsAnswerHelp": "Sendet es stattdessen als Hilfeanfrage, damit dir jemand antwortet.",
-    "submit": "Feedback senden",
-    "thanks": "Danke! Die Leute, die diesen Server betreiben, werden es lesen.",
-    "error": "Das konnte nicht gesendet werden. Versuch es gleich noch einmal.",
+    "contactable": "Ihr dürft mich bei Fragen dazu kontaktieren",
+    "seeIdeas": "Sieh dir an, was sich andere gewünscht haben",
+    "stuck": "Soll sich jemand darum kümmern? Hilfe anfordern",
     "context": {
-      "title": "Wird mitgesendet",
-      "help": "Wo die App gerade war, damit sie sehen, was du gesehen hast. Nichts davon nennt dich oder etwas, das du geöffnet hast.",
-      "remove": "Entfernen",
+      "on": "Enthält deine App-Version und die Seite, auf der du bist.",
+      "off": "Ohne App-Version und Seite.",
+      "switch": "App-Version und Seite mitsenden",
+      "show": "Anzeigen",
+      "hide": "Ausblenden",
       "fields": {
         "app_version": "Version",
         "platform": "Plattform",
@@ -276,9 +303,91 @@
         "route": "Seite",
         "viewport": "Fenster"
       }
-    }
+    },
+    "discard": "Verwerfen",
+    "writeSomething": "Schreib etwas, um es zu senden.",
+    "submit": "Feedback senden",
+    "signInToSend": "Zum Senden anmelden",
+    "thanks": "Danke für dein Feedback!",
+    "thanksBody": "Das Team liest jede Rückmeldung.",
+    "done": "Fertig",
+    "error": "Das konnte nicht gesendet werden. Versuch es gleich noch einmal."
+  },
+  "feedbackSwitch": {
+    "title": "Feedback",
+    "description": "Ideen, Probleme und Lob gehen an das Team, das Initiative macht. Ausgeschaltet sieht hier niemand „Feedback senden“, und nichts wird gesendet.",
+    "label": "Feedback an das Initiative-Team erlauben",
+    "error": "Das ließ sich nicht ändern. Versuch es gleich noch einmal."
   },
   "moderationTopics": {
     "appeal": "Einspruch gegen deine Sperre"
+  },
+  "ideas": {
+    "title": "Ideen",
+    "lede": "Was sich Leute gewünscht haben und wie es darum steht. Stimm für die, die du willst.",
+    "search": "Ideen suchen",
+    "sortLabel": "Reihenfolge",
+    "sort": {
+      "votes": "Meiste Stimmen",
+      "newest": "Neueste"
+    },
+    "statusLabel": "Status",
+    "allStatuses": "Alle",
+    "votedByMe": "Von mir gewählt",
+    "none": "Keine Ideen passen.",
+    "votes_one": "{{count}} Stimme",
+    "votes_other": "{{count}} Stimmen",
+    "vote": "Abstimmen",
+    "voted": "Gewählt",
+    "voteFor": "Für {{title}} stimmen",
+    "voteError": "Deine Stimme konnte nicht gespeichert werden. Versuch es gleich noch einmal.",
+    "all": "Alle Ideen"
+  },
+  "picture": {
+    "take": "Bild dieser Seite",
+    "failed": "Das Bild konnte nicht erstellt werden. Versuch es noch einmal oder häng stattdessen einen Screenshot an.",
+    "title": "Bild dieser Seite",
+    "edit": "{{name}} bearbeiten",
+    "tool": "Werkzeug",
+    "hide": "Verdecken",
+    "mark": "Markieren",
+    "undo": "Rückgängig",
+    "hideHint": "Zeig auf das Bild und klick auf einen Teil, um ihn zu übermalen, oder zieh über einen beliebigen Bereich. Ein Klick auf einen verdeckten Teil holt ihn zurück.",
+    "hideHintFile": "Zieh über alles, was verdeckt werden soll. Ein Klick auf einen verdeckten Bereich holt ihn zurück.",
+    "markHint": "Klick auf das, was nicht stimmt, oder zieh einen Rahmen darum. Jede Markierung hat eine Nummer, auf die du dich beziehen kannst.",
+    "markHintFile": "Zieh einen Rahmen um das, was nicht stimmt. Jede Markierung hat eine Nummer, auf die du dich beziehen kannst.",
+    "keys": "Mit den Pfeiltasten gehst du durch die Teile, die Leertaste verdeckt oder markiert einen, Strg+Z macht es rückgängig.",
+    "people": "Personen verbergen",
+    "peopleHidden": "Namen, Avatare, E-Mail-Adressen und Telefonnummern werden ersetzt, und du erscheinst als „Du“.",
+    "peopleShown": "Namen, Avatare, E-Mail-Adressen und Telefonnummern erscheinen so wie auf der Seite.",
+    "you": "Du",
+    "person": "Person {{number}}",
+    "emailHidden": "E-Mail verborgen",
+    "phoneHidden": "Nummer verborgen",
+    "fileNote": "Beim Anhängen wird eine frische Kopie gezeichnet, also bleibt auf deinem Gerät, wann, wo und womit das Bild aufgenommen wurde.",
+    "marks": "Markierungen",
+    "area": "ein selbst gezogener Bereich",
+    "hidePart": "{{part}} verdecken",
+    "markPart": "{{part}} markieren",
+    "showAgain": "Wieder zeigen",
+    "removeMark": "Markierung entfernen",
+    "who": "Wer das liest, sieht genau dieses Bild.",
+    "attach": "Bild anhängen",
+    "surface": "Das Bild. Mit den Pfeiltasten gehst du durch seine Teile.",
+    "parts": {
+      "name": "Name",
+      "avatar": "Avatar",
+      "email": "E-Mail-Adresse",
+      "phone": "Telefonnummer",
+      "picture": "Bild",
+      "field": "Feld",
+      "button": "Schaltfläche",
+      "link": "Link",
+      "heading": "Überschrift",
+      "row": "Zeile",
+      "item": "Eintrag",
+      "card": "Karte",
+      "text": "Text"
+    }
   }
 }

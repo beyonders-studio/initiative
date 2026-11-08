@@ -67,7 +67,7 @@ import {
   resolveCellStyle,
   styleToCss,
 } from "@/lib/spreadsheet/styles";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 export type { SpreadsheetContent };
 
@@ -1033,9 +1033,7 @@ export const SpreadsheetFileEditor = ({
       )}
       {/* Toolbar buttons must not take focus: the grid owns the keyboard,
           and clipboard events only reach a focused element. Inputs and the
-          labels wrapping them keep their default click behaviour — the
-          colour swatch is a native <input type="color"> whose click *is*
-          its action. */}
+          labels wrapping them keep their default click behaviour. */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: mousedown only suppresses focus theft; every control inside keeps its own semantics */}
       <div
         className="flex min-w-0 shrink-0 items-center gap-2 overflow-hidden border-border border-b bg-muted/20 px-3 py-2"

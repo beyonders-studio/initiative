@@ -2,17 +2,14 @@
 
 ``PROPERTY_LINKS`` is derived from ``PROPERTY_TARGETS``; what can drift is the
 rest of the stack each target has to be known to — the polymorphic gate, the
-freeze walk, the read schema, and the CHECK a migration wrote.
+freeze walk and the read schema. The CHECK on a value's kind follows the
+registry (``app.db.registry_checks``).
 """
 
 import importlib
-import re
 
 import pytest
-from sqlalchemy import text
-from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.tools import INSTALL_METADATA_KIND, PROPERTY_TARGETS
 from app.schemas.tenant.property import PropertiesOnCreate, PropertiesOnUpdate
 from app.db.frozen import render_resource_frozen_fn
 from app.db.initiative_rls import entity_tables, render_entity_initiative_fn
@@ -45,20 +42,3 @@ def test_every_target_is_known_to_the_gates_and_its_read():
         update = getattr(schemas, f"{spec.model.__name__}Update", None)
         if update is not None and "tag_ids" in update.model_fields:
             assert issubclass(update, PropertiesOnUpdate), update.__name__
-
-
-async def test_the_template_takes_a_value_on_every_target(session: AsyncSession):
-    """The CHECK is written by migrations, so a new target needs one."""
-    definition = (
-        await session.exec(
-            text(
-                "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
-                "WHERE conname = 'ck_metadata_values_entity_type' "
-                "AND connamespace = 'guild_template'::regnamespace"
-            )
-        )
-    ).one()[0]
-    assert set(re.findall(r"'(\w+)'", definition)) == {
-        *PROPERTY_TARGETS,
-        INSTALL_METADATA_KIND,
-    }

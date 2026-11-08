@@ -1,17 +1,12 @@
 import { useTranslation } from "react-i18next";
 
 import type { SortField } from "@/api/generated/initiativeAPI.schemas";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { type FieldDef, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
 import type { TranslateFn } from "@/types/i18n";
+import { Field } from "@/ui/field";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 /** What a list of tasks can be sorted by, as the task list names it, and the
  *  field (or key) that names it for a reader. */
@@ -47,15 +42,14 @@ export function TaskSortPicker({
 
   return (
     <div className="grid grid-cols-pair gap-4">
-      <div className="space-y-2">
-        <Label htmlFor="task-sort">{translate("layouts:presets.sortBy")}</Label>
+      <Field label={translate("layouts:presets.sortBy")}>
         <Select
           value={value?.field ?? NO_SORT}
           onValueChange={(field) =>
             onChange(field === NO_SORT ? null : { field, dir: value?.dir ?? "asc" })
           }
         >
-          <SelectTrigger id="task-sort">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -67,7 +61,7 @@ export function TaskSortPicker({
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </Field>
       <div className="flex items-center gap-2 self-end pb-2">
         <Switch
           id="task-sort-descending"

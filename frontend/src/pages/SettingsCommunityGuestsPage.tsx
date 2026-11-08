@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { CalendarPlus, RefreshCcw, UserCheck, UserMinus, X } from "lucide-react";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -18,32 +18,7 @@ import {
 } from "@/components/communities/CommunityInvites";
 import { RemoveCommunityMemberDialog } from "@/components/communities/RemoveCommunityMemberDialog";
 import { EntityPicker } from "@/components/entities/EntityPicker";
-import { SkeletonRegion, TableSkeleton } from "@/components/skeletons/PageSkeletons";
 import { UserHandle } from "@/components/UserHandle";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/data-table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { MultiSelect } from "@/components/ui/multi-select";
-import { RelativeTime } from "@/components/ui/relative-time";
-import { RowActionsMenu } from "@/components/ui/row-actions-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityInvites } from "@/hooks/useCommunityInvites";
@@ -53,9 +28,29 @@ import { useServerTableState } from "@/hooks/useServerTableState";
 import { useExtendGuest, useMakeGuestAMember, useUsers } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import type { AppColumnDef } from "@/lib/table";
 import { TOOLS } from "@/lib/tools";
 import { getUrlHandle, getUserDisplayName } from "@/lib/userDisplay";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Combobox } from "@/ui/combobox";
+import { DataTable } from "@/ui/data-table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { RelativeTime } from "@/ui/relative-time";
+import { RowActionsMenu } from "@/ui/row-actions-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { StatusMessage } from "@/ui/status-message";
 
 /** One item a guest invite gives, and how far. */
 interface ChosenItem {
@@ -84,9 +79,11 @@ const ExtendGuestDialog = ({
     onError: (error) => toast.error(getErrorMessage(error, "communities:guests.extendError")),
   });
 
-  useEffect(() => {
+  const [prevGuest, setPrevGuest] = useState(guest);
+  if (prevGuest !== guest) {
+    setPrevGuest(guest);
     if (guest) setDays(7);
-  }, [guest]);
+  }
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -103,25 +100,20 @@ const ExtendGuestDialog = ({
           <DialogDescription>{t("guests.extendDescription")}</DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={submit}>
-          <div className="space-y-2">
-            <Label htmlFor="extend-guest-days">{t("guests.extendDaysLabel")}</Label>
+          <Field label={t("guests.extendDaysLabel")}>
             <Input
-              id="extend-guest-days"
               type="number"
               min={1}
               value={days}
               onChange={(event) => setDays(Number(event.target.value))}
               autoFocus
             />
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              {t("common:cancel")}
-            </Button>
-            <Button type="submit" disabled={days < 1 || extend.isPending}>
-              {t("guests.extend")}
-            </Button>
-          </DialogFooter>
+          </Field>
+          <DialogFooter
+            submitLabel={t("guests.extend")}
+            pending={extend.isPending}
+            disabled={days < 1}
+          />
         </form>
       </DialogContent>
     </Dialog>
@@ -291,36 +283,33 @@ export const SettingsCommunityGuestsPage = () => {
         <CardContent className="space-y-4">
           <form className="space-y-4" onSubmit={createInvite}>
             <div className="grid grid-cols-fill-48/3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="guest-days">{t("guests.guestDaysLabel")}</Label>
+              <Field label={t("guests.guestDaysLabel")}>
                 <Input
-                  id="guest-days"
                   type="number"
                   min={1}
                   value={guestDays}
                   onChange={(event) => setGuestDays(Number(event.target.value))}
                 />
-              </div>
+              </Field>
               <InviteLimitFields
                 idPrefix="guest-invite"
                 value={inviteLimits}
                 onChange={setInviteLimits}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="guest-initiatives">{t("guests.initiativesLabel")}</Label>
-              <MultiSelect
-                id="guest-initiatives"
-                selectedValues={initiativeIds}
-                options={(initiativesQuery.data ?? []).map((row) => ({
+            <Field label={t("guests.initiativesLabel")}>
+              <Combobox
+                multiple
+                value={initiativeIds}
+                items={(initiativesQuery.data ?? []).map((row) => ({
                   value: String(row.id),
                   label: row.name,
                 }))}
-                onChange={setInitiativeIds}
+                onValueChange={setInitiativeIds}
                 placeholder={t("guests.initiativesPlaceholder")}
                 className="w-full max-w-72"
               />
-            </div>
+            </Field>
             <div className="space-y-2">
               <p className="font-medium text-sm">{t("guests.itemsLabel")}</p>
               <p className="text-muted-foreground text-sm">{t("guests.itemsHelp")}</p>
@@ -405,7 +394,7 @@ export const SettingsCommunityGuestsPage = () => {
               <TableSkeleton rows={3} columns={3} />
             </SkeletonRegion>
           ) : guestsQuery.isError ? (
-            <p className="text-destructive text-sm">{t("guests.unableToLoad")}</p>
+            <StatusMessage onRetry={guestsQuery.refetch} />
           ) : guests.length === 0 && !table.params.search ? (
             <p className="text-muted-foreground text-sm">{t("guests.noGuests")}</p>
           ) : (

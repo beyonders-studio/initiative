@@ -11,8 +11,8 @@ each tool carries inside it is that tool's own test. So is the duplicate of a
 row inside a tool (``resource_access.SUB_TOOLS``), which each sub-tool routes
 itself.
 
-The queue and counter-group signal tests this replaces asserted the same thing
-for two tools under their own event names.
+The counter-group signal tests this replaces asserted the same thing under the
+tool's own event names.
 """
 
 import pytest
@@ -28,7 +28,6 @@ from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.comment import Comment
 from app.models.tenant.counter import Counter
 from app.models.tenant.collection import Collection
-from app.models.tenant.queue import QueueItem
 from app.models.tenant.task import Task
 from app.models.tenant.wiki import WikiPage
 from app.models.tenant.resource_grant import ResourceAccessLevel
@@ -38,7 +37,6 @@ from app.testing import (
     create_calendar_event,
     create_counter,
     create_initiative,
-    create_queue_item,
     create_resource_grant,
     create_tag,
     create_task,
@@ -222,10 +220,6 @@ CHILDREN = {
     Counter: (
         "counters",
         lambda s, tool, user, name: create_counter(s, tool, name=name),
-    ),
-    QueueItem: (
-        "queue-items",
-        lambda s, tool, user, name: create_queue_item(s, tool, label=name),
     ),
     CalendarEvent: (
         "calendar-events",

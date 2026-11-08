@@ -45,6 +45,38 @@ def _said_something(value: str) -> str:
     return trimmed
 
 
+#: What a client's own context may hold: words, versions and route templates.
+_CONTEXT_TEXT = r"^[\w./$:@+\- ]*$"
+
+
+class DeviceContext(SanitizedBaseModel):
+    """The device and page a request was sent from, as the sender saw it
+    before sending and chose to send it. Nothing that names a person or a
+    thing: the route is its template, with every id left out."""
+
+    app_version: Optional[str] = PydanticField(
+        default=None, max_length=32, pattern=_CONTEXT_TEXT
+    )
+    #: ``web``, ``android``, ``ios``, ``desktop``.
+    platform: Optional[str] = PydanticField(
+        default=None, max_length=16, pattern=_CONTEXT_TEXT
+    )
+    locale: Optional[str] = PydanticField(
+        default=None, max_length=35, pattern=_CONTEXT_TEXT
+    )
+    theme: Optional[str] = PydanticField(
+        default=None, max_length=16, pattern=_CONTEXT_TEXT
+    )
+    #: The page's route template, e.g. ``/c/$communityId/i/$initiativeId``.
+    route: Optional[str] = PydanticField(
+        default=None, max_length=200, pattern=_CONTEXT_TEXT
+    )
+    #: The width class the window was in.
+    viewport: Optional[str] = PydanticField(
+        default=None, max_length=16, pattern=_CONTEXT_TEXT
+    )
+
+
 class SupportTicketCreate(SanitizedBaseModel):
     """Asking for help: about a community they are in, or about themselves."""
 
@@ -64,6 +96,8 @@ class SupportTicketCreate(SanitizedBaseModel):
     body: Annotated[str, AfterValidator(_said_something)] = PydanticField(
         min_length=1, max_length=BODY_LENGTH
     )
+    #: The device and page they asked from, where they chose to send it.
+    context: Optional[DeviceContext] = None
 
     @model_validator(mode="after")
     def _names_its_community(self) -> "SupportTicketCreate":
@@ -106,40 +140,9 @@ class AppealTicketCreate(SanitizedBaseModel):
     )
 
 
-#: What a client's own context may hold: words, versions and route templates.
-_CONTEXT_TEXT = r"^[\w./$:@+\- ]*$"
-
-
-class FeedbackContext(SanitizedBaseModel):
-    """Where the app was when feedback was sent, as the sender saw it before
-    sending, and could remove. Nothing that names a person or a thing: the
-    route is its template, with every id left out."""
-
-    app_version: Optional[str] = PydanticField(
-        default=None, max_length=32, pattern=_CONTEXT_TEXT
-    )
-    #: ``web``, ``android``, ``ios``, ``desktop``.
-    platform: Optional[str] = PydanticField(
-        default=None, max_length=16, pattern=_CONTEXT_TEXT
-    )
-    locale: Optional[str] = PydanticField(
-        default=None, max_length=35, pattern=_CONTEXT_TEXT
-    )
-    theme: Optional[str] = PydanticField(
-        default=None, max_length=16, pattern=_CONTEXT_TEXT
-    )
-    #: The page's route template, e.g. ``/c/$communityId/i/$initiativeId``.
-    route: Optional[str] = PydanticField(
-        default=None, max_length=200, pattern=_CONTEXT_TEXT
-    )
-    #: The width class the window was in.
-    viewport: Optional[str] = PydanticField(
-        default=None, max_length=16, pattern=_CONTEXT_TEXT
-    )
-
-
 class FeedbackTicketCreate(SanitizedBaseModel):
-    """Telling whoever runs this server what somebody thinks."""
+    """Telling the team what somebody thinks: an idea, something that got in
+    their way, or what they love."""
 
     stream: Literal["feedback"]
     type: FeedbackTopic
@@ -147,8 +150,11 @@ class FeedbackTicketCreate(SanitizedBaseModel):
     body: Annotated[str, AfterValidator(_said_something)] = PydanticField(
         min_length=1, max_length=BODY_LENGTH
     )
-    #: Where the app was, where they chose to send it.
-    context: Optional[FeedbackContext] = None
+    #: Whether the team may write to them about it. Theirs to offer; off unless
+    #: they tick it.
+    contactable: bool = False
+    #: The device and page they sent it from, where they chose to send it.
+    context: Optional[DeviceContext] = None
 
 
 def _ticket_kind(value: Any) -> Optional[str]:

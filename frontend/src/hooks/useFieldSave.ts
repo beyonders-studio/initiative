@@ -18,6 +18,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { useTranslation } from "react-i18next";
 
 import type {
+  PropertyStep,
   PropertySummary,
   PropertyTarget,
   PropertyValueInput,
@@ -32,11 +33,13 @@ import { toast } from "@/lib/mascotToast";
 import { currentServerKey } from "@/lib/offlineSession";
 
 /** A change to some of an item's fields: what is sent, and how the item reads
- *  once it is saved. A change to its properties names only those it sets or
- *  takes off, so one person's leaves another's standing. */
+ *  once it is saved. A change to its properties names only those it sets,
+ *  takes off or steps, so one person's leaves another's standing. */
 export type ItemEdit<I, P> = { shows: Partial<I> } & (
   | { patch: P }
-  | { properties: { values: PropertyValueInput[]; removed?: number[] } }
+  | {
+      properties: { values: PropertyValueInput[]; removed?: number[]; steps?: PropertyStep[] };
+    }
 );
 
 /** One field's save, as {@link useItemFieldSave} answers it. */
@@ -172,7 +175,7 @@ type Held<I> = I & { [OVER]?: I };
 /**
  * An item as the page passed it, or as a save of it answered over that same
  * copy, with saves not yet answered shown over either: for an item with no
- * read of its own (one the queue's read carries), whose save
+ * read of its own (one another read carries), whose save
  * kind's read key is {@link heldKey}. An answer stands until the page passes
  * a newer copy: the one it was answered over (a dialog opened again on what it
  * held) does not undo it. For a kind with a read of its own, it is `item`.
@@ -205,13 +208,13 @@ export const useHeldItem = <I extends object, P>(
 };
 
 /** {@link usePendingShown} over the item as `query` read it. */
-export const useShownWithPending = <I, P>(
+export const useShownWithPending = <I, P, E>(
   kind: FieldSaveKind<I, P>,
   id: number | null,
-  query: UseQueryResult<I>
-): UseQueryResult<I> => {
+  query: UseQueryResult<I, E>
+): UseQueryResult<I, E> => {
   const data = usePendingShown(kind, id, query.data);
-  return data === query.data ? query : ({ ...query, data } as UseQueryResult<I>);
+  return data === query.data ? query : ({ ...query, data } as UseQueryResult<I, E>);
 };
 
 /**

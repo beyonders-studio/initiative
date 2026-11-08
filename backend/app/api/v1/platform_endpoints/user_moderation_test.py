@@ -660,7 +660,7 @@ class TestTimeOut:
             ("patch", "/api/v1/me", {"timezone": "UTC"}),
             ("post", "/api/v1/communities/", {"name": "Mine"}),
             ("post", "/api/v1/me/delete-account", {}),
-            ("get", "/api/v1/me/contacts", None),
+            ("get", "/api/v1/me/people", None),
             ("get", "/api/v1/me/tasks", None),
         ):
             call = getattr(client, method)

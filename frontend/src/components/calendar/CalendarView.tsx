@@ -3,11 +3,7 @@ import {
   type DragEndEvent,
   DragOverlay,
   type DragStartEvent,
-  MouseSensor,
   pointerWithin,
-  TouchSensor,
-  useSensor,
-  useSensors,
 } from "@dnd-kit/core";
 import {
   addDays,
@@ -36,13 +32,14 @@ import type {
   TagSummary,
   TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { dateTimeFormat } from "@/lib/intl";
-import { parseLocalCalendarDate, resolveLocalDateTime } from "@/lib/localDateTime";
+import { useDragSensors } from "@/hooks/useDragSensors";
 import { toast } from "@/lib/mascotToast";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { parseLocalCalendarDate, resolveLocalDateTime } from "@/ui/lib/localDateTime";
+import { cn } from "@/ui/lib/utils";
+import { Skeleton } from "@/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 import { DayView } from "./views/DayView";
 import { ListView } from "./views/ListView";
@@ -372,12 +369,9 @@ export const CalendarView = ({
   const dndEnabled = !!onEntryReschedule;
   const [activeEntry, setActiveEntry] = useState<CalendarEntry | null>(null);
 
-  // A small move (>5px mouse, long-press on touch) starts a drag; a plain
-  // click still selects the entry, so navigation keeps working.
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
-  );
+  // A small move or a long press starts a drag; a plain click still selects
+  // the entry, so navigation keeps working.
+  const sensors = useDragSensors();
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveEntry((event.active.data.current?.entry as CalendarEntry | undefined) ?? null);

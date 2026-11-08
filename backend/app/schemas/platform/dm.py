@@ -37,7 +37,7 @@ class DirectMessageSettingsRead(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     dm_policy: DmPolicy
-    #: In the reader's own rail order, the same rule My Contacts uses.
+    #: In the reader's own rail order, the same rule the people roster uses.
     communities: List[CommunityDmToggle]
     #: NULL while the account has not answered the age question.
     age_confirmed_at: Optional[datetime] = None
@@ -130,13 +130,13 @@ class ContactGrantRead(SanitizedBaseModel):
     username: str
     discriminator: int
     avatar_url: Optional[str] = None
-    #: Carried so a grant renders as an ordinary contact row wherever one is
+    #: Carried so a grant renders as an ordinary person row wherever one is
     #: listed. No ``display_name``: that name belongs to one community, and a
     #: grant may name somebody the reader shares no community with.
     status: UserStatus = UserStatus.active
     presence: Presence = Presence.offline
     #: What they wear around their picture, for the same reason: a grant row is
-    #: a contact row, and a person looks the same wherever they are listed.
+    #: a person row, and a person looks the same wherever they are listed.
     profile_decorations: ProfileDecorations = Field(default_factory=ProfileDecorations)
     state: str
     #: True when the reader is the one who asked, which is what tells a

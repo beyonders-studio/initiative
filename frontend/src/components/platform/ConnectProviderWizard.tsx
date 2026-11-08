@@ -21,7 +21,7 @@
  * and the same callback to copy.
  */
 
-import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -30,13 +30,6 @@ import type {
   AuthProviderProbeResult,
 } from "@/api/generated/initiativeAPI.schemas";
 import { ProviderMark } from "@/components/auth/ProviderMark";
-import { Button } from "@/components/ui/button";
-import { CopyButton } from "@/components/ui/copy-button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { SuggestCombobox } from "@/components/ui/suggest-combobox";
-import { Switch } from "@/components/ui/switch";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import { useWizard } from "@/hooks/useWizard";
 import {
   buildIssuer,
@@ -52,6 +45,14 @@ import {
 import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { isValidProviderSlug } from "@/lib/providerSlug";
+import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
+import { CopyButton } from "@/ui/copy-button";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Switch } from "@/ui/switch";
+import { WizardDialog, WizardOption } from "@/ui/wizard-dialog";
 
 type Step = "choose" | "address" | "credentials" | "options";
 
@@ -219,16 +220,13 @@ export const ConnectProviderWizard = ({
       {step === "choose" && (
         <div className="grid grid-cols-2 gap-2">
           {PROVIDER_PRESETS.map((option) => (
-            <button
+            <WizardOption
               key={option.key}
-              type="button"
-              className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+              // `custom` has a mark of its own — the standard's.
+              icon={<ProviderMark icon={option.key} />}
+              title={option.name}
               onClick={() => choosePreset(option)}
-            >
-              {/* `custom` has a mark of its own — the standard's. */}
-              <ProviderMark icon={option.key} />
-              <span className="min-w-0 truncate font-medium text-sm">{option.name}</span>
-            </button>
+            />
           ))}
         </div>
       )}
@@ -244,12 +242,8 @@ export const ConnectProviderWizard = ({
           {/* The blanks, each asked for on its own. Nobody should be editing
               the middle of a URL to supply a realm. */}
           {preset.blanks.map((blank) => (
-            <div key={blank.name} className="space-y-2">
-              <Label htmlFor={`provider-blank-${blank.name}`}>
-                {t(`authProviders.blanks.${blank.labelKey}`)}
-              </Label>
+            <Field key={blank.name} label={t(`authProviders.blanks.${blank.labelKey}`)}>
               <Input
-                id={`provider-blank-${blank.name}`}
                 value={blanks[blank.name] ?? ""}
                 placeholder={blank.example}
                 onChange={(event) => {
@@ -257,14 +251,12 @@ export const ConnectProviderWizard = ({
                   setBlanks((prev) => ({ ...prev, [blank.name]: event.target.value }));
                 }}
               />
-            </div>
+            </Field>
           ))}
 
           {isCustomPreset(preset) ? (
-            <div className="space-y-2">
-              <Label htmlFor="provider-issuer">{t("authProviders.issuerLabel")}</Label>
+            <Field label={t("authProviders.issuerLabel")}>
               <Input
-                id="provider-issuer"
                 type="url"
                 value={typedIssuer}
                 placeholder={t("authProviders.issuerPlaceholder")}
@@ -273,7 +265,7 @@ export const ConnectProviderWizard = ({
                   setTypedIssuer(event.target.value);
                 }}
               />
-            </div>
+            </Field>
           ) : (
             <div className="space-y-1">
               <Label>{t("authProviders.issuerLabel")}</Label>
@@ -288,16 +280,10 @@ export const ConnectProviderWizard = ({
               type="button"
               variant="outline"
               onClick={verify}
-              disabled={!addressReady || discoverIssuer.isPending}
+              disabled={!addressReady}
+              pending={discoverIssuer.isPending}
             >
-              {discoverIssuer.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("authProviders.verifying")}
-                </>
-              ) : (
-                t("authProviders.verify")
-              )}
+              {discoverIssuer.isPending ? t("authProviders.verifying") : t("authProviders.verify")}
             </Button>
           </div>
 
@@ -331,25 +317,18 @@ export const ConnectProviderWizard = ({
             </p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="provider-client-id">{t("authProviders.clientIdLabel")}</Label>
-            <Input
-              id="provider-client-id"
-              value={clientId}
-              onChange={(event) => setClientId(event.target.value)}
-            />
-          </div>
+          <Field label={t("authProviders.clientIdLabel")}>
+            <Input value={clientId} onChange={(event) => setClientId(event.target.value)} />
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="provider-client-secret">{t("authProviders.clientSecretLabel")}</Label>
+          <Field label={t("authProviders.clientSecretLabel")}>
             <Input
-              id="provider-client-secret"
               type="password"
               value={clientSecret}
               placeholder={t("authProviders.secretPlaceholder")}
               onChange={(event) => setClientSecret(event.target.value)}
             />
-          </div>
+          </Field>
 
           <Button
             className="w-full"
@@ -364,10 +343,12 @@ export const ConnectProviderWizard = ({
 
       {step === "options" && (
         <form className="space-y-4" onSubmit={submit}>
-          <div className="space-y-2">
-            <Label htmlFor="provider-slug">{t("authProviders.slugLabel")}</Label>
+          <Field
+            label={t("authProviders.slugLabel")}
+            hint={!slugError && t("authProviders.slugHelp")}
+            error={slugError && t("authProviders.slugInvalid")}
+          >
             <Input
-              id="provider-slug"
               value={slug}
               maxLength={64}
               required
@@ -376,49 +357,35 @@ export const ConnectProviderWizard = ({
                 setSlug(event.target.value);
               }}
             />
-            {slugError ? (
-              <p className="text-destructive text-xs">{t("authProviders.slugInvalid")}</p>
-            ) : (
-              <p className="text-muted-foreground text-xs">{t("authProviders.slugHelp")}</p>
-            )}
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="provider-display-name">{t("authProviders.displayNameLabel")}</Label>
+          <Field label={t("authProviders.displayNameLabel")}>
             <Input
-              id="provider-display-name"
               value={displayName}
               required
               onChange={(event) => setDisplayName(event.target.value)}
             />
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="provider-scopes">{t("authProviders.scopesLabel")}</Label>
-            <Input
-              id="provider-scopes"
-              value={scopes}
-              onChange={(event) => setScopes(event.target.value)}
-            />
-            {shown && shown.scopes_supported.length > 0 ? (
-              <p className="text-muted-foreground text-xs">
-                {t("authProviders.scopesFromProvider")}
-              </p>
-            ) : null}
-          </div>
+          <Field
+            label={t("authProviders.scopesLabel")}
+            hint={shown?.scopes_supported.length ? t("authProviders.scopesFromProvider") : null}
+          >
+            <Input value={scopes} onChange={(event) => setScopes(event.target.value)} />
+          </Field>
 
           <div className="space-y-1">
             <Label>{t("authProviders.claimPathLabel")}</Label>
-            <SuggestCombobox
-              suggestions={[
+            <Combobox
+              items={[
                 ...new Set([...(shown?.claims_supported ?? []), ...GROUPS_CLAIM_SUGGESTIONS]),
-              ]}
+              ].map((claim) => ({ value: claim, label: claim }))}
               value={groupsClaim}
+              selectedLabel={groupsClaim}
               onValueChange={setGroupsClaim}
               placeholder={t("authProviders.claimPathPlaceholder")}
               searchPlaceholder={t("authProviders.claimPathSearch")}
-              loadingLabel={t("authProviders.claimPathSearch")}
-              emptyLabel={t("authProviders.claimPathEmpty")}
+              emptyMessage={t("authProviders.claimPathEmpty")}
               typedLabel={(value) => t("authProviders.claimPathUseTyped", { value })}
               aria-label={t("authProviders.claimPathLabel")}
             />

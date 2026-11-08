@@ -14,7 +14,7 @@
  * actually regresses is a page being written without the wiring.
  *
  * {@link ToolIndexPage} covers every tool with no list page of its own
- * (projects, files, wikis, queues, …), so it is on the list too:
+ * (projects, files, wikis, …), so it is on the list too:
  * the entry disappearing from it would take all of them at once.
  */
 import fs from "node:fs";

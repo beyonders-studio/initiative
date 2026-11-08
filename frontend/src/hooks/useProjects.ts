@@ -1,4 +1,4 @@
-import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -22,6 +22,7 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { getGetLayoutsQueryKey, putLayout } from "@/api/generated/layouts/layouts";
+import { useListMyProjects } from "@/api/generated/my-tools/my-tools";
 import {
   getListProjectsQueryKey,
   getReadProjectQueryKey,
@@ -32,26 +33,25 @@ import {
 import {
   createTaskStatus,
   deleteTaskStatus,
-  getListTaskStatusesQueryKey,
-  listTaskStatuses,
   reorderTaskStatuses,
   updateTaskStatus,
+  useListTaskStatuses,
 } from "@/api/generated/task-statuses/task-statuses";
 import {
   copyTaskTypes,
   createTaskType,
   deleteTaskType,
   getListTaskTypeGalleryQueryKey,
-  getListTaskTypesQueryKey,
-  listTaskTypeGallery,
-  listTaskTypes,
+  getListTaskTypesQueryOptions,
   reorderTaskTypes,
   updateTaskType,
+  useListTaskTypeGallery,
+  useListTaskTypes,
 } from "@/api/generated/task-types/task-types";
 import { invalidate, q, type Spec } from "@/api/query-keys";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useCommunityMutation } from "@/hooks/useApiMutation";
+import { useApiMutation, useCommunityMutation } from "@/hooks/useApiMutation";
 import { instanceTarget } from "@/hooks/useToolLayouts";
 import { fetchAllPages } from "@/lib/fetchAllPages";
 import { taskPageWithFields } from "@/lib/layouts/tasks";
@@ -110,11 +110,8 @@ export const useProjectTaskStatuses = (
 ) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<TaskStatusRead[]>({
-    queryKey: getListTaskStatusesQueryKey(communityId, projectId!),
-    queryFn: () => listTaskStatuses(communityId, projectId!),
-    enabled: projectId !== null && Number.isFinite(projectId) && userEnabled,
-    ...rest,
+  return useListTaskStatuses(communityId, projectId!, {
+    query: { enabled: projectId !== null && Number.isFinite(projectId) && userEnabled, ...rest },
   });
 };
 
@@ -123,10 +120,7 @@ export const useProjectTaskStatuses = (
 export const useTaskTypesOf = (projectIds: readonly number[]) => {
   const communityId = useActiveCommunityId();
   return useQueries({
-    queries: projectIds.map((projectId) => ({
-      queryKey: getListTaskTypesQueryKey(communityId, projectId),
-      queryFn: () => listTaskTypes(communityId, projectId),
-    })),
+    queries: projectIds.map((projectId) => getListTaskTypesQueryOptions(communityId, projectId)),
   });
 };
 
@@ -138,11 +132,12 @@ export const useTaskTypeGallery = (
 ) => {
   const communityId = useActiveCommunityId();
   const { i18n } = useTranslation();
-  return useQuery<TaskTypeGalleryGroup[]>({
-    queryKey: [...getListTaskTypeGalleryQueryKey(communityId, projectId), i18n.language],
-    queryFn: () => listTaskTypeGallery(communityId, projectId),
-    staleTime: Number.POSITIVE_INFINITY,
-    ...options,
+  return useListTaskTypeGallery(communityId, projectId, {
+    query: {
+      queryKey: [...getListTaskTypeGalleryQueryKey(communityId, projectId), i18n.language],
+      staleTime: Number.POSITIVE_INFINITY,
+      ...options,
+    },
   });
 };
 
@@ -153,11 +148,8 @@ export const useProjectTaskTypes = (
 ) => {
   const communityId = useActiveCommunityId();
   const { enabled: userEnabled = true, ...rest } = options ?? {};
-  return useQuery<TaskTypeRead[]>({
-    queryKey: getListTaskTypesQueryKey(communityId, projectId!),
-    queryFn: () => listTaskTypes(communityId, projectId!),
-    enabled: projectId !== null && Number.isFinite(projectId) && userEnabled,
-    ...rest,
+  return useListTaskTypes(communityId, projectId!, {
+    query: { enabled: projectId !== null && Number.isFinite(projectId) && userEnabled, ...rest },
   });
 };
 
@@ -167,31 +159,27 @@ export const useGlobalProjects = (
   params?: ListMyProjectsParams,
   options?: QueryOpts<ProjectListResponse>
 ) => {
-  return useQuery<ProjectListResponse>({
-    ...projects.myListQuery(params),
-    ...options,
-  });
+  return useListMyProjects(params, { query: options });
 };
 
 // ── Mutations ───────────────────────────────────────────────────────────────
 
-export const useReorderProjects = (options?: MutationOpts<void, number[]>) => {
-  const communityId = useActiveCommunityId();
-  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
-
-  return useMutation({
-    ...rest,
-    mutationFn: async (orderedIds: number[]) => {
-      await reorderProjects(communityId, { project_ids: orderedIds });
+export const useReorderProjects = (options?: MutationOpts<void, number[]>) =>
+  useCommunityMutation<void, number[]>(
+    {
+      mutationFn: async (communityId, orderedIds) => {
+        await reorderProjects(communityId, { project_ids: orderedIds });
+      },
+      errorKey: "projects:preview.reorderError",
     },
-    onSuccess,
-    onError,
-    onSettled: (...args) => {
-      void invalidate(q.allProjects());
-      onSettled?.(...args);
-    },
-  });
-};
+    {
+      ...options,
+      onSettled: (...args) => {
+        void invalidate(q.allProjects());
+        return options?.onSettled?.(...args);
+      },
+    }
+  );
 
 // ── Pin Mutations ────────────────────────────────────────────────────────────
 
@@ -214,30 +202,24 @@ const replaceProjectInList = (
 export const useToggleProjectPin = (options?: MutationOpts<ProjectRead, TogglePinArgs>) => {
   const communityId = useActiveCommunityId();
   const qc = useQueryClient();
-  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
-
-  return useMutation({
-    ...rest,
-    mutationFn: async ({ projectId, nextState }: TogglePinArgs) => {
-      return updateProject(communityId, projectId, {
-        pinned: nextState,
-      });
+  return useApiMutation<ProjectRead, TogglePinArgs>(
+    {
+      mutationFn: ({ projectId, nextState }) =>
+        updateProject(communityId, projectId, { pinned: nextState }),
+      invalidate: (data) => {
+        // Every cached project list, whatever it was narrowed by — the keys carry
+        // an initiative and a page, so naming them one by one silently misses the
+        // list the reader is actually looking at.
+        qc.setQueriesData<ProjectListResponse>(
+          { queryKey: getListProjectsQueryKey(communityId) },
+          (prev) => replaceProjectInList(prev, data)
+        );
+        qc.setQueryData<ProjectRead>(getReadProjectQueryKey(communityId, data.id), () => data);
+      },
+      errorKey: "projects:pin.error",
     },
-    onSuccess: (...args) => {
-      const data = args[0];
-      // Every cached project list, whatever it was narrowed by — the keys carry
-      // an initiative and a page, so naming them one by one silently misses the
-      // list the reader is actually looking at.
-      qc.setQueriesData<ProjectListResponse>(
-        { queryKey: getListProjectsQueryKey(communityId) },
-        (prev) => replaceProjectInList(prev, data)
-      );
-      qc.setQueryData<ProjectRead>(getReadProjectQueryKey(communityId, data.id), () => data);
-      onSuccess?.(...args);
-    },
-    onError,
-    onSettled,
-  });
+    options
+  );
 };
 
 // ── Task Status Mutations ───────────────────────────────────────────────────

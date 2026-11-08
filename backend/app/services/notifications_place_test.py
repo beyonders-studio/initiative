@@ -58,10 +58,12 @@ def test_the_place_is_read_off_the_payload():
         "subject_type": "task",
         "subject_id": 7,
     }
-    assert user_notifications._place({"community_id": 3, "entity_type": "queue"}) == {
+    assert user_notifications._place(
+        {"community_id": 3, "entity_type": "counter_group"}
+    ) == {
         **nowhere,
         "guild_id": 3,
-        "tool": "queue",
+        "tool": "counter_group",
     }
     assert user_notifications._place({}) == nowhere
 

@@ -12,6 +12,10 @@ with one rule set:
 - date/datetime    → ``value_text`` (ISO 8601)
 - multi_select     → ``value_json``
 - user_reference   → ``value_handle``, and ``value_name`` beside it
+- file             → ``value_name``, the file's name, which an import leaves
+  out: the file is not in the envelope
+- signature        → ``value_name``, the name its signer typed, and when as
+  ``value_text``, which an import leaves out: an import signs for nobody
 
 A task's value of its project's metadata says ``project``, so an import puts
 it on the project's metadata rather than among the initiative's properties.
@@ -43,7 +47,7 @@ def property_export_dict(summary: PropertySummary) -> dict:
     record: dict = {"property_name": summary.name, "property_type": prop_type}
     if prop_type in ("text", "url", "select"):
         record["value_text"] = value
-    elif prop_type in ("number", "currency", "scale"):
+    elif prop_type in ("number", "currency", "scale", "counter"):
         record["value_number"] = float(value) if value is not None else None
     elif prop_type == "checkbox":
         record["value_boolean"] = value
@@ -63,6 +67,13 @@ def property_export_dict(summary: PropertySummary) -> dict:
         record["value_name"] = (
             (value.get("display_name") or record["value_handle"]) if known else None
         )
+    elif prop_type == "file":
+        # For a reader; nothing an import could place.
+        record["value_name"] = value.get("name") if isinstance(value, dict) else None
+    elif prop_type == "signature" and isinstance(value, dict):
+        # For a reader, as the file's is.
+        record["value_name"] = value["name"]
+        record["value_text"] = _iso(value["signed_at"])
     if summary.currency is not None:
         record["currency"] = summary.currency.value
     if summary.project_id is not None:

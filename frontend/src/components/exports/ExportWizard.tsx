@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { useEstimateAggregateExport } from "@/api/generated/exports/exports";
 import { type SortField, type TaskStatusRead, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { dateRangeParams } from "@/components/calendar/visibleRange";
 import type { ExportExtraAction, ExportFormatOption } from "@/components/exports/ExportButton";
 import {
   AGGREGATE_EXPORT_TOOLS,
@@ -17,24 +18,9 @@ import {
 } from "@/components/initiativeTools/shared/ToolViewFilter";
 import { TaskFilters } from "@/components/tasks/TaskFilters";
 import { ToolFilterFields, type ToolListFilters } from "@/components/tools/ToolFilterFields";
-import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import {
-  DateRangeField,
-  dateRangeParams,
-  type LocalDateRange,
-  useFormatDateRange,
-} from "@/components/ui/date-range-field";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Switch } from "@/components/ui/switch";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useExportJob } from "@/hooks/useExportJob";
 import { useWizard } from "@/hooks/useWizard";
-import { formatBytes } from "@/lib/fileUtils";
 import {
   DUE_LABEL_KEYS,
   EMPTY_TASK_FILTERS,
@@ -42,7 +28,17 @@ import {
   taskSpecConditions,
 } from "@/lib/filters/taskFilters";
 import { toolExportEndpoint, toolNavLabelKey, toolViews } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
+import { DateRangeField, type LocalDateRange, useFormatDateRange } from "@/ui/date-range-field";
+import { Label } from "@/ui/label";
+import { formatBytes } from "@/ui/lib/fileUtils";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { cn } from "@/ui/lib/utils";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
+import { Switch } from "@/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
+import { WizardDialog, WizardOption } from "@/ui/wizard-dialog";
 
 /** What the wizard exports: a whole initiative or community, or named
  *  entities of one tool (a tool's export card, a bulk selection). */
@@ -667,10 +663,16 @@ function AggregateExportWizard({
       {step === "mode" && (
         <div className="space-y-2">
           {(["backup", "report"] as const).map((option) => (
-            <button
+            <WizardOption
               key={option}
-              type="button"
-              className="w-full rounded-lg border p-4 text-left transition-colors hover:bg-accent"
+              title={
+                option === "backup" ? t("wizard.mode.backupTitle") : t("wizard.mode.reportTitle")
+              }
+              description={
+                option === "backup"
+                  ? t("wizard.mode.backupDescription")
+                  : t("wizard.mode.reportDescription")
+              }
               onClick={() => {
                 if (option !== mode) {
                   setContent((prev) => forOutput(prev, option === "backup"));
@@ -678,16 +680,7 @@ function AggregateExportWizard({
                 setMode(option);
                 go(option);
               }}
-            >
-              <p className="font-medium text-sm">
-                {option === "backup" ? t("wizard.mode.backupTitle") : t("wizard.mode.reportTitle")}
-              </p>
-              <p className="mt-1 text-muted-foreground text-xs">
-                {option === "backup"
-                  ? t("wizard.mode.backupDescription")
-                  : t("wizard.mode.reportDescription")}
-              </p>
-            </button>
+            />
           ))}
         </div>
       )}
@@ -964,10 +957,11 @@ function EntitiesExportWizard({
   });
   // The view loads after the wizard mounts, and can change while it is
   // closed, so each opening starts from it as it is then.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs on opening only; the seed is read at that moment
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (open && !exportJob.busy) setContent(startContent(only?.format === "json"));
-  }, [open]);
+  }
 
   // Only the content filter travels for named entities: the ids already say
   // which things.

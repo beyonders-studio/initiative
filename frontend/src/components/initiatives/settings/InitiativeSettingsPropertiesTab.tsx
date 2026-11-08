@@ -1,8 +1,9 @@
-import { ArrowDown, ArrowUp, ArrowUpToLine, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpToLine, Pencil, Plus, Trash2, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  type CounterSettingsInput,
   type CurrencyCode,
   MetadataType,
   type PropertyDefinitionCreate,
@@ -11,35 +12,14 @@ import {
   type PropertyDefinitionUpdate,
   type PropertyOption,
 } from "@/api/generated/initiativeAPI.schemas";
+import {
+  CounterSettingsFields,
+  counterSettingsValid,
+} from "@/components/properties/CounterSettingsFields";
 import { CurrencySelect, useDefaultCurrency } from "@/components/properties/CurrencySelect";
 import { PROPERTY_TYPES } from "@/components/properties/NewPropertyForm";
 import { normalizeOptionList, typeRequiresOptions } from "@/components/properties/propertyHelpers";
 import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   type MetadataOwner,
   ownerColumns,
@@ -51,8 +31,28 @@ import {
   usePropertyGroups,
   useUpdateProperty,
 } from "@/hooks/useProperties";
-import { collator } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Checkbox } from "@/ui/checkbox";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { collator } from "@/ui/lib/intl";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
 
 const DEFAULT_COLOR = "#64748B";
 
@@ -63,6 +63,8 @@ interface FormState {
   options: PropertyOption[];
   /** A money property's currency. */
   currency: CurrencyCode;
+  /** A counter's step, bounds and reset value. */
+  counter: CounterSettingsInput;
 }
 
 const emptyFormState = (currency: CurrencyCode): FormState => ({
@@ -71,6 +73,7 @@ const emptyFormState = (currency: CurrencyCode): FormState => ({
   color: null,
   options: [],
   currency,
+  counter: {},
 });
 
 const definitionToFormState = (
@@ -81,6 +84,7 @@ const definitionToFormState = (
   type: definition.type,
   color: definition.color,
   currency: definition.currency ?? currency,
+  counter: definition.counter ?? {},
   options: (definition.options ?? []).map((option) => ({
     value: option.value,
     label: option.label,
@@ -139,7 +143,6 @@ const OptionListEditor = ({ options, onChange, disabled }: OptionListEditorProps
                 onChangeComplete={(value) => handlePatch(index, { color: value })}
                 disabled={disabled}
                 triggerLabel={t("properties:manager.colorLabel")}
-                className="h-9"
               />
             </div>
             <Button
@@ -273,6 +276,7 @@ const PropertyDialog = ({
     if (typeRequiresOptions(formState.type)) {
       return normalizeOptionList(formState.options).length > 0;
     }
+    if (formState.type === MetadataType.counter) return counterSettingsValid(formState.counter);
     return true;
   }, [formState]);
 
@@ -293,6 +297,7 @@ const PropertyDialog = ({
         color: formState.color ?? null,
         options,
         ...(formState.type === MetadataType.currency ? { currency: formState.currency } : {}),
+        ...(formState.type === MetadataType.counter ? { counter: formState.counter } : {}),
         position,
       };
       try {
@@ -312,6 +317,7 @@ const PropertyDialog = ({
       // decide whether to include options in the PATCH payload.
       options: typeRequiresOptions(definition.type) ? options : undefined,
       currency: definition.type === MetadataType.currency ? formState.currency : undefined,
+      counter: definition.type === MetadataType.counter ? formState.counter : undefined,
     };
     try {
       const response = await updateMutation.mutateAsync({
@@ -347,24 +353,21 @@ const PropertyDialog = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="property-manager-name">{t("properties:manager.nameLabel")}</Label>
+          <Field label={t("properties:manager.nameLabel")}>
             <Input
-              id="property-manager-name"
               value={formState.name}
               onChange={(e) => setFormState((prev) => ({ ...prev, name: e.target.value }))}
               autoFocus
             />
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="property-manager-type">{t("properties:manager.typeLabel")}</Label>
+          <Field label={t("properties:manager.typeLabel")}>
             <Select
               value={formState.type}
               onValueChange={(next) => handleTypeChange(next as MetadataType)}
               disabled={isEditing}
             >
-              <SelectTrigger id="property-manager-type">
+              <SelectTrigger>
                 <div className="flex min-w-0 items-center gap-2">
                   {(() => {
                     const Icon = iconForPropertyType(formState.type);
@@ -388,25 +391,30 @@ const PropertyDialog = ({
                 })}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
 
           {formState.type === MetadataType.currency ? (
-            <div className="space-y-2">
-              <Label>{t("properties:currency.label")}</Label>
+            <Field label={t("properties:currency.label")}>
               <CurrencySelect
                 value={formState.currency}
                 onChange={(currency) => setFormState((prev) => ({ ...prev, currency }))}
               />
-            </div>
+            </Field>
           ) : null}
 
-          <div className="space-y-2">
-            <Label>{t("properties:manager.colorLabel")}</Label>
+          {formState.type === MetadataType.counter ? (
+            <CounterSettingsFields
+              value={formState.counter}
+              onChange={(counter) => setFormState((prev) => ({ ...prev, counter }))}
+            />
+          ) : null}
+
+          <Field label={t("properties:manager.colorLabel")}>
             <ColorPickerPopover
               value={formState.color ?? DEFAULT_COLOR}
               onChangeComplete={(value) => setFormState((prev) => ({ ...prev, color: value }))}
             />
-          </div>
+          </Field>
 
           {typeRequiresOptions(formState.type) ? (
             <div className="space-y-2">
@@ -419,18 +427,13 @@ const PropertyDialog = ({
           ) : null}
         </div>
 
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            type="button"
-            onClick={() => void handleSubmit()}
-            disabled={!canSubmit || submitting}
-          >
-            {submitting ? t("common:submitting") : t("common:save")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("common:save")}
+          pendingLabel={t("common:submitting")}
+          onSubmit={() => void handleSubmit()}
+          pending={submitting}
+          disabled={!canSubmit}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -467,7 +470,6 @@ const PropertyDeleteDialog = ({
       title={t(words.deleteTitle)}
       description={t(words.deleteBody)}
       confirmLabel={t(words.delete)}
-      cancelLabel={t("common:cancel")}
       onConfirm={() => void handleConfirm()}
       isLoading={deleteMutation.isPending}
       destructive
@@ -500,9 +502,11 @@ const PromoteDialog = ({
   const promote = usePromoteProperties();
   const [name, setName] = useState("");
   const first = sources[0];
-  useEffect(() => {
+  const [prev, setPrev] = useState({ open, first });
+  if (prev.open !== open || prev.first !== first) {
+    setPrev({ open, first });
     if (open) setName(first?.name ?? "");
-  }, [open, first]);
+  }
   const trimmed = name.trim();
   const same = metadata.find(
     (definition) => definition.name.toLocaleLowerCase() === trimmed.toLocaleLowerCase()
@@ -538,35 +542,27 @@ const PromoteDialog = ({
             {t("properties:manager.promoteBody", { count: sources.length })}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="promote-name">{t("properties:manager.nameLabel")}</Label>
+        <Field
+          label={t("properties:manager.nameLabel")}
+          hint={
+            same !== undefined && fits && t("properties:manager.promoteInto", { name: same.name })
+          }
+          error={same !== undefined && !fits && t("properties:manager.promoteTaken")}
+        >
           <Input
-            id="promote-name"
             value={name}
             maxLength={100}
             onChange={(event) => setName(event.target.value)}
             autoFocus
           />
-          {same !== undefined ? (
-            <p className={fits ? "text-muted-foreground text-sm" : "text-destructive text-sm"}>
-              {fits
-                ? t("properties:manager.promoteInto", { name: same.name })
-                : t("properties:manager.promoteTaken")}
-            </p>
-          ) : null}
-        </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            type="button"
-            onClick={() => void handleSubmit()}
-            disabled={!trimmed || !fits || promote.isPending}
-          >
-            {promote.isPending ? t("common:submitting") : t("properties:manager.promote")}
-          </Button>
-        </DialogFooter>
+        </Field>
+        <DialogFooter
+          submitLabel={t("properties:manager.promote")}
+          pendingLabel={t("common:submitting")}
+          onSubmit={() => void handleSubmit()}
+          pending={promote.isPending}
+          disabled={!trimmed || !fits}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -794,10 +790,9 @@ const OwnerProperties = ({
   let list: ReactNode;
   if (propertiesQuery.isLoading) {
     list = (
-      <div className="flex items-center gap-2 text-muted-foreground text-sm">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        {t("common:loading")}
-      </div>
+      <SkeletonRegion>
+        <ListSkeleton rows={3} avatar={false} />
+      </SkeletonRegion>
     );
   } else if (definitions.length === 0) {
     list = <p className="text-muted-foreground text-sm">{t(words.none)}</p>;
@@ -967,10 +962,9 @@ const InitiativeMetadata = ({ initiativeId }: { initiativeId: number }) => {
 
   if (groupsQuery.isLoading) {
     return (
-      <div className="flex items-center gap-2 text-muted-foreground text-sm">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        {t("common:loading")}
-      </div>
+      <SkeletonRegion>
+        <ListSkeleton rows={3} avatar={false} />
+      </SkeletonRegion>
     );
   }
 
@@ -1078,7 +1072,6 @@ const InitiativeMetadata = ({ initiativeId }: { initiativeId: number }) => {
         title={t("properties:manager.bulkDeleteTitle", { count: chosen.length })}
         description={t("properties:manager.bulkDeleteBody")}
         confirmLabel={t("common:delete")}
-        cancelLabel={t("common:cancel")}
         onConfirm={() => void handleDeleteSelected()}
         isLoading={deleteMany.isPending}
         destructive

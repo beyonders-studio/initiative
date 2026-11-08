@@ -25,7 +25,7 @@ from seed.common import Community
 SEED_INITIATIVE_NAME = "Default Initiative"
 SEED_INITIATIVE_COLOR = "#2563eb"
 
-_SMALL_KIT = (Tool.queue, Tool.counter_group, Tool.calendar, Tool.wiki)
+_SMALL_KIT = (Tool.counter_group, Tool.calendar, Tool.wiki)
 
 #: Who makes each community's default initiative, and who else is in it on
 #: which built-in role.

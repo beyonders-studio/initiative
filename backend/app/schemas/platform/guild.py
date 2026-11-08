@@ -307,6 +307,10 @@ class CommunityBillingSummaryRead(SanitizedBaseModel):
     next_charge: Optional[CommunityBillingChargeRead] = None
     scheduled_change: Optional[CommunityBillingChangeRead] = None
     payment_failed: bool = False
+    #: Whether the portal offers a plan above this one, and whether it can
+    #: cancel this one; the panel offers each only when billing says so.
+    can_upgrade: bool = False
+    can_cancel: bool = False
 
 
 class CommunityInviteGrant(SanitizedBaseModel):
@@ -663,6 +667,37 @@ class CommunityAuthPolicyUpdate(SanitizedBaseModel):
     require_methods: list[GuildRequirableMethod] = Field(default_factory=list)
 
 
+class CommunityProviderReach(SanitizedBaseModel):
+    """How many people in one part of a community have never signed in through
+    one of its providers."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    provider_id: int
+    count: int
+
+
+class CommunityPeopleFigures(SanitizedBaseModel):
+    """How many people one part of a community holds, and how many of them
+    hold nothing yet that answers each kind of sign-in rule. Counts only,
+    never who.
+
+    ``never_through`` counts accounts with no link to a provider at all. A link
+    the community's narrowing would refuse is not seen here, so each figure is
+    the fewest a rule naming that provider would ask.
+    """
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    total: int = 0
+    #: Holding neither a confirmed authenticator nor a passkey.
+    without_factor: int = 0
+    without_passkey: int = 0
+    #: Never signed in through any of the community's providers.
+    never_through_any: int = 0
+    never_through: List[CommunityProviderReach] = Field(default_factory=list)
+
+
 class CommunityAuthSettingsRead(SanitizedBaseModel):
     """Every control on the superadmin seat's Security page, and what the
     deployment already asks beside them."""
@@ -704,6 +739,10 @@ class CommunityAuthSettingsRead(SanitizedBaseModel):
     #: The rules above the deployment sets for this community: shown here, and
     #: changed only by the deployment.
     set_by_deployment: List[str] = Field(default_factory=list)
+    #: What each sign-in rule would ask of the community's members, and of its
+    #: guests: the seat's dialogs state it before a rule is tightened.
+    member_figures: CommunityPeopleFigures
+    guest_figures: CommunityPeopleFigures
 
 
 class CommunityAuthSettingsUpdate(SanitizedBaseModel):

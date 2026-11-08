@@ -53,7 +53,6 @@ from app.models.tenant.collection import Collection
 from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
-from app.models.tenant.queue import Queue
 from app.models.tenant.wiki import Wiki, WikiPage
 from app.models.tenant.task import Task, TaskAssignee
 from app.models.platform.user import User
@@ -117,7 +116,6 @@ _REGISTERED = (
     File,
     Post,
     Project,
-    Queue,
     Wiki,
 )
 
@@ -197,7 +195,7 @@ async def annotate_comment_counts(
     """Set ``comment_count`` on each row from one grouped query.
 
     ``column`` is the comment-parent column these rows are the parent of —
-    ``post_id`` for posts, ``queue_id`` for queues, and so on; every member of
+    ``post_id`` for posts, ``project_id`` for projects, and so on; every member of
     :data:`COMMENT_PARENT_COLUMNS` works. One statement for the whole page,
     rather than a count per row, because a board asks this about twenty posts
     at once.
@@ -741,8 +739,9 @@ async def _ensure_said_to_a_filer(
     """
     from app.core.intake import Conversation, IntakeStream, conversation_for
     from app.models.tenant.intake import IntakeCase
+    from app.services.tenant.cases import holds_cases
 
-    if person is None or column != "task_id":
+    if person is None or column != "task_id" or not await holds_cases(session):
         raise CommentValidationError(CommentMessages.NOT_SAID_TO_A_FILER)
     case = (
         await session.exec(

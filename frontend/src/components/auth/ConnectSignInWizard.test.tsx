@@ -4,7 +4,8 @@
  * The wizard is the only place a community answers all of connect, rule and
  * requirement in one sitting, so what is worth pinning down is the order the
  * three calls go out in, and the two answers that are allowed to be "nothing":
- * a narrowing nobody needs, and a requirement nobody may set.
+ * a narrowing nobody needs, and a requirement nobody may set. Editing a
+ * connection walks the same wizard, asking only the connection's own two.
  */
 
 import { screen } from "@testing-library/react";
@@ -13,12 +14,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildUser } from "@/__tests__/factories";
 import { renderWithProviders } from "@/__tests__/helpers/render";
+import type { CommunityProviderConnectionRead } from "@/api/generated/initiativeAPI.schemas";
 
 const connect = vi.fn();
 const createRule = vi.fn();
 const updatePolicy = vi.fn();
+const updateConnection = vi.fn();
 
-const inheritedRow = (overrides: Record<string, unknown> = {}) => ({
+const inheritedRow = (
+  overrides: Partial<CommunityProviderConnectionRead> = {}
+): CommunityProviderConnectionRead => ({
   id: null,
   inherited: true,
   provider_id: 11,
@@ -29,6 +34,8 @@ const inheritedRow = (overrides: Record<string, unknown> = {}) => ({
   claim_values: [],
   enabled: true,
   auto_join: false,
+  narrowing_approved: false,
+  accepts_provider_placement: false,
   login_ready: true,
   ...overrides,
 });
@@ -42,13 +49,20 @@ vi.mock("@/hooks/useCommunityAuthPolicy", () => ({
   useConnectProvider: () => ({ mutateAsync: connect, isPending: false }),
   useCreateClaimRule: () => ({ mutateAsync: createRule, isPending: false }),
   useUpdateCommunityAuthSettings: () => ({ mutateAsync: updatePolicy, isPending: false }),
+  useUpdateProviderConnection: () => ({ mutateAsync: updateConnection, isPending: false }),
 }));
 
 import { ConnectSignInWizard } from "./ConnectSignInWizard";
 
-const render = (canRequire = true) =>
+const render = (canRequire = true, connection: CommunityProviderConnectionRead | null = null) =>
   renderWithProviders(
-    <ConnectSignInWizard communityId={1} open onOpenChange={vi.fn()} canRequire={canRequire} />,
+    <ConnectSignInWizard
+      communityId={1}
+      open
+      onOpenChange={vi.fn()}
+      canRequire={canRequire}
+      connection={connection}
+    />,
     { auth: { user: buildUser() } }
   );
 
@@ -68,6 +82,7 @@ describe("ConnectSignInWizard", () => {
     connect.mockReset().mockResolvedValue({});
     createRule.mockReset().mockResolvedValue({});
     updatePolicy.mockReset().mockResolvedValue({});
+    updateConnection.mockReset().mockResolvedValue({});
   });
 
   it("walks the four steps and connects the provider that was chosen", async () => {
@@ -104,9 +119,10 @@ describe("ConnectSignInWizard", () => {
       claim_value: "eng-platform",
       community_role: "member",
     });
-    expect(updatePolicy).toHaveBeenCalledWith({
-      auth_policy: { policy: "required", provider_id: 11, require_methods: [] },
-    });
+    expect(updatePolicy).toHaveBeenCalledWith(
+      { auth_policy: { policy: "required", provider_id: 11, require_methods: [] } },
+      expect.anything()
+    );
   });
 
   it("will not connect without saying who on the provider counts", async () => {
@@ -157,11 +173,44 @@ describe("ConnectSignInWizard", () => {
     connections = [inheritedRow({ claim: "tid", claim_values: ["acme-tenant"] })];
     render();
 
-    expect(screen.getByText("From the deployment")).toBeInTheDocument();
+    expect(screen.getByText("From your server")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /entra/i }));
 
     expect(await screen.findByText("Microsoft Entra tenant")).toBeInTheDocument();
     expect(screen.getByDisplayValue("acme-tenant")).toBeInTheDocument();
+  });
+
+  it("edits a connection's narrowing and joining, and nothing else", async () => {
+    const user = userEvent.setup();
+    render(
+      true,
+      inheritedRow({
+        id: 5,
+        inherited: false,
+        claim: "org",
+        claim_values: ["acme", "acme-labs"],
+        auto_join: true,
+      })
+    );
+
+    expect(await screen.findByText("Whose people")).toBeInTheDocument();
+    expect(screen.getByText("Step 1 of 2")).toBeInTheDocument();
+    // A claim that is none of the shortcuts is shown as typed.
+    expect(screen.getByDisplayValue("org")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("acme, acme-labs")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^next$/i }));
+
+    expect(await screen.findByText("Where they land")).toBeInTheDocument();
+    expect(screen.getByRole("switch")).toBeChecked();
+    expect(screen.queryByLabelText(/a first group/i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    expect(updateConnection).toHaveBeenCalledWith({
+      connectionId: 5,
+      data: { claim: "org", claim_values: ["acme", "acme-labs"], auto_join: true },
+    });
+    expect(connect).not.toHaveBeenCalled();
+    expect(createRule).not.toHaveBeenCalled();
   });
 
   it("offers no provider the deployment cannot sign anybody in with", () => {

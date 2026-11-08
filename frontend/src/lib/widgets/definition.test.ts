@@ -216,12 +216,10 @@ describe("effectiveBinding", () => {
 describe("unboundSlots", () => {
   it("names what a binding still needs", () => {
     expect(unboundSlots({ source: "query" })).toEqual(["sql"]);
-    expect(unboundSlots({ source: "sheet_range", file_id: 3 })).toEqual(["range"]);
   });
 
   it("is empty once every required parameter is filled", () => {
     expect(unboundSlots({ source: "query", sql: "SELECT title FROM tasks" })).toEqual([]);
-    expect(unboundSlots({ source: "sheet_range", file_id: 3, range: "A1:B2" })).toEqual([]);
   });
 });
 

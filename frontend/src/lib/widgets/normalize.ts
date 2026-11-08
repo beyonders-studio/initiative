@@ -1,24 +1,12 @@
 /**
  * From what an endpoint answered to what a widget reads.
  *
- * Two producers, one envelope. A statement's columns arrive already typed — the
- * server described them rather than guessing from the first row — and a
- * spreadsheet range's do not, so its types are read off the values. Everything
- * downstream of here sees the same {@link TabularData} and never learns which
- * it was handed.
+ * A statement's columns arrive already typed — the server described them rather
+ * than guessing from the first row — so everything downstream of here sees the
+ * same {@link TabularData}, whatever the statement read.
  */
 
-import type { FileRead } from "@/api/generated/initiativeAPI.schemas";
-import { keyOf, parseA1Range } from "@/lib/spreadsheet/coords";
-
-import type {
-  CellValue,
-  ColumnGrain,
-  ColumnType,
-  DataColumn,
-  WidgetData,
-  WidgetSource,
-} from "./dataShapes";
+import type { CellValue, ColumnGrain, DataColumn, WidgetData, WidgetSource } from "./dataShapes";
 
 /** A cell, in the three shapes a JSON value can usefully be.
  *
@@ -57,73 +45,6 @@ const COLUMN_GRAINS = ["day", "week", "month", "quarter", "year"] as const;
 
 const isColumnGrain = (grain: string | null | undefined): grain is ColumnGrain =>
   COLUMN_GRAINS.some((known) => known === grain);
-
-/**
- * What a column of sheet cells holds.
- *
- * Read off the values because a spreadsheet declares nothing: a column whose
- * every filled cell is a number is a number, and anything else is text. Blank
- * cells are skipped rather than counted as text, so one empty row does not stop
- * a column of figures being figures.
- */
-const sniff = (rows: CellValue[][], index: number): ColumnType => {
-  let seen = false;
-  for (const row of rows) {
-    const value = row[index];
-    if (value === null || value === "") continue;
-    seen = true;
-    if (typeof value !== "number") return "text";
-  }
-  return seen ? "number" : "text";
-};
-
-interface SheetLike {
-  id?: string;
-  name?: string;
-  cells?: Record<string, unknown>;
-}
-
-export const normalizeSheetRange = (
-  file: FileRead,
-  sheetName: string | null | undefined,
-  range: string | null | undefined
-): { columns: DataColumn[]; rows: CellValue[][] } | null => {
-  const content = file.content as { sheets?: SheetLike[] } | null;
-  const sheets = content?.sheets ?? [];
-  if (!sheets.length) return null;
-
-  const sheet = sheetName
-    ? sheets.find((s) => s.name === sheetName || s.id === sheetName)
-    : sheets[0];
-  if (!sheet?.cells) return null;
-
-  const box = range ? parseA1Range(range) : null;
-  if (!box) return null;
-
-  const rows: CellValue[][] = [];
-  for (let row = box.r1; row <= box.r2; row++) {
-    const line: CellValue[] = [];
-    for (let col = box.c1; col <= box.c2; col++) {
-      const value = sheet.cells[keyOf(row, col)];
-      line.push(cell(value));
-    }
-    rows.push(line);
-  }
-  if (!rows.length) return { columns: [], rows: [] };
-
-  const [firstRow] = rows;
-  const headerLooksLikeLabels =
-    rows.length > 1 && firstRow.every((cell) => typeof cell === "string" && cell !== "");
-
-  const body = headerLooksLikeLabels ? rows.slice(1) : rows;
-  const names = headerLooksLikeLabels
-    ? firstRow.map(String)
-    : firstRow.map((_, index) => `Column ${index + 1}`);
-  return {
-    columns: names.map((name, index) => ({ name, type: sniff(body, index) })),
-    rows: body,
-  };
-};
 
 /** The envelope for a binding we fetched nothing for — one whose parameters the
  *  instance config has not filled in yet. */

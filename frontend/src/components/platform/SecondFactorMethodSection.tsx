@@ -21,11 +21,11 @@ import { useTranslation } from "react-i18next";
 
 import type { LoginMethod } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { usePlatformAuthSettings, useUpdatePlatformAuthSettings } from "@/hooks/useSettings";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Checkbox } from "@/ui/checkbox";
+import { Label } from "@/ui/label";
 
 export const SecondFactorMethodSection = () => {
   const { t } = useTranslation("settings");

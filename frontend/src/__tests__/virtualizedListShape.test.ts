@@ -14,9 +14,9 @@
  *    still null, and every offset comes out short by the height of the
  *    toolbar and filters above it.
  *
- * The posts board virtualizes in the page; a collection's grid and timeline do
- * it through a shared row component. Both answer to the same two facts, so
- * they are asked together.
+ * The posts board and a collection's grid and timeline all measure through
+ * the kit's one hook, `useVirtualRows`, and each keeps its own gap, so they are
+ * asked together.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -34,7 +34,7 @@ const LISTS = [
   },
   {
     what: "a collection's wall",
-    source: read("../components/files/collections/VirtualRows.tsx"),
+    source: read("../ui/virtual-rows.tsx"),
     gap: "ROW_GAP",
   },
 ];
@@ -54,11 +54,10 @@ describe("a virtualized list", () => {
     }
   );
 
-  it.each(LISTS)(
-    "$what measures where the list starts instead of assuming the top",
-    ({ source }) => {
-      expect(source).toContain("useLayoutEffect");
-      expect(source).toContain("scrollMargin: listOffset");
-    }
-  );
+  it("measures where the list starts instead of assuming the top, in the hook they share", () => {
+    const rows = read("../ui/virtual-rows.tsx");
+    expect(rows).toContain("useLayoutEffect");
+    expect(rows).toContain("scrollMargin: listOffset");
+    for (const { source } of LISTS) expect(source).toContain("useVirtualRows(listRef");
+  });
 });

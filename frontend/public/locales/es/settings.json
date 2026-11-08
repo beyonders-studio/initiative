@@ -11,7 +11,8 @@
       "privacy": "Privacidad"
     },
     "loginRequired": "Necesitas iniciar sesión para administrar tu perfil.",
-    "goToLogin": "Ir a inicio de sesión"
+    "goToLogin": "Ir a inicio de sesión",
+    "version": "Initiative v{{version}}"
   },
   "communityLayout": {
     "title": "Configuración de la comunidad",
@@ -72,8 +73,6 @@
   "addresses": {
     "title": "Direcciones de correo",
     "description": "Cualquier dirección confirmada te permite entrar, y el correo de tu cuenta llega a todas.",
-    "loadFailed": "No se pudieron cargar tus direcciones.",
-    "retry": "Reintentar",
     "primary": "Principal",
     "unverified": "Sin confirmar",
     "makePrimary": "Hacer principal",
@@ -117,10 +116,7 @@
     "waits": "Este cambio espera hasta el {{date}}. Todas las direcciones de tu cuenta han recibido un correo sobre ello."
   },
   "security": {
-    "loadingDevices": "Cargando dispositivos…",
-    "devicesError": "No se pudieron cargar los dispositivos.",
     "unknownDevice": "Dispositivo desconocido",
-    "revokeDialogCancel": "Cancelar",
     "revoking": "Revocando…",
     "revokeError": "No se pudo revocar el acceso del dispositivo",
     "newKeyTitle": "Nueva clave API",
@@ -143,8 +139,6 @@
     "nameRequired": "El nombre es obligatorio",
     "createSuccess": "Clave API creada",
     "createError": "No se pudo crear la clave API",
-    "loadingKeys": "Cargando claves API…",
-    "keysError": "No se pudieron cargar las claves API.",
     "noKeys": "Aún no hay claves API.",
     "statusExpired": "Expirada",
     "statusDisabled": "Deshabilitada",
@@ -194,9 +188,6 @@
   },
   "ai": {
     "loading": "Cargando la configuración de IA…",
-    "loadError": "No se pudo cargar la configuración de IA.",
-    "enabled": "Activado",
-    "disabled": "Desactivado",
     "providerFieldLabel": "Proveedor",
     "providerPlaceholder": "Selecciona un proveedor",
     "modelLabel": "Modelo",
@@ -211,16 +202,9 @@
   "communityAI": {
     "title": "IA de la comunidad",
     "adminOnly": "Solo los administradores de la comunidad pueden gestionar las conexiones de IA.",
-    "connectionsTitle": "Conexiones de la comunidad",
-    "connectionsDescription": "Define las conexiones de IA que pueden usar los miembros de esta comunidad.",
     "disabledDescription": "Las funciones de IA están desactivadas para la plataforma.",
     "managedByPlatform": "Las conexiones de IA se gestionan a nivel de plataforma. Los miembros configuran su propia clave en la configuración de su perfil.",
-    "managedByServer": "Quien gestiona este servidor administra la IA de esta comunidad.",
-    "switchTitle": "IA en esta comunidad",
-    "switchLabel": "Permitir funciones de IA",
-    "switchHelp": "Desactivada, nada de esta comunidad se envía a un proveedor de IA, sea cual sea la conexión que configuren el servidor o la comunidad.",
-    "switchSaved": "Ajuste de IA guardado",
-    "switchError": "No se pudo guardar el ajuste de IA."
+    "managedByServer": "Quien gestiona este servidor administra la IA de esta comunidad."
   },
   "platformAI": {
     "title": "IA de la plataforma",
@@ -236,9 +220,7 @@
     "saveMode": "Guardar",
     "savingMode": "Guardando…",
     "modeSaved": "Configuración de IA actualizada",
-    "modeSaveError": "No se pudo actualizar la configuración de IA",
-    "connectionsTitle": "Conexiones de la plataforma",
-    "connectionsDescription": "Define las conexiones de IA que usa cada comunidad."
+    "modeSaveError": "No se pudo actualizar la configuración de IA"
   },
   "marketplaceRegistry": {
     "title": "Registro del catálogo",
@@ -551,7 +533,6 @@
     "colorsTitle": "Colores de marca",
     "colorsDescription": "Personaliza los colores de acento para el modo claro y oscuro.",
     "loadingInterface": "Cargando configuración de interfaz…",
-    "interfaceError": "No se pudo cargar la configuración de interfaz.",
     "lightModeLabel": "Acento del modo claro",
     "lightModeHelp": "Los botones, resaltados y estados de enfoque usan este color mientras la aplicación está en modo claro.",
     "darkModeLabel": "Acento del modo oscuro",
@@ -626,8 +607,6 @@
   "email": {
     "platformOnly": "Solo el propietario de la plataforma puede gestionar la configuración de email.",
     "title": "Email SMTP",
-    "loading": "Cargando configuración de email…",
-    "loadError": "No se pudo cargar la configuración de email.",
     "hostLabel": "Servidor",
     "hostPlaceholder": "smtp.proveedordecorreo.com",
     "portLabel": "Puerto",
@@ -656,7 +635,6 @@
   "push": {
     "platformOnly": "Solo el propietario de la plataforma puede gestionar los ajustes de notificaciones push.",
     "loading": "Cargando ajustes de notificaciones push…",
-    "loadError": "No se pudieron cargar los ajustes de notificaciones push.",
     "title": "Firebase Cloud Messaging",
     "description": "Opcional. Sin una clave de cuenta de servicio, las notificaciones push pasan por el relé de push de BeyondersStudio y estos campos pueden quedar vacíos. Con una, las notificaciones de Android pasan por tu propio proyecto de Firebase; las de iPhone siempre usan el relé.",
     "enabledLabel": "Enviar notificaciones push",
@@ -713,7 +691,6 @@
   "auth": {
     "platformOnly": "Solo el propietario de la plataforma puede gestionar la configuración de autenticación.",
     "loading": "Cargando configuración de autenticación…",
-    "loadError": "No se pudo cargar la configuración de autenticación.",
     "postLoginRedirect": "Redirección después de inicio de sesión:",
     "mobileCallback": "Callback de app móvil:",
     "deploymentTitle": "Esta instalación",
@@ -814,7 +791,6 @@
   },
   "platformUsers": {
     "loading": "Cargando usuarios…",
-    "loadError": "No se pudieron cargar los usuarios.",
     "filterPlaceholder": "Filtrar por identificador…",
     "columnId": "ID de usuario",
     "columnHandle": "Identificador",
@@ -937,8 +913,6 @@
         "title": "Casos",
         "count_one": "{{count}} caso abierto que presentó o que trata sobre esta cuenta.",
         "count_other": "{{count}} casos abiertos que presentó o que tratan sobre esta cuenta.",
-        "loading": "Cargando casos…",
-        "loadError": "No se pudieron cargar sus casos.",
         "filed": "Presentado por esta cuenta",
         "about": "Sobre esta cuenta",
         "help": "Para abrir un caso necesitas acceso al proyecto donde se guarda."
@@ -1068,7 +1042,6 @@
     "actionError": "La acción falló",
     "expiresIn": "caduca en {{minutes}} min",
     "minutes": "{{minutes}} min",
-    "loadMore": "Cargar más",
     "status": {
       "pending": "Pendiente",
       "approved": "Aprobado",
@@ -1121,14 +1094,12 @@
   "pluginServices": {
     "platformOnly": "Solo los propietarios de la plataforma pueden gestionar los servicios de complementos.",
     "loading": "Cargando servicios de complementos…",
-    "loadError": "No se pudieron cargar los servicios de complementos.",
     "title": "Servicios de complementos",
     "description": "Los complementos que ejecuta esta instancia. La ficha de un complemento dice qué es y qué puede hacer; aquí indicas dónde responde y las claves con las que firma.",
     "empty": "Todavía no hay servicios de complementos. Un complemento aparece aquí cuando llega su ficha o cuando lo añades.",
     "addService": "Añadir servicio de complemento",
     "edit": "Editar",
     "delete": "Eliminar",
-    "cancel": "Cancelar",
     "save": "Guardar",
     "saving": "Guardando…",
     "enabledLabel": "Activo",
@@ -1252,7 +1223,6 @@
   "providerPlacement": {
     "description": "Asigna a las personas que inicia sesión un proveedor —según el grupo o el directorio que indique— a una comunidad, y a una iniciativa de ella si nombras una.",
     "loading": "Cargando reglas de asignación…",
-    "loadError": "No se pudieron cargar las reglas de asignación. Inténtalo de nuevo.",
     "platformOnly": "La asignación al iniciar sesión la gestionan los operadores y propietarios de la plataforma.",
     "everywhere": {
       "label": "Aplicar las reglas de asignación a todas las comunidades",
@@ -1322,7 +1292,6 @@
     "description": "Establece límites por comunidad para el almacenamiento y el número de usuarios. Bajar un límite por debajo del uso actual bloquea las nuevas subidas o miembros, pero nunca elimina los archivos ni los miembros existentes.",
     "platformOnly": "Necesitas un rol de personal de la plataforma para ver las comunidades.",
     "loading": "Cargando comunidades…",
-    "loadError": "No se pudieron cargar las comunidades. Inténtalo de nuevo.",
     "filterByName": "Filtrar comunidades por nombre",
     "unlimitedPlaceholder": "Ilimitado",
     "helpText": "Los límites de almacenamiento están en GB; los límites de usuarios son un recuento de miembros. Ambos se guardan automáticamente: deja un campo en blanco para ilimitado.",
@@ -1402,7 +1371,6 @@
       "storageLabel": "Límite de almacenamiento",
       "decidesForItself": "Lo que decide por su cuenta",
       "deleted": "Eliminada",
-      "pluginSummariesUnavailable": "No se pudo cargar el uso de los plug-ins.",
       "narrowings": {
         "title": "A quién considera de los suyos",
         "help": "Esta comunidad indica qué llegadas a través de un proveedor son suyas. Ella misma nombra los valores, así que su acuerdo es lo que permite el ingreso automático; hasta entonces la conexión solo sirve para quienes ya están dentro.",
@@ -1455,7 +1423,6 @@
   "storage": {
     "platformOnly": "Solo los propietarios de la plataforma pueden configurar el almacenamiento.",
     "loading": "Cargando la configuración de almacenamiento…",
-    "loadError": "No se pudo cargar la configuración de almacenamiento.",
     "title": "Almacenamiento de objetos",
     "description": "Elige dónde se guardan los archivos subidos y los adjuntos. De forma predeterminada usa el sistema de archivos local; cambia a un almacén compatible con S3 para despliegues escalables o compartidos.",
     "backendLabel": "Backend de almacenamiento",
@@ -1505,19 +1472,19 @@
     "setByDeployment": "Quien gestiona este servidor define esto para tu comunidad.",
     "shareUrl": {
       "title": "Enlace de inicio de sesión para miembros",
-      "description": "Comparte este enlace con los miembros: ofrece los proveedores de inicio de sesión de esta comunidad y los lleva directamente a la comunidad.",
-      "copy": "Copiar enlace",
+      "description": "Ofrece estos proveedores y lleva a la gente directamente a {{community}}.",
+      "copy": "Copiar",
       "copied": "Enlace de inicio de sesión copiado"
     },
     "policy": {
-      "title": "Requisito de inicio de sesión",
-      "description": "Controla con qué inicio de sesión debe haberse autenticado una sesión antes de poder acceder a esta comunidad.",
-      "openLabel": "Abierto",
-      "openHelp": "Cualquier miembro con sesión iniciada puede acceder a esta comunidad.",
-      "requiredLabel": "Requerir inicio de sesión único",
-      "requiredHelp": "Los miembros solo pueden acceder a esta comunidad tras iniciar sesión con el proveedor seleccionado.",
+      "title": "Inicio de sesión de los miembros",
+      "description": "Lo que necesitan los miembros antes de poder abrir {{community}}.",
+      "openLabel": "Cualquier cuenta con sesión iniciada",
+      "openHelp": "Los miembros inician sesión como lo permita este servidor.",
+      "requiredLabel": "A través de nuestros proveedores",
+      "requiredHelp": "Solo cuenta un inicio de sesión con el proveedor que elijas.",
       "providerPlaceholder": "Elige un proveedor…",
-      "noProviders": "Conectad primero un proveedor en «Quién entra».",
+      "noProviders": "Conectad primero un proveedor en «Proveedores de inicio de sesión».",
       "saved": "Requisito de inicio de sesión guardado",
       "error": "No se pudo guardar el requisito de inicio de sesión",
       "selfUnsatisfied": "Tu sesión actual aún no ha iniciado sesión con {{providerName}}. Inicia sesión con él una vez para confirmar que funciona antes de exigirlo.",
@@ -1528,22 +1495,44 @@
       "presentPasskey": "Presentar clave de acceso",
       "anyProvider": "Cualquiera de nuestros proveedores",
       "anyProviderHelp": "Los miembros pueden entrar por cualquier proveedor que esta comunidad haya configurado. Iniciar sesión en otro sitio de esta instalación no cuenta.",
-      "requireFactor": "Exigir también un segundo factor",
-      "requireFactorHelp": "Los miembros deben haber presentado un código de su aplicación de autenticación en esta sesión. Pueden añadirlo sin cerrar sesión.",
       "requirePasskey": "Exigir también una clave de acceso",
       "requirePasskeyHelp": "Los miembros deben haber iniciado sesión con una clave de acceso, o haber presentado una, en esta sesión. Pueden añadirla sin cerrar sesión.",
-      "factorRequiredByPlatform": "Tu servidor ya pide un segundo factor a todo el mundo, así que aquí no hay nada que añadir."
+      "save": "Guardar requisito",
+      "value": {
+        "through": "Con {{provider}}",
+        "throughWithPasskey": "Con {{provider}}, con clave de acceso",
+        "any": "Con cualquiera de nuestros proveedores",
+        "anyWithPasskey": "Con cualquiera de nuestros proveedores, con clave de acceso",
+        "passkey": "Con clave de acceso"
+      },
+      "impact": {
+        "provider": "A los miembros que entraron de otra forma se les pide iniciar sesión con {{provider}} la próxima vez que abran {{community}}. No se cierra la sesión de nadie.",
+        "anyProvider": "A los miembros que entraron de otra forma se les pide iniciar sesión con uno de vuestros proveedores la próxima vez que abran {{community}}. No se cierra la sesión de nadie.",
+        "passkey": "A los miembros que no han usado una clave de acceso en esta sesión se les pide una la próxima vez que abran {{community}}. No se cierra la sesión de nadie.",
+        "selfProvider": "Si tu propia sesión aún no ha usado {{provider}}, inicias sesión con él una vez antes de que se guarde.",
+        "selfOther": "Si tu propia sesión aún no lo cumple, se te pedirá antes de guardar.",
+        "neverThrough_one": "{{count}} de {{total}} miembros nunca ha iniciado sesión con {{provider}}.",
+        "neverThrough_other": "{{count}} de {{total}} miembros nunca han iniciado sesión con {{provider}}.",
+        "neverThroughAny_one": "{{count}} de {{total}} miembros nunca ha iniciado sesión con ninguno de vuestros proveedores.",
+        "neverThroughAny_other": "{{count}} de {{total}} miembros nunca han iniciado sesión con ninguno de vuestros proveedores.",
+        "noPasskey_one": "{{count}} de {{total}} miembros aún no tiene clave de acceso.",
+        "noPasskey_other": "{{count}} de {{total}} miembros aún no tienen clave de acceso."
+      }
     },
     "sessionLimit": {
-      "title": "Duración de la sesión",
-      "allowLabel": "Volver a iniciar sesión cada doce horas",
+      "title": "Volver a iniciar sesión cada 12 horas",
       "saved": "Límite de sesión guardado",
       "error": "No se pudo guardar el límite de sesión",
-      "help": "Para comunidades a las que se les ha pedido limitar cuánto tiempo permanece abierta la sesión. Se aplica a vuestros miembros en todas partes, no solo aquí."
+      "description": "Para comunidades a las que se les ha pedido limitar cuánto tiempo permanece abierta la sesión.",
+      "offLabel": "Desactivado",
+      "onLabel": "Volver a iniciar sesión cada 12 horas",
+      "onDetail": "estos miembros vuelven a iniciar sesión en todo este servidor",
+      "offDetail": "se aplica la duración de sesión de tu servidor",
+      "impact": "Se aplica a estos miembros en todas las comunidades de este servidor, no solo aquí."
     },
     "connections": {
-      "title": "Qué inicios de sesión son vuestros",
-      "description": "La gente inicia sesión en esta instalación. Di cuáles de sus proveedores cuentan como de vuestra comunidad, y quién en ellos cuenta como vuestro.",
+      "title": "Proveedores de inicio de sesión",
+      "description": "Los proveedores con los que inician sesión vuestros miembros, y cuáles de sus cuentas cuentan como vuestras.",
       "connect": "Conectar un proveedor",
       "connected": "Proveedor conectado",
       "connectError": "No se pudo cambiar esa conexión",
@@ -1551,15 +1540,10 @@
       "disconnected": "Proveedor desconectado",
       "disconnectTitle": "¿Desconectar {{name}}?",
       "disconnectDescription": "Deja de contar como vuestra: el botón desaparece de vuestra página de inicio de sesión y nadie nuevo entra por ahí. Nadie cierra sesión y ninguna cuenta cambia. Si exigís entrar por él, levantad eso primero.",
-      "empty": "Aún no hay proveedores conectados: vuestros miembros inician sesión como siempre.",
       "noneOffered": "Quien gestiona esta instalación aún no ha ofrecido ningún proveedor para conectar.",
       "notReady": "No disponible",
-      "narrowedTo": "Solo cuentas cuyo {{claim}} sea {{values}}",
+      "narrowedTo": "{{claim}}: {{values}}",
       "anyoneItVouchesFor": "Cualquiera por quien responda este proveedor",
-      "dialogTitle": "Conectar un proveedor de inicio de sesión",
-      "dialogDescription": "Elige el proveedor que usan vuestros miembros y luego di qué cuentas suyas son vuestras.",
-      "providerLabel": "Proveedor",
-      "providerPlaceholder": "Elige uno",
       "claimLabel": "Qué cuentas cuentan como vuestras",
       "claimHelp": "Aquí las comunidades están separadas, así que indica qué cuentas de este proveedor son tuyas: un dominio de Google Workspace, un inquilino de Entra, un grupo. Solo esas personas cuentan como de tu comunidad.",
       "claimPlaceholder": "Elige qué identifica a tu gente",
@@ -1567,7 +1551,7 @@
       "claimValuesPlaceholder": "example.com, example.org",
       "autoJoinLabel": "Añadirles a esta comunidad",
       "autoJoinHelp": "Quien cuente como vuestro se hace miembro la primera vez que inicia sesión. Déjalo apagado si preferís invitar vosotros.",
-      "joinsOnArrival": "Quien llega se une automáticamente",
+      "joinsOnArrival": "quien llega se une",
       "claimOptions": {
         "hd": "Dominio de Google Workspace",
         "tid": "Tenant de Microsoft Entra",
@@ -1575,26 +1559,26 @@
         "domain": "Dominio",
         "other": "Otra reclamación…"
       },
-      "inherited": "De la instalación",
+      "inherited": "De tu servidor",
       "makeItOurs": "Hacerla nuestra",
       "claimNameLabel": "Nombre de la reclamación",
       "claimNamePlaceholder": "p. ej. org, realm",
       "joinsOnceAgreed": "Las llegadas coincidentes ingresarán de inmediato en cuanto quien administra este servidor confirme que estos valores son suyos. Hasta entonces se les admite y el ingreso es por invitación.",
-      "acceptsPlacementLabel": "Dejar que la instalación asigne a personas de este proveedor",
-      "acceptsPlacementHelp": "Las reglas de asignación de la instalación para este proveedor pueden añadir personas aquí, junto a vuestras propias reglas."
+      "acceptsPlacementLabel": "Dejar que tu servidor asigne personas",
+      "saved": "Conexión guardada",
+      "turnOff": "Desactivar",
+      "turnOn": "Activar"
     },
     "rules": {
-      "title": "Dónde llega vuestra gente",
-      "description": "Vuestro proveedor indica en qué grupos está cada persona. Decid aquí qué significan esos grupos: quién entra como miembro, quién como administrador y en qué iniciativa empieza.",
+      "title": "Dónde llega la gente",
       "add": "Añadir una regla",
       "added": "Regla añadida",
       "addError": "No se pudo añadir esa regla",
       "empty": "Aún no hay reglas: quien llegue por vuestros proveedores entrará sin nada en particular.",
-      "connectFirst": "Conectad primero un proveedor y luego decid qué significan sus grupos.",
       "noGroupsBadge": "No informa de grupos",
       "noGroupsHint": "Quien gestiona esta instalación no ha indicado a este proveedor dónde están sus grupos, así que esta regla no se aplicará a nadie hasta que lo haga.",
-      "landsInCommunity": "Llega por {{provider}}: entra como {{role}}",
-      "landsInInitiative": "Llega por {{provider}}: entra como {{role}}, y en {{initiative}} como {{initiativeRole}}",
+      "landsInCommunity": "Con {{provider}}, entra como {{role}}",
+      "landsInInitiative": "Con {{provider}}, entra como {{role}}, y en {{initiative}} como {{initiativeRole}}",
       "dialogDescription": "Nombrad un grupo del que informe vuestro proveedor y decid dónde pertenece su gente.",
       "providerLabel": "Proveedor",
       "providerPlaceholder": "Elegid uno",
@@ -1616,14 +1600,14 @@
       "removeTitle": "¿Eliminar esta regla?",
       "removeDescription": "Quien lleve {{group}} dejará de ser asignado aquí, y quien esté aquí por esta regla perderá esa posición la próxima vez que inicie sesión con ese proveedor.",
       "deployment": {
-        "title": "Definidas por la instalación",
-        "description": "Reglas de asignación que quien gestiona esta instalación escribió para sus proveedores y que nombran a esta comunidad. Asignan personas aquí junto a vuestras propias reglas en cuanto dejáis entrar las reglas de un proveedor en su conexión.",
-        "everywhere": "La instalación aplica sus reglas de asignación a todas las comunidades."
-      }
-    },
-    "sections": {
-      "whoGetsIn": "Quién entra",
-      "onWhatTerms": "En qué condiciones"
+        "description": "Reglas que tu servidor escribió para sus proveedores y que nombran a esta comunidad. Asignan personas aquí junto a vuestras propias reglas en cuanto la conexión de ese proveedor deja que tu servidor asigne personas.",
+        "everywhere": "Tu servidor aplica sus reglas de asignación a todas las comunidades.",
+        "count_one": "{{count}} regla de tu servidor",
+        "count_other": "{{count}} reglas de tu servidor"
+      },
+      "saved": "Regla guardada",
+      "saveError": "No se pudo guardar esa regla",
+      "editTitle": "Editar regla"
     },
     "emptyState": {
       "title": "Aún no hay nada conectado",
@@ -1649,7 +1633,6 @@
           "prompt": "Si esta pasa a ser la única forma de entrar."
         }
       },
-      "skip": "Omitir",
       "ruleTitle": "Un primer grupo",
       "ruleHelp": "Opcional. Nombre un grupo que informe su proveedor y dónde aterriza su gente. Puede añadir más después.",
       "requireLabel": "Exigir que los miembros entren por este proveedor",
@@ -1657,40 +1640,72 @@
     },
     "secondFactor": {
       "title": "Segundo factor",
-      "description": "Si entrar en esta comunidad exige uno.",
-      "allowLabel": "Exigir un segundo factor",
-      "help": "Los miembros deben haber presentado un segundo factor en esta sesión. Qué tipos cuentan lo decide el servidor, no esta comunidad: pueden añadir uno sin cerrar sesión.",
-      "askedByPlatform": "Su servidor ya pide un segundo factor a todo el mundo aquí, así que no hay nada que añadir.",
+      "description": "Si abrir {{community}} exige un segundo factor en cada sesión.",
       "saved": "Segundo factor guardado.",
-      "error": "No se pudo guardar el requisito de segundo factor."
+      "error": "No se pudo guardar el requisito de segundo factor.",
+      "offLabel": "No exigido",
+      "onLabel": "Exigido en cada sesión",
+      "guestsToo": "también a los invitados",
+      "impact": "Todo el que abra {{community}}, invitados incluidos, presenta un código de una aplicación de autenticación o una clave de acceso en cada sesión. Pueden añadir uno sin cerrar sesión.",
+      "withoutFactor_one": "{{count}} de {{total}} personas aquí aún no tiene autenticador ni clave de acceso.",
+      "withoutFactor_other": "{{count}} de {{total}} personas aquí aún no tienen autenticador ni clave de acceso."
     },
     "guestPolicy": {
-      "title": "Requisito de inicio de sesión para invitados",
-      "description": "Controla con qué inicio de sesión debe haber entrado la sesión de un invitado antes de llegar a esta comunidad. No tienes que cumplirlo tú.",
-      "openHelp": "Cualquier invitado con sesión iniciada puede llegar a lo que se le dio.",
-      "requiredHelp": "Los invitados solo pueden llegar a esta comunidad tras iniciar sesión con el proveedor seleccionado.",
+      "title": "Inicio de sesión de los invitados",
+      "description": "Lo que necesitan los invitados antes de poder abrir {{community}}. No tienes que cumplirlo tú.",
+      "openHelp": "Los invitados inician sesión como lo permita este servidor.",
       "anyProviderHelp": "Los invitados pueden entrar por cualquier proveedor que esta comunidad haya configurado. Iniciar sesión en otro sitio de esta instalación no cuenta.",
       "requirePasskeyHelp": "Los invitados deben haber iniciado sesión con una clave de acceso, o haber presentado una, en esta sesión. Pueden añadirla sin cerrar sesión.",
       "saved": "Requisito de inicio de sesión para invitados guardado",
       "error": "No se pudo guardar el requisito de inicio de sesión para invitados",
-      "save": "Guardar el requisito de inicio de sesión para invitados"
+      "impact": {
+        "provider": "A los invitados que entraron de otra forma se les pide iniciar sesión con {{provider}} la próxima vez que abran {{community}}. No se cierra la sesión de nadie.",
+        "anyProvider": "A los invitados que entraron de otra forma se les pide iniciar sesión con uno de vuestros proveedores la próxima vez que abran {{community}}. No se cierra la sesión de nadie.",
+        "passkey": "A los invitados que no han usado una clave de acceso en esta sesión se les pide una la próxima vez que abran {{community}}. No se cierra la sesión de nadie.",
+        "neverThrough_one": "{{count}} de {{total}} invitados nunca ha iniciado sesión con {{provider}}.",
+        "neverThrough_other": "{{count}} de {{total}} invitados nunca han iniciado sesión con {{provider}}.",
+        "neverThroughAny_one": "{{count}} de {{total}} invitados nunca ha iniciado sesión con ninguno de vuestros proveedores.",
+        "neverThroughAny_other": "{{count}} de {{total}} invitados nunca han iniciado sesión con ninguno de vuestros proveedores.",
+        "noPasskey_one": "{{count}} de {{total}} invitados aún no tiene clave de acceso.",
+        "noPasskey_other": "{{count}} de {{total}} invitados aún no tienen clave de acceso."
+      }
     },
     "guestStay": {
-      "title": "Estancia de los invitados",
+      "title": "Estancia máxima de invitados",
       "description": "Las invitaciones de invitado y las ampliaciones nunca duran más que esto. Los invitados que ya están conservan su fecha de fin.",
       "label": "Estancia máxima de un invitado (días)",
       "hint_one": "Déjalo en blanco para usar el límite del servidor de {{count}} día, que también es lo máximo que puedes poner.",
       "hint_other": "Déjalo en blanco para usar el límite del servidor de {{count}} días, que también es lo máximo que puedes poner.",
       "saved": "Estancia máxima de invitados guardada",
       "error": "No se pudo guardar la estancia máxima de invitados",
-      "save": "Guardar la estancia máxima de invitados"
+      "value_one": "{{count}} día",
+      "value_other": "{{count}} días",
+      "defaultDetail": "el límite de tu servidor",
+      "ceilingDetail": "tu servidor permite hasta {{days}}"
+    },
+    "setByServer": "Definido por tu servidor",
+    "intro": "Cómo se inicia sesión en {{community}}, qué hace falta para entrar y qué sale de la comunidad.",
+    "change": "Cambiar",
+    "changeRule": "Cambiar {{rule}}",
+    "on": "Activado",
+    "off": "Desactivado",
+    "whenYouSave": "Al guardar",
+    "signInRules": {
+      "title": "Reglas de inicio de sesión",
+      "description": "Lo que hace falta antes de poder abrir {{community}}.",
+      "members": "Miembros",
+      "guests": "Invitados"
+    },
+    "groupRules": {
+      "title": "Reglas de grupo",
+      "description": "Qué significan aquí los grupos que informan vuestros proveedores. Cada una se aplica la próxima vez que alguien inicia sesión.",
+      "add": "Añadir"
     }
   },
   "authProviders": {
     "title": "Proveedores de identidad",
     "description": "Los proveedores de inicio de sesión único con los que las personas inician sesión. Cada uno tiene su propio botón en la página de inicio de sesión.",
     "addProvider": "Añadir proveedor",
-    "loading": "Cargando proveedores…",
     "empty": "Aún no hay proveedores configurados.",
     "disabledBadge": "Desactivado",
     "editTitle": "Editar proveedor de inicio de sesión",
@@ -1778,11 +1793,12 @@
   },
   "aiConnections": {
     "title": "Conexiones",
-    "subtitle": "Cada conexión es un destino: un proveedor, un modelo y una clave compartida opcional.",
+    "subtitle_community": "Los proveedores y modelos de IA que pueden usar los miembros de esta comunidad.",
+    "subtitle_platform": "Los proveedores y modelos de IA que pueden usar las comunidades de este servidor.",
+    "locked": "Activa la IA en Seguridad para usar estas conexiones.",
     "add": "Añadir conexión",
+    "toggleLabel": "Usar {{label}}",
     "empty": "Aún no hay conexiones. Añade una para activar las funciones de IA.",
-    "loading": "Cargando conexiones…",
-    "loadError": "No se pudieron cargar las conexiones.",
     "defaultBadge": "Predeterminada",
     "keySet": "Clave compartida configurada",
     "noKey": "Sin clave compartida",
@@ -1814,13 +1830,10 @@
     "modelHintPick": "Elige un modelo para terminar de configurar esta conexión.",
     "needsModel": "Falta el modelo",
     "customHint": "Cualquier servidor que hable la API de OpenAI: vLLM, llama.cpp, LM Studio, LocalAI o una pasarela como LiteLLM. Indica la dirección hasta /v1.",
-    "enabledLabel": "Activada",
-    "enabledDescription": "Permitir que los miembros usen esta conexión.",
     "defaultLabel": "Conexión predeterminada",
     "defaultDescription": "Los miembros usan esta conexión salvo que elijan otra.",
     "save": "Guardar conexión",
     "saving": "Guardando…",
-    "cancel": "Cancelar",
     "communitiesLabel": "Comunidades",
     "communitiesPlaceholder": "Asignarla a una comunidad…",
     "communitiesSearch": "Buscar comunidades…",
@@ -2013,7 +2026,6 @@
   "twoFactor": {
     "title": "Verificación en dos pasos",
     "description": "Pedir un código de una aplicación de autenticación después de la contraseña o del código por correo, y siempre que una comunidad o este servidor pidan un segundo factor.",
-    "loading": "Comprobando…",
     "on": "Activada",
     "notSetUp": "Al iniciar sesión no se pide un código de una aplicación.",
     "setUp": "Configurar la verificación en dos pasos",
@@ -2049,7 +2061,6 @@
     "regenerateError": "No se han podido crear códigos nuevos.",
     "disableError": "No se ha podido desactivar.",
     "codePlaceholder": "123456",
-    "statusError": "No se ha podido comprobar si la verificación en dos pasos está activada. Recarga la página.",
     "copyUnavailable": "No se ha podido copiar: anota los códigos a mano.",
     "notOffered": "Esta instalación no ofrece la aplicación de autenticación.",
     "passwordlessCodes": "Tu cuenta inicia sesión sin contraseña. Con estos códigos vuelves a establecer una si pierdes tu clave de acceso."
@@ -2057,8 +2068,6 @@
   "passkeys": {
     "title": "Claves de acceso",
     "description": "Inicia sesión con la huella, la cara o el bloqueo de pantalla de tu dispositivo en lugar de tu contraseña.",
-    "loading": "Comprobando…",
-    "listError": "No se ha podido comprobar qué claves de acceso tiene esta cuenta. Recarga la página.",
     "empty": "Aún no hay claves de acceso.",
     "emptyHint": "Una clave de acceso vive en tu teléfono, tu portátil o tu gestor de contraseñas, y solo sirve en este sitio.",
     "add": "Añadir una clave de acceso",
@@ -2091,7 +2100,6 @@
     "unsupported": "Este navegador no puede crear claves de acceso. Abre esta página en un navegador actualizado.",
     "siteUnsupported": "Las claves de acceso necesitan que este sitio tenga un nombre de dominio propio y https. Quien gestiona el sitio puede solucionarlo.",
     "limitReached": "Esta cuenta tiene todas las claves de acceso que puede tener ({{limit}}). Quita una para añadir otra.",
-    "addFromBrowser": "Las claves de acceso se añaden desde un navegador con la sesión iniciada en este sitio. «Añadir una clave de acceso» abre uno.",
     "notOffered": "Este sitio no ofrece claves de acceso. Las que ya tienes se conservan.",
     "error": "No ha funcionado. Inténtalo de nuevo."
   },
@@ -2137,37 +2145,38 @@
       "offHelp": "Una notificación que sale de la aplicación dice de qué trata: quién actuó y sobre qué."
     }
   },
-  "communityNotifications": {
-    "title": "Notificaciones que salen de la aplicación",
-    "description": "Qué llevan las notificaciones de esta comunidad al salir. El servidor responde las mismas tres preguntas para todos, y rige la respuesta más estricta.",
-    "saved": "Ajustes de notificaciones guardados",
-    "error": "No se pudieron guardar los ajustes de notificaciones",
+  "communityPrivacy": {
+    "title": "Privacidad",
+    "description": "Qué sale de {{community}} y qué guarda sobre la actividad.",
+    "saved": "Ajuste de privacidad guardado",
+    "error": "No se pudo guardar ese ajuste",
     "push": {
       "label": "Notificaciones en teléfono y escritorio",
       "onHelp": "Las notificaciones de esta comunidad llegan a los teléfonos y a las aplicaciones de escritorio de los miembros.",
       "offHelp": "No se envía nada de esta comunidad a un teléfono ni a la aplicación de escritorio. Los miembros conservan la campana, y el correo si está activo.",
-      "platformHelp": "Este servidor no envía nada a un teléfono ni a la aplicación de escritorio, así que aquí no hay nada que decidir."
+      "platformHelp": "tu servidor no envía nada a teléfonos ni a la aplicación de escritorio"
     },
     "email": {
       "label": "Notificaciones por correo",
       "onHelp": "Las notificaciones de esta comunidad llegan a los buzones de los miembros.",
       "offHelp": "No se envía correo de notificación sobre esta comunidad. Los códigos de inicio de sesión y los restablecimientos de contraseña son de la cuenta y siguen saliendo.",
-      "platformHelp": "Este servidor no envía correo de notificación, así que aquí no hay nada que decidir."
+      "platformHelp": "tu servidor no envía correos de notificación"
     },
     "redact": {
       "label": "Ocultar los detalles de las notificaciones",
       "onHelp": "Las notificaciones sobre esta comunidad dicen el tipo de cosa que ocurrió al salir de la aplicación. Aquí los miembros lo ven todo.",
       "offHelp": "Las notificaciones sobre esta comunidad dicen de qué tratan al salir de la aplicación.",
-      "platformHelp": "Este servidor oculta los detalles en todas partes, así que esta comunidad ya está cubierta."
+      "platformHelp": "tu servidor oculta los detalles de las notificaciones en todas partes"
+    },
+    "ai": {
+      "label": "Funciones de IA",
+      "help": "Permite a los miembros usar funciones de IA en esta comunidad. Desactivada, nada de aquí se envía a un proveedor de IA."
+    },
+    "ranking": {
+      "label": "Ordenar la búsqueda por participación",
+      "help": "La búsqueda muestra más arriba lo que más miembros han abierto o trabajado recientemente. Solo se guarda un nivel aproximado de cada elemento, nunca quién lo abrió ni cuántas veces, y nunca se comparte fuera de esta comunidad.",
+      "platformHelp": "tu servidor ha desactivado el orden por participación en todas las comunidades"
     }
-  },
-  "communityEngagementRanking": {
-    "title": "Orden de búsqueda",
-    "label": "Ordenar los resultados de búsqueda según la participación de la comunidad",
-    "help": "La búsqueda muestra más arriba lo que más miembros han abierto o trabajado recientemente. Solo se guarda un nivel aproximado de cada elemento, nunca quién lo abrió ni cuántas veces, y nunca se comparte fuera de esta comunidad.",
-    "platformHelp": "Este servidor ha desactivado el orden por participación en todas las comunidades.",
-    "saved": "Orden de búsqueda guardado.",
-    "error": "No se pudo guardar el orden de búsqueda."
   },
   "billingInsights": {
     "title": "Métricas de facturación",
@@ -2210,7 +2219,7 @@
   },
   "customRoles": {
     "title": "Roles",
-    "description": "Un rol personalizado da a un miembro parte de la gestión de la comunidad, o limita a un administrador a una parte de ella. Cada persona tiene uno como máximo.",
+    "description": "Todos aquí tienen uno de los roles integrados. Un rol personalizado da a un miembro parte de la gestión de la comunidad, o limita a un administrador a una parte de ella. Cada persona tiene como máximo un rol personalizado.",
     "add": "Añadir rol",
     "addTitle": "Añadir un rol",
     "editTitle": "Editar {{name}}",
@@ -2229,9 +2238,8 @@
     "surfacesLabel": "Qué incluye",
     "notYours": "No tienes esto tú mismo, así que no puedes darlo.",
     "holdsNothing": "Aún no incluye nada.",
-    "empty": "Esta comunidad no tiene roles personalizados.",
+    "builtIn": "Integrado",
     "loading": "Cargando roles",
-    "loadError": "No se pudieron cargar los roles.",
     "closed": "Quien administra este servidor ha desactivado los roles personalizados para esta comunidad. Los roles que tiene siguen aplicándose.",
     "deleteTitle": "¿Eliminar {{name}}?",
     "deleteDescription": "Quienes lo tienen vuelven a su rol normal.",
@@ -2269,6 +2277,10 @@
         "label": "Calendarios de la comunidad",
         "description": "Añadir y cambiar los calendarios propios de la comunidad."
       },
+      "community_contacts": {
+        "label": "Contactos de la comunidad",
+        "description": "Añadir y cambiar los contactos propios de la comunidad, y mover a ellos los contactos de una iniciativa."
+      },
       "webhooks": {
         "label": "Webhooks",
         "description": "Configurar los webhooks de la comunidad."
@@ -2291,8 +2303,7 @@
     "setByDeployment": "Quien gestiona este servidor define este rol. Puedes asignarlo aquí, pero no cambiarlo ni eliminarlo."
   },
   "customRoleRules": {
-    "title": "Roles personalizados por grupo",
-    "description": "Da un rol personalizado a quien inicie sesión con un grupo. Un inicio de sesión lee estas reglas en orden y decide el primer grupo que coincida; un rol asignado a mano se mantiene.",
+    "title": "Roles personalizados · decide la primera coincidencia",
     "add": "Añadir regla de rol",
     "empty": "Ningún grupo da todavía un rol personalizado.",
     "gives": "Con {{provider}}, da {{role}}",
@@ -2301,7 +2312,7 @@
     "remove": "Quitar regla",
     "removeTitle": "¿Quitar esta regla?",
     "removeDescription": "Quienes están en {{group}} conservan el rol hasta su próximo inicio de sesión.",
-    "dialogDescription": "Quien inicie sesión con este proveedor y tenga el grupo recibe el rol, salvo que antes coincida otra regla.",
+    "dialogDescription": "Quien inicie sesión con este proveedor y tenga el grupo recibe el rol, salvo que antes coincida otra regla. Un rol asignado a mano se mantiene.",
     "roleLabel": "Rol personalizado",
     "rolePlaceholder": "Elige un rol",
     "added": "Regla añadida",
@@ -2309,8 +2320,8 @@
     "orderError": "No se pudieron reordenar las reglas",
     "removeError": "No se pudo quitar la regla",
     "closed": "Tu servidor ha desactivado los roles personalizados en esta comunidad. Estas reglas siguen aplicándose; nadie aquí puede cambiarlas.",
-    "loading": "Cargando reglas…",
-    "loadError": "No se pudieron cargar las reglas.",
-    "retry": "Reintentar"
+    "editTitle": "Editar regla de rol",
+    "saved": "Regla guardada",
+    "saveError": "No se pudo guardar la regla"
   }
 }

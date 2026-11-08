@@ -30,7 +30,7 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, AsyncContextManager, Awaitable, Callable
+from typing import Any, AsyncContextManager, Awaitable, BinaryIO, Callable
 from urllib.parse import urlsplit
 
 from cryptography.fernet import InvalidToken
@@ -71,9 +71,6 @@ logger = logging.getLogger(__name__)
 
 #: ``data_jobs.source`` for every import read from an Atlassian site.
 SOURCE = "atlassian"
-
-#: The provider a credential has to have been stored under to start one.
-PROVIDER = "atlassian"
 
 #: The importer whose permission a Jira project needs.
 _PROJECT_ENVELOPE = tool_envelope_type(Tool.project)
@@ -259,18 +256,20 @@ async def start_export(
     user: User,
     guild_id: int,
     initiative_id: int,
-    payload: bytes | Path,
+    payload: bytes | Path | BinaryIO,
     include_attachments: bool = True,
     payload_ref: str | None = None,
 ) -> DataJob:
     """Queue a job that reads a Confluence space's HTML export into
     ``initiative_id`` as a wiki.
 
-    The zip is checked for being one — a zip, within the bounds a restore
-    accepts, with pages in it — and staged for the worker, which converts it
-    the way it reads a site; everything after that is the same review.
-    ``payload`` is the zip itself or the file holding it; ``payload_ref``,
-    where it is already in the community's storage (a resumable upload).
+    The zip is checked for being one — a zip, within the bundle bounds, with
+    pages in it — and staged for the worker, which
+    converts it the way it reads a site; everything after that is the same
+    review. ``payload`` is the zip itself or the file holding it;
+    ``payload_ref``, where it is already in the community's storage (a
+    resumable upload), and ``payload`` may then be the stored file, read where
+    it is.
     """
     await asyncio.to_thread(_check_export, payload)
 
@@ -279,6 +278,7 @@ async def start_export(
     )
     await import_engine.count_active_jobs_locked(session, user=user)
     if payload_ref is None:
+        assert isinstance(payload, (bytes, Path))
         stage = (
             import_engine.stage_payload_file
             if isinstance(payload, Path)
@@ -307,10 +307,10 @@ async def start_export(
     return job
 
 
-def _check_export(payload: bytes | Path) -> None:
-    """Refuse a payload that is not a zip within the upload bounds, or holds
+def _check_export(payload: bytes | Path | BinaryIO) -> None:
+    """Refuse a payload that is not a zip within the bundle bounds, or holds
     no page. Blocking; run it in a thread."""
-    with open_zip(payload) as archive:
+    with open_zip(payload, bundle=True) as archive:
         if not any(
             info.filename.endswith(".html") and not info.filename.endswith("index.html")
             for info in archive.infolist()
@@ -332,7 +332,7 @@ async def _fetch_export(
     async with import_engine.open_payload(guild_id, raw_ref) as upload:
         try:
             archive = (
-                await asyncio.to_thread(open_zip, upload)
+                await asyncio.to_thread(open_zip, upload, bundle=True)
                 if upload is not None
                 else None
             )

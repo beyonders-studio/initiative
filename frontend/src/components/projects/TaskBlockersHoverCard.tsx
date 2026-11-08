@@ -8,11 +8,11 @@ import {
   type TaskRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { EntityCard } from "@/components/entities/EntityCard";
-import { Button } from "@/components/ui/button";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { useRelationshipsFor } from "@/hooks/useRelationships";
 import { groupOf, RELATION_GROUPS } from "@/lib/relationships";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hover-card";
+import { cn } from "@/ui/lib/utils";
 
 interface TaskBlockersHoverCardProps {
   task: Pick<TaskListRead | TaskRead, "id" | "blocked_by_open_count">;

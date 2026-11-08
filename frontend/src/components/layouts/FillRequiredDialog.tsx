@@ -1,9 +1,14 @@
-import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { PropertySummary } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
+import { ItemDraftContext } from "@/hooks/useFieldSave";
+import { useOwnedDefinitions } from "@/hooks/useProperties";
+import { type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
+import { missingRequired, type StoredRegions } from "@/lib/layouts/detailLayout";
+import type { LayoutNode } from "@/lib/layouts/tree";
+import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -11,13 +16,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { ItemDraftContext } from "@/hooks/useFieldSave";
-import { useOwnedDefinitions } from "@/hooks/useProperties";
-import { type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
-import { missingRequired, type StoredRegions } from "@/lib/layouts/detailLayout";
-import type { LayoutNode } from "@/lib/layouts/tree";
-import type { DialogProps } from "@/types/dialog";
+} from "@/ui/dialog";
 
 import { useItemDraft, type Written } from "./AddItemDialog";
 
@@ -111,9 +110,9 @@ const Filling = <I extends Item, C, P>({
         <Button
           type="button"
           onClick={confirm}
-          disabled={pending || holding.size > 0 || missing.length > 0}
+          disabled={holding.size > 0 || missing.length > 0}
+          pending={pending}
         >
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {t("layouts:required.confirm")}
         </Button>
       </DialogFooter>

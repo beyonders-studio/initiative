@@ -217,22 +217,6 @@
   "search": "Buscar",
   "noMatches": "No hay coincidencias.",
   "sectionHelp": "Con título se abre y se cierra; sin él es una caja.",
-  "queueItemDetail": {
-    "name": "Detalle del elemento de la cola",
-    "help": "Cómo se muestra cada elemento de esta cola al abrirlo. Lo que deja fuera queda oculto.",
-    "shipped": "Este es el diseño tal como viene. Cambiarlo lo convierte en el de la cola.",
-    "titleHelp": "Cada elemento muestra su etiqueta.",
-    "hiddenHelp": "Cada elemento puede mostrar esto. Si se quita, queda oculto, y Añadir lo vuelve a poner.",
-    "parts": {
-      "actions": "Menú",
-      "relations": "Relaciones"
-    },
-    "partHelp": {
-      "actions": "Qué más se puede hacer con el elemento: denunciar, duplicar y quitar.",
-      "relations": "Con qué está vinculado el elemento."
-    },
-    "noItems": "Añade un elemento a la cola para ver aquí su diseño."
-  },
   "tab": "Diseños",
   "settingsDescription": "Cómo dispone lo que contiene: cada diseño, cuándo cambió por última vez y el acceso al editor. Todos los que pueden abrirlo los ven; lo que cada persona filtra y ordena es suyo.",
   "counterDetail": {
@@ -294,6 +278,12 @@
     "number": "Un número",
     "stars": "Estrellas",
     "bar": "Una barra"
+  },
+  "counterDisplay": {
+    "label": "Mostrar el contador como",
+    "number": "Un número",
+    "bar": "Una barra",
+    "clock": "Un reloj"
   },
   "fieldProperty": {
     "metadata": "Metadatos",

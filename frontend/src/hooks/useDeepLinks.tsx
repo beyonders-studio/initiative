@@ -5,6 +5,7 @@ import { useEffect } from "react";
 
 import { useAuth } from "@/hooks/useAuth";
 import { redeemNativeSignIn, takePendingSignIn } from "@/lib/nativeSignIn";
+import { takeBrowserAnswer } from "@/lib/passkeys";
 
 import { useServer } from "./useServer";
 
@@ -13,7 +14,8 @@ const isSignInCallback = (url: URL) =>
   url.protocol === "initiative:" && url.host === "oidc" && url.pathname === "/callback";
 
 /**
- * Finish a sign-in the app began in the phone's browser.
+ * Take the links the system browser hands back to the app: a passkey prompt's
+ * answer, and a sign-in the app began there.
  *
  * Handles the link whether it wakes the running app or starts it: the phone
  * often closes the app while the browser is in front. Only a callback for a
@@ -22,7 +24,7 @@ const isSignInCallback = (url: URL) =>
 export function useDeepLinks() {
   const router = useRouter();
   const { isNativePlatform, getServerOrigin } = useServer();
-  const { completeOidcLogin } = useAuth();
+  const { completeOidcLogin, applySignIn } = useAuth();
 
   useEffect(() => {
     if (!isNativePlatform) return;
@@ -32,6 +34,14 @@ export function useDeepLinks() {
       try {
         url = new URL(raw);
       } catch {
+        return;
+      }
+      // A passkey sign-in the answer started the app for is finished here; a
+      // refused one leaves the sign-in page up, to press again.
+      const signedIn = await takeBrowserAnswer(url).catch(() => null);
+      if (signedIn) {
+        await applySignIn(signedIn);
+        await router.navigate({ to: "/", replace: true });
         return;
       }
       if (!isSignInCallback(url)) return;
@@ -68,5 +78,5 @@ export function useDeepLinks() {
     return () => {
       void listener.then((l) => l.remove());
     };
-  }, [isNativePlatform, getServerOrigin, completeOidcLogin, router]);
+  }, [isNativePlatform, getServerOrigin, completeOidcLogin, applySignIn, router]);
 }

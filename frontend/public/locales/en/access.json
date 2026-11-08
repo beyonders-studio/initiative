@@ -61,10 +61,6 @@
     "selectPeople": "Select people…",
     "selectPeopleToRevoke": "Select people to revoke…",
     "permissionLevel": "Permission level",
-    "rolesSelected_one": "{{count}} role selected",
-    "rolesSelected_other": "{{count}} roles selected",
-    "peopleSelected_one": "{{count}} person selected",
-    "peopleSelected_other": "{{count}} people selected",
     "grantRoles_one": "Grant {{count}} role",
     "grantRoles_other": "Grant {{count}} roles",
     "revokeRoles_one": "Revoke {{count}} role",
@@ -102,8 +98,6 @@
     "resource_project_other": "projects",
     "resource_file_one": "file",
     "resource_file_other": "files",
-    "resource_queue_one": "queue",
-    "resource_queue_other": "queues",
     "resource_counter_group_one": "counter group",
     "resource_counter_group_other": "counter groups",
     "resource_calendar_one": "calendar",
@@ -113,7 +107,9 @@
     "resource_post_one": "post",
     "resource_post_other": "posts",
     "resource_wiki_one": "wiki",
-    "resource_wiki_other": "wikis"
+    "resource_wiki_other": "wikis",
+    "resource_contact_one": "contact",
+    "resource_contact_other": "contacts"
   },
   "request": {
     "needAccess": "You need access",
@@ -160,8 +156,6 @@
     "batchTitle": "Access requests",
     "answered": "Already answered",
     "answeredDescription": "There's nothing left to answer here.",
-    "loading": "Loading requests…",
-    "loadError": "Couldn't load these requests.",
     "error": "Couldn't send your answer. Please try again."
   }
 }

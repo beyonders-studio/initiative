@@ -1,9 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { SettingsPlatformIndexPage } from "@/pages/SettingsPlatformIndexPage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/settings/platform/")({
-  component: lazyRouteComponent(() =>
-    import("@/pages/SettingsPlatformIndexPage").then((m) => ({
-      default: m.SettingsPlatformIndexPage,
-    }))
-  ),
+  component: SettingsPlatformIndexPage,
 });

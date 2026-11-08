@@ -35,9 +35,12 @@ FCM_SCOPES = ["https://www.googleapis.com/auth/firebase.messaging"]
 # in-app-only ones, which never push) falls back to the general channel; adding
 # a NEW channel id means a native release, so prefer an existing one.
 DEFAULT_CHANNEL = "default"
+# Both digests, Overdue tasks and Coming up, on one channel, muted or kept as
+# one. The id is the first digest's, which the installed app already registers.
+DIGEST_CHANNEL = "overdue_tasks"
 PUSH_CHANNELS: dict[NotificationType, str] = {
     NotificationType.task_assignment: "task_assignment",
-    NotificationType.overdue_tasks: "overdue_tasks",
+    NotificationType.overdue_tasks: DIGEST_CHANNEL,
     NotificationType.initiative_added: "initiative_added",
     # Join requests are initiative-membership news, so they ride the channel the
     # installed app already registers for it rather than asking for a new one
@@ -80,9 +83,7 @@ PUSH_CHANNELS: dict[NotificationType, str] = {
     NotificationType.event_cancelled: "calendar_events",
     NotificationType.event_rsvp: "calendar_events",
     NotificationType.event_reminder: "event_reminder",
-    # Tasks and events alike, which no channel the installed app registers
-    # describes, so the general one until the digests share a channel (#3065).
-    NotificationType.coming_up: DEFAULT_CHANNEL,
+    NotificationType.coming_up: DIGEST_CHANNEL,
     # A reminder too, so it rides the channel event reminders already register:
     # a new channel id would mean a native release.
     NotificationType.task_reminder: "event_reminder",
@@ -94,6 +95,7 @@ PUSH_CHANNELS: dict[NotificationType, str] = {
     # channel the installed app already registers rather than asking for a
     # new one — a new channel id would mean a native release.
     NotificationType.ticket_updated: "comments",
+    NotificationType.idea_updated: "comments",
     NotificationType.moderation_removal: "comments",
     NotificationType.moderation_warning: "comments",
     # Work landing on a person, so the channel task assignments use.

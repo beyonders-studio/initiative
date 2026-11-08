@@ -97,19 +97,6 @@ export const TOOL_PALETTE: Record<Tool, ToolPaletteSource> = {
       });
     },
   },
-  [Tool.queue]: {
-    useHeading: () => useGroupHeading(Tool.queue),
-    useItems: (ctx) => {
-      const query = useToolPaletteList(TOOL_HOOKS[Tool.queue].listQuery, BROWSE_PAGE, ctx);
-      return (query.data?.items ?? []).map((queue) => ({
-        id: queue.id,
-        label: queue.name,
-        keywords: [queue.description ?? ""],
-        icon: null,
-        path: toolDetailRoute(Tool.queue, queue.initiative_id, queue.id),
-      }));
-    },
-  },
   [Tool.counter_group]: {
     useHeading: () => useGroupHeading(Tool.counter_group),
     useItems: (ctx) => {
@@ -177,6 +164,20 @@ export const TOOL_PALETTE: Record<Tool, ToolPaletteSource> = {
         keywords: [wiki.description ?? ""],
         icon: null,
         path: toolDetailRoute(Tool.wiki, wiki.initiative_id, wiki.id),
+      }));
+    },
+  },
+  [Tool.contact]: {
+    useHeading: () => useGroupHeading(Tool.contact),
+    useItems: (ctx) => {
+      const query = useToolPaletteList(TOOL_HOOKS[Tool.contact].listQuery, BROWSE_PAGE, ctx);
+      return (query.data?.items ?? []).map((contact) => ({
+        id: contact.id,
+        label: contact.name,
+        // Found by how they are reached as well as by name.
+        keywords: [...contact.emails, ...contact.phones].map((detail) => detail.value),
+        icon: null,
+        path: toolDetailRoute(Tool.contact, contact.initiative_id, contact.id),
       }));
     },
   },

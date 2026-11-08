@@ -1,22 +1,12 @@
-import { Link } from "@tanstack/react-router";
-
 import {
   type CounterGroupSummary,
   type CounterPreview,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { TagBadgeList } from "@/components/tags/TagBadge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useCommunityPath } from "@/lib/communityUrl";
+import { ToolCard } from "@/components/tools/ToolCard";
 import { getContrastingTextColor } from "@/lib/counter-color";
-import { numberFormat } from "@/lib/intl";
 import { toolDetailRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
-
-interface CounterGroupCardProps {
-  group: CounterGroupSummary;
-  className?: string;
-}
+import { numberFormat } from "@/ui/lib/intl";
 
 /** The group's first counters and where they stand, as the list sent them,
  *  in the colours they wear on the group's own page. */
@@ -40,33 +30,12 @@ const CounterGroupPreview = ({ counters }: { counters: CounterPreview[] }) => (
   </div>
 );
 
-export const CounterGroupCard = ({ group, className }: CounterGroupCardProps) => {
-  const gp = useCommunityPath();
-
-  return (
-    <Link
-      to={gp(toolDetailRoute(Tool.counter_group, group.initiative_id, group.id))}
-      className={cn(
-        "group block w-full overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg",
-        className
-      )}
-    >
-      {group.preview?.length ? <CounterGroupPreview counters={group.preview} /> : null}
-      <Card className="border-0 shadow-none">
-        {/* With nothing above it, the header stops short of the bookmark the list
-            puts on the card's corner. */}
-        <CardHeader className={cn("pb-2", !group.preview?.length && "pr-14")}>
-          <div className="flex items-start justify-between gap-2">
-            <CardTitle className="line-clamp-1 text-lg leading-tight">{group.name}</CardTitle>
-          </div>
-          {group.description && (
-            <p className="line-clamp-2 text-muted-foreground text-sm">{group.description}</p>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-2 pt-0">
-          <TagBadgeList tags={group.tags} tagHref={(tag) => gp(`/tags/${tag.id}`)} nested />
-        </CardContent>
-      </Card>
-    </Link>
-  );
-};
+export const CounterGroupCard = ({ group }: { group: CounterGroupSummary }) => (
+  <ToolCard
+    to={toolDetailRoute(Tool.counter_group, group.initiative_id, group.id)}
+    name={group.name}
+    description={group.description}
+    tags={group.tags}
+    preview={group.preview?.length ? <CounterGroupPreview counters={group.preview} /> : null}
+  />
+);

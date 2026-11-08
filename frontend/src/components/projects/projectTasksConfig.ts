@@ -8,7 +8,6 @@ import {
   Hash,
   Kanban,
   LayoutGrid,
-  ListOrdered,
   type LucideIcon,
   Megaphone,
   Table,
@@ -60,7 +59,6 @@ export const listLayoutLooks: Record<ListLayoutReadKind, Look> = {
 export const detailLayoutLooks: Record<DetailLayoutRead["kind"], Look> = {
   task: { icon: FileText, labelKey: "layouts:taskLayout" },
   calendar_event: { icon: CalendarDays, labelKey: "layouts:eventDetail.name" },
-  queue_item: { icon: ListOrdered, labelKey: "layouts:queueItemDetail.name" },
   counter: { icon: Hash, labelKey: "layouts:counterDetail.name" },
   post: { icon: Megaphone, labelKey: "layouts:postDetail.name" },
   file: { icon: FileImage, labelKey: "layouts:fileDetail.name" },

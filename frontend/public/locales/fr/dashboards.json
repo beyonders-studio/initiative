@@ -12,8 +12,6 @@
     "noMatchingDashboards": "Aucun tableau de bord ne correspond à vos filtres."
   },
   "loading": "Chargement des tableaux de bord...",
-  "loadError": "Échec du chargement des tableaux de bord.",
-  "loadingDashboard": "Chargement du tableau de bord...",
   "creating": "Création...",
   "notFound": "Tableau de bord introuvable",
   "notFoundDescription": "Le tableau de bord que vous cherchez n’existe pas ou a été supprimé.",
@@ -46,7 +44,6 @@
   },
   "bindingSource": {
     "query": "Requête SQL",
-    "sheet_range": "Plage de feuille",
     "plugin": "Données du plug-in"
   },
   "gallery": {
@@ -87,8 +84,6 @@
     "description": "Choisissez ce que ce widget affiche. Les tableaux de bord ne font que lire vos données.",
     "widgetTitle": "Titre",
     "widgetTitlePlaceholder": "Laissez vide pour utiliser le nom du widget",
-    "source": "Source de données",
-    "choose": "Choisir…",
     "preview": "Aperçu",
     "previewHint": "Vos propres données, telles que le widget les dessinera.",
     "sectionBinding": "Données",
@@ -98,17 +93,14 @@
     "all_calendar": "Tous les calendriers",
     "all_counter_group": "Tous les groupes de compteurs",
     "all_counter": "Tous les compteurs",
-    "all_file": "Toutes les feuilles de calcul",
     "pluginEndpoint": "Ce qu'il lit",
-    "plugin": "Plug-in",
-    "pluginPlaceholder": "Choisir un plug-in",
     "pluginEndpointPlaceholder": "Choisir une lecture…",
     "pluginNotInstalled": "Ce plug-in n'est pas installé dans cette communauté.",
     "pluginParamPlaceholder": "Choisir…",
     "pluginParamNeedsSibling": "Choisissez d'abord la valeur ci-dessus.",
     "pluginParamListHint": "Séparez les valeurs par des virgules.",
     "all_property": "Aucune métadonnée ni propriété",
-    "sqlHelp": "Un SELECT en lecture seule sur les données de cette communauté. Il s'exécute en votre nom et ne renvoie donc que ce que vous pouvez déjà voir."
+    "sqlHelp": "Un SELECT en lecture seule sur les données de cette communauté. Il s'exécute en votre nom et ne renvoie donc que ce que vous pouvez déjà voir. sheet('Budget', 'Sheet1!A1:D') lit une plage d'une feuille de calcul, et plugin('acme.shop', 'orders') lit les données d'un plug-in."
   },
   "picker": {
     "title": "Ajouter un widget",
@@ -136,7 +128,6 @@
     "display": "Affichage",
     "refresh": "Actualiser",
     "open": "Voir d'où viennent ces données",
-    "restricted": "Accès refusé",
     "me": "Moi",
     "cappedHint": "Plus de lignes correspondent qu'un widget n'en charge d'un coup ; voici les {{count}} premières.",
     "rows_task_one": "{{count}} tâche",
@@ -204,7 +195,6 @@
     "absolute": "À une date",
     "relativeDays": "Jours à partir d'aujourd'hui",
     "relativeHint": "Compté au moment où le tableau de bord est ouvert : la question ne se périme jamais.",
-    "loading": "Chargement des filtres…",
     "noFields": "Rien à filtrer ici pour l'instant.",
     "matchPrefix": "Correspondre à",
     "match": "Tous ou au moins un",
@@ -238,14 +228,6 @@
     "column": "Colonne",
     "card": "Carte"
   },
-  "bindingParam": {
-    "file": "Feuille de calcul",
-    "sheet": "Feuille",
-    "range": "Plage",
-    "plugin_uid": "Plug-in",
-    "source_id": "Source de données du plug-in",
-    "sql": "Instruction"
-  },
   "slot": {
     "label": "Libellé",
     "value": "Valeur",
@@ -262,6 +244,14 @@
   },
   "builder": {
     "dataset": "Afficher les données de",
+    "spreadsheet": "Feuille de calcul",
+    "sheet": "Feuille",
+    "firstSheet": "Première feuille visible",
+    "range": "Plage",
+    "rangeHelp": "Laissez vide pour toute la feuille. A:D lit les colonnes A à D, jusqu'à la dernière ligne remplie.",
+    "pluginData": "Données d'un plug-in",
+    "plugin": "Plug-in",
+    "endpoint": "Ce qu'il lit",
     "columns": "Afficher",
     "addColumn": "Ajouter une colonne",
     "removeColumn": "Retirer cette colonne",

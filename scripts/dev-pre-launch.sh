@@ -10,6 +10,25 @@
 # attempt. A seed cut short that way is cleared at the top of the next launch.
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# This is the one command a fresh clone needs. What it needs from the machine is
+# named here, with the way to get each, before anything starts.
+missing=false
+need() {
+    command -v "$1" >/dev/null 2>&1 && return 0
+    echo "Missing $1: $2" >&2
+    missing=true
+}
+need docker "install Docker (https://docs.docker.com/get-started/get-docker/)"
+need uv "install uv (https://docs.astral.sh/uv/getting-started/installation/)"
+need node "install Node.js 26.12.1 or newer (https://nodejs.org/)"
+need pnpm "run corepack enable pnpm"
+if [ "$missing" = false ] && ! docker info >/dev/null 2>&1; then
+    echo "Docker is installed but not running. Start it, then run this again." >&2
+    missing=true
+fi
+[ "$missing" = false ] || exit 1
+
 # This checkout's ports, log paths and frontend API URLs. The main working tree
 # keeps 8000/5173; linked worktrees get their own pair so several run at once.
 . "$SCRIPT_DIR/dev-ports.sh"
@@ -20,7 +39,6 @@ cd "$SCRIPT_DIR/.."
 BACKEND_PID=""
 FRONTEND_PID=""
 OPEN_PID=""
-SEED_STATE=".vscode/.dev_seed_ids.json"
 
 # The guard makes the function idempotent so the signal path (trap fires, the
 # poll loop below falls through, EXIT trap fires) and the natural-exit path (a
@@ -86,27 +104,10 @@ done
 
 docker compose up db -d --wait
 
-# The login roles and the search operator class: a deployment gets these from
-# app.db.bootstrap at startup over its owner connection. A .env that names the
-# three logins usually gives no owner, and the compose superuser is right here,
-# so apply them the same way rather than leave every checkout to hit the boot
-# warning. A .env with DATABASE_URL as the owner needs no override. Idempotent;
-# a failure is not fatal, since search works either way.
-bootstrap_url=""
-if grep -qE '^DATABASE_URL_APP=.+' backend/.env 2>/dev/null; then
-    bootstrap_url="postgresql+asyncpg://${POSTGRES_USER:-initiative}:${POSTGRES_PASSWORD:-initiative}@localhost:5432/${POSTGRES_DB:-initiative}"
-fi
-if ! (
-    cd backend && source .venv/bin/activate &&
-    if [ -n "$bootstrap_url" ]; then export DATABASE_URL_BOOTSTRAP="$bootstrap_url"; fi &&
-    python -m app.db.bootstrap > /dev/null
-); then
-    echo "Database bootstrap did not complete — search may run without its index." >&2
-fi
-
 # A seed that stopped partway left rows the next one would collide with. Clear
 # them here, before the migrate below puts the primary guild + superuser back.
-if [ -f "$SEED_STATE" ] && grep -q '"seed_incomplete": *true' "$SEED_STATE"; then
+seed_status="$(cd backend && .venv/bin/python ../scripts/seed_dev_data.py --status 2>/dev/null | tail -n 1)"
+if [ "$seed_status" = partial ]; then
     echo "A previous seed was interrupted — clearing the partial data first."
     bash scripts/dev-cleanup.sh --data-only
 fi

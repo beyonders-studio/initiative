@@ -14,7 +14,6 @@
       "comments": "Nobody has commented this week."
     },
     "loadError": "Failed to load what's been happening. Please try again later.",
-    "loadMore": "Show more",
     "new": "New",
     "others_one": "{{count}} other",
     "others_other": "{{count}} others",
@@ -42,8 +41,6 @@
     "expand": "Expand activity sidebar",
     "collapse": "Collapse activity sidebar"
   },
-  "loading": "Loading…",
-  "loadError": "Failed to load this tool. Please try again later.",
   "communityWide": "Community-wide",
   "searchPlaceholder": "Search by name…",
   "empty": {
@@ -82,8 +79,7 @@
       "open": "Open to all community members",
       "request": "Joins by request",
       "private": "Invite only"
-    },
-    "loadError": "We couldn't load what this community has on offer. Please try again later."
+    }
   },
   "columns": {
     "name": "Name",
@@ -96,11 +92,13 @@
       "files": "Type",
       "calendars": "Description",
       "dashboards": "Source",
-      "posts": "Preview"
+      "posts": "Preview",
+      "contacts": "Phone or email"
     }
   },
   "detail": {
     "tasksDone": "{{completed}} of {{total}} tasks",
+    "projectProgress": "Project progress",
     "fromMarketplace": "Marketplace",
     "builtHere": "Built here",
     "fileKind": {
@@ -127,7 +125,6 @@
   },
   "recentComments": {
     "noComments": "No comments yet",
-    "loadError": "Failed to load recent comments. Please try again later.",
     "unknownAuthor": "Unknown",
     "onEntity": "on {{entityName}}",
     "inProject": "in {{projectName}}",
@@ -138,7 +135,6 @@
     "title": "Coming up",
     "description": "Everything in the community with a date in the next seven days.",
     "empty": "Nothing coming up this week",
-    "loadError": "Failed to load what's coming up. Please try again later.",
     "today": "Today",
     "tomorrow": "Tomorrow",
     "kind": {

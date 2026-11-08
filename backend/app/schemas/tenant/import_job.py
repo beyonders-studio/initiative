@@ -3,7 +3,10 @@ requests that start one, and the plan and report an import job records — never
 envelope content (large payloads are staged behind storage and deleted on
 terminal states)."""
 
+from enum import Enum
 from typing import Any, Optional
+
+from pydantic import Field
 
 from app.schemas.base import RawTextStr, SanitizedBaseModel
 from app.services.import_engine.contract import EnvelopeImportResult
@@ -60,6 +63,64 @@ class ForeignImportRequest(SanitizedBaseModel):
     #: Its size is bounded at the transport instead (``body_limit``), and the
     #: parser is what decides whether it reads.
     content: RawTextStr
+
+
+class ContactCsvTarget(str, Enum):
+    """What a spreadsheet column of contacts holds. The four details take
+    their field's name, as a contact names them."""
+
+    name = "name"
+    type = "type"
+    emails = "emails"
+    phones = "phones"
+    addresses = "addresses"
+    websites = "websites"
+    organization = "organization"
+    tags = "tags"
+    property = "property"
+
+
+#: The most columns a spreadsheet of contacts is read by.
+MAX_CSV_COLUMNS = 1000
+
+
+class ContactCsvColumn(SanitizedBaseModel):
+    """One column of a spreadsheet of contacts, and what it holds. A column
+    named by none of them is left out.
+
+    Several columns may hold one target: the names are joined with a space,
+    a detail's values are kept in column order, and tags are read from each.
+    """
+
+    #: Where the column is in the header, from 0.
+    column: int = Field(ge=0, lt=MAX_CSV_COLUMNS)
+    target: ContactCsvTarget
+    #: A detail's label, read from this column beside its value.
+    label_column: Optional[int] = Field(default=None, ge=0, lt=MAX_CSV_COLUMNS)
+    #: The initiative property a ``property`` column fills.
+    property_id: Optional[int] = None
+
+
+class ContactCsvPreview(SanitizedBaseModel):
+    """A spreadsheet of contacts, read without keeping it: its header, how
+    many rows it holds, the first few of them, and what each column looks
+    like it holds."""
+
+    headers: list[str]
+    row_count: int
+    samples: list[list[str]]
+    columns: list[ContactCsvColumn]
+
+
+class ContactCsvImportRequest(SanitizedBaseModel):
+    """Body of ``POST /imports/contacts``: the spreadsheet, sent back with
+    what its columns hold, and where its contacts go — an initiative, or with
+    none the community's contacts."""
+
+    initiative_id: Optional[int] = None
+    #: The file itself, verbatim, as :class:`ForeignImportRequest` carries one.
+    content: RawTextStr
+    columns: list[ContactCsvColumn] = Field(max_length=MAX_CSV_COLUMNS)
 
 
 class EntryResult(SanitizedBaseModel):

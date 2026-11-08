@@ -2,14 +2,19 @@ import { Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { AIConnectionResponse } from "@/api/generated/initiativeAPI.schemas";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { PROVIDER_CONFIGS } from "@/lib/ai-providers";
 import { messageForCode } from "@/lib/errorMessage";
-import { dateTimeFormat, listFormat } from "@/lib/intl";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { dateTimeFormat, listFormat } from "@/ui/lib/intl";
+import { Switch } from "@/ui/switch";
 
 interface AIConnectionRowProps {
   connection: AIConnectionResponse;
+  /** On or off, as last asked for while a change is on its way. */
+  enabled: boolean;
+  toggleDisabled: boolean;
+  onToggle: (enabled: boolean) => void;
   isTesting: boolean;
   testDisabled: boolean;
   onTest: () => void;
@@ -19,6 +24,9 @@ interface AIConnectionRowProps {
 
 export const AIConnectionRow = ({
   connection,
+  enabled,
+  toggleDisabled,
+  onToggle,
   isTesting,
   testDisabled,
   onTest,
@@ -40,9 +48,6 @@ export const AIConnectionRow = ({
           {connection.is_default && (
             <Badge variant="secondary">{t("aiConnections.defaultBadge")}</Badge>
           )}
-          <Badge variant={connection.enabled ? "default" : "outline"}>
-            {connection.enabled ? t("ai.enabled") : t("ai.disabled")}
-          </Badge>
           {!connection.model && <Badge variant="warning">{t("aiConnections.needsModel")}</Badge>}
         </div>
         <p className="text-muted-foreground text-sm">
@@ -75,6 +80,12 @@ export const AIConnectionRow = ({
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        <Switch
+          aria-label={t("aiConnections.toggleLabel", { label: connection.label })}
+          checked={enabled}
+          onCheckedChange={onToggle}
+          disabled={toggleDisabled}
+        />
         <Button type="button" variant="outline" size="sm" onClick={onTest} disabled={testDisabled}>
           {isTesting ? t("ai.testing") : t("ai.testConnection")}
         </Button>

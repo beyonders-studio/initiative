@@ -17,11 +17,12 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.v1.platform_endpoints.operator import ConfigManageDep
-from app.core.intake import IntakeStream, meta
+from app.core.intake import IntakeStream, Source, meta, offered_streams
 from app.core.messages import IntakeMessages
 from app.models.platform.guild import Guild
 from app.models.platform.user import User
 from app.schemas.platform.intake import (
+    FeedbackSwitchUpdate,
     IntakeBindingRead,
     IntakeBindingUpsert,
     IntakeBlueprintImport,
@@ -30,7 +31,8 @@ from app.schemas.platform.intake import (
     IntakeSettingsRead,
     OperationsCommunityUpdate,
 )
-from app.services.platform import intake_setup
+from app.services.platform import app_settings as app_settings_service
+from app.services.platform import auth_posture, intake_setup
 from app.services.platform.intake_setup import BindingView
 from app.api.deps import get_current_active_user, SystemSessionDep
 
@@ -53,6 +55,7 @@ def _read(view: BindingView) -> IntakeBindingRead:
         awaiting_filer_status_id=view.awaiting_filer_status_id,
         active_status_id=view.active_status_id,
         conversation=meta(view.stream).conversation,
+        filed=Source.submitted in meta(view.stream).sources,
         isolated=view.isolated,
         shares_initiative=view.shares_initiative,
         enabled=view.enabled,
@@ -61,13 +64,14 @@ def _read(view: BindingView) -> IntakeBindingRead:
 
 
 def _stream_or_404(raw: str) -> IntakeStream:
-    try:
-        return IntakeStream(raw)
-    except ValueError:
+    """The stream named, where this server takes it."""
+    stream = next((s for s in offered_streams() if s.value == raw), None)
+    if stream is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=IntakeMessages.UNKNOWN_STREAM,
-        ) from None
+        )
+    return stream
 
 
 def _address(payload: IntakeContactUpdate) -> str | None:
@@ -88,6 +92,7 @@ async def _settings(session: AsyncSession) -> IntakeSettingsRead:
         bindings=[_read(view) for view in views],
         general_contact_email=general,
         contact_emails={IntakeStream(key): email for key, email in per_stream.items()},
+        feedback_enabled=await app_settings_service.feedback_enabled(session),
     )
 
 
@@ -147,6 +152,21 @@ async def update_general_contact(
     has no address of its own.
     """
     await intake_setup.set_general_contact(session, _address(payload))
+    return await _settings(session)
+
+
+@router.put("/intake/feedback-enabled", response_model=IntakeSettingsRead)
+async def update_feedback_switch(
+    payload: FeedbackSwitchUpdate,
+    session: SystemSessionDep,
+    owner: ConfigManageDep,
+) -> IntakeSettingsRead:
+    """Let people here send feedback to the Initiative team, or stop. Off,
+    nothing offers it and nothing is sent."""
+    await auth_posture.change(
+        auth_posture.RuleContext.platform(session, owner),
+        {"feedback_enabled": payload.enabled},
+    )
     return await _settings(session)
 
 

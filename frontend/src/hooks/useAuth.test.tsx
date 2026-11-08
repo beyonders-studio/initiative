@@ -198,6 +198,20 @@ describe("useAuth identity ordering", () => {
     expect(auth.user).toBe(before);
   });
 
+  it("hands its readers the same value when nothing they read changed", async () => {
+    // Every screen reads this, so a fresh value re-renders all of them.
+    get.mockResolvedValue({ data: buildUser() });
+    renderAuth();
+    await waitFor(() => expect(auth.user).not.toBeNull());
+    const before = auth;
+
+    act(() => {
+      window.dispatchEvent(new Event("offline"));
+    });
+
+    expect(auth).toBe(before);
+  });
+
   it("still swaps the object when the account actually moved", async () => {
     get.mockResolvedValueOnce({ data: buildUser({ username: "Before" }) });
     renderAuth();
@@ -441,42 +455,6 @@ describe("useAuth password sign-in on native", () => {
     expect(form.get("device_name")).toBe("Pixel");
     expect(setItem).toHaveBeenCalledWith(CREDENTIAL_KEYS.refreshToken, "rt");
     expect(setAuthToken).toHaveBeenCalledWith("at");
-  });
-});
-
-describe("useAuth passkey sign-in", () => {
-  beforeEach(() => {
-    get.mockReset();
-    post.mockReset().mockResolvedValue({ data: {} });
-    getItem.mockReset().mockReturnValue(null);
-    setAuthToken.mockReset();
-  });
-
-  it("takes the session the ceremony produced and reads the account", async () => {
-    get.mockResolvedValueOnce({ data: buildUser({ username: "Nobody yet" }) });
-    renderAuth();
-    await waitFor(() => expect(auth.user?.username).toBe("Nobody yet"));
-
-    get.mockResolvedValueOnce({ data: buildUser({ username: "Signed in" }) });
-    await act(async () => {
-      await auth.applyPasskeySignIn({ access_token: "fresh-token", token_type: "bearer" });
-    });
-
-    expect(setAuthToken).toHaveBeenCalledWith("fresh-token");
-    expect(auth.token).toBe("fresh-token");
-    expect(auth.user?.username).toBe("Signed in");
-  });
-
-  it("refuses an answer with no session in it", async () => {
-    // The mobile shape: the ceremony was run on behalf of an app, and what
-    // comes back is a way home rather than a session for this browser.
-    get.mockResolvedValue({ data: buildUser() });
-    renderAuth();
-    await waitFor(() => expect(auth.user).not.toBeNull());
-
-    await expect(
-      auth.applyPasskeySignIn({ token_type: "bearer", redirect_to: "initiative://oidc/callback" })
-    ).rejects.toThrow();
   });
 });
 

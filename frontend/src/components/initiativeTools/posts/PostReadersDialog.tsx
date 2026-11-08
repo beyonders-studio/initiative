@@ -1,19 +1,14 @@
-import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { PostReader } from "@/api/generated/initiativeAPI.schemas";
-import { ContactPersonRow } from "@/components/contacts/ContactPersonRow";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { RelativeTime } from "@/components/ui/relative-time";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PersonRow } from "@/components/connections/PersonRow";
 import { usePostReaders } from "@/hooks/usePosts";
 import type { DialogProps } from "@/types/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { RelativeTime } from "@/ui/relative-time";
+import { StatusMessage } from "@/ui/status-message";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 
 type PostReadersDialogProps = DialogProps & {
   postId: number;
@@ -39,11 +34,11 @@ const ROSTER_LIST = "max-h-80 divide-y overflow-y-auto px-2";
  * list of people in the app, not like a list this one screen invented.
  */
 const Person = ({ person }: { person: PostReader }) => (
-  <ContactPersonRow user={person}>
+  <PersonRow user={person}>
     {person.read_at ? (
       <RelativeTime date={person.read_at} className="shrink-0 text-muted-foreground text-xs" />
     ) : null}
-  </ContactPersonRow>
+  </PersonRow>
 );
 
 /**
@@ -70,12 +65,11 @@ export const PostReadersDialog = ({ open, onOpenChange, postId }: PostReadersDia
         </DialogHeader>
 
         {readers.isLoading ? (
-          <div className="flex items-center gap-2 py-6 text-muted-foreground text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            {t("loading")}
-          </div>
+          <SkeletonRegion>
+            <ListSkeleton rows={4} />
+          </SkeletonRegion>
         ) : readers.isError ? (
-          <p className="py-6 text-destructive text-sm">{t("loadError")}</p>
+          <StatusMessage onRetry={readers.refetch} />
         ) : (
           <Tabs defaultValue="read">
             <TabsList className="w-full">

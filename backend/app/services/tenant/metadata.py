@@ -73,8 +73,9 @@ from sqlalchemy.orm import aliased, selectinload
 from sqlmodel import SQLModel, col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
 from app.core.errors import PluginChannelError
-from app.core.identity_boundary import current_install_boundary
+from app.core.identity_boundary import current_install_boundary, filter_people
 from app.core.messages import (
     PluginChannelMessages,
     PluginMessages,
@@ -105,8 +106,10 @@ from app.db.session import (
 from app.models.platform.identity_ref import IdentityEntity
 from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
+from app.models.tenant.file import File
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.metadata import (
+    PERSON_TYPES,
     REF_LENGTH,
     VALUE_COLUMNS,
     MetadataDefinition,
@@ -124,11 +127,14 @@ from app.services.marketplace.registration_lookup import RegistrationSnapshot
 from app.services.marketplace.widget_meta import in_language
 from app.schemas.tenant.property import (
     MAX_PROPERTY_FILTERS,
+    CounterSettings,
     PropertyOption,
     PropertyOptionsChange,
+    PropertyStep,
     PropertySummary,
     PropertyValueInput,
 )
+from app.services import audit as audit_service
 from app.services.tenant import named_people, tool_layouts
 
 
@@ -266,7 +272,12 @@ def _values_of(definitions: Any) -> Any:
 
 #: The types whose value is ``value_number``.
 _NUMBER_TYPES = frozenset(
-    {MetadataType.number, MetadataType.currency, MetadataType.scale}
+    {
+        MetadataType.number,
+        MetadataType.currency,
+        MetadataType.scale,
+        MetadataType.counter,
+    }
 )
 
 #: The range of a scale.
@@ -315,6 +326,16 @@ def _coerce_scale(raw: Any) -> Decimal:
     if isinstance(raw, bool) or not isinstance(raw, int) or raw not in SCALE_RANGE:
         raise _bad_value()
     return Decimal(raw)
+
+
+def _within(defn: MetadataDefinition, number: Decimal) -> Decimal:
+    """``number`` held to a counter's bounds."""
+    settings = CounterSettings.model_validate(defn.counter or {})
+    if settings.min is not None:
+        number = max(number, Decimal(str(settings.min)))
+    if settings.max is not None:
+        number = min(number, Decimal(str(settings.max)))
+    return number
 
 
 def _coerce_bool(raw: Any) -> bool:
@@ -426,8 +447,9 @@ def _validate_value_for_type(
     persists as an attached-but-empty record.
 
     Raises ``HTTPException`` 400 on type mismatches or select/option
-    issues. Who a ``user_reference`` may name is asked of the whole set by
-    :func:`write_values`.
+    issues. Who a ``user_reference`` may name, and which file a ``file`` may,
+    is asked of the whole set by :func:`write_values`, which also signs a
+    ``signature``: its value here is the name the signer typed.
     """
     cols = _empty_columns()
 
@@ -436,7 +458,7 @@ def _validate_value_for_type(
 
     ptype = defn.type
 
-    if ptype is MetadataType.text:
+    if ptype in (MetadataType.text, MetadataType.signature):
         cols["value_text"] = _coerce_text(raw_value)
     elif ptype is MetadataType.number:
         cols["value_number"] = _coerce_number(raw_value)
@@ -447,6 +469,11 @@ def _validate_value_for_type(
         cols["value_number"] = amount
     elif ptype is MetadataType.scale:
         cols["value_number"] = _coerce_scale(raw_value)
+    elif ptype is MetadataType.counter:
+        count = _coerce_number(raw_value)
+        if not count.is_finite():
+            raise _bad_value()
+        cols["value_number"] = _within(defn, count)
     elif ptype is MetadataType.checkbox:
         cols["value_boolean"] = _coerce_bool(raw_value)
     elif ptype is MetadataType.date:
@@ -480,10 +507,10 @@ def _validate_value_for_type(
                 seen.add(slug)
                 slugs.append(slug)
         cols["value_json"] = slugs
-    elif ptype is MetadataType.user_reference:
+    elif ptype in (MetadataType.user_reference, MetadataType.file):
         if not isinstance(raw_value, int) or isinstance(raw_value, bool):
             raise _bad_value()
-        cols["value_user_id"] = raw_value
+        cols[typed_column_for_property(ptype).key] = raw_value
     else:  # pragma: no cover - defensive; MetadataType is closed
         raise _bad_value()
 
@@ -503,21 +530,30 @@ async def write_values(
     initiative_id: Optional[int],
     removed: Optional[Sequence[int]] = None,
     options: Sequence[PropertyOptionsChange] = (),
+    steps: Sequence[PropertyStep] = (),
     collection_id: Optional[int] = None,
-) -> None:
-    """Replace every property value on ``row`` with ``values``. Given
-    ``removed``, write only the properties ``values`` names and take off the
-    ones ``removed`` names, leaving every other value as it is, so two writes
-    of different properties both stand. ``options`` (with ``removed``)
-    changes options of multi-select values against what each holds when it
-    is written, so two changes of the same value both stand too.
+) -> bool:
+    """Replace every property value on ``row`` with ``values``, but the
+    signatures ``values`` doesn't name. Given ``removed``, write only the
+    properties ``values`` names and take off the ones ``removed`` names,
+    leaving every other value as it is, so two writes of different properties
+    both stand. ``options`` (with ``removed``) changes options of multi-select
+    values, and ``steps`` steps counters, against what each holds when it is
+    written, so two changes of the same value both stand too.
 
     Each value's definition must belong to ``initiative_id`` — the row's own
-    initiative — and a person a value names must be able to open the tool row
-    that governs ``row``. The values are the initiative's properties and, on a
-    task, its project's metadata; or with ``collection_id`` that collection's
-    metadata on ``row``, a file in it. Neither write touches the other's, nor a
-    plug-in's values. The caller has authorized the write and owns the commit.
+    initiative — a person a value names must be able to open the tool row
+    that governs ``row``, and a file a value names must be one of that
+    initiative's that the writer reads. A signature's value is the name its
+    signer types: the writer signs it, now, and only a person writing as
+    themselves may, which a plug-in, an import or a sweep is not. The values
+    are the initiative's properties and, on a task, its project's metadata;
+    or with ``collection_id`` that collection's metadata on ``row``, a file in
+    it. Neither write touches the other's, nor a plug-in's values. The caller
+    has authorized the write and owns the commit.
+
+    Answers whether the write changes ``row`` beyond its signatures, which a
+    replace of every value always does.
     """
     spec = link_for(row)
     held = _of(spec.target, [row.id]) & _values_of(_carried(row, collection_id))
@@ -525,10 +561,23 @@ async def write_values(
         *(removed or ()),
         *(entry.property_id for entry in values),
         *(change.property_id for change in options),
+        *(step.property_id for step in steps),
     ]
-    stored = await _in_turn(session, spec.target, row.id, named_ids, options)
+    stored = await _in_turn(
+        session,
+        spec.target,
+        row.id,
+        named_ids,
+        [*(change.property_id for change in options), *(s.property_id for s in steps)],
+    )
     if removed is None:
-        await session.exec(delete(MetadataValue).where(held))
+        await session.exec(
+            delete(MetadataValue).where(
+                held,
+                ~_values_of(MetadataDefinition.type == MetadataType.signature)
+                | col(MetadataValue.property_id).in_(named_ids),
+            )
+        )
     elif named_ids:
         await session.exec(
             delete(MetadataValue).where(
@@ -536,8 +585,9 @@ async def write_values(
                 MetadataValue.property_id.in_(named_ids),
             )
         )
-    if not values and not options:
-        return
+    changed = removed is None or bool(removed or options or steps)
+    if not values and not options and not steps:
+        return changed
 
     requested_ids = [v.property_id for v in values]
     if len(requested_ids) != len(set(requested_ids)):
@@ -547,7 +597,12 @@ async def write_values(
         )
 
     definitions = await load_definitions_by_ids(
-        session, [*requested_ids, *(change.property_id for change in options)]
+        session,
+        [
+            *requested_ids,
+            *(change.property_id for change in options),
+            *(step.property_id for step in steps),
+        ],
     )
 
     def definition(property_id: int) -> MetadataDefinition:
@@ -566,6 +621,7 @@ async def write_values(
         return defn
 
     named: set[int] = set()
+    files: set[int] = set()
     rows = [
         MetadataValue(
             entity_type=spec.target,
@@ -573,17 +629,54 @@ async def write_values(
             property_id=change.property_id,
             **_options_changed(
                 definition(change.property_id),
-                stored.get(change.property_id, []),
+                list(held.value_json or [])
+                if (held := stored.get(change.property_id))
+                else [],
                 change,
             ),
         )
         for change in options
     ]
+    rows += [
+        MetadataValue(
+            entity_type=spec.target,
+            entity_id=row.id,
+            property_id=step.property_id,
+            **_stepped(
+                definition(step.property_id),
+                held.value_number if (held := stored.get(step.property_id)) else None,
+                step,
+            ),
+        )
+        for step in steps
+    ]
+    signer = guild_context(session)
     for entry in values:
         defn = definition(entry.property_id)
         cols = _validate_value_for_type(defn, entry.value)
         if cols["value_user_id"] is not None:
             named.add(cols["value_user_id"])
+        if cols["value_file_id"] is not None:
+            files.add(cols["value_file_id"])
+        if defn.type is not MetadataType.signature:
+            changed = True
+        elif cols["value_text"] is not None:
+            if signer is None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=PropertyMessages.SIGNER_ONLY,
+                )
+            cols["value_user_id"] = signer.user_id
+            cols["value_datetime"] = datetime.now(timezone.utc)
+            await audit_service.record(
+                session,
+                event_type=AuditEventType.SIGNATURE_SIGNED,
+                actor_user_id=signer.user_id,
+                guild_id=signer.guild_id,
+                target_type=spec.target,
+                target_id=row.id,
+                detail={"property_id": defn.id},
+            )
         rows.append(
             MetadataValue(
                 entity_type=spec.target,
@@ -594,7 +687,16 @@ async def write_values(
         )
     governing = spec.governing(row, initiative_id)
     await named_people.require_readers(session, governing, named)
+    if files:
+        readable = await session.exec(
+            select(File.id).where(
+                col(File.id).in_(files), File.initiative_id == initiative_id
+            )
+        )
+        if files - set(readable.all()):
+            raise _bad_value()
     session.add_all(rows)
+    return changed
 
 
 async def _in_turn(
@@ -602,27 +704,31 @@ async def _in_turn(
     target: str,
     entity_id: int,
     named: Sequence[int],
-    options: Sequence[PropertyOptionsChange],
-) -> dict[int, list[str]]:
-    """Take this write's turn at every value it names, then read the options
-    each value ``options`` changes holds: a write of the same value made
-    meanwhile is the one a change is applied to, and none lands between the
-    read and this write's own."""
+    changed: Sequence[int],
+) -> dict[int, Any]:
+    """Take this write's turn at every value it names, then read the values
+    ``changed`` names, which a change or a step is applied to: a write of the
+    same value made meanwhile is the one it is applied to, and none lands
+    between the read and this write's own."""
     for property_id in sorted(set(named)):
         await advisory_lock(
             session,
             LockNamespace.PROPERTY_VALUE,
             f"{routed_guild_id(session)}:{target}:{entity_id}:{property_id}",
         )
-    if not options:
+    if not changed:
         return {}
     held = await session.exec(
-        select(MetadataValue.property_id, MetadataValue.value_json).where(
+        select(
+            MetadataValue.property_id,
+            MetadataValue.value_json,
+            MetadataValue.value_number,
+        ).where(
             _of(target, [entity_id]),
-            MetadataValue.property_id.in_([c.property_id for c in options]),
+            MetadataValue.property_id.in_(changed),
         )
     )
-    return {property_id: list(slugs or []) for property_id, slugs in held.all()}
+    return {value.property_id: value for value in held.all()}
 
 
 def _options_changed(
@@ -648,6 +754,22 @@ def _options_changed(
     return cols
 
 
+def _stepped(
+    defn: MetadataDefinition, stored: Optional[Decimal], step: PropertyStep
+) -> Dict[str, Any]:
+    """The typed columns of a counter once ``step`` is taken from what it
+    holds, or from its initial value where it holds none, within its
+    bounds."""
+    if defn.type is not MetadataType.counter:
+        raise _bad_value()
+    settings = CounterSettings.model_validate(defn.counter or {})
+    count = Decimal(str(settings.initial)) if stored is None else stored
+    by = Decimal(str(settings.step))
+    cols = _empty_columns()
+    cols["value_number"] = _within(defn, count + by if step.up else count - by)
+    return cols
+
+
 async def set_values(
     session: AsyncSession,
     row: Any,
@@ -656,6 +778,7 @@ async def set_values(
     initiative_id: Optional[int],
     removed: Optional[Sequence[int]] = None,
     options: Sequence[PropertyOptionsChange] = (),
+    steps: Sequence[PropertyStep] = (),
     collection_id: Optional[int] = None,
 ) -> None:
     """The whole write a person or a plug-in makes: resolve a plug-in's person
@@ -663,18 +786,20 @@ async def set_values(
     named, as :func:`write_values`; a collection's metadata with
     ``collection_id``), mark the row changed, and let a target whose own shape
     reacts (a repeating event) do so. Authorization is the caller's."""
-    await write_values(
+    changed = await write_values(
         session,
         row,
         await property_values_by_row_id(session, values),
         initiative_id=initiative_id,
         removed=removed,
         options=options,
+        steps=steps,
         collection_id=collection_id,
     )
     # A collection's metadata is the collection's, so it leaves the file as
-    # it was.
-    if collection_id is None and hasattr(row, "updated_at"):
+    # it was; and signing the row leaves it as it was, so a later signature
+    # doesn't read as a change since an earlier one.
+    if changed and collection_id is None and hasattr(row, "updated_at"):
         row.updated_at = datetime.now(timezone.utc)
         session.add(row)
     await session.flush()
@@ -747,7 +872,8 @@ async def copy_values(
     copy's project with the same name and type (its own, for a copy beside
     it), and the rest is not copied. A collection's metadata stays with the
     files in it, since a copy is in no collection; a plug-in's stays with the
-    source, since only the plug-in writes it.
+    source, since only the plug-in writes it. A signature stays too, on both:
+    the copy was never signed.
     """
     if not copies:
         return
@@ -761,10 +887,10 @@ async def copy_values(
     now = datetime.now(timezone.utc)
     names = ["entity_type", "entity_id", "property_id", *VALUE_COLUMNS]
     held = [getattr(MetadataValue, c) for c in VALUE_COLUMNS]
+    unsigned = MetadataDefinition.type != MetadataType.signature
+    properties = _values_of(and_(_properties(), unsigned))
     await session.exec(
-        delete(MetadataValue).where(
-            _of(target, copies.values()), _values_of(_properties())
-        )
+        delete(MetadataValue).where(_of(target, copies.values()), properties)
     )
     await session.exec(
         insert(MetadataValue).from_select(
@@ -778,12 +904,12 @@ async def copy_values(
                 literal(now),
             )
             .join(pairs, MetadataValue.entity_id == pairs.c.source_id)
-            .where(_of(target, copies.keys()), _values_of(_properties())),
+            .where(_of(target, copies.keys()), properties),
         )
     )
     if model is not Task:
         return
-    projects = col(MetadataDefinition.project_id).is_not(None)
+    projects = col(MetadataDefinition.project_id).is_not(None) & unsigned
     await session.exec(
         delete(MetadataValue).where(_of(target, copies.values()), _values_of(projects))
     )
@@ -810,7 +936,11 @@ async def copy_values(
                     there.type == source.type,
                 ),
             )
-            .where(_of(target, copies.keys()), col(source.project_id).is_not(None)),
+            .where(
+                _of(target, copies.keys()),
+                col(source.project_id).is_not(None),
+                source.type != MetadataType.signature,
+            ),
         )
     )
 
@@ -837,6 +967,7 @@ async def copy_definitions(
             color=defn.color,
             options=defn.options,
             currency=defn.currency,
+            counter=defn.counter,
         )
         for defn in definitions
     ]
@@ -937,6 +1068,7 @@ async def promote(
             position=0 if last is None else last + 1,
             color=first.color,
             currency=first.currency,
+            counter=first.counter,
         )
     elif (target.type, target.currency) != shape:
         raise HTTPException(
@@ -1145,7 +1277,7 @@ def _rehydrate_value(
     ptype = defn.type
     if ptype in {MetadataType.text, MetadataType.url, MetadataType.select}:
         return row.value_text
-    if ptype in {MetadataType.number, MetadataType.currency}:
+    if ptype in {MetadataType.number, MetadataType.currency, MetadataType.counter}:
         return _number_to_json(row.value_number)
     if ptype is MetadataType.scale:
         return int(row.value_number) if row.value_number is not None else None
@@ -1159,6 +1291,18 @@ def _rehydrate_value(
         return list(row.value_json) if row.value_json is not None else []
     if ptype is MetadataType.user_reference:
         return _person(row.value_user_id, user)
+    if ptype is MetadataType.file:
+        return _file(row.value_file_id, row.value_file)
+    if ptype is MetadataType.signature:
+        # Signed while it holds a time, whoever the signer is now: one whose
+        # account is gone reads as nobody.
+        if row.value_datetime is None:
+            return None
+        return {
+            "user": _person(row.value_user_id, user),
+            "name": row.value_text,
+            "signed_at": row.value_datetime,
+        }
     return None  # pragma: no cover
 
 
@@ -1177,9 +1321,24 @@ def _person(user_id: Optional[int], user: Optional[MemberProfile]) -> Any:
     }
 
 
+def _file(file_id: Optional[int], file: Optional[File]) -> Any:
+    """The file a value names, as a reader is shown it: what draws its icon
+    and, for a link, where it points; its id alone where it is not read, or
+    is in the trash."""
+    if file is None:
+        return {"id": file_id} if file_id else None
+    return {
+        "id": file.id,
+        "name": file.name,
+        "file_type": file.file_type,
+        "smart_link_url": file.smart_link_url,
+    }
+
+
 def summaries_from_rows(rows: Iterable[MetadataValue]) -> List[PropertySummary]:
     """:class:`PropertySummary` list from value rows with ``definition``
-    (and ``value_user`` where it applies) loaded, sorted by name."""
+    (and ``value_user`` and ``value_file`` where they apply) loaded, sorted by
+    name."""
     summaries: List[PropertySummary] = []
     for row in rows:
         defn = row.definition
@@ -1194,6 +1353,7 @@ def summaries_from_rows(rows: Iterable[MetadataValue]) -> List[PropertySummary]:
                 collection_id=defn.collection_id,
                 options=_parsed_options(defn) or None,
                 currency=defn.currency,
+                counter=defn.counter,
                 value=_rehydrate_value(defn, row, row.value_user),
             )
         )
@@ -1228,6 +1388,7 @@ async def summaries_by_id(
             .options(
                 selectinload(MetadataValue.definition),
                 selectinload(MetadataValue.value_user),
+                selectinload(MetadataValue.value_file).undefer(File.smart_link_url),
             )
         )
     ).all()
@@ -1318,8 +1479,10 @@ def typed_column_for_property(property_type: MetadataType) -> Any:
         return MetadataValue.value_date
     if property_type is MetadataType.datetime:
         return MetadataValue.value_datetime
-    if property_type is MetadataType.user_reference:
+    if property_type in PERSON_TYPES:
         return MetadataValue.value_user_id
+    if property_type is MetadataType.file:
+        return MetadataValue.value_file_id
     if property_type is MetadataType.multi_select:
         return MetadataValue.value_json
     raise ValueError(f"Unsupported property type: {property_type!r}")
@@ -1371,7 +1534,7 @@ def _coerce_filter_scalar(property_type: MetadataType, raw: Any) -> Any:
             if isinstance(raw, str):
                 return datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
             return None
-        if property_type is MetadataType.user_reference:
+        if property_type in PERSON_TYPES or property_type is MetadataType.file:
             if isinstance(raw, bool):
                 return None
             if isinstance(raw, int):
@@ -1686,14 +1849,15 @@ async def load_definitions_by_ids(
 
 
 async def property_filter_clauses(
-    session: AsyncSession, target: str, raw: Optional[str], *, names_people: bool
+    session: AsyncSession, target: str, raw: Optional[str]
 ) -> list:
     """WHERE clauses for the ``property_filters`` a list of ``target`` carries.
 
     The one reading of the param, for every list and every view of one (a
     tool's list, the event list, the posts timeline). A filter on a
-    person-valued property takes row ids, which an installed plug-in does not
-    hold, so it is left to people (``names_people``), as the task list does.
+    person-valued property takes row ids from a person, and from an installed
+    plug-in the references it names people by, read as row ids as the task list
+    reads them.
     """
     from app.schemas.query import FilterOp  # noqa: WPS433 - local to avoid cycles
 
@@ -1709,16 +1873,17 @@ async def property_filter_clauses(
     definitions = await load_definitions_by_ids(
         session, [condition.property_id for condition in parsed]
     )
-    if not names_people and any(
-        condition.op is not FilterOp.is_null
-        and (definition := definitions.get(condition.property_id)) is not None
-        and definition.type is MetadataType.user_reference
-        for condition in parsed
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=QueryMessages.INVALID_CONDITIONS,
-        )
+    if current_install_boundary() is not None:
+        parsed = [
+            ParsedPropertyFilter(
+                condition.property_id, condition.op, filter_people(condition.value)
+            )
+            if condition.op is not FilterOp.is_null
+            and (definition := definitions.get(condition.property_id)) is not None
+            and definition.type in PERSON_TYPES
+            else condition
+            for condition in parsed
+        ]
     return build_property_filter_clauses(target, parsed, definitions)
 
 
@@ -2131,11 +2296,6 @@ def _fields_on(declared: Any, kind: Optional[str] = None) -> list[dict[str, Any]
         and isinstance(field.get("key"), str)
         and (kind is None or kind in (field.get("on") or ()))
     ]
-
-
-def shown_keys(definition: Any, kind: str) -> frozenset[str]:
-    """The keys a pinned definition declares as fields on ``kind``."""
-    return frozenset(field["key"] for field in _fields_on(definition, kind))
 
 
 def _declared(field: Optional[Mapping[str, Any]], key: str) -> Dict[str, Any]:

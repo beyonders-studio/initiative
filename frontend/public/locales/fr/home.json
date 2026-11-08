@@ -150,7 +150,6 @@
       "daysOption_other": "Les {{count}} prochains jours",
       "empty_one": "Rien de prévu aujourd'hui.",
       "empty_other": "Rien de prévu dans les {{count}} prochains jours.",
-      "loadError": "Impossible de charger ce qui arrive.",
       "openCalendar": "Ouvrir Mon calendrier"
     },
     "calendar": {
@@ -168,7 +167,6 @@
       "toolsHint": "Limitez les deux listes à ces types d'outils. Laissez vide pour tous.",
       "emptyViewed": "Rien d'ouvert pour l'instant. Projets, fichiers et le reste apparaissent ici dès que vous les avez consultés.",
       "emptyChanged": "Rien n'a changé récemment.",
-      "loadError": "Impossible de charger ce qui est récent.",
       "openTools": "Ouvrir Mes outils"
     },
     "bookmarks": {
@@ -176,8 +174,7 @@
       "titleIn": "{{tool}} en signet",
       "description": "Tout ce que vous avez mis en signet, dans chaque communauté, à portée de clic.",
       "toolsHint": "N'afficher que ces types d'outils. Laissez vide pour tous les afficher.",
-      "empty": "Aucun signet pour l'instant. Mettez un signet sur un projet, un fichier ou autre chose depuis sa page, et il vous attendra ici.",
-      "loadError": "Impossible de charger vos signets."
+      "empty": "Aucun signet pour l'instant. Mettez un signet sur un projet, un fichier ou autre chose depuis sa page, et il vous attendra ici."
     },
     "activity": {
       "title": "Activité",
@@ -196,7 +193,6 @@
     "progress": {
       "title": "Mes progrès",
       "description": "Votre série, votre semaine et ce que vous terminez à temps.",
-      "loadError": "Impossible de charger vos progrès.",
       "streak_one": "{{count}} jour",
       "streak_other": "{{count}} jours",
       "firstTask": "Terminez votre première tâche pour lancer une série."
@@ -258,7 +254,6 @@
   "marketplace": {
     "browse": "Parcourir le marketplace",
     "by": "par {{publisher}}",
-    "loadError": "Impossible de charger les dispositions du marketplace.",
     "empty": "Pas encore de dispositions dans le marketplace."
   },
   "store": {
@@ -273,7 +268,6 @@
     "description": "N'importe laquelle de vos bannières peut s'afficher en haut de cette vue, et chaque vue peut en porter une différente.",
     "useProfile": "Utiliser la bannière de mon profil",
     "none": "Aucune bannière",
-    "more": "Obtenir d'autres bannières",
-    "loadError": "Impossible de charger vos bannières."
+    "more": "Obtenir d'autres bannières"
   }
 }

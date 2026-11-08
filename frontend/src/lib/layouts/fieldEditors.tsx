@@ -5,7 +5,7 @@
  */
 
 import { useBlocker } from "@tanstack/react-router";
-import { Loader2, Sparkles, X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import {
   type ReactNode,
   type RefObject,
@@ -16,13 +16,14 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  ContentKind,
-  PropertyDefinitionRead,
-  PropertySummary,
-  TagSummary,
-  Tool,
-  UserSummary,
+import {
+  type ContentKind,
+  MetadataType,
+  type PropertyDefinitionRead,
+  type PropertySummary,
+  type TagSummary,
+  type Tool,
+  type UserSummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import { usePersonMention } from "@/components/comments/usePersonMention";
 import { MentionComposer } from "@/components/markdown/MentionComposer";
@@ -34,6 +35,7 @@ import {
   normalizePropertyValue,
   ownProperties,
   propertyStubFromDefinition,
+  steppedCount,
   userReferenceValue,
 } from "@/components/properties/propertyHelpers";
 import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
@@ -41,10 +43,6 @@ import { SubscribeButton } from "@/components/SubscribeButton";
 import { TagPicker } from "@/components/tags";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { TaskDescription } from "@/components/tasks/TaskDescription";
-import { Button } from "@/components/ui/button";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -62,7 +60,11 @@ import type { MemberSearchScope } from "@/hooks/useUsers";
 import { getHttpStatus } from "@/lib/errorMessage";
 import { currentServerKey } from "@/lib/offlineSession";
 import { getItem, removeItem, setItem } from "@/lib/storage";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { cn } from "@/ui/lib/utils";
+import { Textarea } from "@/ui/textarea";
 
 import { FieldFrame, ReadField, sameJson, useFieldDraft } from "./editing";
 
@@ -88,8 +90,7 @@ const useFittedHeight = (text: string) => {
   return box;
 };
 
-/** An item's title, which is its detail's heading, saved as `field` (a queue
- *  item's is its `label`). It cannot be emptied: leaving it blank puts the
+/** An item's title, which is its detail's heading, saved as `field`. It cannot be emptied: leaving it blank puts the
  *  saved one back. A reader who cannot change it sees the heading alone. */
 /** How a title's text is set, which its marks are set the same way to line up
  *  with it. */
@@ -308,6 +309,8 @@ type PropertiesProps<I extends { properties: PropertySummary[] }, P> = {
   /** The project whose metadata the item holds beside the initiative's
    *  properties: a task's. */
   owner?: MetadataOwner;
+  /** When the item last changed, which a signature made before it says. */
+  updatedAt?: string | null;
 };
 
 /** The item's properties with `property` as it reads after `value`, added
@@ -337,6 +340,7 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
   readOnly,
   initiativeId,
   canOpen,
+  updatedAt,
   property,
   placed = false,
 }: PropertiesProps<I, P> & {
@@ -348,26 +352,43 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
 }) => {
   const { t } = useTranslation(["properties", "common"]);
   const save = useItemFieldSave(kind, id, property.name);
+  const adding = useContext(ItemDraftContext) !== null;
   const saved = normalizePropertyValue(property);
   const edit = (value: unknown): ItemEdit<I, P> => ({
     properties: { values: [{ property_id: property.property_id, value }] },
     shows: { properties: withValue(properties, property, value) } as Partial<I>,
   });
+  // A signature cleared can't be put back: writing it again signs it anew,
+  // as whoever writes it.
+  const restorable = property.type !== MetadataType.signature;
   const draft = useFieldDraft(
     saved,
     (value) =>
       save.save(
         edit(value),
-        isEmptyPropertyValue(value) && !isEmptyPropertyValue(saved) ? edit(saved) : undefined
+        restorable && isEmptyPropertyValue(value) && !isEmptyPropertyValue(saved)
+          ? edit(saved)
+          : undefined
       ),
     sameJson
   );
+  // A step is taken from what the counter holds when it lands, and shows at
+  // once as it reads from here.
+  const step = (up: boolean) => {
+    draft.restore();
+    void save.save({
+      properties: { values: [], steps: [{ property_id: property.property_id, up }] },
+      shows: {
+        properties: withValue(properties, property, steppedCount(property.counter, saved, up)),
+      } as Partial<I>,
+    });
+  };
   // The property stays until it is gone, so a failed removal says so here.
   const remove = () => {
     draft.restore();
     void save.save(
       { properties: { values: [], removed: [property.property_id] }, shows: {} },
-      { ...edit(saved), shows: { properties } as Partial<I> }
+      restorable ? { ...edit(saved), shows: { properties } as Partial<I> } : undefined
     );
   };
   return (
@@ -396,10 +417,13 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
         definition={property}
         value={draft.value}
         onChange={draft.edit}
+        // An item being added has no counter to step yet.
+        onStep={adding ? undefined : step}
         disabled={readOnly}
         initiativeId={initiativeId}
         canOpen={canOpen}
         selectedUser={userReferenceValue(property)}
+        updatedAt={updatedAt}
       />
     </FieldFrame>
   );
@@ -438,7 +462,6 @@ export const ColorField = <
           void save.save({ patch: { color } as P, shows: { color } as Partial<I> })
         }
         triggerLabel={label}
-        className="h-9"
       />
     </FieldFrame>
   );
@@ -501,7 +524,7 @@ export const PlacedPropertyField = <I extends { properties: PropertySummary[] },
     if (isEmptyPropertyValue(property.value)) return null;
     return (
       <ReadField label={property.name}>
-        <PropertyValueCell summary={property} variant="cell" />
+        <PropertyValueCell summary={property} variant="cell" updatedAt={props.updatedAt} />
       </ReadField>
     );
   }
@@ -563,7 +586,11 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
                     <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
                     <span className="truncate">{property.name}</span>
                   </span>
-                  <PropertyValueCell summary={property} variant="cell" />
+                  <PropertyValueCell
+                    summary={property}
+                    variant="cell"
+                    updatedAt={props.updatedAt}
+                  />
                 </li>
               );
             })}
@@ -643,7 +670,7 @@ export const DescriptionField = <I, P>({
   suggest,
   maxLength,
 }: {
-  /** What the item calls it (a queue item's `notes`). A save names the text
+  /** What the item calls it. A save names the text
    *  it was written over as `<field>_base`, which the server refuses once
    *  that has changed. */
   field?: string;
@@ -807,13 +834,9 @@ export const DescriptionField = <I, P>({
                   size="sm"
                   className="h-8 px-2 text-xs"
                   onClick={() => void startFrom()}
-                  disabled={suggesting}
+                  pending={suggesting}
                 >
-                  {suggesting ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-3 w-3" />
-                  )}
+                  <Sparkles className="h-3 w-3" />
                   {suggest.label}
                 </Button>
               ) : null

@@ -12,12 +12,12 @@
  * that nothing is deleted.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { toolCamelPlural } from "@/lib/tools";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -25,10 +25,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { toolCamelPlural } from "@/lib/tools";
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 
 /** Who a tool is being turned on for. */
 export type ToolAudience = "everyone" | "managers";
@@ -51,9 +50,11 @@ export const ToolEnableDialog = ({
   const [audience, setAudience] = useState<ToolAudience>("everyone");
 
   // Each tool is its own question; don't carry the last answer into the next.
-  useEffect(() => {
+  const [prevTool, setPrevTool] = useState(tool);
+  if (prevTool !== tool) {
+    setPrevTool(tool);
     if (tool) setAudience("everyone");
-  }, [tool]);
+  }
 
   const toolName = tool ? t(`${toolCamelPlural(tool)}Feature` as never) : "";
 
@@ -92,14 +93,11 @@ export const ToolEnableDialog = ({
             </div>
           </div>
         </RadioGroup>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
-            {t("common:cancel")}
-          </Button>
-          <Button onClick={() => tool && onConfirm(tool, audience)} disabled={isSaving}>
-            {t("settings.toolAudience.enableConfirm")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("settings.toolAudience.enableConfirm")}
+          onSubmit={() => tool && onConfirm(tool, audience)}
+          pending={isSaving}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -128,7 +126,6 @@ export const ToolDisableDialog = ({
       title={t("settings.toolAudience.disableTitle", { tool: toolName })}
       description={t("settings.toolAudience.disableDescription", { tool: toolName })}
       confirmLabel={t("settings.toolAudience.disableConfirm")}
-      cancelLabel={t("common:cancel")}
       loadingLabel={t("settings.saving")}
       isLoading={isSaving}
       destructive

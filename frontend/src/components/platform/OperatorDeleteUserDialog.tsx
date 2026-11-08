@@ -1,22 +1,22 @@
-import { AlertCircle, ChevronLeft, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, ChevronLeft, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { OperatorUserRead } from "@/api/generated/initiativeAPI.schemas";
 import { ConfirmPhraseField, EligibilityStep } from "@/components/account/DeletionSteps";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { DialogFooter } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import { useOperatorDeleteUser, useUserDeletionEligibility } from "@/hooks/useOperatorUsers";
 import { useWizard } from "@/hooks/useWizard";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import type { DialogWithSuccessProps } from "@/types/dialog";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { DialogFooter } from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
+import { WizardDialog } from "@/ui/wizard-dialog";
 
 /**
  * Three actions are exposed in the operator dialog:
@@ -413,39 +413,30 @@ export function OperatorDeleteUserDialog({
                   disabled={
                     (step === "choose-type" && !canProceedFromChooseType) ||
                     (step === "check-blockers" && !canProceedFromBlockers) ||
-                    (step === "resolve-blockers" && !canProceedFromBlockers) ||
-                    isCheckingEligibility
+                    (step === "resolve-blockers" && !canProceedFromBlockers)
                   }
+                  pending={isCheckingEligibility}
                 >
-                  {isCheckingEligibility ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {t("operatorDeleteUser.loading")}
-                    </>
-                  ) : (
-                    t("operatorDeleteUser.next")
-                  )}
+                  {isCheckingEligibility
+                    ? t("operatorDeleteUser.loading")
+                    : t("operatorDeleteUser.next")}
                 </Button>
               ) : (
                 <Button
                   variant="destructive"
                   onClick={handleDelete}
-                  disabled={!canConfirm || deleteUser.isPending}
+                  disabled={!canConfirm}
+                  pending={deleteUser.isPending}
                 >
-                  {deleteUser.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {action === "deactivate"
-                        ? t("operatorDeleteUser.deactivating")
-                        : t("operatorDeleteUser.deleting")}
-                    </>
-                  ) : action === "deactivate" ? (
-                    t("operatorDeleteUser.deactivateButton")
-                  ) : action === "soft_delete" ? (
-                    t("operatorDeleteUser.anonymizeButton")
-                  ) : (
-                    t("operatorDeleteUser.deleteButton")
-                  )}
+                  {deleteUser.isPending
+                    ? action === "deactivate"
+                      ? t("operatorDeleteUser.deactivating")
+                      : t("operatorDeleteUser.deleting")
+                    : action === "deactivate"
+                      ? t("operatorDeleteUser.deactivateButton")
+                      : action === "soft_delete"
+                        ? t("operatorDeleteUser.anonymizeButton")
+                        : t("operatorDeleteUser.deleteButton")}
                 </Button>
               )}
             </div>

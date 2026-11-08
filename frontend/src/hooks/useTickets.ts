@@ -6,8 +6,6 @@
  * kind; nothing here reasons about bindings or entitlements.
  */
 
-import { useQuery } from "@tanstack/react-query";
-
 import type {
   AppealTicketCreate,
   FeedbackTicketCreate,
@@ -16,32 +14,45 @@ import type {
   ModerationTicketCreate,
   SecurityTicketCreate,
   SupportTicketCreate,
-  TaskCaseRead,
   TaskRead,
   TicketAccepted,
   TicketAvailability,
 } from "@/api/generated/initiativeAPI.schemas";
-import { getReadTaskCaseQueryKey, readTaskCase, takeTaskCase } from "@/api/generated/tasks/tasks";
+import { SupportTopic } from "@/api/generated/initiativeAPI.schemas";
+import {
+  getReadTaskCaseQueryKey,
+  takeTaskCase,
+  useReadTaskCase,
+} from "@/api/generated/tasks/tasks";
 import {
   fileTicket,
-  getListFiledTicketsQueryKey,
   getReadFiledTicketQueryKey,
-  getReadTicketAvailabilityQueryKey,
-  listFiledTickets,
-  readFiledTicket,
-  readTicketAvailability,
   replyToFiledTicket,
+  useListFiledTickets,
+  useReadFiledTicket,
+  useReadTicketAvailability,
 } from "@/api/generated/tickets/tickets";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useApiMutation, useCommunityMutation } from "@/hooks/useApiMutation";
-import { docsUrl } from "@/lib/links";
 import { queryClient } from "@/lib/queryClient";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
-/** Where somebody is sent when there is neither a form nor an address. */
-export const FAQ_URL = docsUrl("faq/");
+/** A ticket's one line at most this long, as the column behind it. */
+export const SUBJECT_MAX = 200;
+
+/** The help a person asks for about a community, rather than themselves. */
+export const COMMUNITY_TOPICS: ReadonlySet<string> = new Set([
+  SupportTopic.community,
+  SupportTopic.data_request,
+]);
+
+/** A help request's one line, from the start of what somebody wrote. */
+export const firstLine = (text: string) => {
+  const line = text.trim().split("\n")[0]?.trim() ?? "";
+  return line.length > SUBJECT_MAX ? `${line.slice(0, SUBJECT_MAX - 1)}…` : line;
+};
 
 /** One filing, told apart by its stream, and an appeal by its type. */
 export type TicketCreate =
@@ -75,12 +86,7 @@ export const useTicketAvailability = (
   options?: QueryOpts<TicketAvailability>
 ) => {
   const params = communityId == null ? undefined : { community_id: communityId };
-  return useQuery<TicketAvailability>({
-    queryKey: getReadTicketAvailabilityQueryKey(params),
-    queryFn: () => readTicketAvailability(params),
-    staleTime: 5 * 60 * 1000,
-    ...options,
-  });
+  return useReadTicketAvailability(params, { query: { staleTime: 5 * 60 * 1000, ...options } });
 };
 
 export const useFileTicket = (options?: MutationOpts<TicketAccepted, TicketFiling>) =>
@@ -96,19 +102,11 @@ export const useFileTicket = (options?: MutationOpts<TicketAccepted, TicketFilin
 
 /** The tickets the reader filed, most recently moved first. */
 export const useFiledTickets = (options?: QueryOpts<FiledTicketList>) =>
-  useQuery<FiledTicketList>({
-    queryKey: getListFiledTicketsQueryKey(),
-    queryFn: () => listFiledTickets(),
-    ...options,
-  });
+  useListFiledTickets({ query: options });
 
 /** One ticket the reader filed, with what has been said to them about it. */
 export const useFiledTicket = (taskId: number, options?: QueryOpts<FiledTicketDetailRead>) =>
-  useQuery<FiledTicketDetailRead>({
-    queryKey: getReadFiledTicketQueryKey(taskId),
-    queryFn: () => readFiledTicket(taskId),
-    ...options,
-  });
+  useReadFiledTicket(taskId, { query: options });
 
 /** Answer on a ticket the reader filed. The answer comes back as the ticket. */
 export const useReplyToTicket = (
@@ -131,12 +129,12 @@ export const useReplyToTicket = (
  *  A task no stream opened answers 404, which is the usual answer. */
 export const useTaskCase = (taskId: number) => {
   const communityId = useActiveCommunityId();
-  return useQuery<TaskCaseRead>({
-    queryKey: getReadTaskCaseQueryKey(communityId, taskId),
-    queryFn: () => readTaskCase(communityId, taskId),
-    enabled: Number.isFinite(taskId),
-    // Most tasks are not cases: a 404 is the usual answer, not a failure.
-    retry: false,
+  return useReadTaskCase(communityId, taskId, {
+    query: {
+      enabled: Number.isFinite(taskId),
+      // Most tasks are not cases: a 404 is the usual answer, not a failure.
+      retry: false,
+    },
   });
 };
 

@@ -12,15 +12,8 @@ import { useTranslation } from "react-i18next";
 
 import type { CommunityPluginListingRef } from "@/api/generated/initiativeAPI.schemas";
 import { ReportButton } from "@/components/moderation/ReportButton";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
 
 /** Where one member's acknowledgement for one plug-in in one community is kept. */
 export const pluginNoticeKey = (

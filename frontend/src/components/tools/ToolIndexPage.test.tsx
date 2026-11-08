@@ -5,17 +5,23 @@
  * its own copy of these tests. The cases come from the page's own `TOOL_INDEX`:
  * add a tool with an entry and it is covered here the moment it exists.
  *
- * What only one tool's list takes — a queue's status, a file's type — is
- * asked of that tool alone, at the bottom. So is what only one tool configures
- * today (files dropped on the list, the reader's own order): the page does it
- * for any tool whose entry asks, and files and projects are the ones that do.
+ * What only one tool's list takes — a file's type — is asked of that tool
+ * alone, at the bottom. So is what only one tool configures today (files
+ * dropped on the list, the reader's own order): the page does it for any tool
+ * whose entry asks, and files and projects are the ones that do.
  */
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it, onTestFinished, vi } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
 
-import { buildNotificationPlace, buildProject, ownerCan, readerCan } from "@/__tests__/factories";
+import {
+  buildContact,
+  buildNotificationPlace,
+  buildProject,
+  ownerCan,
+  readerCan,
+} from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import i18n from "@/__tests__/helpers/i18n-test";
 import { server } from "@/__tests__/helpers/msw-server";
@@ -76,25 +82,27 @@ const CARD_FIELDS: Partial<Record<Tool, Record<string, unknown>>> = {
     pinned_at: null,
     task_summary: { total: 0, completed: 0 },
   },
-  queue: { current_round: 1, is_active: true },
 };
 
-const row = (tool: Tool, fields: { id: number; name: string; archived_at?: string | null }) => ({
-  description: null,
-  initiative_id: INITIATIVE_ID,
-  community_id: 1,
-  created_by: 1,
-  created_at: "2026-01-01T00:00:00Z",
-  updated_at: "2026-01-01T00:00:00Z",
-  archived_at: null,
-  can: ownerCan(),
-  comments_enabled: false,
-  comment_count: 0,
-  tags: [],
-  grants: [],
-  ...CARD_FIELDS[tool],
-  ...fields,
-});
+const row = (tool: Tool, fields: { id: number; name: string; archived_at?: string | null }) =>
+  tool === Tool.contact
+    ? buildContact({ initiative_id: INITIATIVE_ID, ...fields })
+    : {
+        description: null,
+        initiative_id: INITIATIVE_ID,
+        community_id: 1,
+        created_by: 1,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+        archived_at: null,
+        can: ownerCan(),
+        comments_enabled: false,
+        comment_count: 0,
+        tags: [],
+        grants: [],
+        ...CARD_FIELDS[tool],
+        ...fields,
+      };
 
 /**
  * Serve the tool's list endpoint, honouring what every tool's page can ask
@@ -249,9 +257,7 @@ describe("the tool index page", () => {
     expect(requests.at(-1)?.get("page")).toBe("1");
     expect(requests.at(-1)?.get("page_size")).toBe("20");
     expect(
-      screen.getByText(
-        translate("pagination.rangeOf", { ns: "common", start: 1, end: 1, total: 1 })
-      )
+      screen.getByText(translate("pagination.rangeOf", { ns: "ui", start: 1, end: 1, total: 1 }))
     ).toBeInTheDocument();
   });
 
@@ -298,7 +304,7 @@ describe("the tool index page", () => {
 
 describe("the tool index page's property filter", () => {
   it("offers only the properties of the initiative the list is in", async () => {
-    stubList(Tool.queue, [row(Tool.queue, { id: 1, name: "Running" })]);
+    stubList(Tool.counter_group, [row(Tool.counter_group, { id: 1, name: "Running" })]);
     const asked: URLSearchParams[] = [];
     server.use(
       communityHttp.get("/property-definitions/", ({ request }) => {
@@ -307,7 +313,7 @@ describe("the tool index page's property filter", () => {
       })
     );
 
-    renderIndex(Tool.queue);
+    renderIndex(Tool.counter_group);
     await screen.findByText("Running");
     await userEvent.click(screen.getByRole("button", { name: shared("toolbar.filters") }));
 
@@ -315,31 +321,6 @@ describe("the tool index page's property filter", () => {
     expect(asked.map((params) => params.get("initiative_id"))).toEqual(
       asked.map(() => String(INITIATIVE_ID))
     );
-  });
-});
-
-describe("the queue index page", () => {
-  it("sends the status filter as is_active", async () => {
-    const requests = stubList(Tool.queue, [row(Tool.queue, { id: 1, name: "Running" })]);
-    const pick = async (label: string) => {
-      await userEvent.click(
-        screen.getByRole("combobox", { name: translate("filters.status", { ns: "queues" }) })
-      );
-      await userEvent.click(
-        await screen.findByRole("option", { name: translate(label, { ns: "queues" }) })
-      );
-    };
-
-    renderIndex(Tool.queue);
-    await screen.findByText("Running");
-    await userEvent.click(screen.getByRole("button", { name: shared("toolbar.filters") }));
-
-    await pick("filters.inactiveOnly");
-    await waitFor(() => expect(requests.at(-1)?.get("is_active")).toBe("false"));
-    await pick("filters.activeOnly");
-    await waitFor(() => expect(requests.at(-1)?.get("is_active")).toBe("true"));
-    await pick("filters.allStatuses");
-    await waitFor(() => expect(requests.at(-1)?.has("is_active")).toBe(false));
   });
 });
 
@@ -378,25 +359,24 @@ describe("the tool index page's bulk actions", () => {
   };
 
   it("duplicates and deletes a selection through the tool's own routes", async () => {
-    stubList(Tool.queue, [
-      row(Tool.queue, { id: 4, name: "Standup" }),
-      row(Tool.queue, { id: 5, name: "Retro" }),
+    stubList(Tool.counter_group, [
+      row(Tool.counter_group, { id: 4, name: "Standup" }),
+      row(Tool.counter_group, { id: 5, name: "Retro" }),
     ]);
     const duplicated: string[] = [];
     const deleted: string[] = [];
     server.use(
-      communityHttp.post("/queues/:id/duplicate", ({ params }) => {
+      communityHttp.post("/counter-groups/:id/duplicate", ({ params }) => {
         duplicated.push(String(params.id));
         return HttpResponse.json({ id: 40, initiative_id: INITIATIVE_ID });
       }),
-      communityHttp.delete("/queues/:id", ({ params }) => {
+      communityHttp.delete("/counter-groups/:id", ({ params }) => {
         deleted.push(String(params.id));
         return new HttpResponse(null, { status: 204 });
       })
     );
-    vi.spyOn(window, "confirm").mockReturnValue(true);
 
-    renderIndex(Tool.queue);
+    renderIndex(Tool.counter_group);
     await screen.findByText("Standup");
 
     await select("Standup");
@@ -405,6 +385,8 @@ describe("the tool index page's bulk actions", () => {
 
     await select("Retro");
     await userEvent.click(screen.getByRole("button", { name: shared("delete") }));
+    const confirm = await screen.findByRole("alertdialog");
+    await userEvent.click(within(confirm).getByRole("button", { name: shared("delete") }));
     await waitFor(() => expect(deleted).toEqual(["5"]));
   });
 

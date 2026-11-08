@@ -42,6 +42,7 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.relationships import EndpointKind, RelationshipType
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.models.tenant.comment import Comment
@@ -51,12 +52,13 @@ from app.models.tenant.plugin_member_consent import PluginMemberConsent
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
 from app.models.tenant.initiative import InitiativeJoinRequest
 from app.models.tenant.reaction import Reaction
+from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.resource_grant import ResourceGrant
 from app.models.tenant.view_preference import ViewPreference
 from app.models.tenant.webhook_ref import WebhookRef
 from app.models.tenant.webhook_subscription import WebhookSubscription
 from app.services.platform import users as user_service
-from app.services.tenant import webhook_refs
+from app.services.tenant import relationships, webhook_refs
 from app.services.tenant.mention_parser import ANONYMIZED_MENTION_NAME
 from app.testing.factories import (
     create_calendar,
@@ -223,6 +225,7 @@ async def _seed(session: AsyncSession) -> SimpleNamespace:
         guild_id=guild.id,
         victim_id=victim.id,
         keeper_id=keeper.id,
+        task_id=task.id,
         comment_id=comment.id,
         reaction_id=reaction.id,
         **{name: row.id for name, row in rows.items()},
@@ -302,6 +305,35 @@ async def test_what_a_webhook_calls_them_goes(session: AsyncSession, role_sessio
         await session.exec(select(WebhookRef.entity_type, WebhookRef.entity_id))
     ).all()
     assert sorted(left) == [("guild", s.guild_id), ("user", s.keeper_id)]
+
+
+async def test_links_to_them_go(session: AsyncSession, role_session):
+    """Every link with them on an end, whichever end; one to somebody else
+    stays."""
+    s = await _seed(session)
+    task = relationships.Endpoint(EndpointKind.task, s.task_id)
+    victim = relationships.Endpoint(EndpointKind.user, s.victim_id)
+    keeper = relationships.Endpoint(EndpointKind.user, s.keeper_id)
+    await route_session_to_guild(session, s.guild_id)
+    for source, relationship_type, target in (
+        (task, RelationshipType.depends_on, victim),
+        (victim, RelationshipType.part_of, task),
+        (task, RelationshipType.related_to, keeper),
+    ):
+        await relationships.create(
+            session, source=source, relationship_type=relationship_type, target=target
+        )
+    await session.commit()
+
+    await user_service.soft_delete_user(await role_session("app_admin"), s.victim_id)
+    session.expunge_all()
+    await route_session_to_guild(session, s.guild_id)
+    left = (
+        await session.exec(
+            select(EntityRelationship.source_type, EntityRelationship.target_id)
+        )
+    ).all()
+    assert left == [("task", s.keeper_id)]
 
 
 # --- the row stays, un-attributed -------------------------------------------

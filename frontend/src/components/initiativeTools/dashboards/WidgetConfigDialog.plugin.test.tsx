@@ -1,11 +1,10 @@
 /**
- * Configuring an installed plug-in's widget — the three things that were missing.
+ * Configuring an installed plug-in's widget.
  *
- * **The source list was empty.** A plug-in widget's type is namespaced
- * `plugin:<uid>:<widget>`, and this dialog looked it up in the built-in widget
- * catalog, which only ever holds this build's own primitives. The lookup missed,
- * `sources` fell back to `[]`, and every plug-in widget on every canvas offered a
- * data-source control with nothing in it.
+ * **It reads its own plug-in.** A plug-in widget's type is namespaced
+ * `plugin:<uid>:<widget>` and is not in the built-in widget catalog, so its
+ * reads come from its install's pinned definition, and there is no source to
+ * choose.
  *
  * **A parameter with a menu behind it was a text box.** A manifest can say
  * `options_from` — "the values this permits are what that read of mine answers"
@@ -18,7 +17,7 @@
  * disabled on any of those makes a configuration that would have worked
  * unreachable, so the fallback is an input rather than a dead select.
  */
-import { screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -26,8 +25,22 @@ import { renderWithProviders } from "@/__tests__/helpers/render";
 import type { DefinitionWidget } from "@/lib/widgets/definition";
 
 const apiGet = vi.hoisted(() => vi.fn());
+// The generated client calls it as a function, which answers only the widget
+// catalog, from `apiGet`; the hand-written reads (a parameter's options) go
+// through `get`. Any other generated read fails, as an unserved request would.
 vi.mock("@/api/client", () => ({
-  apiClient: { get: apiGet, post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  apiClient: Object.assign(
+    (config: { url: string }) =>
+      config.url.endsWith("/plugins/widget-catalog")
+        ? apiGet(config.url)
+        : Promise.reject(new Error(`not served: ${config.url}`)),
+    {
+      get: apiGet,
+      post: vi.fn(),
+      put: vi.fn(),
+      delete: vi.fn(),
+    }
+  ),
   API_BASE_URL: "http://test/api/v1",
 }));
 
@@ -157,14 +170,14 @@ const mount = (which: DefinitionWidget = widget) =>
   );
 
 describe("configuring a plug-in widget", () => {
-  it("offers a data source, which the built-in catalog does not know about", async () => {
-    // The bug, at its narrowest: the built-in catalog passed in here is empty,
-    // exactly as it is for any `plugin:` type, and the control still has an option.
+  it("offers its plug-in's reads and no source to choose", async () => {
+    // The built-in catalog passed in here is empty, exactly as it is for any
+    // `plugin:` type, and the reads still come from the install.
     serve();
     mount();
 
-    const source = await screen.findByRole("combobox", { name: /data source/i });
-    expect(within(source).getByText("Plug-in data")).toBeInTheDocument();
+    await screen.findByRole("combobox", { name: /what it reads/i });
+    expect(screen.queryByRole("combobox", { name: /data source/i })).not.toBeInTheDocument();
   });
 
   it("offers the reads the widget declares, and no others", async () => {

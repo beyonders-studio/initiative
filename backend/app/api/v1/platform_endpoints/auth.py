@@ -653,11 +653,14 @@ async def begin_passkey_sign_up(
         account_name=normalize_email(payload.email),
         display_name=payload.username.strip(),
     )
+    # An app's registration is bound to the app's challenge, so only the app
+    # can finish it.
     await challenge_service.create(
         session,
         user_id=None,
         purpose=challenge_service.ChallengePurpose.passkey_sign_up,
         value=bytes_to_base64url(ceremony.challenge),
+        answer=payload.code_challenge or None,
     )
     await session.commit()
     return PasskeyRegistrationOptions(options=ceremony.options)
@@ -694,6 +697,7 @@ async def finish_passkey_sign_up(
         user_id=None,
         credential=payload.credential,
         purposes=_SIGN_UP_PURPOSES,
+        code_verifier=payload.code_verifier,
     )
     if isinstance(registered, passkey_service.PresentationRefused):
         await registered.settle(session)
@@ -731,7 +735,11 @@ async def finish_passkey_sign_up(
         amr=passkey_amr(backed_up=registered.backed_up),
         audit_detail={"method": "passkey", "during": "registration"},
     )
-    return PasskeySignUpResult(access_token=token.access_token, codes=account.codes)
+    return PasskeySignUpResult(
+        access_token=token.access_token,
+        refresh_token=token.refresh_token,
+        codes=account.codes,
+    )
 
 
 @router.get("/bootstrap")

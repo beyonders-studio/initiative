@@ -1,9 +1,10 @@
 """What a body says it is about.
 
 A ``#`` link or a ``[[ ]]`` link in something somebody wrote is an assertion
-that the thing being written about and the thing being named belong together.
-This module keeps that assertion in ``relationships`` as a ``references`` edge,
-recomputed from the content every time the content is saved.
+that the thing being written about and the thing being named belong together,
+and an ``@`` mention in it says the same of a person. This module keeps that
+assertion in ``relationships`` as a ``references`` edge, recomputed from the
+content every time the content is saved.
 
 Three rules shape everything here:
 
@@ -16,6 +17,8 @@ something a reference can name, and the conversation about a task is part of
 that task — so a mention in a comment on task 5 is recorded as *task 5
 references it*. That is why the recompute reads the body and every comment
 together: dropping one comment must not drop an edge another still supports.
+A comment's ``@`` is a remark to somebody rather than the thing's own words
+about them, so only the body's mentions of people are kept.
 
 **A withdrawn edge is deleted, not remembered.** A person unlinking two things
 means something; a sentence being rewritten does not. ``relationships.remove``
@@ -31,7 +34,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.references import references_in_body, references_in_text
-from app.core.relationships import Provenance, RelationshipType
+from app.core.relationships import PERSON, EndpointKind, Provenance, RelationshipType
 from app.core.search import SearchEntityType
 from app.db import reference_targets
 from app.db.initiative_rls import COMMENT_PARENT_COLUMNS
@@ -41,6 +44,11 @@ from app.models.tenant.post import Post
 from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.task import Task
 from app.models.tenant.wiki import WikiPage
+from app.services.import_engine.mentions import (
+    editor_mention_ids,
+    markdown_mention_ids,
+)
+from app.services.tenant import named_people
 from app.services.tenant import relationships as relationships_service
 from app.services.tenant.relationships import Endpoint
 
@@ -87,6 +95,12 @@ async def sync_for_entity(
 
     live = await _live_targets(session, wanted)
     if relationships_service.records_edges(session):
+        people = (
+            markdown_mention_ids(body)
+            if isinstance(body, str)
+            else editor_mention_ids(body)
+        )
+        live |= {(EndpointKind(PERSON.value), user_id) for user_id in people}
         await _reconcile(session, entity, live, author_id=author_id)
 
 
@@ -217,15 +231,16 @@ async def _by_kind(
 async def _reconcile(
     session: AsyncSession,
     entity: Endpoint,
-    wanted: set[tuple[SearchEntityType, int]],
+    wanted: set[tuple[EndpointKind, int]],
     *,
     author_id: int | None,
 ) -> None:
     """Add what the content now names, drop what it no longer does.
 
-    Only the additions ask whether the far end is still taking writes. What
-    removes an edge here is the sentence going, and a far end being archived
-    afterwards is not that.
+    Only the additions ask whether the far end is still taking writes, or, for a
+    person, whether they are in the community, as a link to one asks. What
+    removes an edge here is the sentence going, and a far end being archived,
+    or a person leaving, afterwards is not that.
     """
     existing = (
         await session.exec(
@@ -239,7 +254,7 @@ async def _reconcile(
         )
     ).all()
 
-    have = {(SearchEntityType(row.target_type), row.target_id): row for row in existing}
+    have = {(EndpointKind(row.target_type), row.target_id): row for row in existing}
 
     for key, row in have.items():
         if key not in wanted:
@@ -247,6 +262,9 @@ async def _reconcile(
                 session, row, removed_by=author_id, tombstone=False
             )
 
+    adding = wanted - set(have)
+    people = {pair for pair in adding if pair[0] == PERSON.value}
+    members = await named_people.members(session, (pair[1] for pair in people))
     await relationships_service.create_many(
         session,
         source=entity,
@@ -254,7 +272,8 @@ async def _reconcile(
         targets=[
             Endpoint(kind, entity_id)
             for kind, entity_id in sorted(
-                await _accepting_links(session, wanted - set(have)),
+                await _accepting_links(session, adding - people)
+                | {pair for pair in people if pair[1] in members},
                 key=lambda pair: (pair[0].value, pair[1]),
             )
         ],

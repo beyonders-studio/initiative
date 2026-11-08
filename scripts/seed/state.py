@@ -1,62 +1,35 @@
-"""The seed's state file, and ``--clean``."""
+"""Whether the dev database is seeded, and ``--clean``."""
 
 from __future__ import annotations
 
 import contextlib
-import json
-from pathlib import Path
 
 from sqlmodel import select
 
 import app.db.session as db_session
 from app.db.request_context import Unattributed
 from app.db.session import SystemSessionLocal, set_rls_context
-from app.models.platform.user import User
+from app.models.platform.access_grant import AccessGrant
+from app.services.auth import addresses
 from app.services.platform import rules
 
-STATE_FILE = Path(__file__).resolve().parents[2] / ".vscode" / ".dev_seed_ids.json"
+from seed.accounts import USERS
 
 
-def save_state(state: dict) -> None:
-    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    STATE_FILE.write_text(json.dumps(state, indent=2))
-    print(f"  State saved to {STATE_FILE}")
+async def seed_status() -> str:
+    """What the database holds of a seed: ``none``, ``partial`` or ``complete``.
 
-
-def mark_seed_incomplete() -> None:
-    """Record that a seed is in flight, before the first row is written.
-
-    A seed that stops partway leaves rows that look no different from a
-    finished one, and the next seed collides with them. This marker is what
-    tells the next launch to clear them and start over; the finished seed
-    overwrites it with the real id state.
+    The database is the record, so a recreated volume reads as unseeded and
+    every checkout on the same database agrees. A seed writes its accounts
+    first and its PAM access grants last, so accounts with no grant are a seed
+    that stopped partway, whose rows the next one would collide with.
     """
-    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    STATE_FILE.write_text(json.dumps({"seed_incomplete": True}, indent=2))
-
-
-def load_state() -> dict | None:
-    if not STATE_FILE.exists():
-        return None
-    return json.loads(STATE_FILE.read_text())
-
-
-async def state_outlived_its_database(state: dict) -> bool:
-    """Whether the recorded ids belong to a database that is no longer there.
-
-    The state file lives in the checkout and the rows it names live in a Docker
-    volume, so recreating the volume leaves the file describing nothing. Asking
-    the database rather than the filesystem is what tells the two apart: not one
-    of the accounts it recorded still exists.
-    """
-    recorded = state.get("users") or []
-    if not recorded:
-        return False
     async with SystemSessionLocal() as session:
-        survivor = (
-            await session.exec(select(User.id).where(User.id.in_(recorded)))
-        ).first()
-    return survivor is None
+        if await addresses.account_holding(session, USERS[0][0]) is None:
+            return "none"
+        await set_rls_context(session, Unattributed())
+        grant = (await session.exec(select(AccessGrant.id).limit(1))).first()
+    return "complete" if grant is not None else "partial"
 
 
 async def clean() -> None:
@@ -128,7 +101,6 @@ async def clean() -> None:
         await session.commit()
     print("  Community directory switched back off")
 
-    STATE_FILE.unlink(missing_ok=True)
     print(
         "Done! All dev data removed. Run dev-migrate to recreate the primary community + superuser."
     )

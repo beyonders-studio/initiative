@@ -1,15 +1,7 @@
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import type { SortingState } from "@tanstack/react-table";
-import {
-  ExternalLink,
-  LayoutList as LayoutsIcon,
-  Loader2,
-  Plus,
-  Tags,
-  Trash2,
-  Upload,
-} from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ExternalLink, LayoutList as LayoutsIcon, Plus, Tags, Trash2, Upload } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -47,12 +39,6 @@ import { ToolListToolbar } from "@/components/initiativeTools/shared/ToolListToo
 import { LayoutsOverview } from "@/components/layouts/LayoutList";
 import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
-import { Lightbox, type LightboxItem } from "@/components/shared/Lightbox";
-import {
-  CardGridSkeleton,
-  DetailHeaderSkeleton,
-  SkeletonRegion,
-} from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { ToolChest } from "@/components/tools/ToolChest";
 import {
@@ -63,26 +49,6 @@ import {
 import type { ToolIndexRow } from "@/components/tools/ToolIndexPage";
 import { TABLE_SORT_FIELDS, ToolIndexTable } from "@/components/tools/ToolIndexTable";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Label } from "@/components/ui/label";
-import { RelativeTime } from "@/components/ui/relative-time";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCanonicalInitiativeId } from "@/hooks/useCanonicalInitiativeId";
 import {
@@ -96,7 +62,6 @@ import {
   useUpdateCollection,
 } from "@/hooks/useCollections";
 import { useCollectionUploader } from "@/hooks/useCollectionUploader";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { type GridToggleOptions, useGridSelection } from "@/hooks/useGridSelection";
 import { type ListViewSpec, NO_PART_VIEW, useListView, viewKey } from "@/hooks/useListView";
 import { useReadOnOpen } from "@/hooks/useNotifications";
@@ -113,13 +78,26 @@ import { useCommunityPath } from "@/lib/communityUrl";
 import { formatPeriod } from "@/lib/formatDate";
 import { DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
 import { requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
-import { withDisplays } from "@/lib/layouts/fields";
+import { useCounterSteps, withDisplays } from "@/lib/layouts/fields";
 import { FILE_DETAIL } from "@/lib/layouts/fileLayout";
 import { collectionFileFields } from "@/lib/layouts/files";
 import { toast } from "@/lib/mascotToast";
 import { browserTimezone } from "@/lib/timezones";
 import { collectionRoute, toolDetailRoute, toolListRoute } from "@/lib/tools";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { DropdownMenuItem } from "@/ui/dropdown-menu";
+import { Label } from "@/ui/label";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { Lightbox, type LightboxItem } from "@/ui/lightbox";
+import { LoadMore } from "@/ui/load-more";
+import { CardGridSkeleton, DetailHeaderSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { RelativeTime } from "@/ui/relative-time";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
+import { StatusMessage } from "@/ui/status-message";
 
 /** A file as the wall and the table both list it. */
 type FileRow = CollectionFileSummary & { card: null };
@@ -158,7 +136,7 @@ const collectionViewSpec = (
  * masonry, grid and timeline are the gallery's walls, kept as they were: the
  * list is fetched a page at a time as the reader nears the bottom, and every
  * wall keeps only the files near the viewport in the DOM. The table is the
- * Files table.
+ * Files table, which does the same.
  *
  * Every file keeps its own sharing: the list holds only the files the reader
  * can open, and what they may do to each is the file's own answer. Changing
@@ -179,6 +157,18 @@ export function CollectionPage() {
   const collection = collectionQuery.data;
   const initiativeId = useCanonicalInitiativeId(collection?.initiative_id);
   const canEdit = Boolean(collection?.can.edit);
+  // The collection's metadata is the collection's to change; a file's own
+  // properties are the file's.
+  const stepCounter = useCounterSteps(
+    PropertyTarget.file,
+    useCallback(
+      (item, definition) =>
+        definition.collection_id !== null
+          ? canEdit
+          : (item as unknown as CollectionFileSummary).can.edit,
+      [canEdit]
+    )
+  );
   const filesRoute = gp(toolListRoute(Tool.file, initiativeId));
 
   useReadOnOpen(SearchEntityType.collection, collection?.id);
@@ -291,21 +281,6 @@ export function CollectionPage() {
     [feed.data]
   );
   const { fetchNextPage, hasNextPage, isFetchingNextPage } = feed;
-
-  // The bottom of the list asks for the next page as it comes into view.
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const element = sentinelRef.current;
-    if (!element || !hasNextPage || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !isFetchingNextPage) void fetchNextPage();
-      },
-      { rootMargin: "800px" }
-    );
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   // Putting files in: dropped or uploaded, or picked from the initiative's.
   const uploader = useCollectionUploader(collection);
@@ -613,14 +588,11 @@ export function CollectionPage() {
             <Button
               variant="outline"
               size="sm"
-              disabled={selection.selectedItems.length === 0 || remove.isPending}
+              disabled={selection.selectedItems.length === 0}
+              pending={remove.isPending}
               onClick={() => remove.mutate(selection.selectedItems.map((row) => row.id))}
             >
-              {remove.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
+              <Trash2 className="h-4 w-4" />
               {t("collections.removeFrom")}
             </Button>
           ) : null
@@ -663,7 +635,7 @@ export function CollectionPage() {
             <CardGridSkeleton count={8} className="grid grid-cols-fill-36/4 gap-3" />
           </SkeletonRegion>
         ) : feed.isError ? (
-          <p className="text-destructive text-sm">{t("loadError")}</p>
+          <StatusMessage onRetry={feed.refetch} />
         ) : rows.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
             <p className="font-medium">
@@ -693,6 +665,7 @@ export function CollectionPage() {
             onActivate={onActivate}
             selecting={selecting}
             isSelected={isSelected}
+            stepCounter={stepCounter}
             table={(columns) => (
               <ToolIndexTable
                 tool={Tool.file}
@@ -700,6 +673,7 @@ export function CollectionPage() {
                 rows={rows}
                 laidOut={columns}
                 onOpen={hasMetadata ? openRow : undefined}
+                virtualize
                 selection={selection}
                 sorting={view.sorting}
                 onSortingChange={setSorting}
@@ -709,12 +683,14 @@ export function CollectionPage() {
             )}
           />
         ) : null}
-        <div ref={sentinelRef} className="h-px" />
-        {isFetchingNextPage ? (
-          <div className="flex justify-center py-4">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
-          </div>
-        ) : null}
+        {/* The bottom of the list asks for the next page as it comes into view. */}
+        <LoadMore
+          auto
+          rootMargin="800px"
+          hasMore={hasNextPage}
+          loading={isFetchingNextPage}
+          onLoadMore={fetchNextPage}
+        />
       </CollectionDropzone>
 
       {/* A shelf, like a project's: a collection's links are browsed along
@@ -824,7 +800,6 @@ export function CollectionPage() {
         title={t("collections.trashTitle")}
         description={t("collections.trashDescription")}
         confirmLabel={t("collections.trash")}
-        cancelLabel={t("common:cancel")}
         isLoading={trash.isPending}
         destructive
         onConfirm={() => trash.mutate(parsedId)}

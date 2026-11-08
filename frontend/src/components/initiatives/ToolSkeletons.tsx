@@ -3,10 +3,9 @@
  *
  * The create wizard asks "what is this initiative made of?" of people on their
  * first minute in the app, and a name plus a sentence is not enough to answer
- * it — "queue" and "counter" mean nothing until you have seen one. So each
- * card carries a small picture of the screen it is standing in for, drawn from
- * what that screen actually renders: the queue's numbered rows with a "current
- * turn" pill and an avatar, the counter's [−] value [+] in its number, bar and
+ * it — "counter" means nothing until you have seen one. So each card carries
+ * a small picture of the screen it is standing in for, drawn from what that
+ * screen actually renders: the counter's [−] value [+] in its number, bar and
  * ring forms, the calendar's weekday header over a month of cells with event
  * chips that run across days.
  *
@@ -24,7 +23,7 @@ import type { ReactNode } from "react";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TOOL_ICONS } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 interface SketchProps {
   /** Whether the tool is ticked — the sketch brightens to match the card. */
@@ -58,11 +57,6 @@ const EVENTS = [
   { id: "offsite", day: 9, span: 3, tone: accent },
   { id: "review", day: 17, span: 1, tone: ink },
   { id: "launch", day: 24, span: 2, tone: accent },
-] as const;
-const QUEUE_ROWS = [
-  { id: "first", position: "1", current: true },
-  { id: "second", position: "2", current: false },
-  { id: "third", position: "3", current: false },
 ] as const;
 const CHART_BARS = [
   { id: "q1", height: 40 },
@@ -198,45 +192,6 @@ const CalendarSketch = ({ active }: SketchProps) => (
           );
         })}
       </div>
-    </div>
-  </Frame>
-);
-
-/** The queue: numbered rows, each a name over who holds it and an avatar at
- *  the end, with the current turn lit and pinned by its pill. */
-const QueueSketch = ({ active }: SketchProps) => (
-  <Frame>
-    <div className="flex h-full flex-col justify-between">
-      {QUEUE_ROWS.map((row) => (
-        <div
-          key={row.id}
-          className={cn(
-            "flex items-center gap-1.5 rounded-sm border px-1 py-0.5",
-            row.current ? cn(line(active), faint(active)) : "border-transparent"
-          )}
-        >
-          <div
-            className={cn(
-              "h-2 w-2 rounded-sm text-center",
-              row.current ? ink(active) : faint(active)
-            )}
-          />
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <div className="flex items-center gap-1">
-              <div
-                className={cn(
-                  "h-1.5 rounded-sm",
-                  row.current ? ink(active) : faint(active),
-                  "w-1/2"
-                )}
-              />
-              {row.current ? <div className={cn("h-1.5 w-5 rounded-full", ink(active))} /> : null}
-            </div>
-            <div className={cn("h-1 w-1/3 rounded-sm", faint(active))} />
-          </div>
-          <Avatar active={active} />
-        </div>
-      ))}
     </div>
   </Frame>
 );
@@ -389,15 +344,44 @@ const WikiSketch = ({ active }: SketchProps) => (
   </Frame>
 );
 
+/** How a contact is reached, a row each; the first is the one a tap calls. */
+const CONTACT_ROWS = [
+  { id: "phone", width: "w-1/2", tone: accent },
+  { id: "email", width: "w-2/3", tone: faint },
+  { id: "address", width: "w-3/5", tone: faint },
+] as const;
+
+/** A contact's card: a face and a name over the organization they are at,
+ *  then a row for each way to reach them. */
+const ContactSketch = ({ active }: SketchProps) => (
+  <Frame>
+    <div className="flex h-full flex-col gap-1.5">
+      <div className="flex items-center gap-1.5">
+        <Avatar active={active} size="h-7 w-7" />
+        <div className="flex flex-1 flex-col gap-1">
+          <div className={cn("h-2 w-1/2 rounded-sm", ink(active))} />
+          <div className={cn("h-1 w-1/3 rounded-sm", faint(active))} />
+        </div>
+      </div>
+      {CONTACT_ROWS.map((row) => (
+        <div key={row.id} className="flex items-center gap-1.5 px-1">
+          <div className={cn("h-2 w-2 shrink-0 rounded-full", row.tone(active))} />
+          <div className={cn("h-1 rounded-sm", row.width, ink(active))} />
+        </div>
+      ))}
+    </div>
+  </Frame>
+);
+
 export const TOOL_SKETCHES: Record<Tool, (props: SketchProps) => ReactNode> = {
   [Tool.project]: ProjectSketch,
   [Tool.file]: FileSketch,
   [Tool.calendar]: CalendarSketch,
-  [Tool.queue]: QueueSketch,
   [Tool.counter_group]: CounterGroupSketch,
   [Tool.dashboard]: DashboardSketch,
   [Tool.post]: PostSketch,
   [Tool.wiki]: WikiSketch,
+  [Tool.contact]: ContactSketch,
 };
 
 export interface ToolSketchProps extends SketchProps {

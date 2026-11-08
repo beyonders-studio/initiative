@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useToolSettings } from "@/components/tools/settings/ToolSettingsContext";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useSetPostReactions } from "@/hooks/usePostReactions";
 import { usePost } from "@/hooks/usePosts";
+import { Label } from "@/ui/label";
+import { Switch } from "@/ui/switch";
 
 /**
  * Whether a post takes reactions of its own, in its Details card. Everywhere

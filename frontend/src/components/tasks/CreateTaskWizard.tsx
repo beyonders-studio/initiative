@@ -4,11 +4,11 @@ import { useTranslation } from "react-i18next";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { ProjectPickerStep } from "@/components/tasks/ProjectPickerStep";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import { useCommunityInitiativeSteps } from "@/hooks/useCommunityInitiativeSteps";
 import { communityPath } from "@/lib/communityUrl";
 import { getItem, removeItem, setItem } from "@/lib/storage";
 import { toolDetailRoute } from "@/lib/tools";
+import { WizardDialog } from "@/ui/wizard-dialog";
 
 // ── Module-level opener (same pattern as CommandCenter) ─────────────────────
 

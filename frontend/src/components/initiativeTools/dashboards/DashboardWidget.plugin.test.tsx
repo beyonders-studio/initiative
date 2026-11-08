@@ -15,6 +15,11 @@
  * it is actually threaded rather than falling back to the registry (which would
  * silently render "this widget needs a newer version").
  *
+ * **A placed widget reads its canvas.** The canvas read answers every widget on
+ * the dashboard, a plug-in widget with its endpoint's rows read with the
+ * parameters it stores; the plug-in's own data route is only the config
+ * dialog's preview.
+ *
  * **An unreachable plug-in costs one tile.** Not a crash, not a blank, not a
  * misleading "no data" — a localized error tile, with the rest of the canvas
  * untouched.
@@ -27,9 +32,16 @@ import type { WidgetBinding } from "@/hooks/useWidgetData";
 import type { DefinitionWidget } from "@/lib/widgets/definition";
 import { WidgetErrorCode } from "@/lib/widgets/errors";
 
+// The generated client calls the client itself, with the URL in its config, and
+// the hand-written one calls `get`. Both land in `apiGet`, by URL.
 const apiGet = vi.hoisted(() => vi.fn());
 vi.mock("@/api/client", () => ({
-  apiClient: { get: apiGet, post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  apiClient: Object.assign((config: { url: string }) => apiGet(config.url, config), {
+    get: apiGet,
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  }),
   API_BASE_URL: "http://test/api/v1",
 }));
 
@@ -89,7 +101,19 @@ const CATALOG = {
 };
 
 const catalogUrl = (url: string) => url.endsWith("/plugins/widget-catalog");
+const canvasUrl = (url: string) => url.endsWith("/dashboards/11/data");
 const dataUrl = (url: string) => url.includes("/endpoints/");
+
+/** The plug-in catalog, and the canvas with this widget's entry in it. Nothing
+ *  else is answered. */
+const serve = (entry: Record<string, unknown>) =>
+  apiGet.mockImplementation((url: string) => {
+    if (catalogUrl(url)) return Promise.resolve({ data: CATALOG });
+    if (canvasUrl(url)) {
+      return Promise.resolve({ data: { initiative_id: 7, widgets: { w1: entry } } });
+    }
+    return Promise.reject(new Error(`not served: ${url}`));
+  });
 
 beforeEach(() => {
   apiGet.mockReset();
@@ -113,20 +137,14 @@ const mount = (props: { sampleData?: boolean; dashboardId?: number } = {}) =>
   );
 
 describe("DashboardWidget with a plug-in source", () => {
-  it("runs the module the install pinned, over the rows the proxy returned", async () => {
-    apiGet.mockImplementation((url: string) => {
-      if (catalogUrl(url)) return Promise.resolve({ data: CATALOG });
-      if (dataUrl(url)) {
-        return Promise.resolve({
-          data: {
-            rows: [{ days: "mon", totals: 9 }],
-            values: { total: 9 },
-            fetched_at: "",
-            cached: false,
-          },
-        });
-      }
-      return Promise.resolve({ data: {} });
+  it("runs the module the install pinned, over the rows its canvas answered", async () => {
+    serve({
+      plugin: {
+        rows: [{ days: "mon", totals: 9 }],
+        values: { total: 9 },
+        fetched_at: "",
+        cached: false,
+      },
     });
 
     mount({ dashboardId: 11 });
@@ -145,29 +163,20 @@ describe("DashboardWidget with a plug-in source", () => {
     });
   });
 
-  it("asks the proxy for the dashboard the widget sits on", async () => {
-    apiGet.mockImplementation((url: string) =>
-      Promise.resolve({
-        data: catalogUrl(url) ? CATALOG : { rows: [], values: {}, fetched_at: "", cached: false },
-      })
-    );
+  it("reads the canvas it sits on, not the plug-in's own route", async () => {
+    serve({ plugin: { rows: [], values: {}, fetched_at: "", cached: false } });
 
     mount({ dashboardId: 11 });
 
-    await waitFor(() => expect(apiGet.mock.calls.some(([url]) => dataUrl(url))).toBe(true));
-    const [url, config] = apiGet.mock.calls.find(([u]) => dataUrl(u)) as [
-      string,
-      { params: Record<string, unknown> },
-    ];
-    expect(url).toBe("/c/2/plugins/3/endpoints/plugin.acme.shop.orders-summary");
-    expect(config.params.dashboard_id).toBe(11);
+    await waitFor(() => expect(apiGet.mock.calls.some(([url]) => canvasUrl(url))).toBe(true));
+    expect(apiGet.mock.calls.find(([url]) => canvasUrl(url))?.[0]).toBe(
+      "/api/v1/c/2/dashboards/11/data"
+    );
+    expect(apiGet.mock.calls.some(([url]) => dataUrl(url))).toBe(false);
   });
 
   it("draws an error tile when the plug-in is not answering", async () => {
-    apiGet.mockImplementation((url: string) => {
-      if (catalogUrl(url)) return Promise.resolve({ data: CATALOG });
-      return Promise.reject(new Error("502"));
-    });
+    serve({ error: "PLUGIN_SERVICE_UNAVAILABLE" });
 
     mount({ dashboardId: 11 });
 
@@ -194,8 +203,8 @@ describe("DashboardWidget with a plug-in source", () => {
       rows: [{ days: "mon", totals: 4 }],
       values: { total: 4 },
     });
-    // The catalog is a declaration; the data plane is never touched.
-    expect(apiGet.mock.calls.every(([url]) => catalogUrl(url))).toBe(true);
+    // The catalogs are declarations; the data plane is never touched.
+    expect(apiGet.mock.calls.every(([url]) => url.endsWith("/widget-catalog"))).toBe(true);
   });
 
   it("has a localized message for the failure it can produce", () => {
@@ -215,8 +224,8 @@ describe("DashboardWidget with a plug-in source", () => {
 
     expect(await screen.findByText(/no longer installed/i)).toBeInTheDocument();
     expect(renderWidget).not.toHaveBeenCalled();
-    // Only the catalog was read; the data plane was never asked.
-    expect(apiGet.mock.calls.every(([url]) => catalogUrl(url))).toBe(true);
+    // The plug-in itself was never asked.
+    expect(apiGet.mock.calls.some(([url]) => dataUrl(url))).toBe(false);
   });
 
   it("says the plug-in is unavailable when its catalog will not load", async () => {

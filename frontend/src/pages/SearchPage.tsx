@@ -17,16 +17,10 @@ import { Search, SearchX, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { StatusMessage } from "@/components/StatusMessage";
 import { MemberResultRow } from "@/components/search/MemberResultRow";
+import { SearchCategoryTabs } from "@/components/search/SearchCategoryTabs";
 import { SearchResultList } from "@/components/search/SearchResultRow";
-import { ListSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
 import { useCommunities } from "@/hooks/useCommunities";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useCommunitySearch } from "@/hooks/useSearch";
 import { useUserSearch } from "@/hooks/useUsers";
 import {
@@ -37,6 +31,13 @@ import {
   type SearchCategory,
   TOOL_ENTITY_TYPES,
 } from "@/lib/searchResults";
+import { Input } from "@/ui/input";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { PaginationBar } from "@/ui/pagination-bar";
+import { StatusMessage } from "@/ui/status-message";
+import { Switch } from "@/ui/switch";
+import { Tabs, TabsContent } from "@/ui/tabs";
 
 /** A page of one category. */
 const PAGE_SIZE = 20;
@@ -187,17 +188,7 @@ export function SearchPage() {
       ) : (
         <Tabs value={tab} onValueChange={setTab} className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <TabsBar>
-              {SEARCH_CATEGORIES.map((category) => (
-                // Every tab stays open, including one holding nothing: closing
-                // it off leaves the reader unable to confirm that for themselves,
-                // and unable to get back once a changed query fills it. An empty
-                // tab says so.
-                <TabsTrigger key={category} value={category}>
-                  {t(`search:tabs.${category}`)}
-                </TabsTrigger>
-              ))}
-            </TabsBar>
+            <SearchCategoryTabs />
             {tab !== "member" && (
               <div className="flex items-center gap-2">
                 <Switch
@@ -236,8 +227,11 @@ export function SearchPage() {
                     </p>
                   )}
                   <SearchResultList hits={items} />
-                  <Pager
+                  <PaginationBar
+                    className="pt-2"
                     page={page}
+                    pageSize={PAGE_SIZE}
+                    totalCount={results.data?.total_count ?? 0}
                     hasNext={results.data?.has_next ?? false}
                     onPageChange={setPage}
                   />
@@ -303,39 +297,6 @@ function NoResults({ query }: { query: string }) {
   );
 }
 
-function Pager({
-  page,
-  hasNext,
-  onPageChange,
-}: {
-  page: number;
-  hasNext: boolean;
-  onPageChange: (page: number) => void;
-}) {
-  const { t } = useTranslation("common");
-  if (page === 1 && !hasNext) return null;
-  return (
-    <div className="flex justify-end gap-2 pt-2">
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={page <= 1}
-        onClick={() => onPageChange(page - 1)}
-      >
-        {t("previous")}
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={!hasNext}
-        onClick={() => onPageChange(page + 1)}
-      >
-        {t("next")}
-      </Button>
-    </div>
-  );
-}
-
 /** The member roster's own total, once it belongs to this query. */
 function settledMemberTotal(members: ReturnType<typeof useUserSearch>): number | undefined {
   if (members.isPlaceholderData || !members.isFetched) return undefined;
@@ -372,7 +333,14 @@ function MemberResults({
       {items.map((member) => (
         <MemberResultRow key={member.id} member={member} />
       ))}
-      <Pager page={page} hasNext={Boolean(members.data?.has_next)} onPageChange={onPageChange} />
+      <PaginationBar
+        className="pt-2"
+        page={page}
+        pageSize={PAGE_SIZE}
+        totalCount={members.data?.total_count ?? 0}
+        hasNext={Boolean(members.data?.has_next)}
+        onPageChange={onPageChange}
+      />
     </>
   );
 }

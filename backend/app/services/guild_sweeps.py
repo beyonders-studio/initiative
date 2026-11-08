@@ -52,12 +52,18 @@ class Scope(Enum):
     #: suspended, held or deleted-but-retained community keeps its schema, and
     #: what its jobs left behind, until it is purged.
     PROVISIONED = "provisioned"
+    #: The operations community while it takes writes: the one active
+    #: community whose schema has the operations tables
+    #: (``app.db.tenancy.OPERATIONS_TABLES``).
+    OPERATIONS = "operations"
 
-    def admits(self, status: str, *, provisioned: bool) -> bool:
+    def admits(self, status: str, *, provisioned: bool, operations: bool) -> bool:
         if self is Scope.ACTIVE:
             return status == CommunityStatus.active.value
         if self is Scope.LIVE:
             return status in LIVE_STATUS_VALUES
+        if self is Scope.OPERATIONS:
+            return operations and status == CommunityStatus.active.value
         return provisioned
 
 
@@ -95,19 +101,21 @@ async def each_guild(
     if planned is not None:
         only = list(planned)
     all_visits = [*every, *(pair for own in plan.values() for pair in own)]
-    by_cohort: dict[int, list[tuple[int, str, bool]]] = {}
+    by_cohort: dict[int, list[tuple[int, str, bool, bool]]] = {}
     for community in await _communities(all_visits, only):
         by_cohort.setdefault(cohorts.cohort_of(community[0]), []).append(community)
     limit = asyncio.Semaphore(COHORTS_AT_ONCE)
 
-    async def visit_cohort(communities: list[tuple[int, str, bool]]) -> None:
+    async def visit_cohort(communities: list[tuple[int, str, bool, bool]]) -> None:
         try:
             async with limit, cohorts.system_session(communities[0][0]) as session:
-                for guild_id, status, provisioned in communities:
+                for guild_id, status, provisioned, operations in communities:
                     # Ids repeat across schemas.
                     session.expunge_all()
                     for scope, visit in [*plan.get(guild_id, ()), *every]:
-                        if scope.admits(status, provisioned=provisioned):
+                        if scope.admits(
+                            status, provisioned=provisioned, operations=operations
+                        ):
                             await _visit(session, visit, guild_id, name=name)
         except Exception:
             logger.exception(
@@ -125,9 +133,10 @@ async def each_guild(
 
 async def _communities(
     visits: Sequence[tuple[Scope, Visit]], only: Iterable[int] | None
-) -> list[tuple[int, str, bool]]:
-    """Each community in the pass, with its status and whether its schema
-    exists."""
+) -> list[tuple[int, str, bool, bool]]:
+    """Each community in the pass, with its status, whether its schema
+    exists, and whether that schema has the operations tables."""
+    from app.db.operations_schema import operations_schemas
     from app.db.schema_provisioning import guild_schema_name
 
     statement = select(Guild.id, Guild.status).order_by(col(Guild.id).asc())
@@ -141,8 +150,16 @@ async def _communities(
             schemas = set(
                 (await session.exec(text("SELECT nspname FROM pg_namespace"))).scalars()
             )
+        operations: set[str] = set()
+        if any(scope is Scope.OPERATIONS for scope, _visit in visits):
+            operations = await operations_schemas(await session.connection())
     return [
-        (guild_id, status, guild_schema_name(guild_id) in schemas)
+        (
+            guild_id,
+            status,
+            guild_schema_name(guild_id) in schemas,
+            guild_schema_name(guild_id) in operations,
+        )
         for guild_id, status in rows
         if guild_id is not None
     ]

@@ -9,6 +9,7 @@
 import type { NavigateFn } from "@tanstack/react-router";
 
 import { type NotificationRead, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { openAnnouncement } from "@/components/announcements/AnnouncementCenter";
 import { communityPath } from "@/lib/communityUrl";
 import {
   entityRefTypeFor,
@@ -130,13 +131,13 @@ export const notificationLink = (notification: NotificationRead): string | null 
       // device's own store, so there is nothing for a route param to fetch.
       return "/messages";
     // Each lands where it is answered: a message request in the inbox that
-    // would carry the conversation, a connection on the contacts page.
+    // would carry the conversation, a connection in privacy settings.
     case "message_request_received":
     case "message_request_accepted":
       return "/messages";
     case "connection_requested":
     case "connection_accepted":
-      return "/contacts";
+      return "/profile/privacy";
     case "mention":
     case "comment_reply":
     case "comment_on_resource":
@@ -508,6 +509,10 @@ export const notificationText = (
         : t("notifications.accountSuspended");
     case "account_unsuspended":
       return t("notifications.accountUnsuspended");
+    case "announcement":
+      return t("notifications.announcement", {
+        title: typeof data.title === "string" ? data.title : "",
+      });
     case "plugin_consent_requested":
       // The label is the plug-in's own words, quoted as such by the string.
       return t("notifications.pluginConsentRequested", {
@@ -607,6 +612,14 @@ export const notificationText = (
             : "notifications.ticketMoving";
       return t(key, { subject: subject ?? t("notifications.ticketUnnamed") });
     }
+    case "idea_updated":
+      return t("notifications.ideaMoved", {
+        title:
+          typeof data.title === "string" && data.title
+            ? data.title
+            : t("notifications.ideaUnnamed"),
+        status: typeof data.status === "string" ? data.status : "",
+      });
     case "community_welcome":
       return t(
         !sellsHere() ? "notifications.communityWelcomeInApp" : "notifications.communityWelcome",
@@ -640,8 +653,9 @@ const exportDownloadTarget = (
 };
 
 /**
- * Open a notification: mark it read, then fetch a finished export or go to
- * the line's destination. Returns whether it led anywhere.
+ * Open a notification: mark it read, then show an announcement again, fetch a
+ * finished export or go to the line's destination. Returns whether it led
+ * anywhere.
  *
  * The bell, the inbox and the desktop app's system notifications all open a
  * line through this. `t` must have the `exports` namespace loaded, for the
@@ -661,6 +675,15 @@ export const openNotification = (
 ): boolean => {
   if (!notification.read_at) {
     markRead(notification.id);
+  }
+  // An announcement opens again in its own dialog.
+  if (notification.type === "announcement") {
+    const key = notification.data?.announcement_key;
+    if (typeof key !== "string") {
+      return false;
+    }
+    openAnnouncement(key);
+    return true;
   }
   // A finished export is fetched, not navigated to: the artifact lives behind
   // the job-gated download endpoint, so opening it IS the download.

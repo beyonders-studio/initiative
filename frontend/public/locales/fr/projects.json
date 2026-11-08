@@ -1,7 +1,6 @@
 {
   "addProject": "Ajouter un projet",
   "loading": "Chargement des projets…",
-  "loadError": "Impossible de charger les projets.",
   "error": "Une erreur s'est produite",
   "noProjects": "Aucun projet pour l'instant",
   "noProjectsDescription": "Un projet regroupe des tâches et les suit sur un tableau ou dans une table jusqu'à ce qu'elles soient terminées.",
@@ -89,12 +88,15 @@
     "loadingRecent": "Chargement des éléments récents…",
     "closeItem": "Fermer {{name}}",
     "closeOthers": "Fermer les autres",
-    "closeAll": "Fermer tout"
+    "closeAll": "Fermer tout",
+    "closeError": "Impossible de fermer l'onglet.",
+    "closeSomeError": "Certains onglets n'ont pas pu être fermés."
   },
   "pin": {
     "pinned": "Projet épinglé",
     "unpin": "Désépingler le projet",
-    "pin": "Épingler le projet"
+    "pin": "Épingler le projet",
+    "error": "Impossible d'épingler ou de désépingler le projet."
   },
   "taskComposer": {
     "createTask": "Créer la tâche"
@@ -117,7 +119,7 @@
     "categoryInProgress": "En cours",
     "categoryDone": "Terminé",
     "add": "Ajouter",
-    "existingStatuses": "Statuts existants",
+    "existing": "Statuts existants",
     "saveChanges": "Enregistrer les modifications",
     "categoryColumn": "Catégorie",
     "iconColumn": "Icône",
@@ -125,16 +127,16 @@
     "iconPlaceholder": "Choisir une icône",
     "colorPlaceholder": "Choisir une couleur",
     "defaultColumn": "Par défaut",
-    "noStatuses": "Aucun statut configuré pour l'instant.",
+    "empty": "Aucun statut configuré pour l'instant.",
     "deleteTitle": "Supprimer le statut",
-    "deleteStatus": "Supprimer {{name}}",
+    "deleteNamed": "Supprimer {{name}}",
     "deleteDescription": "Supprimer « {{name}} » déplace ses tâches vers un autre statut. Choisissez où elles doivent atterrir, ou laissez faire le statut par défaut du projet.",
     "fallbackLabel": "Déplacer les tâches vers",
     "chooseFallback": "Choisir un statut",
     "fallbackAuto": "Le statut par défaut du projet",
     "onlyStatus": "C’est le seul statut du projet, et un tableau a besoin d’un endroit où poser une tâche.",
     "reorder": "Réorganiser",
-    "setAsDefault": "Définir par défaut",
+    "makeDefault": "Faire de {{name}} le statut par défaut",
     "orderSaved": "Ordre des statuts enregistré",
     "reorderError": "Impossible de réorganiser les statuts",
     "created": "Statut de tâche créé",
@@ -146,13 +148,12 @@
     "noChanges": "Aucune modification à enregistrer",
     "bulkUpdated": "{{count}} statut mis à jour",
     "bulkUpdated_other": "{{count}} statuts mis à jour",
-    "bulkUpdateError": "Impossible de mettre à jour « {{name}} » : {{error}}",
-    "unknownError": "Erreur inconnue"
+    "bulkUpdateError": "Impossible de mettre à jour « {{name}} » : {{error}}"
   },
   "taskTypes": {
     "description": "Les types sont les sortes de tâches de ce projet, comme un bug ou une idée. Chacun a sa propre icône, sa couleur et sa page. Les nouvelles tâches prennent le type par défaut.",
     "noManagePermission": "Seules les personnes qui peuvent modifier ce projet peuvent changer ses types.",
-    "existingTypes": "Types",
+    "existing": "Types",
     "saveChanges": "Enregistrer les modifications",
     "addType": "Ajouter un type",
     "limitReached": "Un projet peut avoir jusqu’à {{max}} types.",
@@ -161,7 +162,7 @@
     "defaultColumn": "Par défaut",
     "iconPlaceholder": "Choisir une icône",
     "colorPlaceholder": "Choisir une couleur",
-    "noTypes": "Aucun type pour l’instant.",
+    "empty": "Aucun type pour l’instant.",
     "pagesOnWiderScreen": "La page d’un type se modifie sur un écran plus large. Ouvrez cette page sur une tablette ou un ordinateur.",
     "addTitle": "Ajouter un type",
     "addDescription": "Choisissez un type tout prêt, partez de zéro ou copiez un type de ce projet.",
@@ -171,7 +172,7 @@
     "startFromHint": "Le nouveau type reprend l’icône, la couleur et la page de ce type. Vous pourrez les changer ensuite.",
     "add": "Ajouter",
     "deleteTitle": "Supprimer le type",
-    "deleteType": "Supprimer {{name}}",
+    "deleteNamed": "Supprimer {{name}}",
     "deleteDescription": "Supprimer « {{name}} » supprime aussi sa page. Ses tâches sont conservées et prennent le type que vous choisissez.",
     "fallbackLabel": "Déplacer ses tâches vers",
     "onlyType": "C’est le seul type du projet, et chaque tâche en a besoin d’un.",
@@ -404,7 +405,8 @@
     "updated": "Mise à jour {{date}}",
     "tasksDone": "{{completed}}/{{total}} terminées",
     "archivedOn": "Archivé le {{date}}",
-    "reorder": "Réordonner le projet"
+    "reorder": "Réordonner le projet",
+    "reorderError": "Impossible de déplacer le projet."
   },
   "presets": {
     "label": "Préréglages",

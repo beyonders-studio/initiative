@@ -1,25 +1,25 @@
 import { SiAtlassian, SiTicktick, SiTodoist, SiVikunja } from "@icons-pack/react-simple-icons";
-import { AlertTriangle, CheckCircle2, FileUp, Loader2, XCircle } from "lucide-react";
-import {
-  type ChangeEvent,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { AlertTriangle, CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
   useCancelImportJob,
   useConfirmImport,
+  useImportContacts,
   useImportForeign,
+  usePreviewContactsImport,
   usePreviewForeignImport,
   useUploadBackup,
 } from "@/api/generated/imports/imports";
-import type { DataJobRead, ForeignPreview } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  ContactCsvColumn,
+  ContactCsvPreview,
+  DataJobRead,
+  ForeignPreview,
+} from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
+import { invalidate, q } from "@/api/query-keys";
 import {
   AtlassianChooseStep,
   type AtlassianConnection,
@@ -28,21 +28,10 @@ import {
   AtlassianFetchingStep,
   AtlassianReviewSummary,
 } from "@/components/imports/AtlassianImportSteps";
+import { ContactColumnsStep } from "@/components/imports/ContactColumnsStep";
 import { ImportPeopleStep, type PlanPerson } from "@/components/imports/ImportPeopleStep";
 import { ImportReport } from "@/components/imports/ImportReport";
 import { LogoIcon } from "@/components/LogoIcon";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useImportJob } from "@/hooks/useImportJob";
 import { liveInitiatives } from "@/hooks/useInitiativeAccess";
@@ -50,16 +39,23 @@ import { useInitiatives } from "@/hooks/useInitiatives";
 import { useWizard } from "@/hooks/useWizard";
 import { BackupPeekError, type PeekedManifest, peekBackupManifest } from "@/lib/backupPeek";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { formatBytes } from "@/lib/fileUtils";
 import { formatDateTime } from "@/lib/formatDate";
-import { numberFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
 import { uploadInPieces } from "@/lib/resumableUpload";
 import { getItem, removeItem, setItem } from "@/lib/storage";
+import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
+import { FileDropArea } from "@/ui/file-drop";
+import { Input } from "@/ui/input";
+import { formatBytes } from "@/ui/lib/fileUtils";
+import { numberFormat } from "@/ui/lib/intl";
+import { Progress } from "@/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { WizardDialog, WizardOption } from "@/ui/wizard-dialog";
 
-// Mirrors the backend's IMPORT_MAX_BACKUP_UPLOAD_BYTES — the UX
-// layer; the server (ASGI middleware + bounded read) is the enforcement.
-const MAX_UPLOAD_BYTES = 268_435_456;
+// Mirrors the backend's IMPORT_MAX_BUNDLE_BYTES, the most a backup sent in
+// pieces may weigh — the UX layer; the server is the enforcement.
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024 * 1024;
 
 // Mirrors IMPORT_MAX_ENVELOPE_BYTES, for the same reason: a foreign export
 // travels as its own text in the request body.
@@ -68,6 +64,9 @@ const MAX_FOREIGN_BYTES = 20 * 1024 * 1024;
 export interface ImportWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Opens on a spreadsheet of contacts going into this initiative, or with
+   *  null the community's contacts, rather than on the choice of source. */
+  contactsInto?: { initiativeId: number | null };
 }
 
 /** Where an import can come from. ``backup`` is this app's own archive; the
@@ -77,11 +76,14 @@ type ForeignSourceKey = "todoist" | "ticktick" | "vikunja";
 /** ``atlassian`` reads a site over its API rather than an uploaded file —
  * Jira projects and Confluence spaces in one go: the server fetches, parks
  * the result for review, then applies it like a backup. */
-type Source = "backup" | "atlassian" | ForeignSourceKey;
+type TileSource = "backup" | "atlassian" | ForeignSourceKey;
+/** ``contacts`` is a spreadsheet of contacts, opened from a contacts list
+ * rather than from a tile: its columns are mapped, then each row is made. */
+type Source = TileSource | "contacts";
 
 /** Each source's mark on its tile, in its own brand colour. A backup is this
  * app's own archive, so it carries this app's logo. */
-const SOURCE_ICONS: Record<Source, ReactNode> = {
+const SOURCE_ICONS: Record<TileSource, ReactNode> = {
   backup: <LogoIcon className="h-8 w-8 shrink-0" aria-hidden="true" focusable="false" />,
   atlassian: <SiAtlassian color="#0052CC" className="h-8 w-8 shrink-0" aria-hidden="true" />,
   todoist: <SiTodoist color="#E44332" className="h-8 w-8 shrink-0" aria-hidden="true" />,
@@ -89,7 +91,7 @@ const SOURCE_ICONS: Record<Source, ReactNode> = {
   vikunja: <SiVikunja color="#196AFF" className="h-8 w-8 shrink-0" aria-hidden="true" />,
 };
 
-const SOURCES: Source[] = ["backup", "atlassian", "todoist", "ticktick", "vikunja"];
+const SOURCES: TileSource[] = ["backup", "atlassian", "todoist", "ticktick", "vikunja"];
 
 /** An Atlassian job this wizard started and has not seen the end of. A fetch
  * runs for minutes and outlives the dialog, so reopening picks it up where it
@@ -103,9 +105,10 @@ type Step =
   | "peek"
   | "uploading"
   | "plan"
-  // Reading another product's export.
+  // Reading another product's export, or a spreadsheet of contacts.
   | "file"
   | "choose"
+  | "columns"
   // Reading an Atlassian site.
   | "connect"
   | "projects"
@@ -129,13 +132,17 @@ type Step =
  * and where it lands, and the import itself is an ordinary envelope import
  * from that point on.
  *
- * Both rejoin at the same tail — say who the file's people are where it
+ * **A spreadsheet of contacts** opens from a contacts list, on its file: the
+ * server says what each column looks like it holds, the columns step settles
+ * it, and each row becomes a contact where the list is.
+ *
+ * All rejoin at the same tail — say who the file's people are where it
  * quotes anybody, then watch it run. Closing the dialog after confirm does
  * not cancel the job; the report also lands in the Data tab's jobs table and
  * the inbox notification.
  */
-export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
-  const { t, i18n } = useTranslation("imports");
+export function ImportWizard({ open, onOpenChange, contactsInto }: ImportWizardProps) {
+  const { t, i18n } = useTranslation(["imports", "common"]);
   const percent = numberFormat(i18n.resolvedLanguage ?? i18n.language, {
     style: "percent",
     maximumFractionDigits: 0,
@@ -143,12 +150,15 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
   const communityId = useActiveCommunityId();
   const importJob = useImportJob();
 
-  const { step, go, commit, back, reset } = useWizard<Step>("source");
-  const [source, setSource] = useState<Source | null>(null);
-  // The file and choose steps are reachable only from a foreign tile, so the
-  // one narrowing here spares every read of it below.
+  const opensOn: Source | null = contactsInto ? "contacts" : null;
+  const { step, go, commit, back, reset } = useWizard<Step>(opensOn ? "file" : "source");
+  const [source, setSource] = useState<Source | null>(opensOn);
+  // The choose step is reachable only from a foreign tile, so the one
+  // narrowing here spares every read of it below.
   const foreignSource: ForeignSourceKey | null =
-    source !== null && source !== "backup" && source !== "atlassian" ? source : null;
+    source !== null && source !== "backup" && source !== "atlassian" && source !== "contacts"
+      ? source
+      : null;
 
   // Backup branch.
   const [file, setFile] = useState<File | null>(null);
@@ -159,6 +169,12 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
   const [preview, setPreview] = useState<ForeignPreview | null>(null);
   const [selection, setSelection] = useState<string>("");
   const [initiativeId, setInitiativeId] = useState<string>("");
+
+  // Contacts branch: what the sheet holds, what each column is read as, and
+  // the report of one applied in the request.
+  const [sheet, setSheet] = useState<ContactCsvPreview | null>(null);
+  const [columns, setColumns] = useState<ContactCsvColumn[]>([]);
+  const [applied, setApplied] = useState<DataJobRead["result"]>(null);
 
   // Atlassian branch.
   const [jiraConnection, setJiraConnection] = useState<AtlassianConnection | null>(null);
@@ -185,6 +201,8 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
   const cancelMutation = useCancelImportJob();
   const previewMutation = usePreviewForeignImport();
   const importMutation = useImportForeign();
+  const sheetPreviewMutation = usePreviewContactsImport();
+  const contactsImportMutation = useImportContacts();
 
   const initiativesQuery = useInitiatives();
   const creatableInitiatives = useMemo(
@@ -211,11 +229,14 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
   useEffect(() => {
     if (!open) {
       reset();
-      setSource(null);
+      setSource(opensOn);
       setFile(null);
       setPeeked(null);
       setForeignText("");
       setPreview(null);
+      setSheet(null);
+      setColumns([]);
+      setApplied(null);
       setSelection("");
       setInitiativeId("");
       setPickError(null);
@@ -229,7 +250,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
       // A job from a previous wizard session is still applying — resume its
       // progress view instead of offering a new flow.
       commit("progress");
-    } else {
+    } else if (!opensOn) {
       const pending = Number(getItem(atlassianJobKey(communityId)));
       if (Number.isFinite(pending) && pending > 0) {
         setSource("atlassian");
@@ -263,6 +284,13 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
     }
   }, [step, importJob.terminal, commit]);
 
+  // Contacts that came in show in their list, the dialog open or not.
+  useEffect(() => {
+    if (source === "contacts" && importJob.terminal?.status === "done") {
+      void invalidate(q.toolList(Tool.contact));
+    }
+  }, [source, importJob.terminal]);
+
   const chooseSource = (picked: Source) => {
     setSource(picked);
     setPickError(null);
@@ -294,13 +322,9 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
     commit(jiraConnection ? "projects" : "connect");
   };
 
-  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+  const handleBackupFile = async (picked: File) => {
     setPickError(null);
     setPeeked(null);
-    const picked = e.target.files?.[0];
-    if (!picked) {
-      return;
-    }
     if (picked.size > MAX_UPLOAD_BYTES) {
       setPickError(t("wizard.pick.tooLarge", { limit: formatBytes(MAX_UPLOAD_BYTES) }));
       return;
@@ -322,11 +346,10 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
     }
   };
 
-  const handleForeignFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+  const handleForeignFile = async (picked: File) => {
     setPickError(null);
     setPreview(null);
-    const picked = e.target.files?.[0];
-    if (!picked || !source || source === "backup") {
+    if (!source || source === "backup") {
       return;
     }
     if (picked.size > MAX_FOREIGN_BYTES) {
@@ -338,6 +361,28 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
       text = await picked.text();
     } catch {
       setPickError(t("wizard.pick.readFailed"));
+      return;
+    }
+    if (source === "contacts") {
+      try {
+        const described = await sheetPreviewMutation.mutateAsync({
+          communityId,
+          data: text,
+          params: contactsInto?.initiativeId
+            ? { initiative_id: contactsInto.initiativeId }
+            : undefined,
+        });
+        if (described.row_count === 0) {
+          setPickError(t("wizard.file.nothingInIt"));
+          return;
+        }
+        setForeignText(text);
+        setSheet(described);
+        setColumns(described.columns);
+        go("columns");
+      } catch (err) {
+        setPickError(getErrorMessage(err, "imports:wizard.file.unreadable"));
+      }
       return;
     }
     try {
@@ -435,6 +480,30 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
     }
   };
 
+  const handleContactsImport = async () => {
+    try {
+      const response = (await contactsImportMutation.mutateAsync({
+        communityId,
+        data: {
+          initiative_id: contactsInto?.initiativeId ?? null,
+          content: foreignText,
+          columns,
+        },
+      })) as { result: DataJobRead["result"] } | DataJobRead;
+      // Only a job has an id, as for a foreign import.
+      if (!("id" in response)) {
+        void invalidate(q.toolList(Tool.contact));
+        setApplied(response.result);
+        commit("report");
+        return;
+      }
+      importJob.watch(response.id);
+      commit("progress");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "imports:envelope.error"));
+    }
+  };
+
   const handleConfirm = async () => {
     if (!stagedJob) {
       return;
@@ -514,7 +583,13 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
   const stepDescriptions: Partial<Record<Step, string>> = {
     source: t("wizard.source.prompt"),
     pick: t("wizard.pick.hint"),
-    file: t("wizard.file.hint", { source: t(`wizard.source.names.${source ?? "backup"}`) }),
+    file:
+      source === "contacts"
+        ? t("wizard.contacts.fileHint")
+        : t("wizard.file.hint", {
+            source: t(`wizard.source.names.${foreignSource ?? "backup"}`),
+          }),
+    columns: t("wizard.contacts.columnsPrompt"),
     choose: t("wizard.choose.prompt"),
     plan: t("wizard.plan.prompt"),
     people: t("wizard.people.prompt"),
@@ -528,16 +603,19 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
   // The questions to answer; the upload, the run and the report are what
   // happens afterwards. The people step appears only where the file quotes
   // somebody — one quoting nobody has nothing to ask about.
-  const foreign = source != null && source !== "backup" && source !== "atlassian";
-  const total = (foreign ? 3 : 4) + (people.length > 0 ? 1 : 0);
+  const foreign = foreignSource != null;
+  // A spreadsheet of contacts opens on its file, then its columns.
+  const sheetOnly = source === "contacts";
+  const total = sheetOnly ? 2 : (foreign ? 3 : 4) + (people.length > 0 ? 1 : 0);
   const position: Record<Step, number | null> = {
     source: 1,
     pick: 2,
     peek: 3,
     uploading: null,
     plan: 4,
-    file: 2,
+    file: sheetOnly ? 1 : 2,
     choose: 3,
+    columns: 2,
     connect: 2,
     projects: 3,
     export: 3,
@@ -548,6 +626,9 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
     report: null,
   };
   const current = position[step];
+  const report =
+    importJob.terminal ??
+    (applied ? { status: "done" as const, error: null, result: applied } : null);
 
   const canImportForeign =
     initiativeId !== "" && (!preview?.picks_one || selection !== "") && !importMutation.isPending;
@@ -557,7 +638,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
       open={open}
       onOpenChange={onOpenChange}
       className="max-h-[85vh] overflow-y-auto sm:max-w-lg"
-      title={t("wizard.title")}
+      title={sheetOnly ? t("wizard.contacts.title") : t("wizard.title")}
       description={stepDescription}
       progress={current === null ? undefined : { current, total }}
       // Back where it costs nothing: choosing a source again, re-reading a
@@ -566,8 +647,9 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
       onBack={
         step === "pick" ||
         step === "peek" ||
-        step === "file" ||
+        (step === "file" && !sheetOnly) ||
         step === "choose" ||
+        step === "columns" ||
         step === "connect" ||
         step === "projects"
           ? back
@@ -580,61 +662,48 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
       {step === "source" && (
         <div className="grid grid-cols-pair gap-3">
           {SOURCES.map((option) => (
-            <button
+            <WizardOption
               key={option}
-              type="button"
+              className="items-start"
+              icon={SOURCE_ICONS[option]}
+              title={t(`wizard.source.names.${option}`)}
+              description={t(`wizard.source.descriptions.${option}`)}
               onClick={() => chooseSource(option)}
-              className="flex cursor-pointer items-start gap-3 rounded-lg border p-4 text-left transition-colors hover:border-primary hover:bg-accent"
-            >
-              {SOURCE_ICONS[option]}
-              <span className="flex-1">
-                <span className="block font-medium text-sm">
-                  {t(`wizard.source.names.${option}`)}
-                </span>
-                <span className="block text-muted-foreground text-xs">
-                  {t(`wizard.source.descriptions.${option}`)}
-                </span>
-              </span>
-            </button>
+            />
           ))}
         </div>
       )}
 
       {step === "pick" && (
         <div className="space-y-3">
-          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed p-8 text-center transition-colors hover:bg-accent">
-            <FileUp className="h-8 w-8 text-muted-foreground" />
-            <span className="font-medium text-sm">{t("wizard.pick.prompt")}</span>
-            <input
-              type="file"
-              accept=".zip,application/zip"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-          </label>
+          <FileDropArea
+            accept=".zip,application/zip"
+            onFile={(picked) => void handleBackupFile(picked)}
+            prompt={t("wizard.pick.prompt")}
+          />
           {pickError && <p className="text-destructive text-sm">{pickError}</p>}
         </div>
       )}
 
       {step === "file" && (
         <div className="space-y-3">
-          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed p-8 text-center transition-colors hover:bg-accent">
-            {previewMutation.isPending ? (
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            ) : (
-              <FileUp className="h-8 w-8 text-muted-foreground" />
-            )}
-            <span className="font-medium text-sm">{t("wizard.file.prompt")}</span>
-            <span className="text-muted-foreground text-xs">
-              {t(`wizard.file.where.${foreignSource ?? "todoist"}`)}
-            </span>
-            <input
-              type="file"
-              accept=".csv,.json,text/csv,application/json"
-              className="hidden"
-              onChange={handleForeignFileChange}
-            />
-          </label>
+          <FileDropArea
+            accept={sheetOnly ? ".csv,text/csv" : ".csv,.json,text/csv,application/json"}
+            onFile={(picked) => void handleForeignFile(picked)}
+            prompt={
+              previewMutation.isPending || sheetPreviewMutation.isPending
+                ? t("common:loading")
+                : sheetOnly
+                  ? t("wizard.contacts.filePrompt")
+                  : t("wizard.file.prompt")
+            }
+            disabled={previewMutation.isPending || sheetPreviewMutation.isPending}
+          />
+          <p className="text-muted-foreground text-xs">
+            {sheetOnly
+              ? t("wizard.contacts.where")
+              : t(`wizard.file.where.${foreignSource ?? "todoist"}`)}
+          </p>
           {source === "todoist" && (
             <p className="flex items-start gap-2 text-muted-foreground text-xs">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -648,10 +717,9 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
       {step === "choose" && preview && (
         <div className="space-y-4">
           {preview.picks_one ? (
-            <div className="space-y-2">
-              <Label htmlFor="import-selection">{t("wizard.choose.whichLabel")}</Label>
+            <Field label={t("wizard.choose.whichLabel")}>
               <Select value={selection} onValueChange={setSelection}>
-                <SelectTrigger id="import-selection">
+                <SelectTrigger>
                   <SelectValue placeholder={t("wizard.choose.whichPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -665,26 +733,23 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           ) : (
-            <div className="space-y-2">
-              <Label htmlFor="import-name">{t("wizard.choose.nameLabel")}</Label>
+            <Field
+              label={t("wizard.choose.nameLabel")}
+              hint={t("wizard.choose.taskCount", { count: preview.options[0]?.task_count ?? 0 })}
+            >
               <Input
-                id="import-name"
                 value={selection}
                 placeholder={t("wizard.choose.namePlaceholder")}
                 onChange={(e) => setSelection(e.target.value)}
               />
-              <p className="text-muted-foreground text-xs">
-                {t("wizard.choose.taskCount", { count: preview.options[0]?.task_count ?? 0 })}
-              </p>
-            </div>
+            </Field>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="import-initiative">{t("wizard.choose.initiativeLabel")}</Label>
+          <Field label={t("wizard.choose.initiativeLabel")}>
             <Select value={initiativeId} onValueChange={setInitiativeId}>
-              <SelectTrigger id="import-initiative">
+              <SelectTrigger>
                 <SelectValue placeholder={t("wizard.choose.initiativePlaceholder")} />
               </SelectTrigger>
               <SelectContent>
@@ -695,13 +760,37 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
 
           <p className="text-muted-foreground text-xs">{t("wizard.choose.note")}</p>
           <Button
             className="w-full"
             disabled={!canImportForeign}
             onClick={() => void handleForeignImport()}
+          >
+            {t("wizard.start")}
+          </Button>
+        </div>
+      )}
+
+      {step === "columns" && sheet && (
+        <div className="space-y-4">
+          <ContactColumnsStep
+            sheet={sheet}
+            initiativeId={contactsInto?.initiativeId ?? null}
+            value={columns}
+            onChange={setColumns}
+          />
+          <p className="text-muted-foreground text-xs">
+            {t("wizard.contacts.rows", { count: sheet.row_count })} · {t("wizard.contacts.note")}
+          </p>
+          <Button
+            className="w-full"
+            disabled={
+              !columns.some((column) => column.target === "name") ||
+              contactsImportMutation.isPending
+            }
+            onClick={() => void handleContactsImport()}
           >
             {t("wizard.start")}
           </Button>
@@ -892,10 +981,10 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
         </div>
       )}
 
-      {step === "report" && importJob.terminal && (
+      {step === "report" && report && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            {importJob.terminal.status === "done" ? (
+            {report.status === "done" ? (
               <>
                 <CheckCircle2 className="h-6 w-6 text-primary" />
                 <p className="font-medium">{t("wizard.report.title")}</p>
@@ -907,7 +996,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
               </>
             )}
           </div>
-          <ImportReport job={importJob.terminal} />
+          <ImportReport job={report} />
           <Button className="w-full" onClick={() => onOpenChange(false)}>
             {t("wizard.close")}
           </Button>

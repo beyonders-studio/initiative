@@ -21,30 +21,21 @@ import { CommandCenter } from "@/components/CommandCenter";
 import { ConfirmBirthdate } from "@/components/ConfirmBirthdate";
 import { CommunityAccessBanner } from "@/components/communities/CommunityAccessBanner";
 import { DemoBannerOrTabs } from "@/components/demo/DemoBanner";
+import { DocumentOutlineScope } from "@/components/editor/DocumentOutline";
 import { DeviceVerificationDialog } from "@/components/messages/DeviceVerificationDialog";
+import { ReportHost } from "@/components/moderation/ReportButton";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { CreateActionProvider } from "@/components/navigation/CreateActionContext";
 import { PushPermissionPrompt } from "@/components/notifications/PushPermissionPrompt";
 import { OfflineBanner } from "@/components/offline/OfflineBanner";
 import { RecentTabsBar } from "@/components/recents/RecentTabsBar";
-import { PageSkeleton } from "@/components/skeletons/PageSkeletons";
+import { SidebarProvider } from "@/components/sidebar/sidebar";
 import { StartFlow } from "@/components/start/StartFlow";
 import { CreateTaskWizard } from "@/components/tasks/CreateTaskWizard";
 import { FeedbackHost } from "@/components/tickets/FeedbackSheet";
 import { CreateToolWizard } from "@/components/tools/CreateToolWizard";
 import { UpdatedNotice } from "@/components/UpdatedNotice";
 import { UpdateReadyToast } from "@/components/UpdateReadyToast";
-import { Button } from "@/components/ui/button";
-import { DocumentOutlineScope } from "@/components/ui/editor/DocumentOutline";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import { SidebarProvider } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { useBackButton } from "@/hooks/useBackButton";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -67,7 +58,17 @@ import { chooseNoCommunityLayout } from "@/lib/noCommunityLayout";
 import { canAccessPlatformAreas } from "@/lib/permissions";
 import { activityScope, getActiveRecentKey } from "@/lib/recentRoute";
 import { returnPath } from "@/lib/returnPath";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/ui/empty";
+import { cn } from "@/ui/lib/utils";
+import { PageSkeleton } from "@/ui/page-skeletons";
 
 /**
  * Loading fallback for lazy-loaded pages inside the main layout.
@@ -78,7 +79,7 @@ const PageLoader = () => <PageSkeleton />;
  * Full-screen loading state shown while auth is being determined.
  */
 const FullScreenLoader = () => (
-  <div className="flex min-h-screen items-center justify-center">
+  <div className="flex min-h-app items-center justify-center">
     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
   </div>
 );
@@ -120,7 +121,7 @@ function AuthenticatedLayout() {
   return <AppLayout />;
 }
 
-export function AppLayout() {
+function AppLayout() {
   // ALL hooks must be called before any conditional returns
   const { user, loading, logout } = useAuth();
   const {
@@ -133,7 +134,7 @@ export function AppLayout() {
   // once the account has one rather than giving way to the app shell.
   const [startFlowBusy, setStartFlowBusy] = useState(false);
   useFinishPendingStart();
-  const location = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
   // Whether the route on screen lays itself out against the window. Read off
   // the matched routes rather than the path, so a route says it once where it
   // is declared.
@@ -222,7 +223,7 @@ export function AppLayout() {
     const layout = chooseNoCommunityLayout({
       hasCommunities: communities.length > 0,
       listFailed: communitiesError !== null,
-      pathname: location.pathname,
+      pathname: pathname,
       canAccessPlatformAreas: reachesPlatformAreas,
     });
     if (layout === "unavailable" && !startFlowBusy) {
@@ -279,7 +280,7 @@ export function AppLayout() {
   // (before the 30s-stale recents query refetches).
   const recentItems = recentQuery.data?.slice(0, user?.recent_tabs_limit ?? 20);
 
-  const activeRecentKey = getActiveRecentKey(location.pathname);
+  const activeRecentKey = getActiveRecentKey(pathname);
 
   // const isDark = document.documentElement.classList.contains("dark");
 
@@ -287,6 +288,7 @@ export function AppLayout() {
     <CreateActionProvider>
       <CommandCenter />
       <FeedbackHost />
+      <ReportHost />
       <CreateTaskWizard />
       <CreateToolWizard tool={Tool.file} />
       {/* A real height rather than a minimum: `min-h-screen` leaves every
@@ -305,7 +307,7 @@ export function AppLayout() {
           applies to descendants whose containing-block chain runs through it;
           the rest are laid out against the document, and it is the document
           that grows to fit them. */}
-      <div className="relative flex h-dvh flex-col overflow-clip bg-background">
+      <div className="relative flex h-app flex-col overflow-clip bg-background">
         <DeviceVerificationDialog />
         <div className="flex min-h-0 flex-1">
           {/* The live editor's headings, shared by the page that hosts the
@@ -463,7 +465,7 @@ export function AppLayout() {
                   </main>
                 </div>
               </div>
-              <ActivityDrawer scope={activityScope(location.pathname)} />
+              <ActivityDrawer scope={activityScope(pathname)} />
               <BottomNav />
             </SidebarProvider>
           </DocumentOutlineScope>
@@ -549,7 +551,7 @@ function CommunitiesUnavailable({
     }
   };
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-app bg-background">
       <Empty>
         <EmptyHeader>
           <EmptyMedia variant="icon">
@@ -559,8 +561,7 @@ function CommunitiesUnavailable({
           <EmptyDescription>{t("noCommunity.unavailableDescription")}</EmptyDescription>
         </EmptyHeader>
         <EmptyContent className="flex-row flex-wrap justify-center">
-          <Button onClick={() => void retry()} disabled={retrying}>
-            {retrying && <Loader2 className="h-4 w-4 animate-spin" />}
+          <Button onClick={() => void retry()} pending={retrying}>
             {t("common:tryAgain")}
           </Button>
           <Button variant="ghost" onClick={logout}>
@@ -583,7 +584,7 @@ function CommunitiesUnavailable({
 function NoCommunitySettingsShell({ logout }: { logout: () => void }) {
   const { t } = useTranslation("communities");
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-app flex-col bg-background">
       <div
         className="sticky top-0 z-50 flex flex-col border-b bg-card/70 backdrop-blur supports-backdrop-filter:bg-card/60"
         style={{ paddingTop: "var(--safe-area-inset-top)" }}

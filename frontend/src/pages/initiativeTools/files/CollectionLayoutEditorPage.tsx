@@ -21,7 +21,7 @@ import {
 } from "@/components/files/collections/collectionLists";
 import { fileDetail } from "@/components/layouts/details";
 import { type EditableLists, LayoutEditor } from "@/components/layouts/LayoutEditor";
-import { ToolSettingsPermissionRequired } from "@/components/tools/settings/ToolSettingsGuard";
+import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import type { ToolIndexRow } from "@/components/tools/ToolIndexPage";
 import { ToolIndexTable } from "@/components/tools/ToolIndexTable";
 import { useCollection, useCollectionFilesFeed } from "@/hooks/useCollections";
@@ -104,7 +104,7 @@ export const CollectionLayoutEditorPage = () => {
   );
 
   if (!collection || !set || !lists) return null;
-  if (!set.can_configure) return <ToolSettingsPermissionRequired />;
+  if (!set.can_configure) return <SettingsPermissionRequired scope="tool" />;
   return (
     <LayoutEditor
       // Another collection's editor starts afresh: a draft, and the question

@@ -12,6 +12,7 @@
 *.log
 uploads/
 .claude/scheduled_tasks.lock
+.claude/settings.local.json
 
 # Python
 __pycache__/

@@ -11,8 +11,8 @@ import { Link } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { Card } from "@/ui/card";
+import { cn } from "@/ui/lib/utils";
 
 export interface HomeWidgetCardProps {
   icon: LucideIcon;

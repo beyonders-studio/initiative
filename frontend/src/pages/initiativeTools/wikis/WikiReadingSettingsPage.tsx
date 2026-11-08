@@ -16,25 +16,17 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { WikiPageOrder, WikiReadingWidth } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 import { useUpdateWiki, useWiki } from "@/hooks/useWikis";
-import { cn } from "@/lib/utils";
-
-/** What the picker opens on when the wiki has no accent of its own. */
-const DEFAULT_ACCENT = "#6366F1";
+import { DEFAULT_COLOR } from "@/lib/initiativeColors";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Separator } from "@/ui/separator";
+import { Switch } from "@/ui/switch";
 
 /** How many heading levels the contents list may show. */
 const DEPTHS = [2, 3, 4] as const;
@@ -243,7 +235,7 @@ export const WikiReadingSettingsPage = () => {
                     so it is given a width of its own and the button beside it
                     stays on the card. */}
                 <ColorPickerPopover
-                  value={wiki.accent_color ?? DEFAULT_ACCENT}
+                  value={wiki.accent_color ?? DEFAULT_COLOR}
                   onChangeComplete={(colour) => save({ accent_color: colour })}
                   disabled={!canWrite}
                   triggerLabel={t("settings.accent")}

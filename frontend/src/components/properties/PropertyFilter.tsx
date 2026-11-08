@@ -3,16 +3,10 @@ import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { type MetadataOwner, useOwnedDefinitions } from "@/hooks/useProperties";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 import { PropertyInput, type PropertyInputProps } from "./PropertyInput";
 import { iconForPropertyType } from "./propertyTypeIcons";
@@ -69,6 +63,13 @@ type BackendOp = (typeof BACKEND_OPS)[number];
 
 const DEFAULT_MAX_FILTERS = 5;
 
+/** The types compared as another: a counter with a number typed in, not
+ *  stepped to one, and a signature by who signed it. */
+const FILTERED_AS: Partial<Record<MetadataType, MetadataType>> = {
+  [MetadataType.counter]: MetadataType.number,
+  [MetadataType.signature]: MetadataType.user_reference,
+};
+
 /**
  * Return the ordered list of operators that make sense for a property type.
  * The first entry is used as the default when adding a new filter.
@@ -81,6 +82,7 @@ export const opsForType = (type: MetadataType): BackendOp[] => {
     case MetadataType.number:
     case MetadataType.currency:
     case MetadataType.scale:
+    case MetadataType.counter:
     case MetadataType.date:
     case MetadataType.datetime:
       return ["eq", "lt", "lte", "gt", "gte", "is_null"];
@@ -92,7 +94,10 @@ export const opsForType = (type: MetadataType): BackendOp[] => {
       // Backend always uses JSONB ``@>`` for multi_select; we only need one row.
       return ["eq"];
     case MetadataType.user_reference:
+    case MetadataType.signature:
       return ["eq", "in_", "is_null"];
+    case MetadataType.file:
+      return ["is_null"];
     default:
       return ["eq"];
   }
@@ -169,7 +174,7 @@ export const PropertyFilter = ({
         key: `${PROPERTY_KEY}${definition.id}`,
         name: definition.name,
         type: definition.type,
-        input: definition,
+        input: { ...definition, type: FILTERED_AS[definition.type] ?? definition.type },
         plugin: false,
       })),
       ...(plugins?.fields ?? []).map((field) => ({
@@ -186,6 +191,7 @@ export const PropertyFilter = ({
           key: null,
           options: null,
           currency: null,
+          counter: null,
           value: null,
         },
         plugin: true,

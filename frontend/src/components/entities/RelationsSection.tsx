@@ -19,25 +19,6 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { AddLinkDialog } from "@/components/entities/AddLinkDialog";
 import { EntityCard } from "@/components/entities/EntityCard";
-import { Button } from "@/components/ui/button";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
-import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { DropOverlay } from "@/components/ui/file-drop";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useFileDrop } from "@/hooks/useFileDrop";
 import { useInitiatives } from "@/hooks/useInitiatives";
 import { useRelatedStates } from "@/hooks/useRelatedStates";
 import {
@@ -57,7 +38,27 @@ import {
   type RelationGroupKey,
 } from "@/lib/relationships";
 import { getItem, setItem } from "@/lib/storage";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/ui/carousel";
+import { Collapsible, CollapsibleContent } from "@/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { DropOverlay } from "@/ui/file-drop";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hover-card";
+import { useFileDrop } from "@/ui/lib/useFileDrop";
+import { cn } from "@/ui/lib/utils";
+import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 
 /**
  * The grid every group draws into. `min(…, 100%)` keeps a card from overflowing
@@ -95,7 +96,6 @@ export type RelationsLayout = "tiles" | "rows" | "carousel" | "graph";
 const LAYOUT_ICONS: Record<RelationsLayout, LucideIcon> = {
   tiles: LayoutGrid,
   rows: Rows3,
-  // Not `GalleryHorizontalEnd`: that one is already the queue's own mark.
   carousel: GalleryHorizontal,
   graph: Waypoints,
 };
@@ -188,7 +188,7 @@ export const RelationsSection = ({
     canAdd &&
     Boolean(initiative?.can.view.includes(Tool.file) && initiative.can.create.includes(Tool.file));
 
-  const { data: rows = [], isLoading, isError } = useRelationshipsFor(entity);
+  const { data: rows = [], isLoading, isError, refetch } = useRelationshipsFor(entity);
   // Only walked while the picture is the thing on screen: no other layout shows
   // more than one hop, and one hop is the list above.
   const neighbourhood = useRelationsNeighbourhood(entity, hops, {
@@ -384,7 +384,7 @@ export const RelationsSection = ({
             ))}
           </div>
         ) : isError ? (
-          <p className="text-muted-foreground text-sm">{t("loadFailed")}</p>
+          <StatusMessage onRetry={refetch} />
         ) : total === 0 ? (
           /* One line, naming two things worth linking from HERE. Not a button
              per kind of link: that would be seven doors into a room nobody has
@@ -410,13 +410,13 @@ export const RelationsSection = ({
           /* One shelf rather than a heading per kind of link: a carousel is
              pushed along, and stopping it at every heading would make it four
              short shelves. What each link says rides on its own card. */
-          <Carousel className="relative">
-            <CarouselContent className="-ml-4">
+          <Carousel>
+            <CarouselContent>
               {visible.map((edge) => {
                 const group = groupOf(edge, shown);
                 if (!group) return null;
                 return (
-                  <CarouselItem key={edge.id} className="basis-40 pl-4 sm:basis-44 md:basis-48">
+                  <CarouselItem key={edge.id} className="basis-40 sm:basis-44 md:basis-48">
                     <EntityCard
                       end={edge.other}
                       badge={t(`groups.${group.key}.title` as const)}
@@ -434,8 +434,8 @@ export const RelationsSection = ({
                 );
               })}
             </CarouselContent>
-            <CarouselPrevious className="left-0 -translate-x-1/2" />
-            <CarouselNext className="right-0 translate-x-1/2" />
+            <CarouselPrevious />
+            <CarouselNext />
           </Carousel>
         ) : (
           shown.map((group) => {

@@ -2,7 +2,12 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type ApiKeyMetadata, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
+import { useListMyApiKeys } from "@/api/generated/users/users";
+import { useCreateApiKey } from "@/hooks/useSecurity";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import { buildApiUrl } from "@/lib/wsUrl";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -10,11 +15,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useCreateApiKey, useMyApiKeys } from "@/hooks/useSecurity";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
-import { buildApiUrl } from "@/lib/wsUrl";
+} from "@/ui/dialog";
 
 /** The longest name an API key takes. */
 const KEY_NAME_MAX = 100;
@@ -43,23 +44,16 @@ export const CalendarSubscribeDialog = ({
   calendars,
 }: CalendarSubscribeDialogProps) => {
   const { t } = useTranslation(["calendars", "common"]);
-  const [dialogKey, setDialogKey] = useState(0);
-  const keysQuery = useMyApiKeys();
+  const keysQuery = useListMyApiKeys();
   const linked = new Set(
     (keysQuery.data?.keys ?? [])
       .filter((key) => key.resource_type === Tool.calendar && key.community_id === communityId)
       .map((key) => key.resource_id)
   );
 
-  const close = () => {
-    onOpenChange(false);
-    // Links are shown once: closing forgets them.
-    setDialogKey((key) => key + 1);
-  };
-
   const [only] = calendars.length === 1 ? calendars : [];
   return (
-    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
@@ -68,7 +62,9 @@ export const CalendarSubscribeDialog = ({
           <DialogDescription>{t("subscribe.description")}</DialogDescription>
         </DialogHeader>
         <p className="text-muted-foreground text-sm">{t("subscribe.secret")}</p>
-        <ul key={dialogKey} className="max-h-[50vh] space-y-3 overflow-y-auto">
+        {/* Links are shown once: each row holds its own, and closing the dialog
+            drops them with the rows. */}
+        <ul className="max-h-[50vh] space-y-3 overflow-y-auto">
           {calendars.map((calendar) => (
             <SubscribeRow
               key={calendar.id}
@@ -81,7 +77,7 @@ export const CalendarSubscribeDialog = ({
         </ul>
         <p className="text-muted-foreground text-sm">{t("subscribe.manage")}</p>
         <DialogFooter>
-          <Button type="button" onClick={close}>
+          <Button type="button" onClick={() => onOpenChange(false)}>
             {t("common:done")}
           </Button>
         </DialogFooter>

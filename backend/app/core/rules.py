@@ -233,6 +233,9 @@ PLATFORM_RULES: dict[str, StoredRule] = _catalog(
     # Whether the deployment follows the marketplace registry. Off stops the
     # background refresh; what already arrived stays.
     StoredRule("marketplace_registry_enabled", _ON, True),
+    # Whether people here may send feedback to the Initiative team. Off,
+    # nothing offers it and nothing is sent.
+    StoredRule("feedback_enabled", _ON, True),
     # How long a deleted account is kept before it is erased, and whether it
     # is erased on a timer at all.
     StoredRule("erase_deleted_accounts", _ON, True),

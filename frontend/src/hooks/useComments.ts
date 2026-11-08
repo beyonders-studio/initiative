@@ -2,7 +2,6 @@ import {
   type InfiniteData,
   infiniteQueryOptions,
   useInfiniteQuery,
-  useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 
@@ -10,11 +9,10 @@ import {
   createComment,
   deleteComment,
   getListCommentsQueryKey,
-  getRecentCommentsQueryKey,
   listComments,
   readComment,
-  recentComments,
   updateComment,
+  useRecentComments as useRecentCommentsQuery,
 } from "@/api/generated/comments/comments";
 import {
   CommentAudience,
@@ -115,12 +113,7 @@ export const useRecentComments = (
   options?: QueryOpts<RecentActivityEntry[]>
 ) => {
   const communityId = useActiveCommunityId();
-  return useQuery<RecentActivityEntry[]>({
-    queryKey: getRecentCommentsQueryKey(communityId, params),
-    queryFn: () => recentComments(communityId, params),
-    staleTime: 30 * 1000,
-    ...options,
-  });
+  return useRecentCommentsQuery(communityId, params, { query: options });
 };
 
 // ── Cache helpers ───────────────────────────────────────────────────────────
@@ -190,12 +183,12 @@ const COMMENT_TARGETS = [
   "collection_id",
   "file_id",
   "project_id",
-  "queue_id",
   "counter_group_id",
   "calendar_id",
   "dashboard_id",
   "post_id",
   "wiki_id",
+  "contact_id",
 ] as const satisfies readonly (keyof CommentThreadParams & keyof CommentRead)[];
 
 const inThread = (comment: CommentRead, params: CommentThreadParams) => {

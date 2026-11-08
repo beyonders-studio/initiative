@@ -4,11 +4,11 @@ import { useTranslation } from "react-i18next";
 import type { CollectionFileSummary, FileSummary } from "@/api/generated/initiativeAPI.schemas";
 import { CollectionFileTile } from "@/components/files/collections/CollectionFileTile";
 import type { CollectionCard } from "@/components/files/collections/collectionLists";
-import { type VirtualRow, VirtualRows } from "@/components/files/collections/VirtualRows";
 import { TagBadge } from "@/components/tags/TagBadge";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
-import { useWidthClass } from "@/hooks/useWidthClass";
 import { groupByTag } from "@/lib/collections";
+import { useWidthClass } from "@/ui/lib/useWidthClass";
+import { type VirtualRow, VirtualRows } from "@/ui/virtual-rows";
 
 interface CollectionGridViewProps {
   files: CollectionFileSummary[];

@@ -1,11 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
-import {
-  getGetTagCountsQueryKey,
-  getGetTagQueryKey,
-  getTag,
-  getTagCounts,
-} from "@/api/generated/tags/tags";
+import { getGetTagCountsQueryOptions, getGetTagQueryOptions } from "@/api/generated/tags/tags";
+import { TagDetailPage } from "@/pages/TagDetailPage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communityId/tags_/$tagId")(
   {
@@ -23,20 +19,12 @@ export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communi
       // its placeholder at once and the reads land into it. A failed prefetch
       // is swallowed here; the page fetches for itself and reports the error.
       void Promise.all([
-        queryClient.ensureQueryData({
-          queryKey: getGetTagQueryKey(communityId, tagId),
-          queryFn: () => getTag(communityId, tagId),
-          staleTime: 60_000,
-        }),
-        queryClient.ensureQueryData({
-          queryKey: getGetTagCountsQueryKey(communityId, tagId),
-          queryFn: () => getTagCounts(communityId, tagId),
-          staleTime: 30_000,
-        }),
+        queryClient.ensureQueryData(
+          getGetTagQueryOptions(communityId, tagId, undefined, { query: { staleTime: 60_000 } })
+        ),
+        queryClient.ensureQueryData(getGetTagCountsQueryOptions(communityId, tagId)),
       ]).catch(() => {});
     },
-    component: lazyRouteComponent(() =>
-      import("@/pages/TagDetailPage").then((m) => ({ default: m.TagDetailPage }))
-    ),
+    component: TagDetailPage,
   }
 );

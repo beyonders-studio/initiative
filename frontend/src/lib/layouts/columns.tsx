@@ -1,6 +1,6 @@
 import { PropertyColumnHeader } from "@/components/properties/propertyColumns";
-import { SortHeader } from "@/components/SortIcon";
-import type { AppColumnDef } from "@/lib/table";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { SortHeader } from "@/ui/sort-icon";
 
 import { FIELD_RENDERERS, type FieldDef, type LayoutEnv, type LayoutItem } from "./fields";
 

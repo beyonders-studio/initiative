@@ -8,14 +8,7 @@
  * reads none.
  */
 
-import { useQuery } from "@tanstack/react-query";
-
-import {
-  getListHoldsQueryKey,
-  listHolds,
-  placeHold,
-  releaseHold,
-} from "@/api/generated/holds/holds";
+import { placeHold, releaseHold, useListHolds } from "@/api/generated/holds/holds";
 import type {
   ContentHoldRead,
   HoldCreate,
@@ -54,14 +47,14 @@ export const useCaseHolds = (
   options?: QueryOpts<ContentHoldRead[]>
 ) => {
   const params = { case_task_id: caseTaskId };
-  return useQuery<ContentHoldRead[]>({
-    queryKey: getListHoldsQueryKey(communityId ?? 0, params),
-    queryFn: () => listHolds(communityId ?? 0, params),
-    enabled: communityId != null,
-    // Without a grant on that community the answer is a refusal, which is
-    // the usual answer, not a failure.
-    retry: false,
-    ...options,
+  return useListHolds(communityId ?? 0, params, {
+    query: {
+      enabled: communityId != null,
+      // Without a grant on that community the answer is a refusal, which is
+      // the usual answer, not a failure.
+      retry: false,
+      ...options,
+    },
   });
 };
 

@@ -162,17 +162,16 @@
       "events": "Événements",
       "project": "Projet",
       "file": "Fichier",
-      "queue": "File",
       "calendar": "Calendrier",
       "post": "Publication",
       "wiki": "Wiki",
+      "contact": "Contact",
       "initiative": "Initiative",
       "community": "Communauté",
       "counter-group": "Groupe de compteurs",
       "dashboard": "Tableau de bord"
     },
     "download": "Télécharger",
-    "empty": "Aucun export pour l’instant.",
-    "loadFailed": "Impossible de charger les exports. Actualisez pour réessayer."
+    "empty": "Aucun export pour l’instant."
   }
 }

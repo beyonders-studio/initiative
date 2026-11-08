@@ -3,19 +3,6 @@ import { type FormEvent, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
 import type { UserEmailRead } from "@/api/generated/initiativeAPI.schemas";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   isOnlyProvenAddress,
   useAddAddress,
@@ -27,6 +14,20 @@ import {
 import { isHeld, useAnnounceHeld } from "@/hooks/useHeldChange";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 
 /** A change to the list waiting on its confirmation. */
 type Change =
@@ -144,12 +145,7 @@ export const AddressManager = () => {
         // Said, not drawn as an empty list. A request that did not arrive and
         // an account holding nothing render the same way otherwise, and the
         // second is alarming on the page that says how you get in.
-        <div className="space-y-2 rounded-md border border-dashed p-4 text-center">
-          <p className="text-muted-foreground text-sm">{t("settings:addresses.loadFailed")}</p>
-          <Button variant="outline" size="sm" onClick={() => void refetch()}>
-            {t("settings:addresses.retry")}
-          </Button>
-        </div>
+        <StatusMessage onRetry={refetch} />
       ) : (
         <ul className="space-y-2">
           {addresses.map((address) => {
@@ -204,23 +200,22 @@ export const AddressManager = () => {
         </ul>
       )}
 
-      <form className="space-y-2" onSubmit={submit}>
-        <Label htmlFor="new-address">{t("settings:addresses.addLabel")}</Label>
-        <div className="flex flex-wrap gap-2">
-          <Input
-            id="new-address"
-            type="email"
-            className="min-w-48 flex-1"
-            value={pending}
-            onChange={(event) => setPending(event.target.value)}
-            placeholder={t("settings:addresses.addPlaceholder")}
-            autoComplete="email"
-          />
-          <Button type="submit" disabled={!pending.trim() || addAddress.isPending}>
-            {t("settings:addresses.addAction")}
-          </Button>
-        </div>
-        <p className="text-muted-foreground text-xs">{t("settings:addresses.addHelp")}</p>
+      <form onSubmit={submit}>
+        <Field label={t("settings:addresses.addLabel")} hint={t("settings:addresses.addHelp")}>
+          <div className="flex flex-wrap gap-2">
+            <Input
+              type="email"
+              className="min-w-48 flex-1"
+              value={pending}
+              onChange={(event) => setPending(event.target.value)}
+              placeholder={t("settings:addresses.addPlaceholder")}
+              autoComplete="email"
+            />
+            <Button type="submit" disabled={!pending.trim() || addAddress.isPending}>
+              {t("settings:addresses.addAction")}
+            </Button>
+          </div>
+        </Field>
       </form>
 
       <Dialog open={change !== null} onOpenChange={(open) => !open && closeChange()}>
@@ -242,27 +237,21 @@ export const AddressManager = () => {
               </DialogDescription>
             </DialogHeader>
             {passwordRequired ? (
-              <div className="space-y-2">
-                <Label htmlFor="address-password">{t("settings:addresses.passwordLabel")}</Label>
+              <Field label={t("settings:addresses.passwordLabel")}>
                 <Input
-                  id="address-password"
                   type="password"
                   autoComplete="current-password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   required
                 />
-              </div>
+              </Field>
             ) : null}
             {changeError ? <p className="text-destructive text-sm">{changeError}</p> : null}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={closeChange}>
-                {t("common:cancel")}
-              </Button>
-              <Button type="submit" disabled={confirming}>
-                {change ? t(`settings:addresses.${change.kind}Confirm`) : null}
-              </Button>
-            </DialogFooter>
+            <DialogFooter
+              submitLabel={change ? t(`settings:addresses.${change.kind}Confirm`) : null}
+              pending={confirming}
+            />
           </form>
         </DialogContent>
       </Dialog>

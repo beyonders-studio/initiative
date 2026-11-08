@@ -2,8 +2,8 @@ import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { MentionComposer } from "@/components/markdown/MentionComposer";
-import { Button } from "@/components/ui/button";
 import { usePastedImages } from "@/hooks/usePastedImages";
+import { Button } from "@/ui/button";
 
 interface CommentInputProps {
   value: string;

@@ -18,6 +18,7 @@ import pytest
 from app.core.messages import ImportEngineMessages
 from app.services.import_engine import atlassian, jira_fetch
 from app.services.import_engine.atlassian_bundle import BundleWriter
+from app.services.import_engine.atlassian_test import answered
 from app.services.import_engine.contract import ImportEngineError
 from app.services.import_engine import limits as import_limits
 
@@ -888,7 +889,7 @@ def _image_site(monkeypatch, issues, content=b"\x89PNG-bytes"):
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
         calls.append({"url": url, "json": json})
         if "/attachment/content/" in url:
-            return httpx.Response(200, content=content)
+            return await answered(method, url, httpx.Response(200, content=content), kw)
         if url.endswith("/statuses"):
             return httpx.Response(200, json=STATUSES)
         if "/rest/api/3/project/" in url:

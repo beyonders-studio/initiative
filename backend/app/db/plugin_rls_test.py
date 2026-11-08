@@ -25,7 +25,6 @@ def test_every_table_named_is_a_guild_table_that_exists():
         ("tasks", "projects"),
         ("task_assignees", "projects"),
         ("calendar_event_attendees", "calendars"),
-        ("queue_items", "queues"),
         ("comments", "comments"),
         ("tags", "tags"),
     ],

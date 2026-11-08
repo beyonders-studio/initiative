@@ -1,12 +1,12 @@
 import { useTranslation } from "react-i18next";
 
 import type { TaskAssigneeSummary, UserPublic } from "@/api/generated/initiativeAPI.schemas";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { listFormat } from "@/lib/intl";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
 import { getInitialsForUser, getUserDisplayName, isAnonymizedUser } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { listFormat } from "@/ui/lib/intl";
+import { cn } from "@/ui/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 type Assignee = UserPublic | TaskAssigneeSummary;
 

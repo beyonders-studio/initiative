@@ -1,23 +1,21 @@
 /**
  * Links between things, as the one endpoint that serves all of them.
  *
- * The five per-tool attach routes — a project's files, a queue item's
- * files and tasks, an event's files — were the same request with
- * different kinds in it. So is everything here: what varies between attaching a
- * file to a project and a task to a queue item is which two things are
- * named, and that is an argument.
+ * The per-tool attach routes — a project's files, an event's files — were the
+ * same request with different kinds in it. So is everything here: what varies
+ * between attaching a file to a project and a task to an event is which two
+ * things are named, and that is an argument.
  */
 
 import {
+  type EndpointKind,
   type EndpointRef,
   type RelationshipCreate,
   type RelationshipRead,
   RelationshipType,
-  type SearchEntityType,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   createRelationship as createRelationshipRequest,
-  listRelationships,
   removeRelationship as removeRelationshipRequest,
   replaceRelationshipSlice,
 } from "@/api/generated/relationships/relationships";
@@ -33,28 +31,6 @@ const ref = (end: EndpointRef) => `${end.type}:${end.id}`;
  * direction carries meaning: what this page names, and what names it.
  */
 export type Direction = "inbound" | "outbound" | "both";
-
-/**
- * Live links touching one thing.
- *
- * Both narrowings are optional, and passing neither asks the question a
- * relations surface actually has: *everything* connected to this, however it
- * runs. Each row says its own type and which way it points, so seven headings
- * are seven filters over one answer rather than seven requests.
- */
-export const listRelated = (
-  communityId: number,
-  entity: EndpointRef,
-  otherType: SearchEntityType | null = null,
-  relationshipType: RelationshipType | null = null,
-  direction: Direction = "both"
-): Promise<RelationshipRead[]> =>
-  listRelationships(communityId, {
-    entity: ref(entity),
-    relationship_type: relationshipType,
-    other_type: otherType,
-    direction,
-  });
 
 /** Link two things. */
 export const relate = async (
@@ -85,7 +61,7 @@ export const createRelationship = (
 export const setRelated = (
   communityId: number,
   entity: EndpointRef,
-  otherType: SearchEntityType,
+  otherType: EndpointKind,
   otherIds: number[],
   relationshipType: RelationshipType = RelationshipType.attached
 ): Promise<RelationshipRead[]> =>

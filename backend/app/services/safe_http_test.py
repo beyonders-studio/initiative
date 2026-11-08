@@ -295,6 +295,27 @@ async def test_a_bounded_read_within_its_bound_reads_as_usual():
     assert "content-encoding" not in response.headers
 
 
+async def test_a_bounded_read_into_a_sink_replaces_what_it_held():
+    """With a sink the decoded body is written there rather than held, over
+    whatever an earlier answer left in it."""
+    import io
+
+    sink = io.BytesIO(b"an earlier answer, longer than this one")
+    with _resolves_to("93.184.216.34"):
+        response = await request_public_target(
+            "GET",
+            "https://site.example.com/file",
+            timeout=5.0,
+            transport=_gzipped(b"the file"),
+            max_bytes=1_000,
+            sink=sink,
+        )
+
+    assert response.status_code == 200
+    assert response.content == b""
+    assert sink.getvalue() == b"the file"
+
+
 async def test_a_pinned_client_sends_nothing_about_the_server_and_reads_a_bounded_reply():
     """An SDK's platform headers are dropped and an uncompressed reply is asked
     for; a compressed reply is refused, and a long one stops at the bound."""

@@ -79,7 +79,7 @@ class ArchiveParent:
 
     The archive cascade stamps every archivable child, so a row that can carry
     its own ``archived_at`` needs none of these. One that cannot — a comment, a
-    wiki page, a queue item — reads it off what it sits under, and a trigger on
+    wiki page, a counter — reads it off what it sits under, and a trigger on
     that table rewrites its entries when the stamp moves.
     """
 
@@ -467,6 +467,9 @@ TOOL_OVERRIDES: dict[Tool, dict[str, object]] = {
     # A post's text is what it says, not a summary of it: the headline is the
     # title and the Lexical body is the body. There is no `description`.
     Tool.post: {"body": ("body",), "body_sql": _post_text},
+    # A contact is found by its name. How to reach one is not text somebody
+    # writes in, which is what a body is (``written_columns``).
+    Tool.contact: {"body": ()},
 }
 
 #: table -> how its rows are indexed.
@@ -486,11 +489,6 @@ SEARCH_SOURCES: dict[str, SearchSource] = {
         title="title",
         body=("description", "checklist"),
         body_sql=_task_text,
-    ),
-    "queue_items": _inside(
-        SearchEntityType.queue_item,
-        title="label",
-        body=("notes",),
     ),
     "counters": _inside(
         SearchEntityType.counter,
@@ -571,6 +569,7 @@ NOT_SEARCHABLE: dict[str, str] = {
     "moderation_report_reporters": "who reported a thing; never a search result",
     "moderation_actions": "the moderation log, reached from its own surface",
     "intake_cases": "the key -> task map; the task it names is what is indexed",
+    "idea_votes": "who voted for an idea; never a search result",
     "evidence": "files attached to a report or a case, opened only through it",
     "personal_items": "one member's own opens, bookmarks and subscriptions",
     "engagement_levels": "how widely an item was engaged with, not content",

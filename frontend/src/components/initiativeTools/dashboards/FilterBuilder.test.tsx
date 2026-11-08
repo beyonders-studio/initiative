@@ -5,15 +5,15 @@
  */
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpResponse } from "msw";
+import { describe, expect, it, vi } from "vitest";
 
 import { buildProject, buildTaskType } from "@/__tests__/factories";
 import { buildPropertyDefinition } from "@/__tests__/factories/properties";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import type { FilterNode } from "@/lib/widgets/conditions";
+import type { FilterFieldSpec, FilterLeaf, FilterNode } from "@/lib/widgets/conditions";
 
 import { FilterBuilder } from "./FilterBuilder";
 
@@ -21,33 +21,23 @@ const ARCHIVED = { field: "archived_at", op: "is_null", value: true } as FilterN
 const TITLE_A = { field: "title", op: "ilike", value: "a" } as FilterNode;
 const TITLE_B = { field: "title", op: "ilike", value: "b" } as FilterNode;
 
-beforeEach(() => {
-  server.use(
-    http.get("/api/v1/fields/:dataset", ({ params }) =>
-      HttpResponse.json({
-        dataset: params.dataset,
-        fields: [
-          {
-            name: "title",
-            type: "text",
-            kind: "text",
-            ops: ["ilike"],
-            multiple: false,
-            sortable: true,
-            options: [],
-          },
-        ],
-        relations: [],
-        default_filters: [ARCHIVED],
-      })
-    )
-  );
-});
+const TITLE: FilterFieldSpec = { field: "title", kind: "text", ops: ["ilike"], multiple: false };
 
-const mount = (value: FilterNode[], dataset = "tasks") => {
+const mount = (
+  value: FilterNode[],
+  fields: FilterFieldSpec[] = [TITLE],
+  defaults: FilterLeaf[] = [ARCHIVED as FilterLeaf]
+) => {
   const onChange = vi.fn();
   renderWithProviders(
-    <FilterBuilder value={value} onChange={onChange} initiativeId={1} dataset={dataset} />
+    <FilterBuilder
+      value={value}
+      onChange={onChange}
+      initiativeId={1}
+      fields={fields}
+      defaults={defaults}
+      loading={false}
+    />
   );
   return onChange;
 };
@@ -102,24 +92,6 @@ describe("FilterBuilder", () => {
 
   it("picks a property from the initiative's own", async () => {
     server.use(
-      http.get("/api/v1/fields/:dataset", () =>
-        HttpResponse.json({
-          dataset: "property_values",
-          fields: [
-            {
-              name: "property_id",
-              type: "reference",
-              kind: "property",
-              ops: ["in_"],
-              multiple: true,
-              sortable: false,
-              options: [],
-            },
-          ],
-          relations: [],
-          default_filters: [],
-        })
-      ),
       communityHttp.get("/property-definitions/", () =>
         HttpResponse.json([
           buildPropertyDefinition({ id: 7, name: "Points" }),
@@ -127,7 +99,11 @@ describe("FilterBuilder", () => {
         ])
       )
     );
-    mount([{ field: "property_id", op: "in_", value: [7] } as FilterNode], "property_values");
+    mount(
+      [{ field: "property_id", op: "in_", value: [7] } as FilterNode],
+      [{ field: "property_id", kind: "property", ops: ["in_"], multiple: true }],
+      []
+    );
     expect(await screen.findByText("Points")).toBeInTheDocument();
   });
 
@@ -135,24 +111,6 @@ describe("FilterBuilder", () => {
     const garden = buildProject({ id: 3, name: "Garden", initiative_id: 1 });
     const kitchen = buildProject({ id: 4, name: "Kitchen", initiative_id: 1 });
     server.use(
-      http.get("/api/v1/fields/:dataset", () =>
-        HttpResponse.json({
-          dataset: "tasks",
-          fields: [
-            {
-              name: "task_type_id",
-              type: "reference",
-              kind: "task_type",
-              ops: ["in_"],
-              multiple: true,
-              sortable: false,
-              options: [],
-            },
-          ],
-          relations: [],
-          default_filters: [],
-        })
-      ),
       communityHttp.get("/projects/", () =>
         HttpResponse.json({ items: [garden, kitchen], total_count: 2, has_next: false })
       ),
@@ -164,7 +122,11 @@ describe("FilterBuilder", () => {
         )
       )
     );
-    mount([{ field: "task_type_id", op: "in_", value: [12] } as FilterNode]);
+    mount(
+      [{ field: "task_type_id", op: "in_", value: [12] } as FilterNode],
+      [{ field: "task_type_id", kind: "task_type", ops: ["in_"], multiple: true }],
+      []
+    );
     expect(await screen.findByText("Bug (Garden)")).toBeInTheDocument();
   });
 });

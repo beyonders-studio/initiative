@@ -27,11 +27,7 @@ import {
   type ProjectTaskCalendar,
 } from "@/components/initiativeTools/events/CalendarListPanel";
 import { ToolFilterPanel } from "@/components/initiativeTools/shared/ToolFilterPanel";
-import { CalendarGridSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
 import { TaskStatusPriorityFilters } from "@/components/tasks/TaskStatusPriorityFilters";
-import { Label } from "@/components/ui/label";
-import { MultiSelect } from "@/components/ui/multi-select";
-import { useAuth } from "@/hooks/useAuth";
 import { useMyCalendarEntries } from "@/hooks/useCalendarEntries";
 import { useMyCalendars } from "@/hooks/useCalendars";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -56,6 +52,10 @@ import {
 import { getProjectColor } from "@/lib/projectColor";
 import { browserTimezone } from "@/lib/timezones";
 import { entityRefRoute, toolSettingsRoute } from "@/lib/tools";
+import { Combobox } from "@/ui/combobox";
+import { useWeekStart } from "@/ui/host";
+import { Label } from "@/ui/label";
+import { CalendarGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 /** Where one person's view of their calendar is kept. What an older release
  *  kept (its filters and month or week as one preference, what was switched
@@ -112,11 +112,10 @@ export interface MyCalendarProps {
 export const MyCalendar = ({ frame, framed = true }: MyCalendarProps) => {
   const { t } = useTranslation(["tasks", "calendars", "common"]);
   const { communities } = useCommunities();
-  const { user } = useAuth();
   const gp = useCommunityPath();
   const navigate = useNavigate();
 
-  const weekStartsOn = (user?.week_starts_on ?? 0) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  const weekStartsOn = useWeekStart();
 
   // This person's view of their calendar: its mode, its filters, and what is
   // switched off.
@@ -382,13 +381,14 @@ export const MyCalendar = ({ frame, framed = true }: MyCalendarProps) => {
             <Label className="mb-2 block font-medium text-muted-foreground text-xs">
               {t("tasks:filters.filterByCommunity")}
             </Label>
-            <MultiSelect
-              selectedValues={communityFilters.map(String)}
-              options={communities.map((community) => ({
+            <Combobox
+              multiple
+              value={communityFilters.map(String)}
+              items={communities.map((community) => ({
                 value: String(community.id),
                 label: community.name,
               }))}
-              onChange={(values) => {
+              onValueChange={(values) => {
                 const numericValues = values.map(Number).filter(Number.isFinite);
                 setCommunityFilters(numericValues);
               }}

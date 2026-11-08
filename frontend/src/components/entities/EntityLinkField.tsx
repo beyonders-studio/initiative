@@ -3,8 +3,8 @@ import { useTranslation } from "react-i18next";
 import type { EndpointRef } from "@/api/generated/initiativeAPI.schemas";
 import { EntityCard } from "@/components/entities/EntityCard";
 import { EntityPicker } from "@/components/entities/EntityPicker";
-import { Label } from "@/components/ui/label";
 import { type LinkedRef, refKey } from "@/lib/relationships";
+import { Label } from "@/ui/label";
 
 interface EntityLinkFieldProps {
   label: string;
@@ -19,11 +19,8 @@ interface EntityLinkFieldProps {
 /**
  * A list of linked things, of any kind, edited in place.
  *
- * This replaces the two kind-locked pickers a queue item carried — one that
- * could only find files and one that could only find tasks — which between
- * them covered two of the thirteen kinds a link may name. It is controlled: the
- * owning form holds the value and decides when to save, because both of its
- * callers save on submit rather than on each pick, and one of them is editing a
+ * It is controlled: the owning form holds the value and decides when to save,
+ * because a form saves on submit rather than on each pick, and may be editing a
  * thing that does not exist yet.
  *
  * Picking appends. The combobox never holds a value of its own, which is how the
@@ -89,7 +86,9 @@ export const EntityLinkField = ({
                   mime_type: null,
                   original_filename: null,
                   smart_link_url: null,
+                  handle: null,
                   is_open: null,
+                  starts_at: null,
                 }}
                 onRemove={
                   readOnly

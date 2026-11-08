@@ -9,15 +9,16 @@ import { useTranslation } from "react-i18next";
 
 import type { HomeLayoutListing } from "@/api/generated/initiativeAPI.schemas";
 import { LayoutMap } from "@/components/home/HomeLayoutsDialog";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useHomeLayoutListings } from "@/hooks/useHomeLayoutListings";
 import { useHomeViews } from "@/hooks/useHomeViews";
 import { layoutFromListing } from "@/lib/home/listing";
 import { canAddView, MAX_HOME_VIEWS } from "@/lib/home/views";
 import { toast } from "@/lib/mascotToast";
 import { resolveArtworkUrl } from "@/lib/uploadUrl";
+import { Button } from "@/ui/button";
+import { Card, CardContent } from "@/ui/card";
+import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 
 const LayoutCard = ({
   listing,
@@ -93,7 +94,7 @@ export function HomeLayoutStore() {
           ))}
         </div>
       ) : listings.isError ? (
-        <p className="text-destructive text-sm">{t("marketplace.loadError")}</p>
+        <StatusMessage onRetry={listings.refetch} />
       ) : (listings.data ?? []).length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("marketplace.empty")}</p>
       ) : (

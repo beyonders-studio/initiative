@@ -78,9 +78,6 @@
     "notFoundDescription": "Ce fichier a peut-être été supprimé ou vous avez suivi un lien invalide.",
     "noAccess": "Accès refusé",
     "backToFiles": "← Retour aux fichiers",
-    "closePanel": "Fermer le panneau",
-    "openPanel": "Ouvrir le panneau",
-    "togglePanel": "Basculer le panneau latéral",
     "titlePlaceholder": "Titre du fichier",
     "imageFileRequired": "Veuillez sélectionner un fichier image.",
     "imageUploaded": "Image téléchargée.",
@@ -105,17 +102,18 @@
   },
   "featuredImage": {
     "label": "Image à la une",
+    "add": "Ajouter une image à la une",
     "upload": "Téléverser une image",
-    "fromFiles": "Depuis Fichiers",
-    "replace": "Remplacer",
-    "remove": "Retirer",
+    "fromFiles": "Choisir dans Fichiers",
+    "replace": "Téléverser une autre image",
+    "replaceFromFiles": "En choisir une autre dans Fichiers",
+    "remove": "Retirer l’image à la une",
     "uploading": "Téléversement en cours…"
   },
   "imageChooser": {
     "title": "Choisir une image dans Fichiers",
     "description": "Elle est insérée telle qu’elle est maintenant : une version plus récente du fichier ne la change pas.",
-    "none": "Aucune image ici.",
-    "more": "Afficher plus"
+    "none": "Aucune image ici."
   },
   "outline": {
     "show": "Afficher le sommaire",
@@ -342,7 +340,6 @@
     "error": "Impossible de convertir ce fichier."
   },
   "viewer": {
-    "loadError": "Impossible de charger le fichier",
     "openNewTab": "Ouvrir dans un nouvel onglet",
     "download": "Télécharger",
     "pageCount_one": "{{count}} page",
@@ -371,7 +368,6 @@
   "createFirst": "Commencer à écrire",
   "dropToUpload": "Dépose pour envoyer un fichier",
   "error": "Un problème est survenu",
-  "loadError": "Impossible de charger les fichiers pour l'instant.",
   "loading": "Chargement des fichiers…",
   "newFile": "Nouveau fichier",
   "noFiles": "Aucun fichier pour l'instant",

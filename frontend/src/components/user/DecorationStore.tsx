@@ -3,8 +3,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { DecorationPack, UserRead } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { firstOfSlot, PackContentsDialog, packPieces } from "@/components/user/PackContents";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import {
@@ -15,6 +13,8 @@ import {
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { decorationSrc, resolveDecoration } from "@/lib/profileDecorations";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 
 /**
  * One pack, shown as the profile it would make.
@@ -52,8 +52,7 @@ const PackCard = ({
   const count = packPieces(entry.contents).length;
 
   const get = (
-    <Button size="sm" className="w-full" disabled={busy} onClick={onInstall}>
-      {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
+    <Button size="sm" className="w-full" pending={busy} onClick={onInstall}>
       {t("store.get")}
     </Button>
   );
@@ -67,13 +66,12 @@ const PackCard = ({
         variant="outline"
         size="sm"
         className="shrink-0"
-        disabled={busy}
+        pending={busy}
         onClick={onRemove}
         // Every card's button says the same word; the name is what tells them
         // apart when the grid is read out.
         aria-label={t("myPacks.removeNamed", { name: entry.name })}
       >
-        {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
         {t("myPacks.remove")}
       </Button>
     </div>
@@ -213,7 +211,6 @@ export const DecorationStore = ({ user }: { user: UserRead }) => {
         title={t("profiles:myPacks.confirmTitle", { name: pending?.name ?? "" })}
         description={t("profiles:myPacks.confirmBody")}
         confirmLabel={t("profiles:myPacks.remove")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("profiles:myPacks.removing")}
         isLoading={remove.isPending}
         onConfirm={() => {

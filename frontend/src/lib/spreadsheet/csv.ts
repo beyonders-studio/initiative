@@ -1,47 +1,13 @@
 /**
- * CSV serialization and parsing for spreadsheet cells.
+ * CSV parsing for spreadsheet cells.
  *
- * Export walks the cell map's bounding box row-major, emitting RFC
- * 4180-compliant fields. Import wraps papaparse, which already handles
- * quoted fields, embedded commas, escaped quotes, and CRLF / LF line
- * endings.
+ * Import wraps papaparse, which already handles quoted fields, embedded
+ * commas, escaped quotes, and CRLF / LF line endings.
  */
 
 import Papa from "papaparse";
 
-import { boundingBox, type CellValue, keyOf, parseKey } from "./coords";
-
-/**
- * Serialize a cell map to CSV text.
- *
- * Empty cells inside the bounding box become empty fields. Booleans
- * round-trip as the strings "true" / "false" (the same convention
- * Numbers / Excel use when interpreting CSV booleans on import).
- */
-export const cellsToCsv = (
-  cells: Record<string, CellValue> | ReadonlyMap<string, CellValue>,
-  /** Optional per-cell resolver. When supplied, its return value is what's
-   *  serialized — used so formula cells export their *computed* value
-   *  (or error token) rather than the raw ``=...`` text. */
-  resolve?: (row: number, col: number) => CellValue
-): string => {
-  const lookup =
-    cells instanceof Map
-      ? (key: string) => cells.get(key)
-      : (key: string) => (cells as Record<string, CellValue>)[key];
-  const { rows, cols } = boundingBox(cells);
-  if (rows === 0 || cols === 0) return "";
-  const grid: string[][] = [];
-  for (let r = 0; r < rows; r++) {
-    const row: string[] = [];
-    for (let c = 0; c < cols; c++) {
-      const value = resolve ? resolve(r, c) : lookup(keyOf(r, c));
-      row.push(value == null ? "" : String(value));
-    }
-    grid.push(row);
-  }
-  return Papa.unparse(grid, { newline: "\n" });
-};
+import { type CellValue, keyOf, parseKey } from "./coords";
 
 /**
  * Parse CSV / TSV text into a sparse cell map.

@@ -48,6 +48,7 @@ from app.db.request_context import (
     Billing,
     ContentGrantee,
     Filer,
+    IdeaReader,
     Install,
     Member,
     Platform,
@@ -70,7 +71,6 @@ from app.testing import (
     create_counter_group,
     create_file,
     create_project,
-    create_queue,
     create_wiki,
     create_wiki_page,
     get_auth_token,
@@ -179,20 +179,30 @@ _FILER_GUILDS: list[int] = []
 @pytest.fixture(autouse=True)
 async def _drop_filer_roles():
     yield
-    from app.db import filer_access
+    from app.db import operations_schema
 
     while _FILER_GUILDS:
-        await filer_access.deprovision_filer_access(_FILER_GUILDS.pop())
+        await operations_schema.deprovision_operations(_FILER_GUILDS.pop())
 
 
 async def _as_filer(w: World, s) -> None:
     """Someone who filed a case, reading it from outside the community: its
     filer role, provisioned as choosing it for operations work does."""
-    from app.db import filer_access
+    from app.db import operations_schema
 
-    await filer_access.provision_filer_access(w.guild_id)
+    await operations_schema.provision_operations(w.guild_id)
     _FILER_GUILDS.append(w.guild_id)
     await set_rls_context(s, Filer(guild_id=w.guild_id, user_id=w.member_id))
+
+
+async def _as_idea_reader(w: World, s) -> None:
+    """Anybody reading the published ideas from outside the community: its
+    ideas role, provisioned as choosing it for operations work does."""
+    from app.db import operations_schema
+
+    await operations_schema.provision_operations(w.guild_id)
+    _FILER_GUILDS.append(w.guild_id)
+    await set_rls_context(s, IdeaReader(guild_id=w.guild_id, user_id=w.member_id))
 
 
 def _as(user: str, **kwargs) -> Route:
@@ -265,6 +275,16 @@ SCENARIOS: tuple[Scenario, ...] = (
     # Their cases' columns and nothing of the projects: refused outright.
     Scenario(
         "filer", Filer, "app_user", _as_filer, _NONE, _NONE, names_community=False
+    ),
+    # Published ideas' columns and nothing of the projects: refused outright.
+    Scenario(
+        "idea reader",
+        IdeaReader,
+        "app_user",
+        _as_idea_reader,
+        _NONE,
+        _NONE,
+        names_community=False,
     ),
     Scenario(
         "billing",
@@ -421,7 +441,6 @@ async def test_every_socket_admits_through_the_seam(
         session, user=visitor, guild=guild, purpose="settings", access_level="admin"
     )
     group = await create_counter_group(session, initiative, owner)
-    queue = await create_queue(session, initiative, owner)
     file = await create_file(session, initiative, owner)
     wiki = await create_wiki(session, initiative, owner)
     page = await create_wiki_page(session, wiki, owner)
@@ -432,7 +451,6 @@ async def test_every_socket_admits_through_the_seam(
     #: community's configuration and none of its content — or, for the
     #: account's own stream, a token that is none.
     channels = {
-        "/api/v1/c/{community_id}/queues/{queue_id}/ws": f"{base}/queues/{queue.id}/ws",
         "/api/v1/c/{community_id}/counter-groups/{group_id}/ws": (
             f"{base}/counter-groups/{group.id}/ws"
         ),

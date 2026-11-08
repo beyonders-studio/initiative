@@ -1,9 +1,9 @@
 """Who may be named on a piece of content.
 
-A task's assignees, an event's attendees, a person-valued property and a queue
-item's person all name somebody on a row that lives inside a tool. Whoever is
-named must be able to open that tool's row: the rule is the same for all of
-them, and it is asked here.
+A task's assignees, an event's attendees and a person-valued property all name
+somebody on a row that lives inside a tool. Whoever is named must be able to
+open that tool's row: the rule is the same for all of them, and it is asked
+here.
 
 "Able to open" is the database's own answer for that person, restated for a
 person other than the one asking. The policies read the requester's standing,
@@ -59,12 +59,11 @@ from app.models.tenant.initiative import (
     InitiativeRule,
 )
 from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
-from app.models.tenant.metadata import MetadataValue
-from app.models.tenant.queue import QueueItem
+from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
 from app.models.tenant.resource_grant import ResourceGrant
 from app.models.tenant.task import Task, TaskAssignee
 from app.services.membership import live_membership_clause
-from app.services.platform.users import visible_to_other_people
+from app.services.platform.users import guild_members, visible_to_other_people
 from app.db.request_context import SystemGuild
 from app.services.tenant.initiative_tools import member_permission_sql, tool_on_sql
 
@@ -299,6 +298,22 @@ async def readers(
         return set((await reader.exec(stmt)).all())
 
 
+async def members(session: AsyncSession, user_ids: Iterable[int]) -> set[int]:
+    """Those of ``user_ids`` in the routed community, its guests among them
+    while they are in, read on :func:`roster_session`: who a link may name."""
+    ids = sorted(set(user_ids))
+    guild_id = routed_guild_id(session)
+    if not ids or guild_id is None:
+        return set()
+    stmt = guild_members(
+        select(MemberProfile.id).where(MemberProfile.id.in_(ids)),
+        guild_id=guild_id,
+        guests=True,
+    )
+    async with roster_session(session) as reader:
+        return set((await reader.exec(stmt)).all())
+
+
 async def require_readers(
     session: AsyncSession, governing: Governing, user_ids: Iterable[int]
 ) -> None:
@@ -319,8 +334,8 @@ async def require_readers(
 class PersonRef:
     """A column naming a person on content inside a tool. ``within`` picks the
     rows inside one governing row; ``clears`` empties the column rather than
-    deleting the row, where the row is more than the name (a property value,
-    a queue item)."""
+    deleting the row, where the row is more than the name (a property
+    value)."""
 
     column: Any
     within: Callable[[int], ColumnElement[bool]]
@@ -347,12 +362,16 @@ PERSON_REFS: dict[Tool, tuple[PersonRef, ...]] = {
             ),
         ),
     ),
-    Tool.queue: (
-        PersonRef(
-            QueueItem.user_id, lambda qid: QueueItem.queue_id == qid, clears=True
-        ),
-    ),
 }
+
+
+#: A value that names a person, rather than a signature, which records who
+#: signed and keeps them.
+_NAMING = MetadataValue.property_id.not_in(
+    sa_select(MetadataDefinition.id).where(
+        MetadataDefinition.type == MetadataType.signature
+    )
+)
 
 
 def _property_ref(tool: Tool) -> PersonRef | None:
@@ -368,7 +387,7 @@ def _property_ref(tool: Tool) -> PersonRef | None:
         return None
 
     def within(gid: int) -> ColumnElement[bool]:
-        return or_(
+        return _NAMING & or_(
             *(
                 and_(
                     MetadataValue.entity_type == spec.target,
@@ -424,7 +443,7 @@ async def sweep_collections(
     guild_id = routed_guild_id(session)
     if guild_id is None:
         raise RuntimeError("people are named on content inside a community")
-    on = MetadataValue.entity_type == link_for(Collection).target
+    on = (MetadataValue.entity_type == link_for(Collection).target) & _NAMING
     unreadable = or_(
         *(
             and_(

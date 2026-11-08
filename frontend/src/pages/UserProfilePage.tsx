@@ -3,12 +3,10 @@ import { UserX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { CommunityCard } from "@/components/communities/CommunityCard";
-import { ContactActionButtons } from "@/components/contacts/ContactActionButtons";
-import { ContactActionsMenu } from "@/components/contacts/ContactActionsMenu";
+import { ConnectionActionButtons } from "@/components/connections/ConnectionActionButtons";
+import { ConnectionActionsMenu } from "@/components/connections/ConnectionActionsMenu";
 import { ReportButton } from "@/components/moderation/ReportButton";
 import { PageBanner } from "@/components/PageBanner";
-import { StatusMessage } from "@/components/StatusMessage";
-import { ProfilePageSkeleton } from "@/components/skeletons/PageSkeletons";
 import { TRAY_SURFACE } from "@/components/toolBrowser/NodeRail";
 import { UserHandle } from "@/components/UserHandle";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
@@ -19,7 +17,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserCommunities, useUserProfile } from "@/hooks/useUsers";
 import { profileBanner } from "@/lib/profileBanner";
 import { resolveTrophies } from "@/lib/profileDecorations";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
+import { ProfilePageSkeleton } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 /**
  * A person's profile.
@@ -104,14 +104,14 @@ export const UserProfilePage = () => {
                 yourself. */}
             {mine ? null : (
               <div className="mb-1 flex items-center gap-2">
-                <ContactActionButtons
+                <ConnectionActionButtons
                   user={{
                     id: profile.id,
                     username: profile.username,
                     discriminator: profile.discriminator,
                   }}
                 />
-                <ContactActionsMenu
+                <ConnectionActionsMenu
                   omit={["profile", "message", "connect", "ask"]}
                   user={{
                     id: profile.id,

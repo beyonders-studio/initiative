@@ -2,26 +2,16 @@ import { Clock, Flame, Target, TrendingDown, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  CardGridSkeleton,
-  ContentCardSkeleton,
-  SkeletonRegion,
-} from "@/components/skeletons/PageSkeletons";
 import { CommunityBreakdownChart } from "@/components/stats/CommunityBreakdownChart";
 import { HeatmapChart } from "@/components/stats/HeatmapChart";
 import { StatsMetricCard } from "@/components/stats/StatsMetricCard";
 import { VelocityChart } from "@/components/stats/VelocityChart";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useUserStats } from "@/hooks/useUserStats";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { CardGridSkeleton, ContentCardSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 const COMMUNITY_FILTER_ALL = "all";
 

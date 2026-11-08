@@ -43,8 +43,6 @@
     "task": "Una tarea",
     "file": "Un archivo",
     "project": "Un proyecto",
-    "queue": "Una cola",
-    "queue_item": "Un elemento",
     "calendar": "Un calendario",
     "calendar_event": "Un evento",
     "counter": "Un contador",
@@ -52,12 +50,8 @@
     "dashboard": "Un panel",
     "wiki": "Una wiki",
     "wiki_page": "Una página de wiki",
+    "contact": "Un contacto",
     "collection": "Una colección"
-  },
-  "paging": {
-    "newer": "Más recientes",
-    "older": "Más antiguas",
-    "page": "Página {{page}}"
   },
   "report": {
     "action": "Denunciar",
@@ -98,7 +92,6 @@
     "roles_one": "{{count}} rol",
     "roles_other": "{{count}} roles"
   },
-  "loadFailed": "No se pudo cargar. Inténtalo de nuevo.",
   "hold": {
     "title": "Retener para la plataforma",
     "description": "La plataforma conserva esto tal como está. Nadie en esta comunidad puede verlo, cambiarlo ni eliminarlo hasta que la plataforma lo libere.",

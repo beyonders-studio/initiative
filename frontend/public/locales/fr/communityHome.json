@@ -14,7 +14,6 @@
       "comments": "Personne n'a commenté cette semaine."
     },
     "loadError": "Impossible de charger ce qui s'est passé. Veuillez réessayer plus tard.",
-    "loadMore": "Afficher plus",
     "new": "Nouveau",
     "others_one": "{{count}} autre personne",
     "others_other": "{{count}} autres personnes",
@@ -42,8 +41,6 @@
     "expand": "Déplier le panneau d'activité",
     "collapse": "Replier le panneau d'activité"
   },
-  "loading": "Chargement…",
-  "loadError": "Impossible de charger cet outil. Veuillez réessayer plus tard.",
   "communityWide": "Toute la communauté",
   "searchPlaceholder": "Rechercher par nom…",
   "empty": {
@@ -82,8 +79,7 @@
       "open": "Ouverte à tous les membres de la communauté",
       "request": "Adhésion sur demande",
       "private": "Sur invitation uniquement"
-    },
-    "loadError": "Impossible de charger ce que propose cette communauté. Veuillez réessayer plus tard."
+    }
   },
   "columns": {
     "name": "Nom",
@@ -96,11 +92,13 @@
       "files": "Type",
       "calendars": "Description",
       "dashboards": "Origine",
-      "posts": "Aperçu"
+      "posts": "Aperçu",
+      "contacts": "Téléphone ou e-mail"
     }
   },
   "detail": {
     "tasksDone": "{{completed}} tâches sur {{total}}",
+    "projectProgress": "Progression du projet",
     "fromMarketplace": "Place de marché",
     "builtHere": "Créé ici",
     "fileKind": {
@@ -127,7 +125,6 @@
   },
   "recentComments": {
     "noComments": "Aucun commentaire pour l'instant",
-    "loadError": "Impossible de charger les commentaires récents. Veuillez réessayer plus tard.",
     "unknownAuthor": "Inconnu",
     "onEntity": "sur {{entityName}}",
     "inProject": "dans {{projectName}}",
@@ -138,7 +135,6 @@
     "title": "À venir",
     "description": "Tout ce qui, dans la communauté, a une date dans les sept prochains jours.",
     "empty": "Rien de prévu cette semaine",
-    "loadError": "Impossible de charger ce qui arrive. Veuillez réessayer plus tard.",
     "today": "Aujourd’hui",
     "tomorrow": "Demain",
     "kind": {

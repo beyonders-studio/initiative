@@ -3,7 +3,6 @@
   "description": "Tout ce à quoi ceci est relié, et comment.",
   "untitled": "Sans titre",
   "empty": "Rien n'est encore lié.",
-  "loadFailed": "Les liens ne répondent pas. Réessaie dans un instant.",
   "add": "Ajouter un lien",
   "graph": {
     "alt": "{{title}} et les {{count}} choses auxquelles il est relié",
@@ -29,11 +28,13 @@
   "removed": "Lien retiré.",
   "dialog": {
     "title": "Ajouter un lien",
-    "description": "Trouve d'abord la chose, puis dis comment les deux se rapportent.",
-    "descriptionUpload": "Trouve d'abord la chose, ou envoie un fichier, puis dis comment les deux se rapportent.",
+    "description": "Trouve d'abord la chose ou la personne, puis dis comment les deux se rapportent.",
+    "descriptionUpload": "Trouve d'abord la chose ou la personne, ou envoie un fichier, puis dis comment les deux se rapportent.",
     "entity": "Chose",
     "entityPlaceholder": "Rechercher par nom…",
     "noResults": "Aucun résultat.",
+    "person": "Personne",
+    "noPeople": "Personne ne correspond.",
     "relationship": "Relation",
     "sentenceLabel": "Comment les deux se rapportent",
     "submit": "Ajouter un lien",
@@ -49,6 +50,7 @@
   },
   "card": {
     "kindLinked": "{{kind}} · relié {{date}}",
+    "person": "Personne",
     "unreachable": "Cette version de l'application ne peut pas ouvrir cela.",
     "remove": "Retirer le lien vers {{title}}"
   },
@@ -92,7 +94,6 @@
       "option": "est étiqueté"
     }
   },
-  "loading": "Chargement…",
   "empty_task": "Rien n'est encore lié. Lie le fichier qui décrit cette tâche, ou la tâche qui la bloque.",
   "empty_file": "Rien n'est encore lié. Lie le projet que ceci explique, ou la tâche dont il est issu.",
   "empty_project": "Rien n'est encore lié. Joins les fichiers sur lesquels ce projet s'appuie.",
@@ -114,11 +115,10 @@
     "generic": "Ceci",
     "post": "Ce billet",
     "project": "Ce projet",
-    "queue": "Cette file",
-    "queue_item": "Cet élément",
     "task": "Cette tâche",
     "wiki": "Ce wiki",
     "wiki_page": "Cette page",
+    "contact": "Ce contact",
     "collection": "Cette collection"
   },
   "blockers": {
@@ -132,8 +132,7 @@
   "empty_counter_group": "Rien n'est encore lié. Lie le projet dont ces chiffres parlent.",
   "empty_dashboard": "Rien n'est encore lié. Lie le projet dont ceci rend compte, ou le fichier qui le lit.",
   "empty_post": "Rien n'est encore lié. Lie le projet annoncé, ou le fichier qui le sous-tend.",
-  "empty_queue": "Rien n'est encore lié. Lie le projet que cette file alimente.",
-  "empty_queue_item": "Rien n'est encore lié. Lie la tâche qu'il est devenu, ou le fichier dont il vient.",
   "empty_wiki_page": "Rien n'est encore lié. Mentionnez cette page avec [[ depuis n’importe où et elle apparaîtra ici.",
+  "empty_contact": "Rien n’est encore lié. Liez la tâche que vous faites pour eux, l’événement où ils seront, ou leur contrat.",
   "empty_collection": "Rien n'est encore lié. Lie le projet auquel ces fichiers sont destinés."
 }

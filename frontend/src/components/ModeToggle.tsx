@@ -1,7 +1,9 @@
 import { Moon, Sun } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
+import { type PridePreference, usePride } from "@/hooks/usePride";
+import { useTheme } from "@/hooks/useTheme";
+import { Button } from "@/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,10 +12,8 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { type PridePreference, usePride } from "@/hooks/usePride";
-import { useTheme } from "@/hooks/useTheme";
-import { cn } from "@/lib/utils";
+} from "@/ui/dropdown-menu";
+import { cn } from "@/ui/lib/utils";
 
 /**
  * A sun that turns into a moon, and back.

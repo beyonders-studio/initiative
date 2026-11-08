@@ -5,19 +5,8 @@ import type {
   RecurrencePreviewRequest,
   RecurrenceStrategy,
 } from "@/api/generated/initiativeAPI.schemas";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useRecurrencePreview } from "@/hooks/useRecurrencePreview";
 import { formatDate, formatDateTime } from "@/lib/formatDate";
-import { dateTimeFormat } from "@/lib/intl";
 import {
   createRecurrenceFromPreset,
   detectRecurrencePreset,
@@ -40,8 +29,14 @@ import {
   withMonthlyMode,
 } from "@/lib/recurrence";
 import { browserTimezone } from "@/lib/timezones";
-import { cn } from "@/lib/utils";
 import type { TranslateFn } from "@/types/i18n";
+import { DateTimePicker } from "@/ui/date-time-picker";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { cn } from "@/ui/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 const hourlyQuickOption = (
   kind: "task" | "event",
@@ -306,8 +301,7 @@ export const RecurrenceEditor = ({
       {building && rule ? (
         <div className="space-y-4 rounded-md border border-border/70 p-4">
           <div className="grid grid-cols-pair gap-3">
-            <div className="space-y-2">
-              <Label htmlFor={`${controlId}-frequency`}>{t("recurrence.frequency")}</Label>
+            <Field label={t("recurrence.frequency")}>
               <Select
                 value={rule.frequency}
                 onValueChange={(next) =>
@@ -315,7 +309,7 @@ export const RecurrenceEditor = ({
                 }
                 disabled={disabled}
               >
-                <SelectTrigger id={`${controlId}-frequency`}>
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -328,11 +322,9 @@ export const RecurrenceEditor = ({
                   <SelectItem value="yearly">{t("recurrence.frequencyYearly")}</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="recurrence-interval">{t("recurrence.repeatEvery")}</Label>
+            </Field>
+            <Field label={t("recurrence.repeatEvery")} hint={t(UNIT_KEYS[rule.frequency] as never)}>
               <Input
-                id="recurrence-interval"
                 type="number"
                 min={1}
                 max={366}
@@ -346,10 +338,7 @@ export const RecurrenceEditor = ({
                 }}
                 disabled={disabled}
               />
-              <p className="text-muted-foreground text-xs">
-                {t(UNIT_KEYS[rule.frequency] as never)}
-              </p>
-            </div>
+            </Field>
           </div>
 
           {rule.frequency === "weekly" ? (
@@ -540,10 +529,15 @@ export const RecurrenceEditor = ({
       ) : null}
 
       {hourly ? (
-        <div className="space-y-2">
-          <Label htmlFor={`${controlId}-limit`}>{t("recurrence.dailyLimit")}</Label>
+        <Field
+          label={t("recurrence.dailyLimit")}
+          hint={t("recurrence.hourlyCompletionHelp")}
+          error={
+            (!hasDueDate || limitInvalid) &&
+            t(!hasDueDate ? "recurrence.hourlyNeedsDueDate" : "recurrence.limitInvalid")
+          }
+        >
           <Input
-            id={`${controlId}-limit`}
             name="recurrence_limit"
             type="number"
             min={1}
@@ -560,8 +554,6 @@ export const RecurrenceEditor = ({
                     : ""
               )
             }
-            aria-invalid={limitInvalid || !hasDueDate}
-            aria-describedby={`${controlId}-limit-help ${controlId}-limit-error`}
             onChange={(event) =>
               onTaskChange?.({
                 rule: value,
@@ -571,15 +563,7 @@ export const RecurrenceEditor = ({
             }
             disabled={disabled}
           />
-          <p id={`${controlId}-limit-help`} className="text-muted-foreground text-sm">
-            {t("recurrence.hourlyCompletionHelp")}
-          </p>
-          {!hasDueDate || limitInvalid ? (
-            <p id={`${controlId}-limit-error`} role="alert" className="text-destructive text-sm">
-              {t(!hasDueDate ? "recurrence.hourlyNeedsDueDate" : "recurrence.limitInvalid")}
-            </p>
-          ) : null}
-        </div>
+        </Field>
       ) : null}
 
       {kind === "task" && rule && strategy && (onStrategyChange || onTaskChange) ? (

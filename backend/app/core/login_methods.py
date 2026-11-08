@@ -11,7 +11,6 @@ tokens and API keys are not members: they are credentials derived from a
 sign-in that already happened, so disabling a method must never invalidate one.
 """
 
-from collections.abc import Iterable
 from enum import Enum
 
 
@@ -72,27 +71,6 @@ DEFAULT_LOGIN_METHODS: tuple[LoginMethod, ...] = (
 )
 
 
-def methods_from_values(values: Iterable[str] | None) -> frozenset[LoginMethod]:
-    """The methods a stored list of values names.
-
-    Never empty. The column is constrained non-empty and the write path refuses
-    to empty it; a list holding nothing this version recognises resolves to the
-    default set. Conservative for a *gate* and conservative for an *account*
-    point opposite ways here, and this resolves in the account's favour.
-
-    Pure, and the one place the resolution lives: the settings surface reads it
-    off a row it already holds, and the account counts read the same column on
-    their own.
-    """
-    resolved = set()
-    for value in values or ():
-        try:
-            resolved.add(LoginMethod(value))
-        except ValueError:
-            continue
-    return frozenset(resolved) or frozenset(DEFAULT_LOGIN_METHODS)
-
-
 class SecondFactorRequirement(str, Enum):
     """Who this deployment asks to hold a second factor.
 
@@ -111,12 +89,6 @@ class SecondFactorRequirement(str, Enum):
     #: Everybody with an account here.
     everyone = "everyone"
 
-
-#: Mirrors the Postgres enum type created in migration 0318. A value added to
-#: one has to be added to the other.
-SECOND_FACTOR_REQUIREMENT_VALUES: tuple[str, ...] = tuple(
-    r.value for r in SecondFactorRequirement
-)
 
 #: The methods that can answer the requirement. A community asks for one of
 #: these by name; the deployment asks only that the account holds one, so

@@ -1,25 +1,20 @@
-import { AlertCircle, CheckCircle2, FileText, Upload } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ICalImportResult, ICalParseResult } from "@/api/generated/initiativeAPI.schemas";
 import { isWritableCalendar } from "@/components/initiativeTools/events/CreateEventDialog";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import { useImportIcalEvents, useParseIcalFile } from "@/hooks/useCalendarEvents";
 import { useCalendarsList } from "@/hooks/useCalendars";
 import { useWizard } from "@/hooks/useWizard";
 import { toast } from "@/lib/mascotToast";
 import { browserTimezone } from "@/lib/timezones";
 import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
+import { FileDropArea } from "@/ui/file-drop";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { WizardDialog } from "@/ui/wizard-dialog";
 
 type Step = "upload" | "result";
 
@@ -70,9 +65,7 @@ export const ICalImportDialog = ({
   // Dates and floating times in the file are read in the importer's zone.
   const tz = browserTimezone();
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleFile = (file: File) => {
     if (file.size > MAX_ICS_SIZE) {
       toast.error(t("calendars:import.parseFailed"));
       return;
@@ -111,25 +104,15 @@ export const ICalImportDialog = ({
     >
       {step === "upload" && (
         <div className="space-y-4">
-          <div>
-            <Label>{t("calendars:import.uploadFileLabel")}</Label>
-            <div className="mt-2">
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-muted border-dashed p-6 transition-colors hover:bg-accent">
-                <Upload className="mb-2 h-8 w-8 text-muted-foreground" />
-                <span className="text-muted-foreground text-sm">
-                  {parseIcal.isPending
-                    ? t("calendars:import.parsing")
-                    : t("calendars:import.uploadFileLabel")}
-                </span>
-                <input
-                  type="file"
-                  accept=".ics,.ical"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                />
-              </label>
-            </div>
-          </div>
+          <FileDropArea
+            accept=".ics,.ical"
+            onFile={handleFile}
+            prompt={
+              parseIcal.isPending
+                ? t("calendars:import.parsing")
+                : t("calendars:import.uploadFileLabel")
+            }
+          />
 
           {parseResult && (
             <div className="rounded-lg bg-muted p-4">
@@ -161,13 +144,12 @@ export const ICalImportDialog = ({
           )}
 
           {parseResult && !fixedCalendarId && (
-            <div>
-              <Label>{t("calendars:import.selectCalendar")}</Label>
+            <Field label={t("calendars:import.selectCalendar")}>
               <Select
                 value={selectedCalendarId?.toString() ?? ""}
                 onValueChange={(v) => setSelectedCalendarId(Number(v))}
               >
-                <SelectTrigger className="mt-2">
+                <SelectTrigger>
                   <SelectValue placeholder={t("calendars:import.selectCalendar")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -178,7 +160,7 @@ export const ICalImportDialog = ({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           )}
 
           <div className="flex justify-end gap-2">

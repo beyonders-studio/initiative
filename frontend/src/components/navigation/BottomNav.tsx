@@ -5,24 +5,24 @@ import { useTranslation } from "react-i18next";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { getOpenCommandCenter } from "@/components/CommandCenter";
 import { usePrimaryCreateAction } from "@/components/navigation/CreateActionContext";
+import { useSidebar } from "@/components/sidebar/sidebar";
 import { getOpenCreateTaskWizard } from "@/components/tasks/CreateTaskWizard";
 import { getOpenCreateToolWizard } from "@/components/tools/CreateToolWizard";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useSidebar } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { useDirectMessagesEnabled } from "@/hooks/useDirectMessages";
 import { useGlobalCreateAccess } from "@/hooks/useInitiativeAccess";
 import { useMessagesWaiting } from "@/hooks/useMyMessages";
 import { useNotificationStreamConnected } from "@/hooks/useNotificationStream";
 import { useNotifications } from "@/hooks/useNotifications";
-import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 
 const pillClass =
   "pointer-events-auto flex items-center gap-1 rounded-full border bg-card/90 p-1 shadow-lg backdrop-blur supports-backdrop-filter:bg-card/70";

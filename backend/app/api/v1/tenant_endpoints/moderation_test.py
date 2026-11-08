@@ -13,7 +13,6 @@ from app.core.tools import Tool
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
 from app.core.intake import CaseField, IntakeStream
-from app.models.platform.app_setting import AppSetting
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.metadata import MetadataDefinition, MetadataValue
 from app.models.tenant.comment import Comment
@@ -33,6 +32,7 @@ from app.testing import (
     create_user,
     emitted,
     get_auth_headers,
+    make_operations_community,
 )
 from app.db.request_context import SystemGuild, Unattributed
 
@@ -157,13 +157,7 @@ async def operations(session):
     ops_initiative = await create_initiative(session, ops_guild, staff)
     ops_project = await create_project(session, ops_initiative, staff)
 
-    await set_rls_context(session, Unattributed())
-    row = (await session.exec(select(AppSetting).where(AppSetting.id == 1))).first()
-    if row is None:
-        row = AppSetting(id=1)
-    row.operations_guild_id = ops_guild.id
-    session.add(row)
-    await session.commit()
+    await make_operations_community(session, ops_guild.id)
 
     await set_rls_context(session, SystemGuild(ops_guild.id))
     session.add(

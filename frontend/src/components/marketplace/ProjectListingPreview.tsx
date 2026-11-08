@@ -14,9 +14,9 @@ import { useTranslation } from "react-i18next";
 
 import type { MarketplaceListingDetail } from "@/api/generated/initiativeAPI.schemas";
 import { ProjectTasksKanbanView } from "@/components/projects/ProjectTasksKanbanView";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { projectListingBoard, readProjectEnvelope } from "@/lib/projectListing";
+import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 type Showing = "blank" | "example";
 

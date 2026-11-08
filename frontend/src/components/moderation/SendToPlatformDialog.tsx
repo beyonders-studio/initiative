@@ -23,7 +23,6 @@ import {
   holdWhyBody,
   holdWhyReady,
 } from "@/components/moderation/HoldFields";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -31,9 +30,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 
 type Choice = "leave" | "hide";
 
@@ -108,18 +107,13 @@ export const SendToPlatformDialog = ({
           </div>
         </RadioGroup>
         {hiding ? <HoldFields value={why} onChange={setWhy} idPrefix="send-hold" /> : null}
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            variant={hiding ? "destructive" : "default"}
-            disabled={sending || (hiding && !holdWhyReady(why))}
-            onClick={send}
-          >
-            {hiding ? t("sendToPlatform.hideSubmit") : t("sendToPlatform.leaveSubmit")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={hiding ? t("sendToPlatform.hideSubmit") : t("sendToPlatform.leaveSubmit")}
+          onSubmit={send}
+          pending={sending}
+          disabled={hiding && !holdWhyReady(why)}
+          destructive={hiding}
+        />
       </DialogContent>
     </Dialog>
   );

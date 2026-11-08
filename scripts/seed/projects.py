@@ -518,7 +518,7 @@ PROJECTS: dict[str, list[dict]] = {
                 },
                 {
                     "title": "Retire the old initiative-tracker house rule",
-                    "description": "Superseded by the queues feature. Kept for the archive view.",
+                    "description": "Superseded by the turn order project. Kept for the archive view.",
                     "priority": TaskPriority.low,
                     "category": TaskStatusCategory.done,
                     "archived": True,
@@ -716,13 +716,13 @@ PROJECTS: dict[str, list[dict]] = {
             "name": "Rules Playtest: Old Initiative Tracker",
             "initiative": "lmop",
             "icon": "\U0001f570\ufe0f",
-            "description": "Superseded by the queues feature. Archived long enough ago "
+            "description": "Superseded by the turn order project. Archived long enough ago "
             "to sort last.",
             "owner": "Admin User",
             "archived_days_ago": 210,
             "tasks": [
                 {
-                    "title": "Compare the tracker against queues",
+                    "title": "Compare the tracker against the turn order project",
                     "priority": TaskPriority.low,
                     "category": TaskStatusCategory.done,
                     "assignees": ["Admin User"],

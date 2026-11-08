@@ -25,6 +25,7 @@ import { Loader2 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { isOwnOrigin } from "@/api/client";
 import type { CommunityPluginHandoff } from "@/api/generated/initiativeAPI.schemas";
 import {
   createCommunityPluginHandoff,
@@ -32,13 +33,6 @@ import {
 } from "@/api/generated/plugins/plugins";
 import { ReportButton } from "@/components/moderation/ReportButton";
 import { PluginProviderNotice, pluginNoticeKey } from "@/components/plugins/PluginProviderNotice";
-import {
-  EditorSkeleton,
-  SkeletonPillRow,
-  SkeletonRegion,
-} from "@/components/skeletons/PageSkeletons";
-import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
@@ -51,8 +45,11 @@ import { showsCuratedCatalogueOnly } from "@/lib/marketplaceCuration";
 import { pageAllow, pluginPages } from "@/lib/pluginSurfaces";
 import { getItem, setItem } from "@/lib/storage";
 import { DEFAULT_THEME } from "@/lib/themes";
-import { cn } from "@/lib/utils";
 import { localized } from "@/lib/widgets/widgetMeta";
+import { Button } from "@/ui/button";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { cn } from "@/ui/lib/utils";
+import { EditorSkeleton, SkeletonPillRow, SkeletonRegion } from "@/ui/page-skeletons";
 
 /** The message names a page and this host agree on. */
 const READY = "initiative-plugin:ready";
@@ -153,8 +150,10 @@ export function CommunityPluginPage({ pluginId, initiativeId }: CommunityPluginP
     };
   }, [activeId, held, termFull, mint, t]);
 
+  // A plug-in's page has an origin of its own: one shared with the app or the
+  // server is not framed.
   const origin = useMemo(() => {
-    if (!handoff?.page_url) return null;
+    if (!handoff?.page_url || isOwnOrigin(handoff.page_url)) return null;
     try {
       return new URL(handoff.page_url).origin;
     } catch {
@@ -351,6 +350,7 @@ export function CommunityPluginPage({ pluginId, initiativeId }: CommunityPluginP
       <PluginProviderNotice name={plugin.name} listing={plugin.listing} onContinue={acknowledge} />
     );
   if (error) return <Notice title={t("plugins:page.failed")} description={error} />;
+  if (handoff?.page_url && !origin) return <Notice title={t("plugins:page.failed")} />;
 
   return (
     <div className="flex h-full flex-col">
@@ -381,7 +381,7 @@ export function CommunityPluginPage({ pluginId, initiativeId }: CommunityPluginP
           )}
         </div>
       )}
-      {handoff?.page_url ? (
+      {handoff && origin ? (
         <iframe
           // Keyed by surface so switching tabs mounts a fresh frame rather
           // than reusing one that already spent its token.

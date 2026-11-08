@@ -26,25 +26,12 @@
  */
 
 import { useNavigate } from "@tanstack/react-router";
-import { Download, Loader2 } from "lucide-react";
+import { Download } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { MarketplaceListingDetail } from "@/api/generated/initiativeAPI.schemas";
 import { ListingProvenance } from "@/components/marketplace/ListingProvenance";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useInstallCommunityPlugin } from "@/hooks/useCommunityPlugins";
 import { useCommunityInitiatives } from "@/hooks/useInitiatives";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -54,6 +41,20 @@ import { toast } from "@/lib/mascotToast";
 import { STANDING_SCOPES, scopeSentence, toggleScope } from "@/lib/pluginScopes";
 import { communityPluginPath, declaredPages } from "@/lib/pluginSurfaces";
 import type { DialogProps } from "@/types/dialog";
+import { Checkbox } from "@/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 
 export interface InstallPluginDialogProps extends DialogProps {
   listing: MarketplaceListingDetail;
@@ -137,15 +138,13 @@ export function InstallPluginDialog({ listing, open, onOpenChange }: InstallPlug
             the same sentence the card and the listing page showed. */}
         <ListingProvenance listing={listing} />
 
-        <div className="space-y-1.5">
-          <Label htmlFor="install-plugin-name">{t("plugins:install.name")}</Label>
+        <Field label={t("plugins:install.name")} className="space-y-1.5">
           <Input
-            id="install-plugin-name"
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder={listing.name}
           />
-        </div>
+        </Field>
 
         {requested.length > 0 && (
           <section className="space-y-2" aria-labelledby="install-plugin-reach">
@@ -283,19 +282,16 @@ export function InstallPluginDialog({ listing, open, onOpenChange }: InstallPlug
           </section>
         )}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button onClick={submit} disabled={install.isPending}>
-            {install.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
+        <DialogFooter
+          submitLabel={
+            <>
               <Download className="h-4 w-4" />
-            )}
-            {t("plugins:install.action")}
-          </Button>
-        </DialogFooter>
+              {t("plugins:install.action")}
+            </>
+          }
+          onSubmit={submit}
+          pending={install.isPending}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -314,10 +310,9 @@ function InitiativePicker({
 
   if (initiatives.isLoading) {
     return (
-      <div className="flex items-center gap-2 border-l pl-4 text-muted-foreground text-sm">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        {t("common:loading")}
-      </div>
+      <SkeletonRegion className="border-l pl-4">
+        <SkeletonLines lines={3} />
+      </SkeletonRegion>
     );
   }
 

@@ -1,4 +1,3 @@
-import { Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -12,18 +11,6 @@ import { JoinPolicySection } from "@/components/initiatives/JoinPolicySection";
 import { InitiativeJoinRequestQueue } from "@/components/initiatives/settings/InitiativeJoinRequestQueue";
 import { useSeenMembers } from "@/components/members/MemberSearchSelect";
 import { UserHandle } from "@/components/UserHandle";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/data-table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   useAddInitiativeMember,
   useInitiativeRoster,
@@ -40,8 +27,14 @@ import {
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { isAdminRole } from "@/lib/permissions";
-import type { AppColumnDef } from "@/lib/table";
 import { getUserDisplayName } from "@/lib/userDisplay";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Combobox } from "@/ui/combobox";
+import { DataTable } from "@/ui/data-table";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 const COMMUNITY_SCOPE: MemberSearchScope = { type: "community" };
 const NONE: never[] = [];
@@ -366,7 +359,7 @@ export const InitiativeSettingsMembersTab = ({
           {canManageMembers ? (
             <>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                <AsyncCombobox
+                <Combobox
                   items={availableUsers.map((candidate) => ({
                     value: String(candidate.id),
                     label: getUserDisplayName(candidate),
@@ -406,16 +399,10 @@ export const InitiativeSettingsMembersTab = ({
                   type="button"
                   variant="outline"
                   onClick={handleAddMember}
-                  disabled={!selectedUserId || !effectiveRoleId || addMember.isPending}
+                  disabled={!selectedUserId || !effectiveRoleId}
+                  pending={addMember.isPending}
                 >
-                  {addMember.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {t("settings.adding")}
-                    </>
-                  ) : (
-                    t("settings.addMember")
-                  )}
+                  {addMember.isPending ? t("settings.adding") : t("settings.addMember")}
                 </Button>
               </div>
               {candidatesQuery.isError ? (

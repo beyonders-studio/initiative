@@ -1,15 +1,8 @@
 import type { ReactNode } from "react";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
 
 export interface SettingsSectionProps {
   /** What this section is for, in the words the reader would use. Left out

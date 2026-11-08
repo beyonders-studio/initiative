@@ -6,6 +6,10 @@ import type {
   PlacementProviderRead,
   ProviderPlacementRuleRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import {
+  useListPlacementRequests,
+  useListProviderPlacement,
+} from "@/api/generated/provider-placement/provider-placement";
 import { ProviderMark } from "@/components/auth/ProviderMark";
 import {
   describePlacementMatch,
@@ -14,22 +18,20 @@ import {
 } from "@/components/auth/ProviderPlacementRuleSummary";
 import { ProviderPlacementRuleDialog } from "@/components/platform/ProviderPlacementRuleDialog";
 import { SettingRow } from "@/components/platform/SettingRow";
-import { SkeletonRegion, TableSkeleton } from "@/components/skeletons/PageSkeletons";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useAgreePlacementRequest,
   useDeletePlacementRule,
-  usePlacementRequests,
-  useProviderPlacement,
   useSetPlacementEverywhere,
 } from "@/hooks/useProviderPlacement";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
+import { Switch } from "@/ui/switch";
 
 /** The rule dialog's subject: a provider, and the rule on it being edited. */
 type Editing = { provider: PlacementProviderRead; rule: ProviderPlacementRuleRead | null };
@@ -49,7 +51,7 @@ export const OperatorDashboardPlacementPage = () => {
   const canManageCommunities = hasCapability(user, Capability.communitiesManage);
   const canSetEverywhere = hasCapability(user, Capability.configManage);
 
-  const placementQuery = useProviderPlacement({ enabled: canManageCommunities });
+  const placementQuery = useListProviderPlacement({ query: { enabled: canManageCommunities } });
 
   const [editing, setEditing] = useState<Editing | null>(null);
   const [removing, setRemoving] = useState<ProviderPlacementRuleRead | null>(null);
@@ -66,8 +68,6 @@ export const OperatorDashboardPlacementPage = () => {
             ? t("providerPlacement.everywhere.enabled")
             : t("providerPlacement.everywhere.disabled")
         ),
-      onError: (error) =>
-        toast.error(getErrorMessage(error, "settings:providerPlacement.everywhere.error")),
       // Close the confirm dialog only once the save settles, so its in-flight
       // state shows while it runs.
       onSettled: () => setConfirmEverywhere(false),
@@ -76,8 +76,6 @@ export const OperatorDashboardPlacementPage = () => {
   const removeRule = (rule: ProviderPlacementRuleRead) =>
     deleteRule.mutate(rule.id, {
       onSuccess: () => toast.success(t("providerPlacement.removed")),
-      onError: (error) =>
-        toast.error(getErrorMessage(error, "settings:providerPlacement.removeError")),
       onSettled: () => setRemoving(null),
     });
 
@@ -94,7 +92,7 @@ export const OperatorDashboardPlacementPage = () => {
   }
 
   if (placementQuery.isError || !placementQuery.data) {
-    return <p className="text-destructive text-sm">{t("providerPlacement.loadError")}</p>;
+    return <StatusMessage onRetry={placementQuery.refetch} />;
   }
 
   const { placement_everywhere: everywhere, providers, rules } = placementQuery.data;
@@ -168,7 +166,6 @@ export const OperatorDashboardPlacementPage = () => {
         title={t("providerPlacement.everywhere.confirmTitle")}
         description={t("providerPlacement.everywhere.confirmDescription")}
         confirmLabel={t("providerPlacement.everywhere.confirm")}
-        cancelLabel={t("authProviders.cancel")}
         isLoading={setEverywhere.isPending}
         onConfirm={() => applyEverywhere(true)}
       />
@@ -181,7 +178,6 @@ export const OperatorDashboardPlacementPage = () => {
           community: removing?.community_name ?? "",
         })}
         confirmLabel={t("providerPlacement.remove")}
-        cancelLabel={t("authProviders.cancel")}
         destructive
         isLoading={deleteRule.isPending}
         onConfirm={() => removing && removeRule(removing)}
@@ -288,7 +284,7 @@ const ProviderRulesCard = ({
  */
 const PlacementRequestsCard = () => {
   const { t } = useTranslation("settings");
-  const requests = usePlacementRequests();
+  const requests = useListPlacementRequests();
   const agree = useAgreePlacementRequest();
   const rows = requests.data ?? [];
   if (rows.length === 0) return null;
@@ -331,10 +327,6 @@ const PlacementRequestsCard = () => {
                       onSuccess: () =>
                         toast.success(
                           t("providerPlacement.requests.agreed", { community: row.community_name })
-                        ),
-                      onError: (err: unknown) =>
-                        toast.error(
-                          getErrorMessage(err, "settings:communities.sheet.narrowings.error")
                         ),
                     }
                   )

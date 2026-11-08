@@ -35,18 +35,18 @@ from app.services.platform import (
 logger = logging.getLogger(__name__)
 
 #: Which line each moment writes, and where tapping it lands. A connection is
-#: answered from the contacts screen and a message request from the inbox,
+#: answered from privacy settings and a message request from the inbox,
 #: because that is where each one is acted on.
 _MOMENTS: dict[tuple[ContactGrantKind, bool], tuple[NotificationType, str, str]] = {
     (ContactGrantKind.connection, False): (
         NotificationType.connection_requested,
         "contact.connectionRequested",
-        "/contacts",
+        "/profile/privacy",
     ),
     (ContactGrantKind.connection, True): (
         NotificationType.connection_accepted,
         "contact.connectionAccepted",
-        "/contacts",
+        "/profile/privacy",
     ),
     (ContactGrantKind.message, False): (
         NotificationType.message_request_received,

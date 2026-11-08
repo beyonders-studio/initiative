@@ -19,8 +19,8 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Input } from "@/components/ui/input";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { Input } from "@/ui/input";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 
 /** Long enough that a pause reads as "done typing", short enough that results
  *  arrive while the reader is still looking at the box. */

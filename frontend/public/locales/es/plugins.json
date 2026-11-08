@@ -33,6 +33,7 @@
     "autoUpdateOff": "Las actualizaciones ahora se aplican a mano.",
     "upgradeTo": "Actualizar a {{version}}",
     "upToDate": "Actualizada",
+    "updateWaiting": "Actualización pendiente",
     "upgraded": "Actualizada a {{version}}.",
     "removeManagedNeutral": "Los cargos de este complemento los gestiona tu proveedor.",
     "removeManagedAction": "Gestionar",
@@ -45,7 +46,8 @@
     "decline": "Rechazar",
     "declined": "Rechazaste la versión {{version}}. El complemento se queda en su versión actual.",
     "declinedDone": "Versión {{version}} rechazada.",
-    "moved": "Ahora hay otra versión disponible. Revisa lo que pide."
+    "moved": "Ahora hay otra versión disponible. Revisa lo que pide.",
+    "refused": "La versión {{version}} no puede ejecutarse en este servidor."
   },
   "install": {
     "title": "Añadir {{name}}",
@@ -266,10 +268,6 @@
         "read": "Leer archivos",
         "write": "Leer y cambiar archivos"
       },
-      "queues": {
-        "read": "Leer colas",
-        "write": "Leer y cambiar colas"
-      },
       "counter_groups": {
         "read": "Leer contadores",
         "write": "Leer y cambiar contadores"
@@ -289,6 +287,10 @@
       "wikis": {
         "read": "Leer wikis",
         "write": "Leer y cambiar wikis"
+      },
+      "contacts": {
+        "read": "Leer contactos",
+        "write": "Leer y cambiar contactos"
       },
       "comments": {
         "read": "Leer comentarios",

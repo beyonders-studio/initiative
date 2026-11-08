@@ -54,9 +54,11 @@ async def create_notification(
     notification_type: NotificationType,
     data: Mapping[str, object],
     prefs: Optional[Mapping[str, Any]] = None,
+    read_at: Optional[datetime] = None,
 ) -> Optional[Notification]:
     """Write one notification, unless its recipient has switched the bell off
-    for that category.
+    for that category. ``read_at`` writes it already read: the record of
+    something the recipient was shown elsewhere.
 
     Every notification in the app is written through here, which is what makes
     this the one place the in-app channel can be honoured. It runs on the
@@ -85,6 +87,7 @@ async def create_notification(
         user_id=user_id,
         type=notification_type,
         data=dict(data),
+        read_at=read_at,
         **place,
     )
     session.add(notification)

@@ -1,24 +1,17 @@
 import { Link, useParams } from "@tanstack/react-router";
-import { Loader2 } from "lucide-react";
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { acceptInvite, useGetInviteStatus } from "@/api/generated/communities/communities";
 import { ServerChip } from "@/components/auth/ServerChoice";
 import { SignInFrame } from "@/components/auth/SignInFrame";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { useApiMutation } from "@/hooks/useApiMutation";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { formatDateTime } from "@/lib/formatDate";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
 
 export const CommunityInvitePage = () => {
   const { code = "" } = useParams({ strict: false }) as { code: string };
@@ -40,30 +33,16 @@ export const CommunityInvitePage = () => {
       : status && !status.is_valid
         ? (status.reason ?? t("invite.noLongerValid"))
         : null;
-  const [accepting, setAccepting] = useState(false);
-  const [acceptError, setAcceptError] = useState<string | null>(null);
-  const [accepted, setAccepted] = useState(false);
-
-  const handleAccept = async () => {
-    if (!normalizedCode || !user) {
-      return;
-    }
-    setAccepting(true);
-    setAcceptError(null);
-    try {
-      await acceptInvite({ code: normalizedCode });
-      setAccepted(true);
+  const accept = useApiMutation(
+    { mutationFn: acceptInvite },
+    {
       // Refresh both explicitly: joining changes the user's community list, and the
       // switcher only reloads when asked to. (It deliberately does not key off
       // the user object's identity — refreshUser() always returns a fresh one,
       // which would refetch every community on any profile change.)
-      await Promise.all([refreshUser(), refreshCommunities()]);
-    } catch (err) {
-      setAcceptError(getErrorMessage(err, "communities:invite.unableToAccept"));
-    } finally {
-      setAccepting(false);
+      onSuccess: () => Promise.all([refreshUser(), refreshCommunities()]),
     }
-  };
+  );
 
   const inviteValid = Boolean(status?.is_valid);
   const inviteTitle = inviteValid
@@ -85,9 +64,9 @@ export const CommunityInvitePage = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           {loading ? (
-            <p className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> {t("invite.loading")}
-            </p>
+            <SkeletonRegion>
+              <SkeletonLines lines={3} />
+            </SkeletonRegion>
           ) : (
             <>
               <div className="rounded border bg-muted/40 p-4 text-sm">
@@ -128,20 +107,26 @@ export const CommunityInvitePage = () => {
                   </p>
                 </div>
               ) : null}
-              {acceptError ? <p className="text-destructive text-sm">{acceptError}</p> : null}
-              {accepted ? <p className="text-primary text-sm">{t("invite.accepted")}</p> : null}
+              {accept.error ? (
+                <p className="text-destructive text-sm">
+                  {getErrorMessage(accept.error, "communities:invite.unableToAccept")}
+                </p>
+              ) : null}
+              {accept.isSuccess ? (
+                <p className="text-primary text-sm">{t("invite.accepted")}</p>
+              ) : null}
               <div className="flex flex-col gap-2">
-                {accepted ? (
+                {accept.isSuccess ? (
                   <Button asChild className="w-full">
                     <Link to="/">{t("invite.continueToApp")}</Link>
                   </Button>
                 ) : (
                   <Button
-                    onClick={handleAccept}
-                    disabled={!user || !inviteValid || accepting || accepted}
+                    onClick={() => accept.mutate({ code: normalizedCode })}
+                    disabled={!user || !inviteValid || accept.isPending}
                     className="w-full"
                   >
-                    {accepting ? t("invite.accepting") : t("invite.acceptInvite")}
+                    {accept.isPending ? t("invite.accepting") : t("invite.acceptInvite")}
                   </Button>
                 )}
 

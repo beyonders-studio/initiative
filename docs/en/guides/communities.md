@@ -45,7 +45,7 @@ A few things never make a card. Your own changes, because you were there. Reacti
 
 Below that are the community's initiatives, the ones you're in and the ones you could join, and then **Coming up**: everything with a date in the next seven days.
 
-To see every project, file or queue that has reached you, here and in your other communities, open [My Tools](your-space.md#my-tools).
+To see every project, file or dashboard that has reached you, here and in your other communities, open [My Tools](your-space.md#my-tools).
 
 !!! screenshot
     The community front page: the banner, the All circle with its tray of this week's activity, the initiatives and Coming up. Save as `docs/en/images/communities/community-front-page.png`.
@@ -114,14 +114,15 @@ The card shows the location exactly as you typed it, and tapping it on your comm
 ??? techspec "Where the suggestions come from"
     The places are [GeoNames](https://www.geonames.org/) data (every town of a thousand people or more) that ships with the app, so typing a place sends nothing anywhere. "Closest to you" starts from the place you've already picked, or else from the city your device's time zone is named after. A picked place saves its country and its coordinates; **Near me** measures the distance between those.
 
-## Inviting people (admins)
+## Inviting people
 
-1. **Community settings → Users**.
-2. Create an **invite link**.
-3. Optionally limit it:
+Admins can invite people, and so can anybody whose [custom role](#custom-roles) includes invites.
+
+1. **Invite members**, beside the member count on the community's front page or at the top of its **Members** page. **Community settings → Users** has the same links.
+2. Optionally limit it:
     - **Max uses** — how many people can get in on this one link.
     - **Expires in (days)** — when it stops working.
-4. **Copy it** and send it however you like. Email, chat, read it aloud down the phone. Copy it now: the link is shown once, when you make it.
+3. **Generate invite**, then **copy it** and send it however you like. Email, chat, read it aloud down the phone. Copy it now: the link is shown once, when you make it.
 
 Anyone who opens it joins after signing in or making an account.
 
@@ -137,7 +138,7 @@ Somebody who needs one project for a fortnight rather than the whole community f
 | **Admin** | All of that, **plus** run the community: members, invites, initiatives, settings. An admin can see and manage everything in their community. |
 | **Superadmin** | All of that, plus how people **get in** — the community's own sign-in. Whoever made the community holds it. |
 
-Promote and demote from **Community settings → Users**.
+Promote and demote from somebody's menu on the **Members** page, or from **Community settings → Users**.
 
 Promoting somebody to admin also lifts the **initiative roles they already hold**: in every initiative they're in, they move to **Moderator**, unless they're a Manager there already. The app then treats them as the authority they actually are — they're told when somebody asks to join, and waiting requests show up on their front page. Demoting somebody leaves their initiative roles exactly where they are.
 
@@ -153,7 +154,7 @@ So the top seat is its own rung, and it's narrow on purpose: the [Security and I
 
 ### Custom roles
 
-The person who should be sending out invites is not always the person who should be able to delete the summer fete. A **custom role** is a named handful of the jobs of running the community, given to one person at a time. Make them under **Community settings → Roles**, and give one to somebody from **Users**.
+The person who should be sending out invites is not always the person who should be able to delete the summer fete. A **custom role** is a named handful of the jobs of running the community, given to one person at a time. Make them under **Community settings → Roles**, and give one to somebody from their menu on the **Members** page, or from **Users**.
 
 | A role on… | Does |
 |---|---|
@@ -162,6 +163,7 @@ The person who should be sending out invites is not always the person who should
 
 - **One role each.** A role only counts while the person is still on its rung, so demoting an admin quietly retires their admin role. Somebody who leaves and comes back starts with none.
 - **Nobody hands out more than they hold.** You can't make or give a role that can do something you can't. Taking a role off an admin gives them every job back, so only an admin who can do everything can do that, and the same goes for promoting, demoting or removing an admin.
+- **Settings are optional.** Invites and the member list work from the **Members** page and the front page, so your door person never has to go looking for Community settings.
 - **Your server can switch custom roles off** for a community. The roles you have keep working; you just can't change them.
 
 Most communities never need one. If yours doesn't, the Roles tab stays empty and nothing else changes.
@@ -263,11 +265,11 @@ Everyone is their handle, `jordan#1234`, until they say otherwise. To go by some
 
 It shows wherever that community shows people, and people can search for it. Clear the box and you're back to your handle.
 
-Admins can set or clear a member's from the row menu under **Community settings → Users**. Handy when four people are called Sam.
+Whoever keeps the member list can set or clear a member's from that person's menu on the **Members** page, or under **Community settings → Users**. Handy when four people are called Sam.
 
 ## Reporting something
 
-Something here that shouldn't be? Comments, notices, pictures, wiki pages, queue items, events, profiles and directory listings all carry a small flag: **Report**. Say what's wrong, add a line if you like, and **Send report**. It isn't offered on your own things, because you can already edit or delete those. **Illegal** and **Other** need a line saying what's wrong.
+Something here that shouldn't be? Comments, notices, pictures, wiki pages, events, profiles and directory listings all carry a small flag: **Report**. Pick what's wrong, add a line if you like, and **Send report**. As the report opens it takes a picture of what you're reporting and attaches it, with the people on it left showing, since a report is usually about someone. Click the picture to hide parts of it or mark them, or remove it. It isn't offered on your own things, because you can already edit or delete those. **Illegal** and **Other** need a line saying what's wrong.
 
 | What you report | Who looks at it |
 |---|---|
@@ -280,7 +282,9 @@ Reporting something **illegal** asks which law it breaks, and goes to the commun
 
 ## Asking for help
 
-The lifebuoy at the foot of the sidebar is **Ask for help**. Where your server takes help requests, it opens a short form — what it's about, a line to name it, what happened — and it goes to the people who run the server, not to the community's own admins.
+**Help** is in your account menu and in search, and is the question mark in the desktop app's title bar. It searches these pages first, from inside the app, and before you type it shows answers for the page you're on. Where your server takes help requests, **Ask the team** sits under the results and starts a request with whatever you searched. Say what happened, pick what it's about, and add a picture if it helps: the camera in the box takes one of the page you're on, the paperclip attaches a file, or paste or drop one on the box. A picture opens in an editor first. The people on it are already swapped out (names become Person 1, Person 2, you show as You, and avatars, emails and phone numbers are hidden), and you can point at any part of the page to hide it, or mark it with a number your message can mention. The request goes to the people who run the server, not to the community's own admins.
+
+Each request carries this device's details: the app's version, the platform, your language and theme, the page you were on (without anything that names what was on it) and the window's size. The line above **Send** shows them, and its switch leaves them out. Close Help halfway through and your draft waits for you as a **Help request draft** button in the corner.
 
 What it's about decides what you can ask:
 
@@ -288,11 +292,15 @@ What it's about decides what you can ask:
 - **This community** — where the server takes help requests from the community you're in.
 - **A copy of this community's data, or deleting it** — for whoever holds the community's seat, where it takes help requests.
 
-Notices that used to say "contact whoever runs this server" — the age question, a read-only or suspended community, running out of seats — have the same **Ask for help** beside them, opened on what the notice is about.
+Notices that used to say "contact whoever runs this server" — the age question, a read-only or suspended community, running out of seats — have **Ask for help** beside them, which opens the same request already set to what the notice is about.
 
-Where the server takes no requests but has said who to write to, the button gives you that address instead. Where there's neither, the button isn't there, and **Documentation**, the question mark beside it, is where to look.
+Where the server takes no requests but has said who to write to, that address sits under the results instead. Where there's neither, the search is all there is, with these pages one click away.
 
-**Send feedback**, in your account menu and the command palette, tells the people who run the server what you think: an idea, a problem, praise or something else, with screenshots if they help. It shows you where the app was — its version, platform, language, theme, the page (without anything that names what was on it) and the window's size — and sends that with it unless you remove it. A problem you need an answer to has **I need an answer**, which sends it as a help request instead. Feedback lands in **My Tickets** too; the team writes first if they write at all, and you're told when it's been read.
+**Send feedback**, in your account menu and the command palette, is where an idea goes, or something that got in your way, or something you love, straight to the team that makes Initiative. Pick which it is and write it; a screenshot pasted into the box comes along too. On any server but Initiative Cloud, it opens Cloud's feedback page in your browser, and sending it takes an Initiative Cloud account. Your own server sends nothing along the way. **See what** shows exactly what else gets sent (the app's version, platform, language, theme, the page without anything that names what was on it, and the window's size), and the switch beside it leaves all that out.
+
+Feedback goes one way unless you tick **You can contact me with questions about this**. Then the team can write to you about it, and it shows up in **My Tickets** on Initiative Cloud when they do. Anything you need sorted out for you belongs in **Ask for help**, which **Something's not right** points you to.
+
+The ideas the team hears most end up on the **Ideas** page on Initiative Cloud, written up by the team, and anybody can read it, signed in or not. **See what others have asked for**, under the box, opens it. Vote for the ones you want, and you'll hear each time one moves along: planned, being built, shipped.
 
 Every request you send lands in **My Tickets**, in the sidebar: where each one stands (**Received**, **In progress**, **Waiting on you**, **Closed**), what the team said, and your replies. You get a notification when it moves, so there's no need to keep checking. A report is listed there too, though the team looks into reports without replying to them.
 

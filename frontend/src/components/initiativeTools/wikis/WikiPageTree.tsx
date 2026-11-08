@@ -2,14 +2,9 @@ import {
   DndContext,
   type DragEndEvent,
   type DragMoveEvent,
-  KeyboardSensor,
-  MouseSensor,
   pointerWithin,
-  TouchSensor,
   useDraggable,
   useDroppable,
-  useSensor,
-  useSensors,
 } from "@dnd-kit/core";
 import { Link } from "@tanstack/react-router";
 import { CircleChevronRight, Home } from "lucide-react";
@@ -24,12 +19,13 @@ import {
   type WikiPageSummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
-import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/sidebar/sidebar";
+import { useDragSensors } from "@/hooks/useDragSensors";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { fileIcon } from "@/lib/fileIcon";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
+import { cn } from "@/ui/lib/utils";
 
 /** Which of a row's three bands a dragged page is over. */
 type DropIntent = "before" | "into" | "after";
@@ -476,13 +472,7 @@ export const WikiPageTree = ({
     // caller's — so naming it here costs nothing and keeps the rule honest.
   }, [activePageId, pages, setExpanded]);
 
-  // The same activation distances the community rail uses, so a drag started
-  // anywhere in the sidebar feels the same.
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor)
-  );
+  const sensors = useDragSensors({ keyboard: true });
 
   const [landing, setLanding] = useState<Landing | null>(null);
 

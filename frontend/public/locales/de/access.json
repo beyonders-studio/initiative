@@ -61,10 +61,6 @@
     "selectPeople": "Personen auswählen…",
     "selectPeopleToRevoke": "Personen zum Widerrufen auswählen…",
     "permissionLevel": "Berechtigungsstufe",
-    "rolesSelected_one": "{{count}} Rolle ausgewählt",
-    "rolesSelected_other": "{{count}} Rollen ausgewählt",
-    "peopleSelected_one": "{{count}} Person ausgewählt",
-    "peopleSelected_other": "{{count}} Personen ausgewählt",
     "grantRoles_one": "{{count}} Rolle gewähren",
     "grantRoles_other": "{{count}} Rollen gewähren",
     "revokeRoles_one": "{{count}} Rolle widerrufen",
@@ -102,8 +98,6 @@
     "resource_project_other": "Projekte",
     "resource_file_one": "Datei",
     "resource_file_other": "Dateien",
-    "resource_queue_one": "Warteschlange",
-    "resource_queue_other": "Warteschlangen",
     "resource_counter_group_one": "Zählergruppe",
     "resource_counter_group_other": "Zählergruppen",
     "resource_calendar_one": "Kalender",
@@ -113,7 +107,9 @@
     "resource_post_one": "Beitrag",
     "resource_post_other": "Beiträge",
     "resource_wiki_one": "Wiki",
-    "resource_wiki_other": "Wikis"
+    "resource_wiki_other": "Wikis",
+    "resource_contact_one": "Kontakt",
+    "resource_contact_other": "Kontakte"
   },
   "request": {
     "needAccess": "Du brauchst Zugriff",
@@ -160,8 +156,6 @@
     "batchTitle": "Zugriffsanfragen",
     "answered": "Schon beantwortet",
     "answeredDescription": "Hier gibt es nichts mehr zu beantworten.",
-    "loading": "Anfragen werden geladen…",
-    "loadError": "Diese Anfragen konnten nicht geladen werden.",
     "error": "Deine Antwort konnte nicht gesendet werden. Bitte versuch es noch einmal."
   }
 }

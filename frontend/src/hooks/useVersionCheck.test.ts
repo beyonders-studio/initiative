@@ -1,6 +1,8 @@
 import { Capacitor } from "@capacitor/core";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { usePendingUpdate } from "@/lib/pendingUpdate";
 
 import { useVersionCheck } from "./useVersionCheck";
 
@@ -16,12 +18,15 @@ describe("useVersionCheck", () => {
     vi.restoreAllMocks();
   });
 
-  it("offers a newer server version on the web", async () => {
+  it("offers a newer server version on the web, and still does once the prompt is closed", async () => {
     vi.spyOn(Capacitor, "isNativePlatform").mockReturnValue(false);
     const { result } = renderHook(() => useVersionCheck());
+    const pending = renderHook(() => usePendingUpdate());
 
     await waitFor(() => expect(result.current.updateAvailable.show).toBe(true));
     expect(result.current.updateAvailable.version).toBe("999.0.0");
+    act(() => result.current.closeDialog());
+    expect(pending.result.current?.action).toBe("reload");
   });
 
   it("leaves the native app to its bundle update", async () => {

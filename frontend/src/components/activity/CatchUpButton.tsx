@@ -11,10 +11,10 @@ import { useTranslation } from "react-i18next";
 import { catchUp } from "@/api/generated/activity/activity";
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { type AISummary, SummarySheet } from "@/components/ai/SummarySheet";
-import { Button } from "@/components/ui/button";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
-import { dateTimeFormat } from "@/lib/intl";
+import { Button } from "@/ui/button";
+import { dateTimeFormat } from "@/ui/lib/intl";
 
 interface CatchUpButtonProps {
   /** When the reader was last here, or null for the change log's whole week. */

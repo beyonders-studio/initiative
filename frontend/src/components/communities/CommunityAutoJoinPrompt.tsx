@@ -19,11 +19,11 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { InitiativeJoinPolicy } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useInitiatives, useUpdateInitiative } from "@/hooks/useInitiatives";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { Label } from "@/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 
 export const CommunityAutoJoinPrompt = () => {
   const { t } = useTranslation(["communities", "common"]);

@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
 
 import { type TaskPriority, TaskStatusCategory } from "@/api/generated/initiativeAPI.schemas";
-import { Label } from "@/components/ui/label";
-import { MultiSelect } from "@/components/ui/multi-select";
 import { PRIORITY_ORDER } from "@/lib/sorting";
+import { Combobox } from "@/ui/combobox";
+import { Label } from "@/ui/label";
 
 interface TaskStatusPriorityFiltersProps {
   statusFilters: TaskStatusCategory[];
@@ -26,13 +26,14 @@ export const TaskStatusPriorityFilters = ({
         <Label className="mb-2 block font-medium text-muted-foreground text-xs">
           {t("filters.filterByStatusCategory")}
         </Label>
-        <MultiSelect
-          selectedValues={statusFilters}
-          options={Object.values(TaskStatusCategory).map((category) => ({
+        <Combobox
+          multiple
+          value={statusFilters}
+          items={Object.values(TaskStatusCategory).map((category) => ({
             value: category,
             label: t(`statusCategory.${category}`),
           }))}
-          onChange={(values) => onStatusChange(values as TaskStatusCategory[])}
+          onValueChange={(values) => onStatusChange(values as TaskStatusCategory[])}
           placeholder={t("filters.allStatusCategories")}
           emptyMessage={t("filters.noStatusCategories")}
         />
@@ -41,13 +42,14 @@ export const TaskStatusPriorityFilters = ({
         <Label className="mb-2 block font-medium text-muted-foreground text-xs">
           {t("filters.filterByPriority")}
         </Label>
-        <MultiSelect
-          selectedValues={priorityFilters}
-          options={PRIORITY_ORDER.map((priority) => ({
+        <Combobox
+          multiple
+          value={priorityFilters}
+          items={PRIORITY_ORDER.map((priority) => ({
             value: priority,
             label: t(`priority.${priority}` as never),
           }))}
-          onChange={(values) => onPriorityChange(values as TaskPriority[])}
+          onValueChange={(values) => onPriorityChange(values as TaskPriority[])}
           placeholder={t("filters.allPriorities")}
           emptyMessage={t("filters.noPriorities")}
         />

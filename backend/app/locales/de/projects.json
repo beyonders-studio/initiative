@@ -88,7 +88,8 @@
         "location": "Ort",
         "link": "Link",
         "amount": "Betrag",
-        "cost": "Kosten"
+        "cost": "Kosten",
+        "design_files": "Designdateien"
       },
       "outlines": {
         "bug": "**Was ist passiert?**\n\n\n**Was hätte passieren sollen?**\n\n\n**Wie lässt es sich wiederholen?**\n\n",

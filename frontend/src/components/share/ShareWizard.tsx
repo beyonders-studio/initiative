@@ -1,15 +1,10 @@
-import { FileUp, Loader2, type LucideIcon, ScrollText, X } from "lucide-react";
+import { FileUp, type LucideIcon, ScrollText, X } from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { ProjectPickerStep } from "@/components/tasks/ProjectPickerStep";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { WizardFrame } from "@/components/ui/wizard-dialog";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { useCommunityInitiativeSteps } from "@/hooks/useCommunityInitiativeSteps";
 import { useServer } from "@/hooks/useServer";
@@ -28,7 +23,12 @@ import { isImage, type ReceivedShare, type SharedFile } from "@/lib/share/pendin
 import { shareNote, shareTitle } from "@/lib/share/shareContent";
 import { getItem, setItem } from "@/lib/storage";
 import { TOOL_ICONS } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { cn } from "@/ui/lib/utils";
+import { Textarea } from "@/ui/textarea";
+import { WizardFrame, WizardOption } from "@/ui/wizard-dialog";
 
 const STORAGE_KEY = "initiative-last-share-destination";
 
@@ -216,20 +216,13 @@ export function ShareWizard({ share, onDone }: ShareWizardProps) {
             <div className="space-y-2">
               {KINDS.filter(({ kind: option }) => kinds.includes(option)).map(
                 ({ kind: option, icon: Icon }) => (
-                  <button
+                  <WizardOption
                     key={option}
-                    type="button"
-                    className="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+                    icon={<Icon className="h-5 w-5 shrink-0 text-muted-foreground" />}
+                    title={t(`kinds.${option}.label`)}
+                    description={t(`kinds.${option}.description`)}
                     onClick={() => setKind(option)}
-                  >
-                    <Icon className="h-5 w-5 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm">{t(`kinds.${option}.label`)}</p>
-                      <p className="text-muted-foreground text-xs">
-                        {t(`kinds.${option}.description`)}
-                      </p>
-                    </div>
-                  </button>
+                  />
                 )
               )}
             </div>
@@ -263,8 +256,7 @@ export function ShareWizard({ share, onDone }: ShareWizardProps) {
                 </li>
               ))}
             </ul>
-            <Button type="submit" className="w-full" disabled={!canSubmit || land.isPending}>
-              {land.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            <Button type="submit" className="w-full" disabled={!canSubmit} pending={land.isPending}>
               {land.isPending
                 ? t("compose.creating")
                 : t("compose.upload", { count: files.length })}
@@ -272,30 +264,25 @@ export function ShareWizard({ share, onDone }: ShareWizardProps) {
           </form>
         ) : destination && writes ? (
           <form className="space-y-4" onSubmit={submit}>
-            <div className="space-y-2">
-              <Label htmlFor="share-title">{t("compose.title")}</Label>
+            <Field
+              label={t("compose.title")}
+              error={titleHasSigil && t("errors:RESERVED_SIGIL_IN_NAME")}
+            >
               <Input
-                id="share-title"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 maxLength={255}
-                aria-invalid={titleHasSigil || undefined}
                 autoFocus
               />
-              {titleHasSigil && (
-                <p className="text-destructive text-sm">{t("errors:RESERVED_SIGIL_IN_NAME")}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="share-note">{t("compose.note")}</Label>
+            </Field>
+            <Field label={t("compose.note")}>
               <Textarea
-                id="share-note"
                 value={note}
                 onChange={(event) => setNote(event.target.value)}
                 placeholder={t("compose.notePlaceholder")}
                 rows={5}
               />
-            </div>
+            </Field>
             {images.length > 0 && (
               <div className="grid grid-cols-fill-24/4 gap-2">
                 {images.map((image) => (
@@ -321,8 +308,7 @@ export function ShareWizard({ share, onDone }: ShareWizardProps) {
                 {t("compose.filesLeftOut", { count: leftOut })}
               </p>
             )}
-            <Button type="submit" className="w-full" disabled={!canSubmit || land.isPending}>
-              {land.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            <Button type="submit" className="w-full" disabled={!canSubmit} pending={land.isPending}>
               {land.isPending ? t("compose.creating") : t(`compose.create.${writes}`)}
             </Button>
           </form>

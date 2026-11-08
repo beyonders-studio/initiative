@@ -40,6 +40,10 @@
     "feedback": {
       "title": "Retours",
       "description": "Ce que les gens nous ont dit vouloir."
+    },
+    "ideas": {
+      "title": "Idées",
+      "description": "Les idées que tout le monde peut lire et soutenir, sur Initiative Cloud."
     }
   },
   "stream": {
@@ -58,6 +62,8 @@
     "landingStatusDefault": "Le statut par défaut du projet",
     "caseTypeLabel": "Les nouveaux cas sont de type",
     "caseTypeDefault": "Le type par défaut du projet",
+    "ideaTypeLabel": "Le type qui met une tâche sur la page Idées",
+    "ideaTypeNone": "Aucun : rien n'est publié",
     "enabledLabel": "Reçoit les nouveaux cas",
     "lastCase": "Dernier cas ouvert le {{when}}.",
     "noCasesYet": "Aucun cas pour l'instant.",
@@ -79,25 +85,40 @@
     "sharesIsolated": "Un autre canal arrive aussi dans cette initiative. Les dossiers de sécurité et de modération devraient avoir leur propre initiative, pour que seules les personnes qui les traitent puissent les lire.",
     "sharesWithIsolated": "Cette initiative reçoit aussi des dossiers de sécurité ou de modération, qui devraient avoir leur propre initiative. Dirigez l'un des canaux ailleurs."
   },
-  "loadFailed": {
-    "title": "Impossible de charger ces paramètres",
-    "description": "Rien n'a été modifié. Réessayez ; si l'échec persiste, le journal du serveur en donnera la raison.",
-    "retry": "Réessayer"
-  },
   "help": {
     "action": "Demander de l'aide",
-    "title": "Demander de l'aide",
-    "description": "Dites-nous ce qui se passe et quelqu'un s'en chargera.",
+    "panel": {
+      "search": "Rechercher dans le guide d'utilisation",
+      "guide": "Guide d'utilisation",
+      "guideBody": "Comment utiliser chaque partie d'Initiative, dès votre premier projet.",
+      "back": "Retour à la recherche",
+      "forThisPage": "Pour cette page",
+      "noMatch": "Rien dans le guide d'utilisation ne correspond à « {{query}} ».",
+      "noMatchAsk": "Essayez d'autres mots, ou demandez à l'équipe ci-dessous. Votre recherche est reprise dans la demande.",
+      "noMatchWrite": "Essayez d'autres mots, ou écrivez à l'adresse ci-dessous.",
+      "noMatchBrowse": "Essayez d'autres mots, ou parcourez le guide d'utilisation.",
+      "unavailable": "La recherche n'est pas configurée sur ce serveur. Le lien vers le guide d'utilisation ci-dessus donne accès à tout.",
+      "noAnswer": "Pas de réponse ici ?",
+      "openRequests_one": "{{count}} demande ouverte",
+      "openRequests_other": "{{count}} demandes ouvertes",
+      "askTeam": "Demander à l'équipe",
+      "writeTo": "Pas de réponse ici ? Écrivez aux personnes qui gèrent ce serveur :",
+      "needsText": "Dites ce qui se passe pour envoyer.",
+      "needsTopic": "Choisissez le sujet pour envoyer.",
+      "sendShortcut": "Ctrl+Entrée envoie",
+      "discard": "Abandonner",
+      "sent": "Envoyé à l'équipe",
+      "sentBody": "Les personnes qui gèrent ce serveur s'en occuperont. Leur réponse arrive dans vos notifications, et la demande reste dans Mes tickets.",
+      "openTickets": "Ouvrir Mes tickets"
+    },
     "subjectLabel": "Titre",
     "subjectPlaceholder": "Une ligne, pour pouvoir le retrouver",
     "bodyLabel": "Que s'est-il passé ?",
     "bodyPlaceholder": "Ce que vous faisiez, ce que vous attendiez et ce qui s'est passé à la place.",
-    "browseFaq": "Consulter la FAQ",
     "submit": "Envoyer",
     "thanks": "Envoyé. Quelqu'un s'en chargera.",
     "error": "Impossible d'envoyer. Réessayez dans un instant.",
     "topicLabel": "De quoi s'agit-il ?",
-    "topicPlaceholder": "Choisissez une option",
     "topics": {
       "account": "Mon compte",
       "community": "Cette communauté",
@@ -133,13 +154,14 @@
     "replyError": "Votre réponse n'a pas pu être envoyée. Réessayez dans un instant.",
     "closedNote": "Ce ticket est clôturé. Si autre chose se présente, demandez de l'aide à nouveau.",
     "noConversation": "Merci pour le signalement. L'équipe examine chacun d'eux, mais ne répond pas aux signalements ici.",
-    "staffFirst": "Merci de nous en avoir parlé. Vous pourrez répondre ici une fois que l'équipe vous aura écrit.",
-    "empty": "Vous n'avez envoyé aucun ticket. Quand vous demandez de l'aide, elle apparaît ici pour que vous puissiez la suivre.",
-    "loadError": "Impossible de charger vos tickets."
+    "empty": "Vous n'avez envoyé aucun ticket. Quand vous demandez de l'aide, elle apparaît ici pour que vous puissiez la suivre."
   },
   "case": {
     "filedBy": "Envoyé par",
     "noFiler": "Ouvert automatiquement",
+    "votes_one": "{{count}} vote",
+    "votes_other": "{{count}} votes",
+    "noContact": "Ne souhaite pas être contacté",
     "theyCalledIt": "Son objet :",
     "noConversation": "Ce type de dossier n'ouvre pas de conversation avec la personne qui l'a envoyé.",
     "staffFirst": "Cette personne pourra répondre une fois que l'équipe lui aura écrit.",
@@ -211,6 +233,7 @@
   },
   "evidence": {
     "attach": "Joindre des fichiers",
+    "dropHere": "Déposez pour joindre",
     "limits_one": "Jusqu'à {{count}} fichier, {{size}} au maximum.",
     "limits_other": "Jusqu'à {{count}} fichiers, {{size}} chacun au maximum.",
     "remove": "Retirer {{name}}",
@@ -221,9 +244,7 @@
     "heading": "Pièces jointes",
     "reveal": "Afficher {{name}}",
     "view": "Voir {{name}}",
-    "open": "Ouvrir {{name}}",
-    "dropped_one": "{{names}} a été retiré : ce formulaire ne l'accepte pas.",
-    "dropped_other": "{{names}} ont été retirés : ce formulaire ne les accepte pas."
+    "open": "Ouvrir {{name}}"
   },
   "security": {
     "action": "Signaler un problème de sécurité",
@@ -246,28 +267,34 @@
     "error": "Impossible d'envoyer. Réessayez dans un instant."
   },
   "feedback": {
-    "action": "Envoyer un avis",
-    "title": "Envoyer un avis",
-    "description": "Dites à celles et ceux qui gèrent ce serveur ce que vous en pensez. Vous pouvez le suivre dans Mes tickets.",
-    "typeLabel": "De quel type d'avis s'agit-il ?",
-    "typePlaceholder": "Choisissez une option",
-    "topics": {
-      "idea": "Une idée",
-      "problem": "Un problème",
-      "praise": "Un compliment",
-      "other": "Autre chose"
+    "title": "Dites-nous ce que vous en pensez",
+    "kindLabel": "Type d'avis",
+    "kinds": {
+      "idea": {
+        "label": "Proposer une idée",
+        "question": "Que voudriez-vous qu'Initiative fasse ?",
+        "placeholder": "L'idée, et ce qu'elle vous permettrait de faire."
+      },
+      "problem": {
+        "label": "Quelque chose ne va pas",
+        "question": "Qu'est-ce qui vous a gêné ?",
+        "placeholder": "Ce que vous faisiez, et ce qui s'est passé."
+      },
+      "praise": {
+        "label": "Faire un compliment",
+        "question": "Qu'est-ce que vous aimez ?",
+        "placeholder": "Ce dont vous parleriez à un ami."
+      }
     },
-    "bodyLabel": "Que voulez-vous leur dire ?",
-    "bodyPlaceholder": "Ce que vous aimeriez, ce qui vous a gêné ou ce qui vous a plu.",
-    "needsAnswer": "J'ai besoin d'une réponse",
-    "needsAnswerHelp": "L'envoie plutôt comme demande d'aide, pour que quelqu'un vous réponde.",
-    "submit": "Envoyer l'avis",
-    "thanks": "Merci ! Celles et ceux qui gèrent ce serveur le liront.",
-    "error": "Impossible d'envoyer. Réessayez dans un instant.",
+    "contactable": "Vous pouvez me contacter si vous avez des questions à ce sujet",
+    "seeIdeas": "Voir ce que d'autres ont demandé",
+    "stuck": "Besoin que quelqu'un s'en occupe ? Demander de l'aide",
     "context": {
-      "title": "Envoyé avec",
-      "help": "Où en était l'application, pour qu'ils voient ce que vous avez vu. Rien ici ne vous nomme, ni rien de ce que vous avez ouvert.",
-      "remove": "Retirer",
+      "on": "Inclut la version de l'application et la page où vous êtes.",
+      "off": "Sans la version de l'application ni la page.",
+      "switch": "Inclure la version de l'application et la page",
+      "show": "Voir le détail",
+      "hide": "Masquer",
       "fields": {
         "app_version": "Version",
         "platform": "Plateforme",
@@ -276,9 +303,91 @@
         "route": "Page",
         "viewport": "Fenêtre"
       }
-    }
+    },
+    "discard": "Abandonner",
+    "writeSomething": "Écrivez quelque chose pour l'envoyer.",
+    "submit": "Envoyer l'avis",
+    "signInToSend": "Se connecter pour envoyer",
+    "thanks": "Merci pour votre avis !",
+    "thanksBody": "L'équipe lit chaque message.",
+    "done": "Terminé",
+    "error": "Impossible d'envoyer. Réessayez dans un instant."
+  },
+  "feedbackSwitch": {
+    "title": "Avis",
+    "description": "Les idées, les problèmes et les compliments vont à l'équipe qui fait Initiative. Désactivé, personne ici ne voit Envoyer un avis et rien n'est envoyé.",
+    "label": "Permettre d'envoyer un avis à l'équipe d'Initiative",
+    "error": "Impossible de modifier ce réglage. Réessayez dans un instant."
   },
   "moderationTopics": {
     "appeal": "Recours contre votre suspension"
+  },
+  "ideas": {
+    "title": "Idées",
+    "lede": "Ce que les gens ont demandé, et où en est chaque idée. Votez pour celles que vous voulez.",
+    "search": "Rechercher des idées",
+    "sortLabel": "Ordre",
+    "sort": {
+      "votes": "Les plus votées",
+      "newest": "Les plus récentes"
+    },
+    "statusLabel": "Statut",
+    "allStatuses": "Toutes",
+    "votedByMe": "Mes votes",
+    "none": "Aucune idée ne correspond.",
+    "votes_one": "{{count}} vote",
+    "votes_other": "{{count}} votes",
+    "vote": "Voter",
+    "voted": "Voté",
+    "voteFor": "Voter pour {{title}}",
+    "voteError": "Impossible d'enregistrer votre vote. Réessayez dans un instant.",
+    "all": "Toutes les idées"
+  },
+  "picture": {
+    "take": "Image de cette page",
+    "failed": "Impossible de faire l'image. Réessayez, ou joignez plutôt une capture d'écran.",
+    "title": "Image de cette page",
+    "edit": "Modifier {{name}}",
+    "tool": "Outil",
+    "hide": "Masquer",
+    "mark": "Marquer",
+    "undo": "Annuler",
+    "hideHint": "Pointez l'image et cliquez sur une partie pour la recouvrir, ou faites glisser sur n'importe quelle zone. Cliquez sur une partie masquée pour la faire revenir.",
+    "hideHintFile": "Faites glisser sur ce que vous voulez masquer. Cliquez sur une zone masquée pour la faire revenir.",
+    "markHint": "Cliquez sur ce qui ne va pas, ou faites glisser autour. Chaque marque a un numéro que votre message peut citer.",
+    "markHintFile": "Faites glisser autour de ce qui ne va pas. Chaque marque a un numéro que votre message peut citer.",
+    "keys": "Les flèches parcourent les parties, Espace en masque ou en marque une, Ctrl+Z annule.",
+    "people": "Masquer les personnes",
+    "peopleHidden": "Les noms, avatars, e-mails et numéros de téléphone sont remplacés, et vous apparaissez comme « Vous ».",
+    "peopleShown": "Les noms, avatars, e-mails et numéros de téléphone apparaissent comme sur la page.",
+    "you": "Vous",
+    "person": "Personne {{number}}",
+    "emailHidden": "e-mail masqué",
+    "phoneHidden": "numéro masqué",
+    "fileNote": "Joindre l'image en dessine une copie neuve : quand, où et avec quel appareil elle a été prise restent sur votre appareil.",
+    "marks": "Marques",
+    "area": "une zone que vous avez tracée",
+    "hidePart": "Masquer {{part}}",
+    "markPart": "Marquer {{part}}",
+    "showAgain": "Afficher à nouveau",
+    "removeMark": "Retirer cette marque",
+    "who": "Qui lit ceci verra exactement cette image.",
+    "attach": "Joindre l'image",
+    "surface": "L'image. Les flèches parcourent ses parties.",
+    "parts": {
+      "name": "le nom",
+      "avatar": "l'avatar",
+      "email": "l'adresse e-mail",
+      "phone": "le numéro de téléphone",
+      "picture": "l'image",
+      "field": "le champ",
+      "button": "le bouton",
+      "link": "le lien",
+      "heading": "le titre",
+      "row": "la ligne",
+      "item": "l'élément",
+      "card": "la carte",
+      "text": "le texte"
+    }
   }
 }

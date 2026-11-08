@@ -332,8 +332,8 @@ def test_each_source_gates_on_a_column_that_points_at_its_tool():
     row — a task by its project, a calendar event by its calendar.
 
     Only ``task`` was exercised end to end; this covers every source
-    structurally, so a new one naming the wrong column (``queue_id`` where
-    ``calendar_id`` was meant) fails here rather than gating search against a
+    structurally, so a new one naming the wrong column (``counter_group_id``
+    where ``calendar_id`` was meant) fails here rather than gating search against a
     resource that has nothing to do with the row.
     """
     for table, source in sorted(SEARCH_SOURCES.items()):

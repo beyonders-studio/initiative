@@ -3,7 +3,8 @@ import { useTranslation } from "react-i18next";
 
 import type { TaskListRead } from "@/api/generated/initiativeAPI.schemas";
 import { type ExportParams, ExportTasksButton } from "@/components/tasks/ExportTasksButton";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/ui/button";
+import { SelectionBar } from "@/ui/selection-bar";
 
 type TaskBulkEditPanelProps = {
   selectedTasks: TaskListRead[];
@@ -28,32 +29,26 @@ export const TaskBulkEditPanel = ({
 }: TaskBulkEditPanelProps) => {
   const { t } = useTranslation(["tasks", "common", "exports"]);
   return (
-    <div className="flex items-center justify-between rounded-md border border-primary bg-primary/5 p-4">
-      <div className="font-medium text-sm">
-        {t("bulkEdit.selected", { count: selectedTasks.length })}
-      </div>
-
-      <div className="flex items-center gap-2">
-        {exportParams && (
-          <ExportTasksButton params={exportParams} label={t("exports:export.selected")} />
-        )}
-        <Button variant="outline" size="sm" onClick={onEditTags}>
-          <Tags className="h-4 w-4" />
-          {t("bulkEdit.editTags")}
-        </Button>
-        <Button variant="outline" size="sm" onClick={onEdit}>
-          <Pencil className="h-4 w-4" />
-          {t("common:edit")}
-        </Button>
-        <Button variant="outline" size="sm" onClick={onArchive} disabled={isArchiving}>
-          <Archive className="h-4 w-4" />
-          {isArchiving ? t("edit.archiving") : t("edit.archive")}
-        </Button>
-        <Button variant="destructive" size="sm" onClick={onDelete}>
-          <Trash2 className="h-4 w-4" />
-          {t("common:delete")}
-        </Button>
-      </div>
-    </div>
+    <SelectionBar label={t("bulkEdit.selected", { count: selectedTasks.length })}>
+      {exportParams && (
+        <ExportTasksButton params={exportParams} label={t("exports:export.selected")} />
+      )}
+      <Button variant="outline" size="sm" onClick={onEditTags}>
+        <Tags className="h-4 w-4" />
+        {t("bulkEdit.editTags")}
+      </Button>
+      <Button variant="outline" size="sm" onClick={onEdit}>
+        <Pencil className="h-4 w-4" />
+        {t("common:edit")}
+      </Button>
+      <Button variant="outline" size="sm" onClick={onArchive} disabled={isArchiving}>
+        <Archive className="h-4 w-4" />
+        {isArchiving ? t("edit.archiving") : t("edit.archive")}
+      </Button>
+      <Button variant="destructive" size="sm" onClick={onDelete}>
+        <Trash2 className="h-4 w-4" />
+        {t("common:delete")}
+      </Button>
+    </SelectionBar>
   );
 };

@@ -67,12 +67,6 @@ export type Spec = {
   personalExact?: readonly string[];
   /** Non-community path prefixes: `/api/v1/me/tasks`. */
   personalPrefix?: readonly string[];
-  /**
-   * Hand-written keys named by their first element and carrying their community in
-   * the second (`["community-plugin", communityId, pluginId]`). Scoped to the active community by
-   * that element, like every other community key.
-   */
-  communityNamed?: readonly string[];
   /** Hand-written keys matched by their first element alone (`["dm", …]`). */
   named?: readonly string[];
 };
@@ -83,7 +77,6 @@ type Matcher = {
   communityPrefix: string[];
   personalExact: Set<string>;
   personalPrefix: string[];
-  communityNamed: Set<string>;
   named: Set<string>;
 };
 
@@ -93,13 +86,11 @@ const merge = (specs: readonly Spec[]): Matcher => {
     communityPrefix: [],
     personalExact: new Set(),
     personalPrefix: [],
-    communityNamed: new Set(),
     named: new Set(),
   };
   for (const spec of specs) {
     for (const path of spec.communityExact ?? []) matcher.communityExact.add(path);
     for (const path of spec.personalExact ?? []) matcher.personalExact.add(path);
-    for (const name of spec.communityNamed ?? []) matcher.communityNamed.add(name);
     for (const name of spec.named ?? []) matcher.named.add(name);
     // Prefixes stay a list: there are only ever a handful, and each has to be
     // tested against the path rather than looked up.
@@ -136,9 +127,6 @@ const matches = (matcher: Matcher, queryKey: readonly unknown[]): boolean => {
     return false;
   }
 
-  if (matcher.communityNamed.has(first)) {
-    return scopedCommunityId === null || queryKey[1] === scopedCommunityId;
-  }
   if (matcher.named.has(first)) return true;
   if (matcher.personalExact.has(first)) return true;
   for (const prefix of matcher.personalPrefix) {
@@ -177,7 +165,6 @@ export const compose = (...specs: Spec[]): Spec => ({
   communityPrefix: specs.flatMap((spec) => spec.communityPrefix ?? []),
   personalExact: specs.flatMap((spec) => spec.personalExact ?? []),
   personalPrefix: specs.flatMap((spec) => spec.personalPrefix ?? []),
-  communityNamed: specs.flatMap((spec) => spec.communityNamed ?? []),
   named: specs.flatMap((spec) => spec.named ?? []),
 });
 
@@ -257,7 +244,7 @@ const recentComments = (): Spec => ({ communityPrefix: ["/api/v1/comments/recent
 
 const notifications = (): Spec => ({ personalPrefix: ["/api/v1/notifications"] });
 
-// ── Contacts: who may reach you, and who you have agreed with ────────────────
+// ── Connections: who may reach you, and who you have agreed with ─────────────
 
 /** The policy and its per-community toggles. */
 const dmSettings = (): Spec => ({ personalExact: ["/api/v1/me/dm-settings"] });
@@ -271,7 +258,7 @@ const contactGrants = (): Spec => ({
 const ignoredAccounts = (): Spec => ({ personalPrefix: ["/api/v1/me/ignored"] });
 
 /** Everyone the reader may reach: the community sections. */
-const contacts = (): Spec => ({ personalPrefix: ["/api/v1/me/contacts"] });
+const people = (): Spec => ({ personalPrefix: ["/api/v1/me/people"] });
 
 /**
  * The direct-message mailbox.
@@ -401,13 +388,9 @@ const pluginServices = (): Spec => ({ personalPrefix: ["/api/v1/plugin-services"
 // One description for every read of an install, because one write moves all of
 // them — the sidebar's list, the settings dialog's detail, the members view —
 // and because the bus names the install community-wide, with no parent to carry it.
-// Two key shapes: the list is Orval's URL key, while the detail and members
-// reads are hand-written and keyed by name. The named pair carries its community in
-// element 1, so it is scoped like every other community key rather than by name.
-const plugins = (): Spec => ({
-  communityPrefix: ["/api/v1/plugins"],
-  communityNamed: ["community-plugin", "community-plugin-members"],
-});
+// Every one is keyed by its path, so one prefix reaches them all, and the
+// widget catalog, which is read under the same path, with them.
+const plugins = (): Spec => ({ communityPrefix: ["/api/v1/plugins"] });
 
 // ── AI Settings (platform config is personal; community/resolved are community) ──
 
@@ -496,10 +479,6 @@ const counter = (counterId: number): Spec => ({
   communityExact: [`/api/v1/counters/${counterId}`],
 });
 
-const queueItem = (itemId: number): Spec => ({
-  communityExact: [`/api/v1/queue-items/${itemId}`],
-});
-
 // ── Posts (community) ────────────────────────────────────────────────────────────
 
 /**
@@ -582,13 +561,11 @@ const toolLists = (which: Tool): Spec => {
     communityPrefix: [`/api/v1/tools/${which}/counts`],
   });
   if (which === Tool.calendar) return compose(lists, allCalendarEvents());
-  // An initiative's list of layouts names its projects, queues and counter
-  // groups, by name. The entries carry projects by their dates and posts by their
+  // An initiative's list of layouts names its projects and counter groups, by
+  // name. The entries carry projects by their dates and posts by their
   // polls' closing.
   if (which === Tool.project) return compose(lists, initiativeLayouts(), allCalendarEntries());
-  if (which === Tool.queue || which === Tool.counter_group) {
-    return compose(lists, initiativeLayouts());
-  }
+  if (which === Tool.counter_group) return compose(lists, initiativeLayouts());
   if (which === Tool.post) return compose(lists, allCalendarEntries());
   return lists;
 };
@@ -623,7 +600,6 @@ const project = (id: number): Spec => toolEntity(Tool.project, id);
 // so a change to one refreshes them too.
 const allFiles = (): Spec => compose(toolList(Tool.file), allCollections());
 const file = (id: number): Spec => compose(toolEntity(Tool.file, id), allCollections());
-const allQueues = (): Spec => toolList(Tool.queue);
 const allCounterGroups = (): Spec => toolList(Tool.counter_group);
 const counterGroup = (id: number): Spec => toolEntity(Tool.counter_group, id);
 const allCalendars = (): Spec => toolList(Tool.calendar);
@@ -634,6 +610,7 @@ const allPosts = (): Spec => toolList(Tool.post);
 const post = (id: number): Spec => toolEntity(Tool.post, id);
 const allWikis = (): Spec => toolList(Tool.wiki);
 const wiki = (id: number): Spec => toolEntity(Tool.wiki, id);
+const allContacts = (): Spec => toolList(Tool.contact);
 
 // ── Property values (community) ──────────────────────────────────────────────────
 
@@ -676,6 +653,7 @@ export const q = {
   allCalendarEvents,
   allCalendars,
   allComments,
+  allContacts,
   allCounterGroups,
   allDashboards,
   allFiles,
@@ -687,7 +665,6 @@ export const q = {
   allProperties,
   allPropertyHolders,
   allReferences,
-  allQueues,
   allSettings,
   allTags,
   allWikis,
@@ -703,7 +680,6 @@ export const q = {
   calendar,
   captchaSettings,
   calendarEvent,
-  queueItem,
   counter,
   communitySettings,
   notificationSettings,
@@ -714,7 +690,6 @@ export const q = {
   filedTickets,
   moderationReports,
   contactGrants,
-  contacts,
   counterGroup,
   customRoles,
   currentUser,
@@ -725,6 +700,7 @@ export const q = {
   fileVersions,
   emailSettings,
   personalItems,
+  people,
   activity,
   fcmConfig,
   communityAIConnections,

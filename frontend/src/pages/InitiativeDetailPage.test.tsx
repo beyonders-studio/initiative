@@ -22,14 +22,7 @@ const page = () =>
   HttpResponse.json({ items: [], total_count: 0, page: 1, page_size: 20, has_next: false });
 
 /** Every tool list answers the same envelope; the tabs only need it to be empty. */
-const VIEWABLE = [
-  Tool.project,
-  Tool.file,
-  Tool.queue,
-  Tool.dashboard,
-  Tool.calendar,
-  Tool.counter_group,
-];
+const VIEWABLE = [Tool.project, Tool.file, Tool.dashboard, Tool.calendar, Tool.counter_group];
 
 function stubEverything(hidden: Tool[] = [], roster = true) {
   server.use(
@@ -40,7 +33,6 @@ function stubEverything(hidden: Tool[] = [], roster = true) {
           name: "Apollo",
           member_count: 4,
           role_display_name: "Project Manager",
-          queues_enabled: true,
           dashboards_enabled: true,
           calendars_enabled: true,
           counter_groups_enabled: true,
@@ -56,7 +48,6 @@ function stubEverything(hidden: Tool[] = [], roster = true) {
     ),
     communityHttp.get("/projects/", page),
     communityHttp.get("/files/", page),
-    communityHttp.get("/queues/", page),
     communityHttp.get("/counter-groups/", page),
     communityHttp.get("/calendars/", page),
     communityHttp.get("/dashboards/", page)
@@ -102,10 +93,10 @@ describe("InitiativeDetailPage", () => {
 
   it("selects the tab the route names", async () => {
     stubEverything();
-    renderAt(Tool.queue);
+    renderAt(Tool.dashboard);
 
-    expect(await screen.findByRole("tab", { name: "Queues" })).toBeInTheDocument();
-    expect(selectedTab()).toHaveAccessibleName("Queues");
+    expect(await screen.findByRole("tab", { name: "Dashboards" })).toBeInTheDocument();
+    expect(selectedTab()).toHaveAccessibleName("Dashboards");
   });
 
   it("falls back to the first tab when the route names none", async () => {
@@ -119,11 +110,11 @@ describe("InitiativeDetailPage", () => {
 
   // A permission change shouldn't dead-end a bookmark someone already has.
   it("falls back to the first available tab for a tool this member can't view", async () => {
-    stubEverything([Tool.queue]);
-    renderAt(Tool.queue);
+    stubEverything([Tool.dashboard]);
+    renderAt(Tool.dashboard);
 
     expect(await screen.findByRole("tab", { name: "Projects" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Queues" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Dashboards" })).not.toBeInTheDocument();
     expect(selectedTab()).toHaveAccessibleName("Projects");
   });
 

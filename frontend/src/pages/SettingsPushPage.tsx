@@ -12,18 +12,20 @@ import { useTranslation } from "react-i18next";
 
 import type { PushSettingsUpdate } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { FormSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { useServerForm } from "@/hooks/useServerForm";
 import { usePushSettings, useUpdatePushSettings } from "@/hooks/useSettings";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
+import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
+import { Switch } from "@/ui/switch";
+import { Textarea } from "@/ui/textarea";
 
 const TEXT_FIELDS = ["project_id", "application_id", "api_key", "sender_id"] as const;
 
@@ -78,7 +80,7 @@ export const SettingsPushPage = () => {
   }
 
   if (query.isError || !query.data) {
-    return <p className="text-destructive text-sm">{t("push.loadError")}</p>;
+    return <StatusMessage onRetry={query.refetch} />;
   }
 
   const hasServiceAccount = query.data.has_service_account;
@@ -132,10 +134,12 @@ export const SettingsPushPage = () => {
           ))}
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="push-service-account">{t("push.serviceAccountLabel")}</Label>
+        <Field
+          label={t("push.serviceAccountLabel")}
+          hint={!serviceAccountInvalid && t("push.serviceAccountHelp")}
+          error={serviceAccountInvalid && t("push.serviceAccountInvalid")}
+        >
           <Textarea
-            id="push-service-account"
             rows={6}
             spellCheck={false}
             autoComplete="off"
@@ -143,14 +147,8 @@ export const SettingsPushPage = () => {
             value={serviceAccount}
             onChange={(event) => setServiceAccount(event.target.value)}
             placeholder={hasServiceAccount ? t("push.serviceAccountSet") : ""}
-            aria-invalid={serviceAccountInvalid}
           />
-          {serviceAccountInvalid ? (
-            <p className="text-destructive text-xs">{t("push.serviceAccountInvalid")}</p>
-          ) : (
-            <p className="text-muted-foreground text-xs">{t("push.serviceAccountHelp")}</p>
-          )}
-        </div>
+        </Field>
 
         <Button type="submit" disabled={update.isPending || serviceAccountInvalid}>
           {update.isPending ? t("push.saving") : t("push.save")}

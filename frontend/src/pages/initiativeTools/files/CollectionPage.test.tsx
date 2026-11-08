@@ -7,9 +7,9 @@
  * 1. **The list is fetched as it is read.** An infinite query with a
  *    sentinel at the bottom, not a page in the URL: a wall is scrolled.
  * 2. **Every view is virtualized from the first render.** The grid and the
- *    timeline through the shared row virtualizer, the masonry through a
- *    window over placements it computes without measuring — none of them
- *    mounts the whole collection.
+ *    timeline through the shared row virtualizer, the table through the same
+ *    one in the data table, the masonry through a window over placements it
+ *    computes without measuring — none of them mounts the whole collection.
  *
  * How the shared row virtualizer measures itself is a shape every virtualized
  * list in the app keeps, proved once in
@@ -18,10 +18,10 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   buildCollection,
@@ -32,17 +32,18 @@ import {
   buildToolLayoutSet,
 } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
+import { layOutVirtualList } from "@/__tests__/helpers/layOutVirtualList";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
-import { numberFormat } from "@/lib/intl";
+import { numberFormat } from "@/ui/lib/intl";
 
 import { CollectionPage } from "./CollectionPage";
 
 const read = (relative: string) => fs.readFileSync(path.resolve(__dirname, relative), "utf-8");
 
 const PAGE = read("./CollectionPage.tsx");
-const ROWS = read("../../../components/files/collections/VirtualRows.tsx");
+const ROWS = read("../../../ui/virtual-rows.tsx");
 const GRID = read("../../../components/files/collections/CollectionGridView.tsx");
 const TIMELINE = read("../../../components/files/collections/CollectionTimelineView.tsx");
 const MASONRY = read("../../../components/files/collections/MasonryWall.tsx");
@@ -50,7 +51,7 @@ const MASONRY = read("../../../components/files/collections/MasonryWall.tsx");
 describe("a collection's wall", () => {
   it("fetches files as the reader scrolls rather than paging", () => {
     expect(PAGE).toContain("useCollectionFilesFeed");
-    expect(PAGE).toContain("IntersectionObserver");
+    expect(PAGE).toMatch(/<LoadMore\s+auto/);
     expect(PAGE).toContain("fetchNextPage");
     expect(PAGE).not.toMatch(/PaginationBar/);
   });
@@ -71,7 +72,31 @@ describe("a collection's wall", () => {
   });
 });
 
+/** The page inside the app's scroller, which its lists measure against. */
+const renderCollection = () =>
+  renderPage(
+    () => (
+      <main data-app-scroll="">
+        <CollectionPage />
+      </main>
+    ),
+    {
+      initialRoute: "/c/$communityId/i/$initiativeId/files/collections/$collectionId",
+      routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
+    }
+  );
+
+const scroller = () => document.querySelector<HTMLElement>("[data-app-scroll]");
+
+/** How tall a table row is laid out. */
+const ROW = 48;
+
 describe("a collection's page", () => {
+  layOutVirtualList((element) => element.hasAttribute("data-app-scroll"), {
+    height: 10 * ROW,
+    rowHeight: ROW,
+  });
+
   it("offers the lists it shows, and takes files out of it", async () => {
     const files = [
       buildFileSummary({ id: 4, name: "Hero" }),
@@ -105,10 +130,7 @@ describe("a collection's page", () => {
       communityHttp.get("/relationships/", () => HttpResponse.json([]))
     );
     const user = userEvent.setup();
-    renderPage(CollectionPage, {
-      initialRoute: "/c/$communityId/i/$initiativeId/files/collections/$collectionId",
-      routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
-    });
+    renderCollection();
 
     expect(await screen.findByRole("heading", { name: "Round 4" })).toBeInTheDocument();
     const lists = await screen.findByRole("tablist", { name: "View" });
@@ -186,10 +208,7 @@ describe("a collection's page", () => {
       communityHttp.get("/property-definitions/", () => HttpResponse.json([])),
       communityHttp.get("/relationships/", () => HttpResponse.json([]))
     );
-    renderPage(CollectionPage, {
-      initialRoute: "/c/$communityId/i/$initiativeId/files/collections/$collectionId",
-      routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
-    });
+    renderCollection();
 
     await waitFor(() =>
       expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
@@ -201,6 +220,48 @@ describe("a collection's page", () => {
     expect(screen.getByRole("link", { name: "Lamp" })).toBeInTheDocument();
     const euros = numberFormat(undefined, { style: "currency", currency: "EUR" }).format(12.5);
     expect(screen.getByText(euros)).toBeInTheDocument();
+  });
+
+  it("mounts only the files near the view in its table, as the page scrolls", async () => {
+    const files = Array.from({ length: 60 }, (_, index) =>
+      buildFileSummary({ id: index + 1, name: `Scan ${index + 1}` })
+    );
+    server.use(
+      communityHttp.get("/collections/:id", () => HttpResponse.json(buildCollection({ id: 5 }))),
+      communityHttp.get("/collections/:id/files", () =>
+        HttpResponse.json({
+          items: files,
+          total_count: files.length,
+          page: 1,
+          page_size: 60,
+          has_next: false,
+          has_prev: false,
+        })
+      ),
+      communityHttp.get("/layouts/", () =>
+        HttpResponse.json(
+          buildToolLayoutSet({ tool: "collection", hidden: ["masonry", "grid", "timeline"] })
+        )
+      ),
+      communityHttp.get("/relationships/", () => HttpResponse.json([]))
+    );
+    // As in a browser, what the page holds moves up as it scrolls.
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: Element
+    ) {
+      const page = scroller();
+      const top = page && page !== this && page.contains(this) ? -page.scrollTop : 0;
+      return { top, bottom: top, left: 0, right: 0, width: 0, height: 0, x: 0, y: top } as DOMRect;
+    });
+    renderCollection();
+
+    await screen.findByRole("link", { name: "Scan 1" });
+    expect(screen.getAllByRole("link", { name: /^Scan \d+$/ }).length).toBeLessThan(files.length);
+    expect(screen.queryByRole("link", { name: "Scan 60" })).not.toBeInTheDocument();
+
+    act(() => scroller()?.scrollTo({ top: 50 * ROW }));
+    await screen.findByRole("link", { name: "Scan 60" });
+    expect(screen.queryByRole("link", { name: "Scan 1" })).not.toBeInTheDocument();
   });
 
   it("opens a file that is not a picture beside its table, with its values there", async () => {
@@ -252,10 +313,7 @@ describe("a collection's page", () => {
       communityHttp.get("/relationships/", () => HttpResponse.json([]))
     );
     const user = userEvent.setup();
-    renderPage(CollectionPage, {
-      initialRoute: "/c/$communityId/i/$initiativeId/files/collections/$collectionId",
-      routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
-    });
+    renderCollection();
 
     // The table is drawn again as the initiative's properties arrive; the name
     // is clicked once they have.
@@ -289,10 +347,7 @@ describe("a collection's page", () => {
       communityHttp.get("/relationships/", () => HttpResponse.json([]))
     );
     const user = userEvent.setup();
-    const { router } = renderPage(CollectionPage, {
-      initialRoute: "/c/$communityId/i/$initiativeId/files/collections/$collectionId",
-      routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
-    });
+    const { router } = renderCollection();
 
     await screen.findByRole("heading", { name: "Collection 1" });
     await user.click(screen.getByRole("button", { name: "More actions" }));
@@ -336,10 +391,7 @@ describe("a collection's page", () => {
       ),
       communityHttp.get("/relationships/", () => HttpResponse.json([]))
     );
-    renderPage(CollectionPage, {
-      initialRoute: "/c/$communityId/i/$initiativeId/files/collections/$collectionId",
-      routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
-    });
+    renderCollection();
 
     expect(await screen.findByRole("combobox", { name: "Status" })).toHaveTextContent("Archived");
   });
@@ -388,10 +440,7 @@ describe("a collection's page", () => {
       communityHttp.get("/relationships/", () => HttpResponse.json([]))
     );
     const user = userEvent.setup();
-    renderPage(CollectionPage, {
-      initialRoute: "/c/$communityId/i/$initiativeId/files/collections/$collectionId",
-      routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
-    });
+    renderCollection();
 
     await user.click(await screen.findByRole("button", { name: /January 2026/ }));
     await waitFor(() => expect(anchors).toContain("2026-01-12T09:00:00Z"));

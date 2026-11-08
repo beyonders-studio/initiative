@@ -40,6 +40,10 @@
     "feedback": {
       "title": "Comentarios",
       "description": "Lo que la gente nos ha dicho que quiere."
+    },
+    "ideas": {
+      "title": "Ideas",
+      "description": "Las ideas que todos pueden leer y votar, en Initiative Cloud."
     }
   },
   "stream": {
@@ -58,6 +62,8 @@
     "landingStatusDefault": "El estado por defecto del proyecto",
     "caseTypeLabel": "Los casos nuevos son de tipo",
     "caseTypeDefault": "El tipo por defecto del proyecto",
+    "ideaTypeLabel": "El tipo que lleva una tarea a la página de Ideas",
+    "ideaTypeNone": "Ninguno: no se publica nada",
     "enabledLabel": "Recibiendo casos nuevos",
     "lastCase": "Último caso abierto el {{when}}.",
     "noCasesYet": "Aún no hay casos.",
@@ -79,25 +85,40 @@
     "sharesIsolated": "Otro canal también llega a esta iniciativa. Los casos de seguridad y moderación deberían tener su propia iniciativa, para que solo quienes los atienden puedan leerlos.",
     "sharesWithIsolated": "Esta iniciativa también recibe casos de seguridad o moderación, que deberían tener su propia iniciativa. Dirige uno de los canales a otro lugar."
   },
-  "loadFailed": {
-    "title": "No se pudieron cargar estos ajustes",
-    "description": "No se ha cambiado nada. Inténtalo de nuevo; si sigue fallando, el registro del servidor dirá por qué.",
-    "retry": "Reintentar"
-  },
   "help": {
     "action": "Pedir ayuda",
-    "title": "Pedir ayuda",
-    "description": "Cuéntanos qué ocurre y alguien se encargará.",
+    "panel": {
+      "search": "Buscar en la guía de uso",
+      "guide": "Guía de uso",
+      "guideBody": "Cómo usar cada parte de Initiative, desde tu primer proyecto.",
+      "back": "Volver a la búsqueda",
+      "forThisPage": "Para esta página",
+      "noMatch": "Nada en la guía de uso coincide con «{{query}}».",
+      "noMatchAsk": "Prueba con otras palabras o pregunta al equipo abajo. Tu búsqueda pasa a la solicitud.",
+      "noMatchWrite": "Prueba con otras palabras o escribe a la dirección de abajo.",
+      "noMatchBrowse": "Prueba con otras palabras o recorre la guía de uso.",
+      "unavailable": "La búsqueda no está configurada en este servidor. El enlace a la guía de uso de arriba lo tiene todo.",
+      "noAnswer": "¿No está la respuesta?",
+      "openRequests_one": "{{count}} solicitud abierta",
+      "openRequests_other": "{{count}} solicitudes abiertas",
+      "askTeam": "Preguntar al equipo",
+      "writeTo": "¿No está la respuesta? Escribe a quienes administran este servidor:",
+      "needsText": "Cuenta qué pasa para enviar.",
+      "needsTopic": "Elige de qué trata para enviar.",
+      "sendShortcut": "Ctrl+Intro envía",
+      "discard": "Descartar",
+      "sent": "Enviado al equipo",
+      "sentBody": "Quienes administran este servidor se encargarán. Su respuesta llega a tus notificaciones y la solicitud queda en Mis tickets.",
+      "openTickets": "Abrir Mis tickets"
+    },
     "subjectLabel": "Título",
     "subjectPlaceholder": "Una línea, para poder encontrarlo después",
     "bodyLabel": "¿Qué ha pasado?",
     "bodyPlaceholder": "Qué estabas haciendo, qué esperabas y qué ocurrió en su lugar.",
-    "browseFaq": "Consultar las preguntas frecuentes",
     "submit": "Enviar",
     "thanks": "Enviado. Alguien se encargará.",
     "error": "No se ha podido enviar. Inténtalo de nuevo en un momento.",
     "topicLabel": "¿De qué se trata?",
-    "topicPlaceholder": "Elige una opción",
     "topics": {
       "account": "Mi cuenta",
       "community": "Esta comunidad",
@@ -133,13 +154,14 @@
     "replyError": "No se pudo enviar tu respuesta. Inténtalo de nuevo en un momento.",
     "closedNote": "Este ticket está cerrado. Si surge otra cosa, vuelve a pedir ayuda.",
     "noConversation": "Gracias por el reporte. El equipo revisa cada uno, pero no responde a los reportes aquí.",
-    "staffFirst": "Gracias por contárnoslo. Podrás responder aquí cuando el equipo te haya escrito.",
-    "empty": "Aún no has enviado ningún ticket. Cuando pidas ayuda, aparecerá aquí para que puedas seguirla.",
-    "loadError": "No se pudieron cargar tus tickets."
+    "empty": "Aún no has enviado ningún ticket. Cuando pidas ayuda, aparecerá aquí para que puedas seguirla."
   },
   "case": {
     "filedBy": "Enviado por",
     "noFiler": "Abierto automáticamente",
+    "votes_one": "{{count}} voto",
+    "votes_other": "{{count}} votos",
+    "noContact": "Prefiere que no le contacten",
     "theyCalledIt": "Su asunto:",
     "noConversation": "Este tipo de caso no abre una conversación con quien lo envió.",
     "staffFirst": "Podrá responder cuando el equipo le haya escrito.",
@@ -211,6 +233,7 @@
   },
   "evidence": {
     "attach": "Adjuntar archivos",
+    "dropHere": "Suelta para adjuntar",
     "limits_one": "Hasta {{count}} archivo, de {{size}} como máximo.",
     "limits_other": "Hasta {{count}} archivos, de {{size}} como máximo cada uno.",
     "remove": "Quitar {{name}}",
@@ -221,9 +244,7 @@
     "heading": "Adjuntos",
     "reveal": "Mostrar {{name}}",
     "view": "Ver {{name}}",
-    "open": "Abrir {{name}}",
-    "dropped_one": "Se quitó {{names}}: aquí no se acepta.",
-    "dropped_other": "Se quitaron {{names}}: aquí no se aceptan."
+    "open": "Abrir {{name}}"
   },
   "security": {
     "action": "Informar de un problema de seguridad",
@@ -246,28 +267,34 @@
     "error": "No se pudo enviar. Inténtalo de nuevo en un momento."
   },
   "feedback": {
-    "action": "Enviar comentarios",
-    "title": "Enviar comentarios",
-    "description": "Cuéntales a quienes gestionan este servidor lo que piensas. Puedes seguirlo en Mis tickets.",
-    "typeLabel": "¿Qué tipo de comentario es?",
-    "typePlaceholder": "Elige una opción",
-    "topics": {
-      "idea": "Una idea",
-      "problem": "Un problema",
-      "praise": "Un elogio",
-      "other": "Otra cosa"
+    "title": "Cuéntanos qué piensas",
+    "kindLabel": "Tipo de comentario",
+    "kinds": {
+      "idea": {
+        "label": "Sugerir una idea",
+        "question": "¿Qué te gustaría que hiciera Initiative?",
+        "placeholder": "La idea, y en qué te ayudaría."
+      },
+      "problem": {
+        "label": "Algo no va bien",
+        "question": "¿Qué te ha estorbado?",
+        "placeholder": "Qué estabas haciendo y qué pasó."
+      },
+      "praise": {
+        "label": "Hacer un cumplido",
+        "question": "¿Qué es lo que te encanta?",
+        "placeholder": "Lo que le contarías a un amigo."
+      }
     },
-    "bodyLabel": "¿Qué quieres decirles?",
-    "bodyPlaceholder": "Lo que te gustaría, lo que te estorbó o lo que te gustó.",
-    "needsAnswer": "Necesito una respuesta",
-    "needsAnswerHelp": "Lo envía como solicitud de ayuda, para que alguien te responda.",
-    "submit": "Enviar comentarios",
-    "thanks": "¡Gracias! Quienes gestionan este servidor lo leerán.",
-    "error": "No se pudo enviar. Inténtalo de nuevo en un momento.",
+    "contactable": "Pueden contactarme si tienen preguntas sobre esto",
+    "seeIdeas": "Mira lo que otros han pedido",
+    "stuck": "¿Necesitas que alguien lo resuelva por ti? Pedir ayuda",
     "context": {
-      "title": "Se envía con él",
-      "help": "Dónde estaba la aplicación, para que vean lo que viste. Nada de esto te nombra ni nombra nada de lo que abriste.",
-      "remove": "Quitar",
+      "on": "Incluye la versión de la app y la página en la que estás.",
+      "off": "Sin la versión de la app ni la página.",
+      "switch": "Incluir la versión de la app y la página",
+      "show": "Ver qué",
+      "hide": "Ocultar",
       "fields": {
         "app_version": "Versión",
         "platform": "Plataforma",
@@ -276,9 +303,91 @@
         "route": "Página",
         "viewport": "Ventana"
       }
-    }
+    },
+    "discard": "Descartar",
+    "writeSomething": "Escribe algo para enviarlo.",
+    "submit": "Enviar comentarios",
+    "signInToSend": "Inicia sesión para enviar",
+    "thanks": "¡Gracias por tu opinión!",
+    "thanksBody": "El equipo lee cada una.",
+    "done": "Listo",
+    "error": "No se pudo enviar. Inténtalo de nuevo en un momento."
+  },
+  "feedbackSwitch": {
+    "title": "Comentarios",
+    "description": "Las ideas, los problemas y los elogios van al equipo que hace Initiative. Desactivado, aquí nadie ve Enviar comentarios y no se envía nada.",
+    "label": "Permitir enviar comentarios al equipo de Initiative",
+    "error": "No se pudo cambiar. Inténtalo de nuevo en un momento."
   },
   "moderationTopics": {
     "appeal": "Apelación contra tu suspensión"
+  },
+  "ideas": {
+    "title": "Ideas",
+    "lede": "Lo que la gente ha pedido y en qué punto está cada cosa. Vota por las que quieras.",
+    "search": "Buscar ideas",
+    "sortLabel": "Orden",
+    "sort": {
+      "votes": "Más votadas",
+      "newest": "Más recientes"
+    },
+    "statusLabel": "Estado",
+    "allStatuses": "Todas",
+    "votedByMe": "Votadas por mí",
+    "none": "Ninguna idea coincide.",
+    "votes_one": "{{count}} voto",
+    "votes_other": "{{count}} votos",
+    "vote": "Votar",
+    "voted": "Votada",
+    "voteFor": "Votar por {{title}}",
+    "voteError": "No se pudo guardar tu voto. Inténtalo de nuevo en un momento.",
+    "all": "Todas las ideas"
+  },
+  "picture": {
+    "take": "Imagen de esta página",
+    "failed": "No se pudo hacer la imagen. Vuelve a intentarlo o adjunta una captura de pantalla.",
+    "title": "Imagen de esta página",
+    "edit": "Editar {{name}}",
+    "tool": "Herramienta",
+    "hide": "Ocultar",
+    "mark": "Marcar",
+    "undo": "Deshacer",
+    "hideHint": "Señala la imagen y haz clic en una parte para taparla, o arrastra sobre cualquier zona. Haz clic en una parte oculta para recuperarla.",
+    "hideHintFile": "Arrastra sobre lo que quieras ocultar. Haz clic en una zona oculta para recuperarla.",
+    "markHint": "Haz clic en lo que falla, o arrastra alrededor. Cada marca tiene un número que puedes usar en tu mensaje.",
+    "markHintFile": "Arrastra alrededor de lo que falla. Cada marca tiene un número que puedes usar en tu mensaje.",
+    "keys": "Las flechas recorren las partes, Espacio oculta o marca una y Ctrl+Z deshace.",
+    "people": "Ocultar personas",
+    "peopleHidden": "Los nombres, avatares, correos y teléfonos se sustituyen, y tú apareces como «Tú».",
+    "peopleShown": "Los nombres, avatares, correos y teléfonos se ven como en la página.",
+    "you": "Tú",
+    "person": "Persona {{number}}",
+    "emailHidden": "correo oculto",
+    "phoneHidden": "número oculto",
+    "fileNote": "Al adjuntarla se dibuja una copia nueva, así que cuándo, dónde y con qué dispositivo se tomó se quedan en tu dispositivo.",
+    "marks": "Marcas",
+    "area": "una zona que dibujaste",
+    "hidePart": "Ocultar {{part}}",
+    "markPart": "Marcar {{part}}",
+    "showAgain": "Volver a mostrar",
+    "removeMark": "Quitar esta marca",
+    "who": "Quien lea esto verá exactamente esta imagen.",
+    "attach": "Adjuntar imagen",
+    "surface": "La imagen. Las flechas recorren sus partes.",
+    "parts": {
+      "name": "el nombre",
+      "avatar": "el avatar",
+      "email": "el correo",
+      "phone": "el teléfono",
+      "picture": "la imagen",
+      "field": "el campo",
+      "button": "el botón",
+      "link": "el enlace",
+      "heading": "el título",
+      "row": "la fila",
+      "item": "el elemento",
+      "card": "la tarjeta",
+      "text": "el texto"
+    }
   }
 }

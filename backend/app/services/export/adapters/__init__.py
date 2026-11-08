@@ -8,12 +8,12 @@ from app.services.export.adapters.backup import (
 )
 from app.services.export.adapters.calendar import CalendarAdapter
 from app.services.export.adapters.calendar_events import CalendarEventsAdapter
+from app.services.export.adapters.contact import ContactAdapter
 from app.services.export.adapters.counter_group import CounterGroupAdapter
 from app.services.export.adapters.dashboard import DashboardAdapter
 from app.services.export.adapters.file import FileAdapter
 from app.services.export.adapters.post import PostAdapter
 from app.services.export.adapters.project import ProjectAdapter
-from app.services.export.adapters.queue import QueueAdapter
 from app.services.export.adapters.tasks_table import TasksTableAdapter
 from app.services.export.adapters.wiki import WikiAdapter
 
@@ -24,12 +24,12 @@ ADAPTERS = {
         CalendarEventsAdapter(),
         ProjectAdapter(),
         FileAdapter(),
-        QueueAdapter(),
         CounterGroupAdapter(),
         DashboardAdapter(),
         CalendarAdapter(),
         PostAdapter(),
         WikiAdapter(),
+        ContactAdapter(),
         InitiativeExportAdapter(),
         GuildExportAdapter(),
     )

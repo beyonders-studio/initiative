@@ -3,20 +3,20 @@ import { useTranslation } from "react-i18next";
 
 import type { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import { NeedAccessOr } from "@/components/access/RequestAccess";
-import { StatusMessage } from "@/components/StatusMessage";
 import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
+import { StatusMessage } from "@/ui/status-message";
 
 /** Where a detail page keeps its `noAccess` and `notFound` strings, each with
  *  a `…Description` beside it. */
 type AccessKeys =
   | "calendars:"
+  | "contacts:"
   | "counterGroups:"
   | "dashboards:"
   | "files:collections."
   | "files:detail."
   | "posts:"
   | "projects:detail."
-  | "queues:"
   | "tasks:edit."
   | "wikis:";
 

@@ -15,7 +15,7 @@ import {
 
 describe("what can be mentioned", () => {
   it("reaches every kind of thing except what people said about them", () => {
-    expect(MENTIONABLE_TYPES).toContain(SearchEntityType.queue);
+    expect(MENTIONABLE_TYPES).toContain(SearchEntityType.wiki);
     expect(MENTIONABLE_TYPES).toContain(SearchEntityType.calendar_event);
     expect(MENTIONABLE_TYPES).toContain(SearchEntityType.dashboard);
     expect(MENTIONABLE_TYPES).not.toContain(SearchEntityType.comment);
@@ -74,7 +74,7 @@ describe("the mention being typed", () => {
 
 describe("what gets written into the comment", () => {
   it("writes the kind's own name, so the renderer reads back what it wrote", () => {
-    expect(entityMentionSyntax(SearchEntityType.queue, "Intake", 4)).toBe("#queue[Intake](4)");
+    expect(entityMentionSyntax(SearchEntityType.wiki, "Fete", 4)).toBe("#wiki[Fete](4)");
     expect(entityMentionSyntax(SearchEntityType.counter_group, "Q1", 7)).toBe(
       "#counter-group[Q1](7)"
     );

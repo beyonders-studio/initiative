@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 
 import {
   clearProviderDefault,
@@ -6,14 +6,13 @@ import {
   deleteAuthProvider,
   discoverAuthProvider,
   getGetProviderDefaultQueryKey,
-  getListAuthProvidersQueryKey,
-  getProviderDefault,
-  listAuthProviders,
   setProviderDefault,
   testAuthProvider,
   updateAuthProvider,
+  useGetProviderDefault,
+  useListAuthProviders,
 } from "@/api/generated/auth-providers/auth-providers";
-import { getAppConfig, getGetAppConfigQueryKey } from "@/api/generated/config/config";
+import { useGetAppConfig } from "@/api/generated/config/config";
 import type {
   AppConfig,
   AuthProviderCreate,
@@ -29,7 +28,6 @@ import type {
   CommunitySuspensionUpdate,
   EmailSettingsResponse,
   EmailSettingsUpdate,
-  FCMConfigResponse,
   GetChangelogParams,
   InterfaceSettingsResponse,
   InterfaceSettingsUpdate,
@@ -54,28 +52,6 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   agreeCommunityNarrowing,
-  getCaptchaSettings,
-  getEmailSettings,
-  getFcmConfig,
-  getGetCaptchaSettingsQueryKey,
-  getGetEmailSettingsQueryKey,
-  getGetFcmConfigQueryKey,
-  getGetNotificationSettingsQueryKey,
-  getGetOidcSettingsQueryKey,
-  getGetPlatformAuthSettingsQueryKey,
-  getGetPushSettingsQueryKey,
-  getGetStorageBackfillStatusQueryKey,
-  getGetStorageSettingsQueryKey,
-  getListPlatformCommunityStorageQueryKey,
-  getNotificationSettings,
-  getOidcSettings,
-  getPlatformAuthSettings,
-  getPushSettings,
-  getReadCommunityNarrowingsQueryKey,
-  getStorageBackfillStatus,
-  getStorageSettings,
-  listPlatformCommunityStorage,
-  readCommunityNarrowings,
   restorePlatformCommunity,
   sendTestEmail,
   setPlatformCommunitySuspension,
@@ -90,30 +66,34 @@ import {
   updatePlatformCommunityStorage,
   updatePushSettings,
   updateStorageSettings,
+  useGetCaptchaSettings,
+  useGetEmailSettings,
+  useGetFcmConfig,
+  useGetNotificationSettings,
+  useGetOidcSettings,
+  useGetPlatformAuthSettings,
+  useGetPushSettings,
+  useGetStorageBackfillStatus,
+  useGetStorageSettings,
+  useListPlatformCommunityStorage,
+  useReadCommunityNarrowings,
   useReadCommunitySettings,
 } from "@/api/generated/settings/settings";
-import { getChangelog, getGetChangelogQueryKey } from "@/api/generated/version/version";
+import { useGetChangelog } from "@/api/generated/version/version";
 import { invalidate, q } from "@/api/query-keys";
 import { useApiMutation } from "@/hooks/useApiMutation";
+import { queryClient } from "@/lib/queryClient";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
 // ── Queries ─────────────────────────────────────────────────────────────────
 
 export const useOidcSettings = (options?: QueryOpts<OIDCSettingsResponse>) => {
-  return useQuery<OIDCSettingsResponse>({
-    queryKey: getGetOidcSettingsQueryKey(),
-    queryFn: () => getOidcSettings(),
-    ...options,
-  });
+  return useGetOidcSettings({ query: options });
 };
 
 export const useAuthProviders = (options?: QueryOpts<AuthProviderOwnerRead[]>) => {
-  return useQuery<AuthProviderOwnerRead[]>({
-    queryKey: getListAuthProvidersQueryKey(),
-    queryFn: () => listAuthProviders(),
-    ...options,
-  });
+  return useListAuthProviders({ query: options });
 };
 
 /** What a community says its own arrivals look like, for the operator. */
@@ -121,11 +101,7 @@ export const useCommunityNarrowings = (
   communityId: number,
   options?: QueryOpts<CommunityNarrowingPending[]>
 ) => {
-  return useQuery<CommunityNarrowingPending[]>({
-    queryKey: getReadCommunityNarrowingsQueryKey(communityId),
-    queryFn: () => readCommunityNarrowings(communityId),
-    ...options,
-  });
+  return useReadCommunityNarrowings(communityId, { query: options });
 };
 
 /** Agree that a community's claim values are its own, or withdraw that. */
@@ -143,58 +119,30 @@ export const useAgreeCommunityNarrowing = (
   );
 
 export const useEmailSettings = (options?: QueryOpts<EmailSettingsResponse>) => {
-  return useQuery<EmailSettingsResponse>({
-    queryKey: getGetEmailSettingsQueryKey(),
-    queryFn: () => getEmailSettings(),
-    ...options,
-  });
+  return useGetEmailSettings({ query: options });
 };
 
 export const useStorageSettings = (options?: QueryOpts<StorageSettingsResponse>) => {
-  return useQuery<StorageSettingsResponse>({
-    queryKey: getGetStorageSettingsQueryKey(),
-    queryFn: () => getStorageSettings(),
-    ...options,
-  });
+  return useGetStorageSettings({ query: options });
 };
 
 export const useStorageBackfillStatus = (options?: QueryOpts<StorageBackfillStatusResponse>) => {
-  return useQuery<StorageBackfillStatusResponse>({
-    queryKey: getGetStorageBackfillStatusQueryKey(),
-    queryFn: () => getStorageBackfillStatus(),
-    ...options,
-  });
+  return useGetStorageBackfillStatus({ query: options });
 };
 
 export const useCaptchaSettings = (options?: QueryOpts<CaptchaSettingsResponse>) =>
-  useQuery<CaptchaSettingsResponse>({
-    queryKey: getGetCaptchaSettingsQueryKey(),
-    queryFn: () => getCaptchaSettings(),
-    ...options,
-  });
+  useGetCaptchaSettings({ query: options });
 
 export const usePushSettings = (options?: QueryOpts<PushSettingsResponse>) =>
-  useQuery<PushSettingsResponse>({
-    queryKey: getGetPushSettingsQueryKey(),
-    queryFn: () => getPushSettings(),
-    ...options,
-  });
+  useGetPushSettings({ query: options });
 
 /** The branding page's values, read from the public config they live in. */
 export const useInterfaceSettings = (options?: QueryOpts<AppConfig>) => {
-  return useQuery<AppConfig>({
-    queryKey: getGetAppConfigQueryKey(),
-    queryFn: () => getAppConfig(),
-    ...options,
-  });
+  return useGetAppConfig({ query: options });
 };
 
 export const useFcmConfig = () => {
-  return useQuery<FCMConfigResponse>({
-    queryKey: getGetFcmConfigQueryKey(),
-    queryFn: () => getFcmConfig(),
-    staleTime: 5 * 60 * 1000,
-  });
+  return useGetFcmConfig(undefined, { query: { staleTime: 5 * 60 * 1000 } });
 };
 
 /**
@@ -207,11 +155,8 @@ export const usePlatformCommunities = (
   params: ListPlatformCommunityStorageParams,
   options?: QueryOpts<PlatformCommunityStorageListResponse>
 ) => {
-  return useQuery<PlatformCommunityStorageListResponse>({
-    queryKey: getListPlatformCommunityStorageQueryKey(params),
-    queryFn: () => listPlatformCommunityStorage(params),
-    placeholderData: keepPreviousData,
-    ...options,
+  return useListPlatformCommunityStorage(params, {
+    query: { placeholderData: keepPreviousData, ...options },
   });
 };
 
@@ -219,11 +164,7 @@ export const useChangelog = (
   params: GetChangelogParams,
   options?: QueryOpts<ChangelogResponse>
 ) => {
-  return useQuery<ChangelogResponse>({
-    queryKey: getGetChangelogQueryKey(params),
-    queryFn: () => getChangelog(params),
-    ...options,
-  });
+  return useGetChangelog(params, { query: options });
 };
 
 // ── Settings Mutations ──────────────────────────────────────────────────────
@@ -329,11 +270,7 @@ export const useUpdateCommunitySettings = (
  * how many device tokens switching push off would drop.
  */
 export const useNotificationSettings = (options?: QueryOpts<NotificationSettingsResponse>) =>
-  useQuery<NotificationSettingsResponse>({
-    queryKey: getGetNotificationSettingsQueryKey(),
-    queryFn: () => getNotificationSettings(),
-    ...options,
-  });
+  useGetNotificationSettings({ query: options });
 
 /**
  * Set the three answers. Switching push off also drops the device tokens the
@@ -351,11 +288,7 @@ export const useUpdateNotificationSettings = (
   );
 
 export const usePlatformAuthSettings = (options?: QueryOpts<PlatformAuthSettingsResponse>) =>
-  useQuery<PlatformAuthSettingsResponse>({
-    queryKey: getGetPlatformAuthSettingsQueryKey(),
-    queryFn: () => getPlatformAuthSettings(),
-    ...options,
-  });
+  useGetPlatformAuthSettings({ query: options });
 
 /**
  * Change any of the deployment's sign-in rules: which ways in it permits, who
@@ -527,35 +460,24 @@ export const useProviderDefault = (
   providerId: number | null,
   options?: QueryOpts<PlatformProviderDefaultRead | null>
 ) => {
-  return useQuery<PlatformProviderDefaultRead | null>({
-    queryKey: getGetProviderDefaultQueryKey(providerId as number),
-    queryFn: () => getProviderDefault(providerId as number),
-    enabled: providerId !== null,
-    ...options,
+  return useGetProviderDefault(providerId as number, {
+    query: { enabled: providerId !== null, ...options },
   });
 };
 
-const useInvalidateProviderDefault = (providerId: number) => {
-  const queryClient = useQueryClient();
-  return () => {
-    void queryClient.invalidateQueries({
-      queryKey: getGetProviderDefaultQueryKey(providerId),
-    });
-  };
-};
+const invalidateProviderDefault = (providerId: number) =>
+  queryClient.invalidateQueries({ queryKey: getGetProviderDefaultQueryKey(providerId) });
 
-export const useSetProviderDefault = (providerId: number) => {
-  const invalidate = useInvalidateProviderDefault(providerId);
-  return useMutation({
+export const useSetProviderDefault = (providerId: number) =>
+  useApiMutation({
     mutationFn: (data: PlatformProviderDefaultUpdate) => setProviderDefault(providerId, data),
-    onSuccess: invalidate,
+    invalidate: () => invalidateProviderDefault(providerId),
+    errorKey: "settings:providerDefaults.saveError",
   });
-};
 
-export const useClearProviderDefault = (providerId: number) => {
-  const invalidate = useInvalidateProviderDefault(providerId);
-  return useMutation({
+export const useClearProviderDefault = (providerId: number) =>
+  useApiMutation({
     mutationFn: () => clearProviderDefault(providerId),
-    onSuccess: invalidate,
+    invalidate: () => invalidateProviderDefault(providerId),
+    errorKey: "settings:providerDefaults.saveError",
   });
-};

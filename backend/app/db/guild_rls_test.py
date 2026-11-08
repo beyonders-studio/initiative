@@ -17,6 +17,7 @@ import pytest
 from sqlalchemy import text
 
 from app.core.reactions import ReactionTarget
+from app.core.relationships import PERSON
 from app.db.initiative_rls import (
     COMMENT_PARENTS,
     CONTENT_KIND_TABLES,
@@ -25,6 +26,8 @@ from app.db.initiative_rls import (
     render_entity_access_fn,
 )
 from app.db.schema_provisioning import (
+    PARTS,
+    _apply_parts,
     drop_guild_schema,
     guild_schema_name,
     provision_guild_schema,
@@ -143,6 +146,8 @@ async def test_every_initiative_scoped_table_has_policies(engine):
     try:
         async with engine.begin() as conn:
             await provision_guild_schema(conn, _GID_POLICIES)
+            # As the operations community, so its own tables are checked too.
+            await _apply_parts(conn, _GID_POLICIES, PARTS, operations=True)
         async with engine.connect() as conn:
             pol_rows = await conn.execute(
                 text(
@@ -309,6 +314,7 @@ async def test_seat_and_ledger_tables_have_policies(engine):
     try:
         async with engine.begin() as conn:
             await provision_guild_schema(conn, gid)
+            await _apply_parts(conn, gid, PARTS, operations=True)
         async with engine.connect() as conn:
             rows = await conn.execute(
                 text(
@@ -662,8 +668,10 @@ def test_every_reaction_target_and_recentable_kind_is_an_arm():
 
 
 def test_the_entity_function_carries_one_arm_per_kind():
+    """And one for a person on an edge's end, which reads no table."""
     fn = render_entity_access_fn()
     for kind, table in entity_tables().items():
         assert f"WHEN '{kind}' THEN" in fn, kind
         assert f"FROM {table} re WHERE re.id = p_entity_id" in fn, kind
-    assert fn.count("WHEN '") == len(entity_tables())
+    assert f"WHEN '{PERSON.value}' THEN\n            RETURN true;" in fn
+    assert fn.count("WHEN '") == len(entity_tables()) + 1

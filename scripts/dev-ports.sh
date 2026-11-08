@@ -26,6 +26,57 @@ if [ -z "${DEV_CHECKOUT_ID:-}" ]; then
     fi
 fi
 
+# The main checkout. A linked worktree runs on its Postgres through its compose
+# file (and the .env beside it), and reads its backend/.env (app/core/config.py),
+# so none of them is copied in.
+DEV_MAIN_ROOT="$(git -C "$DEV_PORTS_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+DEV_MAIN_ROOT="${DEV_MAIN_ROOT%/.git}"
+[ -d "$DEV_MAIN_ROOT/.git" ] || DEV_MAIN_ROOT="$DEV_PORTS_ROOT"
+export DEV_MAIN_ROOT
+# The dev database runs from the main checkout's docker-compose.yml when it has
+# one (it is gitignored), and from the committed docker-compose.dev.yml when not.
+if [ -z "${COMPOSE_FILE:-}" ]; then
+    COMPOSE_FILE="$DEV_MAIN_ROOT/docker-compose.yml"
+    [ -f "$COMPOSE_FILE" ] || COMPOSE_FILE="$DEV_MAIN_ROOT/docker-compose.dev.yml"
+fi
+export COMPOSE_FILE
+# It listens on the port backend/.env's DATABASE_URL names. Before there is a
+# .env, POSTGRES_PORT picks it, and scripts/dev-database.sh writes it there.
+if [ -z "${POSTGRES_PORT:-}" ]; then
+    POSTGRES_PORT="$(sed -n 's#^DATABASE_URL=[^@]*@[^:/]*:\([0-9][0-9]*\)/.*#\1#p' \
+        "$DEV_MAIN_ROOT/backend/.env" 2>/dev/null | head -n 1)"
+fi
+export POSTGRES_PORT="${POSTGRES_PORT:-5432}"
+
+# A worktree shares the main checkout's dev database unless its branch changes
+# migrations, committed or not. Then it gets a database of its own on the same
+# server, and role names of its own since roles are cluster-wide, so its
+# migrations never reach the database every other checkout runs on. A worktree
+# with no origin/dev to compare against gets one too, since nothing then shows
+# its migrations are dev's. Its database URLs are the main checkout's with the
+# database changed (backend/scripts/dev_database_urls.py), and a checkout that
+# can't get them stops here rather than run on the shared one.
+# scripts/dev-database.sh creates the database; drop_test_dbs.py --orphaned
+# drops it once the worktree is gone.
+if [ "$DEV_CHECKOUT_ID" != main ] && [ -z "${DEV_DATABASE:-}" ]; then
+    dev_base="$(git -C "$DEV_PORTS_ROOT" merge-base HEAD origin/dev 2>/dev/null || true)"
+    if [ -z "$dev_base" ] ||
+        [ -n "$(git -C "$DEV_PORTS_ROOT" diff --name-only "$dev_base" -- backend/alembic/versions)" ] ||
+        [ -n "$(git -C "$DEV_PORTS_ROOT" ls-files --others --exclude-standard -- backend/alembic/versions)" ]; then
+        DEV_DATABASE="initiative_dev_$DEV_CHECKOUT_ID"
+        if ! dev_database_urls="$(cd "$DEV_PORTS_ROOT/backend" &&
+            .venv/bin/python scripts/dev_database_urls.py "$DEV_DATABASE")"; then
+            echo "dev-ports: could not point this worktree at its own database, $DEV_DATABASE." >&2
+            unset DEV_DATABASE
+            return 1 2>/dev/null || exit 1
+        fi
+        eval "$dev_database_urls"
+        export DEV_DATABASE
+        export GUILD_ROLE_PREFIX="dev_${DEV_CHECKOUT_ID}_"
+        export PLATFORM_ROLE_PREFIX="dev_${DEV_CHECKOUT_ID}_"
+    fi
+fi
+
 # Offsets are handed out by a small registry rather than derived from the path.
 # A digest would have to collide eventually — across a few dozen worktrees over
 # any range that keeps the ports tidy it is likelier than not — and two

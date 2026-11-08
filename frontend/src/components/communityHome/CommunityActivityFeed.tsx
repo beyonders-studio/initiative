@@ -14,20 +14,21 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ActivityEntry, FeedView } from "@/api/generated/initiativeAPI.schemas";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { RelativeTime } from "@/components/ui/relative-time";
-import { Skeleton } from "@/components/ui/skeleton";
 import { MentionText } from "@/components/user/MentionText";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { useActivityFeed } from "@/hooks/useActivity";
 import { communityPath, useCommunityPath } from "@/lib/communityUrl";
-import { listFormat } from "@/lib/intl";
 import type { ActivityScope } from "@/lib/recentRoute";
 import { FROM_FEED, hitIcon, searchHitPath } from "@/lib/searchResults";
 import { getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/ui/badge";
+import { Card } from "@/ui/card";
+import { listFormat } from "@/ui/lib/intl";
+import { cn } from "@/ui/lib/utils";
+import { LoadMore } from "@/ui/load-more";
+import { RelativeTime } from "@/ui/relative-time";
+import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 
 /** "Ada and 2 others commented and edited", in the reader's language. */
 const useSentence = () => {
@@ -177,7 +178,7 @@ export const CommunityActivityFeed = ({
     );
   }
   if (feed.isError && entries.length === 0) {
-    return <p className="p-2 text-destructive text-sm">{t("feed.loadError")}</p>;
+    return <StatusMessage onRetry={feed.refetch} />;
   }
   if (entries.length === 0) {
     return (
@@ -202,17 +203,11 @@ export const CommunityActivityFeed = ({
       {feed.isFetchNextPageError ? (
         <p className="px-2 text-destructive text-sm">{t("feed.loadError")}</p>
       ) : null}
-      {feed.hasNextPage ? (
-        <Button
-          type="button"
-          variant="secondary"
-          className="w-full"
-          onClick={() => void feed.fetchNextPage()}
-          disabled={feed.isFetchingNextPage}
-        >
-          {feed.isFetchingNextPage ? t("loading") : t("feed.loadMore")}
-        </Button>
-      ) : null}
+      <LoadMore
+        hasMore={feed.hasNextPage}
+        loading={feed.isFetchingNextPage}
+        onLoadMore={feed.fetchNextPage}
+      />
     </div>
   );
 };

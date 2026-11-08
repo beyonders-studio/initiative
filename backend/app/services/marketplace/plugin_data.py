@@ -66,7 +66,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.errors import CodedError
-from app.db.session import routed_guild_id
+from app.db.session import guild_context, routed_context, routed_guild_id
 from app.core.messages import (
     PluginDataMessages,
     PluginServiceMessages,
@@ -84,7 +84,6 @@ from app.schemas.tenant.plugin_data import (
     PluginSummaryRead,
     PluginSummaryReturn,
 )
-from app.services.fields.spec import FieldType
 from app.services.marketplace.plugin_refs import (
     PluginNameRefused,
     ensure_plugin_guild_ref,
@@ -98,7 +97,6 @@ from app.services.marketplace.registration_lookup import (
     registration_for_definition,
     service_public_id,
 )
-from app.services.query.rows import RowColumn
 from app.services.marketplace.service_plugins import _requests, is_admin_only
 from app.services.safe_http import build_validated_request
 from app.services.tenant import plugin_config as plugin_config_service
@@ -124,8 +122,11 @@ __all__ = [
     "cached_call",
     "clear_plugin_data_cache",
     "fetch_plugin_source",
+    "prepare_for_session",
+    "prepare_plugin_source",
     "find_param",
     "find_read_endpoint",
+    "first_actor",
     "row_columns",
     "project_returns",
     "resolve_param_options",
@@ -237,31 +238,16 @@ def find_read_endpoint(
 # --- reading an answer through what was declared ----------------------------
 
 
-#: What an endpoint's declared return types are, in the vocabulary the query
-#: surface already speaks. Two closed sets, mapped once: a URL is text to
-#: anybody reading it, and a moment is a moment however the plug-in spells it.
-_RETURN_FIELD_TYPES: dict[str, FieldType] = {
-    "bool": FieldType.boolean,
-    "datetime": FieldType.date,
-    "int": FieldType.number,
-    "string": FieldType.text,
-    "url": FieldType.text,
-}
+def row_columns(endpoint: Mapping[str, Any]) -> tuple[tuple[str, str], ...]:
+    """The columns the rows of this endpoint hold, as it declared them: each
+    return marked ``list`` (see :func:`project_returns`), by its key and type.
 
-
-def row_columns(endpoint: Mapping[str, Any]) -> tuple[RowColumn, ...]:
-    """The columns the rows of this endpoint hold, as it declared them.
-
-    The returns marked ``list`` are the ones that become rows (see
-    :func:`_read_answer`), so they are the whole of what a statement over those
-    rows may name. Declared rather than discovered, which is what lets a
-    statement be checked before the endpoint has ever run.
+    Declared rather than discovered, which is what lets a statement over them
+    be checked, and offered to somebody writing one, before the endpoint has
+    ever run.
     """
     return tuple(
-        RowColumn(
-            name=entry["key"],
-            type=_RETURN_FIELD_TYPES.get(entry.get("type"), FieldType.text),
-        )
+        (entry["key"], str(entry.get("type") or "string"))
         for entry in _declared_returns(endpoint)
         if entry.get("list") is True
     )
@@ -377,6 +363,13 @@ def _coerce_scalar(field_spec: Mapping[str, Any], value: Any) -> str:
         options = field_spec.get("options")
         if not isinstance(options, list) or text not in options:
             raise PluginDataError(PluginDataMessages.INVALID_PARAMS, 400)
+        return text
+
+    if field_type == "datetime":
+        try:
+            datetime.fromisoformat(text)
+        except ValueError as exc:
+            raise PluginDataError(PluginDataMessages.INVALID_PARAMS, 400) from exc
         return text
 
     if field_type == "url":
@@ -619,6 +612,49 @@ async def _resolve_connections(
     return refs, fields
 
 
+async def first_actor(
+    session: AsyncSession,
+    *,
+    plugin: GuildPlugin,
+    endpoint: Mapping[str, Any],
+    user_id: int | None,
+    actors: Collection[str],
+) -> tuple[str, dict[str, str], dict[str, dict[str, Any]]]:
+    """The first of ``actors`` a call can be made as, with the handles and
+    non-secret fields it runs with (:func:`_resolve_connections`): ``member``
+    on ``user_id``'s own connections and ``installation`` on the community's,
+    its ``requires`` met and every connection its requests name for that actor
+    able to travel
+    (:func:`~app.services.marketplace.declarative.request_refusal`). When none
+    can, the first one's refusal is the answer."""
+    # Imported here: the declarative executor reads this module's limits.
+    from app.services.marketplace.declarative import request_refusal
+
+    refusals: list[PluginDataError] = []
+    for actor in actors:
+        try:
+            refs, fields = await _resolve_connections(
+                session,
+                plugin=plugin,
+                endpoint=endpoint,
+                user_id=user_id if actor == "member" else None,
+                actor=actor,
+            )
+        except PluginDataError as exc:
+            refusals.append(exc)
+            continue
+        refused = request_refusal(plugin.definition, endpoint, refs, actor)
+        if refused is not None:
+            refusals.append(refused)
+            continue
+        return actor, refs, fields
+    raise (
+        refusals[0]
+        if refusals
+        else PluginDataError(PluginDataMessages.CONNECTION_REQUIRED, 409)
+    )
+
+
 async def _member_connection(
     session: AsyncSession, *, plugin_id: int, connection_id: str, user_id: int
 ) -> Optional[GuildPluginUserConnection]:
@@ -713,6 +749,7 @@ def _cache_key(
     canonical_params: str,
     refs: Mapping[str, str],
     fields: Mapping[str, Mapping[str, Any]],
+    actor: Optional[str] = None,
 ) -> str:
     """Every credential the response depended on, in one string.
 
@@ -728,6 +765,7 @@ def _cache_key(
         "config": plugin.config or {},
         "secret_fields": plugin.secret_fields or {},
         "refs": dict(sorted(refs.items())),
+        "actor": actor,
     }
     if is_declarative(plugin.definition):
         # What a declarative endpoint's expressions read, a member's own
@@ -1058,15 +1096,51 @@ async def fetch_plugin_source(
     raw_params: str | None,
     user_id: int | None,
     is_guild_admin: bool,
+    as_installation: bool = False,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> PluginDataResult:
-    """Resolve one endpoint for one caller.
+    """Resolve one endpoint for one caller (:func:`prepare_plugin_source`),
+    and make the call."""
+    call = await prepare_plugin_source(
+        session,
+        plugin=plugin,
+        endpoint_id=endpoint_id,
+        raw_params=raw_params,
+        user_id=user_id,
+        is_guild_admin=is_guild_admin,
+        as_installation=as_installation,
+        transport=transport,
+    )
+    return await call()
+
+
+async def prepare_plugin_source(
+    session: AsyncSession,
+    *,
+    plugin: GuildPlugin,
+    endpoint_id: str,
+    raw_params: str | None,
+    user_id: int | None,
+    is_guild_admin: bool,
+    as_installation: bool = False,
+    transport: httpx.AsyncBaseTransport | None = None,
+) -> Callable[[], Awaitable[PluginDataResult]]:
+    """Resolve one endpoint for one caller, and hand back the call to make.
+
+    Everything the call needs from *session* is read here, so the call itself
+    reads nothing from it, and several can be made at once.
 
     The install has already been loaded under the caller's own guild session, so
     the guild boundary and a guild admin's wider reach are settled before this
     runs. What is decided here is the plug-in's own vocabulary: the endpoint exists,
     the caller may read it, both kill switches are open, the parameters are ones
     the endpoint declared, and the credentials it named are present.
+
+    The call is made as the first of the endpoint's ``actors`` it can be
+    (:func:`first_actor`), or, where it declares none, on every credential
+    the caller and the community hold. ``as_installation`` is a dashboard
+    that runs as its initiative: the call is made as the installation, on the
+    community's connections alone.
     """
     endpoint = find_read_endpoint(plugin.definition, endpoint_id)
     if endpoint is None or (
@@ -1080,21 +1154,37 @@ async def fetch_plugin_source(
     if not plugin.enabled:
         raise PluginDataError(PluginDataMessages.PLUGIN_DISABLED, 409)
 
-    registration = await _load_registration(
-        None, guild_id=routed_guild_id(session), plugin=plugin
-    )
+    guild_id = routed_guild_id(session)
+    registration = await _load_registration(None, guild_id=guild_id, plugin=plugin)
     params, canonical = validate_params(endpoint, raw_params)
-    refs, fields = await _resolve_connections(
-        session, plugin=plugin, endpoint=endpoint, user_id=user_id
-    )
+    declared = endpoint.get("actors")
+    actors = declared if isinstance(declared, list) and declared else None
+    actor: Optional[str] = None
+    if as_installation or actors is not None:
+        actor, refs, fields = await first_actor(
+            session,
+            plugin=plugin,
+            endpoint=endpoint,
+            user_id=user_id,
+            actors=[
+                candidate
+                for candidate in actors or ["installation"]
+                if not as_installation or candidate == "installation"
+            ],
+        )
+    else:
+        refs, fields = await _resolve_connections(
+            session, plugin=plugin, endpoint=endpoint, user_id=user_id
+        )
 
     key = _cache_key(
-        guild_id=routed_guild_id(session),
+        guild_id=guild_id,
         plugin=plugin,
         endpoint_id=endpoint_id,
         canonical_params=canonical,
         refs=refs,
         fields=fields,
+        actor=actor,
     )
 
     async def read(
@@ -1106,22 +1196,55 @@ async def fetch_plugin_source(
         rows, values = await _call_plugin(
             registration=registration,
             plugin=plugin,
-            guild_id=routed_guild_id(session),
+            guild_id=guild_id,
             endpoint_id=endpoint_id,
             params=params,
             refs=refs,
             fields=fields,
             transport=transport,
             read=read,
+            actor=actor,
         )
         return PluginDataResult(
             rows=rows, values=values, fetched_at=datetime.now(timezone.utc)
         )
 
-    result, cached = await cached_call(key, _effective_ttl(endpoint), call)
-    if cached:
-        return replace(result, cached=True)
-    return result
+    async def answer() -> PluginDataResult:
+        result, cached = await cached_call(key, _effective_ttl(endpoint), call)
+        return replace(result, cached=True) if cached else result
+
+    return answer
+
+
+async def prepare_for_session(
+    session: AsyncSession,
+    *,
+    plugin: GuildPlugin,
+    endpoint_id: str,
+    params: Mapping[str, Any],
+    as_installation: bool = False,
+) -> Callable[[], Awaitable[PluginDataResult]]:
+    """The call to one of *plugin*'s read endpoints with *params*, for the
+    person *session* was routed for (:func:`prepare_plugin_source`). A
+    plug-in's minimum age holds for its rows as for its tiles."""
+    # Imported here: the age check reads the platform's settings.
+    from app.services.tenant import plugin_age
+
+    user_id = routed_context(session).user_id
+    if plugin_age.declared_minimum(plugin.definition) and not plugin_age.age_allows(
+        plugin.definition, await plugin_age.current_viewer(user_id)
+    ):
+        raise PluginDataError(GuildPluginMessages.AGE_RESTRICTED, 403)
+    standing = guild_context(session)
+    return await prepare_plugin_source(
+        session,
+        plugin=plugin,
+        endpoint_id=endpoint_id,
+        raw_params=json.dumps(dict(params)),
+        user_id=user_id,
+        is_guild_admin=bool(standing and standing.is_admin),
+        as_installation=as_installation,
+    )
 
 
 async def cached_call(

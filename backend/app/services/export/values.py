@@ -1,6 +1,6 @@
 """A list's values as table cells, written by the kind of value they are.
 
-Every table export (tasks, a project's report, a queue, a counter group)
+Every table export (tasks, a project's report, a counter group)
 draws ``columns`` and fills each cell from its row: one :class:`Column` per
 field, named for the field as the field registry names it (``fields.<name>``
 in the exports catalogue). What a cell holds is decided by the kind of value,
@@ -100,8 +100,8 @@ def moment(value: Any, tz: str | None) -> str:
 
 def property_value(summary: Any, locale: str, tz: str | None) -> Any:
     """A custom property's value as its type shows it: an option by its
-    label, a person by name, a checkbox as yes or no, a moment with its
-    time."""
+    label, a person or a file by name, a checkbox as yes or no, a moment
+    with its time, a signature by who signed and when."""
     if summary is None or summary.value is None:
         return None
     value = summary.value
@@ -121,13 +121,27 @@ def property_value(summary: Any, locale: str, tz: str | None) -> Any:
                 display_name=value.get("display_name"),
             )
         )
+    if kind is MetadataType.file:
+        return value.get("name") if isinstance(value, dict) else None
+    if kind is MetadataType.signature:
+        return et(
+            "values.signed",
+            locale,
+            name=value["name"],
+            date=moment(value["signed_at"], tz),
+        )
     if kind is MetadataType.checkbox:
         return yes_no(value, locale)
     if kind is MetadataType.date:
         return date(value)
     if kind is MetadataType.datetime:
         return moment(value, tz)
-    if kind in (MetadataType.number, MetadataType.currency, MetadataType.scale):
+    if kind in (
+        MetadataType.number,
+        MetadataType.currency,
+        MetadataType.scale,
+        MetadataType.counter,
+    ):
         # An amount stays a number a sheet can add up; its currency is the
         # property's.
         return number(value)

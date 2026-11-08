@@ -15,7 +15,6 @@
  */
 
 import { useMemo } from "react";
-import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import type { CommentEntity } from "@/components/comments/CommentSection";
@@ -27,6 +26,7 @@ import {
   useCommentThreadState,
 } from "@/hooks/useComments";
 import type { ToolCommentEntity } from "@/lib/tools";
+import { StatusMessage } from "@/ui/status-message";
 
 interface ToolCommentsPanelProps {
   /** Which tool answers for the thread — its switch, its sharing. */
@@ -49,8 +49,6 @@ export const ToolCommentsPanel = ({
   title,
   onCountChange,
 }: ToolCommentsPanelProps) => {
-  const { t } = useTranslation("comments");
-
   const targetType: CommentEntity = target?.type ?? tool;
   const entityId = target?.id ?? entity.id;
   const enabled = entity.comments_enabled ?? true;
@@ -76,7 +74,7 @@ export const ToolCommentsPanel = ({
 
   return (
     <div className="space-y-2">
-      {commentsQuery.isError && <p className="text-destructive text-sm">{t("loadError")}</p>}
+      {commentsQuery.isError && <StatusMessage onRetry={commentsQuery.refetch} />}
       <CommentSection
         entityType={targetType}
         entityId={entityId}

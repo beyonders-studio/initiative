@@ -4,10 +4,10 @@ import { useTranslation } from "react-i18next";
 
 import type { PollOptionRead, PostRead } from "@/api/generated/initiativeAPI.schemas";
 import { PollVotersDialog } from "@/components/initiativeTools/posts/PollVotersDialog";
-import { Button } from "@/components/ui/button";
-import { RelativeTime } from "@/components/ui/relative-time";
 import { useRetractPostPollVote, useVoteOnPostPoll } from "@/hooks/usePosts";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
+import { RelativeTime } from "@/ui/relative-time";
 
 interface PostPollProps {
   post: PostRead;

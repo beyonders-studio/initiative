@@ -24,10 +24,6 @@ import { InitiativeSection } from "@/components/sidebar/InitiativeSection";
 import { PluginsSection } from "@/components/sidebar/PluginsSection";
 import { SidebarSearchButton } from "@/components/sidebar/SidebarSearchButton";
 import { SidebarUserFooter } from "@/components/sidebar/SidebarUserFooter";
-import { TagBrowser } from "@/components/sidebar/TagBrowser";
-import { WikiSidebarContent } from "@/components/sidebar/WikiSidebarContent";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Sidebar,
   SidebarContent,
@@ -39,10 +35,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
-} from "@/components/ui/sidebar";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+} from "@/components/sidebar/sidebar";
+import { TagBrowser } from "@/components/sidebar/TagBrowser";
+import { WikiSidebarContent } from "@/components/sidebar/WikiSidebarContent";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useAutoCloseSidebar } from "@/hooks/useAutoCloseSidebar";
@@ -51,25 +46,29 @@ import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
 import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { liveInitiatives } from "@/hooks/useInitiativeAccess";
 import { useInitiativeDirectory, useInitiatives } from "@/hooks/useInitiatives";
-import { compareVersions, useLatestVersion } from "@/hooks/useLatestVersion";
 import { useCommunityBookmarks } from "@/hooks/usePersonalItems";
 import { useProjects } from "@/hooks/useProjects";
 import { useTags } from "@/hooks/useTags";
 import { useToolCountsByInitiative } from "@/hooks/useToolCounts";
-import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
 import { communityPath } from "@/lib/communityUrl";
 import { canAccessOperatorDashboard, canManagePlatformConfig } from "@/lib/permissions";
 import { renderRecentIcon } from "@/lib/recentIcon";
 import { getActiveRecentKey, recentRoute } from "@/lib/recentRoute";
 import { getItem, setItem } from "@/lib/storage";
 import { TOOLS, toolViewParams } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
+import { ScrollArea } from "@/ui/scroll-area";
+import { Skeleton } from "@/ui/skeleton";
+import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 
 export const AppSidebar = () => {
   const { user, logout, refreshUser } = useAuth();
   const { communityDirectoryEnabled, isLoading: configLoading } = useAppConfig();
   const { activeCommunity, activeCommunityId } = useCommunities();
   const isMobile = !atLeast(useWidthClass(), "md");
-  const location = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
   const { t } = useTranslation(["nav", "tags", "initiatives"]);
 
   // Auto-close sidebar on mobile after navigation
@@ -93,7 +92,7 @@ export const AppSidebar = () => {
   const showOperatorDashboard = canAccessOperatorDashboard(user);
 
   // Determine sidebar mode from route
-  const isCommunityRoute = location.pathname.startsWith("/c/");
+  const isCommunityRoute = pathname.startsWith("/c/");
   // The community directory brings its own: what narrows it belongs beside the
   // cards it narrows, not on the page with them. Only where there is a
   // directory to narrow, though — where the owner runs none, the page says so
@@ -101,30 +100,29 @@ export const AppSidebar = () => {
   // twelve shelves that answer nothing. While the config is still loading the
   // directory gets the benefit of the doubt, so the two halves of the screen
   // arrive at the same answer at the same time.
-  const isDirectoryRoute =
-    location.pathname === "/communities" || location.pathname.startsWith("/communities/");
+  const isDirectoryRoute = pathname === "/communities" || pathname.startsWith("/communities/");
   const showDirectorySidebar = isDirectoryRoute && (communityDirectoryEnabled || configLoading);
 
   // Which project row to highlight. A project is addressed inside its
   // initiative, so the pattern has to carry that segment too.
   const activeProjectId = useMemo(() => {
-    const match = location.pathname.match(/^\/c\/\d+\/i\/\d+\/projects\/(\d+)/);
+    const match = pathname.match(/^\/c\/\d+\/i\/\d+\/projects\/(\d+)/);
     return match ? parseInt(match[1], 10) : null;
-  }, [location.pathname]);
+  }, [pathname]);
 
   // The wiki the reader is inside, and the page they are on. A wiki takes the
   // sidebar over the way My Messages does — a wiki is a list of pages and then
   // one of them, which is two levels in a column with room for one.
   const openWiki = useMemo(() => {
-    const match = location.pathname.match(/^\/c\/\d+\/i\/(\d+)\/wikis\/(\d+)/);
+    const match = pathname.match(/^\/c\/\d+\/i\/(\d+)\/wikis\/(\d+)/);
     if (!match) return null;
-    const page = location.pathname.match(/\/wikis\/\d+\/pages\/(\d+)/);
+    const page = pathname.match(/\/wikis\/\d+\/pages\/(\d+)/);
     return {
       initiativeId: parseInt(match[1], 10),
       wikiId: parseInt(match[2], 10),
       pageId: page ? parseInt(page[1], 10) : null,
     };
-  }, [location.pathname]);
+  }, [pathname]);
 
   // Climbing out is a per-visit choice, not a stored one: leaving the wiki's
   // URL puts the ordinary navigation back on its own.
@@ -135,7 +133,7 @@ export const AppSidebar = () => {
   // Helper to create community-scoped paths
   const gp = (path: string) => (activeCommunityId ? communityPath(activeCommunityId, path) : path);
 
-  // The community tree (initiatives/projects/files/queues/counters/tags) is
+  // The community tree (initiatives/projects/files/counters/tags) is
   // only rendered on /c/ routes, and only there does the server-held community
   // context line up with it — on personal pages these community-scoped queries
   // would 409 (no context) and cache errors that linger as zeroed counts.
@@ -167,7 +165,7 @@ export const AppSidebar = () => {
     staleTime: 60_000,
   });
   // Which of them is open: the tool the address names.
-  const activeTool = useMemo(() => getActiveRecentKey(location.pathname), [location.pathname]);
+  const activeTool = useMemo(() => getActiveRecentKey(pathname), [pathname]);
 
   // Every tool's per-initiative counts in one fan-out, keyed by `Tool`, so
   // the badges follow the registry rather than a list kept in step by hand.
@@ -301,15 +299,9 @@ export const AppSidebar = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- storage-backed, re-read per collapse action
   }, [tagCollapseKey]);
 
-  // Fetch the latest released version
-  const { data: latestVersion, isLoading: isLoadingVersion } = useLatestVersion();
-  const currentVersion = __APP_VERSION__;
-  const hasUpdate =
-    latestVersion && currentVersion && compareVersions(latestVersion, currentVersion) > 0;
-
   return (
     <Sidebar
-      className="sticky top-0 h-dvh"
+      className="sticky top-0 h-app"
       variant="sidebar"
       collapsible={isMobile ? "offcanvas" : "none"}
     >
@@ -609,10 +601,6 @@ export const AppSidebar = () => {
           user={user}
           canManagePlatformConfig={showPlatformSettings}
           canAccessOperatorDashboard={showOperatorDashboard}
-          currentVersion={currentVersion}
-          latestVersion={latestVersion ?? null}
-          hasUpdate={Boolean(hasUpdate)}
-          isLoadingVersion={isLoadingVersion}
           onLogout={logout}
           refreshUser={refreshUser}
         />

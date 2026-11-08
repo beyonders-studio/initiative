@@ -15,13 +15,33 @@
  * datasets' fields are offered. That is a set intersection over words, not a
  * `FROM` clause being read — being wrong about it costs a suggestion, never a
  * statement, because nothing is completed that the author does not choose.
+ *
+ * A spreadsheet's range is read by `sheet('<name>', '<range>')`, so inside the
+ * quote that opens one the initiative's spreadsheets are offered by name. What
+ * a range holds is known only once the statement has been checked, which reads
+ * it; those columns are offered under the name the range is read under.
+ *
+ * A plug-in's endpoint is read by `plugin('<public id>', '<endpoint>', name =>
+ * value, …)` in the same way: inside its first quote the installed plug-ins
+ * are offered, inside its second that plug-in's endpoints, and after those the
+ * endpoint's parameters by name. Its columns, too, are offered once the
+ * statement has been checked.
  */
 
 /** The word a completion replaces: what a name may be spelled with. */
 const WORD = /[A-Za-z0-9_]+$/;
 
 /** What kind of thing a suggestion is, for the icon and the grouping. */
-export type CompletionKind = "dataset" | "field" | "function" | "token" | "relation";
+export type CompletionKind =
+  | "dataset"
+  | "field"
+  | "function"
+  | "token"
+  | "relation"
+  | "spreadsheet"
+  | "plugin"
+  | "endpoint"
+  | "param";
 
 export interface Completion {
   /** The text inserted, and what is matched against. */
@@ -41,8 +61,51 @@ export interface DatasetFields {
   relations?: { name: string; dataset: string }[];
 }
 
+/** An installed plug-in a `plugin()` call may name: its public id, and its read
+ *  endpoints by the name a call gives each, with the parameters each declares. */
+export interface PluginReads {
+  publicId: string;
+  endpoints: { name: string; params?: { key: string }[] }[];
+}
+
 /** A name that qualifies the one being typed: `assignee.disp`. */
 const QUALIFIED = /([A-Za-z0-9_]+)\.([A-Za-z0-9_]*)$/;
+
+/** A name SQL reads as written, without quotes. */
+const PLAIN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/** A spreadsheet's name being typed as the first argument of `sheet()`. */
+const SPREADSHEET_NAME = /\bsheet\(\s*'((?:[^']|'')*)$/i;
+
+/** A string constant as far as it is written, and one written in full: its
+ *  closing quote is the one no quote follows. */
+const OPEN_STRING = "'((?:[^']|'')*)";
+const STRING = "'(?:[^']|'')*'(?!')";
+
+/** A plug-in's public id being typed as the first argument of `plugin()`. */
+const PLUGIN_ID = new RegExp(`\\bplugin\\(\\s*${OPEN_STRING}$`, "i");
+/** One of its endpoints' names being typed as the second, after its id. */
+const ENDPOINT_NAME = new RegExp(`\\bplugin\\(\\s*${OPEN_STRING}'\\s*,\\s*${OPEN_STRING}$`, "i");
+/** A parameter's name being typed after both, past any arguments already
+ *  written: strings, and `ARRAY[…]`s, but never the call's closing bracket. */
+const PARAM_NAME = new RegExp(
+  `\\bplugin\\(\\s*${OPEN_STRING}'\\s*,\\s*${OPEN_STRING}'` +
+    `(?:[^)'\\[]|${STRING}|\\[(?:[^\\]']|${STRING})*\\])*,\\s*([A-Za-z0-9_]*)$`,
+  "i"
+);
+
+/** What is being completed at a caret. */
+export interface WordAt {
+  word: string;
+  start: number;
+  /** The name the word is written under, if it has one. */
+  qualifier?: string;
+  /** What the string constant the word is typed in names. */
+  quoted?: "spreadsheet" | "plugin" | "endpoint";
+  /** The `plugin()` call the word is an argument of: the plug-in it names, and
+   *  its endpoint once that is written. */
+  call?: { plugin: string; endpoint?: string };
+}
 
 /** What is being completed at *caret*: the word, where it starts, and the name
  *  it is written under if it has one.
@@ -50,15 +113,34 @@ const QUALIFIED = /([A-Za-z0-9_]+)\.([A-Za-z0-9_]*)$/;
  *  `null` where a completion would make no sense — mid-word from the right, or
  *  with nothing typed and nothing to write it under. After a dot there is
  *  something to offer with no word at all, because what may follow one is a
- *  short and closed list. */
-export const wordAt = (
-  text: string,
-  caret: number
-): { word: string; start: number; qualifier?: string } | null => {
+ *  short and closed list, and the same holds for a quote that opens a name and
+ *  for a parameter of `plugin()`. */
+export const wordAt = (text: string, caret: number): WordAt | null => {
   // Completing from inside a word would replace only its left half.
   const next = text[caret];
   if (next && WORD.test(next)) return null;
   const before = text.slice(0, caret);
+  const named = SPREADSHEET_NAME.exec(before);
+  if (named) return { word: named[1], start: caret - named[1].length, quoted: "spreadsheet" };
+  const plugin = PLUGIN_ID.exec(before);
+  if (plugin) return { word: plugin[1], start: caret - plugin[1].length, quoted: "plugin" };
+  const endpoint = ENDPOINT_NAME.exec(before);
+  if (endpoint) {
+    return {
+      word: endpoint[2],
+      start: caret - endpoint[2].length,
+      quoted: "endpoint",
+      call: { plugin: endpoint[1] },
+    };
+  }
+  const param = PARAM_NAME.exec(before);
+  if (param) {
+    return {
+      word: param[3],
+      start: caret - param[3].length,
+      call: { plugin: param[1], endpoint: param[2] },
+    };
+  }
   const qualified = QUALIFIED.exec(before);
   if (qualified) {
     return {
@@ -95,6 +177,11 @@ export const completionsFor = (
     tokens = [],
     named = [],
     qualifier,
+    ranges = [],
+    spreadsheets = [],
+    plugins = [],
+    quoted,
+    call,
   }: {
     datasets: string[];
     functions: string[];
@@ -106,17 +193,52 @@ export const completionsFor = (
     named?: string[];
     /** The name this word is written under, where it has one. */
     qualifier?: string;
+    /** The ranges the statement read, each under the name it is read under.
+     *  Always in scope: the statement names them. */
+    ranges?: DatasetFields[];
+    /** The spreadsheets a `sheet()` call may name. */
+    spreadsheets?: string[];
+    /** The installed plug-ins a `plugin()` call may name. */
+    plugins?: readonly PluginReads[];
+    /** What the string constant the word is typed in names, if it is in one. */
+    quoted?: WordAt["quoted"];
+    /** The `plugin()` call the word is an argument of. */
+    call?: WordAt["call"];
   }
 ): Completion[] => {
   const needle = word.toLowerCase();
-  const inScope = named.length ? fields.filter((entry) => named.includes(entry.dataset)) : fields;
+  const reads = plugins.find((plugin) => plugin.publicId === call?.plugin);
+  const endpoint = reads?.endpoints.find((candidate) => candidate.name === call?.endpoint);
+  // Inside a quote, and among a call's parameters, what may be written is one
+  // short list, so it is offered with nothing typed yet.
+  const names = quoted
+    ? quoted === "spreadsheet"
+      ? spreadsheets
+      : quoted === "plugin"
+        ? plugins.map((plugin) => plugin.publicId)
+        : (reads?.endpoints ?? []).map((candidate) => candidate.name)
+    : call
+      ? (endpoint?.params ?? []).map((param) => param.key)
+      : undefined;
+  if (names) {
+    const kind: CompletionKind = quoted ?? "param";
+    return names
+      .filter((name) => matches(name, needle) && name.toLowerCase() !== needle)
+      .map((name): Completion => ({ name, kind }));
+  }
+  const inScope = [
+    ...(named.length ? fields.filter((entry) => named.includes(entry.dataset)) : fields),
+    ...ranges,
+  ];
 
   // After a dot there is one kind of answer: a column of whatever the name in
   // front resolves to. A dataset resolves to itself; a relation resolves to
   // what it reaches. Nothing else may follow one, so nothing else is offered —
   // and an empty word is enough, because the list is already short.
   if (qualifier !== undefined) {
-    return fieldsUnder(qualifier, fields, inScope).filter((entry) => matches(entry.name, needle));
+    return fieldsUnder(qualifier, [...fields, ...ranges], inScope).filter((entry) =>
+      matches(entry.name, needle)
+    );
   }
 
   if (!needle) return [];
@@ -199,12 +321,24 @@ export const applyCompletion = (
 ): { text: string; caret: number } => {
   // A relation is never the end of a name: choosing one leaves the caret past
   // the dot, where the next thing offered is one of its columns.
+  // A spreadsheet's name, a plug-in's id and an endpoint's name close the quote
+  // they were typed in, their own quotes doubled as a string constant's are. A
+  // parameter is followed by the arrow that gives it its value. A field named
+  // by a header SQL cannot read bare (`Q3 total`) goes in double quotes.
   const inserted =
     completion.kind === "function"
       ? `${completion.name}(`
       : completion.kind === "relation"
         ? `${completion.name}.`
-        : completion.name;
+        : completion.kind === "spreadsheet" ||
+            completion.kind === "plugin" ||
+            completion.kind === "endpoint"
+          ? `${completion.name.replace(/'/g, "''")}'`
+          : completion.kind === "param"
+            ? `${completion.name} => `
+            : completion.kind === "field" && !PLAIN.test(completion.name)
+              ? `"${completion.name.replace(/"/g, '""')}"`
+              : completion.name;
   return {
     text: text.slice(0, start) + inserted + text.slice(end),
     caret: start + inserted.length,

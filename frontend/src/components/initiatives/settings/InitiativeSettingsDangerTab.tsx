@@ -1,8 +1,8 @@
-import { Archive, ArchiveRestore, Loader2, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader } from "@/ui/card";
 
 interface InitiativeSettingsDangerTabProps {
   isArchived: boolean;
@@ -42,11 +42,9 @@ export const InitiativeSettingsDangerTab = ({
                 type="button"
                 variant="outline"
                 onClick={onToggleArchive}
-                disabled={isArchiving}
+                pending={isArchiving}
               >
-                {isArchiving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : isArchived ? (
+                {isArchived ? (
                   <ArchiveRestore className="h-4 w-4" />
                 ) : (
                   <Archive className="h-4 w-4" />
@@ -61,19 +59,10 @@ export const InitiativeSettingsDangerTab = ({
               type="button"
               variant="destructive"
               onClick={onDeleteInitiative}
-              disabled={isDeleting}
+              pending={isDeleting}
             >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("settings.deletingInitiative")}
-                </>
-              ) : (
-                <>
-                  <Trash2 className="h-4 w-4" />
-                  {t("settings.deleteInitiative")}
-                </>
-              )}
+              <Trash2 className="h-4 w-4" />
+              {isDeleting ? t("settings.deletingInitiative") : t("settings.deleteInitiative")}
             </Button>
           ) : (
             <p className="text-muted-foreground text-sm">{t("settings.contactAdmin")}</p>

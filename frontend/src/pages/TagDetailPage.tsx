@@ -1,29 +1,11 @@
 import { Navigate, useNavigate, useParams, useRouter, useSearch } from "@tanstack/react-router";
 import { SearchX, Settings, TagIcon, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { StatusMessage } from "@/components/StatusMessage";
-import { TableSkeleton, TagDetailSkeleton } from "@/components/skeletons/PageSkeletons";
-import { TagLoadError, TagToolTab, toolTabCount } from "@/components/tags/TagToolTab";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
+import { TagToolTab, toolTabCount } from "@/components/tags/TagToolTab";
 import { useDeleteTag, useTag, useTagCounts, useUpdateTag } from "@/hooks/useTags";
-import { toast } from "@/lib/mascotToast";
 import {
   TOOL_ICONS,
   TOOLS,
@@ -31,6 +13,13 @@ import {
   toolNavLabelKey,
   toolRouteSegment,
 } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Input } from "@/ui/input";
+import { TableSkeleton, TagDetailSkeleton } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
+import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/ui/tabs";
 
 export const TagDetailPage = () => {
   const { t } = useTranslation(["tags", "common", "nav"]);
@@ -49,15 +38,18 @@ export const TagDetailPage = () => {
   const updateTagMutation = useUpdateTag();
 
   const [isEditing, setIsEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState("");
 
   // Reset edit state when navigating between tags
-  useEffect(() => {
+  const [prevTagId, setPrevTagId] = useState(tagId);
+  if (prevTagId !== tagId) {
+    setPrevTagId(tagId);
     setIsEditing(false);
     setEditName("");
     setEditColor("");
-  }, [parsedTagId]);
+  }
 
   if (!hasValidTagId) {
     return <Navigate to="/" replace />;
@@ -111,7 +103,6 @@ export const TagDetailPage = () => {
   const handleDelete = async () => {
     try {
       await deleteTagMutation.mutateAsync(tag.id);
-      toast.success(t("detail.deleted"));
       router.navigate({ to: "/" });
     } catch {
       // Error handled by mutation
@@ -143,7 +134,7 @@ export const TagDetailPage = () => {
                   className="h-9 w-64"
                   autoFocus
                 />
-                <ColorPickerPopover value={editColor} onChange={setEditColor} className="h-9" />
+                <ColorPickerPopover value={editColor} onChange={setEditColor} />
                 <Button
                   size="sm"
                   onClick={() => void handleSaveEdit()}
@@ -172,37 +163,25 @@ export const TagDetailPage = () => {
               <Settings className="h-4 w-4" />
               {t("detail.edit")}
             </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm">
-                  <Trash2 className="h-4 w-4" />
-                  {t("detail.delete")}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>{t("detail.deleteTitle")}</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {t("detail.deleteDescription", { name: tag.name })}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>{t("common:cancel")}</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => void handleDelete()}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    {t("detail.delete")}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button variant="destructive" size="sm" onClick={() => setConfirmingDelete(true)}>
+              <Trash2 className="h-4 w-4" />
+              {t("detail.delete")}
+            </Button>
+            <ConfirmDialog
+              open={confirmingDelete}
+              onOpenChange={setConfirmingDelete}
+              title={t("detail.deleteTitle")}
+              description={t("detail.deleteDescription", { name: tag.name })}
+              confirmLabel={t("detail.delete")}
+              destructive
+              onConfirm={() => void handleDelete()}
+            />
           </div>
         )}
       </div>
 
       {!tagCounts && countsFailed ? (
-        <TagLoadError onRetry={() => void refetchCounts()} />
+        <StatusMessage onRetry={refetchCounts} />
       ) : !tagCounts ? (
         <TableSkeleton rows={6} columns={5} />
       ) : selected === null ? (

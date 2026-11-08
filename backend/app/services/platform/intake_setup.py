@@ -21,10 +21,16 @@ from fastapi import HTTPException, status as http_status
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.intake import Conversation, IntakeStream, meta
+from app.core.intake import (
+    Conversation,
+    IntakeStream,
+    Source,
+    meta,
+    offered_streams,
+)
 from app.core.tools import Tool
 from app.core.messages import GuildMessages, InitiativeMessages, IntakeMessages
-from app.db import cohorts, filer_access
+from app.db import cohorts, operations_schema
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.session import routed_guild_id, set_rls_context
 from app.models.platform.app_setting import AppSetting
@@ -106,16 +112,21 @@ async def set_operations_guild(
                 detail=IntakeMessages.GUILD_NOT_ACTIVE,
             )
 
-    row = await _settings_row(session)
-    row.operations_guild_id = guild_id
-    session.add(row)
-    await session.commit()
-    # A plug-in limited to the operations community follows the choice too.
-    invalidate_registrations()
-    # The filer role follows the choice: created in the community chosen,
-    # dropped from the one it replaces. Boot does the same, so a move this
-    # process did not finish is finished there.
-    await filer_access.reconcile_filer_access(guild_id)
+    # The operations tables and the filer role follow the choice: created in
+    # the community chosen before work is routed there, and dropped from the
+    # one it replaces with its cases' files. Unsetting it keeps the tables, so
+    # pointing back restores them. One choice at a time; boot finishes a move
+    # this process did not.
+    async with operations_schema.choice_turn():
+        if guild_id is not None:
+            await operations_schema.provision_operations(guild_id)
+        row = await _settings_row(session)
+        row.operations_guild_id = guild_id
+        session.add(row)
+        await session.commit()
+        # A plug-in limited to the operations community follows the choice too.
+        invalidate_registrations()
+        await operations_schema.follow_choice(guild_id)
     return guild_id
 
 
@@ -149,11 +160,18 @@ async def set_stream_contact(
 
 
 async def contacts(session: AsyncSession) -> tuple[Optional[str], dict[str, str]]:
-    """The general address and every stream's own, as set."""
+    """The general address and the own address of every stream this server
+    takes, as set."""
     row = (await session.exec(select(AppSetting).where(AppSetting.id == 1))).first()
     if row is None:
         return None, {}
-    return row.intake_general_contact, dict(row.intake_contacts or {})
+    taken = {
+        stream.value
+        for stream in offered_streams()
+        if Source.submitted in meta(stream).sources
+    }
+    own = {k: v for k, v in (row.intake_contacts or {}).items() if k in taken}
+    return row.intake_general_contact, own
 
 
 async def _resolve_project(
@@ -309,18 +327,32 @@ async def _ensure_isolation(
         )
 
 
-async def _blueprint_status_roles(
+async def _blueprint_roles(
     session: AsyncSession, stream: IntakeStream, project_id: int
 ) -> dict[str, Optional[int]]:
-    """The statuses a project set up from ``stream``'s blueprint plays each
-    role with. None for a stream with no conversation, where nobody is ever
-    waited on."""
-    from app.blueprints.intake import REQUESTER_REPLIED, WAITING_ON_REQUESTER
+    """The statuses and type a project set up from ``stream``'s blueprint
+    plays each role with. No statuses for a stream with no conversation, where
+    nobody is ever waited on; a type only for the Ideas board, whose type is
+    what publishes an idea."""
+    from app.blueprints.intake import (
+        PUBLISHED_TYPE,
+        REQUESTER_REPLIED,
+        WAITING_ON_REQUESTER,
+    )
 
     roles: dict[str, Optional[int]] = {
         "awaiting_filer_status_id": None,
         "active_status_id": None,
+        "task_type_id": None,
     }
+    if stream is IntakeStream.ideas:
+        roles["task_type_id"] = (
+            await session.exec(
+                select(TaskType.id)
+                .where(TaskType.project_id == project_id)
+                .where(TaskType.name == PUBLISHED_TYPE)
+            )
+        ).first()
     if meta(stream).conversation is Conversation.none:
         return roles
     rows = (
@@ -485,14 +517,15 @@ async def _view(
 async def list_bindings(
     session: AsyncSession,
 ) -> tuple[Optional[int], list[BindingView]]:
-    """Every stream and where it currently lands.
+    """Every stream this server takes and where it currently lands.
 
     Returns one view per stream, bound or not, so the settings page renders the
     full set rather than only what somebody has already configured.
     """
+    streams = offered_streams()
     guild_id = await operations_guild_id(session)
     if guild_id is None:
-        return None, [await _view(session, s, None, None, None) for s in IntakeStream]
+        return None, [await _view(session, s, None, None, None) for s in streams]
 
     async with _route(guild_id) as routed:
         bindings = {
@@ -500,7 +533,7 @@ async def list_bindings(
             for row in await routed.exec(select(IntakeBinding))
         }
         views: list[BindingView] = []
-        for stream in IntakeStream:
+        for stream in streams:
             binding = bindings.get(stream)
             project = initiative = None
             if binding is not None:
@@ -568,7 +601,7 @@ async def provision_from_blueprint(
             project=project,
             project_id=result.entity_id,
             default_status_id=None,
-            **await _blueprint_status_roles(routed, stream, result.entity_id),
+            **await _blueprint_roles(routed, stream, result.entity_id),
             enabled=True,
         )
         await routed.commit()

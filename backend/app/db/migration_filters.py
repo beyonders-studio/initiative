@@ -8,11 +8,15 @@ drift test proves exactly what ``alembic revision --autogenerate`` would see.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Iterator
 
 from sqlalchemy import ForeignKeyConstraint
 
-from app.db.tenancy import GUILD_SCOPED_TABLES, NON_MODEL_SHARED_TABLES
+from app.db.tenancy import (
+    GUILD_SCOPED_TABLES,
+    NON_MODEL_SHARED_TABLES,
+    OPERATIONS_TABLES,
+)
 
 IncludeObject = Callable[[object, str, str, bool, object], bool]
 
@@ -106,6 +110,39 @@ def strip_cross_schema_foreign_keys(directives: Iterable[Any]) -> None:
         ):
             if container is not None:
                 _strip(container)
+
+
+def reaches_operations_only(directives: Iterable[Any]) -> bool:
+    """Whether the generated guild ops change :data:`OPERATIONS_TABLES` alone,
+    which only the operations community's schema has, so they run where those
+    tables are. Raises for ops that change them beside other tables: those
+    are two revisions, one for every community and one for it."""
+    names = {
+        name
+        for script in directives
+        for container in (
+            getattr(script, "upgrade_ops", None),
+            getattr(script, "downgrade_ops", None),
+        )
+        if container is not None
+        for name in _table_names(container)
+    }
+    operations = names & OPERATIONS_TABLES
+    if operations and names - OPERATIONS_TABLES:
+        raise ValueError(
+            f"{sorted(operations)} are the operations community's alone; generate"
+            f" their change apart from {sorted(names - OPERATIONS_TABLES)}"
+        )
+    return bool(operations)
+
+
+def _table_names(container: Any) -> Iterator[str]:
+    for operation in getattr(container, "ops", ()):
+        name = getattr(operation, "table_name", None)
+        if name:
+            yield name
+        if hasattr(operation, "ops"):
+            yield from _table_names(operation)
 
 
 def _strip(container: Any) -> None:

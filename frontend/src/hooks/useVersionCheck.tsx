@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { getVersion } from "@/api/generated/version/version";
 import { compareVersions } from "@/hooks/useLatestVersion";
+import { setPendingUpdate } from "@/lib/pendingUpdate";
 import { getItem, setItem } from "@/lib/storage";
 
 const CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
@@ -38,6 +39,8 @@ export const useVersionCheck = () => {
         if (!isServerNewer) {
           return;
         }
+        // The Update button offers the reload whether or not the prompt was closed.
+        setPendingUpdate({ action: "reload", run: () => window.location.reload() });
 
         // Check if user already dismissed this specific version
         const dismissedVersion = getItem(DISMISSED_VERSION_KEY);

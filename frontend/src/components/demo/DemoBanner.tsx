@@ -1,19 +1,19 @@
 import { Link } from "@tanstack/react-router";
 import { Hourglass, Presentation } from "lucide-react";
-import { type ReactNode, useEffect, useId, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useLeaveDemoLead, usePublishDemoPitch, useReadDemoPitch } from "@/api/generated/demo/demo";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCommunities } from "@/hooks/useCommunities";
 import { type DemoCopy, useDemoCopy, useIsDemoServer } from "@/hooks/useDemoCopy";
-import { useLiveClockValue, useRelativeTime } from "@/hooks/useRelativeTime";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { listFormat, numberFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { listFormat, numberFormat } from "@/ui/lib/intl";
+import { useLiveClockValue, useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 /** Publishing is queued, so the pitch is read again this often until the new
  *  version lands, and given up on after this long. */
@@ -53,7 +53,6 @@ const BannerRow = ({
 /** "Leave your email": a small form that leaves an address for a follow-up. */
 const LeadPopover = () => {
   const { t } = useTranslation("auth");
-  const emailId = useId();
   const [email, setEmail] = useState("");
   const lead = useLeaveDemoLead();
 
@@ -75,17 +74,15 @@ const LeadPopover = () => {
           >
             <p className="font-medium">{t("demo.lead.title")}</p>
             <p className="text-muted-foreground text-sm">{t("demo.lead.pitch")}</p>
-            <div className="space-y-2">
-              <Label htmlFor={emailId}>{t("demo.lead.label")}</Label>
+            <Field label={t("demo.lead.label")}>
               <Input
-                id={emailId}
                 type="email"
                 autoComplete="email"
                 required
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
-            </div>
+            </Field>
             {lead.isError ? (
               <p className="text-destructive text-sm" role="alert">
                 {getErrorMessage(lead.error, "auth:demo.lead.failed")}

@@ -14,24 +14,24 @@ import {
 import { useTranslation } from "react-i18next";
 
 import type {
+  EndpointRef,
   PropertyDefinitionRead,
   PropertySummary,
-  SearchEntityType,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { EntityLinkField } from "@/components/entities/EntityLinkField";
 import type { RelationsLayout } from "@/components/entities/RelationsSection";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
 import { ownProperties } from "@/components/properties/propertyHelpers";
-import { Button } from "@/components/ui/button";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { type FieldSaveKind, ItemDraftContext } from "@/hooks/useFieldSave";
 import type { MetadataOwner } from "@/hooks/useProperties";
 import { useCommunityPath } from "@/lib/communityUrl";
 import type { LinkedRef } from "@/lib/relationships";
 import type { ToolRelationEntity } from "@/lib/tools";
-import { cn } from "@/lib/utils";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
 
 import {
   addingTree,
@@ -59,7 +59,7 @@ import {
 import { LAYOUT_PARTS, type LayoutContext, type LayoutNode, type Parts, renderNode } from "./tree";
 
 /** What every kind of item drawn on a detail has. */
-type Item = PluginItem & { properties: PropertySummary[] };
+type Item = PluginItem & { properties: PropertySummary[]; updated_at?: string };
 
 /** Where one item lives, which the parts every item's detail has read. */
 export interface ItemHome<I, P> {
@@ -79,7 +79,7 @@ export interface ItemHome<I, P> {
    *  where it is not that entity. */
   links: {
     entity: ToolRelationEntity;
-    target?: { type: SearchEntityType; id: number };
+    target?: EndpointRef;
     title?: string;
     layout?: RelationsLayout;
   };
@@ -150,6 +150,7 @@ const propertiesOf = (item: Item, home: ItemHome<Item, unknown>) => ({
   initiativeId: home.initiativeId,
   canOpen: home.canOpen,
   owner: home.owner,
+  updatedAt: item.updated_at,
 });
 
 /** One field, by its id: one of its initiative's properties, a plug-in's, or

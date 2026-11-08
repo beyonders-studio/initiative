@@ -71,6 +71,10 @@ class NotificationType(str, Enum):
     #: A community made for this account, by them or by staff on their behalf.
     #: Written once, where billing sets plans, inviting them to set up its plan.
     community_welcome = "community_welcome"
+    #: An announcement the recipient was shown and dismissed. Written read, once
+    #: per announcement, naming its key and title; opening it shows the notice
+    #: again.
+    announcement = "announcement"
     connection_requested = "connection_requested"
     connection_accepted = "connection_accepted"
     message_request_received = "message_request_received"
@@ -89,6 +93,9 @@ class NotificationType(str, Enum):
     #: waiting on them, in progress or closed. Names the case and its state,
     #: never what was said.
     ticket_updated = "ticket_updated"
+    #: An idea the recipient voted for moved to another status. Names the idea
+    #: and the status, both as everybody reads them.
+    idea_updated = "idea_updated"
     #: A community's moderators took down something the recipient wrote.
     #: Names the kind and the reason, never what it said or who reported it.
     moderation_removal = "moderation_removal"

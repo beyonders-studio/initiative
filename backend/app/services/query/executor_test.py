@@ -88,7 +88,7 @@ async def test_every_shipped_dashboard_asks_something_postgres_plans(guild):
         if manifest.get("kind") != "dashboard":
             continue
         for widget in manifest["definition"]["widgets"]:
-            await describe(widget["binding"]["sql"], context=_context(guild))
+            await describe(resolve(widget["binding"]["sql"]), context=_context(guild))
 
 
 async def test_it_reports_what_the_planner_expected(guild):
@@ -231,7 +231,9 @@ async def test_a_description_that_cannot_be_planned_is_stopped(
         )
         try:
             with pytest.raises(QueryError) as stopped:
-                await describe("SELECT title FROM tasks", context=_context(guild))
+                await describe(
+                    resolve("SELECT title FROM tasks"), context=_context(guild)
+                )
         finally:
             await holder.rollback()
     assert stopped.value.code == QueryMessages.TIMED_OUT
@@ -242,7 +244,7 @@ async def test_a_field_selected_on_its_own_is_typed_by_the_registry(guild):
     query reports and the fields a dataset offers answer that the same way,
     because one declaration answers both."""
     columns, _ = await describe(
-        "SELECT project_id, title FROM tasks", context=_context(guild)
+        resolve("SELECT project_id, title FROM tasks"), context=_context(guild)
     )
     assert columns == (
         QueryColumn(name="project_id", type=FieldType.reference),
@@ -253,7 +255,7 @@ async def test_a_field_selected_on_its_own_is_typed_by_the_registry(guild):
 async def test_an_output_built_from_fields_is_typed_by_the_database(guild):
     """Nothing declares what an expression is, so the database describes it."""
     columns, _ = await describe(
-        "SELECT lower(title) AS t, length(title) AS n FROM tasks",
+        resolve("SELECT lower(title) AS t, length(title) AS n FROM tasks"),
         context=_context(guild),
     )
     assert columns == (
@@ -283,7 +285,7 @@ async def test_a_length_of_time_is_not_a_moment(guild):
     """An interval is a length, not a point, so nothing offers to place it on a
     timeline."""
     columns, _ = await describe(
-        "SELECT interval '3 days' AS gap FROM tasks", context=_context(guild)
+        resolve("SELECT interval '3 days' AS gap FROM tasks"), context=_context(guild)
     )
     assert columns == (QueryColumn(name="gap", type=FieldType.text),)
 

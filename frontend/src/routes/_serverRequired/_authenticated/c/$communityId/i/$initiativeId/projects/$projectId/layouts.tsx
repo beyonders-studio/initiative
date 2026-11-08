@@ -1,6 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 import { parseLayoutKind } from "@/lib/filters/layoutSearch";
+import { ProjectLayoutEditorPage } from "@/pages/initiativeTools/projects/ProjectLayoutEditorPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/projects/$projectId/layouts"
@@ -9,9 +10,5 @@ export const Route = createFileRoute(
   validateSearch: (search: Record<string, unknown>) => ({
     layout: parseLayoutKind(search.layout),
   }),
-  component: lazyRouteComponent(() =>
-    import("@/pages/initiativeTools/projects/ProjectLayoutEditorPage").then((m) => ({
-      default: m.ProjectLayoutEditorPage,
-    }))
-  ),
+  component: ProjectLayoutEditorPage,
 });

@@ -53,7 +53,7 @@ describe("confirming an age", () => {
       birthdate: "1990-01-01",
     });
     expect(refreshUser).toHaveBeenCalled();
-    expect(invalidations).toHaveBeenCalledWith(q.dmSettings(), q.contacts(), q.contactGrants());
+    expect(invalidations).toHaveBeenCalledWith(q.dmSettings(), q.people(), q.contactGrants());
   });
 
   it("keeps what is on screen when the answer was refused", async () => {

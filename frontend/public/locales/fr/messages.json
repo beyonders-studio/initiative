@@ -33,7 +33,6 @@
     "empty": "Personne dans vos communautés n'a encore activé les messages.",
     "noCommunities": "Personne à afficher. Vous ne partagez encore de communauté avec personne.",
     "unreachable": "Injoignable",
-    "showMore": "Afficher plus",
     "addToGroup": "Ajouter {{name}} à un groupe",
     "removeFromGroup": "Retirer {{name}}",
     "groupHint": "Tout le monde ici sera invité avant de rejoindre.",
@@ -57,7 +56,6 @@
   "recipientHasNoDevice": "{{name}} n'a pas encore configuré les messages chiffrés, ceci n'a donc pas pu être remis.",
   "peerDevicesChanged": "Les appareils de {{name}} ont changé",
   "deviceFailed": "Les messages chiffrés n'ont pas pu être configurés sur cet appareil.",
-  "loading": "Chargement…",
   "unsupportedBrowser": "Les messages chiffrés ont besoin d'une connexion sécurisée et d'un navigateur capable de les exécuter. Vérifie que l'adresse commence par https (ou est localhost), ou utilise l'application.",
   "start": {
     "waiting": "En attente de leur acceptation. Ensuite, vous pourrez vous écrire.",

@@ -1,11 +1,13 @@
+import { Link } from "@tanstack/react-router";
 import {
   Archive,
   ArchiveRestore,
-  Check,
   ChevronsUpDown,
   CircleAlert,
   Loader2,
+  Settings,
   Trash2,
+  UserPlus,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -13,26 +15,12 @@ import { useTranslation } from "react-i18next";
 import type { InitiativeRead } from "@/api/generated/initiativeAPI.schemas";
 import { CommunityInitiativeDefaultsCard } from "@/components/initiatives/CommunityInitiativeDefaultsCard";
 import { DeleteInitiativeDialog } from "@/components/initiatives/DeleteInitiativeDialog";
+import { POLICY_LABEL_KEY } from "@/components/initiatives/JoinPolicySection";
 import { type MemberLike, useSeenMembers } from "@/components/members/MemberSearchSelect";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { DataTable } from "@/components/ui/data-table";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { useArchiveEntity, useUnarchiveEntity } from "@/hooks/useArchive";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useHeldSurfaces } from "@/hooks/useCustomRoles";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInitiativeRoles } from "@/hooks/useInitiativeRoles";
 import {
   useAddInitiativeMember,
@@ -43,12 +31,26 @@ import {
   useUpdateInitiativeMember,
 } from "@/hooks/useInitiatives";
 import { type MemberSearchScope, useUserSearch } from "@/hooks/useUsers";
+import { useCommunityPath } from "@/lib/communityUrl";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { InitiativeColorDot } from "@/lib/initiativeColors";
 import { toast } from "@/lib/mascotToast";
 import { isAdminRole } from "@/lib/permissions";
-import type { AppColumnDef } from "@/lib/table";
+import { initiativeRoute } from "@/lib/tools";
 import { getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader } from "@/ui/card";
+import { Combobox } from "@/ui/combobox";
+import { DataTable } from "@/ui/data-table";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
+import { listFormat } from "@/ui/lib/intl";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { RowActionsMenu } from "@/ui/row-actions-menu";
+import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
+import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 const COMMUNITY_SCOPE: MemberSearchScope = { type: "community" };
 const NONE: never[] = [];
@@ -64,16 +66,15 @@ const NONE: never[] = [];
  * row (which is also how they leave an initiative they added themselves to).
  */
 const InitiativeManagersCell = ({ initiative }: { initiative: InitiativeRead }) => {
-  const { t } = useTranslation(["initiatives", "common"]);
+  const { t, i18n } = useTranslation(["initiatives", "common"]);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const debouncedQuery = useDebouncedValue(query, 250);
   const rolesQuery = useInitiativeRoles(initiative.id);
   const managersQuery = useInitiativeManagers(initiative.id);
 
   // Candidates are the community's members matching what was typed, asked of the
   // server once the picker is open.
-  const searchQuery = useUserSearch({ search: debouncedQuery, enabled: open });
+  const searchQuery = useUserSearch({ search: query, enabled: open });
   const results = useMemo(
     () => (searchQuery.data?.items ?? []).filter((candidate) => candidate.status !== "anonymized"),
     [searchQuery.data]
@@ -171,80 +172,77 @@ const InitiativeManagersCell = ({ initiative }: { initiative: InitiativeRead }) 
     );
   }
 
+  // The managers by name: who runs it is the question this column answers.
+  const shown = managers.map((manager) => knownManagers.get(manager.id) ?? manager);
   const selectedLabel =
     managerCount === 0
       ? t("manage.noManagers")
-      : managerCount === 1
-        ? getUserDisplayName(managers[0], t("manage.managerCount", { count: 1 }))
-        : t("manage.managerCount", { count: managerCount });
+      : listFormat(i18n.language).format(shown.map((manager) => getUserDisplayName(manager)));
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) setQuery("");
+    <Combobox
+      multiple
+      items={candidates.map((candidate) => ({
+        value: String(candidate.id),
+        label: getUserDisplayName(candidate),
+        // Unticking waits until the community has said whether this manager is
+        // one of its admins.
+        disabled: pending || (managerIds.has(candidate.id) && !knownManagers.has(candidate.id)),
+      }))}
+      value={managerIdList.map(String)}
+      // One row is ticked or unticked at a time: the one in only one list.
+      onValueChange={(next) => {
+        const changed = [...next, ...managerIdList.map(String)].find(
+          (value) => next.includes(value) !== managerIds.has(Number(value))
+        );
+        if (changed) toggle(Number(changed));
       }}
-    >
-      <PopoverTrigger asChild>
+      onSearchChange={setQuery}
+      onOpenChange={setOpen}
+      loading={searchQuery.isFetching && candidates.length === 0}
+      searchPlaceholder={t("common:search")}
+      emptyMessage={t("manage.noCandidates")}
+      trigger={
         <Button
           variant="outline"
           size="sm"
           role="combobox"
-          aria-expanded={open}
           aria-label={t("manage.managersColumn")}
-          className="w-48 justify-between font-normal"
+          className={
+            managerCount === 0
+              ? "max-w-48 justify-between border-dashed font-normal text-muted-foreground"
+              : "max-w-48 justify-between font-normal"
+          }
         >
-          <span className={managerCount === 0 ? "text-muted-foreground" : undefined}>
-            {selectedLabel}
-          </span>
+          {managerCount === 0 ? (
+            <UserPlus className="h-4 w-4 shrink-0" />
+          ) : (
+            <span className="flex shrink-0 -space-x-1.5">
+              {shown.slice(0, 3).map((manager) => (
+                <ProfileAvatar
+                  key={manager.id}
+                  user={manager}
+                  className="h-5 w-5 ring-2 ring-background"
+                />
+              ))}
+            </span>
+          )}
+          <span className="min-w-0 truncate">{selectedLabel}</span>
           {pending ? (
             <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
           ) : (
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
           )}
         </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[280px] p-0">
-        <Command shouldFilter={false}>
-          <CommandInput placeholder={t("common:search")} value={query} onValueChange={setQuery} />
-          <CommandList>
-            {searchQuery.isFetching && candidates.length === 0 ? (
-              <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("common:loading")}
-              </div>
-            ) : (
-              <CommandEmpty>{t("manage.noCandidates")}</CommandEmpty>
-            )}
-            <CommandGroup className="max-h-64 overflow-y-auto">
-              {candidates.map((candidate) => {
-                const isManager = managerIds.has(candidate.id);
-                return (
-                  <CommandItem
-                    key={candidate.id}
-                    value={String(candidate.id)}
-                    // Unticking waits until the community has said whether this
-                    // manager is one of its admins.
-                    disabled={pending || (isManager && !knownManagers.has(candidate.id))}
-                    onSelect={() => toggle(candidate.id)}
-                  >
-                    <Check className={cn("h-4 w-4", isManager ? "opacity-100" : "opacity-0")} />
-                    {getUserDisplayName(candidate)}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+      }
+    />
   );
 };
 
 export const SettingsInitiativesPage = () => {
   const { t } = useTranslation(["initiatives", "common"]);
   const { activeCommunity } = useCommunities();
+  const gp = useCommunityPath();
   // Whoever holds the community's initiatives, not only its admins.
   const managesInitiatives = useHeldSurfaces().holds("initiatives");
   // What every initiative uses is the admin rung's own to set.
@@ -258,6 +256,8 @@ export const SettingsInitiativesPage = () => {
   const unarchiveInitiative = useUnarchiveEntity();
 
   const [deleteTarget, setDeleteTarget] = useState<InitiativeRead | null>(null);
+  // Archived initiatives are a view of their own, as every tool's are.
+  const [view, setView] = useState<"active" | "archived">("active");
 
   const toggleArchive = (initiative: InitiativeRead) => {
     const nextArchived = initiative.archived_at === null;
@@ -288,39 +288,34 @@ export const SettingsInitiativesPage = () => {
 
   const columns: AppColumnDef<InitiativeRead>[] = [
     {
-      accessorKey: "id",
-      header: t("manage.idColumn"),
-      cell: ({ row }) => (
-        <span className="font-mono text-muted-foreground text-sm">{row.original.id}</span>
-      ),
-    },
-    {
       accessorKey: "name",
       header: t("manage.nameColumn"),
       cell: ({ row }) => {
         const initiative = row.original;
         return (
-          <div className="flex items-center gap-2">
-            {initiative.color ? (
-              <span
-                className="inline-block h-3 w-3 shrink-0 rounded-full"
-                style={{ backgroundColor: initiative.color }}
-                aria-hidden
-              />
-            ) : null}
-            <span className="font-medium">{initiative.name}</span>
+          <div className="flex min-w-0 items-start gap-2.5">
+            <InitiativeColorDot color={initiative.color} className="mt-1.5 shrink-0" />
+            <div className="min-w-0">
+              <Link
+                to={gp(`${initiativeRoute(initiative.id)}/settings`)}
+                className="font-medium hover:underline"
+              >
+                {initiative.name}
+              </Link>
+              <div className="flex flex-wrap gap-x-3 text-muted-foreground text-xs">
+                <span>{t(POLICY_LABEL_KEY[initiative.join_policy] as never)}</span>
+                <Link
+                  to={gp(`${initiativeRoute(initiative.id)}/settings/members`)}
+                  className="hover:underline"
+                >
+                  {t("manage.memberCount", { count: initiative.member_count })}
+                </Link>
+                <span className="font-mono">#{initiative.id}</span>
+              </div>
+            </div>
           </div>
         );
       },
-    },
-    {
-      id: "members",
-      header: t("manage.membersColumn"),
-      cell: ({ row }) => (
-        <span className="text-muted-foreground text-sm">
-          {t("manage.memberCount", { count: row.original.member_count })}
-        </span>
-      ),
     },
     {
       id: "managers",
@@ -328,53 +323,37 @@ export const SettingsInitiativesPage = () => {
       cell: ({ row }) => <InitiativeManagersCell initiative={row.original} />,
     },
     {
-      id: "status",
-      header: t("manage.statusColumn"),
-      cell: ({ row }) =>
-        row.original.archived_at !== null ? (
-          <Badge variant="outline" className="text-xs">
-            {t("manage.archived")}
-          </Badge>
-        ) : (
-          <Badge className="text-xs">{t("manage.active")}</Badge>
-        ),
-    },
-    {
       id: "actions",
-      header: t("manage.actionsColumn"),
+      header: () => <span className="sr-only">{t("manage.actionsColumn")}</span>,
       cell: ({ row }) => {
         const initiative = row.original;
+        const archived = initiative.archived_at !== null;
         return (
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => toggleArchive(initiative)}
+          <RowActionsMenu subject={initiative.name}>
+            {!archived && (
+              <DropdownMenuItem asChild>
+                <Link to={gp(`${initiativeRoute(initiative.id)}/settings`)}>
+                  <Settings className="h-4 w-4" />
+                  {t("manage.openSettings")}
+                </Link>
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
               disabled={archiveInitiative.isPending || unarchiveInitiative.isPending}
+              onSelect={() => toggleArchive(initiative)}
             >
-              {initiative.archived_at !== null ? (
-                <>
-                  <ArchiveRestore className="h-4 w-4" />
-                  {t("manage.unarchive")}
-                </>
-              ) : (
-                <>
-                  <Archive className="h-4 w-4" />
-                  {t("manage.archive")}
-                </>
-              )}
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              onClick={() => setDeleteTarget(initiative)}
+              {archived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+              {archived ? t("manage.unarchive") : t("manage.archive")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={() => setDeleteTarget(initiative)}
             >
               <Trash2 className="h-4 w-4" />
               {t("manage.delete")}
-            </Button>
-          </div>
+            </DropdownMenuItem>
+          </RowActionsMenu>
         );
       },
     },
@@ -385,12 +364,20 @@ export const SettingsInitiativesPage = () => {
   }
 
   if (initiativesQuery.isLoading) {
-    return <p className="text-muted-foreground text-sm">{t("manage.loading")}</p>;
+    return (
+      <SkeletonRegion>
+        <TableSkeleton rows={5} columns={4} />
+      </SkeletonRegion>
+    );
   }
 
   if (initiativesQuery.isError || !initiativesQuery.data) {
-    return <p className="text-destructive text-sm">{t("manage.loadError")}</p>;
+    return <StatusMessage onRetry={initiativesQuery.refetch} />;
   }
+
+  const live = initiativesQuery.data.filter((initiative) => initiative.archived_at === null);
+  const archived = initiativesQuery.data.filter((initiative) => initiative.archived_at !== null);
+  const counts = { active: live.length, archived: archived.length };
 
   return (
     <div className="space-y-6">
@@ -399,9 +386,26 @@ export const SettingsInitiativesPage = () => {
           <CardDescription>{t("manage.description")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <ToggleGroup
+            type="single"
+            value={view}
+            // Radix clears a single-select group when its item is clicked
+            // again; the table always shows one of the two.
+            onValueChange={(next) => next && setView(next as "active" | "archived")}
+            aria-label={t("common:toolViewFilter.label")}
+            className="justify-start"
+          >
+            {(["active", "archived"] as const).map((option) => (
+              <ToggleGroupItem key={option} value={option} className="h-9 gap-2 px-3">
+                {option === "archived" && <Archive className="h-4 w-4" />}
+                {t(`common:toolViewFilter.${option}`)}
+                <span className="text-muted-foreground text-xs tabular-nums">{counts[option]}</span>
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
           <DataTable
             columns={columns}
-            data={initiativesQuery.data}
+            data={view === "active" ? live : archived}
             enableFilterInput
             filterInputColumnKey="name"
             filterInputPlaceholder={t("manage.filterByName")}
@@ -411,7 +415,7 @@ export const SettingsInitiativesPage = () => {
         </CardContent>
       </Card>
 
-      {isCommunityAdmin && <CommunityInitiativeDefaultsCard />}
+      {isCommunityAdmin && <CommunityInitiativeDefaultsCard initiatives={live} />}
 
       <DeleteInitiativeDialog
         open={deleteTarget !== null}

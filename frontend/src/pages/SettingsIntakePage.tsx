@@ -1,8 +1,9 @@
 /**
  * Where this deployment's operations work lands (platform settings → Intake).
  *
- * Who to contact comes first, and stands on its own: a deployment that routes
- * nothing anywhere still tells people whom to write to.
+ * Whether people may send feedback to the Initiative team comes first, then
+ * who to contact. Both stand on their own: a deployment that routes nothing
+ * anywhere still sends feedback to the team, and tells people whom to write to.
  *
  * Then two levels of decision, in the order an owner makes them: name the
  * community that receives operations work, then say which project each stream
@@ -25,27 +26,13 @@ import {
   type IntakeSettingsRead,
   type IntakeStream,
 } from "@/api/generated/initiativeAPI.schemas";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useDeleteIntakeBinding,
   useImportIntakeBlueprint,
   useIntakeOptions,
   useIntakeSettings,
+  useUpdateFeedbackSwitch,
   useUpdateIntakeGeneralContact,
   useUpdateIntakeStreamContact,
   useUpdateOperationsCommunity,
@@ -57,6 +44,17 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Combobox } from "@/ui/combobox";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { StatusMessage } from "@/ui/status-message";
+import { Switch } from "@/ui/switch";
 
 /** Sentinel for "no community", which a Select cannot express with "". */
 const NONE = "none";
@@ -108,23 +106,12 @@ export const SettingsIntakePage = () => {
   // current value is known.
   if (failed) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("loadFailed.title")}</CardTitle>
-          <CardDescription>{t("loadFailed.description")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button
-            variant="outline"
-            onClick={() => {
-              refetchSettings();
-              refetchOptions();
-            }}
-          >
-            {t("loadFailed.retry")}
-          </Button>
-        </CardContent>
-      </Card>
+      <StatusMessage
+        onRetry={() => {
+          refetchSettings();
+          refetchOptions();
+        }}
+      />
     );
   }
 
@@ -132,6 +119,7 @@ export const SettingsIntakePage = () => {
 
   return (
     <div className="space-y-6">
+      {settings ? <FeedbackCard enabled={settings.feedback_enabled} settled={settled} /> : null}
       {settings ? <ContactsCard settings={settings} settled={settled} /> : null}
 
       <Card>
@@ -141,7 +129,7 @@ export const SettingsIntakePage = () => {
         </CardHeader>
         <CardContent className="space-y-3">
           <Label>{t("community.label")}</Label>
-          <AsyncCombobox
+          <Combobox
             className="max-w-md"
             aria-label={t("community.label")}
             value={boundCommunityId === null ? NONE : String(boundCommunityId)}
@@ -203,6 +191,31 @@ export const SettingsIntakePage = () => {
   );
 };
 
+/** Whether people here may send feedback to the Initiative team. */
+const FeedbackCard = ({ enabled, settled }: { enabled: boolean; settled: boolean }) => {
+  const { t } = useTranslation("intake");
+  const update = useUpdateFeedbackSwitch({
+    onError: (err) => toast.error(getErrorMessage(err, "intake:feedbackSwitch.error")),
+  });
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("feedbackSwitch.title")}</CardTitle>
+        <CardDescription>{t("feedbackSwitch.description")}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex items-center gap-3">
+        <Switch
+          id="feedback-enabled"
+          checked={enabled}
+          disabled={!settled || update.isPending}
+          onCheckedChange={(checked) => update.mutate({ enabled: checked })}
+        />
+        <Label htmlFor="feedback-enabled">{t("feedbackSwitch.label")}</Label>
+      </CardContent>
+    </Card>
+  );
+};
+
 /**
  * Who a notice tells somebody to contact: one general address, and one per
  * stream. A stream left blank uses the general address — never another
@@ -216,7 +229,10 @@ const ContactsCard = ({
   settled: boolean;
 }) => {
   const { t } = useTranslation("intake");
-  const streams = settings.bindings.map((binding) => binding.stream as IntakeStream);
+  // A stream nobody files into has nobody to point at an address.
+  const streams = settings.bindings
+    .filter((binding) => binding.filed !== false)
+    .map((binding) => binding.stream as IntakeStream);
   // One flat field per address: "general", then each stream by name.
   const contactsOf = (loaded: IntakeSettingsRead | undefined): Record<string, string> => ({
     general: loaded?.general_contact_email ?? "",
@@ -265,29 +281,25 @@ const ContactsCard = ({
       </CardHeader>
       <CardContent>
         <form className="max-w-md space-y-4" onSubmit={onSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="intake-contact-general">{t("contacts.generalLabel")}</Label>
+          <Field label={t("contacts.generalLabel")}>
             <Input
-              id="intake-contact-general"
               type="email"
               value={draft.general}
               placeholder={t("contacts.generalPlaceholder")}
               disabled={!settled || saving}
               onChange={(event) => form.set({ general: event.target.value })}
             />
-          </div>
+          </Field>
           {streams.map((stream) => (
-            <div key={stream} className="space-y-2">
-              <Label htmlFor={`intake-contact-${stream}`}>{t(`streams.${stream}.title`)}</Label>
+            <Field key={stream} label={t(`streams.${stream}.title`)}>
               <Input
-                id={`intake-contact-${stream}`}
                 type="email"
                 value={draft[stream]}
                 placeholder={t("contacts.streamPlaceholder")}
                 disabled={!settled || saving}
                 onChange={(event) => form.set({ [stream]: event.target.value })}
               />
-            </div>
+            </Field>
           ))}
           <Button type="submit" disabled={!settled || saving || !changed}>
             {saving ? t("contacts.saving") : t("contacts.save")}
@@ -343,6 +355,7 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
   );
   const statuses = bound?.statuses ?? [];
   const types = bound?.task_types ?? [];
+  const ideas = stream === "ideas";
 
   const busy = !settled || importBlueprint.isPending || upsert.isPending || remove.isPending;
 
@@ -395,10 +408,9 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
           <div className="space-y-3">
             <p className="text-muted-foreground text-sm">{t("stream.setUpHelp")}</p>
             <div className="flex flex-wrap items-end gap-2">
-              <div className="space-y-2">
-                <Label htmlFor={`initiative-${stream}`}>{t("stream.initiativeLabel")}</Label>
+              <Field label={t("stream.initiativeLabel")}>
                 <Select value={initiativeId} onValueChange={setInitiativeId} disabled={busy}>
-                  <SelectTrigger id={`initiative-${stream}`} className="w-64">
+                  <SelectTrigger className="w-64">
                     <SelectValue placeholder={t("stream.initiativePlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -409,7 +421,7 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
               <Button
                 disabled={busy || !initiativeId}
                 onClick={() =>
@@ -419,8 +431,7 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                 {t("stream.setUpForMe")}
               </Button>
             </div>
-            <div className="space-y-2 border-t pt-4">
-              <Label htmlFor={`project-${stream}`}>{t("stream.existingProjectLabel")}</Label>
+            <Field label={t("stream.existingProjectLabel")} className="border-t pt-4">
               <Select
                 value=""
                 disabled={busy || projects.length === 0}
@@ -428,7 +439,7 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                   upsert.mutate({ stream, body: { project_id: Number(value), enabled: true } })
                 }
               >
-                <SelectTrigger id={`project-${stream}`} className="max-w-md">
+                <SelectTrigger className="max-w-md">
                   <SelectValue placeholder={t("stream.existingProjectPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -439,12 +450,17 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor={`bound-project-${stream}`}>{t("stream.landsInLabel")}</Label>
+            {/* Repointing starts fresh in the new project: an incident still
+                open in the old one stays where the work on it is. */}
+            <Field
+              label={t("stream.landsInLabel")}
+              hint={!binding.project_archived && t("stream.repointNote")}
+              error={binding.project_archived && t("stream.archivedNote")}
+            >
               <Select
                 value={String(binding.project_id)}
                 disabled={busy}
@@ -455,7 +471,7 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                   })
                 }
               >
-                <SelectTrigger id={`bound-project-${stream}`} className="max-w-md">
+                <SelectTrigger className="max-w-md">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -474,23 +490,15 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                   ))}
                 </SelectContent>
               </Select>
-              {binding.project_archived ? (
-                <p className="text-destructive text-sm">{t("stream.archivedNote")}</p>
-              ) : (
-                /* Repointing starts fresh in the new project: an incident still
-                   open in the old one stays where the work on it is. */
-                <p className="text-muted-foreground text-xs">{t("stream.repointNote")}</p>
-              )}
-            </div>
+            </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor={`status-${stream}`}>{t("stream.landingStatusLabel")}</Label>
+            <Field label={t("stream.landingStatusLabel")}>
               <Select
                 value={binding.default_status_id ? String(binding.default_status_id) : NONE}
                 disabled={busy || statuses.length === 0}
                 onValueChange={(value) => save({ default_status_id: statusValue(value) })}
               >
-                <SelectTrigger id={`status-${stream}`} className="max-w-xs">
+                <SelectTrigger className="max-w-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -502,22 +510,24 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
 
-            {/* A project with one type has nothing to choose. */}
-            {types.length > 1 || binding.task_type_id ? (
-              <div className="space-y-2">
-                <Label htmlFor={`type-${stream}`}>{t("stream.caseTypeLabel")}</Label>
+            {/* A project with one type has nothing to choose, except on the
+                Ideas board, where the type is what publishes an idea. */}
+            {types.length > 1 || binding.task_type_id || ideas ? (
+              <Field label={t(ideas ? "stream.ideaTypeLabel" : "stream.caseTypeLabel")}>
                 <Select
                   value={statusOption(binding.task_type_id)}
                   disabled={busy}
                   onValueChange={(value) => save({ task_type_id: statusValue(value) })}
                 >
-                  <SelectTrigger id={`type-${stream}`} className="max-w-xs">
+                  <SelectTrigger className="max-w-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NONE}>{t("stream.caseTypeDefault")}</SelectItem>
+                    <SelectItem value={NONE}>
+                      {t(ideas ? "stream.ideaTypeNone" : "stream.caseTypeDefault")}
+                    </SelectItem>
                     {/* One the project no longer offers names itself, or the
                         control would render blank. */}
                     {binding.task_type_id &&
@@ -533,14 +543,13 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
             ) : null}
 
             {binding.conversation && binding.conversation !== Conversation.none ? (
               <div className="space-y-3">
                 <div className="grid grid-cols-pair gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor={`awaiting-${stream}`}>{t("stream.awaitingLabel")}</Label>
+                  <Field label={t("stream.awaitingLabel")}>
                     <Select
                       value={statusOption(binding.awaiting_filer_status_id)}
                       disabled={busy || statuses.length === 0}
@@ -548,7 +557,7 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                         save({ awaiting_filer_status_id: statusValue(value) })
                       }
                     >
-                      <SelectTrigger id={`awaiting-${stream}`}>
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -560,15 +569,14 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`active-${stream}`}>{t("stream.activeLabel")}</Label>
+                  </Field>
+                  <Field label={t("stream.activeLabel")}>
                     <Select
                       value={statusOption(binding.active_status_id)}
                       disabled={busy || statuses.length === 0}
                       onValueChange={(value) => save({ active_status_id: statusValue(value) })}
                     >
-                      <SelectTrigger id={`active-${stream}`}>
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -580,7 +588,7 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
+                  </Field>
                 </div>
                 <p className="text-muted-foreground text-xs">
                   {binding.awaiting_filer_status_id

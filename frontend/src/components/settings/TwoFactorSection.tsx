@@ -11,19 +11,6 @@ import {
   useRegenerateRecoveryCodes,
 } from "@/api/generated/auth/auth";
 import { RecoveryCodesPanel } from "@/components/settings/RecoveryCodesPanel";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import { useAnnounceHeld } from "@/hooks/useHeldChange";
 import { useWizard } from "@/hooks/useWizard";
 import { getErrorMessage } from "@/lib/errorMessage";
@@ -31,6 +18,21 @@ import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { queryClient } from "@/lib/queryClient";
 import { classifySecondFactorAnswer } from "@/lib/secondFactorAnswer";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
+import { WizardDialog } from "@/ui/wizard-dialog";
 
 /** Below this, the set is worth replacing before it runs out. */
 const LOW_ON_CODES = 3;
@@ -250,11 +252,13 @@ export const TwoFactorSection = () => {
   return (
     <div className="space-y-4">
       {status.isLoading ? (
-        <p className="text-muted-foreground text-sm">{t("twoFactor.loading")}</p>
+        <SkeletonRegion>
+          <SkeletonLines lines={2} />
+        </SkeletonRegion>
       ) : status.isError ? (
         // Unknown is not the same as off: offering setup here would send an
         // enrolled account to a dead end.
-        <p className="text-destructive text-sm">{t("twoFactor.statusError")}</p>
+        <StatusMessage onRetry={status.refetch} />
       ) : enrolled ? (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -331,17 +335,15 @@ export const TwoFactorSection = () => {
       >
         {step === "password" ? (
           <form className="space-y-4" onSubmit={submitPassword}>
-            <div className="space-y-2">
-              <Label htmlFor="two-factor-password">{t("twoFactor.passwordLabel")}</Label>
+            <Field label={t("twoFactor.passwordLabel")}>
               <Input
-                id="two-factor-password"
                 type="password"
                 autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
               />
-            </div>
+            </Field>
             {error ? <p className="text-destructive text-sm">{error}</p> : null}
             <DialogFooter>
               <Button type="submit" disabled={begin.isPending || regenerate.isPending}>
@@ -364,10 +366,8 @@ export const TwoFactorSection = () => {
                 {secret}
               </code>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="two-factor-code">{t("twoFactor.codeLabel")}</Label>
+            <Field label={t("twoFactor.codeLabel")}>
               <Input
-                id="two-factor-code"
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 placeholder={t("twoFactor.codePlaceholder")}
@@ -375,7 +375,7 @@ export const TwoFactorSection = () => {
                 onChange={(event) => setCode(event.target.value)}
                 required
               />
-            </div>
+            </Field>
             {error ? <p className="text-destructive text-sm">{error}</p> : null}
             <DialogFooter>
               <Button type="submit" disabled={confirm.isPending || !code.trim()}>
@@ -402,28 +402,24 @@ export const TwoFactorSection = () => {
           </DialogHeader>
           <form className="space-y-4" onSubmit={submitDisable}>
             {passwordRequired ? (
-              <div className="space-y-2">
-                <Label htmlFor="two-factor-off-password">{t("twoFactor.passwordLabel")}</Label>
+              <Field label={t("twoFactor.passwordLabel")}>
                 <Input
-                  id="two-factor-off-password"
                   type="password"
                   autoComplete="current-password"
                   value={offPassword}
                   onChange={(event) => setOffPassword(event.target.value)}
                   required
                 />
-              </div>
+              </Field>
             ) : null}
-            <div className="space-y-2">
-              <Label htmlFor="two-factor-off-code">{t("twoFactor.codeOrRecoveryLabel")}</Label>
+            <Field label={t("twoFactor.codeOrRecoveryLabel")}>
               <Input
-                id="two-factor-off-code"
                 autoComplete="one-time-code"
                 value={offCode}
                 onChange={(event) => setOffCode(event.target.value)}
                 required
               />
-            </div>
+            </Field>
             {error ? <p className="text-destructive text-sm">{error}</p> : null}
             <DialogFooter>
               <Button type="submit" variant="destructive" disabled={disable.isPending}>

@@ -14,6 +14,7 @@ import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { canUseArchiveCard, ToolArchiveCard } from "@/components/tools/settings/ToolArchiveCard";
 import {
   canUseDuplicateCard,
@@ -21,13 +22,12 @@ import {
 } from "@/components/tools/settings/ToolDuplicateCard";
 import { ToolExportCard } from "@/components/tools/settings/ToolExportCard";
 import { useToolSettings } from "@/components/tools/settings/ToolSettingsContext";
-import { ToolSettingsPermissionRequired } from "@/components/tools/settings/ToolSettingsGuard";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { toolListRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 
 export const ToolSettingsAdvancedPage = () => {
   const { t } = useTranslation("common");
@@ -58,7 +58,7 @@ export const ToolSettingsAdvancedPage = () => {
   };
 
   if (!hasAnything) {
-    return <ToolSettingsPermissionRequired />;
+    return <SettingsPermissionRequired scope="tool" />;
   }
 
   return (
@@ -92,7 +92,6 @@ export const ToolSettingsAdvancedPage = () => {
         title={t("toolSettings.deleteConfirmTitle", { name: entity.name })}
         description={t("toolSettings.deleteConfirmDescription")}
         confirmLabel={t("delete")}
-        cancelLabel={t("cancel")}
         onConfirm={handleDelete}
         isLoading={remove.isPending}
         destructive

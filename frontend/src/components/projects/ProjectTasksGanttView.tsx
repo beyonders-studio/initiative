@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { GroupingState } from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronRight } from "lucide-react";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -29,18 +30,6 @@ import {
 import { useListTaskEdges } from "@/api/generated/relationships/relationships";
 import { readTask } from "@/api/generated/tasks/tasks";
 import { TaskTypeMark } from "@/components/tasks/TaskTypeOption";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { GroupBySelect } from "@/components/ui/data-table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Toggle } from "@/components/ui/toggle";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
 import { useOwnedDefinitions } from "@/hooks/useProperties";
@@ -66,13 +55,11 @@ import {
   waitingOn,
   wholesOf,
 } from "@/lib/gantt";
-import { dateTimeFormat } from "@/lib/intl";
 import { LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
 import { boardBands } from "@/lib/layouts/grouping";
 import { taskFields } from "@/lib/layouts/tasks";
 import { browserTimezone } from "@/lib/timezones";
 import { taskRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
 import {
   type AxisTick,
   addUnits,
@@ -82,6 +69,20 @@ import {
   weekendBands,
 } from "@/lib/widgets/timelineAxis";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { GroupBySelect } from "@/ui/data-table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { cn } from "@/ui/lib/utils";
+import { Toggle } from "@/ui/toggle";
+import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 const LABEL_WIDTH = 260;
 const ROW_HEIGHT = 32;
@@ -446,22 +447,18 @@ export const ProjectTasksGanttView = ({
     });
 
   // Which rows are in view, from where the chart is scrolled to: only those,
-  // and the one in the tab order, are drawn.
-  const [view, setView] = useState({ top: 0, height: 0 });
-  const measure = useCallback(() => {
-    const element = scroller.current;
-    if (element) setView({ top: element.scrollTop, height: element.clientHeight });
-  }, []);
-  useLayoutEffect(() => {
-    measure();
-    const element = scroller.current;
-    if (!element || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [measure]);
-  const first = Math.max(0, Math.floor((view.top - HEADER_HEIGHT) / ROW_HEIGHT) - OVERSCAN);
-  const last = Math.min(rows.length, Math.ceil((view.top + view.height) / ROW_HEIGHT) + OVERSCAN);
+  // and the one in the tab order, are drawn. The axis sits above them in the
+  // same scroller, so the rows start that far down it.
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scroller.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: OVERSCAN,
+    scrollMargin: HEADER_HEIGHT,
+  });
+  const inView = virtualizer.getVirtualItems();
+  const first = inView[0]?.index ?? 0;
+  const last = (inView.at(-1)?.index ?? -1) + 1;
 
   // One row is in the tab order, and the arrow keys move it.
   const body = useRef<HTMLDivElement>(null);
@@ -726,7 +723,6 @@ export const ProjectTasksGanttView = ({
 
       <div
         ref={scroller}
-        onScroll={measure}
         className="scrollbar-thin max-h-[75vh] overflow-auto rounded-md border text-sm"
         data-testid="gantt"
       >

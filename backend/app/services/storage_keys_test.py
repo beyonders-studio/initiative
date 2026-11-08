@@ -118,7 +118,6 @@ async def test_the_backfill_encrypts_what_was_stored_before(session: Any) -> Non
 
     storage = get_guild_storage(guild.id)
     assert isinstance(storage, EncryptedStorage)
-    assert storage.is_encrypted("before.txt") is True
     assert (
         plain.resolve_readable("before.txt")
         .read_bytes()

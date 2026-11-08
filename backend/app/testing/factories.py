@@ -31,8 +31,7 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.relationships import Provenance, RelationshipType
-from app.core.search import SearchEntityType
+from app.core.relationships import EndpointKind, Provenance, RelationshipType
 from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant import relationships as relationships_service
 from app.services.platform import grant_cases, rules
@@ -45,6 +44,7 @@ from app.models.platform.plugin_service_registration import PluginServiceRegistr
 from app.models.platform.publisher import Publisher, publisher_prefix
 from app.core.reactions import ReactionTarget
 from app.models.tenant.calendar import Calendar
+from app.models.tenant.contact import Contact
 from app.models.platform.marketplace import (
     MarketplaceListing,
     UID_ALPHABET,
@@ -87,7 +87,6 @@ from app.models.tenant.metadata import (
     MetadataType,
     MetadataValue,
 )
-from app.models.tenant.queue import Queue, QueueItem
 from app.models.tenant.reaction import Reaction
 from app.models.tenant.tag import Tag
 from app.models.tenant.task import (
@@ -430,6 +429,27 @@ async def create_access_grant(
         await session.commit()
         await session.refresh(grant)
     return grant
+
+
+async def make_operations_community(
+    session: AsyncSession, guild_id: int | None
+) -> None:
+    """Point the deployment's operations work at ``guild_id``, or at nothing,
+    and give that community's schema the operations tables and the filer role,
+    as choosing it in the platform settings does."""
+    from app.db.operations_schema import provision_operations
+    from app.db.request_context import Unattributed
+    from app.db.session import set_rls_context
+    from app.models.platform.app_setting import AppSetting
+
+    await set_rls_context(session, Unattributed())
+    row = (await session.exec(select(AppSetting).where(AppSetting.id == 1))).first()
+    row = row or AppSetting(id=1)
+    row.operations_guild_id = guild_id
+    session.add(row)
+    await session.commit()
+    if guild_id is not None:
+        await provision_operations(guild_id)
 
 
 async def create_guild_membership(
@@ -895,88 +915,6 @@ async def create_task(
     return task
 
 
-async def create_queue(
-    session: AsyncSession,
-    initiative: Initiative,
-    creator: User,
-    commit: bool = True,
-    **overrides: Any,
-) -> Queue:
-    """
-    Create a test queue with sensible defaults.
-
-    Args:
-        session: Database session
-        initiative: Initiative the queue belongs to
-        creator: User who creates the queue
-        commit: Whether to commit the transaction (default True)
-        **overrides: Override any default field values
-
-    Returns:
-        Created Queue instance
-    """
-    await route_session_to_guild(session, guild_of(initiative))
-
-    defaults = {
-        "name": f"Test Queue {datetime.now(timezone.utc).timestamp()}",
-        "description": "A test queue",
-        "initiative_id": initiative.id,
-        "created_by": creator.id,
-    }
-
-    queue_data = {**defaults, **overrides}
-    queue = Queue(**queue_data)
-    session.add(queue)
-
-    if commit:
-        await session.commit()
-        await session.refresh(queue)
-
-        await create_resource_grant(
-            session, queue, level=ResourceAccessLevel.owner, user=creator
-        )
-
-    return queue
-
-
-async def create_queue_item(
-    session: AsyncSession,
-    queue: Queue,
-    commit: bool = True,
-    **overrides: Any,
-) -> QueueItem:
-    """
-    Create a test queue item with sensible defaults.
-
-    Args:
-        session: Database session
-        queue: Queue the item belongs to
-        commit: Whether to commit the transaction (default True)
-        **overrides: Override any default field values
-
-    Returns:
-        Created QueueItem instance
-    """
-    await route_session_to_guild(session, guild_of(queue))
-
-    defaults = {
-        "queue_id": queue.id,
-        "label": f"Item {datetime.now(timezone.utc).timestamp()}",
-        "position": 0,
-        "is_visible": True,
-    }
-
-    item_data = {**defaults, **overrides}
-    item = QueueItem(**item_data)
-    session.add(item)
-
-    if commit:
-        await session.commit()
-        await session.refresh(item)
-
-    return item
-
-
 async def create_initiative_member(
     session: AsyncSession,
     initiative: Initiative,
@@ -1149,6 +1087,9 @@ async def create_property_definition(
         "color": color,
         "options": options,
         "currency": "USD" if type is MetadataType.currency else None,
+        "counter": {"step": 1, "min": None, "max": None, "initial": 0}
+        if type is MetadataType.counter
+        else None,
     }
 
     data = {**defaults, **overrides}
@@ -1179,7 +1120,7 @@ async def create_property_value(
 
     Args:
         session: Database session
-        entity: The row to attach the value to (a task, a file, a queue, …)
+        entity: The row to attach the value to (a task, a file, a counter, …)
         definition: MetadataDefinition the value references
         commit: Whether to commit the transaction (default True)
         **value_kwargs: Typed column values
@@ -2109,11 +2050,11 @@ async def create_comment(
     wiki: Wiki | None = None,
     file: File | None = None,
     project: Project | None = None,
-    queue: Queue | None = None,
     counter_group: CounterGroup | None = None,
     calendar: Calendar | None = None,
     dashboard: Dashboard | None = None,
     post: Post | None = None,
+    contact: Contact | None = None,
     collection: Collection | None = None,
     content: str = "A test comment",
     commit: bool = True,
@@ -2127,12 +2068,12 @@ async def create_comment(
         "collection": collection,
         Tool.project.value: project,
         Tool.file.value: file,
-        Tool.queue.value: queue,
         Tool.counter_group.value: counter_group,
         Tool.calendar.value: calendar,
         Tool.dashboard.value: dashboard,
         Tool.post.value: post,
         Tool.wiki.value: wiki,
+        Tool.contact.value: contact,
     }
     # Keyed by the enum rather than by string literals, and checked against it:
     # a new tool that has no keyword here fails on the first test that comments
@@ -2696,6 +2637,46 @@ async def create_wiki_page(
     return page
 
 
+async def create_contact(
+    session: AsyncSession,
+    initiative: Initiative,
+    creator: User,
+    *,
+    name: str | None = None,
+    commit: bool = True,
+    **overrides: Any,
+) -> Contact:
+    """Create a test contact in ``initiative`` with sensible defaults.
+
+    Mirrors the create endpoint's default sharing: the creator owns it and
+    every initiative member can read it.
+    """
+    await route_session_to_guild(session, guild_of(initiative))
+
+    defaults = {
+        "initiative_id": initiative.id,
+        "created_by": creator.id,
+        "name": name or f"Contact {datetime.now(timezone.utc).timestamp()}",
+    }
+    contact = Contact(**{**defaults, **overrides})
+    session.add(contact)
+
+    if commit:
+        await session.commit()
+        await session.refresh(contact)
+
+        await create_resource_grant(
+            session,
+            contact,
+            level=ResourceAccessLevel.owner,
+            user=creator,
+            commit=False,
+        )
+        await create_resource_grant(session, contact, all_initiative_members=True)
+
+    return contact
+
+
 # One arm per Tool, so a test that needs "an instance of every tool" derives it
 # from the enum instead of restating the list. The completeness check runs at
 # import time: a new Tool member fails here once, with a message naming it,
@@ -2704,12 +2685,12 @@ async def create_wiki_page(
 TOOL_FACTORIES: dict[Tool, Any] = {
     Tool.project: create_project,
     Tool.file: create_file,
-    Tool.queue: create_queue,
     Tool.counter_group: create_counter_group,
     Tool.calendar: create_calendar,
     Tool.dashboard: create_dashboard,
     Tool.post: create_post,
     Tool.wiki: create_wiki,
+    Tool.contact: create_contact,
 }
 
 if set(TOOL_FACTORIES) != set(Tool):
@@ -2748,9 +2729,6 @@ async def _collection_holding(
 # its tool's row and a creator, and the ones that name no creator ignore it.
 CHILD_FACTORIES: dict[str, Any] = {
     "task": lambda session, project, creator, **kw: create_task(session, project, **kw),
-    "queue_item": lambda session, queue, creator, **kw: create_queue_item(
-        session, queue, **kw
-    ),
     "calendar_event": create_calendar_event,
     "counter": lambda session, group, creator, **kw: create_counter(
         session, group, **kw
@@ -2794,8 +2772,8 @@ async def create_relationship(
     session: AsyncSession,
     guild: Guild,
     *,
-    source: tuple[SearchEntityType, int],
-    target: tuple[SearchEntityType, int],
+    source: tuple[EndpointKind, int],
+    target: tuple[EndpointKind, int],
     relationship_type: RelationshipType = RelationshipType.attached,
     provenance: Provenance = Provenance.manual,
     created_by: int | None = None,
@@ -2803,8 +2781,8 @@ async def create_relationship(
 ) -> EntityRelationship:
     """Create one edge between two things.
 
-    Endpoints are ``(kind, id)`` pairs, and a symmetric type is stored in the
-    order the constraint requires, so a test may name its two ends in whichever
+    Endpoints are ``(kind, id)`` pairs, a person's ``(EndpointKind.user, id)``,
+    and a symmetric type is stored in the order the constraint requires, so a test may name its two ends in whichever
     order reads better.
     """
     await route_session_to_guild(session, guild.id)

@@ -68,8 +68,6 @@ from app.testing.factories import (
     create_project,
     create_property_definition,
     create_property_value,
-    create_queue,
-    create_queue_item,
     create_relationship,
     create_tag,
     create_guild_auth_policy,
@@ -117,7 +115,7 @@ async def _run_worker() -> None:
     """Render the queued jobs the way the worker does. It re-queries as the
     creator on a read session from the community's cohort, which the standard
     harness points at the test database."""
-    await export_worker.process_export_jobs()
+    await export_worker.jobs.process()
 
 
 async def _download(client: AsyncClient, a, job_id: int) -> Response:
@@ -1472,142 +1470,6 @@ async def test_an_artifact_past_its_expiry_is_not_served(
 
 
 # ---------------------------------------------------------------------------
-# Queue exports
-# ---------------------------------------------------------------------------
-
-
-async def _queue_with_items(acting_user, session):
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    queue = await create_queue(
-        session,
-        a.initiative,
-        a.user,
-        name="Battle Order",
-        description="Round tracker",
-        is_active=True,
-        current_round=3,
-    )
-    # Rotation order is position DESCENDING: Alice acts first.
-    current = await create_queue_item(session, queue, label="Alice", position=30)
-    await create_queue_item(
-        session, queue, label="Bob", position=20, held_at_round=2, notes="waiting"
-    )
-    lurker = await create_queue_item(
-        session, queue, label="Lurker", position=10, is_visible=False
-    )
-    tag = await create_tag(session, a.guild, name="npc")
-    await assign_tag(session, lurker, tag)
-    doc = await create_file(session, a.initiative, a.user, name="Dungeon map")
-    task = await create_task(session, a.project, title="Prep loot")
-    for target in (
-        (SearchEntityType.file, doc.id),
-        (SearchEntityType.task, task.id),
-    ):
-        await create_relationship(
-            session,
-            a.guild,
-            source=(SearchEntityType.queue_item, current.id),
-            target=target,
-        )
-    queue.current_item_id = current.id
-    session.add(queue)
-    await session.commit()
-    return a, queue
-
-
-async def test_queue_export_json_envelope(client: AsyncClient, acting_user, session):
-    a, queue = await _queue_with_items(acting_user, session)
-    resp = await _export(client, a, "queue", ids=[queue.id], format="json")
-    envelope = json.loads(
-        _assert_export(resp, "json", disposition=(".initiative-queue.json",))
-    )
-    assert envelope["type"] == "initiative-queue"
-    assert envelope["schema_version"] == 1
-    assert envelope["name"] == "Battle Order"
-    assert envelope["is_active"] is True
-    assert envelope["current_round"] == 3
-
-    items = envelope["items"]
-    assert [i["label"] for i in items] == ["Alice", "Bob", "Lurker"]  # rotation order
-    assert [i["is_current"] for i in items] == [True, False, False]
-    assert items[1]["held_at_round"] == 2
-    assert items[2]["is_visible"] is False
-    assert items[2]["tags"] == ["npc"]
-    # Guild-local references ride along as display text only (an import can't
-    # rebind them): member name, linked file/task titles — never raw ids.
-    assert "member" in items[0] and "user_id" not in items[0]
-    assert items[0]["files"] == ["Dungeon map"]
-    assert items[0]["tasks"] == ["Prep loot"]
-    assert items[1]["files"] == [] and items[1]["tasks"] == []
-
-
-async def test_a_queue_envelope_records_the_initiatives_of_its_attachments(
-    client: AsyncClient, acting_user, session, monkeypatch
-):
-    """A queue's envelope names what is attached to its items, so the job
-    records the initiative of an attached file beside the queue's own. A
-    report names only the queue's own fields, and records only its own."""
-    monkeypatch.setattr(export_limits, "EXPORT_INLINE_MAX_ROWS", 0)
-    a, queue = await _queue_with_items(acting_user, session)
-    second = await create_initiative(session, a.guild, a.user, name="Second Front")
-    doc = await create_file(session, second, a.user, name="Far map")
-    await create_relationship(
-        session,
-        a.guild,
-        source=(SearchEntityType.queue_item, queue.current_item_id),
-        target=(SearchEntityType.file, doc.id),
-    )
-    guild_id, own, other = a.guild.id, a.initiative.id, second.id
-    jobs = {}
-    for fmt in ("json", "csv"):
-        resp = await _export(client, a, "queue", ids=[queue.id], format=fmt)
-        jobs[fmt] = resp.json()["id"]
-        await _run_worker()
-
-    await route_session_to_guild(session, guild_id)
-    recorded = {
-        fmt: (await session.get(DataJob, job_id)).initiative_ids
-        for fmt, job_id in jobs.items()
-    }
-    assert recorded == {"json": sorted([own, other]), "csv": [own]}
-
-
-_QUEUE_REPORTS: dict[str, dict[str, Any]] = {
-    "csv": {
-        "present": (
-            "#,Item,Member,Tags,Notes,Status",
-            "1,Alice,,,,Current",
-            "2,Bob,,,waiting,Held",
-            "3,Lurker,,npc,,Hidden",
-        )
-    },
-    "md": {
-        "present": (
-            "# Battle Order",
-            "1. **Alice** (Current)",  # numbered turn order, current bolded
-            "2. Bob (waiting · Held)",
-            "3. Lurker (npc · Hidden)",
-        ),
-        "absent": ("| Item |",),  # a list, not a table
-    },
-    "pdf": {"present": ("Battle Order", "Alice", "Lurker", "Round tracker")},
-}
-
-
-@pytest.mark.parametrize("fmt", list(_QUEUE_REPORTS))
-async def test_queue_report_formats_render_the_rotation(
-    client: AsyncClient, acting_user, session, fmt
-):
-    """The queue report carries the whole rotation in turn order — held, hidden
-    and current items, and the description block — in every format it offers."""
-    a, queue = await _queue_with_items(acting_user, session)
-    resp = await _export(client, a, "queue", ids=[queue.id], format=fmt)
-    _assert_export(resp, fmt, **_QUEUE_REPORTS[fmt])
-
-
-# ---------------------------------------------------------------------------
 # Counter-group exports
 # ---------------------------------------------------------------------------
 
@@ -1987,33 +1849,6 @@ async def test_task_export_localizes_report_content(
     )
 
 
-async def test_queue_export_localizes_status_flags_and_headers(
-    client: AsyncClient, acting_user, session
-):
-    """Queue report status flags (Current/Held/Hidden) and headers localize —
-    the JSON envelope stays canonical (importable machine data)."""
-    a, queue = await _queue_with_items(acting_user, session)
-    await _set_locale(session, a.user, "fr")
-
-    _assert_export(
-        await _export(client, a, "queue", ids=[queue.id], format="csv"),
-        "csv",
-        present=(
-            "N°,Élément,Membre,Étiquettes,Notes,Statut",  # French headers
-            "Actuel",
-            "En attente",
-            "Masqué",  # status flags
-        ),
-    )
-
-    # The importable envelope must NOT be localized — kind and field keys stay
-    # canonical so a French user's backup still imports.
-    json_resp = await _export(client, a, "queue", ids=[queue.id], format="json")
-    envelope = json.loads(json_resp.content)
-    assert envelope["type"] == "initiative-queue"
-    assert "items" in envelope and "is_current" in envelope["items"][0]
-
-
 async def test_task_detailed_pdf_is_one_page_per_task_with_full_detail(
     client: AsyncClient, acting_user, session
 ):
@@ -2208,24 +2043,24 @@ async def test_bulk_file_selection_rejects_format_not_shared_by_all(
     assert denied.status_code == 404
 
 
-async def test_bulk_queue_selection_exports_envelope_zip(
+async def test_bulk_counter_group_selection_exports_envelope_zip(
     client: AsyncClient, acting_user, session
 ):
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    q1 = await create_queue(session, a.initiative, a.user, name="Alpha Rotation")
-    q2 = await create_queue(session, a.initiative, a.user, name="Beta Rotation")
+    g1 = await create_counter_group(session, a.initiative, a.user, name="Alpha Tally")
+    g2 = await create_counter_group(session, a.initiative, a.user, name="Beta Tally")
 
-    resp = await _export(client, a, "queue", ids=[q1.id, q2.id], format="json")
+    resp = await _export(client, a, "counter_group", ids=[g1.id, g2.id], format="json")
     assert resp.status_code == 200
     names = _zip_names(resp)
     assert len(names) == 2
-    assert all(n.endswith(".initiative-queue.json") for n in names)
-    assert {e["name"] for e in _zip_json(resp)} == {"Alpha Rotation", "Beta Rotation"}
+    assert all(n.endswith(".initiative-counter-group.json") for n in names)
+    assert {e["name"] for e in _zip_json(resp)} == {"Alpha Tally", "Beta Tally"}
 
     # Single-id selection stays a plain (unzipped) file.
-    single = await _export(client, a, "queue", ids=[q1.id], format="json")
+    single = await _export(client, a, "counter_group", ids=[g1.id], format="json")
     assert single.status_code == 200
     assert single.headers["content-type"] == "application/json"
 
@@ -2670,7 +2505,6 @@ async def _populate_initiative(session, a, initiative):
     project = await create_project(session, initiative, a.user, name="Main Arc")
     await create_task(session, project, title="Fell the tower")
     await create_file(session, initiative, a.user, name="Campaign Notes")
-    await create_queue(session, initiative, a.user, name="Turn Order")
     await create_counter_group(session, initiative, a.user, name="Party Gold")
     calendar = await create_calendar(session, initiative, a.user, name="Raid Nights")
     await create_calendar_event(session, calendar, a.user, title="Session Zero")
@@ -2698,17 +2532,10 @@ async def test_initiative_backup_zip_layout_and_manifest(
     assert manifest["schema_version"] == 1
     assert manifest["guild"]["id"] == a.guild.id
     assert [i["id"] for i in manifest["initiatives"]] == [a.initiative.id]
+    # Every tool is on, and one holding nothing is in the backup whether or not
+    # anybody has written in it yet.
     assert manifest["initiatives"][0]["tools"] == {
-        "project": "included",
-        "file": "included",
-        "queue": "included",
-        "counter_group": "included",
-        "calendar": "included",
-        "post": "included",
-        # On, and holding nothing: a tool the initiative has is in the backup
-        # whether or not anybody has written in it yet.
-        "wiki": "included",
-        "dashboard": "included",
+        tool.value: "included" for tool in Tool
     }
 
     # Every file in the archive is accounted for by the manifest, and vice
@@ -2725,7 +2552,6 @@ async def test_initiative_backup_zip_layout_and_manifest(
     assert set(by_type) == {
         "initiative-project",
         "initiative-file",
-        "initiative-queue",
         "initiative-counter-group",
         "initiative-calendar",
         "initiative-post",
@@ -2867,7 +2693,7 @@ async def test_aggregate_export_hides_dac_invisible_rows(
         initiative_role="member",
     )
     await create_file(session, a.initiative, other.user, name="Their Secret")
-    await create_queue(session, a.initiative, other.user, name="Their Queue")
+    await create_counter_group(session, a.initiative, other.user, name="Their Tally")
     await create_file(session, a.initiative, a.user, name="My Notes")
 
     resp = await _export(client, a, "initiative", initiative_id=a.initiative.id)
@@ -2875,10 +2701,10 @@ async def test_aggregate_export_hides_dac_invisible_rows(
     manifest = json.loads(archive.read("manifest.json"))
     titles = {e["title"] for e in manifest["entries"]}
     assert "My Notes" in titles and a.project.name in titles
-    assert "Their Secret" not in titles and "Their Queue" not in titles
+    assert "Their Secret" not in titles and "Their Tally" not in titles
     assert manifest["skipped"] == []  # invisible != skipped
     dumped = json.dumps(manifest)
-    assert "Their Secret" not in dumped and "Their Queue" not in dumped
+    assert "Their Secret" not in dumped and "Their Tally" not in dumped
 
 
 async def test_guild_export_belongs_to_the_seat(
@@ -3088,7 +2914,6 @@ async def test_report_mode_mixed_formats_zip(
         formats=json.dumps(
             {
                 "project": "pdf",
-                "queue": "csv",
                 "counter_group": "xlsx",
                 "calendar": "ics",
                 "file": {"lexical": "md"},
@@ -3098,7 +2923,7 @@ async def test_report_mode_mixed_formats_zip(
     archive = await _rendered_zip(client, a, monkeypatch, role_session, resp)
     names = archive.namelist()
     assert "manifest.json" not in names
-    assert {n.rsplit(".", 1)[-1] for n in names} == {"pdf", "csv", "xlsx", "ics", "md"}
+    assert {n.rsplit(".", 1)[-1] for n in names} == {"pdf", "xlsx", "ics", "md"}
     pdf_name = next(n for n in names if n.endswith(".pdf"))
     assert archive.read(pdf_name).startswith(b"%PDF")
     ics_name = next(n for n in names if n.endswith(".ics"))
@@ -3112,7 +2937,10 @@ async def test_report_mode_mixed_formats_zip(
 # rather than read as true.
 _INVALID_SELECTORS: list[tuple[dict[str, Any], str]] = [
     ({"include": "not json"}, "EXPORT_INVALID_PARAMS"),
-    ({"mode": "report", "formats": '{"queue": "wav"}'}, "EXPORT_INVALID_FORMAT"),
+    (
+        {"mode": "report", "formats": '{"counter_group": "wav"}'},
+        "EXPORT_INVALID_FORMAT",
+    ),
     (
         {"mode": "report", "formats": '{"file": {"lexical": "xlsx"}}'},
         "EXPORT_INVALID_FORMAT",
@@ -3121,7 +2949,7 @@ _INVALID_SELECTORS: list[tuple[dict[str, Any], str]] = [
     ({"include": '{"project": "yes"}'}, "EXPORT_INVALID_PARAMS"),
     ({"filters": '{"wands": {}}'}, "EXPORT_INVALID_PARAMS"),
     # Paging is the export's own business, not a filter.
-    ({"filters": '{"queue": {"page": 2}}'}, "EXPORT_INVALID_PARAMS"),
+    ({"filters": '{"counter_group": {"page": 2}}'}, "EXPORT_INVALID_PARAMS"),
     (
         {"filters": '{"calendar": {"events": {"start_after": "soon"}}}'},
         "EXPORT_INVALID_PARAMS",
@@ -3203,22 +3031,20 @@ async def test_estimate_reports_counts_uploads_and_ceilings(
     assert resp.status_code == 200
     body = resp.json()
     counts = {tool: t["count"] for tool, t in body["tools"].items()}
-    assert counts == {
+    # Every tool is on; the ones nobody has made anything in count none.
+    assert counts == {tool.value: 0 for tool in Tool} | {
         "project": 2,  # the actor fixture's project + Main Arc
         "file": 2,  # Campaign Notes + the file doc
-        "queue": 1,
         "counter_group": 1,
         "calendar": 1,
         "post": 1,
-        "wiki": 0,  # the tool is on; nobody has made one
-        "dashboard": 0,  # likewise
     }
     assert not any(t["disabled"] for t in body["tools"].values())
     assert body["uploads_count"] == 1
     assert body["uploads_bytes"] == len(payload)
     assert body["uploads_approximate"] is True
-    # entities (8) + tasks (1) + uploads MiB (0)
-    assert body["estimated_rows"] == 9
+    # entities (7) + tasks (1) + uploads MiB (0)
+    assert body["estimated_rows"] == 8
     assert body["max_rows"] == export_limits.EXPORT_MAX_BACKUP_ROWS
     assert body["max_upload_bytes"] == export_limits.EXPORT_MAX_BACKUP_UPLOAD_BYTES
 
@@ -3236,27 +3062,27 @@ async def test_estimate_reports_counts_uploads_and_ceilings(
 async def test_backup_filters_narrow_each_tool_and_are_not_kept(
     client: AsyncClient, acting_user, session, monkeypatch, role_session
 ):
-    """Each tool's filters are its list's: a tag keeps the queues carrying it,
-    archived ones too unless the archive is asked about, templates too unless
-    templates are asked about, a calendar keeps the events in its range, and a
-    project the tasks its task list would show. The estimate counts what the
-    filters leave, and the finished job keeps no filters."""
+    """Each tool's filters are its list's: a tag keeps the counter groups
+    carrying it, archived ones too unless the archive is asked about, templates
+    too unless templates are asked about, a calendar keeps the events in its
+    range, and a project the tasks its task list would show. The estimate
+    counts what the filters leave, and the finished job keeps no filters."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     await enable_all_tools(session, a.initiative)
     tag = await create_tag(session, a.guild, name="raid")
-    tagged = await create_queue(session, a.initiative, a.user, name="Tagged")
-    shelved = await create_queue(
+    tagged = await create_counter_group(session, a.initiative, a.user, name="Tagged")
+    shelved = await create_counter_group(
         session,
         a.initiative,
         a.user,
         name="Shelved",
         archived_at=datetime.now(timezone.utc),
     )
-    await create_queue(session, a.initiative, a.user, name="Plain")
-    for queue in (tagged, shelved):
-        await assign_tag(session, queue, tag)
+    await create_counter_group(session, a.initiative, a.user, name="Plain")
+    for group in (tagged, shelved):
+        await assign_tag(session, group, tag)
     calendar = await create_calendar(session, a.initiative, a.user, name="Raids")
     for title, month in (("Spring", 3), ("Summer", 7)):
         start = datetime(2026, month, 10, 18, tzinfo=timezone.utc)
@@ -3290,28 +3116,28 @@ async def test_backup_filters_narrow_each_tool_and_are_not_kept(
         }
     }
 
-    def filters(**queue: Any) -> str:
+    def filters(**group: Any) -> str:
         return json.dumps(
             {
-                "queue": {"tag_ids": [tag.id], **queue},
+                "counter_group": {"tag_ids": [tag.id], **group},
                 "calendar": {"events": _SUMMER},
                 "project": {"archived": False, **open_tasks},
             }
         )
 
-    async def queues(**queue: Any) -> int:
+    async def groups(**group: Any) -> int:
         resp = await _export(
             client,
             a,
             "estimate",
             scope="initiative",
             initiative_id=a.initiative.id,
-            filters=filters(**queue),
+            filters=filters(**group),
         )
         assert resp.status_code == 200, resp.text
-        return resp.json()["tools"]["queue"]["count"]
+        return resp.json()["tools"]["counter_group"]["count"]
 
-    assert (await queues(), await queues(archived=False)) == (2, 1)
+    assert (await groups(), await groups(archived=False)) == (2, 1)
 
     resp = await _export(
         client, a, "initiative", initiative_id=a.initiative.id, filters=filters()
@@ -3326,7 +3152,10 @@ async def test_backup_filters_narrow_each_tool_and_are_not_kept(
             if e["type"] == kind
         ]
 
-    assert {q["name"] for q in envelopes("initiative-queue")} == {"Tagged", "Shelved"}
+    assert {g["name"] for g in envelopes("initiative-counter-group")} == {
+        "Tagged",
+        "Shelved",
+    }
     [raids] = envelopes("initiative-calendar")
     assert [e["title"] for e in raids["events"]] == ["Summer"]
     projects = {p["project"]["name"]: p for p in envelopes("initiative-project")}
@@ -3391,7 +3220,7 @@ async def test_empty_initiative_backup_is_manifest_only_zip(
     await create_project(session, a.initiative, a.user, name="Switched off")
     # The factory switches every tool on; turn some off so the inventory has
     # deliberately disabled ones to report, one of them holding a project.
-    a.initiative.queues_enabled = False
+    a.initiative.counter_groups_enabled = False
     a.initiative.calendars_enabled = False
     a.initiative.projects_enabled = False
     session.add(a.initiative)
@@ -3405,7 +3234,9 @@ async def test_empty_initiative_backup_is_manifest_only_zip(
     # No CONTENT, so every entry is the initiative's own shape.
     assert {e["type"] for e in manifest["entries"]} == {"initiative-structure"}
     tools = manifest["initiatives"][0]["tools"]
-    assert (tools["project"], tools["queue"], tools["calendar"]) == ("disabled",) * 3
+    assert (tools["project"], tools["counter_group"], tools["calendar"]) == (
+        "disabled",
+    ) * 3
     assert tools["file"] == "included"
 
 

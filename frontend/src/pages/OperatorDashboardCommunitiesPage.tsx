@@ -11,21 +11,6 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { BillingConsoleButton } from "@/components/platform/BillingConsoleButton";
 import { CommunityOperatorSettingsSheet } from "@/components/platform/CommunityOperatorSettingsSheet";
-import { SkeletonRegion, TableSkeleton } from "@/components/skeletons/PageSkeletons";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { DataTable } from "@/components/ui/data-table";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { RowActionsMenu } from "@/components/ui/row-actions-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useServerTableState } from "@/hooks/useServerTableState";
@@ -37,7 +22,17 @@ import {
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
-import type { AppColumnDef } from "@/lib/table";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { DataTable } from "@/ui/data-table";
+import { DropdownMenuItem } from "@/ui/dropdown-menu";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { RowActionsMenu } from "@/ui/row-actions-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { StatusMessage } from "@/ui/status-message";
 
 // Storage caps are entered in binary GB (GiB) so a value round-trips cleanly
 // with `formatBytes` (which is also 1024-based). The editor for them, and for
@@ -153,7 +148,6 @@ const CommunityStatusCell = ({ community }: { community: PlatformCommunityStorag
             ? t("communities.holdConfirm.confirm")
             : t("communities.suspendConfirm.confirm")
         }
-        cancelLabel={t("common:cancel")}
         destructive
         isLoading={update.isPending}
         onConfirm={() => pending && apply(pending)}
@@ -241,7 +235,6 @@ const CommunitySuspensionButton = ({ community }: { community: PlatformCommunity
         confirmLabel={
           lifting ? t("communities.suspension.lift") : t("communities.suspendConfirm.confirm")
         }
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive={!lifting}
         isLoading={update.isPending}
@@ -418,7 +411,7 @@ export const OperatorDashboardCommunitiesPage = () => {
   }
 
   if (communitiesQuery.isError || !communitiesQuery.data) {
-    return <p className="text-destructive text-sm">{t("communities.loadError")}</p>;
+    return <StatusMessage onRetry={communitiesQuery.refetch} />;
   }
 
   return (

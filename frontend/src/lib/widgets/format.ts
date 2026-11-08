@@ -8,7 +8,7 @@
  * correctly happen.
  */
 
-import { dateTimeFormat, numberFormat } from "@/lib/intl";
+import { dateTimeFormat, numberFormat } from "@/ui/lib/intl";
 
 import type { NumberFormat, SeriesTimeUnit } from "./sceneSpec";
 

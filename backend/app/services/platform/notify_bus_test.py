@@ -171,6 +171,7 @@ async def _noop() -> None:
 async def test_a_refused_frame_is_sent_when_the_bus_returns(monkeypatch) -> None:
     """The far side is waiting on a signal that was dropped, not delayed."""
     user_stream._pending_remote.clear()
+    monkeypatch.setattr(user_stream, "_dropped_remote", False)
     sent: list[str] = []
 
     async def _unavailable(_channel: str, _payload: str) -> None:

@@ -35,9 +35,9 @@ import {
 } from "@/lib/counter-math";
 import { fireCounterStepFeedback } from "@/lib/counterStepFeedback";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { collator } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
 import type { MutationOpts } from "@/types/mutation";
+import { collator } from "@/ui/lib/intl";
 
 // ── Optimistic update helpers ───────────────────────────────────────────────
 
@@ -80,11 +80,8 @@ const useCounterWrite = <TData extends CounterRead | CounterGroupRead, TVariable
 
 const counterGroups = TOOL_HOOKS[Tool.counter_group];
 
-export const useCounterGroupsList = counterGroups.useList;
 export const useCounterGroup = counterGroups.useDetail;
 export const useUpdateCounterGroup = counterGroups.useUpdate;
-export const useDeleteCounterGroup = counterGroups.useDelete;
-export const useSetCounterGroupGrants = counterGroups.useSetGrants;
 
 // ── Counter mutations ───────────────────────────────────────────────────────
 

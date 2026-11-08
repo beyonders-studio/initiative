@@ -12,16 +12,6 @@ from typing import Any, Callable, Optional
 from sqlalchemy import ColumnElement, func
 
 
-#: What ``sort_by`` accepts on a cross-guild tool list.
-#:
-#: Shorter than :data:`tool_listing.TOOL_SORT_FIELDS` by one: a guild-wide list
-#: can join the initiative to order by its name, while a cross-guild list
-#: merges each guild's rows by a key the tool's own row carries — and an
-#: initiative's name is not one. The page's initiative column therefore does
-#: not sort.
-MY_TOOL_SORT_FIELDS = ("name", "updated_at", "created_at")
-
-
 def name_key(model: Any) -> ColumnElement[Any]:
     """A row's name as it sorts: lower-cased and compared bytewise, so every
     guild orders names alike and their merge agrees with each guild's order."""
@@ -38,8 +28,10 @@ def sort_key(
 ) -> tuple[ColumnElement[Any], bool]:
     """The expression a cross-guild list orders by, and whether descending.
 
-    A request that names none of :data:`MY_TOOL_SORT_FIELDS` is left in the
-    tool's own default order, which each caller states. The row id is the
+    ``sort_by`` is ``name``, ``updated_at`` or ``created_at``; anything else
+    leaves the tool's own default order, which each caller states. Not the
+    initiative: a cross-guild list merges each guild's rows by a key the tool's
+    own row carries, and an initiative's name is not one. The row id is the
     descending tiebreak either way (:func:`cross_guild.page_across_guilds`).
     """
     descending = sort_dir == "desc"

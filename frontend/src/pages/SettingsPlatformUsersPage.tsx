@@ -11,15 +11,7 @@ import {
   sheetOffersSomething,
   UserOperatorSettingsSheet,
 } from "@/components/platform/UserOperatorSettingsSheet";
-import { SortHeader } from "@/components/SortIcon";
-import { SkeletonRegion, TableSkeleton } from "@/components/skeletons/PageSkeletons";
 import { UserHandle } from "@/components/UserHandle";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/data-table";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { useExportPlatformUsersCsv, usePlatformUsers } from "@/hooks/useOperatorUsers";
 import { useServerTableState } from "@/hooks/useServerTableState";
@@ -27,8 +19,17 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { formatDate, formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
-import type { AppColumnDef } from "@/lib/table";
 import { getUserHandle } from "@/lib/userDisplay";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardHeader } from "@/ui/card";
+import { DataTable } from "@/ui/data-table";
+import { DropdownMenuItem } from "@/ui/dropdown-menu";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { RowActionsMenu } from "@/ui/row-actions-menu";
+import { SortHeader } from "@/ui/sort-icon";
+import { StatusMessage } from "@/ui/status-message";
 
 /** The columns the server sorts the roster by. Status sorts by how much of the
  *  app is left to an account, which brings the ones needing attention together
@@ -97,7 +98,7 @@ export const SettingsPlatformUsersPage = () => {
   }
 
   if (usersQuery.isError || !usersQuery.data) {
-    return <p className="text-destructive text-sm">{t("platformUsers.loadError")}</p>;
+    return <StatusMessage onRetry={usersQuery.refetch} />;
   }
 
   const userColumns: AppColumnDef<OperatorUserRead>[] = [

@@ -15,19 +15,19 @@ import type { ReactNode } from "react";
 
 import type {
   CalendarListResponse,
+  ContactListResponse,
   CounterGroupListResponse,
   DashboardListResponse,
   FileListResponse,
   PostListResponse,
   ProjectListResponse,
-  QueueListResponse,
   TagSummary,
   WikiListResponse,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { Badge } from "@/components/ui/badge";
-import { ProgressCircle } from "@/components/ui/progress-circle";
 import { TOOLS, toolDetailRoute } from "@/lib/tools";
+import { Badge } from "@/ui/badge";
+import { Progress } from "@/ui/progress";
 
 /** One row of a tool table, in terms every tool can answer. */
 export interface ToolRow {
@@ -57,12 +57,12 @@ export interface ToolRow {
 export const TOOL_HAS_DETAIL: Record<Tool, boolean> = {
   [Tool.project]: true,
   [Tool.file]: true,
-  [Tool.queue]: false,
   [Tool.counter_group]: false,
   [Tool.calendar]: true,
   [Tool.dashboard]: true,
   [Tool.post]: true,
   [Tool.wiki]: false,
+  [Tool.contact]: true,
 };
 
 /**
@@ -79,12 +79,12 @@ export const TOOL_HAS_DETAIL: Record<Tool, boolean> = {
 export type ToolResponses = {
   [Tool.project]: ProjectListResponse | undefined;
   [Tool.file]: FileListResponse | undefined;
-  [Tool.queue]: QueueListResponse | undefined;
   [Tool.counter_group]: CounterGroupListResponse | undefined;
   [Tool.calendar]: CalendarListResponse | undefined;
   [Tool.dashboard]: DashboardListResponse | undefined;
   [Tool.post]: PostListResponse | undefined;
   [Tool.wiki]: WikiListResponse | undefined;
+  [Tool.contact]: ContactListResponse | undefined;
 };
 
 /**
@@ -145,7 +145,12 @@ export function buildToolRows(
           updatedAt: project.updated_at,
           detail: (
             <span className="flex items-center gap-2">
-              <ProgressCircle value={percent} className="h-6 w-6 shrink-0" />
+              <Progress
+                variant="ring"
+                value={percent}
+                className="size-6 shrink-0"
+                aria-label={t("detail.projectProgress")}
+              />
               {t("detail.tasksDone", { completed, total })}
             </span>
           ),
@@ -162,17 +167,6 @@ export function buildToolRows(
         tags: file.tags,
         updatedAt: file.updated_at,
         detail: <Badge variant="secondary">{t(`detail.fileKind.${file.kind}`)}</Badge>,
-      }));
-    case Tool.queue:
-      return (data[Tool.queue]?.items ?? []).map((queue) => ({
-        id: queue.id,
-        communityId: queue.community_id ?? fallbackCommunityId,
-        name: queue.name,
-        href: href(queue.id, queue.initiative_id),
-        glyph: null,
-        initiativeId: queue.initiative_id,
-        tags: queue.tags,
-        updatedAt: queue.updated_at,
       }));
     case Tool.counter_group:
       return (data[Tool.counter_group]?.items ?? []).map((group) => ({
@@ -239,6 +233,19 @@ export function buildToolRows(
         initiativeId: wiki.initiative_id,
         tags: wiki.tags,
         updatedAt: wiki.updated_at,
+      }));
+    case Tool.contact:
+      return (data[Tool.contact]?.items ?? []).map((contact) => ({
+        id: contact.id,
+        communityId: contact.community_id ?? fallbackCommunityId,
+        name: contact.name,
+        href: href(contact.id, contact.initiative_id),
+        glyph: null,
+        initiativeId: contact.initiative_id,
+        tags: contact.tags,
+        updatedAt: contact.updated_at,
+        // The first way to reach them, which is what a table of contacts is for.
+        detail: contact.phones[0]?.value ?? contact.emails[0]?.value ?? null,
       }));
   }
 }

@@ -12,14 +12,10 @@
  * Saved as one set: the server replaces the whole grant.
  */
 
-import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CommunityPluginDetail } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { useSetPluginScopes } from "@/hooks/useCommunityPlugins";
 import { toast } from "@/lib/mascotToast";
 import {
@@ -30,6 +26,9 @@ import {
   scopeSentence,
   toggleScope,
 } from "@/lib/pluginScopes";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { Label } from "@/ui/label";
 
 export interface PluginScopesPanelProps {
   plugin: CommunityPluginDetail;
@@ -160,8 +159,12 @@ export function PluginScopesPanel({ plugin }: PluginScopesPanelProps) {
       </ul>
 
       <div className="flex justify-end">
-        <Button size="sm" onClick={save} disabled={setScopes.isPending || sameSet(chosen, granted)}>
-          {setScopes.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+        <Button
+          size="sm"
+          onClick={save}
+          disabled={sameSet(chosen, granted)}
+          pending={setScopes.isPending}
+        >
           {t("common:save")}
         </Button>
       </div>

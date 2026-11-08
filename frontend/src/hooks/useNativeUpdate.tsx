@@ -10,6 +10,7 @@ import { useServer } from "@/hooks/useServer";
 import { autoUpdateConsented, desktopCanUpdate } from "@/lib/desktopUpdates";
 import { toast } from "@/lib/mascotToast";
 import { type UpdateStatement, verifiedStatement } from "@/lib/otaTrust";
+import { setPendingUpdate } from "@/lib/pendingUpdate";
 import DesktopUpdater from "@/plugins/desktopUpdater";
 
 const CURRENT_VERSION = __APP_VERSION__;
@@ -233,24 +234,21 @@ export const useNativeUpdate = () => {
         if (autoUpdateConsented() && (await desktopCanUpdate())) {
           try {
             await DesktopUpdater.download({ version: minNativeVersion });
-            // Stays until answered: this release does not prompt again this session.
+            const restart = () => void DesktopUpdater.install();
+            // The toast says so once; the Update button stays until it is taken.
             toast.info(t("nativeUpdate.desktopReady"), {
-              duration: Number.POSITIVE_INFINITY,
-              action: {
-                label: t("nativeUpdate.restart"),
-                onClick: () => void DesktopUpdater.install(),
-              },
+              action: { label: t("nativeUpdate.restart"), onClick: restart },
             });
+            setPendingUpdate({ action: "restart", run: restart });
             return;
           } catch (error) {
             console.debug("Desktop app update failed:", error);
           }
         }
-        setNativeUpdateRequired({
-          show: true,
-          version: statement.version,
-          minNativeVersion,
-        });
+        const required = { show: true, version: statement.version, minNativeVersion };
+        setNativeUpdateRequired(required);
+        // Closing the dialog leaves the Update button, which opens it again.
+        setPendingUpdate({ action: "install", run: () => setNativeUpdateRequired(required) });
         return;
       }
 
@@ -341,8 +339,17 @@ export const useNativeUpdate = () => {
       handledVersionRef.current = null;
       bundleIdRef.current = null;
       setUpdateReady(HIDDEN);
+      setPendingUpdate(null);
     }
   }, []);
+
+  // The Update button takes the downloaded bundle for as long as it waits,
+  // whether or not the toast that announced it is still up.
+  useEffect(() => {
+    if (updateReady.show) {
+      setPendingUpdate({ action: "reload", run: () => void applyUpdate() });
+    }
+  }, [updateReady.show, applyUpdate]);
 
   /** Dismiss the reload prompt for this session (re-checked on next cold start). */
   const dismissUpdate = useCallback(() => {

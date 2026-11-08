@@ -22,6 +22,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Mapping, Optional
 
+from app.core.cloud import is_cloud
+
 
 class IntakeStream(str, Enum):
     """The kinds of operations work a deployment can route into a project."""
@@ -30,6 +32,8 @@ class IntakeStream(str, Enum):
     moderation = "moderation"
     support = "support"
     feedback = "feedback"
+    #: The ideas the team publishes for everybody to see and vote for.
+    ideas = "ideas"
 
 
 class Source(str, Enum):
@@ -56,7 +60,8 @@ class Conversation(str, Enum):
     #: Nobody writes back. The filer is told the case arrived, and nothing of
     #: what is decided — a report, which is not a conversation.
     none = "none"
-    #: The filer may answer once somebody handling it has written to them.
+    #: The team starts it: the case is its filer's to follow, and to answer,
+    #: once somebody handling it has written to them.
     staff_first = "staff_first"
     #: Either side may write first.
     open = "open"
@@ -102,7 +107,6 @@ class FeedbackTopic(str, Enum):
     idea = "idea"
     problem = "problem"
     praise = "praise"
-    other = "other"
 
 
 #: The one moderation case a person files about themselves: asking for their
@@ -177,6 +181,9 @@ class IntakeStreamMeta:
     #: Whether staff may name one of the stream's cases as the reason for an
     #: access grant, which then reports what the grant did on the case.
     grant_linkable: bool = False
+    #: Whether only Initiative Cloud takes the stream. Every other server sets
+    #: it up nowhere and sends its people to Cloud.
+    cloud_only: bool = False
     #: Whether the community a grant for one of the stream's cases reaches has
     #: its superadmins told of it.
     community_notice: CommunityNoticeRule = CommunityNoticeRule.never
@@ -270,6 +277,21 @@ STREAMS: dict[IntakeStream, IntakeStreamMeta] = {
         max_open_per_filer=None,
         evidence=EvidencePolicy(3, 10 * _MB, IMAGE_TYPES),
         retention_days=30,
+        # Feedback is about the product, so it goes to the team that makes it.
+        cloud_only=True,
+    ),
+    IntakeStream.ideas: IntakeStreamMeta(
+        # The team writes each idea; nobody files into the board.
+        sources=frozenset({Source.manual}),
+        submitter=Submitter.member,
+        blueprint="ideas.json",
+        conversation=Conversation.none,
+        # How often one account may vote for an idea or take a vote back.
+        filing_rate="60/hour",
+        max_open_per_filer=None,
+        evidence=NO_EVIDENCE,
+        retention_days=30,
+        cloud_only=True,
     ),
 }
 
@@ -277,6 +299,13 @@ STREAMS: dict[IntakeStream, IntakeStreamMeta] = {
 def meta(stream: IntakeStream) -> IntakeStreamMeta:
     """What feeds ``stream``. Raises for a stream with no declaration."""
     return STREAMS[stream]
+
+
+def offered_streams() -> tuple[IntakeStream, ...]:
+    """The streams this server sets up and takes: all of them on Initiative
+    Cloud, and everywhere else all but the Cloud-only ones."""
+    cloud = is_cloud()
+    return tuple(s for s in IntakeStream if cloud or not STREAMS[s].cloud_only)
 
 
 def conversation_for(stream: IntakeStream, topic: Optional[str]) -> Conversation:
@@ -369,4 +398,5 @@ STREAM_FIELDS: dict[IntakeStream, tuple[CaseField, ...]] = {
         CaseField.subject_guild,
         CaseField.reported_at,
     ),
+    IntakeStream.ideas: (),
 }

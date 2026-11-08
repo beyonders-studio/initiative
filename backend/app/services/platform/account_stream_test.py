@@ -198,6 +198,28 @@ async def test_listing_a_community_pokes_every_member(
     assert here.id in published_remotely
 
 
+async def test_changing_a_communitys_plan_pokes_every_member(
+    session, account_socket
+) -> None:
+    """The plan is on every member's community list, and the operator who
+    changed it is not one of them."""
+    member = await create_user(session)
+    guild = await create_guild(session)
+    await create_guild_membership(session, user=member, guild=guild)
+    await session.commit()
+    tab = account_socket(member.id)
+
+    await guilds_service.update_guild(
+        session, guild_id=guild.id, max_users=None, max_users_provided=True
+    )
+    await session.commit()
+    await settle()
+
+    assert [(frame["resource"], frame["action"]) for frame in tab.sent] == [
+        ("account", "community")
+    ]
+
+
 async def test_deleting_a_guild_tells_the_people_who_were_in_it(
     session, account_socket
 ) -> None:

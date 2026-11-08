@@ -13,7 +13,6 @@ from app.core.notification_categories import (
     Channel,
     NotificationCategory,
     category_of,
-    is_personal,
     spec_of,
 )
 from app.models.platform.notification import NotificationType
@@ -63,7 +62,7 @@ def test_lookups_agree_with_the_registry():
         for notification_type in spec.types:
             assert category_of(notification_type) is category
             assert spec_of(notification_type) is spec
-            assert is_personal(notification_type) is spec.personal
+            assert (notification_type in PERSONAL_TYPES) is spec.personal
 
 
 def test_personal_types_are_the_union_of_personal_categories():
@@ -91,8 +90,8 @@ def test_mentions_and_subscriptions_are_separate_rows():
         category_of(NotificationType.subscription_activity)
         is NotificationCategory.subscriptions
     )
-    assert is_personal(NotificationType.mention)
-    assert not is_personal(NotificationType.subscription_activity)
+    assert NotificationType.mention in PERSONAL_TYPES
+    assert NotificationType.subscription_activity not in PERSONAL_TYPES
 
 
 def test_cases_are_not_a_preference():

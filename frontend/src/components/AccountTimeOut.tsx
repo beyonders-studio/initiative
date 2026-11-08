@@ -6,8 +6,14 @@ import { FilerState } from "@/api/generated/initiativeAPI.schemas";
 import { getReadMyTimeOutQueryKey } from "@/api/generated/users/users";
 import { TicketConversation } from "@/components/tickets/TicketConversation";
 import { TicketStateBadge } from "@/components/tickets/TicketStateBadge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAccountTimeOut } from "@/hooks/useAccountTimeOut";
+import { useAuth } from "@/hooks/useAuth";
+import { useFiledTicket, useFileTicket } from "@/hooks/useTickets";
+import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import { queryClient } from "@/lib/queryClient";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -15,15 +21,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useAccountTimeOut } from "@/hooks/useAccountTimeOut";
-import { useAuth } from "@/hooks/useAuth";
-import { useFiledTicket, useFileTicket } from "@/hooks/useTickets";
-import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
-import { queryClient } from "@/lib/queryClient";
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Textarea } from "@/ui/textarea";
 
 /** Matches the column behind it, so the field stops where the server would. */
 const BODY_MAX = 5000;
@@ -68,32 +68,25 @@ const AppealDialog = ({
           <DialogTitle>{t("timeOut.appealTitle")}</DialogTitle>
           <DialogDescription>{t("timeOut.appealDescription")}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="appeal-body">{t("timeOut.appealLabel")}</Label>
+        <Field label={t("timeOut.appealLabel")}>
           <Textarea
-            id="appeal-body"
             value={body}
             onChange={(event) => setBody(event.target.value)}
             rows={6}
             maxLength={BODY_MAX}
           />
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            disabled={!body.trim() || file.isPending}
-            onClick={() =>
-              file.mutate({
-                ticket: { stream: "moderation", type: "appeal", body: body.trim() },
-                files: [],
-              })
-            }
-          >
-            {t("timeOut.appealSubmit")}
-          </Button>
-        </DialogFooter>
+        </Field>
+        <DialogFooter
+          submitLabel={t("timeOut.appealSubmit")}
+          pending={file.isPending}
+          disabled={!body.trim()}
+          onSubmit={() =>
+            file.mutate({
+              ticket: { stream: "moderation", type: "appeal", body: body.trim() },
+              files: [],
+            })
+          }
+        />
       </DialogContent>
     </Dialog>
   );
@@ -140,7 +133,7 @@ export const AccountTimeOut = () => {
   const canAppeal = Boolean(data?.can_appeal) && !nowhere && !appealOpen;
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="flex min-h-app items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted">

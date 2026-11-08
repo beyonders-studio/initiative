@@ -6,12 +6,12 @@ backup orchestrator — an unknown discriminator is rejected centrally by
 """
 
 from app.services.import_engine.importers.calendar import CalendarImporter
+from app.services.import_engine.importers.contact import ContactImporter
 from app.services.import_engine.importers.counter_group import CounterGroupImporter
 from app.services.import_engine.importers.dashboard import DashboardImporter
 from app.services.import_engine.importers.file import FileImporter
 from app.services.import_engine.importers.post import PostImporter
 from app.services.import_engine.importers.project import ProjectImporter
-from app.services.import_engine.importers.queue import QueueImporter
 from app.services.import_engine.importers.wiki import WikiImporter
 
 IMPORTERS = {
@@ -19,12 +19,12 @@ IMPORTERS = {
     for importer in (
         ProjectImporter(),
         FileImporter(),
-        QueueImporter(),
         CounterGroupImporter(),
         DashboardImporter(),
         CalendarImporter(),
         PostImporter(),
         WikiImporter(),
+        ContactImporter(),
     )
 }
 

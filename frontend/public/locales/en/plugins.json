@@ -33,6 +33,7 @@
     "autoUpdateOff": "Updates are now applied by hand.",
     "upgradeTo": "Update to {{version}}",
     "upToDate": "Up to date",
+    "updateWaiting": "Update waiting",
     "upgraded": "Updated to {{version}}.",
     "removeManagedNeutral": "Charges for this plug-in are managed by your provider.",
     "removeManagedAction": "Manage",
@@ -45,7 +46,8 @@
     "decline": "Decline",
     "declined": "You declined version {{version}}. The plug-in stays on its current version.",
     "declinedDone": "Version {{version}} declined.",
-    "moved": "A different version is now available. Review what it asks for."
+    "moved": "A different version is now available. Review what it asks for.",
+    "refused": "Version {{version}} can't run on this server."
   },
   "install": {
     "title": "Add {{name}}",
@@ -266,10 +268,6 @@
         "read": "Read files",
         "write": "Read and change files"
       },
-      "queues": {
-        "read": "Read queues",
-        "write": "Read and change queues"
-      },
       "counter_groups": {
         "read": "Read counters",
         "write": "Read and change counters"
@@ -289,6 +287,10 @@
       "wikis": {
         "read": "Read wikis",
         "write": "Read and change wikis"
+      },
+      "contacts": {
+        "read": "Read contacts",
+        "write": "Read and change contacts"
       },
       "comments": {
         "read": "Read comments",

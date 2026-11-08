@@ -1,0 +1,30 @@
+{
+  "unreachable": {
+    "age": {
+      "title": "Los mensajes directos están desactivados en esta cuenta"
+    },
+    "private": {
+      "body": "Tienes la opción Privado. Aún puedes conectar con cualquiera mediante su identificador exacto, y una conexión os permite escribiros sea cual sea tu ajuste. Para que puedan encontrarte aquí, permite que tus comunidades te escriban.",
+      "open": "Permitir que mis comunidades me escriban",
+      "settings": "Ajustes de privacidad"
+    }
+  },
+  "actions": {
+    "label": "Acciones para {{handle}}",
+    "connect": "Conectar",
+    "acceptConnection": "Aceptar conexión",
+    "connectPending": "Solicitud enviada",
+    "ask": "Pedir escribir",
+    "asked": "Solicitud enviada",
+    "askSent": "Solicitud enviada.",
+    "ignore": "Ignorar",
+    "stopIgnoring": "Dejar de ignorar",
+    "removeConnection": "Eliminar conexión",
+    "removeConnectionTitle": "¿Eliminar esta conexión?",
+    "removeConnectionBody": "Dejaréis de estar conectados. Si nada más os permite escribiros —una comunidad que compartáis, o que ambos estéis abiertos a mensajes—, eso también termina.",
+    "message": "Mensaje",
+    "viewProfile": "Ver perfil",
+    "copyHandle": "Copiar identificador",
+    "handleCopied": "Identificador copiado."
+  }
+}

@@ -32,12 +32,6 @@ from sqlalchemy import (
 )
 from sqlmodel import Field, SQLModel
 
-#: Olm's pre-key message — carries what the recipient needs to derive a new
-#: session.
-MESSAGE_TYPE_PREKEY = 0
-#: An ordinary message on a session that already exists.
-MESSAGE_TYPE_NORMAL = 1
-
 
 class DmQueueItem(SQLModel, table=True):
     __tablename__ = "dm_queue"

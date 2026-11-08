@@ -1,12 +1,12 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { acceptLegalDocuments } from "@/api/generated/users/users";
 import { LegalDocumentLinks } from "@/components/auth/LegalNotice";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useApiMutation } from "@/hooks/useApiMutation";
 import { useAuth } from "@/hooks/useAuth";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 /**
  * The screen an account meets when it has never agreed to this deployment's
@@ -25,24 +25,15 @@ import { getErrorMessage } from "@/lib/errorMessage";
 export const AcceptTerms = () => {
   const { t } = useTranslation(["legal", "common"]);
   const { refreshUser, logout } = useAuth();
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const accept = async () => {
-    setSubmitting(true);
-    setError(null);
-    try {
+  const accept = useApiMutation({
+    mutationFn: async () => {
       await acceptLegalDocuments();
       await refreshUser();
-    } catch (err) {
-      setError(getErrorMessage(err, "legal:acceptError"));
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    },
+  });
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="flex min-h-app items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>{t("legal:accept.title")}</CardTitle>
@@ -50,9 +41,13 @@ export const AcceptTerms = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <LegalDocumentLinks />
-          {error && <p className="text-destructive text-sm">{error}</p>}
-          <Button className="w-full" disabled={submitting} onClick={() => void accept()}>
-            {submitting ? t("common:submitting") : t("legal:accept.submit")}
+          {accept.error && (
+            <p className="text-destructive text-sm">
+              {getErrorMessage(accept.error, "legal:acceptError")}
+            </p>
+          )}
+          <Button className="w-full" disabled={accept.isPending} onClick={() => accept.mutate()}>
+            {accept.isPending ? t("common:submitting") : t("legal:accept.submit")}
           </Button>
           <Button type="button" variant="ghost" className="w-full" onClick={() => void logout()}>
             {t("legal:accept.signOut")}

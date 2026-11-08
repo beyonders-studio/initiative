@@ -21,21 +21,14 @@ import {
   type SignedInSessionInfo,
 } from "@/api/generated/initiativeAPI.schemas";
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { useEndSignedIn, useMySessions, useRevokeOtherSessions } from "@/hooks/useSecurity";
 import { toast } from "@/lib/mascotToast";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 const KIND_ICONS = {
   [Kind.mobile]: Smartphone,
@@ -142,9 +135,11 @@ export const SignedInSection = () => {
       description={t("security.signedInDescription")}
     >
       {sessionsQuery.isLoading ? (
-        <p className="text-muted-foreground text-sm">{t("security.loadingDevices")}</p>
+        <SkeletonRegion>
+          <ListSkeleton rows={2} />
+        </SkeletonRegion>
       ) : sessionsQuery.isError ? (
-        <p className="text-destructive text-sm">{t("security.devicesError")}</p>
+        <StatusMessage onRetry={sessionsQuery.refetch} />
       ) : sessions.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-6 text-center text-muted-foreground">
           <MonitorSmartphone className="h-10 w-10 opacity-50" />
@@ -184,60 +179,38 @@ export const SignedInSection = () => {
         </div>
       )}
 
-      <AlertDialog open={pendingEnd !== null} onOpenChange={() => setPendingEnd(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {removing ? t("security.removeDeviceDialogTitle") : t("security.signOutDialogTitle")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              <Trans
-                i18nKey={
-                  removing
-                    ? "security.removeDeviceDialogDescription"
-                    : "security.signOutDialogDescription"
-                }
-                ns="settings"
-                values={{ deviceName: pendingEnd?.label ?? t("security.unknownDevice") }}
-                components={{ bold: <span className="font-medium" /> }}
-              />
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("security.revokeDialogCancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => pendingEnd && endSignedIn.mutate(pendingEnd)}
-              disabled={endSignedIn.isPending}
-            >
-              {endSignedIn.isPending
-                ? t("security.revoking")
-                : removing
-                  ? t("security.removeDeviceConfirm")
-                  : t("security.signOutConfirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={pendingEnd !== null}
+        onOpenChange={() => setPendingEnd(null)}
+        title={removing ? t("security.removeDeviceDialogTitle") : t("security.signOutDialogTitle")}
+        description={
+          <Trans
+            i18nKey={
+              removing
+                ? "security.removeDeviceDialogDescription"
+                : "security.signOutDialogDescription"
+            }
+            ns="settings"
+            values={{ deviceName: pendingEnd?.label ?? t("security.unknownDevice") }}
+            components={{ bold: <span className="font-medium" /> }}
+          />
+        }
+        confirmLabel={removing ? t("security.removeDeviceConfirm") : t("security.signOutConfirm")}
+        loadingLabel={t("security.revoking")}
+        isLoading={endSignedIn.isPending}
+        onConfirm={() => pendingEnd && endSignedIn.mutate(pendingEnd)}
+      />
 
-      <AlertDialog open={confirmSweep} onOpenChange={() => setConfirmSweep(false)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("security.signOutOthersDialogTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("security.signOutOthersDialogDescription", { count: endable.length })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("security.revokeDialogCancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => revokeOthers.mutate()}
-              disabled={revokeOthers.isPending}
-            >
-              {revokeOthers.isPending ? t("security.revoking") : t("security.signOutOthersConfirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={confirmSweep}
+        onOpenChange={() => setConfirmSweep(false)}
+        title={t("security.signOutOthersDialogTitle")}
+        description={t("security.signOutOthersDialogDescription", { count: endable.length })}
+        confirmLabel={t("security.signOutOthersConfirm")}
+        loadingLabel={t("security.revoking")}
+        isLoading={revokeOthers.isPending}
+        onConfirm={() => revokeOthers.mutate()}
+      />
     </SettingsSection>
   );
 };

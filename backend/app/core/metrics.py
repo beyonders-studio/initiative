@@ -72,7 +72,7 @@ http_requests_in_progress = Gauge(
 )
 websocket_connections = Gauge(
     "initiative_websocket_connections",
-    "Live connections (notifications, collaboration, queues, counters) open now.",
+    "Live connections (notifications, collaboration, counters) open now.",
 )
 db_statement_duration = Histogram(
     "initiative_db_statement_duration_seconds",

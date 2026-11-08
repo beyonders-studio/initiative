@@ -84,6 +84,12 @@ export const TOOL_EXPORT_FORMATS: Partial<Record<Tool, ExportFormatOption[]>> = 
     { format: "docx", labelKey: "export.formatWikiDocx" },
     { format: "json", labelKey: "export.formatWikiJson" },
   ],
+  [Tool.contact]: [
+    // The importable envelope, then one spreadsheet of the selection, which
+    // the contacts import reads back.
+    { format: "json", labelKey: "export.formatJson" },
+    { format: "csv", labelKey: "export.formatCsv" },
+  ],
   [Tool.dashboard]: [
     // The importable envelope, and only that: a dashboard is a live canvas
     // over other tools' data, so there is nothing to render it as.
@@ -95,14 +101,6 @@ export const TOOL_EXPORT_FORMATS: Partial<Record<Tool, ExportFormatOption[]>> = 
     { format: "pdf", labelKey: "export.formatPdf" },
     { format: "csv", labelKey: "export.formatCsv" },
     { format: "xlsx", labelKey: "export.formatXlsx" },
-  ],
-  [Tool.queue]: [
-    // Reports (Markdown renders a numbered turn order), then the envelope.
-    { format: "pdf", labelKey: "export.formatPdf" },
-    { format: "csv", labelKey: "export.formatCsv" },
-    { format: "xlsx", labelKey: "export.formatXlsx" },
-    { format: "md", labelKey: "export.formatMarkdown" },
-    { format: "json", labelKey: "export.formatJson" },
   ],
   [Tool.counter_group]: [
     // Table reports, then the importable envelope.
@@ -154,12 +152,6 @@ export const REPORT_TOOL_FORMATS: Partial<Record<Tool, ExportFormatOption[]>> = 
     { format: "csv", labelKey: "export.formatCsv" },
     { format: "xlsx", labelKey: "export.formatXlsx" },
   ],
-  [Tool.queue]: [
-    { format: "pdf", labelKey: "export.formatPdf" },
-    { format: "csv", labelKey: "export.formatCsv" },
-    { format: "xlsx", labelKey: "export.formatXlsx" },
-    { format: "md", labelKey: "export.formatMarkdown" },
-  ],
   [Tool.counter_group]: [
     { format: "pdf", labelKey: "export.formatPdf" },
     { format: "csv", labelKey: "export.formatCsv" },
@@ -170,6 +162,8 @@ export const REPORT_TOOL_FORMATS: Partial<Record<Tool, ExportFormatOption[]>> = 
     { format: "ics", labelKey: "export.formatIcs" },
     { format: "json", labelKey: "export.formatJson" },
   ],
+  // One spreadsheet of each initiative's contacts.
+  [Tool.contact]: [{ format: "csv", labelKey: "export.formatCsv" }],
 };
 
 /** Report-mode per-type file formats — mirrors the backend's

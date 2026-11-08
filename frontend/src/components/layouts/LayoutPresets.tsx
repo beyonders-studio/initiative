@@ -3,17 +3,6 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ListLayoutReadKind, SortField } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { tableSortFields, taskTableSorting } from "@/lib/filters/taskFilters";
 import type { ListLayout } from "@/lib/layouts/draft";
 import { type FieldDef, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
@@ -27,6 +16,17 @@ import {
   storedPreset,
 } from "@/lib/layouts/presets";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
 
 import type { LayoutEdits } from "./LayoutEditor";
 import { TaskSortPicker } from "./TaskSortPicker";
@@ -237,26 +237,17 @@ const PresetDialog = ({
             </DialogTitle>
             <DialogDescription>{translate("layouts:presets.dialogHelp")}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="preset-name">{translate("layouts:presets.name")}</Label>
+          <Field label={translate("layouts:presets.name")}>
             <Input
-              id="preset-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
               maxLength={100}
               autoFocus
             />
-          </div>
+          </Field>
           {of.controls(filters, setFilters)}
           {sortable ? <TaskSortPicker value={sort} onChange={setSort} fields={fields} /> : null}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              {translate("common:cancel")}
-            </Button>
-            <Button type="submit" disabled={!trimmed}>
-              {translate("common:done")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter submitLabel={translate("common:done")} disabled={!trimmed} />
         </form>
       </DialogContent>
     </Dialog>

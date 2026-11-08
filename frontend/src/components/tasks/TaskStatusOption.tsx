@@ -2,8 +2,8 @@ import type { IconName } from "lucide-react/dynamic";
 import type { CSSProperties } from "react";
 
 import type { TaskStatusRead } from "@/api/generated/initiativeAPI.schemas";
-import { Icon } from "@/components/ui/icon-picker";
-import { cn } from "@/lib/utils";
+import { Icon } from "@/ui/icon-picker";
+import { cn } from "@/ui/lib/utils";
 
 type StatusLike = Pick<TaskStatusRead, "name" | "icon" | "color">;
 

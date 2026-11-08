@@ -1,23 +1,11 @@
-import { Loader2 } from "lucide-react";
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { removeMember } from "@/api/generated/users/users";
 import { invalidate, q } from "@/api/query-keys";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { useCommunities } from "@/hooks/useCommunities";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 
 interface RemoveCommunityMemberDialogProps {
   open: boolean;
@@ -43,61 +31,43 @@ export const RemoveCommunityMemberDialog = ({
   onSuccess,
 }: RemoveCommunityMemberDialogProps) => {
   const { t } = useTranslation(["communities", "common"]);
-  const communityId = useActiveCommunityId();
   const { refreshCommunities } = useCommunities();
-  const [removing, setRemoving] = useState(false);
-
-  const handleRemove = async () => {
-    if (userId === null) return;
-    setRemoving(true);
-    try {
-      await removeMember(communityId, userId);
-      void invalidate(q.communityMembers());
-      // The community entry carries member_count, which the invite surfaces read
-      // to tell a full community from one with a seat free. It is provider state,
-      // not a query, so it refreshes rather than invalidates.
-      void refreshCommunities();
-      toast.success(t("removeMember.removed", { email }));
-      onSuccess?.();
-      onOpenChange(false);
-    } catch (err) {
-      console.error("Failed to remove member", err);
-      toast.error(getErrorMessage(err, "communities:removeMember.failedToRemove"));
-    } finally {
-      setRemoving(false);
+  const remove = useCommunityMutation(
+    {
+      mutationFn: (communityId, memberId: number) => removeMember(communityId, memberId),
+      invalidate: () => {
+        void invalidate(q.communityMembers());
+        // The community entry carries member_count, which the invite surfaces read
+        // to tell a full community from one with a seat free. It is provider state,
+        // not a query, so it refreshes rather than invalidates.
+        void refreshCommunities();
+      },
+      errorKey: "communities:removeMember.failedToRemove",
+    },
+    {
+      onSuccess: () => {
+        toast.success(t("removeMember.removed", { email }));
+        onSuccess?.();
+        onOpenChange(false);
+      },
     }
-  };
+  );
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{t("removeMember.title")}</AlertDialogTitle>
-        </AlertDialogHeader>
-        <div className="space-y-3">
-          <AlertDialogDescription>
-            {t("removeMember.description", { email })}
-          </AlertDialogDescription>
-          <p className="text-muted-foreground text-sm">{t("removeMember.ownershipReleased")}</p>
-        </div>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={removing}>{t("common:cancel")}</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleRemove}
-            disabled={removing}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            {removing ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("removeMember.removing")}
-              </>
-            ) : (
-              t("removeMember.removeButton")
-            )}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t("removeMember.title")}
+      description={t("removeMember.description", { email })}
+      confirmLabel={t("removeMember.removeButton")}
+      loadingLabel={t("removeMember.removing")}
+      isLoading={remove.isPending}
+      destructive
+      onConfirm={() => {
+        if (userId !== null) remove.mutate(userId);
+      }}
+    >
+      <p className="text-muted-foreground text-sm">{t("removeMember.ownershipReleased")}</p>
+    </ConfirmDialog>
   );
 };

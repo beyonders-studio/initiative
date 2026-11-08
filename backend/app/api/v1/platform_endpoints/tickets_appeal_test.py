@@ -10,10 +10,9 @@ from sqlmodel import select
 
 from app.core.intake import IntakeStream
 from app.core.messages import AppealMessages, AuthMessages, TicketMessages
-from app.db import filer_access
+from app.db import operations_schema
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
-from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
 from app.models.tenant.comment import Comment, CommentAudience
@@ -21,7 +20,7 @@ from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.services.platform.intake import CaseFiler, open_case
 from app.services.tenant import task_statuses as task_statuses_service
-from app.testing import create_user, get_auth_headers
+from app.testing import create_user, get_auth_headers, make_operations_community
 
 TICKETS = "/api/v1/me/tickets"
 
@@ -34,13 +33,7 @@ async def appeals_desk(session, acting_user):
         guild_role=CommunityRole.admin, initiative=True, project=True
     )
     guild_id = staff.guild.id
-    await set_rls_context(session, Unattributed())
-    row = (await session.exec(select(AppSetting).where(AppSetting.id == 1))).first()
-    if row is None:
-        row = AppSetting(id=1)
-    row.operations_guild_id = guild_id
-    session.add(row)
-    await session.commit()
+    await make_operations_community(session, guild_id)
 
     await set_rls_context(session, SystemGuild(guild_id))
     await task_statuses_service.ensure_default_statuses(
@@ -50,11 +43,10 @@ async def appeals_desk(session, acting_user):
         session.add(IntakeBinding(stream=stream, project_id=staff.project.id))
     await session.commit()
     await set_rls_context(session, Unattributed())
-    await filer_access.provision_filer_access(guild_id)
 
     yield {"staff": staff, "guild_id": guild_id, "project_id": staff.project.id}
     await session.rollback()
-    await filer_access.deprovision_filer_access(guild_id)
+    await operations_schema.deprovision_operations(guild_id)
 
 
 async def _suspend(client, session, user, reason="Spam in three communities"):

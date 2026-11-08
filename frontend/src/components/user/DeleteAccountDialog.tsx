@@ -1,22 +1,23 @@
-import { AlertCircle, ChevronLeft, Loader2 } from "lucide-react";
+import { AlertCircle, ChevronLeft } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
 import { ConfirmPhraseField, EligibilityStep } from "@/components/account/DeletionSteps";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import { useMyDeletionEligibility } from "@/hooks/useOperatorUsers";
 import { useDeleteOwnAccount } from "@/hooks/useUsers";
 import { useWizard } from "@/hooks/useWizard";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import type { DialogWithSuccessProps } from "@/types/dialog";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Button } from "@/ui/button";
+import { DialogFooter } from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
+import { WizardDialog } from "@/ui/wizard-dialog";
 
 /**
  * Self-deletion is constrained to two actions:
@@ -271,16 +272,14 @@ export function DeleteAccountDialog({
             </Alert>
 
             {!passwordless && (
-              <div className="space-y-2">
-                <Label htmlFor="password">{t("deleteAccount.confirmPasswordLabel")}</Label>
+              <Field label={t("deleteAccount.confirmPasswordLabel")} id="password">
                 <Input
-                  id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={t("deleteAccount.enterPassword")}
                 />
-              </div>
+              </Field>
             )}
 
             <ConfirmPhraseField
@@ -313,35 +312,24 @@ export function DeleteAccountDialog({
                 onClick={handleNext}
                 disabled={
                   (step === "choose-type" && !canProceedFromChooseType) ||
-                  (step === "check-blockers" && !canProceedFromBlockers) ||
-                  isCheckingEligibility
+                  (step === "check-blockers" && !canProceedFromBlockers)
                 }
+                pending={isCheckingEligibility}
               >
-                {isCheckingEligibility ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t("deleteAccount.checking")}
-                  </>
-                ) : (
-                  t("deleteAccount.next")
-                )}
+                {isCheckingEligibility ? t("deleteAccount.checking") : t("deleteAccount.next")}
               </Button>
             ) : (
               <Button
                 variant="destructive"
                 onClick={handleSubmit}
-                disabled={!canConfirm || deleteAccount.isPending}
+                disabled={!canConfirm}
+                pending={deleteAccount.isPending}
               >
-                {deleteAccount.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t("deleteAccount.deleting")}
-                  </>
-                ) : action === "deactivate" ? (
-                  t("deleteAccount.deactivateAccount")
-                ) : (
-                  t("deleteAccount.deleteAccountButton")
-                )}
+                {deleteAccount.isPending
+                  ? t("deleteAccount.deleting")
+                  : action === "deactivate"
+                    ? t("deleteAccount.deactivateAccount")
+                    : t("deleteAccount.deleteAccountButton")}
               </Button>
             )}
           </div>

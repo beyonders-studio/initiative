@@ -9,23 +9,28 @@ the rule for what it is meant to be â€” a file a file may hold, or any upload â€
 and stored as the type its bytes turned out to be. One that is not is left out, and the import says so. A key already stored
 here is never written over. The community's storage quota is checked against
 the zip's own sizes before anything is written, and those sizes bound what is
-read, too.
+read, too. A file is copied out of the zip to disk a chunk at a time and
+stored from there, so none is held in memory whole, however large.
 """
 
 from __future__ import annotations
 
 import asyncio
+import tempfile
 import zipfile
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Awaitable, Callable, Literal, Sequence
+from pathlib import Path
+from typing import TYPE_CHECKING, Awaitable, BinaryIO, Callable, Literal, Sequence
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import ImportEngineMessages
 from app.models.platform.user import User
+from app.services.data_jobs import while_beating
+from app.services.import_engine.atlassian import HEARTBEAT_SECONDS
 from app.services.import_engine.contract import ImportEngineError
-from app.services.import_engine.zip_bounds import read_member
+from app.services.import_engine.zip_bounds import copy_member
 
 if TYPE_CHECKING:
     from app.services.storage import StorageBackend
@@ -70,24 +75,31 @@ class RestoredAssets:
     warnings: list[str] = field(default_factory=list)
 
 
-def _detect(asset: ArchiveAsset, data: bytes) -> tuple[str | None, str | None]:
-    """The type ``data`` is stored as, or the warning that leaves it out."""
+def _detect(
+    asset: ArchiveAsset, source: BinaryIO, size: int
+) -> tuple[str | None, str | None]:
+    """The type the ``size`` bytes ``source`` reads are stored as, or the
+    warning that leaves them out."""
     from app.services.tenant.attachments import (
+        MAX_IMAGE_BYTES,
         detect_document_image_type,
-        validate_file,
+        validate_source,
     )
 
-    if asset.kind == "upload":
+    unsupported = f"unsupported_file:{asset.key}"
+    if not size:
+        return None, unsupported
+    if asset.kind == "upload" and size <= MAX_IMAGE_BYTES:
         # An upload is a document image or an uploaded file, whichever its
         # bytes say; an image takes the same rule it was uploaded under.
-        image_type = detect_document_image_type(data)
+        image_type = detect_document_image_type(source.read())
         if image_type is not None:
             return image_type, None
+        source.seek(0)
     try:
-        content_type, _extension = validate_file(data, asset.original_filename)
+        return validate_source(source, asset.original_filename), None
     except ValueError:
-        return None, f"unsupported_file:{asset.key}"
-    return content_type, None
+        return None, unsupported
 
 
 async def _already_stored(
@@ -135,7 +147,7 @@ async def restore_assets(
     Raises ``IMPORT_QUOTA_EXCEEDED`` when the files would take the community
     past its storage quota, or when they read to more than the zip declared.
     On any failure the files already written are removed. ``heartbeat`` is
-    called after each file stored.
+    called after each file stored, and while a large one is copied or stored.
     """
     from app.services.storage import get_guild_storage
     from app.services.tenant.attachments import (
@@ -173,47 +185,78 @@ async def restore_assets(
         ) from exc
 
     read_total = 0
+    # Each file is copied here before it is checked and stored.
+    spool = tempfile.NamedTemporaryFile(prefix="import-asset-")
     try:
         for asset, info in pending:
+            spool.seek(0)
+            spool.truncate()
             # What the quota was checked against also bounds what is read: a
             # member is read no further than what is left of it.
-            try:
-                data = await asyncio.to_thread(
-                    read_member,
-                    archive,
-                    info,
-                    max_bytes=incoming - read_total,
-                    code=ImportEngineMessages.IMPORT_QUOTA_EXCEEDED,
-                )
-            except ImportEngineError:
-                raise
-            except Exception:
+            size = await while_beating(
+                asyncio.to_thread(
+                    _copy_out, archive, info, spool, incoming - read_total
+                ),
+                heartbeat,
+                every=HEARTBEAT_SECONDS,
+                finish=True,
+            )
+            if size is None:
                 outcome.missing.append(asset.key)
                 continue
-            read_total += len(data)
-            content_type, warning = await asyncio.to_thread(_detect, asset, data)
+            read_total += size
+            spool.flush()
+            spool.seek(0)
+            content_type, warning = await asyncio.to_thread(_detect, asset, spool, size)
             if content_type is None:
                 if warning is not None:
                     outcome.warnings.append(warning)
                 continue
-            await store_upload(
-                session,
-                guild_id=guild_id,
-                filename=asset.key,
-                data=data,
-                content_type=content_type,
-                created_by=user.id,
-                initiative_id=initiative_id,
+            await while_beating(
+                store_upload(
+                    session,
+                    guild_id=guild_id,
+                    filename=asset.key,
+                    data=Path(spool.name),
+                    content_type=content_type,
+                    created_by=user.id,
+                    initiative_id=initiative_id,
+                ),
+                heartbeat,
+                every=HEARTBEAT_SECONDS,
+                finish=True,
             )
             outcome.written.append(asset.key)
             outcome.content_types[asset.key] = content_type
-            outcome.restored_bytes += len(data)
+            outcome.restored_bytes += size
             if heartbeat is not None:
                 await heartbeat()
     except BaseException:
         remove_written(guild_id, outcome.written)
         raise
+    finally:
+        spool.close()
     return outcome
+
+
+def _copy_out(
+    archive: zipfile.ZipFile, info: zipfile.ZipInfo, target: BinaryIO, max_bytes: int
+) -> int | None:
+    """Copy one member to ``target`` and answer its size, or ``None`` when it
+    cannot be read. One that reads past ``max_bytes`` raises
+    ``IMPORT_QUOTA_EXCEEDED``. Blocking; run it in a thread."""
+    try:
+        return copy_member(
+            archive,
+            info,
+            target,
+            max_bytes=max_bytes,
+            code=ImportEngineMessages.IMPORT_QUOTA_EXCEEDED,
+        )
+    except ImportEngineError:
+        raise
+    except Exception:
+        return None
 
 
 def remove_written(guild_id: int, keys: list[str]) -> None:

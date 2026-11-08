@@ -8,29 +8,24 @@
  * deciding it.
  */
 
-import { useQuery } from "@tanstack/react-query";
-
 import type {
   CommunityPluginInstall,
   CommunityPluginListResponse,
   CommunityPluginRead,
-  CommunityPluginUninstallNotice,
   CommunityPluginUpdate,
   ItemKind,
   PluginActionResult,
   PluginPlacementRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
-  getListCommunityPluginsQueryKey,
-  getReadUninstallNoticeQueryKey,
   installCommunityPlugin,
-  listCommunityPlugins,
   putCommunityPluginPlacement,
   putCommunityPluginScopes,
-  readUninstallNotice,
   runPluginAction,
   uninstallCommunityPlugin,
   updateCommunityPlugin,
+  useListCommunityPlugins,
+  useReadUninstallNotice,
 } from "@/api/generated/plugins/plugins";
 import { invalidate, q, type Spec } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -39,17 +34,12 @@ import { useCommunities } from "@/hooks/useCommunities";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
-const pluginsKey = (communityId: number) => getListCommunityPluginsQueryKey(communityId);
-
 export const useCommunityPlugins = (options?: QueryOpts<CommunityPluginListResponse>) => {
   const communityId = useActiveCommunityId();
   const communityWide = Boolean(useCommunities().activeCommunity?.can.community_wide);
   const { enabled = true, ...rest } = options ?? {};
-  return useQuery<CommunityPluginListResponse>({
-    queryKey: pluginsKey(communityId),
-    queryFn: () => listCommunityPlugins(communityId),
-    enabled: enabled && communityWide,
-    ...rest,
+  return useListCommunityPlugins(communityId, {
+    query: { enabled: enabled && communityWide, ...rest },
   });
 };
 
@@ -59,14 +49,12 @@ export const useCommunityPlugins = (options?: QueryOpts<CommunityPluginListRespo
  */
 export const useUninstallNotice = (pluginId: number, locale: string, enabled: boolean) => {
   const communityId = useActiveCommunityId();
-  return useQuery<CommunityPluginUninstallNotice>({
-    queryKey: getReadUninstallNoticeQueryKey(communityId, pluginId, { locale }),
-    queryFn: () => readUninstallNotice(communityId, pluginId, { locale }),
-    enabled,
-    staleTime: 0,
-    gcTime: 0,
-    retry: false,
-  });
+  return useReadUninstallNotice(
+    communityId,
+    pluginId,
+    { locale },
+    { query: { enabled, staleTime: 0, gcTime: 0, retry: false } }
+  );
 };
 
 export const useInstallCommunityPlugin = (
@@ -155,7 +143,6 @@ export const useSetPluginScopes = (
 const ITEM_READS: Record<ItemKind, (id: number) => Spec[]> = {
   task: (id) => [q.allTasks(), q.task(id)],
   calendar_event: (id) => [q.allCalendarEvents(), q.calendarEvent(id)],
-  queue_item: (id) => [q.allQueues(), q.queueItem(id)],
   counter: (id) => [q.allCounterGroups(), q.counter(id)],
   post: (id) => [q.allPosts(), q.post(id)],
 };

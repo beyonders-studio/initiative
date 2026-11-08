@@ -40,7 +40,8 @@
   "errors": {
     "communityContext": "No se pudo determinar el contexto de la comunidad para esta tarea.",
     "statusUpdate": "No se pudo actualizar el estado de la tarea.",
-    "statusNoMatch": "No se pudo actualizar el estado de la tarea. No se encontró un estado coincidente."
+    "statusNoMatch": "No se pudo actualizar el estado de la tarea. No se encontró un estado coincidente.",
+    "reorder": "No se pudo mover la tarea."
   },
   "updating": "Actualizando…",
   "projectFallback": "Proyecto #{{id}}",
@@ -112,22 +113,17 @@
       "days_other": "{{count}} días",
       "any": "Cualquier fecha"
     },
-    "loadError": "La lista de Enfoque no está disponible ahora.",
     "truncated": "Mostrando las primeras {{shown}}. Reduce el intervalo de fechas para una lista más corta.",
     "settingsHint": "Las tareas fijadas siempre aparecen, sea cual sea esta configuración."
   },
   "myTasks": {
     "title": "Mis tareas",
     "noCommunity": "Sin comunidad",
-    "loadError": "No se pudieron cargar tus tareas.",
     "groupByDate": "Fecha",
     "groupByCommunity": "Comunidad"
   },
   "myCalendar": {
     "title": "Mi calendario"
-  },
-  "tagTasks": {
-    "loadError": "No se pudieron cargar las tareas."
   },
   "ai": {
     "fromComments_one": "Escrito sin el comentario de la tarea, que no cabía.",
@@ -182,8 +178,6 @@
   "move": {
     "title": "Mover tarea a otro proyecto",
     "description": "Selecciona un proyecto de destino dentro de la comunidad actual. Solo puedes mover tareas a proyectos donde tengas permiso para crear nuevo trabajo.",
-    "loadError": "No se pudieron cargar los proyectos con acceso de escritura.",
-    "loading": "Cargando proyectos disponibles…",
     "noProjects": "Aún no tienes otros proyectos con acceso de escritura disponibles.",
     "searchPlaceholder": "Buscar proyectos…",
     "statusResetWarning": "Mover esta tarea restablecerá su estado a ‘Pendientes’.",
@@ -199,8 +193,7 @@
     "noInitiatives": "No se encontraron iniciativas en esta comunidad.",
     "noProjects": "No se encontraron proyectos en esta iniciativa.",
     "back": "Atrás",
-    "searchProjects": "Buscar proyectos…",
-    "loadMore": "Cargar más"
+    "searchProjects": "Buscar proyectos…"
   },
   "bulkEdit": {
     "title": "Editar tareas",

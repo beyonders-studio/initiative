@@ -1,3 +1,5 @@
+import { tanStackRouterCodeSplitter } from "@tanstack/router-plugin/vite";
+import fs from "fs";
 import path from "path";
 import { defineConfig } from "vitest/config";
 
@@ -7,6 +9,9 @@ import { defineConfig } from "vitest/config";
 process.env.LC_ALL = "en_US.UTF-8";
 
 export default defineConfig({
+  // A route's page loads with the route, as in the build, so importing the
+  // route tree does not load every page.
+  plugins: [tanStackRouterCodeSplitter()],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),
@@ -14,6 +19,9 @@ export default defineConfig({
   },
   define: {
     __APP_VERSION__: JSON.stringify("0.0.0-test"),
+    __CLOUD_ORIGIN__: JSON.stringify(
+      fs.readFileSync(path.resolve(import.meta.dirname, "../CLOUD_ORIGIN"), "utf-8").trim()
+    ),
     __IS_CAPACITOR__: JSON.stringify(false),
     // The app serves its own emoji dataset rather than reaching a CDN, and the
     // path is a build-time constant. Without it here the identifier survives

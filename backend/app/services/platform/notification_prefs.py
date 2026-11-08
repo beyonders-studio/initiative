@@ -416,7 +416,7 @@ def reachable(
 
     :func:`wants` answers whether the account wants it at all; this adds
     whatever is holding delivery. One function, so the three places that fan
-    out — notifications, direct messages, contacts — cannot drift apart on it.
+    out — notifications, direct messages, connections — cannot drift apart on it.
 
     Email rarely asks this: an email is deferred rather than refused, which is
     :func:`email_due_at`'s job. Push does, because a push that arrives after

@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { PASSWORD_MIN_LENGTH } from "@/lib/passwordPolicy";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
 
 /**
  * A new password and its confirmation, with the length the policy asks for
@@ -30,38 +30,28 @@ export const NewPasswordFields = ({
 }) => {
   const { t } = useTranslation("auth");
   const short = password.length > 0 && password.length < PASSWORD_MIN_LENGTH;
+  const help = t("passwordPolicy.minLengthHelp");
   return (
     <>
-      <div className="space-y-2">
-        <Label htmlFor={id}>{label}</Label>
+      <Field label={label} hint={!short && help} error={short && help} id={id}>
         <Input
-          id={id}
           type="password"
           value={password}
           onChange={(event) => onPasswordChange(event.target.value)}
           autoComplete="new-password"
           minLength={PASSWORD_MIN_LENGTH}
-          aria-describedby={`${id}-hint`}
           required
         />
-        <p
-          id={`${id}-hint`}
-          className={short ? "text-destructive text-xs" : "text-muted-foreground text-xs"}
-        >
-          {t("passwordPolicy.minLengthHelp")}
-        </p>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={`${id}-confirm`}>{t("passwordPolicy.confirmLabel")}</Label>
+      </Field>
+      <Field label={t("passwordPolicy.confirmLabel")} id={`${id}-confirm`}>
         <Input
-          id={`${id}-confirm`}
           type="password"
           value={confirm}
           onChange={(event) => onConfirmChange(event.target.value)}
           autoComplete="new-password"
           required
         />
-      </div>
+      </Field>
     </>
   );
 };

@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ruff check:*)",
+      "Bash(pnpm run build:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm run lint:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm tsc:*)",
+      "Bash(python -m ruff check:*)",
+      "Bash(pnpm exec tsc:*)",
+      "Bash(timeout 300 pytest:*)",
+      "Bash(python -m pytest:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(pnpm typecheck *)"
+    ]
+  }
+}

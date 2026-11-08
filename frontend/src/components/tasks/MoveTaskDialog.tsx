@@ -3,7 +3,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ProjectRead } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
+import { Combobox } from "@/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -12,8 +12,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { SearchableCombobox } from "@/components/ui/searchable-combobox";
+} from "@/ui/dialog";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 type MoveTaskDialogProps = {
   trigger?: ReactNode;
@@ -60,7 +61,6 @@ export const MoveTaskDialog = ({
   }, [open, availableProjects, selectedValue]);
 
   const isDisabled = isLoading || availableProjects.length === 0 || hasError;
-  const confirmDisabled = isDisabled || isSaving || !selectedValue;
 
   const handleConfirm = () => {
     const parsed = Number(selectedValue);
@@ -89,13 +89,15 @@ export const MoveTaskDialog = ({
         </DialogHeader>
 
         {hasError ? (
-          <p className="text-destructive text-sm">{t("move.loadError")}</p>
+          <StatusMessage />
         ) : isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("move.loading")}</p>
+          <SkeletonRegion>
+            <ListSkeleton rows={3} avatar={false} />
+          </SkeletonRegion>
         ) : availableProjects.length === 0 ? (
           <p className="text-muted-foreground text-sm">{t("move.noProjects")}</p>
         ) : (
-          <SearchableCombobox
+          <Combobox
             items={comboboxItems}
             value={selectedValue}
             onValueChange={setSelectedValue}
@@ -109,19 +111,13 @@ export const MoveTaskDialog = ({
           <span>{t("move.statusResetWarning")}</span>
         </div>
 
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isSaving}
-          >
-            {t("common:cancel")}
-          </Button>
-          <Button type="button" onClick={handleConfirm} disabled={confirmDisabled}>
-            {isSaving ? t("move.moving") : t("move.moveTask")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("move.moveTask")}
+          onSubmit={handleConfirm}
+          pending={isSaving}
+          pendingLabel={t("move.moving")}
+          disabled={isDisabled || !selectedValue}
+        />
       </DialogContent>
     </Dialog>
   );

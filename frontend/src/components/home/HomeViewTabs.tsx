@@ -10,25 +10,6 @@ import { ArrowLeft, ArrowRight, Copy, MoreHorizontal, Pencil, Plus, Trash2 } fro
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsBar, TabsTrigger } from "@/components/ui/tabs";
 import {
   canAddView,
   cleanViewName,
@@ -37,6 +18,19 @@ import {
   MAX_HOME_VIEWS,
   MAX_VIEW_NAME_LENGTH,
 } from "@/lib/home/views";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Tabs, TabsBar, TabsTrigger } from "@/ui/tabs";
 
 export interface HomeViewTabsProps {
   views: HomeViews;
@@ -156,7 +150,6 @@ export function HomeViewTabs({
         title={t("views.deleteTitle", { name: deleting?.name ?? "" })}
         description={t("views.deleteDescription")}
         confirmLabel={t("views.deleteConfirm")}
-        cancelLabel={t("common:cancel")}
         destructive
         onConfirm={() => {
           if (deleting) onDelete(deleting.id);
@@ -180,23 +173,13 @@ function RenameViewDialog({
     <Dialog open={view !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent aria-describedby={undefined}>
         {/* Keyed by the view, so each opening starts from its current name. */}
-        {view ? (
-          <RenameViewForm key={view.id} view={view} onClose={onClose} onSave={onSave} />
-        ) : null}
+        {view ? <RenameViewForm key={view.id} view={view} onSave={onSave} /> : null}
       </DialogContent>
     </Dialog>
   );
 }
 
-function RenameViewForm({
-  view,
-  onClose,
-  onSave,
-}: {
-  view: HomeViewEntry;
-  onClose: () => void;
-  onSave: (name: string) => void;
-}) {
+function RenameViewForm({ view, onSave }: { view: HomeViewEntry; onSave: (name: string) => void }) {
   const { t } = useTranslation(["home", "common"]);
   const [name, setName] = useState(view.name);
   const clean = cleanViewName(name);
@@ -211,24 +194,15 @@ function RenameViewForm({
       <DialogHeader>
         <DialogTitle>{t("views.renameTitle")}</DialogTitle>
       </DialogHeader>
-      <div className="space-y-2">
-        <Label htmlFor="home-view-name">{t("views.nameLabel")}</Label>
+      <Field label={t("views.nameLabel")}>
         <Input
-          id="home-view-name"
           value={name}
           maxLength={MAX_VIEW_NAME_LENGTH}
           onChange={(event) => setName(event.target.value)}
           autoFocus
         />
-      </div>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>
-          {t("common:cancel")}
-        </Button>
-        <Button type="submit" disabled={!clean}>
-          {t("common:save")}
-        </Button>
-      </DialogFooter>
+      </Field>
+      <DialogFooter submitLabel={t("common:save")} disabled={!clean} />
     </form>
   );
 }

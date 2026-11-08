@@ -1,40 +1,16 @@
 import { Link } from "@tanstack/react-router";
 import { Download, HandCoins, IdCard, RefreshCcw, UserMinus } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  type CommunityRole,
-  SupportTopic,
-  type UserCommunityMember,
-} from "@/api/generated/initiativeAPI.schemas";
-import {
-  CommunityInviteList,
-  InviteLimitFields,
-  NewInviteLink,
-} from "@/components/communities/CommunityInvites";
+import { CommunityRole, type UserCommunityMember } from "@/api/generated/initiativeAPI.schemas";
+import { MemberInvites } from "@/components/communities/CommunityInvites";
 import { MemberDisplayNameDialog } from "@/components/communities/MemberDisplayNameDialog";
 import { RemoveCommunityMemberDialog } from "@/components/communities/RemoveCommunityMemberDialog";
 import { TransferContentOwnershipDialog } from "@/components/communities/TransferContentOwnershipDialog";
 import { UnownedContentCard } from "@/components/communities/UnownedContentCard";
-import { FormSkeleton, SkeletonRegion, TableSkeleton } from "@/components/skeletons/PageSkeletons";
-import { HelpLink } from "@/components/support/HelpLink";
 import { UserHandle } from "@/components/UserHandle";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/data-table";
-import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { RowActionsMenu } from "@/components/ui/row-actions-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
-import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityAuthSettings } from "@/hooks/useCommunityAuthPolicy";
 import { useCommunityInvites } from "@/hooks/useCommunityInvites";
@@ -53,15 +29,19 @@ import {
 } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import { isAdminRole } from "@/lib/permissions";
-import type { AppColumnDef } from "@/lib/table";
+import { assignableCommunityRoles, isAdminRole } from "@/lib/permissions";
 import { getUrlHandle, getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { DataTable } from "@/ui/data-table";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
+import type { AppColumnDef } from "@/ui/lib/table";
+import { FormSkeleton, SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { RowActionsMenu } from "@/ui/row-actions-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { StatusMessage } from "@/ui/status-message";
+import { Switch } from "@/ui/switch";
 
-//: What this community's roles are, in the order the picker offers them. The
-//: seat is only on the list for somebody who already holds it — an admin can
-//: neither appoint nor demote one, and the server says so too.
-const COMMUNITY_ROLE_OPTIONS: CommunityRole[] = ["admin", "member"];
-const SEAT_ROLE_OPTIONS: CommunityRole[] = ["superadmin", "admin", "member"];
 //: The custom role picker's "none", since a select's value is a string.
 const NO_CUSTOM_ROLE = "none";
 
@@ -70,7 +50,6 @@ export const SettingsUsersPage = () => {
   const { t } = useTranslation(["communities", "settings"]);
 
   const { activeCommunity } = useCommunities();
-  const { canSell, openPortal } = useBillingPortal();
   // Running the community, not reaching its work: the roster and its
   // invites are parts of running it, held by its admins, by a custom role, or
   // by a settings grant standing in. Platform role has nothing to do with it.
@@ -80,7 +59,9 @@ export const SettingsUsersPage = () => {
   // hold, so a grant that only reads does not list them.
   const managesInvites = held.writes && held.holds("invites");
   const opensPage = managesMembers || held.holds("invites");
-  const roleOptions = activeCommunity?.can.seat ? SEAT_ROLE_OPTIONS : COMMUNITY_ROLE_OPTIONS;
+  const roleOptions = assignableCommunityRoles(Boolean(activeCommunity?.can.seat));
+  // Rungs are changed by whoever may make an admin, as on the members page.
+  const changesRungs = held.writes && held.managesAdmins;
 
   const activeCommunityId = activeCommunity?.id ?? null;
 
@@ -95,20 +76,7 @@ export const SettingsUsersPage = () => {
   // Whoever runs the server may set it for the whole community instead.
   const apiAccessFixed = (authSettings?.set_by_deployment ?? []).includes("api_keys");
 
-  // Seat cap, admin-only on the payload and null when uncapped. A full community
-  // mints no invite (the server refuses), so the form says so up front instead
-  // of failing on submit. Where a billing portal exists the cap travels with
-  // the plan — raising it is an upgrade, not a request to an operator — so the
-  // message and its action differ from the self-hosted one.
-  const maxUsers = activeCommunity?.max_users ?? null;
-  const usedSeats = activeCommunity?.member_count ?? 0;
-  const atUserLimit = maxUsers !== null && usedSeats >= maxUsers;
-  const planName = activeCommunity?.tier_name ?? null;
-
   const invites = useCommunityInvites(activeCommunityId, managesInvites);
-  // Guest invites are Settings › Guests'; these are for members.
-  const memberInvites = invites.invites.filter((invite) => invite.guest_days == null);
-  const [inviteLimits, setInviteLimits] = useState({ maxUses: 1, expiresDays: 7 });
   const [deleteUserConfirm, setDeleteUserConfirm] = useState<{
     userId: number;
     email: string;
@@ -198,7 +166,7 @@ export const SettingsUsersPage = () => {
   }
 
   if (usersQuery.isError || !usersQuery.data) {
-    return <p className="text-destructive text-sm">{t("users.unableToLoadSettings")}</p>;
+    return <StatusMessage onRetry={usersQuery.refetch} />;
   }
 
   // The handle leads: every member has one. A name is only the display name
@@ -248,7 +216,8 @@ export const SettingsUsersPage = () => {
       cell: ({ row }) => {
         const communityMember = row.original;
         const isSelf = communityMember.id === user?.id;
-        const currentCommunityRole = communityMember.community_role ?? "member";
+        const currentCommunityRole = (communityMember.community_role ??
+          CommunityRole.member) as CommunityRole;
         if (!managesMembers) {
           return (
             <span className="text-sm">
@@ -256,6 +225,14 @@ export const SettingsUsersPage = () => {
             </span>
           );
         }
+        // A superadmin's rung answers to the seat.
+        const changeable =
+          !isSelf && changesRungs && (currentCommunityRole !== CommunityRole.superadmin || isSeat);
+        // The rung they hold is listed even where the reader can't give it,
+        // so the picker names it.
+        const options = roleOptions.includes(currentCommunityRole)
+          ? roleOptions
+          : [currentCommunityRole, ...roleOptions];
         return (
           <div className="flex flex-col gap-1">
             <Select
@@ -263,13 +240,19 @@ export const SettingsUsersPage = () => {
               onValueChange={(value) =>
                 handleRoleChange(communityMember.id, value as CommunityRole)
               }
-              disabled={isSelf || updateCommunityMembership.isPending}
+              disabled={!changeable || updateCommunityMembership.isPending}
             >
-              <SelectTrigger disabled={isSelf} className="min-w-40">
+              <SelectTrigger
+                disabled={!changeable}
+                className="min-w-40"
+                aria-label={t("users.communityRolePickerLabel", {
+                  name: getUserDisplayName(communityMember),
+                })}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {roleOptions.map((roleOption) => (
+                {options.map((roleOption) => (
                   <SelectItem key={roleOption} value={roleOption}>
                     {t(`users.communityRole.${roleOption}` as never)}
                   </SelectItem>
@@ -288,12 +271,20 @@ export const SettingsUsersPage = () => {
             cell: ({ row }) => {
               const communityMember = row.original;
               const roleId = heldRoleIds.get(communityMember.id) ?? null;
-              if (!managesMembers || customRolesClosed) {
+              if (!managesMembers) {
                 const name = customRoles.find((role) => role.id === roleId)?.name;
                 return name ? <span className="text-sm">{name}</span> : null;
               }
               // A role applies while its holder stands on its rung.
               const rung = isAdminRole(communityMember.community_role) ? "admin" : "member";
+              // Given only by somebody who could take off the one held now, as
+              // on the members page; the held one is listed either way.
+              const heldRole = customRoles.find((role) => role.id === roleId);
+              const changeable =
+                held.writes && !customRolesClosed && (!heldRole || held.takesOff(heldRole));
+              const options = customRoles.filter(
+                (role) => role.id === roleId || (changeable && held.gives(role))
+              );
               return (
                 <Select
                   value={roleId === null ? NO_CUSTOM_ROLE : String(roleId)}
@@ -303,9 +294,10 @@ export const SettingsUsersPage = () => {
                       roleId: value === NO_CUSTOM_ROLE ? null : Number(value),
                     })
                   }
-                  disabled={assignCustomRole.isPending}
+                  disabled={!changeable || assignCustomRole.isPending}
                 >
                   <SelectTrigger
+                    disabled={!changeable}
                     className="min-w-40"
                     aria-label={t("settings:customRoles.pickerLabel", {
                       name: getUserDisplayName(communityMember),
@@ -315,7 +307,7 @@ export const SettingsUsersPage = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NO_CUSTOM_ROLE}>{t("settings:customRoles.none")}</SelectItem>
-                    {customRoles.map((role) => (
+                    {options.map((role) => (
                       <SelectItem key={role.id} value={String(role.id)}>
                         <span className="flex flex-col">
                           <span>{role.name}</span>
@@ -419,11 +411,6 @@ export const SettingsUsersPage = () => {
       : []),
   ];
 
-  const createInvite = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!atUserLimit) void invites.create(inviteLimits);
-  };
-
   return (
     <div className="space-y-6">
       {managesInvites ? (
@@ -438,47 +425,8 @@ export const SettingsUsersPage = () => {
               <span className="sr-only">{t("users.refreshInvites")}</span>
             </Button>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <form className="grid grid-cols-fill-48/3 gap-4" onSubmit={createInvite}>
-              <InviteLimitFields
-                idPrefix="invite"
-                value={inviteLimits}
-                onChange={setInviteLimits}
-              />
-              <div className="flex items-end">
-                <Button type="submit" disabled={invites.submitting || atUserLimit}>
-                  {invites.submitting ? t("users.generatingInvite") : t("users.generateInvite")}
-                </Button>
-              </div>
-            </form>
-            {atUserLimit && canSell && activeCommunityId && activeCommunity?.can.seat ? (
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-muted-foreground text-sm">
-                  {planName
-                    ? t("users.inviteSeatsFullPlan", { plan: planName, count: maxUsers ?? 0 })
-                    : t("users.inviteSeatsFullUpgrade", { count: maxUsers ?? 0 })}
-                </p>
-                <Button size="sm" onClick={() => void openPortal(activeCommunityId, "upgrade")}>
-                  {t("usagePanel.upgrade")}
-                </Button>
-              </div>
-            ) : atUserLimit ? (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <p className="text-muted-foreground text-sm">
-                  {t("users.inviteSeatsFull", { max: maxUsers })}
-                </p>
-                <HelpLink topic={SupportTopic.community} communityId={activeCommunityId} />
-              </div>
-            ) : null}
-            {invites.newInviteCode ? <NewInviteLink code={invites.newInviteCode} /> : null}
-            <div className="h-px bg-border" />
-            <CommunityInviteList
-              invites={memberInvites}
-              isLoading={invites.isLoading}
-              error={invites.error}
-              emptyText={t("users.noActiveInvites")}
-              onDelete={(inviteId) => void invites.remove(inviteId)}
-            />
+          <CardContent>
+            <MemberInvites invites={invites} />
           </CardContent>
         </Card>
       ) : null}
@@ -488,28 +436,6 @@ export const SettingsUsersPage = () => {
             {/* Named only beside the invites card; alone, the tab names it. */}
             {managesInvites ? <CardTitle>{t("users.usersTitle")}</CardTitle> : null}
             <CardDescription>{t("users.usersDescription")}</CardDescription>
-            {/* Three words that get mixed up constantly, explained where the
-                choice is actually made rather than in the help centre. */}
-            <dl className="mt-3 space-y-1 text-muted-foreground text-xs">
-              {roleOptions.map((roleOption) => (
-                <div key={roleOption} className="flex gap-1.5">
-                  <dt className="font-medium text-foreground">
-                    {t(`users.communityRole.${roleOption}` as never)}
-                  </dt>
-                  <dd>{t(`users.communityRoleHelp.${roleOption}` as never)}</dd>
-                </div>
-              ))}
-              {showsApiAccess ? (
-                <div className="flex gap-1.5">
-                  <dt className="font-medium text-foreground">{t("users.apiAccessColumn")}</dt>
-                  <dd>
-                    {apiAccessFixed
-                      ? t("settings:communityAuth.setByDeployment")
-                      : t("users.apiAccessHelp")}
-                  </dd>
-                </div>
-              ) : null}
-            </dl>
           </div>
           {managesMembers ? (
             <Button

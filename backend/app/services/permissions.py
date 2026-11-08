@@ -15,8 +15,6 @@ the schema's own ``resource_actions``, read off the loaded row by
   - :func:`client_access` — the row's ``can``, the same answer
   - :func:`granted_scope_clause` — deliberately NARROWER than the policy for a
     list spanning initiatives (no guild-admin leg)
-  - :func:`writable_scope_clause` — "which of these may I change", which a read
-    policy does not answer
 
 Guild isolation and initiative membership are separate layers, in ``rls.py`` and
 Postgres.
@@ -28,7 +26,7 @@ from enum import Enum
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import ColumnElement, and_, false, func, inspect, or_, true
+from sqlalchemy import ColumnElement, and_, func, inspect, or_, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload, undefer
 from sqlmodel import select
@@ -54,16 +52,6 @@ from app.models.tenant.resource_grant import (
     ResourceAccessLevel,
     ResourceGrant,
 )
-
-
-def _frozen_community(context: ActorContext | None) -> bool:
-    """Whether this request reads a community whose content is on hold.
-
-    The routed role (``guild_<id>_ro``) refuses the write either way; the app
-    layer agrees so every derived level reports read rather than offering an
-    affordance the database will reject.
-    """
-    return context is not None and context.content_read_only
 
 
 def granted_scope_clause(
@@ -138,38 +126,6 @@ def listing_scope_clause(
     if initiative_id is not None:
         return true()
     return granted_scope_clause(tool, id_col, user_id, context=context, access=access)
-
-
-def writable_scope_clause(
-    tool: Tool,
-    id_col: ColumnElement[int],
-    user_id: int | None,
-    *,
-    context: ActorContext | None,
-    initiative_id: int | None = None,
-) -> ColumnElement[bool]:
-    """The listing rule narrowed to what the reader may CHANGE.
-
-    This one does NOT collapse the way :func:`listing_scope_clause` does. A read
-    policy admits a row shared at any level, so "may I see it" is already
-    answered and "may I edit it" is strictly narrower — the grant rows have to
-    be filtered to :data:`WRITE_LEVELS` here, whatever the statement's scope.
-
-    The two branches are the scope choice made elsewhere: confined to one
-    initiative, the table's own gate answers, asked at write; spanning them,
-    only what has been granted does.
-    """
-    if initiative_id is not None:
-        return func.resource_access(
-            tool.value, id_col, user_id, initiative_id, True, standing_arg()
-        )
-    if context is not None and context.grant_satisfies(access="write"):
-        return true()
-    if user_id is None:
-        # Spanning initiatives, what may be changed is read from grants to a
-        # person; an installed plug-in asks one initiative at a time.
-        return false()
-    return func.resource_granted(tool.value, id_col, user_id, True, standing_arg())
 
 
 # ── Generic DAC engine (registry-driven) ─────────────────────────

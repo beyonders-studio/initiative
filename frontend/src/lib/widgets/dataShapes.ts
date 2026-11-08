@@ -106,7 +106,7 @@ export interface DataMeta {
 export type WidgetData = (TabularData | PluginRows) & { meta?: DataMeta };
 
 /** What a *binding* may name — as distinct from the envelope it produces. */
-export type WidgetSource = "query" | "sheet_range" | "plugin";
+export type WidgetSource = "query" | "plugin";
 
 /** Widget-level display options, already validated by the backend against the
  *  primitive's allow-list (`WIDGET_SPECS[...].options`). Values are strings —

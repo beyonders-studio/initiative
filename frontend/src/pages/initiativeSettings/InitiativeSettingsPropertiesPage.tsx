@@ -3,15 +3,15 @@
  * tasks, and events can carry.
  */
 
-import { InitiativeSettingsPermissionRequired } from "@/components/initiatives/settings/InitiativeSettingsGuard";
 import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
+import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
 
 export const InitiativeSettingsPropertiesPage = () => {
   const { initiativeId, canManageMembers } = useInitiativeSettings();
 
   if (!canManageMembers) {
-    return <InitiativeSettingsPermissionRequired />;
+    return <SettingsPermissionRequired scope="initiative" />;
   }
 
   return <InitiativeSettingsPropertiesTab initiativeId={initiativeId} />;

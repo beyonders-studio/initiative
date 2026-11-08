@@ -34,10 +34,10 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Callable, Literal, Mapping, Optional, Sequence
+from typing import Any, Literal, Mapping
 
 from app.core.errors import CodedError
-from app.core.messages import DashboardMessages, QueryMessages
+from app.core.messages import DashboardMessages
 from app.models.platform.marketplace import UID_ALPHABET, UID_LENGTH
 from app.services.marketplace.manifest_values import (
     IDENTIFIER_CHARS,
@@ -50,8 +50,6 @@ from app.services.marketplace.service_plugins import (
     MAX_ENDPOINT_ID_LENGTH,
 )
 from app.services.query.resolve import QueryError, resolve
-from app.services.query.rows import RowColumn
-from app.services.query.rows import plan as row_plan
 
 SCHEMA_VERSION = 1
 
@@ -346,14 +344,12 @@ WIDGET_SPECS: dict[str, WidgetSpec] = {
     ),
 }
 
-#: What a binding may name. Three, and only the first is ours to write: a
-#: **query** is a statement over this guild's datasets, a **sheet_range** is a
-#: cell range in a spreadsheet file, and **plugin** is an installed listing's
-#: own endpoint. The first two both answer with columns and rows, so a widget
-#: draws them by the same path and never learns which it was given.
+#: What a binding may name. Two, and only the first is ours to write: a
+#: **query** is a statement over this guild's datasets, its spreadsheets'
+#: ranges and its plug-ins' read endpoints, and **plugin** is an installed
+#: listing's own widget's endpoint.
 QUERY_SOURCE = "query"
-SHEET_SOURCE = "sheet_range"
-TABULAR_SOURCES: frozenset[str] = frozenset({QUERY_SOURCE, SHEET_SOURCE})
+TABULAR_SOURCES: frozenset[str] = frozenset({QUERY_SOURCE})
 
 
 # --- plug-in widgets ------------------------------------------------------------
@@ -456,18 +452,8 @@ def plugin_widget_parts(declared: str) -> tuple[str, str] | None:
     return listing_uid, widget_id
 
 
-#: How a caller looks up what an endpoint hands back: given a plug-in and one of
-#: its endpoints, the columns its rows hold, or ``None`` where this caller
-#: cannot say. A dashboard is saved through a request that can look up the
-#: install; a listing is validated with its own manifest in hand; a factory has
-#: neither and checks the statement's shape alone.
-EndpointColumns = Callable[[str, str], "Optional[Sequence[RowColumn]]"]
-
-
 def _normalize_plugin_binding(
-    binding: dict[str, Any],
-    listing_uid: str,
-    endpoint_columns: "Optional[EndpointColumns]" = None,
+    binding: dict[str, Any], listing_uid: str
 ) -> dict[str, Any]:
     """A ``plugin`` binding: which installed plug-in, which source, which parameters.
 
@@ -501,45 +487,7 @@ def _normalize_plugin_binding(
     }
     if params:
         cleaned["params"] = params
-    statement = _checked_row_statement(
-        binding.get("sql"), listing_uid, endpoint_id, endpoint_columns
-    )
-    if statement is not None:
-        cleaned["sql"] = statement
     return cleaned
-
-
-def _checked_row_statement(
-    raw: Any,
-    listing_uid: str,
-    endpoint_id: str,
-    endpoint_columns: "Optional[EndpointColumns]",
-) -> Optional[str]:
-    """A statement over the rows an endpoint returns, read the way it will be.
-
-    Its shape is checked here whatever the caller knows — one ``SELECT``, the
-    allowed nodes and functions, and ``rows`` as its only relation. Its
-    *columns* are checked too wherever the caller can say what the endpoint
-    hands back, which is what keeps a widget naming a column its plug-in does not
-    send from being storable.
-    """
-    if raw is None or (isinstance(raw, str) and not raw.strip()):
-        return None
-    if not isinstance(raw, str):
-        _fail(DashboardMessages.BINDING_SQL_MISSING)
-        raise AssertionError  # unreachable; _fail raises
-    if len(raw) > MAX_SQL_LENGTH:
-        _fail(DashboardMessages.BINDING_SQL_TOO_LONG)
-    declared = endpoint_columns(listing_uid, endpoint_id) if endpoint_columns else None
-    try:
-        row_plan(raw, declared if declared is not None else ())
-    except QueryError as refused:
-        # Nothing was declared, so a name cannot be wrong here — only the shape
-        # can, and this caller cannot see the difference.
-        if declared is None and refused.code == QueryMessages.UNKNOWN_FIELD:
-            return raw
-        raise DashboardDefinitionError(refused.code) from refused
-    return raw
 
 
 def _check_plugin_param(value: Any) -> Any:
@@ -683,7 +631,6 @@ def _normalize_binding(
     spec: WidgetSpec,
     *,
     plugin_listing_uid: str | None = None,
-    endpoint_columns: "Optional[EndpointColumns]" = None,
 ) -> dict[str, Any]:
     """Check the source is one we can fetch and this widget can draw, then keep
     its parameters as given for the fetcher to interpret."""
@@ -695,25 +642,7 @@ def _normalize_binding(
         # total branch rather than an extra allowed value.
         if source != PLUGIN_BINDING_SOURCE:
             _fail(DashboardMessages.BINDING_SOURCE_NOT_ALLOWED)
-        return _normalize_plugin_binding(binding, plugin_listing_uid, endpoint_columns)
-
-    if source == PLUGIN_BINDING_SOURCE:
-        # A widget of this build's own — a chart, a table, a total — reading an
-        # plug-in, which is possible exactly as far as the rows are described. A
-        # statement makes them so: it names the columns it returns, and the
-        # endpoint declared the ones it reads. Without one they are the plug-in's
-        # own shape, which only the plug-in's own module knows how to draw.
-        if not str(binding.get("sql") or "").strip():
-            _fail(DashboardMessages.BINDING_SOURCE_NOT_ALLOWED)
-        # It has no module of its own to be one plug-in's, so it names the plug-in it
-        # reads rather than inheriting one. What it may see is decided exactly
-        # where a plug-in widget's is: the dashboard's gates and the binding the
-        # definition stores.
-        return _normalize_plugin_binding(
-            binding,
-            _check_uid(binding.get("plugin_uid"), DashboardMessages.BINDING_INVALID),
-            endpoint_columns,
-        )
+        return _normalize_plugin_binding(binding, plugin_listing_uid)
 
     if not isinstance(source, str) or source not in TABULAR_SOURCES:
         _fail(DashboardMessages.BINDING_SOURCE_UNKNOWN)
@@ -866,7 +795,6 @@ def _normalize_widget(
     raw: Any,
     index: int,
     seen_ids: set[str],
-    endpoint_columns: "Optional[EndpointColumns]" = None,
 ) -> dict[str, Any]:
     widget = _require_mapping(raw, DashboardMessages.WIDGET_INVALID)
     declared = widget.get("type")
@@ -903,7 +831,6 @@ def _normalize_widget(
             widget.get("binding"),
             spec,
             plugin_listing_uid=plugin_parts[0] if plugin_parts else None,
-            endpoint_columns=endpoint_columns,
         ),
     }
     if preset is not None:
@@ -921,9 +848,7 @@ def _normalize_widget(
     return cleaned
 
 
-def normalize_dashboard_definition(
-    payload: Any, *, endpoint_columns: "Optional[EndpointColumns]" = None
-) -> dict[str, Any]:
+def normalize_dashboard_definition(payload: Any) -> dict[str, Any]:
     """Validate and canonicalize a dashboard definition.
 
     Raises ``DashboardDefinitionError`` with a machine code for a widget type or
@@ -943,8 +868,7 @@ def normalize_dashboard_definition(
 
     seen_ids: set[str] = set()
     widgets = [
-        _normalize_widget(raw, index, seen_ids, endpoint_columns)
-        for index, raw in enumerate(raw_widgets)
+        _normalize_widget(raw, index, seen_ids) for index, raw in enumerate(raw_widgets)
     ]
 
     raw_layout = definition.get("layout")

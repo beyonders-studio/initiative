@@ -1,30 +1,119 @@
 {
-  "unreachable": {
-    "age": {
-      "title": "Les messages privés sont désactivés pour ce compte"
-    },
-    "private": {
-      "body": "Vous êtes en mode Privé. Vous pouvez toujours vous connecter à quelqu'un via son identifiant exact, et une connexion vous permet de vous écrire quel que soit ce réglage. Pour être joignable ici, autorisez vos communautés à vous écrire.",
-      "open": "Autoriser mes communautés à m'écrire",
-      "settings": "Paramètres de confidentialité"
-    }
+  "title": "Contacts",
+  "newContact": "Nouveau contact",
+  "importCsv": "Importer des contacts depuis un CSV",
+  "createDescription": "Une personne ou une organisation, et comment la joindre.",
+  "addPersonDescription": "Quelqu’un chez {{name}}, et comment le joindre.",
+  "creating": "Création...",
+  "name": "Nom",
+  "namePlaceholder": "Domaine du Lac, Priya Shah...",
+  "kind": "Personne ou organisation",
+  "person": "Personne",
+  "organization": "Organisation",
+  "partOf": "Organisation",
+  "noOrganization": "Aucune",
+  "searchOrganizations": "Rechercher des organisations...",
+  "noOrganizations": "Aucune organisation ne correspond.",
+  "communityHint": "Communauté",
+  "fields": {
+    "phones": "Téléphone",
+    "emails": "E-mail",
+    "addresses": "Adresse",
+    "websites": "Site web"
   },
-  "actions": {
-    "label": "Actions pour {{handle}}",
-    "connect": "Se connecter",
-    "acceptConnection": "Accepter la connexion",
-    "connectPending": "Demande envoyée",
-    "ask": "Demander à écrire",
-    "asked": "Demande envoyée",
-    "askSent": "Demande envoyée.",
-    "ignore": "Ignorer",
-    "stopIgnoring": "Ne plus ignorer",
-    "removeConnection": "Supprimer la connexion",
-    "removeConnectionTitle": "Supprimer cette connexion ?",
-    "removeConnectionBody": "Vous ne serez plus connectés. Si rien d'autre ne vous permet de vous écrire — une communauté commune, ou le fait que vous soyez tous deux ouverts aux messages —, cela prend fin aussi.",
-    "message": "Message",
-    "viewProfile": "Voir le profil",
-    "copyHandle": "Copier l'identifiant",
-    "handleCopied": "Identifiant copié."
+  "add": {
+    "phones": "Ajouter un téléphone",
+    "emails": "Ajouter un e-mail",
+    "addresses": "Ajouter une adresse",
+    "websites": "Ajouter un site web"
+  },
+  "placeholders": {
+    "phones": "+33 6 12 34 56 78",
+    "emails": "nom@exemple.fr",
+    "addresses": "12 rue du Port\n75001 Paris",
+    "websites": "exemple.fr"
+  },
+  "label": "Libellé",
+  "labelOf": "Libellé pour {{field}}",
+  "removeOf": "Retirer {{field}}",
+  "labels": {
+    "mobile": "Mobile",
+    "work": "Travail",
+    "home": "Domicile",
+    "office": "Bureau",
+    "main": "Standard",
+    "billing": "Facturation",
+    "venue": "Lieu",
+    "booking": "Réservations",
+    "other": "Autre"
+  },
+  "noContacts": "Aucun contact pour l’instant",
+  "noContactsDescription": "Gardez les personnes et entreprises pour qui ou avec qui vous travaillez : le client, le lieu, le fournisseur. Liez-les aux tâches, événements et fichiers dont ils font partie.",
+  "createFirst": "Ajouter le premier contact",
+  "loading": "Chargement des contacts...",
+  "error": "Une erreur s’est produite",
+  "notFound": "Contact introuvable",
+  "notFoundDescription": "Le contact que vous cherchez n’existe pas ou a été supprimé.",
+  "noAccess": "Accès refusé",
+  "noAccessDescription": "Vous n’avez pas la permission de voir ce contact.",
+  "backToContacts": "Retour aux contacts",
+  "filters": {
+    "searchLabel": "Nom",
+    "searchContacts": "Rechercher des contacts...",
+    "kind": "Personnes ou organisations",
+    "allKinds": "Tout le monde",
+    "people": "Personnes",
+    "organizations": "Organisations",
+    "noMatchingContacts": "Aucun contact ne correspond à vos filtres."
+  },
+  "columns": {
+    "phone": "Téléphone",
+    "email": "E-mail",
+    "organization": "Organisation"
+  },
+  "reach": {
+    "copy": "Copier",
+    "copied": "Adresse copiée"
+  },
+  "details": {
+    "title": "Comment les joindre",
+    "edit": "Modifier",
+    "saved": "Contact enregistré",
+    "empty": "Pas encore de téléphone, d’e-mail, d’adresse ni de site web."
+  },
+  "standing": {
+    "title": "Où en sont les choses",
+    "openTasks": "Tâches ouvertes",
+    "upcoming": "À venir",
+    "files": "Fichiers",
+    "empty": "Rien d’ouvert, à venir ou classé avec eux pour l’instant."
+  },
+  "newTask": "Nouvelle tâche",
+  "newEvent": "Nouvel événement",
+  "linked": "Lié à {{name}}",
+  "task": {
+    "description": "Ajoutée à un projet d’ici et liée à {{name}}.",
+    "project": "Projet",
+    "change": "Changer",
+    "title": "Titre",
+    "titlePlaceholder": "Envoyer l’acompte, Confirmer le menu...",
+    "create": "Ajouter la tâche"
+  },
+  "people": {
+    "title": "Personnes",
+    "add": "Ajouter une personne",
+    "empty": "Personne pour l’instant."
+  },
+  "move": {
+    "action": "Déplacer vers les contacts de la communauté",
+    "title": "Déplacer {{name}} vers les contacts de la communauté ?",
+    "description": "Tout le monde dans la communauté pourra le consulter, et ses liens restent. Les propriétés de cette initiative sont retirées.",
+    "confirm": "Déplacer",
+    "moving": "Déplacement...",
+    "moved": "Déplacé vers les contacts de la communauté"
+  },
+  "community": {
+    "title": "Contacts de la communauté",
+    "description": "Le carnet d’adresses propre à la communauté. Liez-les depuis le travail de n’importe quelle initiative."
   }
 }

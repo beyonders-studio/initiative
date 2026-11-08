@@ -59,8 +59,8 @@ async def set_properties(
     guild_context: PropertiesWrite,
 ) -> List[PropertySummary]:
     """Replace the custom property values on one tool or sub-tool, or with
-    ``merge`` write only the ones named and leave the rest, and change options
-    of multi-select values against what each holds.
+    ``merge`` write only the ones named and leave the rest, change options of
+    multi-select values and step counters against what each holds.
 
     Requires write on the tool that governs it: a tool itself, or the tool a
     sub-tool sits in (a task's project, an event's calendar). Each value's
@@ -106,6 +106,7 @@ async def set_properties(
             initiative_id=initiative_id,
             removed=payload.removed if payload.merge else None,
             options=payload.options,
+            steps=payload.steps,
         )
         await required_fields.refuse_emptied(session, required)
     except (HTTPException, CodedError):

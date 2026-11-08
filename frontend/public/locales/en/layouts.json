@@ -217,22 +217,6 @@
   "search": "Search",
   "noMatches": "Nothing matches.",
   "sectionHelp": "With a title it opens and closes; without one it's a box.",
-  "queueItemDetail": {
-    "name": "Queue item detail",
-    "help": "How every item in this queue is shown when it's opened. What it leaves out is hidden.",
-    "shipped": "This is the layout as shipped. Changing it makes it the queue's own.",
-    "titleHelp": "Every item shows its label.",
-    "hiddenHelp": "Every item can show this. Taken off, it is hidden, and Add puts it back.",
-    "parts": {
-      "actions": "Menu",
-      "relations": "Relations"
-    },
-    "partHelp": {
-      "actions": "What else can be done with the item: report, duplicate and remove.",
-      "relations": "What the item is linked to."
-    },
-    "noItems": "Add an item to the queue to see its layout here."
-  },
   "tab": "Layouts",
   "settingsDescription": "How it lays out what it holds: each layout, when it was last changed, and the way into the editor. Everyone who can open it sees them; what each person filters and sorts by is their own.",
   "counterDetail": {
@@ -294,6 +278,12 @@
     "number": "A number",
     "stars": "Stars",
     "bar": "A bar"
+  },
+  "counterDisplay": {
+    "label": "Show the counter as",
+    "number": "A number",
+    "bar": "A bar",
+    "clock": "A clock"
   },
   "fieldProperty": {
     "metadata": "Metadata",

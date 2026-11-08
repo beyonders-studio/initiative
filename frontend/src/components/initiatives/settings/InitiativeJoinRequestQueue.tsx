@@ -11,16 +11,11 @@
  * roster is managed, so the two agree.
  */
 
-import { Check, Clock, Loader2, X } from "lucide-react";
+import { Check, Clock, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { InitiativeJoinRequestRead } from "@/api/generated/initiativeAPI.schemas";
 import { JoinRequestStatus } from "@/api/generated/initiativeAPI.schemas";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RelativeTime } from "@/components/ui/relative-time";
 import { useInitiativeJoinRequests, useResolveJoinRequest } from "@/hooks/useInitiatives";
 import { toast } from "@/lib/mascotToast";
 import {
@@ -29,6 +24,12 @@ import {
   getUserDisplayName,
   isAnonymizedUser,
 } from "@/lib/userDisplay";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { RelativeTime } from "@/ui/relative-time";
+import { StatusMessage } from "@/ui/status-message";
 
 export interface InitiativeJoinRequestQueueProps {
   initiativeId: number;
@@ -117,15 +118,12 @@ export const InitiativeJoinRequestQueue = ({ initiativeId }: InitiativeJoinReque
           <Button
             size="sm"
             disabled={resolveRequest.isPending}
+            pending={isResolving}
             onClick={() =>
               resolveRequest.mutate({ initiativeId, requestId: request.id, approved: true })
             }
           >
-            {isResolving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Check className="h-4 w-4" />
-            )}
+            <Check className="h-4 w-4" />
             {t("joinRequests.approve")}
           </Button>
         </div>
@@ -144,7 +142,7 @@ export const InitiativeJoinRequestQueue = ({ initiativeId }: InitiativeJoinReque
       </CardHeader>
       <CardContent className="p-0">
         {queueQuery.isError ? (
-          <p className="p-4 text-destructive text-sm">{t("joinRequests.queueLoadError")}</p>
+          <StatusMessage onRetry={queueQuery.refetch} />
         ) : (
           <ul className="divide-y">{requests.map(renderRequest)}</ul>
         )}

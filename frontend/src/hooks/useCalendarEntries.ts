@@ -1,10 +1,8 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 
 import {
-  getListCalendarEntriesQueryKey,
-  getListMyCalendarEntriesQueryKey,
-  listCalendarEntries,
-  listMyCalendarEntries,
+  useListCalendarEntries,
+  useListMyCalendarEntries,
 } from "@/api/generated/calendar-entries/calendar-entries";
 import type {
   CalendarEntriesResponse,
@@ -24,11 +22,8 @@ export const useCalendarEntries = (
   options?: QueryOpts<CalendarEntriesResponse>
 ) => {
   const communityId = useActiveCommunityId();
-  return useQuery<CalendarEntriesResponse>({
-    queryKey: getListCalendarEntriesQueryKey(communityId, params),
-    queryFn: () => listCalendarEntries(communityId, params),
-    placeholderData: keepPreviousData,
-    ...options,
+  return useListCalendarEntries(communityId, params, {
+    query: { placeholderData: keepPreviousData, ...options },
   });
 };
 
@@ -40,10 +35,7 @@ export const useMyCalendarEntries = (
   params: ListMyCalendarEntriesParams,
   options?: QueryOpts<CalendarEntriesResponse>
 ) => {
-  return useQuery<CalendarEntriesResponse>({
-    queryKey: getListMyCalendarEntriesQueryKey(params),
-    queryFn: () => listMyCalendarEntries(params),
-    placeholderData: keepPreviousData,
-    ...options,
+  return useListMyCalendarEntries(params, {
+    query: { placeholderData: keepPreviousData, ...options },
   });
 };

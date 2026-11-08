@@ -37,7 +37,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from app.models.tenant.project import Project
     from app.models.platform.user_profile_view import MemberProfile
     from app.models.tenant.file import File
-    from app.models.tenant.queue import Queue
     from app.models.tenant.calendar import Calendar
     from app.models.tenant.counter import CounterGroup
 
@@ -498,10 +497,6 @@ class Initiative(
     )
     projects: List["Project"] = Relationship(back_populates="initiative")
     files: List["File"] = Relationship(
-        back_populates="initiative",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
-    queues: List["Queue"] = Relationship(
         back_populates="initiative",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )

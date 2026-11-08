@@ -29,7 +29,6 @@ import {
   NON_EXPORTABLE_TOOLS,
   PARENT_TOOL,
   SIDEBAR_TOOLS,
-  showsRelations,
   singularOf,
   TOOL_ICONS,
   TOOL_SETTINGS_SECTIONS,
@@ -43,7 +42,6 @@ import {
   toolInPath,
   toolListRoute,
   toolNavLabelKey,
-  toolParamName,
   toolPascalPlural,
   toolPlural,
   toolRouteSegment,
@@ -235,7 +233,7 @@ describe("tool routes", () => {
   // Without this a tool could ship with a clickable card and nowhere to land.
   it("every tool has its per-entity detail route", () => {
     for (const tool of TOOLS) {
-      const file = `${INITIATIVE_ROUTES}/${toolRouteSegment(tool)}/$${toolParamName(tool)}/index.tsx`;
+      const file = `${INITIATIVE_ROUTES}/${toolRouteSegment(tool)}/$${toolCamelSingular(tool)}Id/index.tsx`;
       expect(communityRouteFiles, `missing detail route file ${file}`).toContain(file);
     }
   });
@@ -244,7 +242,7 @@ describe("tool routes", () => {
   // absence of this check is how a tool shipped with no way to do either.
   it("every tool has its per-entity settings route", () => {
     for (const tool of TOOLS) {
-      const file = `${INITIATIVE_ROUTES}/${toolRouteSegment(tool)}/$${toolParamName(tool)}/settings.tsx`;
+      const file = `${INITIATIVE_ROUTES}/${toolRouteSegment(tool)}/$${toolCamelSingular(tool)}Id/settings.tsx`;
       expect(communityRouteFiles, `missing settings route file ${file}`).toContain(file);
     }
   });
@@ -253,7 +251,7 @@ describe("tool routes", () => {
   // A missing file is a tab that navigates to a blank page.
   it("every tool has a route per settings section", () => {
     for (const tool of TOOLS) {
-      const settings = `${INITIATIVE_ROUTES}/${toolRouteSegment(tool)}/$${toolParamName(tool)}/settings`;
+      const settings = `${INITIATIVE_ROUTES}/${toolRouteSegment(tool)}/$${toolCamelSingular(tool)}Id/settings`;
       for (const section of TOOL_SETTINGS_SECTIONS) {
         const file = section === "details" ? `${settings}/index.tsx` : `${settings}/${section}.tsx`;
         expect(communityRouteFiles, `missing settings section route file ${file}`).toContain(file);
@@ -286,8 +284,6 @@ describe("tool routes", () => {
 
   it("derives the route param name from the enum", () => {
     expect(toolCamelSingular(Tool.counter_group)).toBe("counterGroup");
-    expect(toolParamName(Tool.counter_group)).toBe("counterGroupId");
-    expect(toolParamName(Tool.project)).toBe("projectId");
   });
 });
 
@@ -311,12 +307,14 @@ describe("tool route builders", () => {
     );
   });
 
-  // Only calendars have community-level entities (a plug-in installs one). A null
-  // initiative means "address me at the community route", never "unknown".
+  // Calendars and contacts have community-level entities (a community plug-in
+  // holds them). A null initiative means "address me at the community route",
+  // never "unknown".
   it("keeps a community-level entity at its community route", () => {
     expect(toolListRoute(Tool.calendar, null)).toBe("/calendars");
     expect(toolDetailRoute(Tool.calendar, null, 3)).toBe("/calendars/3");
     expect(toolSettingsRoute(Tool.calendar, null, 3)).toBe("/calendars/3/settings");
+    expect(toolDetailRoute(Tool.contact, null, 4)).toBe("/contacts/4");
   });
 
   it("nests a child entity under its parent", () => {
@@ -362,7 +360,7 @@ describe("tool relations", () => {
     // not offer them has to be named in NO_RELATIONS_PANEL with its reason,
     // rather than simply never having been wired up.
     const wired = toolsWithRelationsPanel();
-    const missing = TOOLS.filter((tool) => showsRelations(tool) && !wired.has(tool));
+    const missing = TOOLS.filter((tool) => !NO_RELATIONS_PANEL.has(tool) && !wired.has(tool));
     expect(missing, `no ToolRelationsPanel wired for ${missing.join(", ")}`).toEqual([]);
   });
 
@@ -381,7 +379,6 @@ describe("tool relations", () => {
       "calendar_event",
       "collection",
       "counter",
-      "queue_item",
       "task",
       "wiki_page",
     ]);
@@ -485,8 +482,9 @@ describe("tool imports", () => {
   });
 
   // The data-jobs table labels a job by its `source` column, which the backend
-  // writes as the envelope type for an import and the adapter key for an
-  // export. Both are derived from the enum, so both label sets are too — a key
+  // writes as the envelope type for an import (`contacts-csv` for a
+  // spreadsheet of contacts) and the adapter key for an export. Both are
+  // derived from the enum, so both label sets are too — a key
   // that matches no source renders as its own raw key in the UI, which is how
   // `initiative-calendar-events` survived a calendar rename unnoticed.
   it("labels every import source in every locale", async () => {
@@ -494,7 +492,7 @@ describe("tool imports", () => {
     for (const locale of locales) {
       const file = await import(`../../public/locales/${locale}/imports.json`);
       const labels = (file.default ?? file).table.source as Record<string, string>;
-      const expected = ["backup", ...BULK_EXPORT_TOOLS.map(toolEnvelopeType)];
+      const expected = ["backup", "contacts-csv", ...BULK_EXPORT_TOOLS.map(toolEnvelopeType)];
       expect(Object.keys(labels).sort(), `${locale}/imports.json table.source`).toEqual(
         expected.sort()
       );
@@ -538,7 +536,10 @@ describe("toolInPath", () => {
   it("reads the outermost tool, so what it holds and its settings name it", () => {
     expect(toolInPath("/c/1/i/2/projects/3/tasks/5")).toEqual({ tool: Tool.project, id: 3 });
     expect(toolInPath("/c/1/i/2/wikis/4/files/8")).toEqual({ tool: Tool.wiki, id: 4 });
-    expect(toolInPath("/c/1/i/2/queues/6/settings/access")).toEqual({ tool: Tool.queue, id: 6 });
+    expect(toolInPath("/c/1/i/2/dashboards/6/settings/access")).toEqual({
+      tool: Tool.dashboard,
+      id: 6,
+    });
   });
 
   it("is null anywhere that is no tool's page", () => {

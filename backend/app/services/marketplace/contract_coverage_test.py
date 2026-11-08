@@ -266,7 +266,7 @@ def maximal_manifest() -> dict:
                 "name": {"en": "Demo"},
                 "kind": "badge",
                 "list": True,
-                "on": ["task", "queue_item"],
+                "on": ["task", "counter"],
                 "description": {"en": "The item's demo"},
                 "tone": "accent",
                 "states": {
@@ -373,7 +373,7 @@ def maximal_declarative_manifest() -> dict:
 
     A request sends a body or a GraphQL query, a cursor goes in a parameter or
     a variable, and a route reads a body path or a header, so those are spread
-    over several requests. Only a write's request names a connection per actor.
+    over several requests.
     """
     api = '"https://api.tracker.example/issues"'
     paged = {
@@ -1176,7 +1176,7 @@ def _labelled_on(connection) -> dict:
         _with(
             maximal_declarative_manifest,
             lambda b: b["endpoints"][0]["request"].update(
-                connection={"installation": "workspace"}
+                connection={"member": "profile", "installation": "workspace"}
             ),
         ),
         _labelled_on({"member": "profile"}),
@@ -1259,7 +1259,7 @@ def test_one_plugin_is_one_kind_and_says_only_what_its_kind_says(body):
     plug-in's list field offers actions on its elements, each declared and
     offered wherever the field is, and an action asks for the params of an
     endpoint it names. A request on a member's connection is one its endpoint
-    requires and the installation does not make; a write's request naming a
+    requires and the installation does not make; a request naming a
     connection per actor names one for each of its actors, the member's own
     for the member and the community's for the installation. An endpoint is
     closed: a misspelt term is refused, not dropped."""
@@ -1267,6 +1267,17 @@ def test_one_plugin_is_one_kind_and_says_only_what_its_kind_says(body):
 
     with pytest.raises(ListingDefinitionError):
         normalize_listing_definition("plugin", body, public_id=DECLARATIVE_ID)
+
+
+def test_a_reads_request_names_a_connection_per_actor():
+    """A read made as the member carries the member's own credential, and one
+    made as the installation the community's, as a write's does."""
+    body = maximal_declarative_manifest()
+    body["endpoints"][0]["actors"] = ["member", "installation"]
+    per_actor = {"member": "profile", "installation": "workspace"}
+    body["endpoints"][0]["request"]["connection"] = per_actor
+    normalized = normalize_listing_definition("plugin", body, public_id=DECLARATIVE_ID)
+    assert normalized["endpoints"][0]["request"]["connection"] == per_actor
 
 
 def test_a_declarative_manifest_is_named_by_its_listing():

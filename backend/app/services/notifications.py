@@ -511,7 +511,8 @@ async def deliver_notices(
     Each notice is a line of its own, or joins the recipient's unread line for
     its thread; a notice that joins one sends no email and no push, so a
     flurry is one interruption. A reaction rolls into the line for what was
-    reacted to, and one taken back comes out of it. A push of its own (a
+    reacted to, and one taken back comes out of it. A record is a line written
+    read, with no email or push. A push of its own (a
     digest, a hold summary) writes nothing, and a notice whose line is already
     written is back only for its push; both are asked whether the push is
     still wanted. Returns the notices whose push should go — the worker sends
@@ -526,6 +527,18 @@ async def deliver_notices(
             await _take_back_reaction(session, recipient, notice)
             continue
         notification_type = NotificationType(notice.type)
+        if notice.kind == "record":
+            # A record of something the recipient was already shown: a line
+            # written read, and no email, push or desktop notification.
+            await user_notifications.create_notification(
+                session,
+                user_id=recipient.id,
+                notification_type=notification_type,
+                data=notice.data,
+                prefs=prefs,
+                read_at=notice.created_at,
+            )
+            continue
         channels = await _channels(
             session,
             recipient,
@@ -651,18 +664,6 @@ def _task_target_path(task_id: int | None, project_id: int | None) -> str:
     # No entity to resolve — the guild home is the only honest landing spot now
     # that there is no guild-wide project list.
     return "/"
-
-
-def _initiative_target_path(initiative_id: int | None) -> str:
-    """An initiative is addressed directly rather than through the resolver: it
-    is the thing tool references resolve INTO, so it has a stable address of its
-    own."""
-    if initiative_id is None:
-        # No one initiative to open, so land on the guild's front page — which
-        # is where the initiative list lives now that the standalone page is
-        # gone. "/i" would only redirect here anyway.
-        return "/"
-    return f"/i/{initiative_id}"
 
 
 def _recipient_locale(user: User) -> str:

@@ -39,6 +39,7 @@ __all__ = [
     "ContentGrantee",
     "ContextShapeError",
     "Filer",
+    "IdeaReader",
     "SignIn",
     "Install",
     "Member",
@@ -481,7 +482,7 @@ class Filer:
     Not a member and not a grantee: they hold no standing in the community and
     are routed into the one role that exists for this, ``guild_<id>_filer``,
     whose grants and row policies admit their own cases and nothing else (see
-    ``app.db.filer_access``). Only the account and its cases are written. The community is the
+    ``app.db.operations_schema``). Only the account and its cases are written. The community is the
     schema and the role, never ``app.current_guild_id``, which the shared
     tables read as membership.
     """
@@ -501,12 +502,49 @@ class Filer:
         object.__setattr__(self, "cases", tuple(sorted(int(c) for c in self.cases)))
 
     def route(self) -> Route:
-        from app.db.filer_access import filer_role_name
+        from app.db.operations_schema import filer_role_name
 
         return Route(
             {gucs.USER_ID: self.user_id, gucs.FILER_CASES: self.cases},
             filer_role_name(self.guild_id),
             _guild_schemas(self.guild_id),
+        )
+
+
+# --- Somebody reading the published ideas ----------------------------------------
+
+
+@dataclass(frozen=True)
+class IdeaReader:
+    """Anybody reading the published ideas, signed in or not, in the
+    operations community.
+
+    Not a member and not a grantee: routed into the one role that exists for
+    this, ``guild_<id>_ideas``, whose grants and row policies admit the
+    published ideas and their votes and nothing else (see
+    ``app.db.operations_schema``). The account, where there is one, is what
+    the reader's own vote is told apart by.
+    """
+
+    guild_id: int
+    user_id: Optional[int] = None
+
+    @property
+    def attributed(self) -> bool:
+        return self.user_id is not None
+
+    def __post_init__(self) -> None:
+        if self.guild_id is None:
+            raise ContextShapeError("an ideas routing names the community")
+
+    def route(self) -> Route:
+        from app.db.operations_schema import ideas_role_name
+
+        values: dict[gucs.Guc, Any] = {}
+        if self.user_id is not None:
+            values[gucs.USER_ID] = self.user_id
+        return Route(
+            values, ideas_role_name(self.guild_id), _guild_schemas(self.guild_id)
         )
 
 
@@ -568,6 +606,7 @@ RequestContext = Union[
     SettingsGrantee,
     Install,
     Filer,
+    IdeaReader,
     SystemGuild,
     SystemMaintenance,
 ]

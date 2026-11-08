@@ -43,7 +43,6 @@ from app.models.tenant.metadata import MetadataDefinition
 from app.models.tenant.post import Post
 from app.models.tenant.post_poll import PostPoll, PostPollOption
 from app.models.tenant.project import Project
-from app.models.tenant.queue import QueueItem
 from app.models.tenant.task import Task
 from app.models.tenant.wiki import Wiki, WikiPage
 from app.schemas.base import RESERVED_SIGIL_CODE, RESERVED_SIGILS
@@ -363,10 +362,9 @@ def _beside(source: Any, copy: Any) -> bool:
     return source.initiative_id == copy.initiative_id
 
 
-def _rows_inside(model: type, *carried: str) -> Contents:
+def _rows_inside(model: type) -> Contents:
     """The contents of a tool that is a list of ``model`` rows: each copied
-    into the copy, keeping ``carried`` of the references a copy otherwise
-    drops."""
+    into the copy."""
     parent = resource_access.parent_column(model)
 
     async def contents(
@@ -379,10 +377,7 @@ def _rows_inside(model: type, *carried: str) -> Contents:
             session,
             rows,
             beside=_beside(source, copy),
-            values=lambda row: {
-                parent: copy.id,
-                **{column: getattr(row, column) for column in carried},
-            },
+            values=lambda row: {parent: copy.id},
         )
         return [clone for _, clone in pairs]
 
@@ -629,17 +624,12 @@ TOOL_COPIERS: dict[Tool, ToolCopier] = {
     Tool.counter_group: ToolCopier(
         copies=frozenset({Counter}), contents=_rows_inside(Counter)
     ),
-    Tool.queue: ToolCopier(
-        copies=frozenset({QueueItem}),
-        contents=_rows_inside(QueueItem, "user_id"),
-        # A copy starts its rotation from the top.
-        reset={"is_active": False, "current_round": 1},
-    ),
     Tool.dashboard: ToolCopier(),
     Tool.calendar: ToolCopier(
         copies=frozenset({CalendarEvent}), contents=_calendar_contents
     ),
     Tool.wiki: ToolCopier(copies=frozenset({WikiPage}), contents=_wiki_contents),
+    Tool.contact: ToolCopier(),
     # A copy of a notice is a draft: not published, scheduled or pinned.
     Tool.post: ToolCopier(
         contents=_post_contents,

@@ -222,13 +222,14 @@ async def _erase_in_guild(
 
     ``guild_session`` is a system session routed into ``guild_id``.
     """
+    from app.core.relationships import PERSON, EndpointKind
     from app.models.platform.identity_ref import IdentityEntity
     from app.models.tenant.calendar_event import CalendarEventAttendee
     from app.models.tenant.custom_role import CustomRoleMember
     from app.models.tenant.metadata import MetadataValue
-    from app.models.tenant.queue import QueueItem
     from app.models.tenant.view_preference import ViewPreference
     from app.models.tenant.webhook_ref import WebhookRef
+    from app.services.tenant import relationships as relationships_service
     from app.services.tenant.mention_parser import anonymize_user_mentions
 
     # Releases their owner grants (content is left unowned) and drops their
@@ -273,8 +274,8 @@ async def _erase_in_guild(
         .where(col(BatchedNotice.actor_id) == user_id)
         .values(actor_id=None)
     )
-    # All per-user DAC grants (project, file, queue, counter group, calendar
-    # event) live in the polymorphic resource_grants table; one delete clears
+    # All per-user DAC grants (project, file, counter group, calendar event)
+    # live in the polymorphic resource_grants table; one delete clears
     # every resource type for this user in the schema.
     await guild_session.exec(
         delete(ResourceGrant).where(ResourceGrant.user_id == user_id)
@@ -291,10 +292,27 @@ async def _erase_in_guild(
     await guild_session.exec(
         delete(TaskAssignee).where(TaskAssignee.user_id == user_id)
     )
-    # Queue items: assigned-to is nullable, so just clear the pointer.
-    await guild_session.exec(
-        update(QueueItem).where(QueueItem.user_id == user_id).values(user_id=None)
-    )
+    # The operations community alone names people from outside it: its votes
+    # for ideas, which go, and the cases they filed, which stay with nobody to
+    # tell about them.
+    # A case or an idea in the trash or archived is frozen; clearing a person
+    # out of it is not an edit of it, and writes it as a purge does.
+    from app.db import gucs
+    from app.db.session import raise_flag
+    from app.models.tenant.intake import IdeaVote, IntakeCase
+    from app.services.tenant.cases import holds_cases
+
+    if await holds_cases(guild_session):
+        await raise_flag(guild_session, gucs.PURGING)
+        await guild_session.exec(
+            delete(IdeaVote).where(col(IdeaVote.user_id) == user_id)
+        )
+        await guild_session.exec(
+            update(IntakeCase)
+            .where(col(IntakeCase.filer_user_id) == user_id)
+            .values(filer_user_id=None)
+        )
+        await raise_flag(guild_session, gucs.PURGING, False)
     await guild_session.exec(
         delete(CalendarEventAttendee).where(CalendarEventAttendee.user_id == user_id)
     )
@@ -304,6 +322,10 @@ async def _erase_in_guild(
         update(MetadataValue)
         .where(MetadataValue.value_user_id == user_id)
         .values(value_user_id=None)
+    )
+    # Every link with them on an end, from either side, tombstones included.
+    await relationships_service.purge_for_entities(
+        guild_session, EndpointKind(PERSON.value), [user_id]
     )
 
 
@@ -593,7 +615,7 @@ async def _erase_personal_rows(session: AsyncSession, *, user_id: int) -> None:
     A hard delete gets all of these from the ``users`` foreign key. Anonymizing
     keeps the row, so the cascade never fires and each one is deleted here.
     Rows that pair this account with somebody else go from both sides: a husk
-    on another person's contacts, ignore list or conversation is a trace of
+    on another person's connections, ignore list or conversation is a trace of
     the account just the same.
     """
     from app.models.platform.announcement import AnnouncementReadReceipt
@@ -1272,11 +1294,6 @@ async def _deployment_rules() -> Values:
 
     async with SystemSessionLocal() as system_session:
         return await rules.platform_values(system_session)
-
-
-async def to_operator_read_one(user: User) -> "OperatorUserRead":
-    """``to_operator_read`` for the routes that return one account."""
-    return (await to_operator_read([user]))[0]
 
 
 #: The age below which somebody may not take part in the parts of the platform

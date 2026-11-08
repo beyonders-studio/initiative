@@ -1,18 +1,17 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
-import { type ProjectRead, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { getReadProjectQueryKey, readProject } from "@/api/generated/projects/projects";
-import {
-  getListTaskStatusesQueryKey,
-  listTaskStatuses,
-} from "@/api/generated/task-statuses/task-statuses";
+import { Tool } from "@/api/generated/initiativeAPI.schemas";
+import { getGetLayoutsQueryOptions } from "@/api/generated/layouts/layouts";
+import { getReadProjectQueryOptions } from "@/api/generated/projects/projects";
+import { getListTaskStatusesQueryOptions } from "@/api/generated/task-statuses/task-statuses";
 import { keptView } from "@/hooks/useListView";
 import { projectViewSpec, resolveProjectView } from "@/hooks/useProjectTaskView";
 import { tasksQuery } from "@/hooks/useTasks";
-import { instanceTarget, listLayouts, toolLayoutsQuery } from "@/hooks/useToolLayouts";
+import { instanceTarget, listLayouts } from "@/hooks/useToolLayouts";
 import { parseListLayout, parsePreset } from "@/lib/filters/layoutSearch";
 import { buildTaskListParams } from "@/lib/filters/taskFilters";
 import { viewPreferencesQuery } from "@/lib/viewPreferences";
+import { ProjectDetailPage } from "@/pages/initiativeTools/projects/ProjectDetailPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/projects/$projectId/"
@@ -37,21 +36,18 @@ export const Route = createFileRoute(
     void (async () => {
       try {
         const [, set, views] = await Promise.all([
-          queryClient.ensureQueryData<ProjectRead>({
-            queryKey: getReadProjectQueryKey(communityId, projectId),
-            queryFn: () => readProject(communityId, projectId),
-            staleTime: 30_000,
-          }),
-          queryClient.ensureQueryData({
-            ...toolLayoutsQuery(communityId, instanceTarget(Tool.project, projectId)),
-            staleTime: 60_000,
-          }),
+          queryClient.ensureQueryData(getReadProjectQueryOptions(communityId, projectId)),
+          queryClient.ensureQueryData(
+            getGetLayoutsQueryOptions(communityId, instanceTarget(Tool.project, projectId), {
+              query: { staleTime: 60_000 },
+            })
+          ),
           queryClient.ensureQueryData(viewPreferencesQuery(communityId)),
-          queryClient.ensureQueryData({
-            queryKey: getListTaskStatusesQueryKey(communityId, projectId),
-            queryFn: () => listTaskStatuses(communityId, projectId),
-            staleTime: 60_000,
-          }),
+          queryClient.ensureQueryData(
+            getListTaskStatusesQueryOptions(communityId, projectId, {
+              query: { staleTime: 60_000 },
+            })
+          ),
         ]);
 
         // Resolve exactly the way the section does, and build the params with the
@@ -76,9 +72,5 @@ export const Route = createFileRoute(
       }
     })();
   },
-  component: lazyRouteComponent(() =>
-    import("@/pages/initiativeTools/projects/ProjectDetailPage").then((m) => ({
-      default: m.ProjectDetailPage,
-    }))
-  ),
+  component: ProjectDetailPage,
 });

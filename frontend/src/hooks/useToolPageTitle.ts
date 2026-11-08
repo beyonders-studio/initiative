@@ -18,7 +18,7 @@ import { toolInPath } from "@/lib/tools";
 export const useToolPageTitle = () => {
   const { t } = useTranslation("common");
   const communityId = useActiveCommunityId();
-  const { pathname } = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
   const found = toolInPath(pathname);
   // A query is always asked, so the hook order holds; with no tool in the path
   // it is disabled and names nothing.

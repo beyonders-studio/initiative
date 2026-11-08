@@ -1,7 +1,6 @@
 {
   "addProject": "Add Project",
   "loading": "Loading projects…",
-  "loadError": "Unable to load projects.",
   "error": "Something went wrong",
   "noProjects": "No projects yet",
   "noProjectsDescription": "A project holds tasks and tracks them on a board or in a table until they are done.",
@@ -89,12 +88,15 @@
     "loadingRecent": "Loading recent items…",
     "closeItem": "Close {{name}}",
     "closeOthers": "Close others",
-    "closeAll": "Close all"
+    "closeAll": "Close all",
+    "closeError": "Couldn't close the tab.",
+    "closeSomeError": "Some tabs couldn't be closed."
   },
   "pin": {
     "pinned": "Pinned project",
     "unpin": "Unpin project",
-    "pin": "Pin project"
+    "pin": "Pin project",
+    "error": "Couldn't pin or unpin the project."
   },
   "taskComposer": {
     "createTask": "Create task"
@@ -117,7 +119,7 @@
     "categoryInProgress": "In Progress",
     "categoryDone": "Done",
     "add": "Add",
-    "existingStatuses": "Existing statuses",
+    "existing": "Existing statuses",
     "saveChanges": "Save changes",
     "categoryColumn": "Category",
     "iconColumn": "Icon",
@@ -125,16 +127,16 @@
     "iconPlaceholder": "Pick an icon",
     "colorPlaceholder": "Pick a color",
     "defaultColumn": "Default",
-    "noStatuses": "No statuses configured yet.",
+    "empty": "No statuses configured yet.",
     "deleteTitle": "Delete status",
-    "deleteStatus": "Delete {{name}}",
+    "deleteNamed": "Delete {{name}}",
     "deleteDescription": "Deleting “{{name}}” moves any tasks in it to another status. Pick where they should land, or leave it to the project’s default.",
     "fallbackLabel": "Move tasks to",
     "chooseFallback": "Choose a status",
     "fallbackAuto": "The project’s default status",
     "onlyStatus": "This is the project’s only status, and a board needs somewhere to put a task.",
     "reorder": "Reorder",
-    "setAsDefault": "Set as default",
+    "makeDefault": "Make {{name}} the default",
     "orderSaved": "Status order saved",
     "reorderError": "Unable to reorder statuses",
     "created": "Task status created",
@@ -146,13 +148,12 @@
     "noChanges": "No changes to save",
     "bulkUpdated": "{{count}} status updated",
     "bulkUpdated_other": "{{count}} statuses updated",
-    "bulkUpdateError": "Failed to update “{{name}}”: {{error}}",
-    "unknownError": "Unknown error"
+    "bulkUpdateError": "Failed to update “{{name}}”: {{error}}"
   },
   "taskTypes": {
     "description": "Types are the kinds of task this project holds, like a bug or an idea. Each has its own icon, color and page. New tasks start as the default type.",
     "noManagePermission": "Only people who can edit this project can change its types.",
-    "existingTypes": "Types",
+    "existing": "Types",
     "saveChanges": "Save changes",
     "addType": "Add type",
     "limitReached": "A project can have up to {{max}} types.",
@@ -161,7 +162,7 @@
     "defaultColumn": "Default",
     "iconPlaceholder": "Pick an icon",
     "colorPlaceholder": "Pick a color",
-    "noTypes": "No types yet.",
+    "empty": "No types yet.",
     "pagesOnWiderScreen": "A type's page is edited on a wider screen. Open this page on a tablet or a computer.",
     "addTitle": "Add a type",
     "addDescription": "Pick a ready-made type, start blank, or copy one this project has.",
@@ -171,7 +172,7 @@
     "startFromHint": "The new type starts with this type's icon, color and page. You can change them afterwards.",
     "add": "Add",
     "deleteTitle": "Delete type",
-    "deleteType": "Delete {{name}}",
+    "deleteNamed": "Delete {{name}}",
     "deleteDescription": "Deleting “{{name}}” also deletes its page. Its tasks are kept and become the type you pick.",
     "fallbackLabel": "Move its tasks to",
     "onlyType": "This is the project's only type, and every task needs one.",
@@ -404,7 +405,8 @@
     "updated": "Updated {{date}}",
     "tasksDone": "{{completed}}/{{total}} done",
     "archivedOn": "Archived {{date}}",
-    "reorder": "Reorder project"
+    "reorder": "Reorder project",
+    "reorderError": "Couldn't move the project."
   },
   "presets": {
     "label": "Presets",

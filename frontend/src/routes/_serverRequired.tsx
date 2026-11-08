@@ -7,7 +7,7 @@ import { useNativeUpdate } from "@/hooks/useNativeUpdate";
 import { useServer } from "@/hooks/useServer";
 
 const FullScreenLoader = () => (
-  <div className="flex min-h-screen items-center justify-center">
+  <div className="flex min-h-app items-center justify-center">
     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
   </div>
 );
@@ -35,7 +35,7 @@ export const Route = createFileRoute("/_serverRequired")({
 
 function ServerRequiredLayout() {
   const { loading, isNativePlatform, isServerConfigured } = useServer();
-  const { pathname } = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
   // OTA live updates (native only). Mounted here — once a server is configured but before
   // auth is required — so a fresh install can update its web bundle even from the login screen.
   const {

@@ -1,13 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
-
 import {
   getReadDashboardQueryKey,
-  getReadInstalledListingsQueryKey,
-  getReadWidgetCatalogQueryKey,
-  readInstalledListings,
-  readWidgetCatalog,
   setViewMode,
   upgradeDashboard,
+  useReadInstalledListings,
+  useReadWidgetCatalog,
 } from "@/api/generated/dashboards/dashboards";
 import type {
   DashboardInstalledListings,
@@ -29,7 +25,6 @@ import type { QueryOpts } from "@/types/query";
 // each one reads and the invalidation each one fires.
 
 const dashboards = TOOL_HOOKS[Tool.dashboard];
-export const useDashboardsList = dashboards.useList;
 export const useDashboard = dashboards.useDetail;
 export const useCreateDashboard = dashboards.useCreate;
 export const useUpdateDashboard = dashboards.useUpdate;
@@ -49,11 +44,8 @@ export const useSetDashboardGrants = dashboards.useSetGrants;
  */
 export const useWidgetCatalog = (options?: QueryOpts<WidgetCatalog>) => {
   const communityId = useActiveCommunityId();
-  return useQuery<WidgetCatalog>({
-    queryKey: getReadWidgetCatalogQueryKey(communityId),
-    queryFn: () => readWidgetCatalog(communityId),
-    staleTime: Number.POSITIVE_INFINITY,
-    ...options,
+  return useReadWidgetCatalog(communityId, {
+    query: { staleTime: Number.POSITIVE_INFINITY, ...options },
   });
 };
 
@@ -66,11 +58,7 @@ export const useWidgetCatalog = (options?: QueryOpts<WidgetCatalog>) => {
  */
 export const useInstalledListings = (options?: QueryOpts<DashboardInstalledListings>) => {
   const communityId = useActiveCommunityId();
-  return useQuery<DashboardInstalledListings>({
-    queryKey: getReadInstalledListingsQueryKey(communityId),
-    queryFn: () => readInstalledListings(communityId),
-    ...options,
-  });
+  return useReadInstalledListings(communityId, { query: options });
 };
 
 // ── Mutations ───────────────────────────────────────────────────────────────

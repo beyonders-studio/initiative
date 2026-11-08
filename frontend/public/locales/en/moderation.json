@@ -43,8 +43,6 @@
     "task": "A task",
     "file": "A file",
     "project": "A project",
-    "queue": "A queue",
-    "queue_item": "A queue item",
     "calendar": "A calendar",
     "calendar_event": "An event",
     "counter": "A counter",
@@ -52,12 +50,8 @@
     "dashboard": "A dashboard",
     "wiki": "A wiki",
     "wiki_page": "A wiki page",
+    "contact": "A contact",
     "collection": "A collection"
-  },
-  "paging": {
-    "newer": "Newer",
-    "older": "Older",
-    "page": "Page {{page}}"
   },
   "report": {
     "action": "Report",
@@ -98,7 +92,6 @@
     "roles_one": "{{count}} role",
     "roles_other": "{{count}} roles"
   },
-  "loadFailed": "Could not load that. Try again.",
   "hold": {
     "title": "Hold for the platform",
     "description": "The platform keeps this exactly as it is. Nobody in this community can see, change or delete it until the platform releases it.",

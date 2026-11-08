@@ -10,23 +10,24 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { NeedAccessOr } from "@/components/access/RequestAccess";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
+import { isWideFile, ReadOnlyFileBody } from "@/components/files/detail/ReadOnlyFileBody";
 import { WikiChrome } from "@/components/initiativeTools/wikis/WikiChrome";
-import { isWideFile, WikiFileBody } from "@/components/initiativeTools/wikis/WikiFileBody";
 import {
   WikiConnectionsSheet,
   WikiPageConnections,
 } from "@/components/initiativeTools/wikis/WikiPageConnections";
 import { WikiPageNav } from "@/components/initiativeTools/wikis/WikiPageNav";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useFile } from "@/hooks/useFiles";
-import { atLeast, useRegionWidthClass } from "@/hooks/useWidthClass";
 import { useWiki } from "@/hooks/useWikis";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolDetailRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Card, CardHeader, CardTitle } from "@/ui/card";
+import { atLeast, useRegionWidthClass } from "@/ui/lib/useWidthClass";
+import { cn } from "@/ui/lib/utils";
+import { EditorSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
+import { Skeleton } from "@/ui/skeleton";
 
 /**
  * A file, read as a page of the wiki it was put in.
@@ -104,7 +105,11 @@ export const WikiFileView = () => {
   }
 
   if (!wiki) {
-    return <p className="p-6 text-muted-foreground text-sm">{t("pages.loading")}</p>;
+    return (
+      <SkeletonRegion className="p-6">
+        <EditorSkeleton />
+      </SkeletonRegion>
+    );
   }
 
   // Prose keeps the wiki's reading width; a file, a canvas or a grid needs
@@ -157,7 +162,15 @@ export const WikiFileView = () => {
                   body waits for this visit's own fetch. */}
               {file && fileQuery.isFetchedAfterMount ? (
                 <>
-                  <WikiFileBody file={file} />
+                  <ReadOnlyFileBody
+                    file={file}
+                    // Prose runs on in the wiki's own column rather than in a card.
+                    className={
+                      isWideFile(file)
+                        ? undefined
+                        : "max-h-none rounded-none border-0 bg-transparent shadow-none"
+                    }
+                  />
                   {/* A borrowed file is a page of this wiki while you are
                       reading it here, so it leads on like one. */}
                   <WikiPageNav

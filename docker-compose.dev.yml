@@ -1,0 +1,24 @@
+# The dev database that scripts/dev-pre-launch.sh and the editor launch
+# configurations start (scripts/dev-ports.sh picks this file). A root
+# docker-compose.yml, which is gitignored, takes its place when a checkout has
+# one. For running Initiative itself, see docker-compose.example.yml.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-initiative}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-initiative}
+      POSTGRES_DB: ${POSTGRES_DB:-initiative}
+    # The port backend/.env's DATABASE_URL names (scripts/dev-ports.sh).
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  postgres_data:

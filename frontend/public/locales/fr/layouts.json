@@ -217,22 +217,6 @@
   "search": "Rechercher",
   "noMatches": "Aucun résultat.",
   "sectionHelp": "Avec un titre, elle s'ouvre et se ferme ; sans titre, c'est une boîte.",
-  "queueItemDetail": {
-    "name": "Détail de l'élément de file",
-    "help": "Comment chaque élément de cette file s'affiche quand on l'ouvre. Ce qu'il laisse de côté est masqué.",
-    "shipped": "Voici la mise en page d'origine. La modifier en fait celle de la file.",
-    "titleHelp": "Chaque élément affiche son libellé.",
-    "hiddenHelp": "Chaque élément peut afficher ceci. Retiré, il est masqué, et Ajouter le remet.",
-    "parts": {
-      "actions": "Menu",
-      "relations": "Relations"
-    },
-    "partHelp": {
-      "actions": "Ce qu'on peut faire d'autre avec l'élément : signaler, dupliquer et retirer.",
-      "relations": "Ce à quoi l'élément est lié."
-    },
-    "noItems": "Ajoutez un élément à la file pour voir sa mise en page ici."
-  },
   "tab": "Mises en page",
   "settingsDescription": "Comment il dispose ce qu'il contient : chaque mise en page, sa dernière modification et l'accès à l'éditeur. Tous ceux qui peuvent l'ouvrir les voient ; ce que chacun filtre et trie lui appartient.",
   "counterDetail": {
@@ -294,6 +278,12 @@
     "number": "Un nombre",
     "stars": "Des étoiles",
     "bar": "Une barre"
+  },
+  "counterDisplay": {
+    "label": "Afficher le compteur comme",
+    "number": "Un nombre",
+    "bar": "Une barre",
+    "clock": "Une horloge"
   },
   "fieldProperty": {
     "metadata": "Métadonnée",

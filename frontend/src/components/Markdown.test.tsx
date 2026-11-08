@@ -163,7 +163,7 @@ describe("Markdown", () => {
     vi.restoreAllMocks();
   });
 
-  it("scrolls a release's pictures sideways as a strip when there are several", async () => {
+  it("puts a release's pictures on a shelf when there are several", async () => {
     const user = userEvent.setup();
     const { container } = render(
       <Markdown
@@ -181,9 +181,9 @@ describe("Markdown", () => {
     const settings = screen.getByAltText("The task types in settings");
     const board = screen.getByAltText("A board showing each type");
     expect(settings.closest("p")).toBeNull();
-    const strip = settings.closest(".overflow-x-auto");
-    expect(strip).not.toBeNull();
-    expect(strip).toContainElement(board);
+    const shelf = settings.closest('[aria-roledescription="carousel"]');
+    expect(shelf).not.toBeNull();
+    expect(shelf).toContainElement(board);
     expect(container).toHaveTextContent("2");
 
     await user.click(screen.getByRole("button", { name: /A board showing each type/ }));

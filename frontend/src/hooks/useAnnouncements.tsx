@@ -23,14 +23,13 @@ interface UseAnnouncementsResult {
 }
 
 /**
- * Every announcement still standing, dismissed ones included.
- *
- * The queue's opposite: the dialog is a notice you deal with once, and this is
- * where it stays afterwards. A notice given an end date is not here either —
- * expiry retires it, which is the difference between an end date and letting a
- * notice simply be dismissed.
+ * Every announcement still standing, dismissed ones included: what a line in
+ * the notifications opens again. A notice given an end date is not here —
+ * expiry retires it, which is the difference between an end date and letting
+ * a notice simply be dismissed.
  */
-export const useAnnouncementArchive = () => useListAnnouncements({ include_dismissed: true });
+export const useAnnouncementArchive = (enabled: boolean) =>
+  useListAnnouncements({ include_dismissed: true }, { query: { enabled } });
 
 /**
  * The reader's side of announcements: what to show, and what they did with it.
@@ -50,7 +49,7 @@ export const useAnnouncementArchive = () => useListAnnouncements({ include_dismi
  *   a notice that asked for more than one comes back until it has them.
  */
 export const useAnnouncements = (enabled: boolean): UseAnnouncementsResult => {
-  const { pathname } = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
   const { data } = useListAnnouncements(undefined, {
     query: {
       enabled,

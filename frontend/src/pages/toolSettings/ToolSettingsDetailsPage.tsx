@@ -6,7 +6,7 @@
  * itself rather than at a `/settings/details` alias.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { TagSummary } from "@/api/generated/initiativeAPI.schemas";
@@ -14,18 +14,18 @@ import { PropertyTarget, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TagPicker } from "@/components/tags";
 import { useToolSettings } from "@/components/tools/settings/ToolSettingsContext";
 import { ToolTemplateCard } from "@/components/tools/settings/ToolTemplateCard";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { propertySaves } from "@/hooks/useProperties";
 import { useServerForm } from "@/hooks/useServerForm";
 import { useSetToolComments } from "@/hooks/useToolComments";
 import { useSetToolTags } from "@/hooks/useToolTags";
 import { PropertiesField } from "@/lib/layouts/fieldEditors";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Switch } from "@/ui/switch";
+import { Textarea } from "@/ui/textarea";
 
 export const ToolSettingsDetailsPage = () => {
   const { t } = useTranslation(["common", "properties"]);
@@ -48,10 +48,12 @@ export const ToolSettingsDetailsPage = () => {
   const [tags, setTags] = useState<TagSummary[]>(entity.tags ?? []);
   const [commentsEnabled, setCommentsEnabled] = useState(entity.comments_enabled);
 
-  useEffect(() => {
+  const [prevEntity, setPrevEntity] = useState(entity);
+  if (prevEntity !== entity) {
+    setPrevEntity(entity);
     setTags(entity.tags ?? []);
     setCommentsEnabled(entity.comments_enabled);
-  }, [entity]);
+  }
 
   const setToolTags = useSetToolTags(tool);
   const setToolComments = useSetToolComments(tool);
@@ -82,27 +84,23 @@ export const ToolSettingsDetailsPage = () => {
       {update && (
         <Card>
           <CardContent className="space-y-4 pt-6">
-            <div className="space-y-2">
-              <Label htmlFor="tool-settings-name">{t("name")}</Label>
+            <Field label={t("name")}>
               <Input
-                id="tool-settings-name"
                 value={details.values.name}
                 onChange={(e) => details.set({ name: e.target.value })}
                 placeholder={t("toolSettings.namePlaceholder")}
                 disabled={!canManage}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tool-settings-description">{t("description")}</Label>
+            </Field>
+            <Field label={t("description")}>
               <Textarea
-                id="tool-settings-description"
                 value={details.values.description}
                 onChange={(e) => details.set({ description: e.target.value })}
                 placeholder={t("toolSettings.descriptionPlaceholder")}
                 disabled={!canManage}
                 rows={3}
               />
-            </div>
+            </Field>
             {canManage && (
               <Button
                 onClick={handleDetailsSave}
@@ -163,6 +161,7 @@ export const ToolSettingsDetailsPage = () => {
               readOnly={!canManage}
               initiativeId={entity.initiative_id}
               canOpen={{ tool, id: entity.id }}
+              updatedAt={entity.updated_at}
               hideLabel
             />
           </CardContent>

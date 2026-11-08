@@ -31,6 +31,7 @@ from app.db import cohorts
 from app.services.platform.intake import CaseFiler, CaseRefs, open_case
 
 if TYPE_CHECKING:
+    from app.schemas.platform.ticket import DeviceContext
     from app.services.platform.evidence import PreparedEvidence
 
 #: Longest a request's summary and its body may be. The case is a task, whose
@@ -106,6 +107,7 @@ async def request_help(
     subject: str,
     body: str,
     topic: SupportTopic = SupportTopic.community,
+    context: Optional["DeviceContext"] = None,
     evidence: Sequence["PreparedEvidence"] = (),
     now: Optional[datetime] = None,
 ) -> int:
@@ -114,8 +116,9 @@ async def request_help(
     The case names who asked, and for a question about a community which one,
     as the weak refs every case carries, and records them as its filer: their
     subject and their words open the case, said to them, so the conversation
-    starts where they started it. The description is the platform's summary.
-    What they attached is stored with it.
+    starts where they started it. The description is the platform's summary,
+    with the device and page they asked from where they sent it. What they
+    attached is stored with it.
 
     A question about a community is held to what that community lets them
     ask (:func:`community_topics`); a question about themselves is not about
@@ -145,6 +148,7 @@ async def request_help(
         ),
         now=moment,
         filer=CaseFiler(user_id=requester.id, subject=subject, words=body),
+        device=context,
         evidence=evidence,
         topic=topic.value,
     )

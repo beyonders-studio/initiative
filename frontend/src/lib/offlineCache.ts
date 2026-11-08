@@ -126,7 +126,7 @@ const PERSIST_DENYLIST = [
   // device (see `src/crypto/`). They are not duplicated here.
   "/api/v1/me/dm",
   "/api/v1/me/connections",
-  "/api/v1/me/contacts",
+  "/api/v1/me/people",
   "/api/v1/me/ignored",
   "/api/v1/me/message-requests",
   "/dm/",
@@ -201,8 +201,8 @@ export const isPersistablePath = (path: string): boolean => {
 
 /**
  * The dehydrate filter. Only successful reads of allowlisted paths are kept —
- * a cached error is noise, and every hand-written query key (`["dm", …]`,
- * `["contacts", …]`) falls out here because its first element is not a path.
+ * a cached error is noise, and every hand-written query key (`["dm", …]`)
+ * falls out here because its first element is not a path.
  */
 export const shouldPersistQuery = (query: Query): boolean => {
   if (query.state.status !== "success") return false;

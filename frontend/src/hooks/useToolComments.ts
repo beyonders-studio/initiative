@@ -10,7 +10,7 @@ import type { MutationOpts } from "@/types/mutation";
  * list + detail queries so the settings page and the entity's page agree on
  * whether the thread is there.
  *
- * Tasks and queue items are sub-resources, not tools: their threads are part of
+ * Tasks are sub-resources, not tools: their threads are part of
  * their own flow and have no switch.
  */
 export const useSetToolComments = (

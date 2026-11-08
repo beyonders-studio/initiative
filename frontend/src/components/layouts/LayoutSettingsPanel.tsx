@@ -10,23 +10,15 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
-import { SCALE_DISPLAYS, type ScaleDisplay } from "@/components/properties/propertyHelpers";
-import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+  COUNTER_DISPLAYS,
+  type FieldDisplay,
+  SCALE_DISPLAYS,
+} from "@/components/properties/propertyHelpers";
+import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { MAX_COLUMN_LIMIT } from "@/hooks/useColumnLimits";
 import type { MetadataOwner } from "@/hooks/useProperties";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { listFormat } from "@/lib/intl";
 import { LAYOUT_REGIONS } from "@/lib/layouts/detailLayout";
 import {
   cardOf,
@@ -41,6 +33,13 @@ import { type FieldDef, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
 import type { LayoutNode } from "@/lib/layouts/tree";
 import { initiativeRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { listFormat } from "@/ui/lib/intl";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 import type { EditableDetail } from "./details";
 import type { LayoutEdits } from "./LayoutEditor";
@@ -99,10 +98,10 @@ export const ListLayoutSettings = ({
             return node?.type === "field" ? String(node.props?.field) : null;
           })()
         : null;
-  const scale =
-    selectedField !== null && fields.get(selectedField)?.property?.type === MetadataType.scale
-      ? selectedField
-      : null;
+  // A scale or a counter selected, which the list may draw in more than one way.
+  const drawnType = selectedField !== null ? fields.get(selectedField)?.property?.type : undefined;
+  const drawn =
+    drawnType === MetadataType.scale || drawnType === MetadataType.counter ? drawnType : null;
   return (
     // Disabled as one, so a save under way leaves every control as it was.
     <fieldset disabled={locked} className="min-w-0">
@@ -159,10 +158,11 @@ export const ListLayoutSettings = ({
           edits={edits}
         />
       )}
-      {scale !== null ? (
-        <ScaleDisplaySetting
-          value={layout.definition.displays?.[scale] ?? "number"}
-          onChange={(display) => edits.changeDisplay(scale, display)}
+      {selectedField !== null && drawn !== null ? (
+        <DisplaySetting
+          type={drawn}
+          value={layout.definition.displays?.[selectedField] ?? "number"}
+          onChange={(display) => edits.changeDisplay(selectedField, display)}
         />
       ) : null}
       {selectedField !== null ? <MetadataFieldNote field={selectedField} fields={fields} /> : null}
@@ -198,31 +198,46 @@ const MetadataFieldNote = ({
   );
 };
 
-/** How the list draws the scale selected: a number, five stars, or a bar. */
-const ScaleDisplaySetting = ({
+/** How the list draws the scale or counter selected: a scale as a number,
+ *  five stars or a bar; a counter as a number, a bar or a clock. */
+const DisplaySetting = ({
+  type,
   value,
   onChange,
 }: {
-  value: ScaleDisplay;
-  onChange: (display: ScaleDisplay) => void;
+  type: typeof MetadataType.scale | typeof MetadataType.counter;
+  value: FieldDisplay;
+  onChange: (display: FieldDisplay) => void;
 }) => {
   const { t } = useTranslation(["layouts"]);
+  const [label, offered] =
+    type === MetadataType.scale
+      ? [
+          t("layouts:scaleDisplay.label"),
+          SCALE_DISPLAYS.map((display) => [display, t(`layouts:scaleDisplay.${display}`)]),
+        ]
+      : [
+          t("layouts:counterDisplay.label"),
+          COUNTER_DISPLAYS.map((display) => [display, t(`layouts:counterDisplay.${display}`)]),
+        ];
   return (
-    <div className="space-y-2 px-4 pb-4">
-      <Label htmlFor="scale-display">{t("layouts:scaleDisplay.label")}</Label>
-      <Select value={value} onValueChange={(next) => onChange(next as ScaleDisplay)}>
-        <SelectTrigger id="scale-display">
+    <Field label={label} className="px-4 pb-4">
+      <Select
+        value={offered.some(([display]) => display === value) ? value : "number"}
+        onValueChange={(next) => onChange(next as FieldDisplay)}
+      >
+        <SelectTrigger>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {SCALE_DISPLAYS.map((display) => (
+          {offered.map(([display, name]) => (
             <SelectItem key={display} value={display}>
-              {t(`layouts:scaleDisplay.${display}`)}
+              {name}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
-    </div>
+    </Field>
   );
 };
 
@@ -546,13 +561,12 @@ const GroupSettings = ({
   );
   return (
     <Panel heading={t("layouts:group")}>
-      <div className="space-y-2">
-        <Label htmlFor="group-direction">{t("layouts:arrange")}</Label>
+      <Field label={t("layouts:arrange")}>
         <Select
           value={props.direction === "row" ? "row" : "column"}
           onValueChange={(direction) => set("direction", direction === "row" ? "row" : undefined)}
         >
-          <SelectTrigger id="group-direction">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -560,14 +574,13 @@ const GroupSettings = ({
             <SelectItem value="row">{t("layouts:sideBySide")}</SelectItem>
           </SelectContent>
         </Select>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="group-gap">{t("layouts:spacing")}</Label>
+      </Field>
+      <Field label={t("layouts:spacing")}>
         <Select
           value={props.gap === "sm" ? "sm" : "xs"}
           onValueChange={(gap) => set("gap", gap === "sm" ? "sm" : undefined)}
         >
-          <SelectTrigger id="group-gap">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -575,7 +588,7 @@ const GroupSettings = ({
             <SelectItem value="sm">{t("layouts:roomy")}</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </Field>
       {props.direction === "row" ? flag("wrap", true, t("layouts:wrap")) : null}
       {flag("align", "start", t("layouts:ownWidth"))}
       {flag("tone", "muted", t("layouts:muted"))}
@@ -606,10 +619,8 @@ const SectionSettings = ({
     // Titled, it is an accordion that opens and closes; untitled, a box.
     <Panel heading={t(title ? "layouts:blocks.accordion" : "layouts:blocks.box")}>
       <p className="text-muted-foreground text-sm">{t("layouts:sectionHelp")}</p>
-      <div className="space-y-2">
-        <Label htmlFor="section-title">{t("layouts:sectionTitle")}</Label>
+      <Field label={t("layouts:sectionTitle")}>
         <CommittedInput
-          id="section-title"
           value={title}
           // An accordion just added is named by typing over its title.
           selectOn={title === t("layouts:blocks.accordion") ? node : undefined}
@@ -624,7 +635,7 @@ const SectionSettings = ({
             });
           }}
         />
-      </div>
+      </Field>
       <div className="flex items-center justify-between gap-2">
         <Label htmlFor="section-collapsed">{t("layouts:startFolded")}</Label>
         <Switch
@@ -651,7 +662,7 @@ const CommittedInput = ({
   selectOn,
   onCommit,
 }: {
-  id: string;
+  id?: string;
   value: string;
   optional?: boolean;
   /** It takes a whole number. */

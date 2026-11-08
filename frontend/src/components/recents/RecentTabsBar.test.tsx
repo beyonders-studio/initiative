@@ -8,7 +8,6 @@ import {
   buildRecentFileItem,
   buildRecentItem,
   buildRecentProjectItem,
-  buildRecentQueueItem,
 } from "@/__tests__/factories/recent.factory";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 
@@ -43,7 +42,6 @@ describe("RecentTabsBar", () => {
     const items = [
       buildRecentProjectItem({ name: "Lost Mines", icon: "⚒️" }),
       buildRecentFileItem({ name: "Session Notes" }),
-      buildRecentQueueItem({ name: "Combat" }),
       buildRecentCounterGroupItem({ name: "HP Trackers" }),
     ];
     renderWithProviders(
@@ -57,7 +55,6 @@ describe("RecentTabsBar", () => {
 
     expect(screen.getByText("Lost Mines")).toBeInTheDocument();
     expect(screen.getByText("Session Notes")).toBeInTheDocument();
-    expect(screen.getByText("Combat")).toBeInTheDocument();
     expect(screen.getByText("HP Trackers")).toBeInTheDocument();
     // Project emoji icon should be rendered alongside the name.
     expect(screen.getByText("⚒️")).toBeInTheDocument();
@@ -67,7 +64,6 @@ describe("RecentTabsBar", () => {
     const items = [
       buildRecentProjectItem({ entity_id: 11, name: "ProjectX" }),
       buildRecentFileItem({ entity_id: 22, name: "DocY" }),
-      buildRecentQueueItem({ entity_id: 33, name: "QueueZ" }),
       buildRecentCounterGroupItem({ entity_id: 44, name: "GroupW" }),
     ];
     renderWithProviders(
@@ -84,10 +80,6 @@ describe("RecentTabsBar", () => {
       "/c/1/i/5/projects/11"
     );
     expect(screen.getByRole("link", { name: /DocY/ })).toHaveAttribute("href", "/c/1/i/5/files/22");
-    expect(screen.getByRole("link", { name: /QueueZ/ })).toHaveAttribute(
-      "href",
-      "/c/1/i/5/queues/33"
-    );
     expect(screen.getByRole("link", { name: /GroupW/ })).toHaveAttribute(
       "href",
       "/c/1/i/5/counter-groups/44"
@@ -121,10 +113,10 @@ describe("RecentTabsBar", () => {
 
   it("dispatches onClose with the item when the X is clicked", async () => {
     const onClose = vi.fn();
-    const queue = buildRecentQueueItem({ entity_id: 7, name: "Combat" });
+    const group = buildRecentCounterGroupItem({ entity_id: 7, name: "Combat" });
     renderWithProviders(
       <RecentTabsBar
-        items={[queue]}
+        items={[group]}
         onClose={onClose}
         onCloseOthers={() => {}}
         onCloseAll={() => {}}
@@ -135,7 +127,7 @@ describe("RecentTabsBar", () => {
     await userEvent.click(closeButton);
 
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(onClose).toHaveBeenCalledWith(queue);
+    expect(onClose).toHaveBeenCalledWith(group);
   });
 
   it("dispatches close / close others / close all from the right-click menu", async () => {

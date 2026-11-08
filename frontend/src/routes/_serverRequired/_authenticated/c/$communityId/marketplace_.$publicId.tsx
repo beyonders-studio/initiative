@@ -1,7 +1,8 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 import type { ListingKind } from "@/api/generated/initiativeAPI.schemas";
 import { parseListingKind } from "@/lib/marketplace";
+import { MarketplaceListingPage } from "@/pages/marketplace/MarketplaceListingPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/marketplace_/$publicId"
@@ -11,9 +12,5 @@ export const Route = createFileRoute(
     const kind = parseListingKind(search.kind);
     return kind ? { kind } : {};
   },
-  component: lazyRouteComponent(() =>
-    import("@/pages/marketplace/MarketplaceListingPage").then((m) => ({
-      default: m.MarketplaceListingPage,
-    }))
-  ),
+  component: MarketplaceListingPage,
 });

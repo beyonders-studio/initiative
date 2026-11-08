@@ -21,6 +21,9 @@
     "user_reference": "Person",
     "currency": "Money",
     "scale": "Scale",
+    "counter": "Counter",
+    "file": "File",
+    "signature": "Signature",
     "link": "Link",
     "badge": "Badge",
     "json": "Data"
@@ -59,11 +62,23 @@
     "optionAddFailed": "Could not add option",
     "scalePlaceholder": "0–100",
     "stars_one": "{{count}} star",
-    "stars_other": "{{count}} stars"
+    "stars_other": "{{count}} stars",
+    "stepDown": "Step {{name}} down",
+    "stepUp": "Step {{name}} up",
+    "reset": "Reset {{name}}",
+    "newFile": "New file",
+    "fileUnavailable": "A file you can't open",
+    "sign": "Sign",
+    "signTitle": "Sign {{name}}",
+    "signStatement": "Typing your name and signing adds your signature to this item as it is now. It's recorded under your account.",
+    "signNameLabel": "Your name",
+    "signingAs": "Signing as {{name}}"
   },
   "cell": {
     "emptyValue": "—",
-    "none": "None"
+    "none": "None",
+    "signed": "{{name}}, {{date}}",
+    "updatedAfterSigning": "Updated after signing"
   },
   "manager": {
     "title": "Metadata",
@@ -132,5 +147,17 @@
     "label": "Currency",
     "none": "No currency matches",
     "default": "USD"
+  },
+  "counter": {
+    "step": "Step",
+    "min": "Minimum",
+    "max": "Maximum",
+    "initial": "Initial value",
+    "stepPlaceholder": "1",
+    "minPlaceholder": "None",
+    "maxPlaceholder": "None",
+    "initialPlaceholder": "0",
+    "stepPositive": "The step has to be more than zero",
+    "minAboveMax": "The minimum can't be more than the maximum"
   }
 }

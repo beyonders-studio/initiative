@@ -21,7 +21,7 @@
  * a token you could then use as them.
  */
 
-import { Loader2, ShieldOff, UserX } from "lucide-react";
+import { ShieldOff, UserX } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -32,18 +32,6 @@ import {
   ConsentAccess,
   ConsentStatus,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   useBlockMemberConnection,
   useCommunityPluginMembers,
@@ -58,6 +46,12 @@ import { formatDate } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import { localized } from "@/lib/widgets/widgetMeta";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { PaginationBar } from "@/ui/pagination-bar";
+import { Skeleton } from "@/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
 
 export interface PluginMembersPanelProps {
   pluginId: number;
@@ -90,7 +84,6 @@ export function PluginMembersPanel({ pluginId, enabled }: PluginMembersPanelProp
   const consentSummary = membersQuery.data?.consent_summary;
   const totalCount = membersQuery.data?.total_count ?? 0;
   const pageSize = membersQuery.data?.page_size ?? 1;
-  const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
   // The server's page, which falls back to the first when this one emptied.
   const current = membersQuery.data?.page ?? page;
 
@@ -129,29 +122,13 @@ export function PluginMembersPanel({ pluginId, enabled }: PluginMembersPanelProp
         />
       )}
 
-      {pageCount > 1 && (
-        <div className="flex items-center justify-end gap-2">
-          <span className="text-muted-foreground text-sm">
-            {t("common:pageOf", { current, total: pageCount })}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage(current - 1)}
-            disabled={!membersQuery.data?.has_prev}
-          >
-            {t("common:previous")}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage(current + 1)}
-            disabled={!membersQuery.data?.has_next}
-          >
-            {t("common:next")}
-          </Button>
-        </div>
-      )}
+      <PaginationBar
+        page={current}
+        pageSize={pageSize}
+        totalCount={totalCount}
+        hasNext={Boolean(membersQuery.data?.has_next)}
+        onPageChange={setPage}
+      />
 
       {summary.length > 0 && (
         <div>
@@ -159,9 +136,8 @@ export function PluginMembersPanel({ pluginId, enabled }: PluginMembersPanelProp
             size="sm"
             variant="destructive"
             onClick={() => setConfirmingRevokeAll(true)}
-            disabled={revokeAll.isPending}
+            pending={revokeAll.isPending}
           >
-            {revokeAll.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {t("plugins:members.revokeAll")}
           </Button>
         </div>
@@ -307,10 +283,9 @@ function MemberConsents({
         <Button
           size="sm"
           variant="destructive"
-          disabled={revokeAll.isPending}
+          pending={revokeAll.isPending}
           onClick={() => setConfirming(true)}
         >
-          {revokeAll.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           {t("plugins:consent.revokeAll")}
         </Button>
       )}

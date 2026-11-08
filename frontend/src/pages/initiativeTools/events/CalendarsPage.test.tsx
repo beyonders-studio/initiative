@@ -17,7 +17,7 @@ import { createTestQueryClient, renderPage } from "@/__tests__/helpers/render";
 import { keepViewPreferences } from "@/__tests__/helpers/viewPreferences";
 import type { FilterCondition, FilterGroup } from "@/api/generated/initiativeAPI.schemas";
 import { CALENDAR_VIEW_MODE_KEY } from "@/components/calendar";
-import { dateRangeParams } from "@/components/ui/date-range-field";
+import { dateRangeParams } from "@/components/calendar/visibleRange";
 import { VIEW_PREFERENCES_QUERY_KEY } from "@/hooks/useViewPreference";
 import { viewPreferencesQueryKey } from "@/lib/viewPreferences";
 

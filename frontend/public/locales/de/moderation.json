@@ -43,8 +43,6 @@
     "task": "Eine Aufgabe",
     "file": "Eine Datei",
     "project": "Ein Projekt",
-    "queue": "Eine Warteschlange",
-    "queue_item": "Ein Eintrag",
     "calendar": "Ein Kalender",
     "calendar_event": "Ein Termin",
     "counter": "Ein Zähler",
@@ -52,12 +50,8 @@
     "dashboard": "Ein Dashboard",
     "wiki": "Ein Wiki",
     "wiki_page": "Eine Wiki-Seite",
+    "contact": "Ein Kontakt",
     "collection": "Eine Sammlung"
-  },
-  "paging": {
-    "newer": "Neuer",
-    "older": "Älter",
-    "page": "Seite {{page}}"
   },
   "report": {
     "action": "Melden",
@@ -98,7 +92,6 @@
     "roles_one": "{{count}} Rolle",
     "roles_other": "{{count}} Rollen"
   },
-  "loadFailed": "Das konnte nicht geladen werden. Versuche es erneut.",
   "hold": {
     "title": "Für die Plattform zurückhalten",
     "description": "Die Plattform bewahrt dies genau so auf, wie es ist. Niemand in dieser Community kann es sehen, ändern oder löschen, bis die Plattform es freigibt.",

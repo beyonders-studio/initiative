@@ -3,7 +3,7 @@ import type { MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useToggleProjectPin } from "@/hooks/useProjects";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 interface PinProjectButtonProps {
   projectId: number;

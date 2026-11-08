@@ -80,6 +80,9 @@ class LockNamespace(IntEnum):
     QUERY_SLOT = _tag(b"QUER")
     #: One intake key in a guild, keyed by guild, stream and key.
     INTAKE_CASE = _tag(b"INTK")
+    #: Making the operations tables follow the deployment's choice of
+    #: operations community. One for the deployment.
+    OPERATIONS_CHOICE = _tag(b"OPSC")
     #: One moderation report target, keyed by guild, initiative and target.
     MODERATION_REPORT = _tag(b"MODR")
     #: One comment thread, keyed by guild, table and row: locking it and

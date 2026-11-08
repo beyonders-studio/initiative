@@ -13,12 +13,11 @@ import { useTranslation } from "react-i18next";
 
 import { DeleteInitiativeDialog } from "@/components/initiatives/DeleteInitiativeDialog";
 import { InitiativeSettingsDangerTab } from "@/components/initiatives/settings/InitiativeSettingsDangerTab";
-import { InitiativeSettingsPermissionRequired } from "@/components/initiatives/settings/InitiativeSettingsGuard";
+import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { useArchiveEntity, useUnarchiveEntity } from "@/hooks/useArchive";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
 import { useDeleteInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 
 export const InitiativeSettingsDangerPage = () => {
@@ -38,13 +37,10 @@ export const InitiativeSettingsDangerPage = () => {
       toast.success(t("settings.deleted"));
       router.navigate({ to: gp("/") });
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "initiatives:settings.deleteError"));
-    },
   });
 
   if (!canManageMembers && !canDeleteInitiative) {
-    return <InitiativeSettingsPermissionRequired />;
+    return <SettingsPermissionRequired scope="initiative" />;
   }
 
   if (!initiative) {

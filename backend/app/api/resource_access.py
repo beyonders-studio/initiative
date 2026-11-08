@@ -42,7 +42,6 @@ from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.counter import Counter
 from app.models.tenant.collection import Collection
 from app.models.tenant.initiative import Initiative, PermissionKey
-from app.models.tenant.queue import QueueItem
 from app.models.tenant.wiki import WikiPage
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.task import Task
@@ -56,6 +55,7 @@ from app.services import reachability
 from app.services.tenant import ownership as ownership_service
 from app.services.tenant import calendar_events as events_service
 from app.services.tenant import calendars as calendars_service
+from app.services.tenant import contacts as contacts_service
 from app.services.tenant import counters as counters_service
 from app.services.tenant import dashboards as dashboards_service
 from app.services.tenant import files as files_service
@@ -65,7 +65,6 @@ from app.services.tenant import wikis as wikis_service
 from app.services.tenant import posts as posts_service
 from app.services.tenant import named_people
 from app.services.tenant import project_grants
-from app.services.tenant import queues as queues_service
 from app.services.tenant import task_queries
 from app.services.tenant.initiative_tools import tool_on
 
@@ -122,11 +121,6 @@ RESOURCE_ACCESS: dict[Tool, ResourceAccessConfig] = {
         files_service.get_file_for_grants,
         hydrated_loader=files_service.get_file_hydrated,
     ),
-    Tool.queue: ResourceAccessConfig(
-        Tool.queue,
-        queues_service.get_queue,
-        hydrated_loader=queues_service.get_queue_hydrated,
-    ),
     # Counter group routes name their row ``group_id``.
     Tool.counter_group: ResourceAccessConfig(
         Tool.counter_group, counters_service.get_counter_group, id_param="group_id"
@@ -143,13 +137,12 @@ RESOURCE_ACCESS: dict[Tool, ResourceAccessConfig] = {
         wikis_service.get_wiki,
         hydrated_loader=wikis_service.get_wiki_hydrated,
     ),
+    Tool.contact: ResourceAccessConfig(
+        Tool.contact,
+        contacts_service.get_contact,
+        hydrated_loader=contacts_service.get_contact_hydrated,
+    ),
 }
-
-
-# The tools whose sharing can be set through the unified *local* grant flow
-# (``set_resource_grants`` / the bulk endpoint) — exactly the tools registered
-# above, derived so the two never drift.
-GRANTABLE_KINDS: tuple[Tool, ...] = tuple(RESOURCE_ACCESS)
 
 
 def governing_tool(table: str) -> Tool:
@@ -486,12 +479,6 @@ SUB_TOOLS: dict[type, SubTool] = {
     Task: SubTool(task_queries.load_for_change),
     CalendarEvent: SubTool(events_service.get_event),
     Counter: SubTool(counters_service.get_counter, name="name"),
-    # A copy is not held out of the rotation.
-    QueueItem: SubTool(
-        queues_service.get_queue_item,
-        name="label",
-        copy_resets={"held_at_round": None},
-    ),
     WikiPage: SubTool(
         wikis_service.get_page,
         copy_resets={"yjs_state": None, "yjs_updated_at": None},

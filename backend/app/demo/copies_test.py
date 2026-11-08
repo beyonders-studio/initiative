@@ -86,7 +86,7 @@ async def pitch(demo, client, acting_user, session):
     await create_task(session, a.project, title="Proof the dough", assignees=[bea])
     queued = await client.get(a.g("/exports/community"), headers=a.headers)
     assert queued.status_code == 202, queued.text
-    await export_worker.process_export_jobs()
+    await export_worker.jobs.process()
 
     host = await accounts.demo_host(session)
     a.guild.created_by = host.id
@@ -170,7 +170,7 @@ async def test_a_link_seats_the_visitor_in_its_role(pitch, client, session, role
     token = await link(role)
     copy_id = await copies.build_copy()
     opened, headers, me = await _open(client, token)
-    await import_worker.process_import_jobs()
+    await import_worker.jobs.process()
 
     host = await accounts.demo_host(session)
     roster = await _roster(session, copy_id)
@@ -357,7 +357,7 @@ async def test_making_a_pitch_imports_and_publishes(pitch, session):
         pitch_id = await pitches.make_pitch(
             bundle=bundle, name="Rosie's", editors=["rev#1000"]
         )
-    await export_worker.process_export_jobs()
+    await export_worker.jobs.process()
 
     made = await session.get(Guild, pitch_id)
     assert made is not None and made.name == "Rosie's"
@@ -610,7 +610,7 @@ async def test_a_pitch_admin_publishes_it(pitch, client, session, acting_user):
     assert refused.json()["detail"] == DemoMessages.DEMO_PITCH_ADMIN_REQUIRED
 
     before = (await client.get(editor.g("/demo/pitch"), headers=editor.headers)).json()
-    await export_worker.process_export_jobs()
+    await export_worker.jobs.process()
     after = (await client.get(member.g("/demo/pitch"), headers=member.headers)).json()
     assert before["is_pitch"] and after["is_pitch"]
     assert after["last_published_at"] > before["last_published_at"]
@@ -796,7 +796,7 @@ async def test_a_listed_pitch_from_the_api_and_its_deletion(
     assert set((await session.exec(select(Initiative.join_policy))).all()) == {
         "request"
     }
-    await export_worker.process_export_jobs()
+    await export_worker.jobs.process()
     linked = await client.post(
         _api(ops, "links"),
         json={"pitch_ref": pitch_ref},
@@ -867,7 +867,7 @@ async def test_a_link_from_the_api_reports_its_opening_and_its_leads(
             headers=headers,
         )
     assert made.status_code == 200, made.text
-    await export_worker.process_export_jobs()
+    await export_worker.jobs.process()
     linked = await client.post(
         _api(ops, "links"),
         json={"pitch_ref": made.json()["pitch_ref"]},
@@ -882,7 +882,7 @@ async def test_a_link_from_the_api_reports_its_opening_and_its_leads(
     copy = await client.get("/api/v1/demo/copy", headers=visitor)
     assert copy.json()["community_id"] == opened["community_id"]
     assert copy.json()["ready"] is False
-    await import_worker.process_import_jobs()
+    await import_worker.jobs.process()
     await create_import_job(
         session,
         await session.get(Guild, opened["community_id"]),

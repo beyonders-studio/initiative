@@ -1,9 +1,4 @@
-import {
-  keepPreviousData,
-  useInfiniteQuery,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { keepPreviousData, useQueryClient } from "@tanstack/react-query";
 
 import {
   extendCommunityGuest,
@@ -30,15 +25,13 @@ import {
   exportUsersCsv,
   getListDecorationPacksQueryKey,
   getListMyDecorationsQueryKey,
-  getListRosterQueryKey,
   getListUsersQueryKey,
   installDecorationPack,
-  listRoster,
-  listUsers,
   removeDecorationPack,
   updateMe,
   useListDecorationPacks,
   useListMyDecorations,
+  useListUsers,
   useReadUserCommunities,
   useReadUserProfile,
   useSearchUsers,
@@ -64,39 +57,9 @@ export const useUsers = (
   options?: QueryOpts<UserCommunityMemberListResponse>
 ) => {
   const communityId = useActiveCommunityId();
-  return useQuery<UserCommunityMemberListResponse>({
-    queryKey: getListUsersQueryKey(communityId, params),
-    queryFn: () => listUsers(communityId, params),
+  return useListUsers(communityId, params, {
     // Keep the page on screen while the next one (or the next search) loads.
-    placeholderData: keepPreviousData,
-    ...options,
-  });
-};
-
-/** People per page of the sidebar roster. */
-const ROSTER_PAGE_SIZE = 50;
-
-/**
- * The active community's people roster, grown a page at a time.
- *
- * Presence is read when the page is served and not pushed, so it refetches
- * every minute while it is open. A guest has no roster to read.
- */
-export const useCommunityRoster = () => {
-  const communityId = useActiveCommunityId();
-  const communityWide = Boolean(useCommunities().activeCommunity?.can.community_wide);
-  return useInfiniteQuery({
-    queryKey: getListRosterQueryKey(communityId),
-    queryFn: ({ pageParam }) =>
-      listRoster(communityId, {
-        page: pageParam,
-        page_size: ROSTER_PAGE_SIZE,
-      }),
-    initialPageParam: 1,
-    getNextPageParam: (last) => (last.has_next ? last.page + 1 : undefined),
-    enabled: communityId > 0 && communityWide,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    query: { placeholderData: keepPreviousData, ...options },
   });
 };
 
@@ -122,7 +85,7 @@ export interface UserSearchOptions {
   /** Bounded page size (server caps at 100). */
   pageSize?: number;
   /** Only the people who can open this row: who may be named on what it
-   *  holds (assignees, attendees, person properties, queue items). */
+   *  holds (assignees, attendees, person properties). */
   canOpen?: { tool: Tool; id: number | null | undefined };
   /** Gate the request — pass the picker's `open` state so we don't fetch until
    *  the dropdown is shown. */
@@ -310,7 +273,7 @@ export const useInitiativeMemberSearch = (
  * - `initiative`: one initiative's members (mentions, linked members).
  * - `canOpen`: the people who can open one row, who are the ones that may be
  *   named on what it holds (task assignees, event attendees, person
- *   properties, queue items).
+ *   properties).
  */
 export type MemberSearchScope =
   | { type: "community"; communityIdOverride?: number }
@@ -456,7 +419,7 @@ type SetDisplayNameVars = { communityId: number; userId?: number; displayName: s
 /**
  * What somebody is called in one community — their own, without `userId`, or
  * a member's, by an administrator. The name is drawn wherever the community
- * draws people, so its content, its rosters and the contacts lists refresh
+ * draws people, so its content, its rosters and the people lists refresh
  * along with the community list.
  */
 export const useSetMemberDisplayName = (options?: MutationOpts<void, SetDisplayNameVars>) =>
@@ -469,7 +432,7 @@ export const useSetMemberDisplayName = (options?: MutationOpts<void, SetDisplayN
           : setMemberDisplayName(communityId, userId, body));
       },
       invalidate: () =>
-        invalidate(q.communityContent(), q.communityMembers(), q.contacts(), q.allCommunities()),
+        invalidate(q.communityContent(), q.communityMembers(), q.people(), q.allCommunities()),
     },
     options
   );

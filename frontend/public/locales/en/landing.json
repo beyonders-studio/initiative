@@ -16,7 +16,7 @@
     "titleAria": "Your group has a lot going on. It's time to take the Initiative.",
     "subtitle": "Your group's projects, tasks, files and plans, in one place. Instead of across a group chat, two spreadsheets, an email thread from March, and the head of whoever's been doing this the longest.",
     "freeTitle": "Free to sign up",
-    "freeBody": "Your account and your first community are free, and every paid plan starts with a 14-day free trial.",
+    "freeBody": "Your account and the communities you keep to yourself are free, and every paid plan starts with a 14-day free trial.",
     "signUp": "Sign up",
     "signIn": "Sign in",
     "download": "Download",
@@ -62,12 +62,12 @@
     "note": "Switch on the ones your group needs. Switching one off later deletes nothing.",
     "projects": "Boards, tables and calendars of the same tasks, with confetti if you want it.",
     "files": "Pages, spreadsheets and whiteboards you edit together live.",
-    "queues": "Keep track of whose turn it is, since apparently it's always nobody's.",
     "counterGroups": "Tickets sold, cakes promised, chairs still missing.",
     "calendars": "Events with RSVPs and reminders, so you're not the one reminding everyone.",
     "dashboards": "Your numbers on one screen, and people only see what they have access to.",
     "wikis": "Write down what the group knows, with links that keep working after a rename.",
-    "posts": "Announcements that don't get buried, with polls and read receipts."
+    "posts": "Announcements that don't get buried, with polls and read receipts.",
+    "contacts": "Everyone the work is for or with, one tap from a call, with what's open for each."
   },
   "together": {
     "titleStart": "Built for doing it",
@@ -155,10 +155,6 @@
       "rsvpMaybe": "Maybe",
       "rsvpNo": "Can't",
       "reminder": "Reminder an hour before"
-    },
-    "rota": {
-      "title": "Snack duty",
-      "detail": "Round 6, it's Luis this week"
     },
     "points": {
       "planTitle": "Plan things together",
@@ -384,10 +380,8 @@
     "readMoreAria": "Read the whole post about Initiative {{version}}",
     "older": "Show older posts",
     "back": "All posts",
-    "loading": "Loading…",
     "empty": "Nothing here yet.",
-    "notFound": "Couldn't find that release. It may not have shipped yet.",
-    "error": "Couldn't load what's new. Give it a minute and try again."
+    "notFound": "Couldn't find that release. It may not have shipped yet."
   },
   "meta": {
     "homeTitle": "Initiative: your group has a lot going on, and it's time to take the Initiative",

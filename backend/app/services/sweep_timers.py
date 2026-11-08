@@ -555,11 +555,30 @@ def sweeps() -> tuple[Sweep, ...]:
             kind="evidence",
             scope=Scope.ACTIVE,
             every=hour,
-            visit=evidence.purge_due,
+            visit=evidence.purge_reports_due,
+            next_due=lambda _now: select(
+                func.min(ModerationReport.decided_at) + report_keep
+            ).where(col(ModerationReport.id).in_(select(Evidence.report_id))),
+            sources=(
+                on_row("evidence", "now()"),
+                on_row(
+                    "moderation_reports",
+                    "{row}.decided_at",
+                    after=report_keep,
+                    events="UPDATE OF decided_at",
+                    when="NEW.decided_at IS NOT NULL",
+                ),
+            ),
+        ),
+        Sweep(
+            kind="case_evidence",
+            scope=Scope.OPERATIONS,
+            every=hour,
+            visit=evidence.purge_cases_due,
             # A case's evidence is kept from when its task closes, for its
             # stream's retention: any task closing arms the shortest, which is
             # never later.
-            next_due=lambda _now: least(
+            next_due=lambda _now: (
                 select(
                     func.min(
                         func.least(
@@ -577,10 +596,7 @@ def sweeps() -> tuple[Sweep, ...]:
                 .select_from(IntakeCase)
                 .join(Task, col(Task.id) == IntakeCase.task_id)
                 .join(TaskStatus, col(TaskStatus.id) == Task.task_status_id)
-                .where(col(IntakeCase.task_id).in_(select(Evidence.case_task_id))),
-                select(func.min(ModerationReport.decided_at) + report_keep).where(
-                    col(ModerationReport.id).in_(select(Evidence.report_id))
-                ),
+                .where(col(IntakeCase.task_id).in_(select(Evidence.case_task_id)))
             ),
             sources=(
                 on_row("evidence", "now()"),
@@ -590,13 +606,6 @@ def sweeps() -> tuple[Sweep, ...]:
                     after=shortest_case_keep,
                     events="UPDATE OF completed_at, deleted_at",
                     when="NEW.completed_at IS NOT NULL OR NEW.deleted_at IS NOT NULL",
-                ),
-                on_row(
-                    "moderation_reports",
-                    "{row}.decided_at",
-                    after=report_keep,
-                    events="UPDATE OF decided_at",
-                    when="NEW.decided_at IS NOT NULL",
                 ),
             ),
         ),
@@ -1031,6 +1040,20 @@ async def _claim(now: datetime, *, outward: bool) -> list[Any]:
     return list(rows)
 
 
+async def disarm(guild_id: int, kinds: Iterable[str]) -> None:
+    """Remove the community's timers for ``kinds``, sweeps it no longer
+    runs."""
+    async with cohorts.system_session(None) as session:
+        await set_rls_context(session, Unattributed())
+        await session.exec(
+            text(
+                "DELETE FROM community_timers"
+                " WHERE community_id = :guild_id AND kind = ANY(:kinds)"
+            ).bindparams(guild_id=guild_id, kinds=sorted(kinds))  # type: ignore[call-overload]
+        )
+        await session.commit()
+
+
 async def _delete(ids: set[int]) -> None:
     if not ids:
         return
@@ -1164,12 +1187,19 @@ async def _pending_kinds(guild_id: int) -> set[str]:
 async def reconcile(session: AsyncSession, guild_id: int) -> datetime:
     """Arm every sweep that has work in the community and no timer for it, and
     count each one: a write no source covered. Returns the next reconcile."""
+    from app.db.operations_schema import holds_operations
+    from app.db.schema_provisioning import guild_schema_name
+
     now = datetime.now(timezone.utc)
     pending = await _pending_kinds(guild_id)
+    # The operations community's own sweeps read tables only it has.
+    operations = await holds_operations(session, guild_schema_name(guild_id))
     checked = [
         sweep
         for sweep in sweeps()
-        if sweep.kind != RECONCILE and sweep.due_outside is None
+        if sweep.kind != RECONCILE
+        and sweep.due_outside is None
+        and (operations or sweep.scope is not Scope.OPERATIONS)
     ]
     probe = select(
         *(sweep.next_due(now).scalar_subquery().label(sweep.kind) for sweep in checked)

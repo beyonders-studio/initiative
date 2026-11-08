@@ -14,7 +14,14 @@ import { useTranslation } from "react-i18next";
 
 import type { SecondFactorAnswer } from "@/api/generated/initiativeAPI.schemas";
 import { createPlatformCommunityBillingServiceHandoff } from "@/api/generated/settings/settings";
-import { Button } from "@/components/ui/button";
+import { useBreakGlassRequirements } from "@/hooks/useAccessGrants";
+import { useAppConfig } from "@/hooks/useAppConfig";
+import { getErrorCode, getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import { openExternal, reserveTab } from "@/lib/openExternal";
+import { assertForBreakGlass, describePasskeyPromptError, passkeysRunHere } from "@/lib/passkeys";
+import { classifySecondFactorAnswer } from "@/lib/secondFactorAnswer";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -22,15 +29,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useBreakGlassRequirements } from "@/hooks/useAccessGrants";
-import { useAppConfig } from "@/hooks/useAppConfig";
-import { getErrorCode, getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
-import { assertForBreakGlass, describePasskeyPromptError } from "@/lib/passkeys";
-import { classifySecondFactorAnswer } from "@/lib/secondFactorAnswer";
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 type BillingConsole = "support" | "operator";
 
@@ -56,8 +57,7 @@ export const BillingConsoleButton = ({
     if (!billing) return;
     setOpening(true);
     // Opened inside the click, before the request, so it is not a popup.
-    const tab = window.open("about:blank", "_blank");
-    if (tab) tab.opener = null;
+    const tab = reserveTab();
     try {
       const { handoff_token } = await createPlatformCommunityBillingServiceHandoff(
         community.id,
@@ -71,8 +71,7 @@ export const BillingConsoleButton = ({
       const url = `${billing.url}/${console}?lang=${encodeURIComponent(
         lang
       )}#${console}_handoff=${encodeURIComponent(handoff_token)}`;
-      if (tab) tab.location.href = url;
-      else window.open(url, "_blank", "noopener,noreferrer");
+      openExternal(url, tab);
       setAsking(false);
     } catch (err) {
       tab?.close();
@@ -174,7 +173,7 @@ const SecondFactorDialog = ({
             </p>
           </div>
           <DialogFooter className="flex-wrap gap-2">
-            {hasKey ? (
+            {hasKey && passkeysRunHere() ? (
               <Button
                 type="button"
                 variant="outline"

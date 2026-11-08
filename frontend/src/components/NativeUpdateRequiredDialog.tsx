@@ -3,8 +3,13 @@ import { Download } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { desktopCanUpdate, setAutoUpdateConsent } from "@/lib/desktopUpdates";
+import { androidApkUrl, desktopInstallerUrl, PLAY_STORE_URL, RELEASES_URL } from "@/lib/links";
+import { detectDesktopOs } from "@/pages/landing/platform";
+import AppEnvironment, { PLAY_STORE_INSTALLER } from "@/plugins/appEnvironment";
+import DesktopUpdater from "@/plugins/desktopUpdater";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -12,13 +17,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { desktopCanUpdate, setAutoUpdateConsent } from "@/lib/desktopUpdates";
-import { androidApkUrl, desktopInstallerUrl, PLAY_STORE_URL, RELEASES_URL } from "@/lib/links";
-import { detectDesktopOs } from "@/pages/landing/platform";
-import AppEnvironment, { PLAY_STORE_INSTALLER } from "@/plugins/appEnvironment";
-import DesktopUpdater from "@/plugins/desktopUpdater";
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
 
 interface NativeUpdateRequiredDialogProps {
   open: boolean;

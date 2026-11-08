@@ -10,7 +10,6 @@ import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TOOL_EXPORT_FORMATS } from "@/components/exports/formats";
-import { dateRangeParams } from "@/components/ui/date-range-field";
 import { EMPTY_TASK_FILTERS, taskSpecConditions } from "@/lib/filters/taskFilters";
 
 import { ExportWizard } from "./ExportWizard";
@@ -20,15 +19,16 @@ vi.mock("@/lib/mascotToast", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+import { dateRangeParams } from "@/components/calendar/visibleRange";
 import { downloadBlob } from "@/lib/csv";
 
 const ESTIMATE = {
   tools: {
     project: { count: 3, disabled: false },
     file: { count: 5, disabled: false },
-    queue: { count: 0, disabled: true },
     counter_group: { count: 2, disabled: false },
     calendar: { count: 4, disabled: false },
+    wiki: { count: 0, disabled: true },
   },
   uploads_count: 1,
   uploads_bytes: 2_500_000,
@@ -97,7 +97,7 @@ describe("ExportWizard", () => {
     // with its switch off and locked.
     await screen.findByText("3 items");
     expect(screen.getByText(/not enabled/i)).toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: /queues/i })).toBeDisabled();
+    expect(screen.getByRole("switch", { name: /wikis/i })).toBeDisabled();
     // Uploads footprint from the estimate, human-formatted.
     expect(screen.getByText(/2\.4 MB/)).toBeInTheDocument();
 
@@ -106,9 +106,9 @@ describe("ExportWizard", () => {
     await userEvent.click(screen.getByRole("button", { name: /next/i }));
 
     // The confirm summary matches the payload: the deselected tool AND the
-    // disabled tool (Queues) are absent from the "will export" list.
+    // disabled tool (Wikis) are absent from the "will export" list.
     const summary = screen.getByText(/files ·/i, { selector: "p" });
-    expect(summary.textContent).not.toMatch(/queues/i);
+    expect(summary.textContent).not.toMatch(/wikis/i);
     expect(summary.textContent).not.toMatch(/counters/i);
     expect(summary.textContent).toMatch(/projects/i);
 
@@ -123,7 +123,7 @@ describe("ExportWizard", () => {
       file: true,
       counter_group: false,
       // Disabled tools submit as excluded — matching their locked-off switch.
-      queue: false,
+      wiki: false,
     });
     expect(params.get("formats")).toBeNull();
 
@@ -251,10 +251,7 @@ describe("ExportWizard", () => {
     server.use(
       communityHttp.get("/exports/estimate", ({ request }) => {
         estimates.push(new URL(request.url).searchParams);
-        return HttpResponse.json({
-          ...ESTIMATE,
-          tools: { ...ESTIMATE.tools, queue: { count: 6, disabled: false } },
-        });
+        return HttpResponse.json(ESTIMATE);
       })
     );
     let sent: URL | null = null;
@@ -283,16 +280,9 @@ describe("ExportWizard", () => {
     await user.click(within(projects).getByRole("button", { name: "Filter Projects" }));
     await user.click(within(projects).getByRole("radio", { name: "Active" }));
 
-    // Stopped queues, by the queue list's own status filter.
-    const queues = screen.getByRole("group", { name: "Queues" });
-    await user.click(within(queues).getByRole("button", { name: "Filter Queues" }));
-    await user.click(within(queues).getByRole("combobox", { name: "Status" }));
-    await user.click(await screen.findByRole("option", { name: "Inactive" }));
-
     const expected = {
       calendar: { search: "standup" },
       project: { archived: false },
-      queue: { is_active: false },
     };
     await waitFor(() =>
       expect(JSON.parse(estimates.at(-1)?.get("filters") ?? "null")).toEqual(expected)
@@ -301,7 +291,6 @@ describe("ExportWizard", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("Calendar: “standup”")).toBeInTheDocument();
     expect(screen.getByText("Projects: Active only")).toBeInTheDocument();
-    expect(screen.getByText("Queues: 1 more filter")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /start export/i }));
     await waitFor(() => expect(sent).not.toBeNull());
@@ -368,10 +357,7 @@ describe("ExportWizard", () => {
     server.use(
       communityHttp.get("/exports/estimate", ({ request }) => {
         estimates.push(new URL(request.url).searchParams);
-        return HttpResponse.json({
-          ...ESTIMATE,
-          tools: { ...ESTIMATE.tools, queue: { count: 6, disabled: false } },
-        });
+        return HttpResponse.json(ESTIMATE);
       })
     );
     let sent: URL | null = null;
@@ -575,7 +561,7 @@ describe("ExportWizard", () => {
   it("goes from format to confirm for a tool whose content has no filter", async () => {
     let sent: URLSearchParams | null = null;
     server.use(
-      communityHttp.get("/exports/queue", ({ request }) => {
+      communityHttp.get("/exports/counter_group", ({ request }) => {
         sent = new URL(request.url).searchParams;
         return new HttpResponse("a,b", { headers: { "Content-Type": "text/csv" } });
       })
@@ -588,10 +574,10 @@ describe("ExportWizard", () => {
       <ExportWizard
         scope={{
           kind: "entities",
-          tool: Tool.queue,
+          tool: Tool.counter_group,
           ids: [7],
-          formats: TOOL_EXPORT_FORMATS[Tool.queue] ?? [],
-          filenameStem: "queues",
+          formats: TOOL_EXPORT_FORMATS[Tool.counter_group] ?? [],
+          filenameStem: "counter-groups",
           extraActions: [{ labelKey: "export.formatPng", onSelect: drawPicture }],
         }}
         open

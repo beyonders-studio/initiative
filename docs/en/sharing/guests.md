@@ -83,4 +83,4 @@ A community with its own [sign-in](../security/community-security.md) can ask so
 ## Related
 
 - [Sharing projects & files](sharing-projects-and-files.md) — the Viewer and Editor levels a guest gets.
-- [Working with communities](../guides/communities.md#inviting-people-admins) — inviting members.
+- [Working with communities](../guides/communities.md#inviting-people) — inviting members.

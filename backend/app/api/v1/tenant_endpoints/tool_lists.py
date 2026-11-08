@@ -59,12 +59,12 @@ from app.api.deps import (
 from app.core.plugin_scopes import PluginScopeAccess, scope_name, tool_resource
 from app.api import resource_access
 from app.api.v1.tenant_endpoints import calendars as calendars_endpoints
+from app.api.v1.tenant_endpoints import contacts as contacts_endpoints
 from app.api.v1.tenant_endpoints import counters as counters_endpoints
 from app.api.v1.tenant_endpoints import dashboards as dashboards_endpoints
 from app.api.v1.tenant_endpoints import files as files_endpoints
 from app.api.v1.tenant_endpoints import posts as posts_endpoints
 from app.api.v1.tenant_endpoints import projects as projects_endpoints
-from app.api.v1.tenant_endpoints import queues as queues_endpoints
 from app.api.v1.tenant_endpoints import wikis as wikis_endpoints
 from app.core.messages import QueryMessages
 from app.core.tools import Tool
@@ -72,6 +72,7 @@ from app.db.query import build_paginated_response
 from app.models.platform.user import User
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.collection import Collection, CollectionFile
+from app.models.tenant.contact import Contact
 from app.models.tenant.counter import CounterGroup
 from app.models.tenant.dashboard import Dashboard
 from app.core.file_types import FileKind, FileType
@@ -79,7 +80,6 @@ from app.models.tenant.file import File
 from app.models.tenant.post import Post
 from app.models.tenant.project import Project
 from app.models.tenant.personal_item import PersonalItem
-from app.models.tenant.queue import Queue
 from app.models.tenant.wiki import Wiki
 from app.schemas.tenant.collection import (
     CollectionFileListResponse,
@@ -89,6 +89,12 @@ from app.schemas.tenant.calendar import (
     CalendarListResponse,
     CalendarRead,
     CalendarSummary,
+)
+from app.schemas.tenant.contact import (
+    ContactOrganization,
+    ContactListResponse,
+    ContactRead,
+    ContactSummary,
 )
 from app.schemas.tenant.counter import (
     CounterGroupListResponse,
@@ -112,11 +118,6 @@ from app.schemas.tenant.initiative import (
 from app.schemas.tenant.post import PostListResponse, PostRead
 from app.schemas.tenant.timeline import TimelineResponse
 from app.schemas.tenant.project import ProjectListResponse, ProjectRead
-from app.schemas.tenant.queue import (
-    QueueListResponse,
-    QueueRead,
-    QueueSummary,
-)
 from app.schemas.tenant.wiki import (
     WikiListResponse,
     WikiRead,
@@ -128,12 +129,12 @@ from app.services.tenant import archive as archive_service
 from app.services.tenant import comments as comments_service
 from app.services.tenant import calendars as calendars_service
 from app.services.tenant import collections as collections_service
+from app.services.tenant import contacts as contacts_service
 from app.services.tenant import counters as counters_service
 from app.services.tenant import dashboards as dashboards_service
 from app.services.tenant import files as files_service
 from app.services.tenant import posts as posts_service
 from app.services.tenant import metadata as metadata_service
-from app.services.tenant import queues as queues_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import timeline as timeline_service
 from app.services.tenant import tool_listing
@@ -403,7 +404,7 @@ class ToolListSpec:
     grants_note: Optional[str] = None
     #: async (spec, req) -> the whole WHERE. Defaults to the shared set.
     conditions: Optional[Callable[..., Awaitable[list]]] = None
-    #: Rows belonging to the guild rather than to an initiative (guild calendars).
+    #: Rows belonging to the guild rather than to an initiative (``COMMUNITY_ROWS``).
     guild_level_rows: bool = False
     #: Send a reader whose page has fallen off the end back to the first one.
     clamp_page: bool = False
@@ -456,7 +457,6 @@ async def list_conditions(spec: ToolListSpec, req: ListRequest) -> list:
             req.session,
             spec.tool.value,
             req.values.get("property_filters"),
-            names_people=req.user is not None,
         ),
     ]
 
@@ -618,31 +618,37 @@ _COLLECTION_FILTER = ListParam(
 
 
 # ---------------------------------------------------------------------------
-# Calendars
+# Calendars and contacts, which may belong to the whole community
 # ---------------------------------------------------------------------------
 
 
-async def _calendar_conditions(spec: ToolListSpec, req: ListRequest) -> list:
+async def _community_conditions(spec: ToolListSpec, req: ListRequest) -> list:
+    """The shared set, and ``scope=community``: the rows that belong to the
+    whole community. That is the opposite of the unfiltered list, which is
+    everything in scope, so it is asked for by name rather than inferred from
+    an absent ``initiative_id``."""
     conditions = await _default_conditions(spec, req)
     if req.values.get("scope") == "community":
-        # The opposite of the unfiltered list, which is everything in scope, so
-        # it is asked for by name rather than inferred from an absent
-        # ``initiative_id``.
-        conditions.append(Calendar.initiative_id.is_(None))
+        conditions.append(spec.model.initiative_id.is_(None))
+    return conditions
+
+
+_COMMUNITY_SCOPE = ListParam(
+    "scope", Optional[Literal["community"]], Query(default=None)
+)
+
+
+async def _contact_conditions(spec: ToolListSpec, req: ListRequest) -> list:
+    """The community scope, and people or organizations."""
+    conditions = await _community_conditions(spec, req)
+    if req.values.get("is_organization") is not None:
+        conditions.append(Contact.is_organization.is_(req.values["is_organization"]))
     return conditions
 
 
 # ---------------------------------------------------------------------------
 # Posts
 # ---------------------------------------------------------------------------
-
-
-async def _queue_conditions(spec: ToolListSpec, req: ListRequest) -> list:
-    """The shared set, and whether the queue is running."""
-    conditions = await _default_conditions(spec, req)
-    if req.values.get("is_active") is not None:
-        conditions.append(Queue.is_active.is_(req.values["is_active"]))
-    return conditions
 
 
 async def _post_conditions(spec: ToolListSpec, req: ListRequest) -> list:
@@ -663,6 +669,25 @@ async def _post_conditions(spec: ToolListSpec, req: ListRequest) -> list:
 
 def _post_order(req: ListRequest) -> list:
     return posts_service.board_order(anchored=req.values.get("until") is not None)
+
+
+_contact_summaries = _summaries(ContactSummary)
+
+
+async def _serialize_contacts(spec: ToolListSpec, req: ListRequest, rows: list) -> list:
+    """The ordinary page, with each person's organization read for the page
+    at once."""
+    items = await _contact_summaries(spec, req, rows)
+    organizations = await contacts_service.organizations_of(
+        req.session, (item.id for item in items if not item.is_organization)
+    )
+    for item in items:
+        if (found := organizations.get(item.id)) is not None:
+            org_id, name, initiative_id = found
+            item.organization = ContactOrganization(
+                id=org_id, name=name, initiative_id=initiative_id
+            )
+    return items
 
 
 async def _serialize_posts(spec: ToolListSpec, req: ListRequest, rows: list) -> list:
@@ -798,43 +823,6 @@ TOOL_LISTS: dict[Tool, ToolListSpec] = {
             "list_my_files)."
         ),
     ),
-    Tool.queue: ToolListSpec(
-        tool=Tool.queue,
-        read_model=QueueRead,
-        read_row=queues_endpoints.read_after_write,
-        model=Queue,
-        response_model=QueueListResponse,
-        loader_options=_loads(queues_service.list_loader_options),
-        default_order=_order(Queue.updated_at.desc(), Queue.id.desc()),
-        serialize=_summaries(
-            QueueSummary,
-            preview=lambda session, _guild_id, rows: queues_service.list_previews(
-                session, rows
-            ),
-        ),
-        conditions=_queue_conditions,
-        params=(
-            _initiative_id(),
-            search_param(),
-            sort_by_param(),
-            sort_dir_param(),
-            _tag_ids(Tool.queue),
-            _property_filters(),
-            _archived(),
-            ListParam(
-                "is_active",
-                Optional[bool],
-                Query(
-                    default=None,
-                    description="Only running queues, or only stopped ones.",
-                ),
-            ),
-            _include_preview(),
-            page_param(),
-            page_size_param(20, ge=1, le=100),
-        ),
-        list_doc="List queues visible to the current user (guild admins see all).",
-    ),
     Tool.counter_group: ToolListSpec(
         tool=Tool.counter_group,
         read_model=CounterGroupRead,
@@ -874,13 +862,13 @@ TOOL_LISTS: dict[Tool, ToolListSpec] = {
         loader_options=_loads(calendars_service.calendar_loader_options),
         default_order=_order(Calendar.name.asc(), Calendar.id.asc()),
         serialize=_summaries(CalendarSummary),
-        conditions=_calendar_conditions,
+        conditions=_community_conditions,
         # A calendar may belong to the guild rather than to an initiative: the
         # plug-in holds it, and no initiative's switch has anything to say about it.
         guild_level_rows=True,
         params=(
             _initiative_id(),
-            ListParam("scope", Optional[Literal["community"]], Query(default=None)),
+            _COMMUNITY_SCOPE,
             search_param(),
             sort_by_param(),
             sort_dir_param(),
@@ -1027,6 +1015,52 @@ TOOL_LISTS: dict[Tool, ToolListSpec] = {
             page_size_param(100, ge=0, le=500),
         ),
         list_doc="List wikis visible to the current user (guild admins see all).",
+    ),
+    Tool.contact: ToolListSpec(
+        tool=Tool.contact,
+        read_model=ContactRead,
+        read_row=contacts_endpoints.read_after_write,
+        model=Contact,
+        response_model=ContactListResponse,
+        loader_options=_loads(contacts_service.list_loader_options),
+        default_order=_order(Contact.name.asc(), Contact.id.asc()),
+        serialize=_serialize_contacts,
+        conditions=_contact_conditions,
+        # A contact may belong to the community rather than to an initiative:
+        # the plug-in holds it, as it does a community calendar.
+        guild_level_rows=True,
+        params=(
+            _initiative_id(),
+            _COMMUNITY_SCOPE,
+            search_param(
+                "Full-text match over the contact's name, through the same "
+                "index the search page reads."
+            ),
+            sort_by_param(
+                "Order by one of: name, initiative, updated_at. Omit for by name."
+            ),
+            sort_dir_param(),
+            _tag_ids(Tool.contact),
+            _property_filters(),
+            _archived(),
+            ListParam(
+                "is_organization",
+                Optional[bool],
+                Query(
+                    default=None,
+                    description="Only organizations (true) or only people (false).",
+                ),
+            ),
+            page_param(),
+            page_size_param(100, ge=0, le=500),
+        ),
+        list_doc=(
+            "List contacts visible to the current user (guild admins see all).\n"
+            "\n"
+            "``scope=community`` narrows to the community's own contacts, the "
+            "ones the\n"
+            "community contacts plug-in holds, belonging to no initiative."
+        ),
     ),
 }
 

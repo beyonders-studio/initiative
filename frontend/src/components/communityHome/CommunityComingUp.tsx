@@ -17,16 +17,17 @@ import { useTranslation } from "react-i18next";
 import { type ListCalendarEntriesParams, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { utcDateKey } from "@/components/calendar/eventCalendarEntry";
 import { ToolIconTile } from "@/components/initiatives/ToolSkeletons";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useCalendarEntries } from "@/hooks/useCalendarEntries";
 import { useInitiatives } from "@/hooks/useInitiatives";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { dateTimeFormat } from "@/lib/intl";
-import { formatCompactTime } from "@/lib/timeFormat";
 import { browserTimezone } from "@/lib/timezones";
 import { entityRefRoute, taskRoute, toolDetailRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { formatCompactTime } from "@/ui/lib/timeFormat";
+import { cn } from "@/ui/lib/utils";
+import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 
 const DAYS_AHEAD = 7;
 
@@ -189,7 +190,7 @@ export const CommunityComingUp = () => {
             ))}
           </div>
         ) : entriesQuery.isError ? (
-          <p className="text-destructive text-sm">{t("comingUp.loadError")}</p>
+          <StatusMessage onRetry={entriesQuery.refetch} />
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground text-sm">
             <CalendarClock className="h-8 w-8 opacity-50" />

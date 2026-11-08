@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -29,12 +30,7 @@ import {
   registerUser,
   verifyStepUpCode,
 } from "@/api/generated/auth/auth";
-import type {
-  PasskeySignInResult,
-  Token,
-  UserCreate,
-  UserRead,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { Token, UserCreate, UserRead } from "@/api/generated/initiativeAPI.schemas";
 import { readMe } from "@/api/generated/users/users";
 import { clearAllWhiteboardSceneCaches } from "@/components/files/whiteboardSceneCache";
 import { forgetMessagesOnThisDevice, serveAccount } from "@/crypto/messaging";
@@ -115,9 +111,8 @@ interface AuthContextValue {
   sessionUnverified: boolean;
   login: (payload: LoginPayload) => Promise<void>;
   completeSecondFactor: (payload: SecondFactorPayload) => Promise<void>;
-  applyPasskeySignIn: (result: PasskeySignInResult) => Promise<void>;
-  /** Adopt a session a sign-in route answered with directly: a code sent to
-   *  an address, or a demo link. */
+  /** Adopt a session a sign-in route answered with directly: a passkey, a
+   *  code sent to an address, or a demo link. */
   applySignIn: (token: Token) => Promise<void>;
   stepUpWithFactor: (payload: StepUpPayload) => Promise<void>;
   stepUpWithPasskey: () => Promise<void>;
@@ -456,23 +451,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [sessionUnverified, isOnline, refreshUser]);
 
-  const login = async ({ email, password, deviceName }: LoginPayload) => {
-    try {
-      const token = await loginAccessToken({
-        username: email,
-        password,
-        grant_type: "password",
-        device_name: Capacitor.isNativePlatform() ? deviceName || "Mobile Device" : undefined,
-      });
-      await adoptSession(token, { begin: true });
-    } catch (error) {
-      const challenge = secondFactorChallenge(error);
-      if (challenge) {
-        throw new SecondFactorRequiredError(challenge);
+  const login = useCallback(
+    async ({ email, password, deviceName }: LoginPayload) => {
+      try {
+        const token = await loginAccessToken({
+          username: email,
+          password,
+          grant_type: "password",
+          device_name: Capacitor.isNativePlatform() ? deviceName || "Mobile Device" : undefined,
+        });
+        await adoptSession(token, { begin: true });
+      } catch (error) {
+        const challenge = secondFactorChallenge(error);
+        if (challenge) {
+          throw new SecondFactorRequiredError(challenge);
+        }
+        throw new Error(getErrorMessage(error, "auth:login.defaultError"));
       }
-      throw new Error(getErrorMessage(error, "auth:login.defaultError"));
-    }
-  };
+    },
+    [adoptSession]
+  );
 
   /**
    * Finish a sign-in that was waiting on the account's second factor.
@@ -482,31 +480,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
    * sign-in — is what that path already does. Native is handed its refresh
    * token in the body and keeps it; the browser reads one from a cookie.
    */
-  const completeSecondFactor = async ({ challenge, code, recoveryCode }: SecondFactorPayload) => {
-    try {
-      const token = await answerSecondFactor({
-        challenge,
-        code: code ?? null,
-        recovery_code: recoveryCode ?? null,
-      });
-      await adoptSession(token, { begin: true });
-    } catch (error) {
-      throw new Error(getErrorMessage(error, "auth:login.defaultError"));
-    }
-  };
-
-  const applyPasskeySignIn = useCallback(
-    async (result: PasskeySignInResult) => {
-      const accessToken = result.access_token;
-      if (!accessToken) {
-        throw new Error(t("login.passkeyFailed"));
+  const completeSecondFactor = useCallback(
+    async ({ challenge, code, recoveryCode }: SecondFactorPayload) => {
+      try {
+        const token = await answerSecondFactor({
+          challenge,
+          code: code ?? null,
+          recovery_code: recoveryCode ?? null,
+        });
+        await adoptSession(token, { begin: true });
+      } catch (error) {
+        throw new Error(getErrorMessage(error, "auth:login.defaultError"));
       }
-      await adoptSession({ access_token: accessToken }, { begin: true });
     },
-    [adoptSession, t]
+    [adoptSession]
   );
 
-  /** Adopt the session a code sent to an address, or a demo link, produced. */
+  /** Adopt the session a passkey, a code sent to an address, or a demo link produced. */
   const applySignIn = useCallback(
     async (token: Token) => {
       await adoptSession(token, { begin: true });
@@ -521,13 +511,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
    * middle of a visit: a community asked for the factor, and the answer goes
    * against the live session rather than a fresh one.
    */
-  const stepUpWithFactor = async ({ code, recoveryCode }: StepUpPayload) => {
-    const token = await answerStepUpWithFactor({
-      code: code ?? null,
-      recovery_code: recoveryCode ?? null,
-    });
-    await adoptSession(token, { begin: false });
-  };
+  const stepUpWithFactor = useCallback(
+    async ({ code, recoveryCode }: StepUpPayload) => {
+      const token = await answerStepUpWithFactor({
+        code: code ?? null,
+        recovery_code: recoveryCode ?? null,
+      });
+      await adoptSession(token, { begin: false });
+    },
+    [adoptSession]
+  );
 
   /**
    * The same move, answered with a passkey.
@@ -535,19 +528,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
    * The ceremony belongs to the browser, so it lives in `lib/passkeys`; what
    * comes back is the same session the code step-up produces.
    */
-  const stepUpWithPasskey = async () => {
+  const stepUpWithPasskey = useCallback(async () => {
     await adoptSession(await presentPasskeyForStepUp(), { begin: false });
-  };
+  }, [adoptSession]);
 
   /**
    * The same move, answered with a code sent to one of the account's proved
    * addresses. `challenge` is the handle the send route handed back.
    */
-  const stepUpWithEmailCode = async ({ challenge, code }: EmailCodeStepUpPayload) => {
-    await adoptSession(await verifyStepUpCode({ challenge, code }), { begin: false });
-  };
+  const stepUpWithEmailCode = useCallback(
+    async ({ challenge, code }: EmailCodeStepUpPayload) => {
+      await adoptSession(await verifyStepUpCode({ challenge, code }), { begin: false });
+    },
+    [adoptSession]
+  );
 
-  const register = async ({ inviteCode, ...body }: RegisterPayload) => {
+  const register = useCallback(async ({ inviteCode, ...body }: RegisterPayload) => {
     const made = await registerUser(body, inviteCode ? { invite_code: inviteCode } : undefined);
     // The first account changes the server's answer to "has anyone signed up",
     // which decides whether /login shows first-run registration. The next visit
@@ -557,7 +553,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       refetchType: "none",
     });
     return made;
-  };
+  }, []);
 
   // Memoized: the OIDC callback page calls this from an effect, and this
   // function also sets the user it depends on. An unstable identity would make
@@ -689,24 +685,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => window.removeEventListener(AUTH_ACCOUNT_SUSPENDED_EVENT, handleSuspended);
   }, [refreshUser]);
 
-  const value: AuthContextValue = {
-    user,
-    token,
-    loading,
-    sessionUnverified,
-    login,
-    completeSecondFactor,
-    applyPasskeySignIn,
-    applySignIn,
-    stepUpWithFactor,
-    stepUpWithPasskey,
-    stepUpWithEmailCode,
-    register,
-    completeOidcLogin,
-    logout,
-    refreshUser,
-    acceptUser,
-  };
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      token,
+      loading,
+      sessionUnverified,
+      login,
+      completeSecondFactor,
+      applySignIn,
+      stepUpWithFactor,
+      stepUpWithPasskey,
+      stepUpWithEmailCode,
+      register,
+      completeOidcLogin,
+      logout,
+      refreshUser,
+      acceptUser,
+    }),
+    [
+      user,
+      token,
+      loading,
+      sessionUnverified,
+      login,
+      completeSecondFactor,
+      applySignIn,
+      stepUpWithFactor,
+      stepUpWithPasskey,
+      stepUpWithEmailCode,
+      register,
+      completeOidcLogin,
+      logout,
+      refreshUser,
+      acceptUser,
+    ]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

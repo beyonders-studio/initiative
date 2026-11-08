@@ -20,7 +20,7 @@ And yes, the app is called Initiative too. Context usually sorts it out. See [Wo
 
 ### Tool
 
-Any of the eight kinds of thing that live inside an initiative: **projects**, **files**, **calendars**, **queues**, **counters**, **dashboards**, **posts** and **wikis**.
+Any of the eight kinds of thing that live inside an initiative: **projects**, **files**, **calendars**, **counters**, **dashboards**, **posts**, **wikis** and **contacts**.
 
 Worth knowing because they all behave alike — same sharing, same tags, same comment threads — so learning one teaches you the rest. The list has grown before. See [Tools](../guides/tools.md).
 

@@ -33,7 +33,6 @@
     "empty": "Nobody in your communities has messaging turned on yet.",
     "noCommunities": "Nobody to show. You share no communities with anyone yet.",
     "unreachable": "Not reachable",
-    "showMore": "Show more",
     "addToGroup": "Add {{name}} to a group",
     "removeFromGroup": "Remove {{name}}",
     "groupHint": "Everyone here will be asked before they join.",
@@ -57,7 +56,6 @@
   "recipientHasNoDevice": "{{name}} has not set up encrypted messages yet, so this could not be delivered.",
   "peerDevicesChanged": "{{name}}'s devices changed",
   "deviceFailed": "Encrypted messages could not be set up on this device.",
-  "loading": "Loading…",
   "unsupportedBrowser": "Encrypted messages need a secure connection and a browser that can run them. Check the address starts with https (or is localhost), or try the app.",
   "start": {
     "waiting": "Waiting for them to accept. You can message each other once they do.",

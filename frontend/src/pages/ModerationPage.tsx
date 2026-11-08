@@ -26,11 +26,6 @@ import { RemovalDialog } from "@/components/moderation/RemovalDialog";
 import { SendToPlatformDialog } from "@/components/moderation/SendToPlatformDialog";
 import { WarnDialog } from "@/components/moderation/WarnDialog";
 import { communityEvidenceUrl, EvidenceList } from "@/components/tickets/Evidence";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { MentionText } from "@/components/user/MentionText";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { refreshAfterHolding } from "@/hooks/useHolds";
@@ -49,6 +44,14 @@ import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { searchHitPath } from "@/lib/searchResults";
 import { getUserDisplayName } from "@/lib/userDisplay";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { CardGridSkeleton, ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { PaginationBar } from "@/ui/pagination-bar";
+import { StatusMessage } from "@/ui/status-message";
+import { Tabs, TabsList, TabsTrigger } from "@/ui/tabs";
+import { Textarea } from "@/ui/textarea";
 
 export const ModerationPage = () => {
   const { t } = useTranslation(["moderation", "common"]);
@@ -70,9 +73,6 @@ export const ModerationPage = () => {
   );
 
   const reports = data?.items ?? [];
-  // The server may answer with an earlier page than the one asked for, when
-  // reports settled in between left fewer pages than there were.
-  const shownPage = data?.page ?? page;
 
   const showTab = (next: "open" | "settled") => {
     setTab(next);
@@ -114,7 +114,9 @@ export const ModerationPage = () => {
 
       {area === "reports" &&
         (isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("common:loading")}</p>
+          <SkeletonRegion>
+            <CardGridSkeleton count={3} className="space-y-4" />
+          </SkeletonRegion>
         ) : (
           <div className="space-y-4">
             {reports.length === 0 ? (
@@ -133,28 +135,17 @@ export const ModerationPage = () => {
               ))
             )}
 
-            {(data?.has_prev || data?.has_next) && (
-              <div className="flex items-center justify-between gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!data.has_prev}
-                  onClick={() => setPage(shownPage - 1)}
-                >
-                  {t("paging.newer")}
-                </Button>
-                <span className="text-muted-foreground text-sm">
-                  {t("paging.page", { page: shownPage })}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!data.has_next}
-                  onClick={() => setPage(shownPage + 1)}
-                >
-                  {t("paging.older")}
-                </Button>
-              </div>
+            {/* The server's page, which may be earlier than the one asked
+                for when reports settled in between left fewer pages. */}
+            {data && (
+              <PaginationBar
+                className="pt-2"
+                page={data.page}
+                pageSize={data.page_size}
+                totalCount={data.total_count}
+                hasNext={data.has_next}
+                onPageChange={setPage}
+              />
             )}
           </div>
         ))}
@@ -415,17 +406,21 @@ const ReportCard = ({ report, communityId, initiativeId }: ReportCardProps) => {
 const MembersArea = ({ initiativeId }: { initiativeId: number }) => {
   const { t } = useTranslation(["moderation", "common"]);
   const [page, setPage] = useState(1);
-  const { data, isLoading, isError } = useInitiativeRoster(initiativeId, {
+  const { data, isLoading, isError, refetch } = useInitiativeRoster(initiativeId, {
     page,
     page_size: MEMBERS_PAGE_SIZE,
   });
   const members = data?.items ?? [];
 
   if (isLoading) {
-    return <p className="text-muted-foreground text-sm">{t("common:loading")}</p>;
+    return (
+      <SkeletonRegion>
+        <ListSkeleton rows={5} avatar={false} />
+      </SkeletonRegion>
+    );
   }
   if (isError) {
-    return <p className="text-destructive text-sm">{t("loadFailed")}</p>;
+    return <StatusMessage onRetry={refetch} />;
   }
 
   return (
@@ -450,28 +445,15 @@ const MembersArea = ({ initiativeId }: { initiativeId: number }) => {
             </div>
           </div>
         ))}
-        {data && (data.has_prev || data.has_next) && (
-          <div className="flex items-center justify-between gap-2 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!data.has_prev}
-              onClick={() => setPage(data.page - 1)}
-            >
-              {t("common:previous")}
-            </Button>
-            <span className="text-muted-foreground text-sm">
-              {t("paging.page", { page: data.page })}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!data.has_next}
-              onClick={() => setPage(data.page + 1)}
-            >
-              {t("common:next")}
-            </Button>
-          </div>
+        {data && (
+          <PaginationBar
+            className="pt-2"
+            page={data.page}
+            pageSize={data.page_size}
+            totalCount={data.total_count}
+            hasNext={data.has_next}
+            onPageChange={setPage}
+          />
         )}
       </CardContent>
     </Card>
@@ -494,16 +476,20 @@ const SharingArea = ({
   initiativeId: number;
 }) => {
   const { t } = useTranslation(["moderation", "common"]);
-  const { data, isLoading, isError } = useInitiativeSharing(communityId, initiativeId);
+  const { data, isLoading, isError, refetch } = useInitiativeSharing(communityId, initiativeId);
   const items = data?.items ?? [];
 
   if (isLoading) {
-    return <p className="text-muted-foreground text-sm">{t("common:loading")}</p>;
+    return (
+      <SkeletonRegion>
+        <ListSkeleton rows={5} avatar={false} />
+      </SkeletonRegion>
+    );
   }
   // A read that failed and a community that has shared nothing are different
   // answers; this says which one it is.
   if (isError) {
-    return <p className="text-destructive text-sm">{t("loadFailed")}</p>;
+    return <StatusMessage onRetry={refetch} />;
   }
 
   return (
@@ -567,7 +553,7 @@ const SharingArea = ({
 const LogArea = ({ communityId, initiativeId }: { communityId: number; initiativeId: number }) => {
   const { t } = useTranslation(["moderation", "common"]);
   const [page, setPage] = useState(1);
-  const { data, isLoading, isError } = useModerationLog(
+  const { data, isLoading, isError, refetch } = useModerationLog(
     { communityId, initiativeId, page },
     { enabled: Boolean(communityId) && Number.isFinite(initiativeId) }
   );
@@ -577,10 +563,14 @@ const LogArea = ({ communityId, initiativeId }: { communityId: number; initiativ
   const items = data?.items ?? [];
 
   if (isLoading) {
-    return <p className="text-muted-foreground text-sm">{t("common:loading")}</p>;
+    return (
+      <SkeletonRegion>
+        <ListSkeleton rows={5} avatar={false} />
+      </SkeletonRegion>
+    );
   }
   if (isError) {
-    return <p className="text-destructive text-sm">{t("loadFailed")}</p>;
+    return <StatusMessage onRetry={refetch} />;
   }
 
   return (
@@ -601,28 +591,15 @@ const LogArea = ({ communityId, initiativeId }: { communityId: number; initiativ
             />
           ))
         )}
-        {data && (data.has_prev || data.has_next) && (
-          <div className="flex items-center justify-between gap-2 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!data.has_prev}
-              onClick={() => setPage(data.page - 1)}
-            >
-              {t("paging.newer")}
-            </Button>
-            <span className="text-muted-foreground text-sm">
-              {t("paging.page", { page: data.page })}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!data.has_next}
-              onClick={() => setPage(data.page + 1)}
-            >
-              {t("paging.older")}
-            </Button>
-          </div>
+        {data && (
+          <PaginationBar
+            className="pt-2"
+            page={data.page}
+            pageSize={data.page_size}
+            totalCount={data.total_count}
+            hasNext={data.has_next}
+            onPageChange={setPage}
+          />
         )}
       </CardContent>
     </Card>

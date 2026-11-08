@@ -1,17 +1,12 @@
-import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { PollOptionRead, PollVoter } from "@/api/generated/initiativeAPI.schemas";
-import { ContactPersonRow } from "@/components/contacts/ContactPersonRow";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { PersonRow } from "@/components/connections/PersonRow";
 import { usePostPollVoters } from "@/hooks/usePosts";
 import type { DialogProps } from "@/types/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 type PollVotersDialogProps = DialogProps & {
   postId: number;
@@ -37,7 +32,7 @@ const Group = ({ heading, people }: { heading: string; people: PollVoter[] }) =>
     </h3>
     <ul className="divide-y">
       {people.map((person) => (
-        <ContactPersonRow key={person.id} user={person} />
+        <PersonRow key={person.id} user={person} />
       ))}
     </ul>
   </section>
@@ -80,12 +75,11 @@ export const PollVotersDialog = ({
         </DialogHeader>
 
         {voters.isLoading ? (
-          <div className="flex items-center gap-2 py-6 text-muted-foreground text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            {t("loading")}
-          </div>
+          <SkeletonRegion>
+            <ListSkeleton rows={4} />
+          </SkeletonRegion>
         ) : voters.isError ? (
-          <p className="py-6 text-destructive text-sm">{t("loadError")}</p>
+          <StatusMessage onRetry={voters.refetch} />
         ) : (
           <div className={ROSTER}>
             {options.map((option) => {

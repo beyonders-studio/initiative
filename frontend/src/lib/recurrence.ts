@@ -1,7 +1,7 @@
 import type { RecurrenceStrategy } from "@/api/generated/initiativeAPI.schemas";
-import { dateTimeFormat, listFormat } from "@/lib/intl";
 import { browserTimezone } from "@/lib/timezones";
 import type { TranslateFn } from "@/types/i18n";
+import { dateTimeFormat, listFormat } from "@/ui/lib/intl";
 
 /** The task's rule, completion strategy and optional daily maximum change together. */
 export type TaskRecurrenceValue = {
@@ -416,14 +416,6 @@ export const summarizeRecurrence = (
 
   return parts.join(" ");
 };
-
-export const updateWeeklyWeekdays = (
-  rule: RecurrenceRule,
-  weekdays: RecurrenceWeekday[]
-): RecurrenceRule => ({
-  ...rule,
-  weekdays: sortWeekdays(weekdays),
-});
 
 /** Month days in order: the numbered ones, then the last. */
 export const sortMonthDays = (days: number[]) =>

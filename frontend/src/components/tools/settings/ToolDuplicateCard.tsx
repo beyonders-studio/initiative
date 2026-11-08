@@ -17,8 +17,14 @@ import {
   type ToolSettingsEntity,
   useToolSettings,
 } from "@/components/tools/settings/ToolSettingsContext";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useDuplicateTool } from "@/hooks/toolHooks";
+import { useToolCreateAccess } from "@/hooks/useInitiativeAccess";
+import { useInitiative } from "@/hooks/useInitiatives";
+import { useCommunityPath } from "@/lib/communityUrl";
+import { toast } from "@/lib/mascotToast";
+import { toolDetailRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -26,22 +32,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useDuplicateTool } from "@/hooks/toolHooks";
-import { useToolCreateAccess } from "@/hooks/useInitiativeAccess";
-import { useInitiative } from "@/hooks/useInitiatives";
-import { useCommunityPath } from "@/lib/communityUrl";
-import { toast } from "@/lib/mascotToast";
-import { toolDetailRoute } from "@/lib/tools";
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** Whether this viewer may copy it: write on it, or read on a template, which
  *  is made to be copied. Where the copy may go is the dialog's question. A
@@ -140,10 +134,9 @@ export const ToolDuplicateCard = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="duplicate-initiative">{t("toolSettings.duplicate.initiative")}</Label>
+            <Field label={t("toolSettings.duplicate.initiative")}>
               <Select value={destination} onValueChange={setInitiativeId}>
-                <SelectTrigger id="duplicate-initiative">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -154,11 +147,9 @@ export const ToolDuplicateCard = () => {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="duplicate-name">{t("name")}</Label>
+            </Field>
+            <Field label={t("name")}>
               <Input
-                id="duplicate-name"
                 value={name}
                 onChange={(event) => setTypedName(event.target.value)}
                 placeholder={t("toolSettings.namePlaceholder")}
@@ -166,23 +157,15 @@ export const ToolDuplicateCard = () => {
                   if (event.key === "Enter") submit();
                 }}
               />
-            </div>
+            </Field>
           </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={duplicate.isPending}
-            >
-              {t("cancel")}
-            </Button>
-            <Button type="button" onClick={submit} disabled={duplicate.isPending || !name.trim()}>
-              {duplicate.isPending
-                ? t("toolSettings.duplicate.duplicating")
-                : t("toolSettings.duplicate.action")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("toolSettings.duplicate.action")}
+            onSubmit={submit}
+            pending={duplicate.isPending}
+            pendingLabel={t("toolSettings.duplicate.duplicating")}
+            disabled={!name.trim()}
+          />
         </DialogContent>
       </Dialog>
     </>

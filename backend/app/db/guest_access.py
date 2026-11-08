@@ -52,7 +52,12 @@ class GuestAccess(str, Enum):
 #: scheduler's own record, and operations intake, which the community's staff
 #: runs.
 _NOT_GUEST_SURFACE: frozenset[str] = frozenset(
-    {"event_reminder_dispatches", "intake_bindings", "intake_cases"}
+    {
+        "event_reminder_dispatches",
+        "intake_bindings",
+        "intake_cases",
+        "idea_votes",
+    }
 )
 
 #: The tables no tool governs that a guest reaches, by name.

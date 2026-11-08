@@ -3,7 +3,7 @@ import { Component, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ErrorState, isStaleBundleError, StaleBundleState } from "@/components/errors/ErrorPages";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/ui/button";
 
 const AppErrorFallback = ({ error }: { error: unknown }) => {
   const { t } = useTranslation("common");

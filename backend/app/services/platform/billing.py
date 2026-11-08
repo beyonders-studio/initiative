@@ -354,9 +354,20 @@ async def apply_community_sync(
     )
     for key, value in synced.items():
         await rules.put(session, key, value, guild_id=guild_id, set_by=SetBy.deployment)
+    from app.services import ai_settings
+
+    ai_settings.turn_off_guild_connections_once_committed(session, guild_id)
     # Stamp the guild whichever row moved: "when did this guild last change"
     # stays a fact about the guild.
     await session.exec(update(Guild).where(Guild.id == guild_id).values(**guild_values))
+    # Here rather than at the top: the guilds module reads this one.
+    from app.services.platform import guilds as guilds_service
+
+    # The plan is on every member's community list: each one reads it again
+    # once the sync commits. The members are read on ``system``.
+    await guilds_service.signal_members_present(
+        session, guild_id=guild_id, reader=system
+    )
     return Synced(version=version, went_on_hold=went_on_hold)
 
 

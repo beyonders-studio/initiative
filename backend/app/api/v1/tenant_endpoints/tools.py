@@ -4,8 +4,8 @@ One route serves every tool, so a new ``Tool`` member gets the surface with no
 per-tool endpoint: loading + authorization go through the unified
 resource-access registry, tag assignment through the tag-link registry, and the
 comment switch through the column every tool carries.
-Only the content-level extras (tasks, queue items) keep hand-written tag
-routes — they are sub-resources of a tool, not tools themselves.
+Only tasks keep hand-written tag routes — they are a tool's sub-resources,
+not tools themselves.
 """
 
 from datetime import datetime, timezone

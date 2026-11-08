@@ -4,16 +4,10 @@ import {
   type DragEndEvent,
   DragOverlay,
   type DragStartEvent,
-  KeyboardSensor,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
 } from "@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -26,8 +20,20 @@ import { useTranslation } from "react-i18next";
 
 import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { Galaxy } from "@/components/icons/Galaxy";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { useSidebar } from "@/components/sidebar/sidebar";
+import { useAppConfig } from "@/hooks/useAppConfig";
+import { useBillingPortal } from "@/hooks/useBillingPortal";
+import { type CommunityEntry, useCommunities } from "@/hooks/useCommunities";
+import { useDragSensors } from "@/hooks/useDragSensors";
+import { useMessagesWaiting } from "@/hooks/useMyMessages";
+import { useUnreadTree } from "@/hooks/useUnreadTree";
+import { communityPath } from "@/lib/communityUrl";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { getInitials } from "@/lib/initials";
+import { toast } from "@/lib/mascotToast";
+import { resolveHeaderlessApiUrl } from "@/lib/uploadUrl";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -36,24 +42,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useSidebar } from "@/components/ui/sidebar";
-import { Textarea } from "@/components/ui/textarea";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAppConfig } from "@/hooks/useAppConfig";
-import { useBillingPortal } from "@/hooks/useBillingPortal";
-import { type CommunityEntry, useCommunities } from "@/hooks/useCommunities";
-import { useMessagesWaiting } from "@/hooks/useMyMessages";
-import { useUnreadTree } from "@/hooks/useUnreadTree";
-import { communityPath } from "@/lib/communityUrl";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { getInitials } from "@/lib/initials";
-import { toast } from "@/lib/mascotToast";
-import { resolveHeaderlessApiUrl } from "@/lib/uploadUrl";
-import { cn } from "@/lib/utils";
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { cn } from "@/ui/lib/utils";
+import { Textarea } from "@/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
+import { BetaBadge } from "../BetaBadge";
 import { LogoIcon } from "../LogoIcon";
 import { CommunityCardFace } from "./CommunityCardFace";
 import { CommunityContextMenu } from "./CommunityContextMenu";
@@ -161,27 +157,23 @@ const CreateCommunityButton = ({ expanded = false }: { expanded?: boolean }) => 
           <DialogDescription>{t("createCommunityDescription")}</DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="community-name">{t("communityNameLabel")}</Label>
+          <Field label={t("communityNameLabel")}>
             <Input
-              id="community-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder={t("communityNamePlaceholder")}
               maxLength={255}
               required
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="community-description">{t("descriptionLabel")}</Label>
+          </Field>
+          <Field label={t("descriptionLabel")}>
             <Textarea
-              id="community-description"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder={t("descriptionPlaceholder")}
               rows={3}
             />
-          </div>
+          </Field>
           {error ? <p className="text-destructive text-sm">{error}</p> : null}
           <DialogFooter>
             <Button type="submit" disabled={submitting}>
@@ -648,22 +640,9 @@ export const CommunitySidebar = ({ isHomeMode = false }: { isHomeMode?: boolean 
   const startReorder = useCallback(() => setReorderMode(true), []);
   const stopReorder = useCallback(() => setReorderMode(false), []);
 
-  // Mouse always reorders on a small drag; the touch sensor only joins the
-  // context while reorder mode is on (useSensors drops the nulls).
-  const mouseSensor = useSensor(MouseSensor, {
-    activationConstraint: {
-      distance: 6,
-    },
-  });
-  const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: {
-      distance: 8,
-    },
-  });
-  const keyboardSensor = useSensor(KeyboardSensor, {
-    coordinateGetter: sortableKeyboardCoordinates,
-  });
-  const sensors = useSensors(mouseSensor, reorderMode ? touchSensor : null, keyboardSensor);
+  // Mouse always reorders on a small drag; touch only joins in while reorder
+  // mode is on.
+  const sensors = useDragSensors({ keyboard: true, touch: reorderMode });
   const draggedCommunity = useMemo(
     () => communities.find((community) => community.id === activeDragId) ?? null,
     [communities, activeDragId]
@@ -682,9 +661,7 @@ export const CommunitySidebar = ({ isHomeMode = false }: { isHomeMode?: boolean 
   // shrinks to one while reordering, the mode closes itself rather than
   // leaving taps inert.
   const canReorder = memberCommunities.length > 1;
-  useEffect(() => {
-    if (!canReorder) setReorderMode(false);
-  }, [canReorder]);
+  if (!canReorder && reorderMode) setReorderMode(false);
 
   // --- Expandable "Communities" flyout state machine (mirrors MobileSidebar) ---
   // `expanded` is the desired state; `render`/`atOpen` decouple mount from the
@@ -908,7 +885,7 @@ export const CommunitySidebar = ({ isHomeMode = false }: { isHomeMode?: boolean 
       // (SidebarGroup/SidebarMenuItem). Without a positive z-index here the
       // sticky rail (and its absolutely-positioned flyout) would paint beneath
       // those later-in-DOM siblings, bleeding the content through the flyout.
-      className="sticky top-0 z-30 flex max-h-dvh w-20 flex-col items-center gap-3 border-r bg-sidebar px-2 pb-4"
+      className="sticky top-0 z-30 flex max-h-app w-20 flex-col items-center gap-3 border-r bg-sidebar px-2 pb-4"
       style={{ paddingTop: "calc(var(--safe-area-inset-top) + 1rem)" }}
       onTouchStart={handleRailTouchStart}
       onTouchMove={handleRailTouchMove}
@@ -926,6 +903,7 @@ export const CommunitySidebar = ({ isHomeMode = false }: { isHomeMode?: boolean 
               aria-label={t("nav:home")}
             >
               <LogoIcon className="h-10 w-10" aria-hidden="true" focusable="false" />
+              <BetaBadge className="-mt-1 px-1.5 py-0 text-[0.625rem]" />
               {/* From inside a community this is the only thing pointing home,
                   so it carries the mark that something is waiting there. A dot
                   carries no text, so the count it stands for is written out for
@@ -1049,7 +1027,7 @@ export const CommunitySidebar = ({ isHomeMode = false }: { isHomeMode?: boolean 
             // Overlay the whole sidebar (rail + content column): stay anchored
             // at the rail's left edge and span the full sidebar width — on
             // mobile the drawer width, on desktop --sidebar-width.
-            className="absolute top-0 left-0 z-40 flex h-dvh w-[var(--sidebar-width-mobile,90vw)] flex-col border-r bg-sidebar shadow-lg md:w-[var(--sidebar-width,20rem)]"
+            className="absolute top-0 left-0 z-40 flex h-app w-[var(--sidebar-width-mobile,90vw)] flex-col border-r bg-sidebar shadow-lg md:w-[var(--sidebar-width,20rem)]"
             style={{
               transform: panelTransform,
               transition: drag ? "none" : `transform ${FLYOUT_TRANSITION_MS}ms ${FLYOUT_EASING}`,

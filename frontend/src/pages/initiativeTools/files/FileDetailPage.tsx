@@ -1,6 +1,6 @@
 import { useParams } from "@tanstack/react-router";
 import type { SerializedEditorState } from "lexical";
-import { ListTree, Loader2, Maximize2, Minimize2, PanelRight, Save } from "lucide-react";
+import { ListTree, Loader2, Maximize2, Minimize2, Save, Sparkles } from "lucide-react";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -9,26 +9,21 @@ import { generateSummary, notifyMentions } from "@/api/generated/files/files";
 import { FileKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { type AISummary, SummarySheet, useSummarySheet } from "@/components/ai/SummarySheet";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
+import { CollaborationStatusBadge } from "@/components/editor/CollaborationStatusBadge";
+import { FeaturedImageProvider } from "@/components/editor/context/featured-image-context";
+import {
+  DocumentOutlinePanel,
+  DocumentOutlineScope,
+  useDocumentOutline,
+} from "@/components/editor/DocumentOutline";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
 import { FileCollections } from "@/components/files/collections/FileCollections";
 import { fileBody } from "@/components/files/detail/fileBodies";
 import { FileFeaturedImage } from "@/components/files/FileFeaturedImage";
 import { clearWhiteboardSceneCache } from "@/components/files/whiteboardSceneCache";
-import { FileDetailSkeleton } from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { ToolChest, ToolChestSegment } from "@/components/tools/ToolChest";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { CollaborationStatusBadge } from "@/components/ui/editor/CollaborationStatusBadge";
-import { FeaturedImageProvider } from "@/components/ui/editor/context/featured-image-context";
-import {
-  DocumentOutlinePanel,
-  DocumentOutlineScope,
-  useDocumentOutline,
-} from "@/components/ui/editor/DocumentOutline";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { useAuth } from "@/hooks/useAuth";
 import { useCanonicalInitiativeId } from "@/hooks/useCanonicalInitiativeId";
@@ -38,15 +33,20 @@ import { useFile, useSetFileCache, useUpdateFile } from "@/hooks/useFiles";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { useServerForm } from "@/hooks/useServerForm";
 import { uploadAttachment } from "@/lib/attachmentUtils";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { findNewMentions } from "@/lib/mentionUtils";
 import { toolListRoute, toolRouteSegment, toolSettingsRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
 import { CollaborationError } from "@/lib/yjs/CollaborationProvider";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { cn } from "@/ui/lib/utils";
+import { FileDetailSkeleton } from "@/ui/page-skeletons";
 
 export const FileDetailPage = () => {
   const { t } = useTranslation(["files", "properties", "common", "editor"]);
@@ -575,19 +575,6 @@ export const FileDetailPage = () => {
             <ToolChestSegment label={t("collections.heading")}>
               <FileCollections file={file} />
             </ToolChestSegment>
-            {showSummaryTab ? (
-              <ToolChestSegment>
-                <Button
-                  variant={sidePanel.isOpen ? "secondary" : "outline"}
-                  size="sm"
-                  onClick={sidePanel.toggle}
-                  title={sidePanel.isOpen ? t("detail.closePanel") : t("detail.openPanel")}
-                >
-                  <PanelRight className="h-4 w-4" />
-                  <span className="sr-only">{t("detail.togglePanel")}</span>
-                </Button>
-              </ToolChestSegment>
-            ) : null}
           </ToolChest>
         }
         title={
@@ -611,14 +598,10 @@ export const FileDetailPage = () => {
                 onClick={() => {
                   if (!saveFile.isPending) saveNow();
                 }}
-                disabled={saveFile.isPending}
+                pending={saveFile.isPending}
                 className="shrink-0"
               >
-                {saveFile.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
+                <Save className="h-4 w-4" />
                 {t("common:save")}
               </Button>
             ) : null}
@@ -654,7 +637,7 @@ export const FileDetailPage = () => {
                 {/* Collaboration status - shown between featured image and editor.
                   Also shown when offline even in non-collaborative mode, so the
                   user sees an explicit offline indicator at the top of the editor. */}
-                {/* Wraps rather than overflows: the row carries up to four
+                {/* Wraps rather than overflows: the row carries up to five
                   controls and none of them shrink. */}
                 <div className="flex flex-wrap items-center gap-2">
                   {prose && (
@@ -668,6 +651,17 @@ export const FileDetailPage = () => {
                     >
                       <ListTree className="h-4 w-4" />
                       {t("editor:outline.title")}
+                    </Button>
+                  )}
+                  {showSummaryTab && (
+                    <Button
+                      type="button"
+                      variant={sidePanel.isOpen ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={sidePanel.toggle}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      {t("editor:summary.title")}
                     </Button>
                   )}
                   {(joinsRoom || !isOnline) && (
@@ -727,16 +721,10 @@ export const FileDetailPage = () => {
                             <Button
                               type="button"
                               onClick={() => saveNow()}
-                              disabled={!isDirty || saveFile.isPending}
+                              disabled={!isDirty}
+                              pending={saveFile.isPending}
                             >
-                              {saveFile.isPending ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                  {t("detail.saving")}
-                                </>
-                              ) : (
-                                t("detail.saveChanges")
-                              )}
+                              {saveFile.isPending ? t("detail.saving") : t("detail.saveChanges")}
                             </Button>
                             <div className="flex items-center gap-2">
                               <Checkbox

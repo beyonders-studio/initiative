@@ -22,6 +22,7 @@ from pydantic import Field
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
+from starlette.background import BackgroundTask
 from sqlmodel import col, select
 
 from app.api.deps import (
@@ -75,13 +76,18 @@ CurrentUserDep = Annotated[User, Depends(get_current_active_user)]
 def _inline_response(result: InlineExport) -> Response:
     # The filename can carry user text (file titles, original upload
     # names) — the helper escapes it (RFC 5987) so it can't break the header.
-    return Response(
-        content=result.content,
-        media_type=result.content_type,
-        headers={
-            "Content-Disposition": content_disposition_attachment(result.filename)
-        },
+    headers = {"Content-Disposition": content_disposition_attachment(result.filename)}
+    if isinstance(result.content, bytes):
+        return Response(
+            content=result.content, media_type=result.content_type, headers=headers
+        )
+    # A stored file or an archive on disk streams rather than being read in.
+    response = build_upload_response(
+        result.content, headers=headers, media_type=result.content_type
     )
+    if result.temporary is not None:
+        response.background = BackgroundTask(result.temporary.unlink, missing_ok=True)
+    return response
 
 
 def _allow_job(guild_context: GuildContext) -> bool:
@@ -303,7 +309,7 @@ def _parse_json_param(raw: Optional[str]) -> Optional[dict]:
 _FILTERS_DESCRIPTION = (
     "JSON object of tool→filters narrowing what each tool exports: the tool's "
     "own list filters (as its list route takes them, such as "
-    '``{"queue": {"tag_ids": [3]}}``), and for calendars an ``events`` date '
+    '``{"project": {"tag_ids": [3]}}``), and for calendars an ``events`` date '
     "range. ``archived`` omitted exports live and archived rows alike."
 )
 
@@ -405,7 +411,7 @@ async def export_initiative(
     include: Optional[str] = Query(
         default=None,
         description=(
-            'JSON object of tool→bool, e.g. {"project": true, "queue": false}. '
+            'JSON object of tool→bool, e.g. {"project": true, "calendar": false}. '
             "Omitted = every tool."
         ),
     ),

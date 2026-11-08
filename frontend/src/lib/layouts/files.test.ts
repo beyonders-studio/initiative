@@ -13,7 +13,13 @@ import type { LayoutNode } from "./tree";
 
 const caption = buildPropertyDefinition({ id: 21, name: "Caption", collection_id: 5 });
 const price = buildPropertyDefinition({ id: 22, name: "Price", type: MetadataType.currency });
-const fields = collectionFileFields([caption], [price]);
+const stock = buildPropertyDefinition({
+  id: 23,
+  name: "Stock",
+  type: MetadataType.counter,
+  counter: { step: 1, min: 0, max: null, initial: 4 },
+});
+const fields = collectionFileFields([caption], [price, stock]);
 
 const file = buildCollectionFile({
   name: "Harbour",
@@ -28,8 +34,14 @@ describe("collectionFileFields", () => {
   it("reads a collection's field from the file's values there, a property from its own", () => {
     expect(fields.get("name")?.value(item)).toBe(file);
     expect(fields.get("property:21")?.value(item)).toMatchObject({ value: "Dusk" });
-    // An empty value is no value.
+    // An empty value is no value, but a counter the file has never held
+    // holds its initial value.
     expect(fields.get("property:22")?.value(item)).toBeNull();
+    expect(fields.get("property:23")?.value(item)).toMatchObject({
+      property_id: 23,
+      value: null,
+      counter: { initial: 4 },
+    });
   });
 });
 

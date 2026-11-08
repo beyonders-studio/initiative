@@ -1,9 +1,9 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { ShareRequestsPage } from "@/pages/ShareRequestsPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/share-requests_/$batchId"
 )({
-  component: lazyRouteComponent(() =>
-    import("@/pages/ShareRequestsPage").then((m) => ({ default: m.ShareRequestsPage }))
-  ),
+  component: ShareRequestsPage,
 });

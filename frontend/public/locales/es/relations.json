@@ -3,7 +3,6 @@
   "description": "Todo con lo que esto está conectado, y cómo.",
   "untitled": "Sin título",
   "empty": "Aún no hay nada enlazado.",
-  "loadFailed": "Los enlaces no responden. Inténtalo de nuevo en un momento.",
   "add": "Añadir enlace",
   "graph": {
     "alt": "{{title}} y las {{count}} cosas con las que está conectado",
@@ -29,11 +28,13 @@
   "removed": "Enlace eliminado.",
   "dialog": {
     "title": "Añadir un enlace",
-    "description": "Busca primero la cosa y luego di cómo se relacionan.",
-    "descriptionUpload": "Busca primero la cosa, o sube un archivo, y luego di cómo se relacionan.",
+    "description": "Busca primero la cosa o la persona y luego di cómo se relacionan.",
+    "descriptionUpload": "Busca primero la cosa o la persona, o sube un archivo, y luego di cómo se relacionan.",
     "entity": "Cosa",
     "entityPlaceholder": "Buscar por nombre…",
     "noResults": "No hay coincidencias.",
+    "person": "Persona",
+    "noPeople": "Nadie coincide.",
     "relationship": "Relación",
     "sentenceLabel": "Cómo se relacionan",
     "submit": "Añadir enlace",
@@ -49,6 +50,7 @@
   },
   "card": {
     "kindLinked": "{{kind}} · enlazado {{date}}",
+    "person": "Persona",
     "unreachable": "Esta versión de la aplicación no puede abrir eso.",
     "remove": "Quitar el enlace con {{title}}"
   },
@@ -92,7 +94,6 @@
       "option": "está etiquetado"
     }
   },
-  "loading": "Cargando…",
   "empty_task": "Aún no hay nada enlazado. Enlaza el archivo que describe esta tarea, o la tarea que la bloquea.",
   "empty_file": "Aún no hay nada enlazado. Enlaza el proyecto que esto explica, o la tarea de la que surgió.",
   "empty_project": "Aún no hay nada enlazado. Adjunta los archivos en los que se apoya este proyecto.",
@@ -114,11 +115,10 @@
     "generic": "Esto",
     "post": "Esta publicación",
     "project": "Este proyecto",
-    "queue": "Esta cola",
-    "queue_item": "Este elemento",
     "task": "Esta tarea",
     "wiki": "Esta wiki",
     "wiki_page": "Esta página",
+    "contact": "Este contacto",
     "collection": "Esta colección"
   },
   "blockers": {
@@ -132,8 +132,7 @@
   "empty_counter_group": "Aún no hay nada enlazado. Enlaza el proyecto del que hablan estos números.",
   "empty_dashboard": "Aún no hay nada enlazado. Enlaza el proyecto del que informa, o el archivo que lo interpreta.",
   "empty_post": "Aún no hay nada enlazado. Enlaza el proyecto que anuncia, o el archivo que hay detrás.",
-  "empty_queue": "Aún no hay nada enlazado. Enlaza el proyecto que alimenta esta cola.",
-  "empty_queue_item": "Aún no hay nada enlazado. Enlaza la tarea en la que se convirtió, o el archivo del que salió.",
   "empty_wiki_page": "Aún no hay nada enlazado. Menciona esta página con [[ desde cualquier sitio y aparecerá aquí.",
+  "empty_contact": "Aún no hay nada enlazado. Enlaza la tarea que haces para ellos, el evento al que irán o su contrato.",
   "empty_collection": "Aún no hay nada enlazado. Enlaza el proyecto para el que son estos archivos."
 }

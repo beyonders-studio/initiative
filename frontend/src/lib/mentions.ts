@@ -2,7 +2,7 @@
  * What can be named inside a comment or a document, and how it is written down.
  *
  * One trigger opens the picker over everything: `@` for people, `#` for
- * anything else. The type words after `#` — `#task:`, `#queue:` — narrow it,
+ * anything else. The type words after `#` — `#task:`, `#wiki:` — narrow it,
  * and they are DERIVED from the generated entity types rather than listed, so
  * a tool added server-side can be mentioned the same day.
  *

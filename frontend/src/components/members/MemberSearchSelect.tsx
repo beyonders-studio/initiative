@@ -1,21 +1,8 @@
-import { Check, ChevronDown, ChevronsUpDown, Loader2, Users, X } from "lucide-react";
+import { ChevronsUpDown, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { UserSummary } from "@/api/generated/initiativeAPI.schemas";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { type MemberSearchScope, USER_ID_LOOKUP_MAX, useMemberSearch } from "@/hooks/useUsers";
 import {
   getAvatarSrc,
@@ -23,7 +10,10 @@ import {
   getUserDisplayName,
   hasDisplayName,
 } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
+import { cn } from "@/ui/lib/utils";
 
 /** The slim user shape these pickers render (the search endpoints' `UserSummary`). */
 export type MemberSummary = Pick<
@@ -90,7 +80,8 @@ export const useSeenMembers = (
   return seen;
 };
 
-const MemberAvatar = ({ user, className }: { user: MemberLike; className?: string }) => {
+/** A person's picture, or their initials in their own colour. */
+export const MemberAvatar = ({ user, className }: { user: MemberLike; className?: string }) => {
   const src = getAvatarSrc(user);
   const label = getUserDisplayName(user);
   return (
@@ -164,18 +155,15 @@ export const MemberMultiSelect = ({
   const { t } = useTranslation(["projects", "common"]);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const debounced = useDebouncedValue(query, 250);
 
-  const searchResult = useMemberSearch(scope, { search: debounced, enabled: open });
+  const searchResult = useMemberSearch(scope, { search: query, enabled: open });
   const results = useMemo<MemberSummary[]>(
     () => searchResult.data?.items ?? [],
     [searchResult.data]
   );
   const seen = useSeenMembers(scope, selectedIds, selectedUsers, results);
 
-  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const resolvedPlaceholder = placeholder ?? t("projects:assignee.searchPlaceholder");
-  const resolvedEmpty = emptyMessage ?? t("projects:assignee.emptyMessage");
 
   // Always surface the currently-selected members, even when the active search
   // doesn't return them — otherwise a selection the server no longer matches
@@ -195,191 +183,97 @@ export const MemberMultiSelect = ({
     return [...mine, ...rest];
   }, [results, selectedIds, seen, currentUserId]);
 
-  const toggle = (id: number) => {
-    if (!Number.isFinite(id)) return;
-    if (selectedSet.has(id)) {
-      onChange(selectedIds.filter((value) => value !== id));
-    } else {
-      onChange([...selectedIds, id]);
-    }
+  // A token changed, or else a person did: one row is toggled at a time.
+  const handleValueChange = (next: string[]) => {
+    const token = tokens.find((each) => next.includes(each.value) !== each.selected);
+    if (token) return token.onToggle(!token.selected);
+    onChange(next.filter((value) => !tokens.some((each) => each.value === value)).map(Number));
   };
 
-  const remove = (id: number) => onChange(selectedIds.filter((value) => value !== id));
-
-  const handleOpenChange = (next: boolean) => {
-    if (disabled) return;
-    setOpen(next);
-    if (!next) setQuery("");
-  };
-
-  // Compact summary for the filter variant: placeholder / the single name /
-  // "N selected".
-  const filterSummary = useMemo(() => {
-    // Tokens count toward the summary: with only "Unassigned" on, a trigger
-    // still reading "All assignees" would misdescribe the list.
-    const chosenTokens = tokens.filter((token) => token.selected);
-    const total = chosenTokens.length + selectedIds.length;
-    if (total === 0) return resolvedPlaceholder;
-    if (total === 1) {
-      if (chosenTokens.length === 1) return chosenTokens[0].label;
-      const only = seen.get(selectedIds[0]);
-      return getUserDisplayName(only ?? { id: selectedIds[0] });
-    }
-    return t("common:countSelected", { count: total });
-  }, [selectedIds, tokens, seen, resolvedPlaceholder, t]);
-
-  return (
-    <div className={cn(variant === "default" && "space-y-3", className)}>
-      <Popover open={disabled ? false : open} onOpenChange={handleOpenChange}>
-        <PopoverTrigger asChild>
-          {variant === "filter" ? (
-            <button
-              type="button"
-              id={id}
-              role="combobox"
-              aria-expanded={!disabled && open}
-              disabled={disabled}
-              className={cn(
-                "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
-                selectedIds.length === 0 &&
-                  !tokens.some((token) => token.selected) &&
-                  "text-muted-foreground"
-              )}
-            >
-              <span className="truncate">{filterSummary}</span>
-              <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </button>
-          ) : (
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={!disabled && open}
-              disabled={disabled}
-              className={cn(
-                "h-auto min-h-10 w-full justify-start",
-                selectedIds.length === 0 &&
-                  !tokens.some((token) => token.selected) &&
-                  "text-muted-foreground"
-              )}
-            >
-              <Users className="h-4 w-4 shrink-0 opacity-50" />
-              {selectedIds.length > 0 ? (
-                <div className="flex flex-wrap gap-1">
-                  {selectedIds.map((id) => {
-                    const user = seen.get(id) ?? { id, display_name: null };
-                    const label = getUserDisplayName(user);
-                    return (
-                      <span
-                        key={id}
-                        className="inline-flex max-w-full items-center gap-1 rounded-md bg-secondary py-0.5 pr-1.5 pl-1 font-medium text-secondary-foreground text-xs"
+  const picker = (
+    <Combobox
+      multiple
+      id={id}
+      className={className}
+      items={[
+        ...tokens.map((token) => ({ value: token.value, label: token.label })),
+        ...orderedResults.map((user) => ({
+          value: String(user.id),
+          label: getUserDisplayName(user),
+          icon: <MemberAvatar user={user} />,
+          hint: user.id === currentUserId ? t("projects:assignee.you") : undefined,
+        })),
+      ]}
+      value={[
+        ...tokens.filter((token) => token.selected).map((token) => token.value),
+        ...selectedIds.map(String),
+      ]}
+      onValueChange={handleValueChange}
+      onSearchChange={setQuery}
+      onOpenChange={setOpen}
+      loading={searchResult.isFetching && results.length === 0}
+      placeholder={resolvedPlaceholder}
+      searchPlaceholder={resolvedPlaceholder}
+      emptyMessage={emptyMessage ?? t("projects:assignee.emptyMessage")}
+      disabled={disabled}
+      trigger={
+        variant === "default" ? (
+          <Button
+            id={id}
+            variant="outline"
+            role="combobox"
+            disabled={disabled}
+            className={cn(
+              "h-auto min-h-10 w-full justify-start",
+              selectedIds.length === 0 &&
+                !tokens.some((token) => token.selected) &&
+                "text-muted-foreground"
+            )}
+          >
+            <Users className="h-4 w-4 shrink-0 opacity-50" />
+            {selectedIds.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {selectedIds.map((id) => {
+                  const user = seen.get(id) ?? { id, display_name: null };
+                  const label = getUserDisplayName(user);
+                  return (
+                    <span
+                      key={id}
+                      className="inline-flex max-w-full items-center gap-1 rounded-md bg-secondary py-0.5 pr-1.5 pl-1 font-medium text-secondary-foreground text-xs"
+                    >
+                      <MemberAvatar user={user} className="h-4 w-4 text-3xs" />
+                      <span className="truncate">{label}</span>
+                      <button
+                        type="button"
+                        className="rounded-sm hover:opacity-70 focus:outline-none"
+                        aria-label={t("projects:assignee.removeAssignee", { name: label })}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          event.preventDefault();
+                          if (!disabled) onChange(selectedIds.filter((value) => value !== id));
+                        }}
                       >
-                        <MemberAvatar user={user} className="h-4 w-4 text-3xs" />
-                        <span className="truncate">{label}</span>
-                        <button
-                          type="button"
-                          className="rounded-sm hover:opacity-70 focus:outline-none"
-                          aria-label={t("projects:assignee.removeAssignee", { name: label })}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            event.preventDefault();
-                            if (!disabled) remove(id);
-                          }}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    );
-                  })}
-                </div>
-              ) : (
-                <span>{resolvedPlaceholder}</span>
-              )}
-            </Button>
-          )}
-        </PopoverTrigger>
-        <PopoverContent className="w-72 p-0" align="start">
-          {/* Server-side search — never re-filter client-side. */}
-          <Command shouldFilter={false}>
-            <CommandInput
-              placeholder={resolvedPlaceholder}
-              value={query}
-              onValueChange={setQuery}
-            />
-            <CommandList>
-              {searchResult.isFetching && results.length === 0 ? (
-                <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground text-sm">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("common:loading")}
-                </div>
-              ) : (
-                <>
-                  <CommandEmpty>{resolvedEmpty}</CommandEmpty>
-                  {tokens.length > 0 ? (
-                    <>
-                      <CommandGroup>
-                        {tokens.map((token) => (
-                          <CommandItem
-                            key={token.value}
-                            value={token.value}
-                            onSelect={() => token.onToggle(!token.selected)}
-                            className="cursor-pointer"
-                          >
-                            <div
-                              className={cn(
-                                "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary",
-                                token.selected
-                                  ? "bg-primary text-primary-foreground"
-                                  : "opacity-50 [&_svg]:invisible"
-                              )}
-                            >
-                              <Check className="h-3 w-3" />
-                            </div>
-                            <span className="truncate">{token.label}</span>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                      <CommandSeparator />
-                    </>
-                  ) : null}
-                  <CommandGroup>
-                    {orderedResults.map((user) => {
-                      const isSelected = selectedSet.has(user.id);
-                      const isCurrentUser = user.id === currentUserId;
-                      return (
-                        <CommandItem
-                          key={user.id}
-                          value={String(user.id)}
-                          onSelect={() => toggle(user.id)}
-                          className="cursor-pointer"
-                        >
-                          <div
-                            className={cn(
-                              "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-primary",
-                              isSelected
-                                ? "bg-primary text-primary-foreground"
-                                : "opacity-50 [&_svg]:invisible"
-                            )}
-                          >
-                            <Check className="h-3 w-3" />
-                          </div>
-                          <MemberAvatar user={user} />
-                          <span className="truncate">{getUserDisplayName(user)}</span>
-                          {isCurrentUser ? (
-                            <span className="text-muted-foreground text-xs">
-                              {t("projects:assignee.you")}
-                            </span>
-                          ) : null}
-                        </CommandItem>
-                      );
-                    })}
-                  </CommandGroup>
-                </>
-              )}
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-      {variant === "default" && selectedIds.length > 0 ? (
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              <span>{resolvedPlaceholder}</span>
+            )}
+          </Button>
+        ) : undefined
+      }
+    />
+  );
+
+  // "filter" is the field alone; "default" also offers to clear it.
+  if (variant === "filter") return picker;
+  return (
+    <div className={cn("space-y-3", className)}>
+      {picker}
+      {selectedIds.length > 0 ? (
         <Button
           type="button"
           variant="ghost"
@@ -399,7 +293,8 @@ export const MemberMultiSelect = ({
 interface MemberSelectProps {
   scope: MemberSearchScope;
   value: number | null;
-  onChange: (id: number | null) => void;
+  /** The id picked, and the member it names, for a caller that shows them. */
+  onChange: (id: number | null, user?: MemberSummary) => void;
   /** Display info for the current value so the trigger shows a name without a
    *  search round-trip. */
   selectedUser?: MemberLike | null;
@@ -424,9 +319,8 @@ export const MemberSelect = ({
   const { t } = useTranslation(["common"]);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const debounced = useDebouncedValue(query, 250);
 
-  const searchResult = useMemberSearch(scope, { search: debounced, enabled: open });
+  const searchResult = useMemberSearch(scope, { search: query, enabled: open });
   const results = useMemo<MemberSummary[]>(
     () => searchResult.data?.items ?? [],
     [searchResult.data]
@@ -435,93 +329,50 @@ export const MemberSelect = ({
   const selectedIds = useMemo(() => (value != null ? [value] : []), [value]);
   const seen = useSeenMembers(scope, selectedIds, selectedUsers, results);
 
-  const handleOpenChange = (next: boolean) => {
-    if (disabled) return;
-    setOpen(next);
-    if (!next) setQuery("");
-  };
-
   const selected = value != null ? (seen.get(value) ?? selectedUser ?? { id: value }) : null;
-  const triggerLabel = selected
-    ? getUserDisplayName(selected)
-    : (placeholder ?? t("common:selectAnOption"));
 
   return (
-    <div className={cn("w-full", className)}>
-      <Popover open={disabled ? false : open} onOpenChange={handleOpenChange}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={!disabled && open}
-            aria-label={ariaLabel}
-            disabled={disabled}
-            className={cn("w-full justify-between", !selected && "text-muted-foreground")}
-          >
-            <span className="flex min-w-0 items-center gap-2">
-              {selected ? <MemberAvatar user={selected} className="h-5 w-5 text-3xs" /> : null}
-              <span className="truncate">{triggerLabel}</span>
+    <Combobox
+      items={[
+        // Clearing is listed first while there is something to clear: "" is
+        // no member's id.
+        ...(value != null ? [{ value: "", label: t("common:clear"), icon: X }] : []),
+        ...results.map((user) => ({
+          value: String(user.id),
+          label: getUserDisplayName(user),
+          icon: <MemberAvatar user={user} />,
+        })),
+      ]}
+      value={value != null ? String(value) : null}
+      onValueChange={(next) => {
+        const user = results.find((each) => String(each.id) === next);
+        onChange(user ? user.id : null, user);
+      }}
+      onSearchChange={setQuery}
+      onOpenChange={setOpen}
+      loading={searchResult.isFetching && results.length === 0}
+      searchPlaceholder={placeholder}
+      emptyMessage={emptyMessage}
+      disabled={disabled}
+      trigger={
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-label={ariaLabel}
+          disabled={disabled}
+          className={cn("w-full justify-between", !selected && "text-muted-foreground", className)}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            {selected ? <MemberAvatar user={selected} className="h-5 w-5 text-3xs" /> : null}
+            <span className="truncate">
+              {selected
+                ? getUserDisplayName(selected)
+                : (placeholder ?? t("common:selectAnOption"))}
             </span>
-            <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-72 p-0" align="start">
-          <Command shouldFilter={false}>
-            <CommandInput
-              placeholder={placeholder ?? t("common:search")}
-              value={query}
-              onValueChange={setQuery}
-            />
-            <CommandList>
-              {searchResult.isFetching && results.length === 0 ? (
-                <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground text-sm">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("common:loading")}
-                </div>
-              ) : (
-                <>
-                  <CommandEmpty>{emptyMessage ?? t("common:noResults")}</CommandEmpty>
-                  <CommandGroup>
-                    {value != null ? (
-                      <CommandItem
-                        value="__clear__"
-                        onSelect={() => {
-                          onChange(null);
-                          handleOpenChange(false);
-                        }}
-                        className="cursor-pointer text-muted-foreground"
-                      >
-                        <X className="h-4 w-4" />
-                        {t("common:clear")}
-                      </CommandItem>
-                    ) : null}
-                    {results.map((user) => (
-                      <CommandItem
-                        key={user.id}
-                        value={String(user.id)}
-                        onSelect={() => {
-                          onChange(user.id);
-                          handleOpenChange(false);
-                        }}
-                        className="cursor-pointer"
-                      >
-                        <Check
-                          className={cn(
-                            "h-4 w-4 shrink-0",
-                            user.id === value ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        <MemberAvatar user={user} />
-                        <span className="truncate">{getUserDisplayName(user)}</span>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </>
-              )}
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-    </div>
+          </span>
+          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      }
+    />
   );
 };

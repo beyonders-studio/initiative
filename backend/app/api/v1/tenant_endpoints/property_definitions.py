@@ -595,6 +595,7 @@ async def create_property_definition(
         color=payload.color,
         options=_serialize_options(payload.options),
         currency=payload.currency.value if payload.currency else None,
+        counter=payload.counter.model_dump() if payload.counter else None,
     )
     session.add(defn)
     await session.commit()
@@ -667,6 +668,9 @@ async def update_property_definition(
 
     if payload.currency is not None and defn.type is MetadataType.currency:
         defn.currency = payload.currency.value
+
+    if payload.counter is not None and defn.type is MetadataType.counter:
+        defn.counter = payload.counter.model_dump()
 
     orphaned_value_count = 0
     if "options" in data:

@@ -1,12 +1,12 @@
 import { useTranslation } from "react-i18next";
 
 import type { ProjectRead } from "@/api/generated/initiativeAPI.schemas";
-import { EmojiPicker } from "@/components/EmojiPicker";
 import { ProjectDateFields } from "@/components/projects/ProjectDateFields";
-import { Label } from "@/components/ui/label";
 import { useUpdateProject } from "@/hooks/useProjects";
 import { useServerForm } from "@/hooks/useServerForm";
 import { dateRangeBounds } from "@/lib/dateRange";
+import { EmojiField } from "@/ui/emoji-picker";
+import { Field } from "@/ui/field";
 
 interface ProjectDates {
   startDate: string;
@@ -47,15 +47,13 @@ export const ProjectDetailsFields = ({ project }: { project: ProjectRead }) => {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="project-icon">{t("createDialog.iconLabel")}</Label>
-        <EmojiPicker
-          id="project-icon"
+      <Field label={t("createDialog.iconLabel")}>
+        <EmojiField
           value={project.icon ?? undefined}
           onChange={(emoji) => update.mutate({ icon: emoji ?? null })}
           disabled={!canEdit}
         />
-      </div>
+      </Field>
       <ProjectDateFields
         idPrefix="project-settings"
         startDate={dates.values.startDate}

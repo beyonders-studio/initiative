@@ -1,38 +1,13 @@
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  AdminSurface,
+import {
+  type AdminSurface,
   CommunityRole,
-  CustomRoleRead,
+  type CustomRoleRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { ListSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RowActionsMenu } from "@/components/ui/row-actions-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
 import {
   ADMIN_SURFACES,
@@ -44,6 +19,28 @@ import {
   useUpdateCustomRole,
 } from "@/hooks/useCustomRoles";
 import type { DialogProps } from "@/types/dialog";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Checkbox } from "@/ui/checkbox";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { RowActionsMenu } from "@/ui/row-actions-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { StatusMessage } from "@/ui/status-message";
 
 /** The longest name the server takes. */
 const MAX_NAME_LENGTH = 64;
@@ -69,12 +66,15 @@ const CustomRoleDialog = ({ role, open, onOpenChange }: CustomRoleDialogProps) =
   const [rung, setRung] = useState<Rung>("member");
   const [surfaces, setSurfaces] = useState<AdminSurface[]>([]);
 
-  useEffect(() => {
-    if (!open) return;
-    setName(role?.name ?? "");
-    setRung(role?.base_rung === "admin" ? "admin" : "member");
-    setSurfaces(role?.surfaces ?? []);
-  }, [open, role]);
+  const [prev, setPrev] = useState({ open, role });
+  if (prev.open !== open || prev.role !== role) {
+    setPrev({ open, role });
+    if (open) {
+      setName(role?.name ?? "");
+      setRung(role?.base_rung === "admin" ? "admin" : "member");
+      setSurfaces(role?.surfaces ?? []);
+    }
+  }
 
   const offered = offeredSurfaces(rung);
   const pending = createRole.isPending || updateRole.isPending;
@@ -112,24 +112,24 @@ const CustomRoleDialog = ({ role, open, onOpenChange }: CustomRoleDialogProps) =
           <DialogDescription>{t("customRoles.dialogDescription")}</DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="custom-role-name">{t("customRoles.nameLabel")}</Label>
+          <Field label={t("customRoles.nameLabel")}>
             <Input
-              id="custom-role-name"
               value={name}
               maxLength={MAX_NAME_LENGTH}
               onChange={(event) => setName(event.target.value)}
               autoFocus
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="custom-role-rung">{t("customRoles.rungLabel")}</Label>
+          </Field>
+          <Field
+            label={t("customRoles.rungLabel")}
+            hint={role ? t("customRoles.rungFixed") : t(`customRoles.rungHelp.${rung}`)}
+          >
             <Select
               value={rung}
               onValueChange={(value) => setRung(value as Rung)}
               disabled={Boolean(role)}
             >
-              <SelectTrigger id="custom-role-rung" className="w-full max-w-72">
+              <SelectTrigger className="w-full max-w-72">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -140,10 +140,7 @@ const CustomRoleDialog = ({ role, open, onOpenChange }: CustomRoleDialogProps) =
                 </SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-muted-foreground text-xs">
-              {role ? t("customRoles.rungFixed") : t(`customRoles.rungHelp.${rung}`)}
-            </p>
-          </div>
+          </Field>
           <fieldset className="space-y-3">
             <legend className="mb-2 font-medium text-sm">{t("customRoles.surfacesLabel")}</legend>
             {offered.map((surface) => {
@@ -172,14 +169,11 @@ const CustomRoleDialog = ({ role, open, onOpenChange }: CustomRoleDialogProps) =
               );
             })}
           </fieldset>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={close}>
-              {t("common:cancel")}
-            </Button>
-            <Button type="submit" disabled={pending || !name.trim()}>
-              {role ? t("common:save") : t("customRoles.add")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={role ? t("common:save") : t("customRoles.add")}
+            pending={pending}
+            disabled={!name.trim()}
+          />
         </form>
       </DialogContent>
     </Dialog>
@@ -187,14 +181,23 @@ const CustomRoleDialog = ({ role, open, onOpenChange }: CustomRoleDialogProps) =
 };
 
 /**
- * Community settings › Roles: the community's custom roles. A role on the
- * member rung gives a member some parts of running the community; one on the
- * admin rung narrows an admin to the parts it lists.
+ * Community settings › Roles: the roles every community has, then its custom
+ * ones. A role on the member rung gives a member some parts of running the
+ * community; one on the admin rung narrows an admin to the parts it lists.
  */
 export const SettingsCommunityRolesPage = () => {
-  const { t } = useTranslation(["settings", "common"]);
+  const { t } = useTranslation(["settings", "communities", "common"]);
   const { activeCommunity } = useCommunities();
+  const { guestsEnabled } = useAppConfig();
   const held = useHeldSurfaces();
+  // Highest first. Guests only where the deployment allows them and the
+  // community takes any, as on the Guests tab.
+  const builtInRoles: CommunityRole[] = [
+    CommunityRole.superadmin,
+    CommunityRole.admin,
+    CommunityRole.member,
+    ...(guestsEnabled && activeCommunity?.max_guests !== 0 ? [CommunityRole.guest] : []),
+  ];
   const rolesQuery = useCustomRoles({ enabled: held.holds("roles") });
   const deleteRole = useDeleteCustomRole();
   // `null` closed; `"new"` adds one.
@@ -205,18 +208,6 @@ export const SettingsCommunityRolesPage = () => {
   // keep applying, and nobody changes them.
   const closed = Boolean(activeCommunity?.closed_surfaces?.includes("custom_roles"));
   const changes = held.writes && !closed;
-  // What the server allows, so nobody fills in a form it must refuse: a role
-  // holding nothing the reader lacks, on the admin rung only for an admin, and
-  // deleting an admin's role (which gives its holders everything back) only for
-  // somebody who holds everything. A settings grant answers for itself.
-  const lent = Boolean(activeCommunity?.grantSettingsLevel);
-  const holdsEvery = ADMIN_SURFACES.every(held.holds);
-  const editable = (role: CustomRoleRead) =>
-    lent ||
-    (role.surfaces.every(held.holds) &&
-      (role.base_rung !== "admin" || Boolean(activeCommunity?.can.administer)));
-  const deletable = (role: CustomRoleRead) =>
-    editable(role) && (lent || role.base_rung !== "admin" || holdsEvery);
   // A role the deployment defined is given here, and changed only by it.
   const fromDeployment = (role: CustomRoleRead) => role.set_by === "deployment";
 
@@ -240,7 +231,7 @@ export const SettingsCommunityRolesPage = () => {
             <CardTitle>{t("customRoles.title")}</CardTitle>
             <CardDescription>{t("customRoles.description")}</CardDescription>
           </div>
-          {roles.length > 0 ? addButton : null}
+          {addButton}
         </CardHeader>
         <CardContent className="space-y-4">
           {closed ? (
@@ -248,76 +239,81 @@ export const SettingsCommunityRolesPage = () => {
               <AlertDescription>{t("customRoles.closed")}</AlertDescription>
             </Alert>
           ) : null}
+          <ul className="divide-y rounded-md border">
+            {builtInRoles.map((role) => (
+              <li key={role} className="space-y-1.5 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium">
+                    {t(`communities:users.communityRole.${role}` as never)}
+                  </p>
+                  <Badge variant="secondary" className="font-normal">
+                    {t("customRoles.builtIn")}
+                  </Badge>
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  {t(`communities:users.communityRoleHelp.${role}` as never)}
+                </p>
+              </li>
+            ))}
+            {roles.map((role) => (
+              <li key={role.id} className="flex items-start justify-between gap-3 p-3">
+                <div className="min-w-0 space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{role.name}</p>
+                    <span className="text-muted-foreground text-xs">
+                      {t(`customRoles.rung.${role.base_rung === "admin" ? "admin" : "member"}`)}
+                    </span>
+                  </div>
+                  {role.surfaces.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {role.surfaces.map((surface) => (
+                        <Badge key={surface} variant="secondary" className="font-normal">
+                          {t(`customRoles.surfaces.${surface}.label`)}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-xs">{t("customRoles.holdsNothing")}</p>
+                  )}
+                  {fromDeployment(role) ? (
+                    <p className="text-muted-foreground text-xs">
+                      {t("customRoles.setByDeployment")}
+                    </p>
+                  ) : changes && !held.gives(role) ? (
+                    <p className="text-muted-foreground text-xs">{t("customRoles.beyondYours")}</p>
+                  ) : changes && !held.takesOff(role) ? (
+                    <p className="text-muted-foreground text-xs">
+                      {t("customRoles.widensAnAdmin")}
+                    </p>
+                  ) : null}
+                </div>
+                {changes && held.gives(role) && !fromDeployment(role) ? (
+                  <RowActionsMenu subject={role.name}>
+                    <DropdownMenuItem onSelect={() => setEditing(role)}>
+                      <Pencil className="h-4 w-4" />
+                      {t("common:edit")}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      disabled={!held.takesOff(role)}
+                      onSelect={() => setDeleting(role)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {t("common:delete")}
+                    </DropdownMenuItem>
+                  </RowActionsMenu>
+                ) : null}
+              </li>
+            ))}
+          </ul>
           {rolesQuery.isLoading ? (
             <SkeletonRegion label={t("customRoles.loading")}>
               <ListSkeleton rows={2} avatar={false} />
             </SkeletonRegion>
           ) : rolesQuery.isError ? (
-            <p className="text-destructive text-sm">{t("customRoles.loadError")}</p>
-          ) : roles.length === 0 ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <p className="text-muted-foreground text-sm">{t("customRoles.empty")}</p>
-              {addButton}
-            </div>
-          ) : (
-            <ul className="divide-y rounded-md border">
-              {roles.map((role) => (
-                <li key={role.id} className="flex items-start justify-between gap-3 p-3">
-                  <div className="min-w-0 space-y-1.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium">{role.name}</p>
-                      <span className="text-muted-foreground text-xs">
-                        {t(`customRoles.rung.${role.base_rung === "admin" ? "admin" : "member"}`)}
-                      </span>
-                    </div>
-                    {role.surfaces.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {role.surfaces.map((surface) => (
-                          <Badge key={surface} variant="secondary" className="font-normal">
-                            {t(`customRoles.surfaces.${surface}.label`)}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-muted-foreground text-xs">
-                        {t("customRoles.holdsNothing")}
-                      </p>
-                    )}
-                    {fromDeployment(role) ? (
-                      <p className="text-muted-foreground text-xs">
-                        {t("customRoles.setByDeployment")}
-                      </p>
-                    ) : changes && !editable(role) ? (
-                      <p className="text-muted-foreground text-xs">
-                        {t("customRoles.beyondYours")}
-                      </p>
-                    ) : changes && !deletable(role) ? (
-                      <p className="text-muted-foreground text-xs">
-                        {t("customRoles.widensAnAdmin")}
-                      </p>
-                    ) : null}
-                  </div>
-                  {changes && editable(role) && !fromDeployment(role) ? (
-                    <RowActionsMenu subject={role.name}>
-                      <DropdownMenuItem onSelect={() => setEditing(role)}>
-                        <Pencil className="h-4 w-4" />
-                        {t("common:edit")}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        disabled={!deletable(role)}
-                        onSelect={() => setDeleting(role)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        {t("common:delete")}
-                      </DropdownMenuItem>
-                    </RowActionsMenu>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
+            <StatusMessage onRetry={rolesQuery.refetch} />
+          ) : null}
         </CardContent>
       </Card>
 
@@ -333,7 +329,6 @@ export const SettingsCommunityRolesPage = () => {
         title={t("customRoles.deleteTitle", { name: deleting?.name ?? "" })}
         description={t("customRoles.deleteDescription")}
         confirmLabel={t("common:delete")}
-        cancelLabel={t("common:cancel")}
         destructive
         isLoading={deleteRole.isPending}
         onConfirm={() => {

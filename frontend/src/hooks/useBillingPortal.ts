@@ -1,10 +1,9 @@
-import { Browser } from "@capacitor/browser";
-import { Capacitor } from "@capacitor/core";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
 import { createCommunityBillingHandoff } from "@/api/generated/communities/communities";
 import { useAppConfig } from "@/hooks/useAppConfig";
+import { openExternal, reserveTab as reserveBlankTab } from "@/lib/openExternal";
 import { sellsOnThisDevice, useStoreSellingAnswer } from "@/lib/storeSelling";
 
 /** Portal page to land on: the plan/card setup screen, or the existing
@@ -19,21 +18,6 @@ export interface BillingPortalQuery {
   request?: "plugin";
   listing?: string;
 }
-
-/** The phone apps, which open the portal with `@capacitor/browser`. */
-const opensInBrowserSheet = (): boolean => {
-  const platform = Capacitor.getPlatform();
-  return platform === "ios" || platform === "android";
-};
-
-/** A tab opened now, inside the click, to send to the portal once the handoff
- *  is minted; none in the phone apps, which open a browser sheet instead. */
-const blankTab = (): Window | null => {
-  if (opensInBrowserSheet()) return null;
-  const tab = window.open("about:blank", "_blank");
-  if (tab) tab.opener = null;
-  return tab;
-};
 
 /**
  * Link-out to the external billing portal for one community.
@@ -107,7 +91,10 @@ export const useBillingPortal = () => {
     [pageUrl]
   );
 
-  const reserveTab = useCallback((): Window | null => (canSell ? blankTab() : null), [canSell]);
+  const reserveTab = useCallback(
+    (): Window | null => (canSell ? reserveBlankTab() : null),
+    [canSell]
+  );
 
   // `selling` false for a page that sells nothing (a request to the
   // deployment's owners), which any device may open where there is a portal.
@@ -119,7 +106,7 @@ export const useBillingPortal = () => {
       selling: boolean
     ) => {
       if (selling ? !canSell : !hasBilling) return;
-      const tab = reserved ?? (selling ? reserveTab() : blankTab());
+      const tab = reserved ?? (selling ? reserveTab() : reserveBlankTab());
       let url = base;
       try {
         const { handoff_token } = await createCommunityBillingHandoff(communityId);
@@ -127,15 +114,7 @@ export const useBillingPortal = () => {
       } catch {
         // Without a handoff, the bare portal page.
       }
-      if (opensInBrowserSheet()) {
-        try {
-          await Browser.open({ url });
-        } catch {
-          // No browser sheet: let the system open the address.
-          window.open(url, "_blank", "noopener,noreferrer");
-        }
-      } else if (tab) tab.location.href = url;
-      else window.open(url, "_blank", "noopener,noreferrer");
+      openExternal(url, tab);
     },
     [canSell, hasBilling, reserveTab]
   );

@@ -1,21 +1,18 @@
 import { useTranslation } from "react-i18next";
 
+import {
+  useGetPlatformAiMode,
+  useListPlatformConnections,
+} from "@/api/generated/ai-settings/ai-settings";
 import type { AIConfigMode } from "@/api/generated/initiativeAPI.schemas";
 import {
   AIConnectionManager,
   type ConnectionMutations,
 } from "@/components/settings/AIConnectionManager";
-import { FormSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   useCreatePlatformConnection,
   useDeletePlatformConnection,
   useFetchPlatformConnectionModels,
-  usePlatformAIMode,
-  usePlatformConnections,
   useTestPlatformConnection,
   useUpdatePlatformAIMode,
   useUpdatePlatformConnection,
@@ -23,9 +20,14 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useServerForm } from "@/hooks/useServerForm";
 import { getProvidersForScope } from "@/lib/ai-providers";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Label } from "@/ui/label";
+import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
+import { StatusMessage } from "@/ui/status-message";
 
 const MODES: AIConfigMode[] = ["disabled", "platform", "community"];
 
@@ -34,7 +36,7 @@ export const SettingsAIPage = () => {
   const { user } = useAuth();
   const isPlatformOwner = hasCapability(user, Capability.configManage);
 
-  const modeQuery = usePlatformAIMode({ enabled: isPlatformOwner });
+  const modeQuery = useGetPlatformAiMode({ query: { enabled: isPlatformOwner } });
   // Chosen, then saved: a refetch in between must not put the old mode back.
   const form = useServerForm(
     modeQuery.data,
@@ -48,12 +50,11 @@ export const SettingsAIPage = () => {
 
   const updateMode = useUpdatePlatformAIMode({
     onSuccess: () => toast.success(t("platformAI.modeSaved")),
-    onError: (error) => toast.error(getErrorMessage(error, "settings:platformAI.modeSaveError")),
   });
 
   const savedMode = modeQuery.data?.mode;
-  const connectionsQuery = usePlatformConnections({
-    enabled: isPlatformOwner && savedMode === "platform",
+  const connectionsQuery = useListPlatformConnections({
+    query: { enabled: isPlatformOwner && savedMode === "platform" },
   });
 
   const mutations: ConnectionMutations = {
@@ -77,7 +78,7 @@ export const SettingsAIPage = () => {
   }
 
   if (modeQuery.isError || !modeQuery.data) {
-    return <p className="text-destructive text-sm">{t("ai.loadError")}</p>;
+    return <StatusMessage onRetry={modeQuery.refetch} />;
   }
 
   const isDirty = mode !== modeQuery.data.mode;
@@ -126,11 +127,7 @@ export const SettingsAIPage = () => {
 
       {savedMode === "platform" && (
         <Card>
-          <CardHeader>
-            <CardTitle>{t("platformAI.connectionsTitle")}</CardTitle>
-            <CardDescription>{t("platformAI.connectionsDescription")}</CardDescription>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <AIConnectionManager
               scope="platform"
               connections={connectionsQuery.data ?? []}

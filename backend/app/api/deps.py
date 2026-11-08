@@ -1,3 +1,4 @@
+import json
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Annotated, Any, NoReturn, Optional, Sequence
@@ -9,22 +10,10 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.plugin_access_token import InstallAccessToken
-from app.core.plugin_scopes import (
-    UnknownPluginScope,
-    parse_scope,
-    validate_scopes,
-)
+from app.core import audit_context, auth_context
 from app.core.capabilities import Capability, user_has_capability
 from app.core.config import API_V1_STR
-from app.core.login_methods import LoginMethod
-from app.core import auth_context
-from app.services.membership import live_membership_clause
-from app.services.tenant import plugin_age
-from app.services.tenant.plugin_age import AgeViewer
-from app.services.auth import credentials
-from app.services.auth import guild_provider_connections as guild_connections
-from app.core.tools import Tool
+from app.core.guild_auth_options import CommunityAuthOption
 from app.core.identify import (
     FEED_URL_CREDENTIALS,
     CredentialKind,
@@ -33,37 +22,32 @@ from app.core.identify import (
     identify,
     identify_url_token,
 )
-from app.services.auth.credentials import (
-    Authenticated,
-    CredentialRefused,
-    asked_of_an_account,
-)
-from app.services.auth.assurance import (
-    SECOND_FACTOR_AMR,
-    carries_passkey,
-)
-from app.core.login_methods import SecondFactorRequirement
-from app.core.guild_auth_options import CommunityAuthOption
-from app.services.platform import auth_posture
-from app.services.platform import guild_entitlements, rules
-from app.core import audit_context
-from app.core.messages import (
-    AccessGrantMessages,
-    PluginMessages,
-    AuthMessages,
-    DirectMessageMessages,
-    GuildMessages,
-    UserMessages,
-)
-from app.core.security import (
-    SESSION_COOKIE_NAME,
-    STEP_UP_CHALLENGE,
-)
 from app.core.identity_boundary import (
     InstallBoundary,
     admit_install,
     written_mention_refs,
 )
+from app.core.login_methods import LoginMethod, SecondFactorRequirement
+from app.core.messages import (
+    AccessGrantMessages,
+    AuthMessages,
+    DirectMessageMessages,
+    GuildMessages,
+    PluginMessages,
+    UserMessages,
+)
+from app.core.plugin_access_token import InstallAccessToken
+from app.core.plugin_scopes import (
+    UnknownPluginScope,
+    parse_scope,
+    validate_scopes,
+)
+from app.core.rules import SignInRequirement
+from app.core.security import (
+    SESSION_COOKIE_NAME,
+    STEP_UP_CHALLENGE,
+)
+from app.core.tools import Tool
 from app.db import cohorts
 from app.db.guild_standing import (
     ActorContext,
@@ -71,16 +55,16 @@ from app.db.guild_standing import (
     InstallContext,
     named_ref_candidates,
 )
-from app.models.platform.identity_ref import IdentityEntity
 from app.db.public_rls import PLATFORM_SUSPENDED
 from app.db.request_context import (
-    Filer,
     ContentGrantee,
-    SignIn,
+    Filer,
+    IdeaReader,
     Install,
     Member,
     Platform,
     SettingsGrantee,
+    SignIn,
 )
 from app.db.session import (
     apply_guild_standing,
@@ -96,22 +80,37 @@ from app.models.platform.access_grant import (
     AccessGrantPurpose,
     AccessLevel,
 )
+from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.guild import (
     LIVE_STATUS_VALUES,
     AdminSurface,
-    Guild,
-    GuildMembership,
     CommunityRole,
     CommunityStatus,
+    Guild,
+    GuildMembership,
 )
-from app.core.rules import SignInRequirement
-from app.models.platform.auth_provider import AuthProvider
+from app.models.platform.identity_ref import IdentityEntity
 from app.models.platform.user import (
     LOGIN_STATUSES,
     User,
     UserStatus,
 )
+from app.services.auth import credentials
+from app.services.auth import guild_provider_connections as guild_connections
+from app.services.auth.assurance import (
+    SECOND_FACTOR_AMR,
+    carries_passkey,
+)
+from app.services.auth.credentials import (
+    Authenticated,
+    CredentialRefused,
+    asked_of_an_account,
+)
+from app.services.membership import live_membership_clause
 from app.services.platform import access_grants as access_grants_service
+from app.services.platform import auth_posture, guild_entitlements, rules
+from app.services.tenant import plugin_age
+from app.services.tenant.plugin_age import AgeViewer
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 SystemSessionDep = Annotated[AsyncSession, Depends(get_system_session)]
@@ -129,7 +128,6 @@ _SAFE_HTTP_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 #: something authority the credential itself carries, because there the
 #: credential is a party to the decision rather than a way of transporting it.
 CREDENTIAL_SESSION = CredentialKind.session.value
-CREDENTIAL_API_KEY = CredentialKind.api_key.value
 #: An installed plug-in's access token. Only a route that names a plug-in scope
 #: admits one (:func:`plugin_scope`).
 CREDENTIAL_INSTALL = "install"
@@ -1260,16 +1258,6 @@ async def get_guild_settings_session(
     return session
 
 
-async def get_guild_settings_write_session(
-    session: SessionDep,
-    guild_context: Annotated[GuildContext, Depends(get_guild_settings_context)],
-) -> AsyncSession:
-    """The same session, for a configuration route that changes something: a
-    grantee is asked for the ``read_write`` grant beside the rung."""
-    require_grant_writes(guild_context)
-    return session
-
-
 async def establish_guild_access(
     session: AsyncSession,
     current_user: User,
@@ -1445,6 +1433,36 @@ async def establish_filer_access(session: AsyncSession, user: User) -> int:
     return guild_id
 
 
+async def establish_ideas_access(session: AsyncSession, user: Optional[User]) -> int:
+    """Route ``session`` as whoever reads the published ideas, ``user`` or
+    nobody signed in — the establishment seam for the ideas, beside
+    :func:`establish_filer_access`.
+
+    Into the operations community's ``guild_<id>_ideas`` role, which is what
+    decides what they read. ``session`` comes from that community's cohort on
+    the request engine. Returns the community's id.
+
+    Raises :class:`FilerAccessError` where no operations community is set, or
+    it has no ideas role to assume.
+    """
+    from app.services.platform.intake import configured_operations_guild_id
+
+    guild_id = await configured_operations_guild_id()
+    if guild_id is None:
+        raise FilerAccessError("no operations community")
+    user_id = int(user.id) if user is not None else None
+    try:
+        await set_rls_context(session, IdeaReader(guild_id=guild_id, user_id=user_id))
+        # Applied by the first statement: a community with no ideas role to
+        # assume is refused here rather than by the caller's first read.
+        await session.exec(sa_text("SELECT 1"))
+    except DBAPIError as exc:
+        clear_rls_context(session)
+        await session.rollback()
+        raise FilerAccessError("operations community cannot be routed") from exc
+    return guild_id
+
+
 async def establish_install_access(
     session: AsyncSession,
     install: VerifiedInstall,
@@ -1558,7 +1576,8 @@ def _strings_in(value: Any) -> list[str]:
 
 async def named_refs(request: Request) -> list[str]:
     """The references an installed plug-in's request names: in its path, its query
-    string and its JSON body, a mention in its text included.
+    string (inside a value that is JSON too, as a list's filters are) and its
+    JSON body, a mention in its text included.
 
     Read before FastAPI validates any of them, so the standing statement can
     resolve them in the same round trip. Starlette keeps the body it read, so
@@ -1566,7 +1585,14 @@ async def named_refs(request: Request) -> list[str]:
     nobody here; FastAPI answers for it.
     """
     values: list[str] = [str(v) for v in request.path_params.values()]
-    values.extend(v for _, v in request.query_params.multi_items())
+    for _, value in request.query_params.multi_items():
+        values.append(value)
+        # JSON may lead with whitespace, as the filter parser reads it.
+        if value.lstrip(" \t\n\r")[:1] in ("[", "{"):
+            try:
+                values.extend(_strings_in(json.loads(value)))
+            except ValueError:
+                pass
     content_type = request.headers.get("content-type", "")
     if "json" in content_type and await request.body():
         try:
@@ -1989,9 +2015,6 @@ SettingsSeatWriteContextDep = Annotated[
     Depends(require_guild_roles(CommunityRole.superadmin, settings=True, write=True)),
 ]
 SettingsRLSSessionDep = Annotated[AsyncSession, Depends(get_guild_settings_session)]
-SettingsWriteSessionDep = Annotated[
-    AsyncSession, Depends(get_guild_settings_write_session)
-]
 SeatContextDep = Annotated[GuildContext, Depends(get_guild_seat_context)]
 SeatWriteContextDep = Annotated[GuildContext, Depends(get_guild_seat_write_context)]
 SeatSessionDep = Annotated[AsyncSession, Depends(get_guild_seat_session)]
@@ -2048,21 +2071,6 @@ async def _apply_user_session_context(
     )
     await set_rls_context(session, Platform(user_id=current_user.id, tier=tier))
     return session
-
-
-async def get_factor_exempt_user_session(
-    session: SessionDep,
-    current_user: FactorExemptUser,
-) -> AsyncSession:
-    """The platform-path session for a route that stays reachable while the
-    deployment's second-factor rule is unmet — routed exactly as the ordinary
-    one, and holding no more."""
-    return await _apply_user_session_context(session, current_user)
-
-
-FactorExemptSessionDep = Annotated[
-    AsyncSession, Depends(get_factor_exempt_user_session)
-]
 
 
 async def get_account_holder_session(

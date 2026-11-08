@@ -7,11 +7,13 @@
  * flips to "requested" when the directory re-reads.
  */
 
-import { Loader2 } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
+import { useRequestToJoinInitiative } from "@/hooks/useInitiatives";
+import { toast } from "@/lib/mascotToast";
+import type { DialogProps } from "@/types/dialog";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -19,12 +21,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useRequestToJoinInitiative } from "@/hooks/useInitiatives";
-import { toast } from "@/lib/mascotToast";
-import type { DialogProps } from "@/types/dialog";
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Textarea } from "@/ui/textarea";
 
 /** Mirrors `JOIN_REQUEST_MESSAGE_MAX_LENGTH` in the backend's initiative
  *  schemas, which is the authority — this only stops the typing early so a
@@ -45,11 +44,13 @@ export const RequestToJoinDialog = ({
   const [message, setMessage] = useState("");
 
   // Reset on close, however it was closed — reopening starts a fresh note.
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (!open) {
       setMessage("");
     }
-  }, [open]);
+  }
 
   const requestToJoin = useRequestToJoinInitiative({
     onSuccess: () => {
@@ -80,10 +81,8 @@ export const RequestToJoinDialog = ({
           <DialogDescription>{t("joinRequests.dialogDescription")}</DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="join-request-message">{t("joinRequests.messageLabel")}</Label>
+          <Field label={t("joinRequests.messageLabel")} hint={t("joinRequests.messageHint")}>
             <Textarea
-              id="join-request-message"
               value={message}
               onChange={(event) => setMessage(event.target.value)}
               placeholder={t("joinRequests.messagePlaceholder")}
@@ -91,18 +90,10 @@ export const RequestToJoinDialog = ({
               rows={3}
               disabled={requestToJoin.isPending}
             />
-            <p className="text-muted-foreground text-xs">{t("joinRequests.messageHint")}</p>
-          </div>
+          </Field>
           <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button type="submit" disabled={requestToJoin.isPending || !initiative}>
-              {requestToJoin.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("joinRequests.sending")}
-                </>
-              ) : (
-                t("joinRequests.send")
-              )}
+            <Button type="submit" disabled={!initiative} pending={requestToJoin.isPending}>
+              {requestToJoin.isPending ? t("joinRequests.sending") : t("joinRequests.send")}
             </Button>
           </DialogFooter>
         </form>

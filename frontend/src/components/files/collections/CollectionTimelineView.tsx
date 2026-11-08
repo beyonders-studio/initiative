@@ -4,11 +4,11 @@ import { useTranslation } from "react-i18next";
 import type { CollectionFileSummary, TimelineBucket } from "@/api/generated/initiativeAPI.schemas";
 import { CollectionFileTile } from "@/components/files/collections/CollectionFileTile";
 import type { CollectionCard } from "@/components/files/collections/collectionLists";
-import { type VirtualRow, VirtualRows } from "@/components/files/collections/VirtualRows";
 import { TimelineRail } from "@/components/timeline/TimelineRail";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
 import { fileRatio, formatDay, groupByDay } from "@/lib/collections";
 import { formatPeriod, formatPeriodYear } from "@/lib/formatDate";
+import { type VirtualRow, VirtualRows } from "@/ui/virtual-rows";
 
 interface CollectionTimelineViewProps {
   files: CollectionFileSummary[];

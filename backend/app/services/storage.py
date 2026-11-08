@@ -1054,11 +1054,6 @@ class EncryptedStorage:
             ),
         )
 
-    def is_encrypted(self, key: str) -> bool | None:
-        """Whether ``key`` is stored encrypted; ``None`` where it is missing."""
-        probed = self._probe(key)
-        return None if probed is None else probed[1] is not None
-
     def encrypt_in_place(self, key: str) -> bool:
         """Re-write ``key``, stored before encryption was on, encrypted.
         Returns whether it did: not for an object already encrypted, missing,
@@ -1279,6 +1274,16 @@ class _RangeReader(io.RawIOBase):
         return len(data)
 
 
+def blob_pieces(blob: ReadableBlob) -> Iterator[bytes]:
+    """A stored file's bytes a piece at a time, from disk or from a stream."""
+    if blob.path is None:
+        yield from blob.stream or ()
+        return
+    with blob.path.open("rb") as handle:
+        while piece := handle.read(1024 * 1024):
+            yield piece
+
+
 def open_seekable(backend: StorageBackend, key: str, size: int) -> BinaryIO | None:
     """``key``'s ``size`` bytes as a seekable file, ``None`` when it is
     missing: the file itself where the backend keeps one on disk, otherwise
@@ -1349,10 +1354,6 @@ def reset_s3_client() -> None:
     """
     global _s3_client
     _s3_client = None
-
-
-def _backend_name() -> str:
-    return current_storage_config().backend
 
 
 def _local(prefix: str = "") -> LocalFilesystemStorage:
@@ -1437,23 +1438,6 @@ def _make(prefix: str) -> StorageBackend:
             return DualReadStorage(primary=s3, fallback=_local(prefix))
         return s3
     raise ValueError(f"Unsupported STORAGE_BACKEND={name!r} (expected 'local' or 's3')")
-
-
-def get_storage() -> StorageBackend:
-    """Return the process-wide local backend.
-
-    There is no *unscoped* S3 backend: all object-store content is guild-scoped,
-    so S3 writes MUST go through :func:`get_guild_storage` (which namespaces keys
-    under ``guild_<id>/``). Returning a root-prefixed S3 backend here would let a
-    caller write objects at the bucket root, outside any guild namespace — so the
-    S3 path raises instead. Identity media (avatars, icons) stays in Postgres, so
-    there is no public-plane S3 caller that would need this.
-    """
-    if _backend_name() == "s3":
-        raise NotImplementedError(
-            "get_storage() has no unscoped S3 backend; use get_guild_storage(guild_id)"
-        )
-    return _make("")
 
 
 def get_guild_storage(guild_id: int) -> StorageBackend:

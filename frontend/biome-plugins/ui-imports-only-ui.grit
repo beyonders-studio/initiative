@@ -1,0 +1,25 @@
+// The UI kit in src/ui is copied whole into our plug-ins, so it imports
+// nothing of Initiative's: npm packages, the kit's own files and the
+// generated API's types, which the copy carries. What it needs from the app
+// comes through ui/host.ts. Kit files import each other as @/ui/…, so a path
+// with a `..` in it is refused wherever it starts: it can climb out of the kit.
+language js
+
+or {
+  JsModuleSource() as $source,
+  `import($source)`
+} where {
+  or {
+    $source <: r"[\"'](?:[^\"']*/)?\.\.(?:/[^\"']*)?[\"']",
+    and {
+      $source <: r"[\"']@/.*",
+      not $source <: r"[\"']@/ui/.*",
+      not $source <: r"[\"']@/api/generated/initiativeAPI\.schemas[\"']"
+    }
+  },
+  register_diagnostic(
+    span=$source,
+    message="src/ui is copied into our plug-ins, so it imports only npm packages, @/ui/… and the generated API's types. Take what the app provides through ui/host.ts, or move this component out of src/ui.",
+    severity="error"
+  )
+}

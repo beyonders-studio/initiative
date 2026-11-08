@@ -32,7 +32,7 @@ from app.models.platform.guild import CommunityRole
 from app.models.platform.user import User
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.initiative import Initiative
-from app.core.legacy_references import rewrite_body, rewrite_ref, rewrite_text
+from app.core.legacy_references import UNMAPPED, rewrite_body, rewrite_ref, rewrite_text
 from app.core.tools import Tool, tool_envelope_type, tool_for_create_permission
 from app.schemas.tenant.import_job import BackupPlanPerson, EnvelopeImportPlan
 from app.services.import_engine.common import (
@@ -98,7 +98,7 @@ _TEXT_KEYS = frozenset(
 
 def _rewrite_strings(value: Any) -> Any:
     if isinstance(value, str):
-        return rewrite_text(value, {})
+        return rewrite_text(value, UNMAPPED)
     if isinstance(value, list):
         return [_rewrite_strings(item) for item in value]
     if isinstance(value, dict):
@@ -110,8 +110,8 @@ def current_shape(value: Any) -> Any:
     """``value``, read from an archive or an envelope, with the names an
     older build gave files spelled as this one spells them, and every
     reference in its bodies and running text as well. A gallery's pictures
-    are restored with no id to name them by, so a reference to one is its
-    words."""
+    are restored with no id to name them by, and a queue and its items are
+    not restored, so a reference to any of them is its words."""
     if isinstance(value, list):
         return [current_shape(item) for item in value]
     if not isinstance(value, dict):
@@ -121,9 +121,9 @@ def current_shape(value: Any) -> Any:
         key = _LEGACY_KEYS.get(key, key)
         if key in _BODY_KEYS:
             item = (
-                rewrite_text(item, {})
+                rewrite_text(item, UNMAPPED)
                 if isinstance(item, str)
-                else rewrite_body(item, {})
+                else rewrite_body(item, UNMAPPED)
             )
         elif key in _TEXT_KEYS:
             item = _rewrite_strings(item)
@@ -143,7 +143,7 @@ def current_shape(value: Any) -> Any:
         shaped["tool"] = _LEGACY_ENTRY_TOOLS[tool]
     ref = shaped.get("external_ref")
     if isinstance(ref, str):
-        shaped["external_ref"] = rewrite_ref(ref, {}) or ref
+        shaped["external_ref"] = rewrite_ref(ref, UNMAPPED) or ref
     permissions = shaped.get("permissions")
     if isinstance(permissions, list):
         shaped["permissions"] = [

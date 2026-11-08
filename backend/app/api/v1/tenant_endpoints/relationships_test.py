@@ -7,19 +7,29 @@ so a caller never has to know that a symmetric edge is stored in node-id order.
 
 from datetime import datetime, timezone
 from httpx import AsyncClient
+from sqlalchemy import text
 
 from app.core.messages import RelationshipMessages
+from app.core.relationships import EndpointKind, RelationshipType
 from app.models.platform.guild import CommunityRole
+from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
+from app.testing.routing import route_as
 from app.testing.schema_harness import route_session_to_guild
 from app.testing import (
     create_resource_grant,
     create_calendar_event,
     create_file,
+    create_guest,
     create_guild_calendar,
+    create_guild_membership,
     create_initiative,
     create_project,
+    create_relationship,
     create_tag,
     create_task,
+    create_user,
+    get_auth_headers,
 )
 
 
@@ -230,8 +240,8 @@ async def test_a_link_you_made_is_yours_to_remove(
 async def test_a_task_link_is_addressed_by_the_same_surface(
     client: AsyncClient, acting_user, session
 ):
-    """The point of one router: a queue item's tasks and a project's files
-    are the same request with different kinds in it."""
+    """The point of one router: an event's files and a task's files are the
+    same request with different kinds in it."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
@@ -254,14 +264,17 @@ async def test_a_task_link_is_addressed_by_the_same_surface(
 async def test_a_kind_no_edge_may_name_is_refused(
     client: AsyncClient, acting_user, session
 ):
+    """Nor is a person what a list is asked about: nothing gathers everything
+    that links to somebody."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    response = await client.get(
-        _url(a), headers=a.headers, params={"entity": "comment:1"}
-    )
-    assert response.status_code == 400
-    assert response.json()["detail"] == RelationshipMessages.BAD_ENDPOINT
+    for entity in ("comment:1", f"user:{a.user.id}"):
+        response = await client.get(
+            _url(a), headers=a.headers, params={"entity": entity}
+        )
+        assert response.status_code == 400, entity
+        assert response.json()["detail"] == RelationshipMessages.BAD_ENDPOINT
 
 
 async def test_a_guild_calendars_event_holds_no_initiative_content(
@@ -369,8 +382,8 @@ async def test_a_replace_cannot_drop_a_link_a_delete_would_refuse(
 async def test_a_kind_no_edge_may_name_is_refused_as_a_filter(
     client: AsyncClient, acting_user, session
 ):
-    """``other_type`` takes any search kind, and the ones no edge can name have
-    to be refused here rather than at the node encoder."""
+    """``other_type`` takes only what an edge can name, so the rest is refused
+    as a bad parameter rather than reaching the node encoder."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
@@ -384,8 +397,7 @@ async def test_a_kind_no_edge_may_name_is_refused_as_a_filter(
         },
         json=[],
     )
-    assert response.status_code == 400, response.text
-    assert response.json()["detail"] == RelationshipMessages.BAD_ENDPOINT
+    assert response.status_code == 422, response.text
 
 
 async def test_an_archived_project_takes_no_new_links(
@@ -800,6 +812,115 @@ async def test_a_far_end_says_what_it_lives_in(
 
 
 # ---------------------------------------------------------------------------
+# A person on one end
+#
+# A link to somebody says something about the item on its other end, so it is
+# made by whoever may edit that item and shown to whoever may read it.
+# ---------------------------------------------------------------------------
+
+
+async def test_a_link_to_a_person_is_made_by_whoever_may_edit_the_item(
+    client: AsyncClient, acting_user, session
+):
+    """Whatever the type, and whichever side the person is on. Somebody who may
+    only read the task says nothing about people on it, the person has to be in
+    the community, and two people are not linked to each other."""
+    a = await acting_user(
+        guild_role=CommunityRole.member, initiative=True, project=True
+    )
+    b = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=a.guild,
+        initiative=a.initiative,
+        initiative_role="member",
+    )
+    task = await create_task(session, a.project)
+    # Readable by everyone in the initiative, writable only by its owner.
+    await create_resource_grant(session, a.project, all_initiative_members=True)
+    stranger = await create_user(session)
+    item = {"type": "task", "id": task.id}
+    a_end = {"type": "user", "id": a.user.id}
+    b_end = {"type": "user", "id": b.user.id}
+
+    async def link(actor, source: dict, rtype: str, target: dict):
+        return await client.post(
+            _url(actor),
+            headers=actor.headers,
+            json={"source": source, "relationship_type": rtype, "target": target},
+        )
+
+    for rtype in ("depends_on", "related_to"):
+        made = await link(a, item, rtype, b_end)
+        assert made.status_code == 201, made.text
+        other = made.json()["other"]
+        assert (other["type"], other["id"]) == ("user", b.user.id)
+
+    for source, rtype, target in (
+        (item, "depends_on", a_end),
+        (item, "related_to", a_end),
+        (b_end, "part_of", item),
+    ):
+        refused = await link(b, source, rtype, target)
+        assert refused.status_code == 403, refused.text
+        assert refused.json()["detail"] == RelationshipMessages.ITEM_NOT_WRITABLE
+
+    outside = await link(a, item, "related_to", {"type": "user", "id": stranger.id})
+    assert outside.status_code == 404, outside.text
+    assert outside.json()["detail"] == RelationshipMessages.ENDPOINT_NOT_FOUND
+
+    between = await link(a, a_end, "related_to", b_end)
+    assert between.status_code == 400, between.text
+    assert between.json()["detail"] == RelationshipMessages.BETWEEN_PEOPLE
+
+
+async def test_a_link_to_a_person_shows_to_whoever_reads_the_item(
+    client: AsyncClient, acting_user, session, role_session
+):
+    """A guest given the project reads the task's link to somebody, drawn as the
+    community shows them; a member who cannot open the task reads no row of it."""
+    a = await acting_user(
+        guild_role=CommunityRole.member, initiative=True, project=True
+    )
+    task = await create_task(session, a.project)
+    jane = await create_user(session, avatar_url="https://example.test/jane.png")
+    await create_guild_membership(
+        session, user=jane, guild=a.guild, display_name="Jane"
+    )
+    await create_relationship(
+        session,
+        a.guild,
+        source=(EndpointKind.task, task.id),
+        target=(EndpointKind.user, jane.id),
+        relationship_type=RelationshipType.depends_on,
+    )
+    await app_settings_service.ensure_settings_row(session)
+    await rules.put(session, "guests_enabled", True)
+    await session.commit()
+    guest = await create_guest(session, a.guild)
+    await create_resource_grant(session, a.project, user=guest)
+    outsider = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
+
+    response = await client.get(
+        _url(a), headers=get_auth_headers(guest), params={"entity": f"task:{task.id}"}
+    )
+    assert response.status_code == 200, response.text
+    (edge,) = response.json()
+    other = edge["other"]
+    assert (other["type"], other["id"], other["initiative_id"]) == (
+        "user",
+        jane.id,
+        None,
+    )
+    assert other["title"] == "Jane"
+    assert other["handle"] == f"{jane.username}{jane.discriminator:04d}"
+    assert other["image_urls"] == ["https://example.test/jane.png"]
+
+    unreadable = await role_session("app_user")
+    await route_as(unreadable, user_id=outsider.user.id, guild_id=a.guild.id)
+    assert (await unreadable.exec(text("SELECT id FROM relationships"))).all() == []
+
+
+# ---------------------------------------------------------------------------
 # A neighbourhood
 #
 # What the graph draws: everything within a few hops of one thing, in one
@@ -809,8 +930,6 @@ async def test_a_far_end_says_what_it_lives_in(
 
 async def _seed(session, guild_id: int, *pairs) -> None:
     """Record ``(source, type, target)`` edges as they are, past the picker."""
-    from app.core.relationships import RelationshipType
-    from app.core.search import SearchEntityType
     from app.services.tenant import relationships as relationships_service
     from app.services.tenant.relationships import Endpoint
 
@@ -818,9 +937,9 @@ async def _seed(session, guild_id: int, *pairs) -> None:
     for (source_kind, source_id), rtype, (target_kind, target_id) in pairs:
         await relationships_service.create(
             session,
-            source=Endpoint(SearchEntityType(source_kind), source_id),
+            source=Endpoint(EndpointKind(source_kind), source_id),
             relationship_type=RelationshipType(rtype),
-            target=Endpoint(SearchEntityType(target_kind), target_id),
+            target=Endpoint(EndpointKind(target_kind), target_id),
         )
     await session.commit()
 
@@ -927,6 +1046,27 @@ async def test_a_neighbourhood_walks_through_labels_only_when_asked(
 
     with_tags, _ = await _neighbourhood(client, a, centre, hops=2, include_tags="true")
     assert with_tags == {("tag", tag.id): 1, ("project", elsewhere.id): 2}
+
+
+async def test_a_neighbourhood_reaches_a_person_and_walks_no_further(
+    client: AsyncClient, acting_user, session
+):
+    """What else links to somebody is read from each of those items' side,
+    never gathered from theirs."""
+    a = await acting_user(
+        guild_role=CommunityRole.member, initiative=True, project=True
+    )
+    elsewhere = await create_file(session, a.initiative, a.user)
+    await _seed(
+        session,
+        a.guild.id,
+        (("project", a.project.id), "related_to", ("user", a.user.id)),
+        (("file", elsewhere.id), "related_to", ("user", a.user.id)),
+    )
+
+    nodes, edges = await _neighbourhood(client, a, f"project:{a.project.id}", hops=3)
+    assert nodes == {("user", a.user.id): 1}
+    assert len(edges) == 1
 
 
 async def test_a_neighbourhood_does_not_walk_past_what_the_reader_cannot_open(

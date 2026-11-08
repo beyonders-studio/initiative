@@ -91,8 +91,11 @@ def _create() -> None:
 
 def _drop() -> None:
     """Drop the table: its rendered policies first, then its row security,
-    then the table."""
+    then the table. A schema without it, where a later revision dropped it,
+    is left alone."""
     bind = op.get_bind()
+    if bind.execute(sa.text("SELECT to_regclass(:t) IS NULL"), {"t": TABLE}).scalar():
+        return
     for (name,) in bind.execute(
         sa.text("SELECT polname FROM pg_policy WHERE polrelid = to_regclass(:t)"),
         {"t": TABLE},

@@ -1,31 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
-
 import {
   createAnnouncement,
   deleteAnnouncement,
-  getListAllAnnouncementsQueryKey,
-  listAllAnnouncements,
   updateAnnouncement,
   uploadAnnouncementImage,
 } from "@/api/generated/announcements/announcements";
 import type {
   AnnouncementImageRead,
-  AnnouncementOperatorListResponse,
   AnnouncementOperatorRead,
   AnnouncementUpdate,
   AnnouncementWrite,
 } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { useApiMutation } from "@/hooks/useApiMutation";
-import type { QueryOpts } from "@/types/query";
-
-/** Every announcement, drafts and compiled-in notices included. */
-export const usePlatformAnnouncements = (options?: QueryOpts<AnnouncementOperatorListResponse>) =>
-  useQuery<AnnouncementOperatorListResponse>({
-    queryKey: getListAllAnnouncementsQueryKey(),
-    queryFn: () => listAllAnnouncements(),
-    ...options,
-  });
 
 export const useCreateAnnouncement = () =>
   useApiMutation<AnnouncementOperatorRead, AnnouncementWrite>({

@@ -20,7 +20,6 @@ from app.core.file_types import FileType
 from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
-from app.models.tenant.queue import Queue
 from app.models.tenant.task import Task
 from app.models.tenant.upload import Upload
 from app.services.tenant.lifecycle_tree import CASCADE_CHILDREN, CASCADE_PARENTS
@@ -222,8 +221,6 @@ async def test_restrictive_delete_policy_exists_on_each_soft_delete_table(
         "comments",
         "initiatives",
         "tags",
-        "queues",
-        "queue_items",
         "calendars",
         "calendar_events",
     }
@@ -711,22 +708,22 @@ async def test_hard_purge_unlinks_references_in_trashed_linking_files(
 # ---------------------------------------------------------------------------
 
 
-async def test_restore_initiative_brings_back_an_archived_queues_items(
+async def test_restore_initiative_brings_back_an_archived_counter_groups_counters(
     session: AsyncSession,
 ):
-    """A queue item carries no ``archived_at``: inside an archived queue it is
-    simply live, because that is the only state it has. Restoring the
+    """A counter carries no ``archived_at``: inside an archived counter group
+    it is simply live, because that is the only state it has. Restoring the
     initiative has to put it back in exactly that state."""
-    from app.models.tenant.queue import QueueItem
+    from app.models.tenant.counter import Counter, CounterGroup
     from app.services.tenant.archive import archive_entity
-    from app.testing.factories import create_queue, create_queue_item
+    from app.testing.factories import create_counter, create_counter_group
 
     user = await create_user(session)
     guild = await create_guild(session, creator=user)
     initiative = await create_initiative(session, guild, user)
-    queue = await create_queue(session, initiative, user)
-    item = await create_queue_item(session, queue)
-    await archive_entity(session, queue)
+    group = await create_counter_group(session, initiative, user)
+    counter = await create_counter(session, group)
+    await archive_entity(session, group)
     await session.commit()
 
     await soft_delete_entity(
@@ -739,15 +736,17 @@ async def test_restore_initiative_brings_back_an_archived_queues_items(
 
     refreshed = (
         await session.exec(
-            select_including_deleted(QueueItem).where(QueueItem.id == item.id)
+            select_including_deleted(Counter).where(Counter.id == counter.id)
         )
     ).one()
     assert refreshed.deleted_at is None
-    refreshed_queue = (
-        await session.exec(select_including_deleted(Queue).where(Queue.id == queue.id))
+    refreshed_group = (
+        await session.exec(
+            select_including_deleted(CounterGroup).where(CounterGroup.id == group.id)
+        )
     ).one()
-    assert refreshed_queue.deleted_at is None
-    assert refreshed_queue.archived_at is not None
+    assert refreshed_group.deleted_at is None
+    assert refreshed_group.archived_at is not None
 
 
 async def test_restore_initiative_brings_back_an_archived_files_comments(
@@ -921,7 +920,6 @@ async def _file(
     from app.models.tenant.comment import Comment
     from app.models.tenant.counter import Counter
     from app.models.tenant.collection import Collection
-    from app.models.tenant.queue import QueueItem
     from app.models.tenant.wiki import Wiki, WikiPage
     from app.testing.factories import (
         TOOL_FACTORIES,
@@ -929,7 +927,6 @@ async def _file(
         create_comment,
         create_counter,
         create_collection,
-        create_queue_item,
         create_task,
         create_wiki_page,
     )
@@ -940,8 +937,6 @@ async def _file(
         return await TOOL_FACTORIES[tool](session, parent, user)
     if model is Task:
         return await create_task(session, parent)
-    if model is QueueItem:
-        return await create_queue_item(session, parent)
     if model is Counter:
         return await create_counter(session, parent)
     if model is CalendarEvent:
