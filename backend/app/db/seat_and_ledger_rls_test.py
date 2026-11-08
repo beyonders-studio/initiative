@@ -27,6 +27,7 @@ from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.ai_connection import GuildAIConnection, GuildAIConnectionKey
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.plugin_placement import PluginPlacement
@@ -54,7 +55,12 @@ async def _as(role_session, *, user_id: int, guild_id: int, settings=False):
 async def _seed_connection(session, guild_id: int, user_id: int) -> None:
     await route_session_to_guild(session, guild_id)
     session.add(
-        GuildAIConnection(label="Shared", provider="openai", created_by=user_id)
+        GuildAIConnection(
+            label="Shared",
+            provider="openai",
+            created_by=user_id,
+            created_by_kind=ActorKind.member,
+        )
     )
     await session.commit()
 
@@ -279,7 +285,10 @@ async def test_only_the_seat_and_the_system_engine_read_secrets(
     )
     await route_session_to_guild(session, seat.guild.id)
     connection = GuildAIConnection(
-        label="Shared", provider="openai", created_by=seat.user.id
+        label="Shared",
+        provider="openai",
+        created_by=seat.user.id,
+        created_by_kind=ActorKind.member,
     )
     session.add(connection)
     await session.flush()
@@ -343,6 +352,7 @@ async def _subscription(session, *, guild_id: int, initiative_id, user_id: int):
     sub = WebhookSubscription(
         initiative_id=initiative_id,
         created_by=user_id,
+        created_by_kind=ActorKind.member,
         target_url="https://hooks.example.com/in",
         hmac_secret="s" * 32,
         event_types=["task.created"],

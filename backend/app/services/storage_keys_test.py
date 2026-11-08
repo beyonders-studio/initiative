@@ -13,6 +13,7 @@ from sqlalchemy import text
 from app.core import storage_crypto
 from app.core.config import settings
 from app.db import session as db_session
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.pending_upload import PendingUpload
 from app.services import storage_config, storage_encryption, storage_keys
 from app.services.storage import (
@@ -144,6 +145,7 @@ async def _arriving(session: Any, guild_id: int, key: str, *, encrypted: bool) -
         PendingUpload(
             id=key.removeprefix("resumable-"),
             created_by=user.id,
+            created_by_kind=ActorKind.member,
             purpose="file",
             filename="big.mov",
             length=100,

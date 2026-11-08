@@ -15,6 +15,7 @@ from sqlmodel import select
 
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.data_job import DataJob, DataJobDirection
 from app.testing import (
     create_access_grant,
@@ -66,6 +67,7 @@ async def test_a_settings_grant_reads_a_members_row_and_writes_only_beside_read_
         DataJob(
             direction=DataJobDirection.export,
             created_by=other.id,
+            created_by_kind=ActorKind.member,
             source="tasks",
             template_id="task-table",
         )

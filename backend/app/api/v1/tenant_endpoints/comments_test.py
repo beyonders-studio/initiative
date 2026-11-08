@@ -368,12 +368,15 @@ async def test_a_comment_is_its_authors_to_change(
     rewrite = text("UPDATE comments SET content = 'Not what I said' WHERE id = :id")
     trash = text(
         "UPDATE comments SET deleted_at = now(),"
-        " deleted_by = NULLIF(current_setting('app.current_user_id'), '')::int"
+        " deleted_by = NULLIF(current_setting('app.current_user_id'), '')::int,"
+        " deleted_by_kind = 'member'"
         " WHERE id = :id"
     )
     forge = text(
-        "INSERT INTO comments (task_id, content, created_by, created_at, updated_at)"
-        " VALUES (:task, 'Said for you', :author, now(), now()) RETURNING created_by"
+        "INSERT INTO comments"
+        " (task_id, content, created_by, created_by_kind, created_at, updated_at)"
+        " VALUES (:task, 'Said for you', :author, 'member', now(), now())"
+        " RETURNING created_by"
     )
 
     for outsider in (other, admin):

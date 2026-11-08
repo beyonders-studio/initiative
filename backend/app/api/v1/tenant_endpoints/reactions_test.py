@@ -13,6 +13,7 @@ from sqlalchemy import delete as sa_delete
 from app.core.messages import ReactionMessages
 from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.schemas.tenant.reaction import SUGGESTED_EMOJI
 from app.services.tenant.reactions import MAX_REACTIONS_PER_USER
@@ -243,6 +244,7 @@ class TestReactionToggle:
                 target_id=comment_id,
                 emoji=THUMBS,
                 created_by=a.user.id,
+                created_by_kind=ActorKind.member,
             )
         )
         await session.commit()
@@ -293,6 +295,7 @@ class TestReactionToggle:
                     target_id=comment_id,
                     emoji=emoji,
                     created_by=a.user.id,
+                    created_by_kind=ActorKind.member,
                 )
             )
         await session.commit()
@@ -992,6 +995,7 @@ async def test_a_reaction_is_its_reactors_to_change(session, acting_user, readin
             target_id=comment.id,
             emoji=PARTY,
             created_by=a.user.id,
+            created_by_kind=ActorKind.member,
         )
         asking.add(mine)
         await asking.flush()

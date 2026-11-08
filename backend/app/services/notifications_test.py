@@ -24,6 +24,7 @@ from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.platform.notice_outbox import NoticeOutboxItem
 from app.models.platform.notification import Notification, NotificationType
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.models.tenant.calendar_event import (
     CalendarEvent,
@@ -144,6 +145,7 @@ def _unsaved_event(
     return CalendarEvent(
         calendar_id=1,
         created_by=1,
+        created_by_kind=ActorKind.member,
         title=title,
         start_at=start_at,
         end_at=end_at,

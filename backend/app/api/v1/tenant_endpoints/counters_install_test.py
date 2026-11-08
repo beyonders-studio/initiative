@@ -16,6 +16,7 @@ from sqlmodel import select
 
 from app.core.messages import PluginMessages
 from app.core.tools import Tool
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.counter import Counter, CounterGroup
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.testing import (
@@ -189,7 +190,10 @@ async def test_what_it_creates_is_its_own_and_it_steps_the_counters(
         (ResourceAccessLevel.owner, installed.plugin.id, None)
     ]
     group = await session.get(CounterGroup, body["id"])
-    assert group is not None and group.created_by is None
+    assert group is not None and (group.created_by, group.created_by_kind) == (
+        installed.plugin.id,
+        ActorKind.plugin,
+    )
 
     renamed = await client.patch(
         guild_url(guild_id, f"/counter-groups/{group.id}"),

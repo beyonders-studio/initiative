@@ -18,6 +18,7 @@ from app.core.messages import PluginMessages
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
 from app.models.platform.notification import Notification, NotificationType
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.task import Task
 from app.testing import (
@@ -304,7 +305,10 @@ async def test_creates_a_task_assigned_by_reference_and_names_nobody(
 
     await route_session_to_guild(session, gid)
     stored = await session.get(Task, body["id"])
-    assert stored is not None and stored.created_by is None
+    assert stored is not None and (stored.created_by, stored.created_by_kind) == (
+        installed.plugin.id,
+        ActorKind.plugin,
+    )
 
     lines = await _assignment_lines(session, installed.seat.user.id)
     assert [line.data["assigned_by_name"] for line in lines] == [installed.plugin.name]
@@ -480,8 +484,16 @@ async def test_makes_a_project_from_a_template_with_its_task_links(
             )
         )
     ).all()
-    assert [(e.relationship_type, e.target_id, e.created_by) for e in edges] == [
-        (RelationshipType.depends_on.value, copies["Design"], None)
+    assert [
+        (e.relationship_type, e.target_id, e.created_by, e.created_by_kind)
+        for e in edges
+    ] == [
+        (
+            RelationshipType.depends_on.value,
+            copies["Design"],
+            installed.plugin.id,
+            ActorKind.plugin,
+        )
     ]
 
 

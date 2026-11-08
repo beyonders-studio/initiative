@@ -19,6 +19,7 @@ from sqlmodel import select
 
 from app.core.audit_events import AuditEventType
 from app.core.messages import PluginMessages, WebhookSubscriptionMessages
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.webhook_subscription import WebhookSubscription
 from app.services.marketplace import plugin_refs
 from app.testing import create_guild_plugin, emitted, route_session_to_guild
@@ -115,7 +116,10 @@ async def test_an_install_subscribes_to_what_its_scopes_read(
 
     row = await _row(session, installed.guild.id, body["id"])
     assert row.plugin_install_id == installed.plugin.id
-    assert row.created_by is None
+    assert (row.created_by, row.created_by_kind) == (
+        installed.plugin.id,
+        ActorKind.plugin,
+    )
     assert row.initiative_id == installed.placed.id
 
     (line,) = emitted(capfd, AuditEventType.WEBHOOK_CREATED)

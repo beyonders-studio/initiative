@@ -14,6 +14,7 @@ from sqlalchemy import update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.task import Task, TaskAssignee, TaskPriority
 from app.services.tenant.task_types import get_default_type
@@ -57,6 +58,7 @@ async def _create_task(
         task_status_id=status.id,
         task_type_id=(await get_default_type(session, project.id)).id,
         created_by=created_by,
+        created_by_kind=ActorKind.member,
         due_date=due_date,
         start_date=start_date,
         priority=priority,
@@ -136,7 +138,11 @@ async def test_list_my_tasks_assigned_or_created(
     await _assign(session, from_other, user.id)
     # A row from before ``created_by`` existed belongs to nobody's created view.
     legacy = await _create_task(session, project, "Legacy", created_by=user.id)
-    await session.exec(update(Task).where(Task.id == legacy.id).values(created_by=None))
+    await session.exec(
+        update(Task)
+        .where(Task.id == legacy.id)
+        .values(created_by=None, created_by_kind=ActorKind.system)
+    )
     await session.commit()
 
     headers = get_auth_headers(user)

@@ -19,6 +19,7 @@ from app.core.file_types import FileType
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.search_entry import SearchEntry
 from app.services.tenant import file_versions
 from app.testing import Actor, create_file
@@ -233,6 +234,7 @@ async def test_a_uploaded_file_indexes_its_filename_only(
         session,
         doc,
         created_by=a.user.id,
+        created_by_kind=ActorKind.member,
         file_url=f"/uploads/{a.guild.id}/v2.pdf",
         file_content_type="application/pdf",
         original_filename="vendor-contract-2026.pdf",

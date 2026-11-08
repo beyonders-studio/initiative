@@ -17,6 +17,7 @@ from app.db import cohorts, timers
 from app.models.platform.community_timer import CommunityTimer
 from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.platform.user_notification_prefs import DigestCadence
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.personal_item import PersonalItem
@@ -437,6 +438,7 @@ async def test_a_webhook_backlog_keeps_the_drain_due(session: AsyncSession):
         WebhookSubscription(
             initiative_id=None,
             created_by=author.id,
+            created_by_kind=ActorKind.member,
             target_url="https://example.test/hook",
             hmac_secret="secret",
             event_types=["posts.created"],

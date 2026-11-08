@@ -15,6 +15,7 @@ from sqlmodel import select, update
 
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.event_outbox import EventOutbox
 from app.models.tenant.plugin_event_outbox import PluginEventOutbox
 from app.models.tenant.webhook_delivery import WebhookDelivery
@@ -146,6 +147,7 @@ async def test_every_subscription_in_a_guild_is_drained(
             WebhookSubscription(
                 initiative_id=None,
                 created_by=user_id,
+                created_by_kind=ActorKind.member,
                 target_url=f"https://example.test/hook-{index}",
                 hmac_secret=f"secret-{index}",
                 event_types=["tasks.created"],
@@ -207,6 +209,7 @@ async def test_ledger_delivers_each_transaction_once(
         WebhookSubscription(
             initiative_id=None,
             created_by=user_id,
+            created_by_kind=ActorKind.member,
             target_url="https://example.test/hook",
             hmac_secret="secret",
             event_types=["tasks.created"],
@@ -267,6 +270,7 @@ async def test_a_refused_batch_is_retried_not_lost_or_overtaken(
         WebhookSubscription(
             initiative_id=None,
             created_by=user_id,
+            created_by_kind=ActorKind.member,
             target_url="https://example.test/hook",
             hmac_secret="secret",
             event_types=["tasks.created"],
@@ -329,6 +333,7 @@ async def test_repeated_refusals_escalate_the_backoff(
         WebhookSubscription(
             initiative_id=None,
             created_by=user_id,
+            created_by_kind=ActorKind.member,
             target_url="https://example.test/hook",
             hmac_secret="secret",
             event_types=["tasks.created"],
@@ -396,6 +401,7 @@ async def test_an_exhausted_batch_is_dead_lettered_and_unblocks_the_backlog(
     subscription = WebhookSubscription(
         initiative_id=None,
         created_by=user_id,
+        created_by_kind=ActorKind.member,
         target_url="https://example.test/hook",
         hmac_secret="secret",
         event_types=["tasks.created"],

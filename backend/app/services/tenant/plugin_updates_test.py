@@ -19,6 +19,7 @@ from app.core.messages import MarketplaceMessages
 from app.core.rules import SURFACE_PLUGINS, SetBy
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification, NotificationType
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.plugin_schedule_run import PluginScheduleRun
 from app.services.platform import rules
@@ -768,6 +769,7 @@ def test_a_version_asking_to_use_another_plugin_asks_for_more():
         definition=_asking("files:read"),
         granted_scopes=["files:read"],
         created_by=1,
+        created_by_kind=ActorKind.member,
     )
     ceiling = ("files:read", "plugins:tests.github")
 
@@ -790,6 +792,7 @@ def test_a_plugin_scope_above_the_ceiling_asks_for_nothing():
         definition=_asking("files:read"),
         granted_scopes=["files:read"],
         created_by=1,
+        created_by_kind=ActorKind.member,
     )
 
     asks = plugin_updates.upgrade_asks(

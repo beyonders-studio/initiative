@@ -9,6 +9,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
 from app.core.security import create_upload_token
+from app.models.tenant._mixins import ActorKind
 from app.services.storage import USER_CONTENT_CSP
 from app.testing.factories import (
     create_access_grant,
@@ -75,6 +76,7 @@ async def test_upload_accessible_with_auth_header(
         Upload(
             filename="test_auth_header.txt",
             created_by=user.id,
+            created_by_kind=ActorKind.member,
             size_bytes=5,
         )
     )
@@ -107,6 +109,7 @@ async def test_a_served_upload_is_cacheable_but_not_indefinitely(
         Upload(
             filename="test_cache_header.txt",
             created_by=user.id,
+            created_by_kind=ActorKind.member,
             size_bytes=5,
         )
     )
@@ -163,6 +166,7 @@ async def test_upload_accessible_with_scoped_upload_token(
         Upload(
             filename="test_query_upload_token.txt",
             created_by=user.id,
+            created_by_kind=ActorKind.member,
             size_bytes=5,
         )
     )
@@ -202,6 +206,7 @@ async def test_issue_upload_token_endpoint(
         Upload(
             filename="test_minted_token.txt",
             created_by=user.id,
+            created_by_kind=ActorKind.member,
             size_bytes=5,
         )
     )
@@ -289,6 +294,7 @@ async def test_upload_guild_member_can_access_file(
     upload = Upload(
         filename="test_guild_access.png",
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         size_bytes=16,
     )
     session.add(upload)
@@ -319,6 +325,7 @@ async def test_upload_non_member_cannot_access_file(
         upload = Upload(
             filename="test_guild_forbidden.png",
             created_by=owner.id,
+            created_by_kind=ActorKind.member,
             size_bytes=16,
         )
         session.add(upload)
@@ -396,8 +403,8 @@ async def test_upload_row_in_guild_schema_is_served(
     await session.exec(
         text(
             f'INSERT INTO "{schema}".uploads'
-            " (filename, created_by, size_bytes, created_at)"
-            " VALUES (:fn, :uid, 5, now())"
+            " (filename, created_by, created_by_kind, size_bytes, created_at)"
+            " VALUES (:fn, :uid, 'member', 5, now())"
         ),
         params={"fn": "test_guild_schema_row.txt", "uid": user.id},
     )
@@ -498,7 +505,14 @@ async def test_an_upload_is_reached_the_way_the_community_is(
     await create_guild_membership(session, user=user, guild=guild)
     _stage_upload(guild.id, "rule.txt")
     await route_session_to_guild(session, guild.id)
-    session.add(Upload(filename="rule.txt", created_by=user.id, size_bytes=5))
+    session.add(
+        Upload(
+            filename="rule.txt",
+            created_by=user.id,
+            created_by_kind=ActorKind.member,
+            size_bytes=5,
+        )
+    )
     await session.commit()
     path = f"/uploads/{guild.id}/rule.txt"
 
@@ -542,6 +556,7 @@ async def test_a_served_upload_is_typed_from_its_row(
         Upload(
             filename="recorded_as_svg.png",
             created_by=user.id,
+            created_by_kind=ActorKind.member,
             size_bytes=44,
             content_type="image/svg+xml",
         )
@@ -574,6 +589,7 @@ async def test_a_served_raster_stays_inline(
         Upload(
             filename="picture.png",
             created_by=user.id,
+            created_by_kind=ActorKind.member,
             size_bytes=16,
             content_type="image/png",
         )
@@ -606,6 +622,7 @@ async def test_a_row_without_a_recorded_type_falls_back_to_its_name(
             Upload(
                 filename=name,
                 created_by=user.id,
+                created_by_kind=ActorKind.member,
                 size_bytes=16,
             )
         )

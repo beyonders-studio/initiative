@@ -17,6 +17,7 @@ from sqlmodel import select
 from app.models.platform.guild import CommunityRole, GuildInvite
 from app.models.platform.rule import CommunityRule
 from app.models.platform.user import UserRole
+from app.models.tenant._mixins import ActorKind
 from app.testing import (
     create_access_grant,
     create_auth_provider,
@@ -28,7 +29,11 @@ from app.testing import (
 
 def _invite(guild_id: int, user_id: int, code: str) -> GuildInvite:
     return GuildInvite(
-        code_hash=code, guild_id=guild_id, created_by=user_id, max_uses=1
+        code_hash=code,
+        guild_id=guild_id,
+        created_by=user_id,
+        created_by_kind=ActorKind.member,
+        max_uses=1,
     )
 
 
