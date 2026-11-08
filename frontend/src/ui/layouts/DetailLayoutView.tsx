@@ -64,10 +64,10 @@ export interface ItemHome<I, P> {
  * kind's own, and what a side drawn as shipped places after its own.
  */
 export interface DetailExtension<I> {
-  env: LayoutEnv;
+  env: LayoutEnv<I>;
   /** Fields beside the kind's own: what its `fields` is given beside its
    *  initiative's properties. */
-  fields: FieldDef[];
+  fields: FieldDef<I>[];
   /** Parts a side drawn as shipped places after its own. */
   more: LayoutNode[];
   /** Parts beside those every item's detail has, which the kind's own may
@@ -75,7 +75,7 @@ export interface DetailExtension<I> {
    *  then. */
   parts: Parts<I>;
   /** Draws a field the kind has no editor of its own for: one this adds. */
-  field: (field: FieldDef, item: I) => ReactNode;
+  field: (field: FieldDef<I>, item: I) => ReactNode;
   /** The detail, drawn from `tree`, inside what its parts read. */
   wrap: (tree: LayoutNode, children: ReactNode) => ReactNode;
 }
@@ -144,10 +144,10 @@ export const useItemContext = <C,>(): C => useDrawn().context as C;
 export const useItemHome = <H extends object = object>(): ItemHome<unknown, unknown> & H =>
   useDrawn().home as unknown as ItemHome<unknown, unknown> & H;
 
-const propertiesOf = (
-  item: DetailItem,
+const propertiesOf = <I extends DetailItem>(
+  item: I,
   home: ItemHome<DetailItem, unknown>,
-  view: LayoutContext
+  view: LayoutContext<I>
 ) => ({
   saves: home.saves,
   env: view.env.properties,
@@ -162,7 +162,15 @@ const propertiesOf = (
 
 /** One field, by its id: one of its initiative's properties, the kind's own,
  *  or one its extension adds. */
-const ItemField = ({ id, item, view }: { id: string; item: DetailItem; view: LayoutContext }) => {
+const ItemField = <I extends DetailItem>({
+  id,
+  item,
+  view,
+}: {
+  id: string;
+  item: I;
+  view: LayoutContext<I>;
+}) => {
   const { detail, home, extension } = useDrawn();
   const t = useTranslation(detail.namespaces).t as (
     key: string,
@@ -184,7 +192,13 @@ const ItemField = ({ id, item, view }: { id: string; item: DetailItem; view: Lay
 
 /** Its properties, but for those the layout places on their own. A reader
  *  sees none where it holds none; a community's own tool has none to offer. */
-const ItemProperties = ({ item, view }: { item: DetailItem; view: LayoutContext }) => {
+const ItemProperties = <I extends DetailItem>({
+  item,
+  view,
+}: {
+  item: I;
+  view: LayoutContext<I>;
+}) => {
   const { home } = useDrawn();
   const placed = useContext(PlacedProperties);
   if (home.initiativeId === null) return null;
@@ -245,13 +259,13 @@ const RequiredMark = ({
 };
 
 /** Each part drawn as `parts` draws it, marked where its layout requires it. */
-const markRequired = <I,>(parts: Parts<I>): Parts<I> =>
+const markRequired = <I extends DetailItem>(parts: Parts<I>): Parts<I> =>
   Object.fromEntries(
     Object.entries(parts).map(([type, draw]) => [
       type,
-      (node: LayoutNode, item: I, view: LayoutContext, all: Parts<I>) =>
+      (node: LayoutNode, item: I, view: LayoutContext<I>, all: Parts<I>) =>
         isRequired(node) ? (
-          <RequiredMark node={node} item={item as DetailItem}>
+          <RequiredMark node={node} item={item}>
             {draw(node, item, view, all)}
           </RequiredMark>
         ) : (
@@ -292,7 +306,7 @@ const MoreOptions = ({ children }: { children: ReactNode }) => {
 
 // A change of type changes how many parts come before the fold, so the fold is
 // keyed by its type: it stays open, and what it holds stays drawn.
-const drawChildren = <I,>(node: LayoutNode, item: I, view: LayoutContext, parts: Parts<I>) =>
+const drawChildren = <I,>(node: LayoutNode, item: I, view: LayoutContext<I>, parts: Parts<I>) =>
   node.children?.map((child, index) => (
     <Fragment key={child.type === "more" ? "more" : index}>
       {renderNode(child, item, view, parts)}
@@ -301,10 +315,10 @@ const drawChildren = <I,>(node: LayoutNode, item: I, view: LayoutContext, parts:
 
 /** What an item being added on one column is laid out with (`addingTree`). */
 const ADDING_PARTS = {
-  adding: <I,>(node: LayoutNode, item: I, view: LayoutContext, parts: Parts<I>) => (
+  adding: <I,>(node: LayoutNode, item: I, view: LayoutContext<I>, parts: Parts<I>) => (
     <div className="flex min-w-0 flex-col gap-4">{drawChildren(node, item, view, parts)}</div>
   ),
-  more: <I,>(node: LayoutNode, item: I, view: LayoutContext, parts: Parts<I>) => (
+  more: <I,>(node: LayoutNode, item: I, view: LayoutContext<I>, parts: Parts<I>) => (
     <MoreOptions>{drawChildren(node, item, view, parts)}</MoreOptions>
   ),
 };
@@ -320,10 +334,10 @@ const partsOf = <I extends DetailItem>(
 ): Parts<I> => {
   const parts: Parts<I> = {
     ...LAYOUT_PARTS,
-    field: (node: LayoutNode, item: I, view: LayoutContext) => (
+    field: (node: LayoutNode, item: I, view: LayoutContext<I>) => (
       <ItemField id={String(node.props?.field)} item={item} view={view} />
     ),
-    properties: (_node: LayoutNode, item: I, view: LayoutContext) => (
+    properties: (_node: LayoutNode, item: I, view: LayoutContext<I>) => (
       <ItemProperties item={item} view={view} />
     ),
     actions: () => <ItemActions />,
@@ -382,7 +396,7 @@ const ItemDetail = <I extends DetailItem, C, P>({
     return upFront ? addingTree(laidOut, [...upFront, ...requiredKeys(layout)]) : laidOut;
   }, [spec, layout, more, upFront]);
   const placed = useMemo(() => placedProperties(tree), [tree]);
-  const view = useMemo<LayoutContext>(
+  const view = useMemo<LayoutContext<I>>(
     () => ({
       fields: detail.fields([], added),
       variant: "detail",
