@@ -28,7 +28,7 @@
     "deleteTitle": "Delete this page?",
     "deleteDescription": "Its sub-pages go with it. You can restore them from the trash.",
     "empty": "No pages yet",
-    "emptyDescription": "Start with one page. Link to another with [[ and it will be made when you follow it.",
+    "emptyDescription": "Start with one page. Type # in it to link to another.",
     "createFirst": "Write the first page",
     "notFound": "That page is not in this wiki",
     "isHome": "Home page",

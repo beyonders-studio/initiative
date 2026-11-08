@@ -172,6 +172,7 @@
     "gone": "Gelöscht",
     "noMatches": "Nichts in dieser Initiative passt zu „{{query}}“.",
     "scopeHint": "Hier lässt sich nur die Initiative dieses Dokuments benennen.",
+    "searchOrCreate": "Tippe, um zu suchen, oder lege an, was noch fehlt",
     "searching": "Suche läuft …",
     "unavailable": "Das ist für dich nicht mehr verfügbar"
   },

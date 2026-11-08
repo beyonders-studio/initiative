@@ -28,7 +28,7 @@
     "deleteTitle": "Diese Seite löschen?",
     "deleteDescription": "Ihre Unterseiten gehen mit. Du kannst sie aus dem Papierkorb wiederherstellen.",
     "empty": "Noch keine Seiten",
-    "emptyDescription": "Fang mit einer Seite an. Verlinke mit [[ auf eine andere – sie wird angelegt, sobald du ihr folgst.",
+    "emptyDescription": "Fang mit einer Seite an. Tippe darin #, um auf eine andere zu verlinken.",
     "createFirst": "Die erste Seite schreiben",
     "notFound": "Diese Seite ist nicht in diesem Wiki",
     "isHome": "Startseite",
