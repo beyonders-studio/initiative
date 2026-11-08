@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A task type's page layout is named for its type** in the layout editor's outline and settings, where it read "{{name}} page".
 - **Making a thing from `[[` works in wiki pages and posts.** Choosing **Create** when nothing matched did nothing outside text documents; it now asks what kind of thing to make and links it, as it does in a document. An empty wiki says to link pages with `#`.
 - **Cmd/Ctrl+B and Cmd/Ctrl+K do one thing in a document.** Bold no longer folds the sidebar too, and making a link no longer opens search.
 - **The storage page gives the S3 move in the order that works.** Save S3 with **Serve missing objects from local** on, then start the backfill; **Start backfill** waits until S3 is saved, where before the page said to backfill first, which the server refused.

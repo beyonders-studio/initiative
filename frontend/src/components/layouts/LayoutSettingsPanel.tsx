@@ -300,7 +300,7 @@ export const DetailLayoutSettings = ({
           ) : null}
         </>
       ) : (
-        <Panel heading={t(of.words.name)}>
+        <Panel heading={t(of.words.name, { name: of.typeName })}>
           <p className="text-muted-foreground text-sm">{t(of.words.help)}</p>
           <Shipped t={t} stored={stored} edits={edits} shipped={of.words.shipped} />
         </Panel>

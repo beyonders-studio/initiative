@@ -437,7 +437,7 @@ export const DetailLayoutOutline = ({
           <OutlineRow
             id="layout"
             depth={0}
-            label={t(of.words.name)}
+            label={t(of.words.name, { name: of.typeName })}
             icon={<FileText className="h-4 w-4" aria-hidden="true" />}
             selected={sameSelection(selection, { kind: "layout" })}
             onSelect={() => edits.select({ kind: "layout" })}
