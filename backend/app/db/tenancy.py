@@ -435,7 +435,7 @@ GUILD_SCOPED_TABLES: frozenset[str] = INITIATIVE_SCOPED_TABLES | GUILD_LEVEL_TAB
 # (``app.db.operations_schema``). Each is still classified above, which is how
 # it is secured there.
 OPERATIONS_TABLES: frozenset[str] = frozenset(
-    {"intake_bindings", "intake_cases", "case_grants", "ideas", "idea_votes"}
+    {"intake_bindings", "intake_cases", "case_grants", "idea_votes"}
 )
 
 # Union of every table that has an explicit placement decision.

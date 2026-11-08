@@ -56,7 +56,6 @@ _NOT_GUEST_SURFACE: frozenset[str] = frozenset(
         "event_reminder_dispatches",
         "intake_bindings",
         "intake_cases",
-        "ideas",
         "idea_votes",
     }
 )

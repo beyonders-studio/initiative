@@ -1,7 +1,8 @@
 """The published ideas: what anybody reads of the Ideas board, and the votes.
 
 An idea is a task on the board bound to the ``ideas`` stream that the team
-published (``app.models.tenant.intake.Idea``). Reading goes through the ideas
+published: its ``ideas`` case, a row in ``intake_cases`` the team opens and
+takes away from the task's Idea panel. Reading goes through the ideas
 role (``app.db.operations_schema``), signed in or not: a published idea's
 title, description and status, and how many voted. A vote is written on the
 writer's own session once a read through that role has shown the idea is
@@ -31,16 +32,13 @@ from app.db.request_context import SystemGuild
 from app.db.session import routed_guild_id, set_rls_context
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
-from app.models.tenant.intake import Idea, IdeaVote, IntakeBinding
+from app.models.tenant.intake import IdeaVote, IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.services.platform import notice_outbox
 from app.services.platform.intake import configured_operations_guild_id
 
 #: The counter namespace a vote's pace is kept under.
 _PACE_NAMESPACE = "ideas"
-
-#: How often the vote sweep looks. A status change is news, not an alarm.
-IDEA_NOTICE_POLL_SECONDS = 60
 
 
 class IdeaNotFound(Exception):
@@ -137,7 +135,13 @@ def _public(query):
     """``query`` over ``Task``, kept to what anybody may read: a published
     idea still on the board bound to ``ideas``, not archived, trashed or held."""
     return (
-        query.join(Idea, Idea.task_id == Task.id)
+        query.join(
+            IntakeCase,
+            and_(
+                IntakeCase.task_id == Task.id,
+                IntakeCase.stream == IntakeStream.ideas.value,
+            ),
+        )
         .join(
             IntakeBinding,
             and_(
@@ -174,7 +178,7 @@ def _ideas_query(user: Optional[User], *, with_description: bool = False):
     columns = [
         Task.id.label("task_id"),
         Task.title,
-        Idea.published_at,
+        IntakeCase.opened_at.label("published_at"),
         Task.updated_at,
         TaskStatus.id.label("status_id"),
         TaskStatus.name.label("status_name"),
@@ -238,9 +242,9 @@ async def list_ideas(
             await session.exec(select(func.count()).select_from(query.subquery()))
         ).one()
         order = (
-            (votes.desc(), Idea.published_at.desc(), Task.id.desc())  # type: ignore[union-attr]
+            (votes.desc(), IntakeCase.opened_at.desc(), Task.id.desc())  # type: ignore[union-attr]
             if sort is IdeaSort.votes
-            else (Idea.published_at.desc(), Task.id.desc())  # type: ignore[union-attr]
+            else (IntakeCase.opened_at.desc(), Task.id.desc())  # type: ignore[union-attr]
         )
         rows = (
             await session.exec(
@@ -346,8 +350,9 @@ class IdeaPanel:
 
 
 async def on_the_board(session: AsyncSession, task: Task) -> bool:
-    """Whether ``task`` is on the board bound to the ``ideas`` stream, read on
-    the team's own session. False on a server with no board."""
+    """Whether ``task`` is the team's to publish: on the board bound to the
+    ``ideas`` stream and no other stream's case, read on the team's own
+    session. False on a server with no board."""
     if not board_open():
         return False
     bound = (
@@ -357,13 +362,28 @@ async def on_the_board(session: AsyncSession, task: Task) -> bool:
             )
         )
     ).first()
-    return bound is not None and bound == task.project_id
+    if bound is None or bound != task.project_id:
+        return False
+    # Another stream's case moved onto the board says what its filer wrote:
+    # it is not the team's to publish.
+    other = (
+        await session.exec(
+            select(IntakeCase.id)
+            .where(IntakeCase.task_id == task.id)
+            .where(IntakeCase.stream != IntakeStream.ideas.value)
+        )
+    ).first()
+    return other is None
 
 
 async def panel(session: AsyncSession, task: Task) -> IdeaPanel:
     """``task``'s Idea panel, read on the team's own session."""
     published = (
-        await session.exec(select(Idea.published_at).where(Idea.task_id == task.id))
+        await session.exec(
+            select(IntakeCase.opened_at)
+            .where(IntakeCase.task_id == task.id)
+            .where(IntakeCase.stream == IntakeStream.ideas.value)
+        )
     ).first()
     votes = (
         await session.exec(
@@ -375,73 +395,79 @@ async def panel(session: AsyncSession, task: Task) -> IdeaPanel:
 
 async def publish(session: AsyncSession, task: Task, *, on: bool) -> None:
     """Publish ``task`` as an idea, or take it back, on the team's own
-    session: its row policies are what say the reader may change the task."""
-    if on:
+    session: its row policies are what say the reader may change the task.
+
+    Publishing opens the task's ``ideas`` case; :func:`on_the_board` has
+    already refused a task that is another stream's case.
+    """
+    published = (
         await session.exec(
-            pg_insert(Idea)
-            .values(task_id=task.id, published_at=datetime.now(timezone.utc))
-            .on_conflict_do_nothing(index_elements=["task_id"])
+            select(IntakeCase.id)
+            .where(IntakeCase.task_id == task.id)
+            .where(IntakeCase.stream == IntakeStream.ideas.value)
         )
-    else:
-        await session.exec(delete(Idea).where(Idea.task_id == task.id))  # type: ignore[arg-type]
+    ).first()
+    if on and published is None:
+        now = datetime.now(timezone.utc)
+        session.add(
+            IntakeCase(
+                stream=IntakeStream.ideas,
+                task_id=task.id,
+                opened_at=now,
+                last_seen_at=now,
+                noted_at=now,
+            )
+        )
+    elif not on:
+        await session.exec(
+            delete(IntakeCase)
+            .where(IntakeCase.task_id == task.id)  # type: ignore[arg-type]
+            .where(IntakeCase.stream == IntakeStream.ideas.value)  # type: ignore[arg-type]
+        )
     await session.commit()
 
 
-# ── Telling voters ───────────────────────────────────────────────────────────
+async def voter_notices(session: AsyncSession) -> list[dict[str, Any]]:
+    """The notices owed to voters whose idea moved to another status, each
+    vote marked as told. Read on the operations community's system session
+    by the ticket sweep, beside its filers' notices.
 
-
-async def notify_voters() -> int:
-    """One pass: tell each voter whose idea moved to another status. Returns
-    how many were told."""
-    guild_id = await configured_operations_guild_id() if board_open() else None
-    if guild_id is None:
-        return 0
-    notices: list[dict[str, Any]] = []
-    async with cohorts.system_session(guild_id) as session:
-        await set_rls_context(session, SystemGuild(guild_id))
-        # Only what anybody may still read: the system's own role would also
-        # see a task moved off the board, trashed or held.
-        rows = await session.exec(
-            _public(
-                select(IdeaVote, Task.task_status_id, Task.title, TaskStatus.name)
-                .select_from(IdeaVote)
-                .join(Task, Task.id == IdeaVote.task_id)
-            )
-            .join(TaskStatus, TaskStatus.id == Task.task_status_id)
-            .where(
-                IdeaVote.notified_status_id.is_distinct_from(  # type: ignore[union-attr]
-                    Task.task_status_id
-                )
-            )
-            .order_by(IdeaVote.id)
-            # Two instances sweeping at once each take different votes.
-            .with_for_update(of=IdeaVote, skip_locked=True)
+    Only what anybody may still read: the system's own role would also see a
+    task moved off the board, trashed or held.
+    """
+    if not board_open():
+        return []
+    rows = await session.exec(
+        _public(
+            select(IdeaVote, Task.task_status_id, Task.title, TaskStatus.name)
+            .select_from(IdeaVote)
+            .join(Task, Task.id == IdeaVote.task_id)
         )
-        for idea_vote, status_id, title, status_name in rows.all():
-            notices.append(
-                notice_outbox.row(
-                    idea_vote.user_id,
-                    None,
-                    NotificationType.idea_updated,
-                    {
-                        "task_id": idea_vote.task_id,
-                        "title": title,
-                        "status": status_name,
-                        "target_path": f"/ideas/{idea_vote.task_id}",
-                    },
-                )
+        .join(TaskStatus, TaskStatus.id == Task.task_status_id)
+        .where(
+            IdeaVote.notified_status_id.is_distinct_from(  # type: ignore[union-attr]
+                Task.task_status_id
             )
-            idea_vote.notified_status_id = status_id
-            session.add(idea_vote)
-        await notice_outbox.enqueue(session, notices)
-        await session.commit()
-    return len(notices)
-
-
-async def process_idea_notices() -> None:
-    """Background sweep: tell voters what moved on the ideas they voted for."""
-    import logging
-
-    told = await notify_voters()
-    if told:
-        logging.getLogger(__name__).info("ideas: told %s voter(s) an idea moved", told)
+        )
+        .order_by(IdeaVote.id)
+        # Two instances sweeping at once each take different votes.
+        .with_for_update(of=IdeaVote, skip_locked=True)
+    )
+    notices: list[dict[str, Any]] = []
+    for idea_vote, status_id, title, status_name in rows.all():
+        notices.append(
+            notice_outbox.row(
+                idea_vote.user_id,
+                None,
+                NotificationType.idea_updated,
+                {
+                    "task_id": idea_vote.task_id,
+                    "title": title,
+                    "status": status_name,
+                    "target_path": f"/ideas/{idea_vote.task_id}",
+                },
+            )
+        )
+        idea_vote.notified_status_id = status_id
+        session.add(idea_vote)
+    return notices

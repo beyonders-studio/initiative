@@ -223,28 +223,6 @@ class IntakeCase(SQLModel, table=True):
     )
 
 
-class Idea(CreatedByMixin, table=True):
-    """A task on the Ideas board that the team published.
-
-    The task is the idea: its title, description and status are what people
-    read. A row here is what publishes it, so moving a task onto the board
-    shows nobody anything, and taking the row away unpublishes it. Its votes
-    stay with the task, so publishing it again brings them back.
-    """
-
-    __tablename__ = "ideas"
-
-    task_id: int = Field(
-        sa_column=Column(
-            Integer, ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True
-        )
-    )
-    published_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), nullable=False)
-    )
-    created_by: Optional[int] = Field(default=None, nullable=True)
-
-
 class IdeaVote(SQLModel, table=True):
     """One account's vote for one idea, and the status they were last told it
     was in."""

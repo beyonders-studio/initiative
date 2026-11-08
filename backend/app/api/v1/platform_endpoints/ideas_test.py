@@ -14,9 +14,9 @@ from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.notice_outbox import NoticeOutboxItem
 from app.models.platform.notification import NotificationType
-from app.models.tenant.intake import Idea, IntakeBinding, IntakeCase
+from app.models.tenant.intake import IdeaVote, IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
-from app.services.platform import ideas as ideas_service
+from app.services.platform import ticket_notices
 from app.services.platform import users as user_service
 from app.testing import create_project, create_task, get_auth_headers
 
@@ -41,7 +41,15 @@ async def board(session, operations, cloud):  # noqa: F811
     await set_rls_context(session, SystemGuild(operations["guild"].id))
     session.add(published)
     session.add(IntakeBinding(stream=IntakeStream.ideas, project_id=project.id))
-    session.add(Idea(task_id=published.id, published_at=published.created_at))
+    session.add(
+        IntakeCase(
+            stream=IntakeStream.ideas.value,
+            task_id=published.id,
+            opened_at=published.created_at,
+            last_seen_at=published.created_at,
+            noted_at=published.created_at,
+        )
+    )
     session.add(
         IntakeCase(
             stream=IntakeStream.feedback.value,
@@ -151,6 +159,10 @@ async def test_the_team_publishes_an_idea_from_its_panel(client, board):
     assert panel.status_code == 200, panel.text
     assert panel.json() == {"published_at": None, "votes": 0}
 
+    # A feedback case moved onto the board is its sender's words, not an idea.
+    case = await client.get(f"{base}/{board['case'].id}/idea", headers=headers)
+    assert case.status_code == 404
+
     published = await client.put(
         f"{base}/{board['draft'].id}/idea/published", headers=headers
     )
@@ -189,11 +201,11 @@ async def test_voters_hear_when_an_idea_moves(client, session, acting_user, boar
     nobody; a move tells each voter once."""
     voter = await acting_user()
     await client.put(f"{IDEAS}/{board['published'].id}/vote", headers=voter.headers)
-    assert await ideas_service.notify_voters() == 0
+    assert await ticket_notices.notify_filers() == 0
 
     await _move(session, board, board["published"], TaskStatusCategory.in_progress)
-    assert await ideas_service.notify_voters() == 1
-    assert await ideas_service.notify_voters() == 0
+    assert await ticket_notices.notify_filers() == 1
+    assert await ticket_notices.notify_filers() == 0
 
     await set_rls_context(session, Unattributed())
     notice = (
@@ -230,14 +242,23 @@ async def test_a_task_moved_off_the_board_is_nobodys_to_read(
 
     response = await client.get(f"{IDEAS}/{board['published'].id}")
     assert response.status_code == 404
-    assert await ideas_service.notify_voters() == 0
+    assert await ticket_notices.notify_filers() == 0
 
 
 async def test_erasing_a_voter_takes_their_vote(client, session, acting_user, board):
+    """Even from an idea the team archived, which freezes what is under it."""
     voter = await acting_user()
     await client.put(f"{IDEAS}/{board['published'].id}/vote", headers=voter.headers)
+    await set_rls_context(session, SystemGuild(board["guild"].id))
+    task = (
+        await session.exec(select(Task).where(Task.id == board["published"].id))
+    ).one()
+    task.archived_at = task.created_at
+    session.add(task)
+    await session.commit()
+
     await user_service.hard_delete_user(session, voter.user.id)
 
-    await _move(session, board, board["published"], TaskStatusCategory.in_progress)
-    assert await ideas_service.notify_voters() == 0
-    assert (await client.get(f"{IDEAS}/{board['published'].id}")).json()["votes"] == 0
+    await set_rls_context(session, SystemGuild(board["guild"].id))
+    assert (await session.exec(select(IdeaVote))).all() == []
+    await set_rls_context(session, Unattributed())

@@ -1464,10 +1464,12 @@ async def establish_ideas_access(session: AsyncSession, user: Optional[User]) ->
     user_id = int(user.id) if user is not None else None
     try:
         await set_rls_context(session, IdeaReader(guild_id=guild_id, user_id=user_id))
-        # The published ideas, read through the role's own row on ideas: the
-        # one read the other ideas rows are then keyed on.
+        # The published ideas, read through the role's own row on
+        # intake_cases: the one read the other ideas rows are then keyed on.
         tasks = (
-            await session.exec(sa_text("SELECT task_id FROM ideas ORDER BY task_id"))
+            await session.exec(
+                sa_text("SELECT task_id FROM intake_cases ORDER BY task_id")
+            )
         ).all()
         # End the transaction, which leaves the role, before routing again.
         await session.rollback()

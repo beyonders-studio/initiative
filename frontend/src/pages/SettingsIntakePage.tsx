@@ -240,7 +240,7 @@ const ContactsCard = ({
   const { t } = useTranslation("intake");
   // A stream nobody files into has nobody to point at an address.
   const streams = settings.bindings
-    .filter((binding) => binding.filed)
+    .filter((binding) => binding.filed !== false)
     .map((binding) => binding.stream as IntakeStream);
   // One flat field per address: "general", then each stream by name.
   const contactsOf = (loaded: IntakeSettingsRead | undefined): Record<string, string> => ({

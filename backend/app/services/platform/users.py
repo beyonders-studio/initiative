@@ -295,10 +295,15 @@ async def _erase_in_guild(
     # The operations community alone names people from outside it: its votes
     # for ideas, which go, and the cases they filed, which stay with nobody to
     # tell about them.
+    # A case or an idea in the trash or archived is frozen; clearing a person
+    # out of it is not an edit of it, and writes it as a purge does.
+    from app.db import gucs
+    from app.db.session import raise_flag
     from app.models.tenant.intake import IdeaVote, IntakeCase
     from app.services.tenant.cases import holds_cases
 
     if await holds_cases(guild_session):
+        await raise_flag(guild_session, gucs.PURGING)
         await guild_session.exec(
             delete(IdeaVote).where(col(IdeaVote.user_id) == user_id)
         )
@@ -307,6 +312,7 @@ async def _erase_in_guild(
             .where(col(IntakeCase.filer_user_id) == user_id)
             .values(filer_user_id=None)
         )
+        await raise_flag(guild_session, gucs.PURGING, False)
     await guild_session.exec(
         delete(CalendarEventAttendee).where(CalendarEventAttendee.user_id == user_id)
     )

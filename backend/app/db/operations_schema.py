@@ -157,7 +157,7 @@ FILER_ROWS: dict[str, str] = {
 #: one's title, description and status, never its assignees, properties or
 #: tags; the Ideas board's statuses; and the votes, as counts.
 IDEAS_TABLE_ACCESS: dict[str, tuple[str, ...]] = {
-    "ideas": ("task_id", "published_at"),
+    "intake_cases": ("id", "task_id", "stream", "opened_at"),
     "tasks": (
         "id",
         "project_id",
@@ -176,10 +176,11 @@ IDEAS_TABLE_ACCESS: dict[str, tuple[str, ...]] = {
 
 _IDEAS = gucs.IDEA_TASKS.once
 IDEAS_ROWS: dict[str, str] = {
-    # Every row is a published idea. The one read of which they are: the seam
-    # takes their tasks from here into ``app.idea_tasks``, which the rows
-    # below read instead of ``ideas``, whose own policy reads ``tasks``.
-    "ideas": "true",
+    # A published idea is an ``ideas`` case. The one read of which they are:
+    # the seam takes their tasks from here into ``app.idea_tasks``, which the
+    # rows below read instead of ``intake_cases``, whose own policy reads
+    # ``tasks``.
+    "intake_cases": "stream = 'ideas'",
     "tasks": f"id = ANY ({_IDEAS})",
     "task_statuses": (
         'project_id IN (SELECT b.project_id FROM "{s}".intake_bindings b'

@@ -1,14 +1,15 @@
 """ideas and their votes
 
-Two operations tables, in ``guild_template`` and the operations community's
-schema alone. ``ideas`` holds the Ideas board's published tasks, one row each:
-the row is what publishes a task. ``idea_votes`` holds who voted for which
-idea, and the status each voter was last told it was in. Neither holds rows
-yet. Their row security is rendered at the next start, as always.
+One operations table, in ``guild_template`` and the operations community's
+schema alone: ``idea_votes``, who voted for which idea, and the status each
+voter was last told it was in. It holds no rows yet, and its row security is
+rendered at the next start, as always.
 
-The Ideas board is a stream, so the check on ``intake_bindings.stream`` and
-``intake_cases.stream`` admits ``ideas`` beside the four it held. The
-downgrade takes away an Ideas binding before it puts the four back.
+The Ideas board is a stream, and a published idea is its case, so the check on
+``intake_bindings.stream`` and ``intake_cases.stream`` admits ``ideas`` beside
+the four it held. The
+downgrade takes away the Ideas binding and its cases before it puts the four
+back.
 
 Revision ID: 20261108_0589
 Revises: 20261107_0588
@@ -25,7 +26,7 @@ down_revision = "20261107_0588"
 branch_labels = None
 depends_on = None
 
-TABLES = ("idea_votes", "ideas")
+TABLES = ("idea_votes",)
 
 #: The streams each check admitted before, and after.
 _BEFORE = ("security", "moderation", "support", "feedback")
@@ -45,18 +46,6 @@ def _streams_check(streams: tuple[str, ...]) -> None:
 def _create() -> None:
     _streams_check(_AFTER)
     op.create_table(
-        "ideas",
-        sa.Column("task_id", sa.Integer(), nullable=False),
-        sa.Column("published_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("created_by", sa.Integer(), nullable=True),
-        sa.ForeignKeyConstraint(["task_id"], ["tasks.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("task_id"),
-    )
-    op.execute(
-        "CREATE TRIGGER tr_ideas_set_created_by BEFORE INSERT "
-        "ON ideas FOR EACH ROW EXECUTE FUNCTION public.fn_set_created_by()"
-    )
-    op.create_table(
         "idea_votes",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("task_id", sa.Integer(), nullable=False),
@@ -71,8 +60,9 @@ def _create() -> None:
 
 
 def _drop() -> None:
-    """Drop both tables: their rendered policies first, then their row
-    security, then the tables."""
+    """Drop the table: its rendered policies first, then its row security,
+    then the table. Then take the Ideas binding and its cases away, and put
+    the four streams' check back."""
     bind = op.get_bind()
     for table in TABLES:
         if bind.execute(
@@ -86,17 +76,18 @@ def _drop() -> None:
             op.execute(f'DROP POLICY IF EXISTS "{name}" ON {table}')
         op.execute(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY")
         op.drop_table(table)
-    forced = bind.execute(
-        sa.text(
-            "SELECT relforcerowsecurity FROM pg_class"
-            " WHERE oid = to_regclass('intake_bindings')"
-        )
-    ).scalar()
-    if forced:
-        op.execute("ALTER TABLE intake_bindings NO FORCE ROW LEVEL SECURITY")
-    op.execute("DELETE FROM intake_bindings WHERE stream = 'ideas'")
-    if forced:
-        op.execute("ALTER TABLE intake_bindings FORCE ROW LEVEL SECURITY")
+    for table in ("intake_cases", "intake_bindings"):
+        forced = bind.execute(
+            sa.text(
+                "SELECT relforcerowsecurity FROM pg_class WHERE oid = to_regclass(:t)"
+            ),
+            {"t": table},
+        ).scalar()
+        if forced:
+            op.execute(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
+        op.execute(f"DELETE FROM {table} WHERE stream = 'ideas'")
+        if forced:
+            op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
     _streams_check(_BEFORE)
 
 

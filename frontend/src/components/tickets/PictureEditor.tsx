@@ -456,7 +456,7 @@ export const PictureEditor = ({ session, attached, onDone, onCancel }: PictureEd
   return (
     <Dialog open onOpenChange={(open) => !open && !saving && cancel()}>
       <DialogContent
-        className="flex h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-6xl flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl"
+        className="flex h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl"
         // Enter here is the editor's: it does not reach the panel's send shortcut.
         onKeyDown={(event) => {
           if (event.key === "Enter") event.stopPropagation();

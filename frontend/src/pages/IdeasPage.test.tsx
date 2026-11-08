@@ -37,9 +37,11 @@ vi.mock("@/hooks/useIdeas", () => ({
 import { IdeasPage } from "./IdeasPage";
 
 describe("IdeasPage", () => {
-  it("lists the published ideas with their status and votes, and the board's statuses", () => {
+  it("lists the published ideas with their status and votes, and the board's statuses", async () => {
     renderPage(IdeasPage, { initialRoute: "/ideas", auth: { user: null } });
-    expect(screen.getByRole("link", { name: "Recurring events skip holidays" })).toBeVisible();
+    expect(
+      await screen.findByRole("link", { name: "Recurring events skip holidays" })
+    ).toBeVisible();
     expect(screen.getByText("2 votes")).toBeVisible();
     expect(screen.getByRole("radio", { name: "Shipped" })).toBeInTheDocument();
     // Only somebody signed in has votes of their own to narrow to.
@@ -50,7 +52,7 @@ describe("IdeasPage", () => {
     const user = userEvent.setup();
     const out = renderPage(IdeasPage, { initialRoute: "/ideas", auth: { user: null } });
     await user.click(
-      screen.getByRole("button", { name: "Vote for Recurring events skip holidays" })
+      await screen.findByRole("button", { name: "Vote for Recurring events skip holidays" })
     );
     expect(out.router.state.location.pathname).toBe("/login");
     expect(out.router.state.location.search).toEqual({ next: "/ideas" });
@@ -59,7 +61,7 @@ describe("IdeasPage", () => {
 
     renderPage(IdeasPage, { initialRoute: "/ideas", auth: { user: buildUser() } });
     await user.click(
-      screen.getByRole("button", { name: "Vote for Recurring events skip holidays" })
+      await screen.findByRole("button", { name: "Vote for Recurring events skip holidays" })
     );
     expect(mutate).toHaveBeenCalledWith({ taskId: 7, on: true });
   });

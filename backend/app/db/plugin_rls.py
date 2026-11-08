@@ -75,7 +75,6 @@ _NOT_PLUGIN_SURFACE: frozenset[str] = frozenset(
         # Operations intake, which the community's own staff runs.
         "intake_bindings",
         "intake_cases",
-        "ideas",
         "idea_votes",
     }
 )
