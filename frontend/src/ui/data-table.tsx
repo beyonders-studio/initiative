@@ -12,12 +12,12 @@ import {
   type TableState as TableStateOf,
   useTable,
 } from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronDown, MoreVertical } from "lucide-react";
 import {
   Fragment,
   memo,
   type ReactNode,
+  type UIEvent,
   useCallback,
   useEffect,
   useId,
@@ -54,6 +54,7 @@ import { cn } from "@/ui/lib/utils";
 import { PaginationBar } from "@/ui/pagination-bar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
+import { useVirtualRows } from "@/ui/virtual-rows";
 
 type TableState = TableStateOf<AppTableFeatures>;
 
@@ -143,17 +144,17 @@ interface DataTableProps<TData extends RowData> {
    */
   grouping?: GroupingState;
   onGroupingChange?: (grouping: GroupingState) => void;
+  /** Mounts only the rows near the view, as the page scrolls past them, for
+   *  a table too long to draw whole. Its head stays at the top of the page
+   *  while its rows go by, and it does not paginate. */
   enableVirtualization?: boolean;
   virtualRowHeight?: number;
   virtualOverscan?: number;
-  virtualContainerHeight?: string;
 }
 
 export interface DataTableRowWrapperProps<TData extends RowData> {
   row: AppRow<TData>;
   children: ReactNode;
-  /** When virtualization is enabled, apply these to the row element for positioning. */
-  virtualStyle?: React.CSSProperties;
   /** When virtualization is enabled, set this as data-index on the row element. */
   virtualIndex?: number;
   /** When virtualization is enabled, attach this ref to the row element for measurement. */
@@ -161,6 +162,7 @@ export interface DataTableRowWrapperProps<TData extends RowData> {
 }
 
 const DEFAULT_PAGE_SIZE = 20;
+const FIXED_LAYOUT = "table-fixed [&_td]:break-words";
 const GROUPING_NONE_VALUE = "__none__";
 
 export function DataTable<TData extends RowData>({
@@ -204,7 +206,6 @@ export function DataTable<TData extends RowData>({
   enableVirtualization = false,
   virtualRowHeight = 48,
   virtualOverscan = 5,
-  virtualContainerHeight = "h-[60vh]",
 }: DataTableProps<TData>) {
   const { t } = useTranslation("ui");
   const initialStateRef = useRef<Partial<TableState> | undefined>(initialState);
@@ -627,7 +628,6 @@ export function DataTable<TData extends RowData>({
     }
   }, [onExitSelection]);
 
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sortedRows = table.getRowModel().rows;
   const rows = useMemo(() => {
     const at = pinnedRowId ? sortedRows.findIndex((row) => row.id === pinnedRowId) : -1;
@@ -635,13 +635,31 @@ export function DataTable<TData extends RowData>({
       ? [sortedRows[at], ...sortedRows.slice(0, at), ...sortedRows.slice(at + 1)]
       : sortedRows;
   }, [sortedRows, pinnedRowId]);
-  const virtualizer = useVirtualizer({
+  const bodyRef = useRef<HTMLTableSectionElement>(null);
+  const {
+    virtualizer,
+    items: virtualItems,
+    paddingTop,
+    paddingBottom,
+  } = useVirtualRows(bodyRef, {
     count: rows.length,
-    getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => virtualRowHeight,
     overscan: virtualOverscan,
     enabled: enableVirtualization,
   });
+  // A virtualized table's head is drawn apart from its body, so that it stays
+  // at the top of the page as the rows go by: the box the body scrolls
+  // sideways in would otherwise hold it. It follows the body sideways, and the
+  // body follows it where moving focus into it scrolled it.
+  const headScrollerRef = useRef<HTMLDivElement>(null);
+  const bodyScrollerRef = useRef<HTMLDivElement>(null);
+  const followSideways = (event: UIEvent<HTMLDivElement>) => {
+    const headScroller = headScrollerRef.current;
+    const bodyScroller = bodyScrollerRef.current;
+    if (!headScroller || !bodyScroller) return;
+    if (event.target === bodyScroller) headScroller.scrollLeft = bodyScroller.scrollLeft;
+    else if (event.target === headScroller) bodyScroller.scrollLeft = headScroller.scrollLeft;
+  };
 
   const visibleColCount = table.getVisibleLeafColumns().length || columns.length;
 
@@ -659,14 +677,120 @@ export function DataTable<TData extends RowData>({
     .map((c) => c.id)
     .join(",");
 
-  // Padding-based virtualization: spacer rows keep scroll height correct
-  // while visible rows render in normal table flow for proper column alignment.
-  const virtualItems = enableVirtualization ? virtualizer.getVirtualItems() : [];
-  const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
-  const paddingBottom =
-    virtualItems.length > 0
-      ? virtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end
-      : 0;
+  // A virtualized table holds only the rows in view, so the automatic layout
+  // algorithm, which sizes columns from the cells it can see, re-measures
+  // against different content on every scroll and the columns jump. Fixed
+  // layout and a colgroup take the widths from each column's `size` instead,
+  // which do not change as rows come and go, and keep the head's columns over
+  // the body's. Spare width is shared out in proportion to those sizes, so a
+  // column that should take up the slack declares a bigger one.
+  const columnWidths = (
+    <colgroup>
+      {table.getVisibleLeafColumns().map((column) => (
+        <col key={column.id} style={{ width: column.getSize() }} />
+      ))}
+    </colgroup>
+  );
+  const head = (
+    <TableHeader>
+      {table.getHeaderGroups().map((headerGroup) => (
+        <TableRow key={headerGroup.id}>
+          {headerGroup.headers.map((header) => {
+            return (
+              <TableHead key={header.id}>
+                {header.isPlaceholder
+                  ? null
+                  : flexRender(header.column.columnDef.header, header.getContext())}
+              </TableHead>
+            );
+          })}
+        </TableRow>
+      ))}
+    </TableHeader>
+  );
+  const body = (
+    <TableBody ref={bodyRef}>
+      {rows.length ? (
+        enableVirtualization ? (
+          <>
+            {paddingTop > 0 && (
+              <tr>
+                <td
+                  style={{ height: paddingTop, padding: 0, border: "none" }}
+                  colSpan={visibleColCount}
+                />
+              </tr>
+            )}
+            {virtualItems.map((virtualRow) => {
+              const row = rows[virtualRow.index];
+              return (
+                <VirtualRow
+                  key={row.id}
+                  row={row}
+                  virtualRow={virtualRow}
+                  measureElement={virtualizer.measureElement}
+                  groupingEnabled={groupingEnabled}
+                  colSpan={visibleColCount}
+                  rowWrapper={rowWrapper}
+                  groupRowWrapper={groupRowWrapper}
+                  visibleColumnKey={visibleColumnKey}
+                />
+              );
+            })}
+            {paddingBottom > 0 && (
+              <tr>
+                <td
+                  style={{ height: paddingBottom, padding: 0, border: "none" }}
+                  colSpan={visibleColCount}
+                />
+              </tr>
+            )}
+          </>
+        ) : (
+          rows.map((row) => {
+            if (groupingEnabled && row.getIsGrouped()) {
+              return (
+                <GroupedRow
+                  key={row.id}
+                  row={row}
+                  colSpan={visibleColCount}
+                  wrapper={groupRowWrapper}
+                />
+              );
+            }
+            const cells = row
+              .getVisibleCells()
+              .map((cell) => (
+                <TableCell key={cell.id}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+              ));
+            if (rowWrapper) {
+              return (
+                <Fragment key={row.id}>
+                  {rowWrapper({
+                    row,
+                    children: cells,
+                  })}
+                </Fragment>
+              );
+            }
+            return (
+              <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                {cells}
+              </TableRow>
+            );
+          })
+        )
+      ) : (
+        <TableRow>
+          <TableCell colSpan={visibleColCount} className="h-24 text-center">
+            {t("table.noResults")}
+          </TableCell>
+        </TableRow>
+      )}
+    </TableBody>
+  );
 
   return (
     <div className="space-y-4">
@@ -694,7 +818,10 @@ export function DataTable<TData extends RowData>({
         })()}
       <div
         className={cn(
-          "overflow-hidden rounded-md border bg-card",
+          // Clipped rather than hidden: a box that hides its overflow is a
+          // scroller, which a virtualized table's head would stay at the top
+          // of instead of the page's.
+          "overflow-clip rounded-md border bg-card",
           selectionModeActive && "border-primary ring-2 ring-primary/20"
         )}
       >
@@ -889,124 +1016,33 @@ export function DataTable<TData extends RowData>({
           </div>
         ) : null}
 
-        <Table
-          scrollContainerRef={enableVirtualization ? scrollContainerRef : undefined}
-          scrollContainerClassName={enableVirtualization ? virtualContainerHeight : undefined}
-          className={enableVirtualization ? "table-fixed [&_td]:break-words" : undefined}
-        >
-          {/*
-            A virtualized table holds only the rows in view, so the automatic
-            layout algorithm — which sizes columns from the cells it can see —
-            re-measures against different content on every scroll and the
-            columns jump. Fixed layout plus a colgroup takes the widths from
-            each column's `size` instead, which doesn't change as rows come and
-            go. Spare width is shared out in proportion to those sizes, so a
-            column that should take up the slack just declares a bigger one.
-          */}
-          {enableVirtualization && (
-            <colgroup>
-              {table.getVisibleLeafColumns().map((column) => (
-                <col key={column.id} style={{ width: column.getSize() }} />
-              ))}
-            </colgroup>
-          )}
-          <TableHeader className={enableVirtualization ? "sticky top-0 z-10 bg-card" : undefined}>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
-                    </TableHead>
-                  );
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {rows.length ? (
-              enableVirtualization ? (
-                <>
-                  {paddingTop > 0 && (
-                    <tr>
-                      <td
-                        style={{ height: paddingTop, padding: 0, border: "none" }}
-                        colSpan={visibleColCount}
-                      />
-                    </tr>
-                  )}
-                  {virtualItems.map((virtualRow) => {
-                    const row = rows[virtualRow.index];
-                    return (
-                      <VirtualRow
-                        key={row.id}
-                        row={row}
-                        virtualRow={virtualRow}
-                        measureElement={virtualizer.measureElement}
-                        groupingEnabled={groupingEnabled}
-                        colSpan={visibleColCount}
-                        rowWrapper={rowWrapper}
-                        groupRowWrapper={groupRowWrapper}
-                        visibleColumnKey={visibleColumnKey}
-                      />
-                    );
-                  })}
-                  {paddingBottom > 0 && (
-                    <tr>
-                      <td
-                        style={{ height: paddingBottom, padding: 0, border: "none" }}
-                        colSpan={visibleColCount}
-                      />
-                    </tr>
-                  )}
-                </>
-              ) : (
-                rows.map((row) => {
-                  if (groupingEnabled && row.getIsGrouped()) {
-                    return (
-                      <GroupedRow
-                        key={row.id}
-                        row={row}
-                        colSpan={visibleColCount}
-                        wrapper={groupRowWrapper}
-                      />
-                    );
-                  }
-                  const cells = row
-                    .getVisibleCells()
-                    .map((cell) => (
-                      <TableCell key={cell.id}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    ));
-                  if (rowWrapper) {
-                    return (
-                      <Fragment key={row.id}>
-                        {rowWrapper({
-                          row,
-                          children: cells,
-                        })}
-                      </Fragment>
-                    );
-                  }
-                  return (
-                    <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
-                      {cells}
-                    </TableRow>
-                  );
-                })
-              )
-            ) : (
-              <TableRow>
-                <TableCell colSpan={visibleColCount} className="h-24 text-center">
-                  {t("table.noResults")}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+        {enableVirtualization ? (
+          // Two tables, one to a screen reader: see `TableRow`.
+          <div role="table" onScrollCapture={followSideways}>
+            <Table
+              role="presentation"
+              scrollContainerRef={headScrollerRef}
+              scrollContainerClassName="sticky top-0 z-10 overflow-hidden bg-card"
+              className={FIXED_LAYOUT}
+            >
+              {columnWidths}
+              {head}
+            </Table>
+            <Table
+              role="presentation"
+              scrollContainerRef={bodyScrollerRef}
+              className={FIXED_LAYOUT}
+            >
+              {columnWidths}
+              {body}
+            </Table>
+          </div>
+        ) : (
+          <Table>
+            {head}
+            {body}
+          </Table>
+        )}
         {showPagination && (
           <PaginationBar
             className="p-4"

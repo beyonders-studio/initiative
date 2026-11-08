@@ -29,6 +29,12 @@ const getVersion = () => {
   }
 };
 
+// Initiative Cloud's address, from the CLOUD_ORIGIN file at the project root,
+// which the backend reads too.
+const CLOUD_ORIGIN = fs
+  .readFileSync(path.resolve(import.meta.dirname, "../CLOUD_ORIGIN"), "utf-8")
+  .trim();
+
 const createProxyConfig = (supportsWebSocket = false) => ({
   target: devProxyTarget,
   changeOrigin: true,
@@ -217,6 +223,7 @@ export default defineConfig({
   base: isCapacitorBuild ? "" : "/",
   define: {
     __APP_VERSION__: JSON.stringify(getVersion()),
+    __CLOUD_ORIGIN__: JSON.stringify(CLOUD_ORIGIN),
     __IS_CAPACITOR__: JSON.stringify(isCapacitorBuild),
     // Absolute, on native too: the Capacitor WebView serves index.html from
     // its origin root, so a relative URL would resolve against whatever route

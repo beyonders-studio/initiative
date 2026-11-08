@@ -22,7 +22,7 @@ vi.mock("@/hooks/useTickets", async () => {
   };
 });
 
-import { ReportButton } from "./ReportButton";
+import { ReportButton, ReportHost } from "./ReportButton";
 
 const me = buildUser({ id: 10 });
 
@@ -56,12 +56,24 @@ describe("ReportButton", () => {
     expect(screen.queryByRole("button", { name: "Report" })).not.toBeInTheDocument();
   });
 
-  it("opens the dialog", async () => {
-    render({ authorId: 99 });
+  it("opens one report at a time, a new one for each thing reported", async () => {
+    renderWithProviders(
+      <>
+        <ReportButton targetType="post" targetId={1} />
+        <ReportButton targetType="post" targetId={2} />
+        <ReportHost />
+      </>,
+      { auth: { user: me } }
+    );
     const user = userEvent.setup();
+    const [first, second] = screen.getAllByRole("button", { name: "Report" });
 
-    await user.click(screen.getByRole("button", { name: "Report" }));
-    expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByText("Report this")).toBeInTheDocument();
+    await user.click(first);
+    expect(await screen.findByRole("dialog", { name: "Report this" })).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Anything else?"), "About the first post.");
+
+    await user.click(second);
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(screen.getByLabelText("Anything else?")).toHaveValue("");
   });
 });

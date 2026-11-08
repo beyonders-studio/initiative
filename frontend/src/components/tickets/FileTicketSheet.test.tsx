@@ -1,5 +1,5 @@
 /**
- * The dialog reports and security problems are filed through.
+ * The sheet reports and security problems are filed through.
  *
  * What it must not do is as important as what it does: a report never says
  * where it went, and tells the reporter nothing about what happens next.
@@ -14,7 +14,9 @@ import { renderWithProviders } from "@/__tests__/helpers/render";
 
 const fileMutate = vi.fn();
 const fileOptions = vi.hoisted(() => ({
-  current: undefined as { onError?: (e: unknown) => void } | undefined,
+  current: undefined as
+    | { onSuccess?: (accepted: unknown) => void; onError?: (e: unknown) => void }
+    | undefined,
 }));
 const contacts = vi.hoisted(() => ({ moderation: null as string | null }));
 const POLICY = vi.hoisted(() => ({
@@ -33,18 +35,18 @@ vi.mock("@/hooks/useTickets", async () => {
         security: { mode: "form", contact: null, evidence: POLICY },
       },
     }),
-    useFileTicket: (options: { onError?: (e: unknown) => void }) => {
+    useFileTicket: (options: (typeof fileOptions)["current"]) => {
       fileOptions.current = options;
       return { mutate: fileMutate, isPending: false };
     },
   };
 });
 
-import { FileTicketDialog, type FileTicketDialogProps } from "./FileTicketDialog";
+import { FileTicketSheet, type FileTicketSheetProps } from "./FileTicketSheet";
 
-const report = (props: Partial<FileTicketDialogProps> = {}) =>
+const report = (props: Partial<FileTicketSheetProps> = {}) =>
   renderWithProviders(
-    <FileTicketDialog
+    <FileTicketSheet
       open
       onOpenChange={() => {}}
       ticket={{ stream: "moderation", targetType: "comment", targetId: 42 }}
@@ -55,11 +57,10 @@ const report = (props: Partial<FileTicketDialogProps> = {}) =>
   );
 
 const chooseReason = async (user: ReturnType<typeof userEvent.setup>, name: string) => {
-  await user.click(screen.getByRole("combobox", { name: "What is wrong?" }));
-  await user.click(await screen.findByRole("option", { name }));
+  await user.click(screen.getByRole("radio", { name }));
 };
 
-describe("FileTicketDialog", () => {
+describe("FileTicketSheet", () => {
   beforeEach(() => {
     fileMutate.mockClear();
     contacts.moderation = null;
@@ -99,8 +100,7 @@ describe("FileTicketDialog", () => {
 
       await chooseReason(user, "Illegal");
       expect(send).toBeDisabled();
-      await user.click(screen.getByRole("combobox", { name: "Which law?" }));
-      await user.click(await screen.findByRole("option", { name: "Privacy" }));
+      await user.click(screen.getByRole("radio", { name: "Privacy" }));
       // A law named, and still nothing said about it.
       expect(send).toBeDisabled();
       await user.type(screen.getByLabelText("Tell them what you saw"), "My home address.");
@@ -122,11 +122,10 @@ describe("FileTicketDialog", () => {
       const user = userEvent.setup();
 
       await chooseReason(user, "Illegal");
-      await user.click(screen.getByRole("combobox", { name: "Which law?" }));
-      await user.click(await screen.findByRole("option", { name: "Child safety" }));
+      await user.click(screen.getByRole("radio", { name: "Child safety" }));
 
       expect(screen.getByText(/Don't attach anything/)).toBeInTheDocument();
-      expect(screen.queryByText("Attach files")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Attach files" })).not.toBeInTheDocument();
     });
 
     it("needs words for a report of something else", async () => {
@@ -171,9 +170,20 @@ describe("FileTicketDialog", () => {
       );
     });
 
+    it("thanks the reporter once it is sent, with the server's address where it gave one", async () => {
+      report();
+      act(() => {
+        fileOptions.current?.onSuccess?.({ platform_contact: "abuse@example.org" });
+      });
+
+      expect(await screen.findByText("Thanks — somebody will look at this.")).toHaveFocus();
+      expect(screen.getByText(/abuse@example\.org/)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Send report" })).toBeNull();
+    });
+
     it("never says where the report will go", () => {
       report();
-      // Nothing in the dialog names a venue, a project or a moderator: where
+      // Nothing in the sheet names a venue, a project or a moderator: where
       // it goes is decided server-side and is not the reporter's business.
       for (const leak of [/moderator/i, /platform/i, /operations/i, /initiative/i]) {
         expect(screen.queryByText(leak)).not.toBeInTheDocument();
@@ -217,7 +227,7 @@ describe("FileTicketDialog", () => {
 
       contacts.moderation = "trust@example.org";
       view.rerender(
-        <FileTicketDialog
+        <FileTicketSheet
           open
           onOpenChange={() => {}}
           ticket={{ stream: "moderation", targetType: "comment", targetId: 42 }}
@@ -232,7 +242,7 @@ describe("FileTicketDialog", () => {
   describe("reporting a security problem", () => {
     it("sends what it is about, a line and the words, from nowhere in particular", async () => {
       renderWithProviders(
-        <FileTicketDialog
+        <FileTicketSheet
           open
           onOpenChange={() => {}}
           ticket={{ stream: "security" }}
@@ -247,8 +257,7 @@ describe("FileTicketDialog", () => {
       await user.type(screen.getByLabelText("What did you find?"), "On the sign-in reply.");
       // Not until it says what kind of problem it is.
       expect(send).toBeDisabled();
-      await user.click(screen.getByRole("combobox", { name: "What is it about?" }));
-      await user.click(await screen.findByRole("option", { name: "A weakness in this server" }));
+      await user.click(screen.getByRole("radio", { name: "A weakness in this server" }));
       await user.click(send);
 
       expect(fileMutate).toHaveBeenCalledWith({
@@ -305,7 +314,7 @@ describe("FileTicketDialog", () => {
       await user.upload(screen.getByTestId("evidence-input"), files);
       expect(screen.getByRole("alert")).toHaveTextContent("You can attach up to 2 files.");
       expect(screen.getByRole("button", { name: "Remove a.png" })).toBeInTheDocument();
-      expect(screen.queryByText("c.png")).toBeNull();
+      expect(screen.queryByRole("img", { name: "c.png" })).toBeNull();
       expect(screen.getByRole("button", { name: "Attach files" })).toBeDisabled();
     });
   });

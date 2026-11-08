@@ -1,6 +1,9 @@
 /// <reference types="vite/client" />
 
 declare const __APP_VERSION__: string;
+/** Initiative Cloud's origin, from the CLOUD_ORIGIN file at the project root,
+ *  which the backend reads too. */
+declare const __CLOUD_ORIGIN__: string;
 declare const __IS_CAPACITOR__: boolean;
 /** Where the emoji picker fetches its dataset from — served by the app itself
  *  (see the emojibase plugin in vite.config.ts), never a public CDN. */

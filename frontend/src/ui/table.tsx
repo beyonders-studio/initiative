@@ -27,28 +27,24 @@ const TableHeader = React.forwardRef<
 ));
 TableHeader.displayName = "TableHeader";
 
-interface TableBodyProps extends React.HTMLAttributes<HTMLTableSectionElement> {
-  virtualHeight?: number;
-}
-
-const TableBody = React.forwardRef<HTMLTableSectionElement, TableBodyProps>(
-  ({ className, virtualHeight, style, ...props }, ref) => (
-    <tbody
-      ref={ref}
-      className={cn("[&_tr:last-child]:border-0", className)}
-      style={
-        virtualHeight != null ? { height: virtualHeight, position: "relative", ...style } : style
-      }
-      {...props}
-    />
-  )
-);
+const TableBody = React.forwardRef<
+  HTMLTableSectionElement,
+  React.HTMLAttributes<HTMLTableSectionElement>
+>(({ className, ...props }, ref) => (
+  <tbody ref={ref} className={cn("[&_tr:last-child]:border-0", className)} {...props} />
+));
 TableBody.displayName = "TableBody";
 
+// A virtualized data table is drawn as two tables, its head kept at the top of
+// the page apart from its body, under one element with the table role. The
+// two tables are presentational, so the rows and cells in them name their own
+// roles to stay one table's rows and cells.
 const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTMLTableRowElement>>(
   ({ className, ...props }, ref) => (
     <tr
       ref={ref}
+      // biome-ignore lint/a11y/noRedundantRoles: a presentational table's rows need it, as above.
+      role="row"
       className={cn(
         "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
         className
@@ -65,6 +61,7 @@ const TableHead = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <th
     ref={ref}
+    role="columnheader"
     className={cn(
       "h-10 px-2 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
       className
@@ -80,6 +77,8 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
+    // biome-ignore lint/a11y/noRedundantRoles: a presentational table's cells need it, as on the row.
+    role="cell"
     className={cn(
       "p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
       className

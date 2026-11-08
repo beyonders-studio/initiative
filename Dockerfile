@@ -10,6 +10,8 @@ COPY frontend .
 COPY VERSION /VERSION
 COPY MIN_NATIVE_VERSION /MIN_NATIVE_VERSION
 COPY MIN_DESKTOP_VERSION /MIN_DESKTOP_VERSION
+# Initiative Cloud's address, which the build bakes into the app.
+COPY CLOUD_ORIGIN /CLOUD_ORIGIN
 # The artwork credits, which every build writes into THIRD_PARTY_NOTICES.txt
 # (frontend/scripts/third-party-notices.mjs reads ../NOTICE.md).
 COPY NOTICE.md /NOTICE.md
@@ -136,6 +138,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 COPY VERSION ./VERSION
 COPY MIN_NATIVE_VERSION ./MIN_NATIVE_VERSION
 COPY MIN_DESKTOP_VERSION ./MIN_DESKTOP_VERSION
+COPY CLOUD_ORIGIN ./CLOUD_ORIGIN
 # Which build this is. The dev build passes `dev`, and only a dev image names the
 # dev app in its passkey association files (app/core/native_apps.py).
 ARG IMAGE_CHANNEL=release

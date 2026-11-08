@@ -23,6 +23,7 @@ import { CommunityAccessBanner } from "@/components/communities/CommunityAccessB
 import { DemoBannerOrTabs } from "@/components/demo/DemoBanner";
 import { DocumentOutlineScope } from "@/components/editor/DocumentOutline";
 import { DeviceVerificationDialog } from "@/components/messages/DeviceVerificationDialog";
+import { ReportHost } from "@/components/moderation/ReportButton";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { CreateActionProvider } from "@/components/navigation/CreateActionContext";
 import { PushPermissionPrompt } from "@/components/notifications/PushPermissionPrompt";
@@ -287,6 +288,7 @@ function AppLayout() {
     <CreateActionProvider>
       <CommandCenter />
       <FeedbackHost />
+      <ReportHost />
       <CreateTaskWizard />
       <CreateToolWizard tool={Tool.file} />
       {/* A real height rather than a minimum: `min-h-screen` leaves every

@@ -89,17 +89,10 @@ def expected_origin() -> str:
     """The origin a ceremony must have come from — scheme, host and port."""
     from app.core.config import settings
 
-    parts = urlsplit(settings.APP_URL.strip())
-    if not parts.scheme or not parts.hostname:
+    origin = settings.app_origin
+    if origin is None:
         raise RuntimeError("APP_URL is not a whole URL, so no origin can be derived")
-    scheme = parts.scheme.lower()
-    hostname = parts.hostname
-    host = f"[{hostname}]" if ":" in hostname else hostname
-    is_default_port = (scheme == "https" and parts.port == 443) or (
-        scheme == "http" and parts.port == 80
-    )
-    port = f":{parts.port}" if parts.port is not None and not is_default_port else ""
-    return f"{scheme}://{host}{port}"
+    return origin
 
 
 def expected_origins() -> list[str]:
