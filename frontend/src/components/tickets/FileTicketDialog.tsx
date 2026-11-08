@@ -45,6 +45,7 @@ import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -261,7 +262,6 @@ export const FileTicketDialog = ({
       }}
     >
       <DialogContent
-        className="flex max-h-[85dvh] flex-col"
         onKeyDown={(event) => {
           if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
             event.preventDefault();
@@ -293,7 +293,7 @@ export const FileTicketDialog = ({
           </Empty>
         ) : (
           <>
-            <div className="-mx-1 min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-1">
+            <DialogBody className="space-y-4">
               {isReport ? (
                 <>
                   <Choice
@@ -401,7 +401,7 @@ export const FileTicketDialog = ({
                   {nowhere}
                 </p>
               ) : null}
-            </div>
+            </DialogBody>
 
             <DialogFooter
               submitLabel={isReport ? t("moderation:report.submit") : t("security.submit")}

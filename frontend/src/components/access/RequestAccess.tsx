@@ -164,7 +164,7 @@ export const RequestAccessDialog = ({
   const { t } = useTranslation("access");
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card sm:max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{title ?? t("request.submit")}</DialogTitle>
           <DialogDescription>{description ?? t("request.description")}</DialogDescription>

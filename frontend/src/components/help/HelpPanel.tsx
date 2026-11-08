@@ -95,7 +95,7 @@ export const HelpPanel = ({ help }: { help: HelpState }) => {
       <DialogContent
         aria-describedby={undefined}
         // One height for every view, so moving between them does not resize it.
-        className="flex h-[min(36rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0"
+        className="h-[min(36rem,calc(100dvh-2rem))] gap-0 p-0"
       >
         {view === "search" ? (
           <SearchView

@@ -4,7 +4,14 @@ import { useTranslation } from "react-i18next";
 import { useFilesList } from "@/hooks/useFiles";
 import { fileIcon } from "@/lib/fileIcon";
 import { Button } from "@/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
 import { Input } from "@/ui/input";
 import { cn } from "@/ui/lib/utils";
 
@@ -56,26 +63,24 @@ export const FileChooserDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[80vh] flex-col gap-0 p-0 sm:max-w-lg">
-        <DialogHeader className="border-b px-5 py-4">
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
           <DialogTitle>{text.title}</DialogTitle>
           <DialogDescription>{text.description}</DialogDescription>
         </DialogHeader>
 
-        <div className="border-b px-5 py-3">
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t("filters.searchFiles")}
-            aria-label={text.description}
-          />
-        </div>
+        <Input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t("filters.searchFiles")}
+          aria-label={text.description}
+        />
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        <DialogBody>
           {candidates.length === 0 ? (
-            <p className="px-3 py-2 text-muted-foreground text-sm">{text.none}</p>
+            <p className="py-2 text-muted-foreground text-sm">{text.none}</p>
           ) : (
-            <ul className="space-y-0.5">
+            <ul className="-mx-3 space-y-0.5">
               {candidates.map((file) => {
                 const { Icon, colorClass } = fileIcon({
                   file_type: file.file_type,
@@ -97,7 +102,7 @@ export const FileChooserDialog = ({
               })}
             </ul>
           )}
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

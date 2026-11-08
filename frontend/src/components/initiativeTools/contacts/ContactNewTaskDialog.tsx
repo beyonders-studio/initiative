@@ -73,7 +73,7 @@ export const ContactNewTaskDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto bg-card sm:max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t("newTask")}</DialogTitle>
           <DialogDescription>{t("task.description", { name: contact.name })}</DialogDescription>

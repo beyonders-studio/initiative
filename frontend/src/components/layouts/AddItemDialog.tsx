@@ -156,7 +156,7 @@ export const AddItemDialog = <I extends Item, C, P, R extends { id: number }>({
           the item's own page. */}
       <DialogContent
         className={cn(
-          "@container w-full rounded-2xl border bg-card shadow-2xl",
+          "@container",
           // One column needs no room for a second.
           props.detail.addingUpFront ? "sm:max-w-2xl" : "sm:max-w-5xl"
         )}

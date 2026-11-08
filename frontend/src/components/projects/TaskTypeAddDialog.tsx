@@ -13,6 +13,7 @@ import { TaskTypeIcon, TaskTypeOption } from "@/components/tasks/TaskTypeOption"
 import { useTaskTypeGallery } from "@/hooks/useProjects";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -38,7 +39,7 @@ interface TaskTypeAddDialogProps {
 
 export const TaskTypeAddDialog = ({ open, onOpenChange, ...props }: TaskTypeAddDialogProps) => (
   <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="flex max-h-[90dvh] flex-col bg-card">
+    <DialogContent>
       <TaskTypeAddForm {...props} />
     </DialogContent>
   </Dialog>
@@ -75,15 +76,13 @@ const TaskTypeAddForm = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex min-h-0 flex-col gap-4">
+    <form onSubmit={handleSubmit} className="contents">
       <DialogHeader>
         <DialogTitle>{t("taskTypes.addTitle")}</DialogTitle>
         <DialogDescription>{t("taskTypes.addDescription")}</DialogDescription>
       </DialogHeader>
 
-      {/* Positioned, so the hidden inputs Radix adds to form controls
-              scroll with the list instead of stretching the dialog. */}
-      <div className="relative min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+      <DialogBody className="space-y-4">
         <ReadyMadeGallery
           blank={{
             name: t("taskTypes.gallery.blank"),
@@ -137,7 +136,7 @@ const TaskTypeAddForm = ({
             </SelectContent>
           </Select>
         </Field>
-      </div>
+      </DialogBody>
 
       <Field label={t("taskTypes.nameLabel")} error={nameTaken && t("errors:TASK_TYPE_NAME_TAKEN")}>
         <Input

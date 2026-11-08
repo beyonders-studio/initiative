@@ -32,17 +32,12 @@ const dialogSurfaceClassName =
   "z-50 gap-4 bg-background p-6 shadow-lg data-[state=closed]:animate-out data-[state=open]:animate-in";
 
 /**
- * A panel centred in the viewport, as a dialog and an alert dialog draw it.
- *
- * `[&>*]:min-w-0` is load-bearing, not cosmetic. This is a grid, so every
- * direct child is a grid item with `min-width: auto` — its automatic minimum
- * is its *content's* minimum, which a nowrap row, a long unbroken word or an
- * editor toolbar can push past the dialog's own width. The item then
- * overflows the box rather than shrinking inside it, and on a phone the
- * right-hand side of every field is simply cut off. Resetting the floor lets
- * children shrink to the dialog and clip/wrap on their own terms.
+ * A panel centred in the viewport, as a dialog and an alert dialog draw it: a
+ * column no taller than the screen, whose children stack at the dialog's
+ * width. A dialog taller than that scrolls whole, unless its middle is a
+ * `DialogBody`, which scrolls on its own between the header and the footer.
  */
-const dialogContentClassName = `${dialogSurfaceClassName} data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] grid max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] overflow-y-auto rounded-lg border duration-200 sm:max-w-lg [&>*]:min-w-0`;
+const dialogContentClassName = `${dialogSurfaceClassName} data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] flex max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col overflow-y-auto rounded-lg border duration-200 sm:max-w-lg`;
 
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
@@ -99,6 +94,32 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="dialog-header"
       className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * The part of a dialog between its header and its footer that scrolls when the
+ * dialog is taller than the screen, so the title and the buttons stay in view.
+ * It reaches the dialog's sides, which puts its scrollbar at the edge, and its
+ * padding keeps a focused field's ring from being cut off. It is positioned, so
+ * the hidden inputs Radix adds to form controls scroll with it instead of
+ * stretching the dialog.
+ *
+ * A plain overflow container rather than `ScrollArea`: the dialog is bounded
+ * only by its maximum height, and Radix's viewport sizes itself with `h-full`,
+ * which resolves to nothing against that, so its content would be clipped
+ * instead of scrolled.
+ *
+ * A form around the body and the footer takes `className="contents"`, so they
+ * stay the dialog's own rows.
+ */
+function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="dialog-body"
+      className={cn("relative -mx-6 -my-1 min-h-0 flex-1 overflow-y-auto px-6 py-1", className)}
       {...props}
     />
   );
@@ -194,6 +215,7 @@ DialogDescription.displayName = DialogPrimitive.Description.displayName;
 
 export {
   Dialog,
+  DialogBody,
   DialogClose,
   DialogContent,
   DialogDescription,

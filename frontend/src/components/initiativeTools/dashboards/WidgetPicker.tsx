@@ -148,7 +148,7 @@ export function WidgetPicker({ catalog, widgetCount, onAdd }: WidgetPickerProps)
             {t("canvas.addWidget")}
           </Button>
         </DialogTrigger>
-        <DialogContent className="flex h-[min(44rem,90vh)] w-[min(72rem,95vw)] max-w-none flex-col gap-4 sm:max-w-none">
+        <DialogContent className="h-[min(44rem,90vh)] w-[min(72rem,95vw)] max-w-none sm:max-w-none">
           <DialogHeader>
             <DialogTitle>{t("picker.title")}</DialogTitle>
             <DialogDescription>{t("picker.description")}</DialogDescription>
