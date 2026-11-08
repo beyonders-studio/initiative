@@ -322,8 +322,8 @@ async def _community(
     session: AsyncSession, ids: dict[str, list], users: dict[str, User], spec: dict
 ) -> None:
     """A listed community, made in the order the others are. A listing is
-    fixed at "no adult content" and "handles, not real names" — the two check
-    constraints on a listed community leave no other answer."""
+    fixed at "no adult content", which its check constraint leaves no other
+    answer to."""
     guild = await guilds.create_guild(
         session,
         ids,

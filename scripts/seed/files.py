@@ -384,6 +384,8 @@ FILES: dict[str, list[dict]] = {
             "tags": ["lore", "items/loot"],
             "projects": ["Barovia Arc"],
             "links": ["Campaign Setting: The Land of Barovia"],
+            # Read out at the table, so the player who sat for it can read it.
+            "readers": ["Elara Moonwhisper"],
         },
         {
             "title": "DM Notes: Strahd's True Motives",
@@ -450,7 +452,7 @@ FILES: dict[str, list[dict]] = {
             "initiative": "starfall",
             "creator": "Admin User",
             "writers": ["Finley Goldtongue"],
-            "readers": ["Kael Windrunner", "Aurelia Brightshield"],
+            "readers": ["Kael Windrunner", "Aurelia Brightshield", "Elara Moonwhisper"],
             "paragraphs": [
                 (
                     "The year is 2487. Earth was rendered uninhabitable by the Cascade "
@@ -586,6 +588,7 @@ FILES: dict[str, list[dict]] = {
             "title": "Crew Manifest: The Crimson Maiden",
             "initiative": "crimson",
             "creator": "Finley Goldtongue",
+            "writers": ["Thorn Ironforge"],
             "paragraphs": [
                 (
                     "Captain: Finley 'Goldtongue' Ashford — Bard/Swashbuckler. Charisma is "

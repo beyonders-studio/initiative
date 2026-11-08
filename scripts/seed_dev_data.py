@@ -74,13 +74,13 @@ from app.core.intake import IntakeStream
 from app.db.session import SystemSessionLocal
 
 #: Each community's content, in the order it is written. Tags come first so
-#: anything can carry one; archiving waits for the end (see ``projects``).
+#: anything can carry one. Comments wait until it is committed, and archiving
+#: until they are in (see ``comments`` and ``projects``).
 AREAS = (
     initiatives,
     tags,
     projects,
     files,
-    comments,
     counters,
     dashboards,
     calendars,
@@ -116,6 +116,9 @@ async def seed() -> None:
             for area in AREAS:
                 print(f"  Creating {area.__name__.rsplit('.', 1)[-1]}...")
                 await area.seed(c)
+            await session.commit()
+            print("  Creating comments...")
+            await comments.seed(c)
             await projects.apply_archives(c)
             await session.commit()
             seeded[key] = c.guild
@@ -138,6 +141,9 @@ async def seed() -> None:
             f"  {operations.OPERATIONS_GUILD_NAME} (community {ops_guild.id}): "
             f"{len(IntakeStream)} streams bound"
         )
+        await session.commit()
+
+        await guilds.name_members(session, users)
         await session.commit()
 
         print("  Filing tickets, reports and a hold...")
