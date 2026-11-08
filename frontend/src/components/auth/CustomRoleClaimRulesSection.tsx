@@ -261,7 +261,6 @@ export const CustomRoleClaimRulesSection = ({ communityId }: { communityId: numb
           group: removing?.claim_value ?? "",
         })}
         confirmLabel={t("customRoleRules.remove")}
-        cancelLabel={t("authProviders.cancel")}
         destructive
         isLoading={deleteRule.isPending}
         onConfirm={() => {

@@ -11,7 +11,6 @@ import path from "node:path";
 import { cleanup, configure } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from "vitest";
 
-import { connectKit } from "@/lib/kitHost";
 import { resetStoreSelling } from "@/lib/storeSelling";
 
 import { resetFactories } from "./factories";
@@ -274,7 +273,13 @@ if (typeof Blob.prototype.stream !== "function") {
 // The UI kit's host, filled as the app fills it at boot
 // ---------------------------------------------------------------------------
 
-connectKit();
+// Imported once the test file has registered its mocks and imported what it
+// tests, so the host is filled from the modules that file mocked (a native
+// camera, native storage) rather than from copies this setup loaded first.
+beforeAll(async () => {
+  const { connectKit } = await import("@/lib/kitHost");
+  connectKit();
+});
 
 // ---------------------------------------------------------------------------
 // MSW lifecycle

@@ -785,7 +785,6 @@ export const UserOperatorSettingsSheet = ({
         title={t("platformUsers.suspendTitle", { handle: getUserHandle(user) })}
         description={t("platformUsers.suspendBody")}
         confirmLabel={t("platformUsers.suspend")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={setSuspension.isPending}
@@ -817,7 +816,6 @@ export const UserOperatorSettingsSheet = ({
           role: roleConfirm ? platformRoleLabel(roleConfirm, t as TranslateFn) : "",
         })}
         confirmLabel={t("common:confirm")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         isLoading={updateRole.isPending}
         onConfirm={() => roleConfirm && updateRole.mutate({ userId: user.id, role: roleConfirm })}
@@ -831,7 +829,6 @@ export const UserOperatorSettingsSheet = ({
           handle: getUserHandle(user),
         })}
         confirmLabel={t("platformUsers.sheet.avatarRemove")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={removeAvatar.isPending}
@@ -847,7 +844,6 @@ export const UserOperatorSettingsSheet = ({
           count: user.api_key_count,
         })}
         confirmLabel={t("platformUsers.sheet.apiKeysRevoke")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={revokeApiKeys.isPending}
@@ -862,7 +858,6 @@ export const UserOperatorSettingsSheet = ({
           handle: getUserHandle(user),
         })}
         confirmLabel={t("platformUsers.sheet.signOut")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={signOut.isPending}
@@ -875,7 +870,6 @@ export const UserOperatorSettingsSheet = ({
         title={t("platformUsers.resetPassword")}
         description={t("platformUsers.resetDescription", { handle })}
         confirmLabel={t("common:send")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         isLoading={resetPassword.isPending}
         onConfirm={() => resetPassword.mutate(user.id)}
@@ -887,7 +881,6 @@ export const UserOperatorSettingsSheet = ({
         title={t("platformUsers.clearSecondFactor")}
         description={t("platformUsers.clearSecondFactorDescription", { handle })}
         confirmLabel={t("platformUsers.clearSecondFactorConfirm")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={clearSecondFactor.isPending}
@@ -918,7 +911,6 @@ export const UserOperatorSettingsSheet = ({
             : ""
         }
         confirmLabel={t("platformUsers.sheet.clear.button")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive
         isLoading={clearField.isPending}

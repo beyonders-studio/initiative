@@ -117,7 +117,6 @@
     "embla-carousel-react": "^8.6.0",
     "fast-formula-parser": "^1.0.19",
     "frimousse": "^0.3.0",
-    "fuse.js": "^7.5.0",
     "graphology": "^0.26.0",
     "graphology-layout-forceatlas2": "^0.10.1",
     "i18next": "^26.5.7",
@@ -144,7 +143,6 @@
     "tailwind-merge": "^3.7.0",
     "tailwindcss": "^4.3.3",
     "typo-js": "^1.4.0",
-    "usehooks-ts": "^3.1.1",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.33"
   },

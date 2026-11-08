@@ -1,13 +1,14 @@
 import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
-import Fuse from "fuse.js";
 import type { LucideIcon, LucideProps } from "lucide-react";
 import { dynamicIconImports, type IconName } from "lucide-react/dynamic";
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useDebounceValue } from "usehooks-ts";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
+import { commandFilter } from "@/ui/lib/fuzzyMatch";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { cn } from "@/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Skeleton } from "@/ui/skeleton";
@@ -93,8 +94,8 @@ const IconPicker = React.forwardRef<React.ComponentRef<typeof PopoverTrigger>, I
       onOpenChange,
       children,
       searchable = true,
-      searchPlaceholder = "Search for an icon...",
-      triggerPlaceholder = "Select an icon",
+      searchPlaceholder,
+      triggerPlaceholder,
       iconsList,
       categorized = true,
       modal = false,
@@ -102,32 +103,36 @@ const IconPicker = React.forwardRef<React.ComponentRef<typeof PopoverTrigger>, I
     },
     ref
   ) => {
+    const { t } = useTranslation("ui");
     const [selectedIcon, setSelectedIcon] = useState<IconName | undefined>(defaultValue);
     const [isOpen, setIsOpen] = useState(defaultOpen || false);
-    const [search, setSearch] = useDebounceValue("", 100);
+    const [typed, setSearch] = useState("");
+    const search = useDebouncedValue(typed, 100);
     const [isPopoverVisible, setIsPopoverVisible] = useState(false);
     const { icons } = useIconsData();
     const [isLoading, setIsLoading] = useState(true);
 
     const iconsToUse = useMemo(() => iconsList || icons, [iconsList, icons]);
 
-    const fuseInstance = useMemo(() => {
-      return new Fuse(iconsToUse, {
-        keys: ["name", "tags", "categories"],
-        threshold: 0.3,
-        ignoreLocation: true,
-        includeScore: true,
-      });
-    }, [iconsToUse]);
-
+    // Best match first, forgiving typos: the icon's name, then its tags, then
+    // its categories, which are broad groups many icons share.
     const filteredIcons = useMemo(() => {
-      if (search.trim() === "") {
+      const query = search.trim();
+      if (query === "") {
         return iconsToUse;
       }
-
-      const results = fuseInstance.search(search.toLowerCase().trim());
-      return results.map((result) => result.item);
-    }, [search, iconsToUse, fuseInstance]);
+      return iconsToUse
+        .map((icon) => ({
+          icon,
+          score: Math.max(
+            commandFilter(icon.name, query, icon.tags),
+            ...icon.categories.map((category) => commandFilter(category, query) * 0.8)
+          ),
+        }))
+        .filter(({ score }) => score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map(({ icon }) => icon);
+    }, [search, iconsToUse]);
 
     const categorizedIcons = useMemo(() => {
       if (!categorized || search.trim() !== "") {
@@ -145,7 +150,7 @@ const IconPicker = React.forwardRef<React.ComponentRef<typeof PopoverTrigger>, I
             categories.get(category)!.push(icon);
           });
         } else {
-          const category = "Other";
+          const category = t("iconPicker.other");
           if (!categories.has(category)) {
             categories.set(category, []);
           }
@@ -156,7 +161,7 @@ const IconPicker = React.forwardRef<React.ComponentRef<typeof PopoverTrigger>, I
       return Array.from(categories.entries())
         .map(([name, icons]) => ({ name, icons }))
         .sort((a, b) => a.name.localeCompare(b.name));
-    }, [filteredIcons, categorized, search]);
+    }, [filteredIcons, categorized, search, t]);
 
     const virtualItems = useMemo(() => {
       const items: Array<{
@@ -319,7 +324,7 @@ const IconPicker = React.forwardRef<React.ComponentRef<typeof PopoverTrigger>, I
 
     const renderVirtualContent = useCallback(() => {
       if (filteredIcons.length === 0) {
-        return <div className="text-center text-gray-500">No icon found</div>;
+        return <div className="text-center text-gray-500">{t("iconPicker.empty")}</div>;
       }
 
       return (
@@ -362,7 +367,7 @@ const IconPicker = React.forwardRef<React.ComponentRef<typeof PopoverTrigger>, I
           })}
         </div>
       );
-    }, [virtualizer, virtualItems, categorizedIcons, filteredIcons, renderIcon]);
+    }, [virtualizer, virtualItems, categorizedIcons, filteredIcons, renderIcon, t]);
 
     React.useEffect(() => {
       if (isPopoverVisible) {
@@ -397,14 +402,18 @@ const IconPicker = React.forwardRef<React.ComponentRef<typeof PopoverTrigger>, I
                   <Icon name={(value || selectedIcon)!} /> {value || selectedIcon}
                 </>
               ) : (
-                triggerPlaceholder
+                (triggerPlaceholder ?? t("iconPicker.placeholder"))
               )}
             </Button>
           )}
         </PopoverTrigger>
         <PopoverContent className="w-64 p-2">
           {searchable && (
-            <Input placeholder={searchPlaceholder} onChange={handleSearchChange} className="mb-2" />
+            <Input
+              placeholder={searchPlaceholder ?? t("iconPicker.search")}
+              onChange={handleSearchChange}
+              className="mb-2"
+            />
           )}
           {categorized && search.trim() === "" && (
             <div className="mt-2 flex flex-row gap-1 overflow-x-auto pb-2">{categoryButtons}</div>

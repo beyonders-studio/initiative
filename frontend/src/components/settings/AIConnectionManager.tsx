@@ -156,7 +156,6 @@ export const AIConnectionManager = ({
         title={t("aiConnections.deleteTitle")}
         description={t("aiConnections.deleteDescription", { label: pendingDelete?.label ?? "" })}
         confirmLabel={t("aiConnections.delete")}
-        cancelLabel={t("aiConnections.cancel")}
         onConfirm={confirmDelete}
         isLoading={mutations.remove.isPending}
         destructive

@@ -130,7 +130,6 @@ export const ToolDisableDialog = ({
       title={t("settings.toolAudience.disableTitle", { tool: toolName })}
       description={t("settings.toolAudience.disableDescription", { tool: toolName })}
       confirmLabel={t("settings.toolAudience.disableConfirm")}
-      cancelLabel={t("common:cancel")}
       loadingLabel={t("settings.saving")}
       isLoading={isSaving}
       destructive

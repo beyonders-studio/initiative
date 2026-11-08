@@ -43,7 +43,6 @@ import {
 } from "@/ui/dropdown-menu";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
-import { commandFilter } from "@/ui/lib/fuzzyMatch";
 import {
   type AppColumnDef,
   type AppRow,
@@ -169,7 +168,7 @@ export function DataTable<TData extends RowData>({
   rowWrapper,
   groupRowWrapper,
   enableFilterInput = false,
-  filterInputPlaceholder = "Filter...",
+  filterInputPlaceholder,
   filterInputColumnKey = "name",
   filterValue,
   onFilterValueChange,
@@ -383,8 +382,10 @@ export function DataTable<TData extends RowData>({
     columns: columnsWithSelection,
     defaultColumn: {
       filterFn: (row, columnId, filterValue: string) => {
+        // Exact: a filter keeps rows rather than ranking them, so a near
+        // match would keep rows that don't hold what was typed.
         const cellValue = String(row.getValue(columnId) ?? "");
-        return commandFilter(cellValue, filterValue) > 0;
+        return cellValue.toLowerCase().includes(filterValue.toLowerCase());
       },
     },
     onSortingChange: handleSortingChange,
@@ -735,7 +736,7 @@ export function DataTable<TData extends RowData>({
               )}
               {enableFilterInput && (
                 <Input
-                  placeholder={filterInputPlaceholder}
+                  placeholder={filterInputPlaceholder ?? t("table.filter")}
                   value={
                     onFilterValueChange
                       ? (filterValue ?? "")

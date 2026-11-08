@@ -781,7 +781,7 @@ const PluginActionDialog = ({
 /** Runs a plug-in's actions on an item, asking first when the action says
  *  to, or asks for something. */
 const useActionRunner = (kind: PluginItemKind, itemId: number) => {
-  const { t, i18n } = useTranslation("common");
+  const { i18n } = useTranslation("common");
   const run = useRunPluginAction();
   const [asking, setAsking] = useState<Asking | null>(null);
   const start = (plugin: PluginOnItems, action: PluginActionDecl, element?: string) => {
@@ -819,7 +819,6 @@ const useActionRunner = (kind: PluginItemKind, itemId: number) => {
         confirmLabel={
           asking ? (localized(asking.action.name, i18n.language) ?? asking.action.id) : ""
         }
-        cancelLabel={t("cancel")}
         onConfirm={() => {
           if (asking) {
             run.mutate({

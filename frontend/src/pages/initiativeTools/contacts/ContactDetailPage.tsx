@@ -520,7 +520,6 @@ export function ContactDetailPage() {
           title={t("move.title", { name: contact.name })}
           description={t("move.description")}
           confirmLabel={t("move.confirm")}
-          cancelLabel={t("common:cancel")}
           onConfirm={() => move.mutate()}
           isLoading={move.isPending}
           loadingLabel={t("move.moving")}

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Send feedback is a quick review.** Rate how the app is working for you out of five, then say what you like most and what you wish it did, both optional. It docks beside the page on a wide screen, keeps your draft when you close it, and takes a screenshot pasted into it. Feedback goes one way unless you tick that the team can contact you with questions, and a low rating points you to **Ask for help** for anything that needs an answer. Feedback cases carry the rating on a **rating** field.
 - **Each AI connection has its own on/off switch** on its row under **Integrations**, in place of the Enabled field in its dialog. A community's **Allow AI features** switch moved to the **Security** tab, beside its other restrictions. When AI goes off, whether the community or the server turns it off, the community's connections go off with it, and none can be turned on again until AI is back on.
 - **The desktop app on Windows and Linux hides its menu bar.** The File, Edit, View and Window row no longer takes space under the title bar; press Alt to show it. Zoom, reload and full screen keep their shortcuts.
+- **Search forgives typos.** The command palette and the icon picker find what you meant through a swapped, wrong or extra letter (one in a word of four to seven letters, two from eight), and the words of a name in any order, with an exact name first. A table's filter is exact: it keeps the rows that hold what you typed, in any case.
 
 ### Fixed
 
@@ -25,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Posts from X and Reddit show where you put them.** A post in a document or on a whiteboard draws in a frame from its own site, on the web and in the apps, and a link file to one shows the post.
 - **Tabs past the edge of a narrow window can be reached with a mouse.** A row of tabs wider than the page, such as **Platform settings** on a narrow screen, shows a thin scrollbar under it to drag.
 - **The arrow keys move through what `[[` offers.** They stayed on the first match; now they step through the list, as they do for `@` and `#`.
+- **Progress bars tell a screen reader how far along they are,** as a percent in your language, where they read as busy with no value.
+- **Confirmations, pickers and tables speak your language.** Cancel, Continue, Please wait, a picker's placeholder, a table's filter and the labels a screen reader hears were English in every language.
 
 ## [0.78.0] - 2026-11-06
 
