@@ -1,5 +1,4 @@
-from typing import Optional
-
+from pydantic import ConfigDict
 from sqlalchemy import (
     Boolean,
     Column,
@@ -10,8 +9,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
-from pydantic import ConfigDict
-
 
 # Platform OIDC config lives on the provider registry row (``auth_providers``
 # slug ``oidc``), not here. Which ways in the deployment permits is the rule
@@ -41,10 +38,10 @@ class AppSetting(SQLModel, table=True):
     # version differs from ``last_seen_version``, the old value becomes
     # ``previous_version``. Both are NULL on a fresh install, which is exactly
     # what "never upgraded from anything" looks like.
-    last_seen_version: Optional[str] = Field(
+    last_seen_version: str | None = Field(
         default=None, sa_column=Column(String(32), nullable=True)
     )
-    previous_version: Optional[str] = Field(
+    previous_version: str | None = Field(
         default=None, sa_column=Column(String(32), nullable=True)
     )
     # When this deployment first booted with each change in
@@ -54,10 +51,10 @@ class AppSetting(SQLModel, table=True):
         sa_column=Column(JSONB, nullable=False, server_default=text("'{}'::jsonb")),
     )
 
-    smtp_host: Optional[str] = Field(
+    smtp_host: str | None = Field(
         default=None, sa_column=Column(String(255), nullable=True)
     )
-    smtp_port: Optional[int] = Field(
+    smtp_port: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
     smtp_secure: bool = Field(
@@ -68,14 +65,14 @@ class AppSetting(SQLModel, table=True):
         default=True,
         sa_column=Column(Boolean, nullable=False, server_default="true"),
     )
-    smtp_username: Optional[str] = Field(
+    smtp_username: str | None = Field(
         default=None, sa_column=Column(String(255), nullable=True)
     )
     # The SMTP password lives on ``app_setting_secrets``.
-    smtp_from_address: Optional[str] = Field(
+    smtp_from_address: str | None = Field(
         default=None, sa_column=Column(String(255), nullable=True)
     )
-    smtp_test_recipient: Optional[str] = Field(
+    smtp_test_recipient: str | None = Field(
         default=None, sa_column=Column(String(255), nullable=True)
     )
 
@@ -103,17 +100,17 @@ class AppSetting(SQLModel, table=True):
         default="local",
         sa_column=Column(String(20), nullable=False, server_default="local"),
     )
-    s3_bucket: Optional[str] = Field(
+    s3_bucket: str | None = Field(
         default=None, sa_column=Column(String(255), nullable=True)
     )
     s3_region: str = Field(
         default="us-east-1",
         sa_column=Column(String(64), nullable=False, server_default="us-east-1"),
     )
-    s3_endpoint_url: Optional[str] = Field(
+    s3_endpoint_url: str | None = Field(
         default=None, sa_column=Column(String(1000), nullable=True)
     )
-    s3_access_key_id: Optional[str] = Field(
+    s3_access_key_id: str | None = Field(
         default=None, sa_column=Column(String(255), nullable=True)
     )
     # The S3 secret access key lives on ``app_setting_secrets``.
@@ -132,10 +129,10 @@ class AppSetting(SQLModel, table=True):
     # page — so they sit here; the secret that verifies a token is on
     # ``app_setting_secrets``. Enforcement needs all three, which is what
     # ``app.services.captcha_config`` resolves.
-    captcha_provider: Optional[str] = Field(
+    captcha_provider: str | None = Field(
         default=None, sa_column=Column(String(50), nullable=True)
     )
-    captcha_site_key: Optional[str] = Field(
+    captcha_site_key: str | None = Field(
         default=None, sa_column=Column(String(500), nullable=True)
     )
 
@@ -147,17 +144,17 @@ class AppSetting(SQLModel, table=True):
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default=text("false")),
     )
-    fcm_project_id: Optional[str] = Field(
+    fcm_project_id: str | None = Field(
         default=None, sa_column=Column(String(200), nullable=True)
     )
-    fcm_application_id: Optional[str] = Field(
+    fcm_application_id: str | None = Field(
         default=None, sa_column=Column(String(200), nullable=True)
     )
     # Firebase's API key is public by design (it ships in the client).
-    fcm_api_key: Optional[str] = Field(
+    fcm_api_key: str | None = Field(
         default=None, sa_column=Column(String(500), nullable=True)
     )
-    fcm_sender_id: Optional[str] = Field(
+    fcm_sender_id: str | None = Field(
         default=None, sa_column=Column(String(50), nullable=True)
     )
 
@@ -169,7 +166,7 @@ class AppSetting(SQLModel, table=True):
     # An ordinary guild in every other respect. Which project each stream lands
     # in is per-guild config inside it (``intake_bindings``), so the platform
     # holds a pointer and no second copy of the tooling.
-    operations_guild_id: Optional[int] = Field(
+    operations_guild_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("guilds.id", ondelete="SET NULL"), nullable=True
@@ -183,7 +180,7 @@ class AppSetting(SQLModel, table=True):
     # stream (``app.services.platform.intake.contact_for``). Independent of the
     # operations guild: a deployment that routes nothing can still say who to
     # write to.
-    intake_general_contact: Optional[str] = Field(
+    intake_general_contact: str | None = Field(
         default=None, sa_column=Column(String(320), nullable=True)
     )
     intake_contacts: dict[str, str] = Field(

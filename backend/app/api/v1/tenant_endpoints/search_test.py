@@ -9,20 +9,19 @@ route to the thing found — hold.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timedelta, timezone
-
+from datetime import UTC, datetime, timedelta
 
 from app.db import cohorts
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.engagement_level import LEVEL_MAX, EngagementLevel
 from app.services.tenant.post_publication import publish_due_posts
 from app.testing import (
-    create_resource_grant,
     Actor,
     create_comment,
     create_file,
     create_post,
     create_project,
+    create_resource_grant,
     create_tag,
     create_task,
     create_wiki,
@@ -30,7 +29,6 @@ from app.testing import (
     lexical_body,
     route_system,
 )
-
 
 ActingUser = Callable[..., Awaitable[Actor]]
 
@@ -486,7 +484,7 @@ async def test_archived_work_is_kept_back_until_it_is_asked_for(
         session,
         a.project,
         title="shelved cabinet too",
-        archived_at=datetime.now(timezone.utc),
+        archived_at=datetime.now(UTC),
     )
 
     default = await _search(client, a, search="shelved")
@@ -586,7 +584,7 @@ async def test_suggest_leaves_archived_work_out(
         session,
         a.project,
         title="retired lantern",
-        archived_at=datetime.now(timezone.utc),
+        archived_at=datetime.now(UTC),
     )
 
     response = await client.get(
@@ -709,14 +707,14 @@ async def test_a_scheduled_notice_is_not_searchable_until_it_goes_up(
         a.user,
         name="embargoed announcement",
         published_at=None,
-        scheduled_for=datetime.now(timezone.utc) - timedelta(minutes=1),
+        scheduled_for=datetime.now(UTC) - timedelta(minutes=1),
     )
 
     assert (await _search(client, a, search="embargoed"))["items"] == []
 
     async with cohorts.system_session(a.guild.id) as system:
         await route_system(system, guild_id=a.guild.id)
-        await publish_due_posts(system, now=datetime.now(timezone.utc))
+        await publish_due_posts(system, now=datetime.now(UTC))
         await system.commit()
 
     body = await _search(client, a, search="embargoed")

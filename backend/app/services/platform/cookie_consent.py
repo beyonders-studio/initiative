@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -45,7 +45,7 @@ async def record_consent(
     else:
         row.granted = kept
         row.version = version
-    row.decided_at = datetime.now(timezone.utc)
+    row.decided_at = datetime.now(UTC)
     session.add(row)
     await session.flush()
     return row

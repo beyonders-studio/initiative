@@ -662,18 +662,16 @@ async def test_an_imported_event_is_not_held_to_it(
         "calendar_event",
         _required("location"),
     )
-    ics = "\r\n".join(
-        [
-            "BEGIN:VCALENDAR",
-            "VERSION:2.0",
-            "BEGIN:VEVENT",
-            "UID:one@example.com",
-            "SUMMARY:Imported",
-            "DTSTART:20991020T120000Z",
-            "DTEND:20991020T130000Z",
-            "END:VEVENT",
-            "END:VCALENDAR",
-        ]
+    ics = (
+        "BEGIN:VCALENDAR\r\n"
+        "VERSION:2.0\r\n"
+        "BEGIN:VEVENT\r\n"
+        "UID:one@example.com\r\n"
+        "SUMMARY:Imported\r\n"
+        "DTSTART:20991020T120000Z\r\n"
+        "DTEND:20991020T130000Z\r\n"
+        "END:VEVENT\r\n"
+        "END:VCALENDAR"
     )
 
     imported = await client.post(

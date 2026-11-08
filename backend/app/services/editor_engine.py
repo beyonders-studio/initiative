@@ -19,7 +19,7 @@ import base64
 import secrets
 import threading
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from app.services.worker_pool import Pool, PoolError
 
@@ -43,7 +43,7 @@ class EditorError(Exception):
     """The editor gave no answer: it refused the document, or did not run."""
 
 
-_pool: Optional[Pool] = None
+_pool: Pool | None = None
 _pool_lock = threading.Lock()
 
 
@@ -95,7 +95,7 @@ async def _ask(request: dict[str, Any]) -> dict[str, Any]:
     return reply
 
 
-async def bootstrap(content: Optional[dict]) -> bytes:
+async def bootstrap(content: dict | None) -> bytes:
     """A document's Yjs state, from its editor JSON, or the state of an empty
     document when it has none. Written as a Yjs client of its own."""
     reply = await _ask(
@@ -133,7 +133,7 @@ async def apply(state: bytes, content: dict) -> bytes:
     return base64.b64decode(reply["update"])
 
 
-async def sheet_range(content: dict, range_: Optional[str]) -> dict:
+async def sheet_range(content: dict, range_: str | None) -> dict:
     """``range_`` of a spreadsheet's stored content, read as the grid reads it:
     ``{"columns", "rows", "sheets"}``, or ``{"refused", "sheets"}`` naming what
     the range got wrong (``lib/spreadsheet/range.ts``)."""

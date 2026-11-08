@@ -20,6 +20,7 @@ def _run(
         [sys.executable, "-I", str(SCRIPT), str(source), str(target)],
         capture_output=True,
         text=True,
+        check=False,
     )
     return done, target
 

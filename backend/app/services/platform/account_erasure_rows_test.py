@@ -35,7 +35,7 @@ runs (the deletion request and the retention purge; the row stays, emptied), and
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -47,10 +47,10 @@ from app.models.platform.guild import CommunityRole
 from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.models.tenant.comment import Comment
 from app.models.tenant.event_reminder_dispatch import EventReminderDispatch
-from app.models.tenant.personal_item import PersonalItem
-from app.models.tenant.plugin_member_consent import PluginMemberConsent
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
 from app.models.tenant.initiative import InitiativeJoinRequest
+from app.models.tenant.personal_item import PersonalItem
+from app.models.tenant.plugin_member_consent import PluginMemberConsent
 from app.models.tenant.reaction import Reaction
 from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.resource_grant import ResourceGrant
@@ -66,8 +66,8 @@ from app.testing.factories import (
     create_comment,
     create_file,
     create_guild,
-    create_guild_plugin,
     create_guild_membership,
+    create_guild_plugin,
     create_initiative,
     create_initiative_member,
     create_project,
@@ -119,7 +119,7 @@ async def _seed(session: AsyncSession) -> SimpleNamespace:
     comment = await create_comment(session, victim, file=file)
     reaction = await create_reaction(session, victim, comment=comment)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await route_session_to_guild(session, guild.id)
     rows = {
         # A receipt that a reminder for this event reached this person.
@@ -255,7 +255,7 @@ async def test_what_they_kept_goes(session: AsyncSession, role_session):
                 user_id=person,
                 entity_type="project",
                 entity_id=1,
-                bookmarked_at=datetime.now(timezone.utc),
+                bookmarked_at=datetime.now(UTC),
             )
         )
         session.add(

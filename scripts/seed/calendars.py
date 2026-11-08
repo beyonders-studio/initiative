@@ -16,7 +16,6 @@ from app.models.tenant.calendar_event import (
 )
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.services.tenant import relationships as relationships_service
-
 from seed.common import NOW, Community, share, tag
 
 #: Each event. ``recurrence`` is RRULE lines repeating on the start's own

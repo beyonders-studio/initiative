@@ -61,7 +61,7 @@ are harmless and cost one short row each.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.models.platform.announcement import (
     AnnouncementAudienceAccounts,
@@ -125,7 +125,7 @@ BUILTIN_ANNOUNCEMENTS: tuple[BuiltinAnnouncement, ...] = (
         slug="0-65-admin-sidebar-lists-your-initiatives",
         title="Your sidebar now lists the initiatives you are in",
         category=AnnouncementCategory.breaking,
-        published_at=datetime(2026, 9, 2, tzinfo=timezone.utc),
+        published_at=datetime(2026, 9, 2, tzinfo=UTC),
         # Only the people it changes anything for, and worth saying twice: an
         # admin who skims past it will conclude their initiatives are gone.
         guild_admins_only=True,
@@ -181,7 +181,7 @@ BUILTIN_ANNOUNCEMENTS: tuple[BuiltinAnnouncement, ...] = (
         slug="0-66-search-needs-bootstrap-connection",
         title="Search needs one line in your compose file",
         category=AnnouncementCategory.maintenance,
-        published_at=datetime(2026, 9, 7, tzinfo=timezone.utc),
+        published_at=datetime(2026, 9, 7, tzinfo=UTC),
         # Only the people who can edit a deployment's environment, and only on
         # a deployment that upgraded into this: a fresh install came up with
         # the connection already wired, so there is nothing for it to add.
@@ -233,7 +233,7 @@ BUILTIN_ANNOUNCEMENTS: tuple[BuiltinAnnouncement, ...] = (
         slug="0-66-my-pages-moved",
         title="Three sidebar pages became one",
         category=AnnouncementCategory.info,
-        published_at=datetime(2026, 9, 7, tzinfo=timezone.utc),
+        published_at=datetime(2026, 9, 7, tzinfo=UTC),
         # For the people who had those pages in their sidebar last week. A new
         # account never saw them, and a fresh install never had them.
         audience_accounts=AnnouncementAudienceAccounts.existing,
@@ -262,7 +262,7 @@ BUILTIN_ANNOUNCEMENTS: tuple[BuiltinAnnouncement, ...] = (
         slug="0-67-notifications",
         title="Notifications got a lot quieter",
         category=AnnouncementCategory.feature,
-        published_at=datetime(2026, 9, 9, tzinfo=timezone.utc),
+        published_at=datetime(2026, 9, 9, tzinfo=UTC),
         # For accounts that lived with the old, louder version.
         audience_accounts=AnnouncementAudienceAccounts.existing,
         only_upgrading_from_below="0.67.0",
@@ -289,7 +289,7 @@ BUILTIN_ANNOUNCEMENTS: tuple[BuiltinAnnouncement, ...] = (
         slug="0-76-comment-removal-moved-to-moderators",
         title="Taking down comments is for moderators now",
         category=AnnouncementCategory.breaking,
-        published_at=datetime(2026, 10, 9, tzinfo=timezone.utc),
+        published_at=datetime(2026, 10, 9, tzinfo=UTC),
         audience_accounts=AnnouncementAudienceAccounts.existing,
         only_upgrading_from_below="0.76.0",
         guild_admins_only=True,
@@ -321,7 +321,7 @@ BUILTIN_ANNOUNCEMENTS: tuple[BuiltinAnnouncement, ...] = (
         slug="0-76-intake-status-roles",
         title="Tell requesters when you're waiting on them",
         category=AnnouncementCategory.feature,
-        published_at=datetime(2026, 10, 11, tzinfo=timezone.utc),
+        published_at=datetime(2026, 10, 11, tzinfo=UTC),
         audience_accounts=AnnouncementAudienceAccounts.existing,
         only_upgrading_from_below="0.76.0",
         min_platform_role=UserRole.owner,
@@ -355,7 +355,7 @@ BUILTIN_ANNOUNCEMENTS: tuple[BuiltinAnnouncement, ...] = (
         slug="0-78-galleries-and-queues",
         title="Galleries are now collections, and queues projects",
         category=AnnouncementCategory.info,
-        published_at=datetime(2026, 10, 27, tzinfo=timezone.utc),
+        published_at=datetime(2026, 10, 27, tzinfo=UTC),
         # For the people who had galleries or queues. A new account and a fresh
         # install start with neither and have nothing to look for.
         audience_accounts=AnnouncementAudienceAccounts.existing,

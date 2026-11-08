@@ -1,6 +1,5 @@
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import Column, DateTime, String, Uuid
 from sqlmodel import Field, Index, SQLModel
@@ -20,7 +19,7 @@ class PushToken(SQLModel, table=True):
         Index("ix_push_tokens_user_device_token", "user_id", "push_token", unique=True),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(
         foreign_key="users.id", ondelete="CASCADE", nullable=False, index=True
     )
@@ -28,7 +27,7 @@ class PushToken(SQLModel, table=True):
     # The session that registered this device, followed along its rotation
     # chain to the live row. A plain uuid, as ``auth_sessions.parent_id`` is:
     # session rows are purged on their own schedule.
-    session_id: Optional[uuid.UUID] = Field(
+    session_id: uuid.UUID | None = Field(
         default=None, sa_column=Column(Uuid, nullable=True, index=True)
     )
     push_token: str = Field(
@@ -39,15 +38,15 @@ class PushToken(SQLModel, table=True):
         sa_column=Column(String(32), nullable=False),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     # Track last successful push delivery for monitoring
-    last_used_at: Optional[datetime] = Field(
+    last_used_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )

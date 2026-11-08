@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Collection, Sequence
 from itertools import count
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import and_, delete, func, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -38,7 +38,7 @@ async def list_roles(session: AsyncSession) -> list[CustomRole]:
     )
 
 
-async def get_role(session: AsyncSession, role_id: int) -> Optional[CustomRole]:
+async def get_role(session: AsyncSession, role_id: int) -> CustomRole | None:
     return await session.get(CustomRole, role_id)
 
 
@@ -160,8 +160,8 @@ async def assign(
     session: AsyncSession,
     *,
     user_id: int,
-    role_id: Optional[int],
-    provider_id: Optional[int] = None,
+    role_id: int | None,
+    provider_id: int | None = None,
 ) -> None:
     """Give ``user_id`` the role ``role_id``, from now, or take theirs off.
     ``provider_id`` is the sign-in provider whose claims gave it; a role given
@@ -186,7 +186,7 @@ async def assign(
     )
 
 
-async def held_role(session: AsyncSession, user_id: int) -> Optional[CustomRole]:
+async def held_role(session: AsyncSession, user_id: int) -> CustomRole | None:
     """The role ``user_id``'s assignment names, whatever membership it was
     given in: what taking it off would take off."""
     return (
@@ -248,7 +248,7 @@ async def apply_claims(
     provider_id: int,
     claim_values: set[str],
     admitted: bool,
-) -> Optional[tuple[Optional[int], Optional[int]]]:
+) -> tuple[int | None, int | None] | None:
     """A sign-in through ``provider_id``'s say over ``user_id``'s custom role:
     the role of the first rule for the provider whose group the claims carry,
     while the community counts the arrival as its own, or none.
@@ -257,7 +257,7 @@ async def apply_claims(
     or by another provider is left as it is. A role from an earlier membership
     counts as none. Returns ``(from, to)`` role ids when it changed anything.
     """
-    wanted: Optional[int] = None
+    wanted: int | None = None
     if admitted:
         for rule in await claim_rules(session):
             if (

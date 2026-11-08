@@ -11,7 +11,7 @@ The socket, the after-commit queueing and the cross-worker bus belong to
 :mod:`app.services.platform.user_stream`.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 from sqlmodel import select
 
@@ -21,7 +21,7 @@ from app.services.platform import user_stream
 RESOURCE = "tickets"
 
 
-def queue_ticket_signal(session: Any, user_id: Optional[int]) -> None:
+def queue_ticket_signal(session: Any, user_id: int | None) -> None:
     """Tell ``user_id`` their tickets changed, once this session commits."""
     user_stream.queue_frame(
         session, user_id, user_stream.build_frame(RESOURCE, "changed")

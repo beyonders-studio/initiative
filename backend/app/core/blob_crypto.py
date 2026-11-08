@@ -32,7 +32,7 @@ from __future__ import annotations
 import os
 import struct
 import uuid
-from typing import Iterable, Iterator
+from collections.abc import Iterable, Iterator
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes

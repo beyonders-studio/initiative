@@ -23,15 +23,14 @@ from app.db.public_rls import (
     SHARED_TABLE_REGISTRY,
     UPDATE,
     Grants,
+    SharedTable,
     platform_tier,
     role_name,
-    SharedTable,
 )
 from app.db.tenancy import SHARED_TABLES
 from app.models.platform.app_setting import AppSetting
 from app.services.platform.app_settings import GLOBAL_SETTINGS_ID
 from app.testing import as_role, create_user
-
 
 TABLE = "app_setting_secrets"
 MOVED_COLUMNS = ("smtp_password_encrypted", "s3_secret_access_key_encrypted")
@@ -158,20 +157,19 @@ async def test_the_system_engine_reads_and_writes_it(session):
     user = await create_user(session)
     await _make_rows(session)
 
-    async with as_role(session, "app_admin", user.id):
-        async with session.begin_nested():
-            value = (
-                await session.exec(
-                    text(f"SELECT smtp_password_encrypted FROM {TABLE} WHERE id = 1")
-                )
-            ).scalar_one()
-            assert value == "smtp-ct"
+    async with as_role(session, "app_admin", user.id), session.begin_nested():
+        value = (
             await session.exec(
-                text(
-                    f"UPDATE {TABLE} SET s3_secret_access_key_encrypted = 'rotated' "
-                    "WHERE id = 1"
-                )
+                text(f"SELECT smtp_password_encrypted FROM {TABLE} WHERE id = 1")
             )
+        ).scalar_one()
+        assert value == "smtp-ct"
+        await session.exec(
+            text(
+                f"UPDATE {TABLE} SET s3_secret_access_key_encrypted = 'rotated' "
+                "WHERE id = 1"
+            )
+        )
     stored = (
         await session.exec(
             text(f"SELECT s3_secret_access_key_encrypted FROM {TABLE} WHERE id = 1")

@@ -20,7 +20,7 @@ The same pass tells each voter whose idea moved to another status
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import and_, func, or_
 from sqlmodel import select
@@ -131,7 +131,7 @@ async def notify_filers() -> int:
             replied = latest is not None and latest > (
                 case.filer_notified_comment_id or 0
             )
-            previous: Optional[str] = case.filer_notified_state
+            previous: str | None = case.filer_notified_state
             moved = previous is not None and previous != state.value
             # A case's first pass only records where it starts: its filer
             # filed it a moment ago and knows. A reply is still worth telling.

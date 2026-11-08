@@ -2,7 +2,6 @@
 
 import copy
 
-
 from app.services.import_engine.mentions import (
     MENTION_HANDLE,
     detach_editor_mentions,

@@ -1,6 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import Column, ColumnElement, DateTime, Integer, String, Text, and_
 from sqlmodel import Field, Index, SQLModel
@@ -83,7 +82,7 @@ class CommunityNotice(str, Enum):
 
 
 def grant_is_live(
-    status: "str | AccessGrantStatus", expires_at: Optional[datetime], now: datetime
+    status: "str | AccessGrantStatus", expires_at: datetime | None, now: datetime
 ) -> bool:
     """Whether a grant confers access at ``now``: approved and unexpired.
 
@@ -145,7 +144,7 @@ class AccessGrant(SQLModel, table=True):
         Index("ix_access_grants_user_guild", "user_id", "guild_id"),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
 
     # The grantee and the guild they're being granted access to. A grant is
     # meaningless once either side is gone, so both cascade.
@@ -193,24 +192,24 @@ class AccessGrant(SQLModel, table=True):
     requested_by_id: int = Field(
         foreign_key="users.id", ondelete="CASCADE", nullable=False
     )
-    approved_by_id: Optional[int] = Field(
+    approved_by_id: int | None = Field(
         default=None, foreign_key="users.id", ondelete="SET NULL", nullable=True
     )
-    revoked_by_id: Optional[int] = Field(
+    revoked_by_id: int | None = Field(
         default=None, foreign_key="users.id", ondelete="SET NULL", nullable=True
     )
 
     requested_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
-    decided_at: Optional[datetime] = Field(
+    decided_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-    expires_at: Optional[datetime] = Field(
+    expires_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-    revoked_at: Optional[datetime] = Field(
+    revoked_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     # The operations case a grant serves is linked in the operations
@@ -218,12 +217,12 @@ class AccessGrant(SQLModel, table=True):
     # grant does is reported there.
     #: When what the grant did was last reported on its case, while it is
     #: live.
-    activity_noted_at: Optional[datetime] = Field(
+    activity_noted_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: When the grant's case was told it had ended, with what it did in all.
     #: Set once; a grant with no case is closed out with nothing to tell.
-    closed_out_at: Optional[datetime] = Field(
+    closed_out_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: Whether, and when, the community's superadmins are emailed about this
@@ -236,11 +235,11 @@ class AccessGrant(SQLModel, table=True):
         ),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 

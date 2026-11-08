@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core.smart_chips import SmartChipAspect, SmartChipKind, SmartChipTone
 from app.core.search import SearchEntityType
-
+from app.core.smart_chips import SmartChipAspect, SmartChipKind, SmartChipTone
 
 #: Ceiling on one chips request, so the cost of answering one is bounded.
 #:
@@ -40,7 +39,7 @@ class ReferenceRead(BaseModel):
     through.
     """
 
-    refs: List[str] = Field(
+    refs: list[str] = Field(
         default_factory=list,
         max_length=MAX_REFS,
         description=_REFS_DESCRIPTION
@@ -52,7 +51,7 @@ class ReferenceRead(BaseModel):
 class EmbedRead(BaseModel):
     """The references to show in full, as `kind:id`."""
 
-    refs: List[str] = Field(
+    refs: list[str] = Field(
         default_factory=list, max_length=MAX_EMBEDS, description=_REFS_DESCRIPTION
     )
 
@@ -74,19 +73,19 @@ class SmartChipState(BaseModel):
     #: What the reference names.
     entity_type: SearchEntityType
     #: Which fact about it, or absent where this is simply what it is called.
-    aspect: Optional[SmartChipAspect] = None
+    aspect: SmartChipAspect | None = None
     text: str
     #: What the thing is called right now. Sent with every answer so a chip
     #: showing a fact can also name what the fact is about — the reading goes
     #: in the sentence, the name goes on the card behind it — without the
     #: caller spending a second reference on the same row.
-    title: Optional[str] = None
+    title: str | None = None
     tone: SmartChipTone
     #: A colour the thing carries itself — a task status has one. Overrides the
     #: tone where present.
-    color: Optional[str] = None
-    date: Optional[datetime] = None
-    number: Optional[Decimal] = None
+    color: str | None = None
+    date: datetime | None = None
+    number: Decimal | None = None
     #: Whether this reader may change the fact from the chip itself. Only a chip
     #: that can be acted on — a task's box — is ever ``True``.
     writable: bool = False
@@ -108,10 +107,10 @@ class ReferenceEmbed(BaseModel):
     #: What the thing is called right now.
     title: str
     #: Its description, where the kind has one and it is filled in.
-    description: Optional[str] = None
+    description: str | None = None
     #: Its body as the editor stores it (Lexical JSON), where the thing is
     #: prose — a text document, a wiki page — and has anything written in it.
-    body: Optional[Dict[str, Any]] = None
+    body: dict[str, Any] | None = None
 
 
 class ReferenceEmbedList(BaseModel):
@@ -119,7 +118,7 @@ class ReferenceEmbedList(BaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    items: List[ReferenceEmbed]
+    items: list[ReferenceEmbed]
 
 
 class SmartChipStateList(BaseModel):
@@ -132,4 +131,4 @@ class SmartChipStateList(BaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    items: List[SmartChipState]
+    items: list[SmartChipState]

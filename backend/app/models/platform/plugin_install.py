@@ -29,8 +29,6 @@ claims its route first. Reached only by the system engine.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from sqlalchemy import (
     Boolean,
     Column,
@@ -44,11 +42,11 @@ from sqlmodel import Field, SQLModel
 
 __all__ = [
     "EXCLUSIVE_ROUTE_INDEX",
-    "PluginInstall",
-    "PluginInstallClaim",
     "HOOK_ROUTE_MAX_LENGTH",
     "SETTING_KEY_LENGTH",
     "SETTING_VALUE_LENGTH",
+    "PluginInstall",
+    "PluginInstallClaim",
 ]
 
 #: The widest route value kept.
@@ -87,7 +85,7 @@ class PluginInstall(SQLModel, table=True):
     #: The listing the install came from, which names its registration.
     listing_uid: str = Field(sa_column=Column(String(length=14), nullable=False))
     enabled: bool = Field(sa_column=Column(Boolean, nullable=False))
-    hook_route: Optional[str] = Field(
+    hook_route: str | None = Field(
         default=None,
         sa_column=Column(String(length=HOOK_ROUTE_MAX_LENGTH), nullable=True),
     )
@@ -101,7 +99,7 @@ class PluginInstall(SQLModel, table=True):
     #: ``community_status`` hook. The community-hook worker compares it with
     #: ``guilds.status`` and tells the plug-in when the two differ, so a status
     #: is told however it was changed.
-    community_status_sent: Optional[str] = Field(
+    community_status_sent: str | None = Field(
         default=None, sa_column=Column(String(length=16), nullable=True)
     )
 

@@ -18,8 +18,8 @@ taken with ``max``.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator, Mapping
 from pathlib import Path
-from typing import Iterator, Mapping
 
 from prometheus_client import REGISTRY, Counter, Gauge, Histogram, Info
 from prometheus_client.core import GaugeMetricFamily

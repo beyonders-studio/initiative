@@ -13,9 +13,9 @@ this pack on every deployment carrying the catalog.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Iterable
+from datetime import UTC, datetime
 
 from sqlalchemy import delete, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -26,8 +26,8 @@ from app.core.profile_decorations import SHIPPED_DECORATIONS
 from app.models.platform.marketplace import MarketplaceListing
 from app.models.platform.user import User
 from app.models.platform.user_decoration import UserDecoration
-from app.services.marketplace import catalog as catalog_service
 from app.schemas.platform.user import OwnedDecoration, ProfileDecorations
+from app.services.marketplace import catalog as catalog_service
 
 #: A ceiling on one read of the shelf. The catalog paginates; this surface does
 #: not, because a person's decoration store is not a browsing problem.
@@ -316,7 +316,7 @@ async def install_pack(session: AsyncSession, *, user_id: int, pack: Pack) -> li
     Runs on the system engine — the request path reads its library and never
     writes it.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await session.exec(
         pg_insert(UserDecoration)
         .values(
@@ -426,7 +426,7 @@ async def remove_pack(
             .where(User.id == user_id)
             .values(
                 profile_decorations=stripped.model_dump(),
-                updated_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(UTC),
             )
         )
     return stripped

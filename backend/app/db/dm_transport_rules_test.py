@@ -6,7 +6,7 @@ request path gets.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import delete, text
@@ -81,7 +81,7 @@ async def _device(session: AsyncSession, user: User) -> DmDevice:
 async def _conversation(
     session: AsyncSession, *users: User, accepted: bool = True
 ) -> DmConversation:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     conversation = DmConversation(
         kind=(
             DmConversationKind.direct if len(users) == 2 else DmConversationKind.group
@@ -380,7 +380,7 @@ async def _add_member(
         ).bindparams(
             c=conversation.id,
             u=user.id,
-            at=datetime.now(timezone.utc) if accepted else None,
+            at=datetime.now(UTC) if accepted else None,
         )
     )
 

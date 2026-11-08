@@ -15,12 +15,13 @@ reaction control where it would not show a reply box. Seeing the chips asks for
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Awaitable, Callable, Optional, cast
+from datetime import UTC, datetime
+from typing import cast
 
-from sqlalchemy import delete as sa_delete, func
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 from sqlmodel import col, select
@@ -32,11 +33,11 @@ from app.core.reactions import ReactionTarget
 from app.core.tools import Tool
 from app.db import session as db_session
 from app.db.advisory_locks import LockNamespace, advisory_lock
+from app.models.platform.user import User
 from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.models.tenant.reaction import Reaction
-from app.models.platform.user import User
-from app.services.platform import accounts as accounts_service
 from app.schemas.tenant.reaction import ReactionGroup, ReactionSummary, ReactionUser
+from app.services.platform import accounts as accounts_service
 from app.services.tenant.initiative_tools import tool_on_in
 
 logger = logging.getLogger(__name__)
@@ -89,7 +90,7 @@ class TargetContext:
     target: ReactionTarget
     target_id: int
     title: str
-    author_id: Optional[int]
+    author_id: int | None
     about: tuple[str, int]
 
 
@@ -241,7 +242,7 @@ async def load_reactions(
 
 
 def summarize(
-    reactions: Iterable[Reaction], *, viewer_id: Optional[int]
+    reactions: Iterable[Reaction], *, viewer_id: int | None
 ) -> list[ReactionGroup]:
     """Collapse rows into one group per emoji, in first-reacted order.
 
@@ -267,7 +268,7 @@ async def summary_for(
     *,
     target: ReactionTarget,
     target_id: int,
-    viewer_id: Optional[int],
+    viewer_id: int | None,
 ) -> ReactionSummary:
     """The whole reaction state of one target, as the toggle route replies."""
     grouped = await load_reactions(session, target=target, target_ids=[target_id])
@@ -381,7 +382,7 @@ async def toggle_reaction(
                     created_by=cast(int, user.id),
                     # Spelled out: this is a Core insert, so the model's
                     # default_factory never runs for it.
-                    created_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(UTC),
                 )
                 .on_conflict_do_nothing(constraint="uq_reactions_target_user_emoji")
                 .returning(Reaction.id)

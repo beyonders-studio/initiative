@@ -27,27 +27,26 @@ import uuid
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from fastapi import HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
-from sqlmodel import update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import update as sql_update
 from sqlmodel.ext.asyncio.session import AsyncSession as SqlModelSession
 
 from app.api.v1.platform_endpoints.session_cookies import (
     set_refresh_cookie,
     set_session_cookie,
 )
+from app.core import audit_context
 from app.core.audit_events import AuditEventType
 from app.core.config import install_id, is_device, settings
 from app.core.login_methods import LoginMethod
 from app.core.messages import AuthMessages, SettingsMessages
-from app.core import audit_context
 from app.core.rate_limit import SIGN_IN_FAILURES
-from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.core.security import (
     REFRESH_COOKIE_NAME,
     get_password_hash,
@@ -55,22 +54,21 @@ from app.core.security import (
     password_needs_rehash,
     verify_sign_in_password,
 )
+from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.models.platform.auth_session import AuthSession
 from app.models.platform.user import User, may_sign_in
 from app.schemas.platform.token import Token
 from app.services import audit as audit_service
 from app.services import email as email_service
-from app.services.auth import addresses
-from app.services.auth.assurance import SECOND_FACTOR_AMR
+from app.services.auth import addresses, sign_in_locks
 from app.services.auth import challenges as challenge_service
 from app.services.auth import passkeys as passkey_service
 from app.services.auth import sessions as session_service
-from app.services.auth import sign_in_locks
 from app.services.auth import subject as subject_service
 from app.services.auth import totp as totp_service
-from app.services.platform import auth_posture
-from app.services.platform import user_tokens
+from app.services.auth.assurance import SECOND_FACTOR_AMR
 from app.services.content_sockets import sockets as content_sockets
+from app.services.platform import auth_posture, user_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -810,7 +808,7 @@ async def set_password(
     )
     issued: OpenedSession | None = None
     async with session_store(system_session, user_id=user_id):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         account.hashed_password = (
             get_password_hash(password) if password is not None else None
         )

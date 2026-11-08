@@ -1,6 +1,6 @@
 """What an installed plug-in sends to call another plug-in through Initiative."""
 
-from typing import Any, Dict
+from typing import Any
 
 from pydantic import ConfigDict
 
@@ -15,4 +15,4 @@ class PluginHubCall(SanitizedBaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    params: Dict[str, Any] = {}
+    params: dict[str, Any] = {}

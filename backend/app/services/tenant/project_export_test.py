@@ -6,39 +6,38 @@ verify the new project has equivalent tags, statuses, properties, tasks,
 checklists, assignees, and property values.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
-
-from app.core.user_display import handle_of
 from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.user_display import handle_of
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.plugin_placement import PluginPlacement
-from app.models.tenant.project import Project
 from app.models.tenant.metadata import (
     MetadataDefinition,
     MetadataType,
     MetadataValue,
 )
+from app.models.tenant.plugin_placement import PluginPlacement
+from app.models.tenant.project import Project
 from app.models.tenant.tag import Tag
+from app.models.tenant.task import Task, TaskAssignee, TaskStatusCategory
 from app.models.tenant.tool_layout import ToolLayout
 from app.schemas.tenant.import_envelopes import CURRENT_SCHEMA_VERSION
-from app.models.tenant.task import Task, TaskAssignee, TaskStatusCategory
 from app.schemas.tenant.project_export import ProjectExportEnvelope
+from app.services.import_engine.context import ImportContext
+from app.services.tenant import ownership as ownership_service
 from app.services.tenant import project_export as export_service
 from app.services.tenant import project_import as import_service
-from app.services.tenant.project_grants import get_project_hydrated
-from app.services.tenant import task_statuses as task_statuses_service
-from app.services.tenant import ownership as ownership_service
 from app.services.tenant import tags as tags_service
+from app.services.tenant import task_statuses as task_statuses_service
 from app.services.tenant import task_types as task_types_service
+from app.services.tenant.project_grants import get_project_hydrated
 from app.services.tenant.task_types import get_default_type
-from app.services.import_engine.context import ImportContext
 from app.testing import (
     assign_tag,
     checklist_items,
@@ -108,9 +107,9 @@ async def _seed_populated_project(session: AsyncSession):
         description="Important",
         position=1024.0,
         series_id=4242,
-        due_date=datetime(2026, 10, 7, 9, tzinfo=timezone.utc),
+        due_date=datetime(2026, 10, 7, 9, tzinfo=UTC),
         recurrence="RRULE:FREQ=WEEKLY\nRDATE:20261007T090000Z",
-        recurrence_anchor=datetime(2026, 10, 5, 9, tzinfo=timezone.utc),
+        recurrence_anchor=datetime(2026, 10, 5, 9, tzinfo=UTC),
         recurrence_carry={
             "title": "Fix it once",
             "tag_ids": [tag.id],
@@ -148,7 +147,7 @@ async def test_round_trip_into_different_initiative(session: AsyncSession):
         owner,
         assignee,
         guild,
-        source_initiative,
+        _source_initiative,
         source_project,
     ) = await _seed_populated_project(session)
 
@@ -180,9 +179,7 @@ async def test_round_trip_into_different_initiative(session: AsyncSession):
     assert exported_task.properties[0].property_name == "Severity"
     assert exported_task.properties[0].value_text == "high"
     assert exported_task.series == 4242
-    assert exported_task.recurrence_anchor == datetime(
-        2026, 10, 5, 9, tzinfo=timezone.utc
-    )
+    assert exported_task.recurrence_anchor == datetime(2026, 10, 5, 9, tzinfo=UTC)
     assert exported_task.recurrence_carry == {
         "title": "Fix it once",
         "tags": [{"name": "blocker", "color": "#FF0000"}],
@@ -233,14 +230,14 @@ async def test_round_trip_into_different_initiative(session: AsyncSession):
     assert new_task.title == "Fix the thing"
     # Its series is named after the first task of it the import made.
     assert new_task.series_id == new_task.id
-    assert new_task.recurrence_anchor == datetime(2026, 10, 5, 9, tzinfo=timezone.utc)
+    assert new_task.recurrence_anchor == datetime(2026, 10, 5, 9, tzinfo=UTC)
     from app.services.tenant.task_series import next_dates
 
     dates = await next_dates(
         session, new_task, now=new_task.due_date, user_timezone="UTC"
     )
     assert dates is not None
-    assert dates[1] == datetime(2026, 10, 12, 9, tzinfo=timezone.utc)
+    assert dates[1] == datetime(2026, 10, 12, 9, tzinfo=UTC)
     await tags_service.annotate_tags(session, [new_task])
     assert new_task.recurrence_carry == {
         "title": "Fix it once",
@@ -646,7 +643,7 @@ async def test_an_unticked_property_leaves_project_metadata_of_its_name(
 async def test_an_envelope_holds_one_layout_of_each_kind_as_read(
     session: AsyncSession,
 ):
-    owner, _assignee, _guild, _initiative, project = await _seed_populated_project(
+    _owner, _assignee, _guild, _initiative, project = await _seed_populated_project(
         session
     )
     body = (
@@ -669,7 +666,7 @@ async def test_an_envelope_holds_one_layout_of_each_kind_as_read(
 
 
 async def test_an_envelope_holds_a_task_page_for_each_type(session: AsyncSession):
-    owner, _assignee, guild, initiative, project = await _seed_populated_project(
+    owner, _assignee, guild, _initiative, project = await _seed_populated_project(
         session
     )
     body = (
@@ -731,9 +728,9 @@ async def test_an_envelope_holds_a_task_page_for_each_type(session: AsyncSession
 async def test_property_type_collision_renames(session: AsyncSession):
     (
         owner,
-        assignee,
+        _assignee,
         guild,
-        source_initiative,
+        _source_initiative,
         source_project,
     ) = await _seed_populated_project(session)
     envelope = await export_service.build_project_export(
@@ -778,9 +775,9 @@ async def test_property_options_mismatch_renames(session: AsyncSession):
     values that aren't valid options on the target side."""
     (
         owner,
-        assignee,
+        _assignee,
         guild,
-        source_initiative,
+        _source_initiative,
         source_project,
     ) = await _seed_populated_project(session)
     envelope = await export_service.build_project_export(
@@ -830,9 +827,9 @@ async def test_property_options_label_only_difference_matches(session: AsyncSess
     counts as a match (no rename, no new definition)."""
     (
         owner,
-        assignee,
+        _assignee,
         guild,
-        source_initiative,
+        _source_initiative,
         source_project,
     ) = await _seed_populated_project(session)
     envelope = await export_service.build_project_export(
@@ -879,7 +876,7 @@ async def test_a_counter_matches_only_one_kept_to_its_settings(session: AsyncSes
     task = (
         await session.exec(select(Task).where(Task.project_id == source_project.id))
     ).first()
-    await create_property_value(session, task, seats, value_number=Decimal("50"))
+    await create_property_value(session, task, seats, value_number=Decimal(50))
     envelope = await export_service.build_project_export(
         session, await get_project_hydrated(session, source_project.id)
     )
@@ -906,7 +903,7 @@ async def test_a_counter_matches_only_one_kept_to_its_settings(session: AsyncSes
             MetadataDefinition.name == "Seats_counter",
         )
     )
-    assert kept.one() == (settings, Decimal("50"))
+    assert kept.one() == (settings, Decimal(50))
 
 
 async def test_unmatched_assignees_reported(session: AsyncSession):
@@ -914,7 +911,7 @@ async def test_unmatched_assignees_reported(session: AsyncSession):
         owner,
         assignee,
         guild,
-        source_initiative,
+        _source_initiative,
         source_project,
     ) = await _seed_populated_project(session)
     envelope = await export_service.build_project_export(
@@ -940,7 +937,9 @@ async def test_a_thread_survives_the_round_trip(session: AsyncSession):
     from app.models.tenant.comment import Comment
     from app.testing import create_comment
 
-    owner, assignee, guild, initiative, project = await _seed_populated_project(session)
+    owner, assignee, guild, _initiative, project = await _seed_populated_project(
+        session
+    )
     task = (await session.exec(select(Task).where(Task.project_id == project.id))).one()
     question = await create_comment(session, owner, task=task, content="Question")
     await create_comment(
@@ -1026,7 +1025,7 @@ async def test_legacy_envelope_keeps_carried_dates_and_consumed_count(session):
     old_task.recurrence_anchor = None
     old_task.recurrence_anchor_count = 0
     old_task.recurrence_occurrence_count = 2
-    old_task.due_date = datetime(2026, 10, 9, 9, tzinfo=timezone.utc)
+    old_task.due_date = datetime(2026, 10, 9, 9, tzinfo=UTC)
     old_task.recurrence_carry = {"due_date": "2026-10-07T09:00:00+00:00"}
     target = await create_initiative(session, guild, owner, name="Legacy restore")
     await route_as(session, user_id=owner.id, guild_id=guild.id)
@@ -1039,25 +1038,25 @@ async def test_legacy_envelope_keeps_carried_dates_and_consumed_count(session):
     restored = (
         await session.exec(select(Task).where(Task.project_id == result.entity_id))
     ).one()
-    assert restored.recurrence_anchor == datetime(2026, 10, 7, 9, tzinfo=timezone.utc)
+    assert restored.recurrence_anchor == datetime(2026, 10, 7, 9, tzinfo=UTC)
     assert restored.recurrence_anchor_count == 2
     from app.services.tenant.task_series import next_dates
 
     dates = await next_dates(
         session,
         restored,
-        now=datetime(2026, 10, 10, tzinfo=timezone.utc),
+        now=datetime(2026, 10, 10, tzinfo=UTC),
         user_timezone="UTC",
     )
     assert dates is not None
-    assert dates[1] == datetime(2026, 10, 14, 9, tzinfo=timezone.utc)
+    assert dates[1] == datetime(2026, 10, 14, 9, tzinfo=UTC)
 
 
 async def test_task_types_survive_the_round_trip(session: AsyncSession):
     """A project's types come back as they were, and each task as its type."""
     from app.models.tenant.task import TaskType
 
-    owner, _assignee, guild, initiative, project = await _seed_populated_project(
+    owner, _assignee, guild, _initiative, project = await _seed_populated_project(
         session
     )
     types = await task_types_service.list_types(session, project.id)

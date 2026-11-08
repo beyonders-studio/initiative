@@ -4,101 +4,141 @@ icon: lucide/save
 
 # Backups & updates
 
-Two ongoing jobs come with self-hosting: keeping a safety net, and staying current.
+Running your own server comes with two chores: keeping a copy of everything, and keeping current. Neither takes long, and both matter far more than they feel like they do, right up until the afternoon one of them matters enormously.
 
-Neither is hard. Both matter far more than they feel like they do, right up until the one day they matter enormously.
+## What to back up
 
-## Backups
+| What | Where it is | Why |
+|---|---|---|
+| The database | The `db` container, in the `postgres_data` volume | Every project, task, comment, document and setting |
+| The database's roles | The same PostgreSQL, outside the database | The logins and per-community roles the data is granted to |
+| Uploads | `./uploads` beside the compose file, unless they're in [object storage](object-storage.md) | Every file people attached or uploaded |
+| `SECRET_KEY` | Your `.env` | Without it, a restored database can't read what it encrypted |
 
-There are exactly **two** things to back up:
+Back up the first three together and on a schedule, and keep the copies somewhere that isn't the server. Keep `SECRET_KEY` somewhere safe and separate, with your other secrets. An export Initiative wrote to `EXPORT_DESTINATION_DIR` is yours to collect too; Initiative never deletes it.
 
-1. **The database** — every project, task, comment and setting, and everything written in Files.
-2. **The uploads** — the files people attached, at `/app/uploads` unless you've moved them to [object storage](object-storage.md).
-
-Back up both **together and regularly**, and keep copies somewhere that isn't the server.
+On a [native package](native-packages.md), the uploads are in `/var/lib/initiative/uploads` and the settings, `SECRET_KEY` included, in `/etc/initiative/server.env`.
 
 ### The database
 
-A standard PostgreSQL dump does the job:
+From the folder with your compose file, with the user and database the compose file uses (`initiative` and `initiative`, unless you set `POSTGRES_USER` or `POSTGRES_DB`):
 
 ```bash
-# Adjust the service name and credentials to match your compose file
-docker compose exec -T db pg_dump -U postgres initiative > initiative-backup.sql
+docker compose exec -T db pg_dump -U initiative initiative > initiative-$(date +%F).sql
+docker compose exec -T db pg_dumpall -U initiative --roles-only > initiative-roles-$(date +%F).sql
 ```
 
-Automate it (a nightly cron job will do), keep several days of history, and **actually test a restore occasionally**.
+`pg_dump` takes a consistent snapshot while Initiative runs, so there's no need to stop anything. The roles file holds the logins' password hashes, so keep it as safe as the dump.
 
-A backup you have never restored is not a safety net. It's a hypothesis.
+Run it nightly and keep a couple of weeks. As a crontab line, writing into a `backups` folder you've made beside the compose file, with the `%` escaped the way cron needs:
+
+```text
+0 3 * * * cd /srv/initiative && docker compose exec -T db pg_dump -U initiative initiative | gzip > backups/initiative-$(date +\%F).sql.gz
+```
 
 ### Uploads
 
-Copy the uploads volume to your backup location. If uploads live in [S3-compatible storage](object-storage.md), back up the bucket instead — most object stores have their own snapshot or replication features.
+From the same folder, with `sudo` in front if the folder belongs to the container's user rather than yours:
 
-!!! warning "Keep your SECRET_KEY with your backups — safely"
-    Some stored data is encrypted with `SECRET_KEY`, and a database restore cannot decrypt those fields without the same key.
+```bash
+tar -czf uploads-$(date +%F).tar.gz uploads
+```
 
-    Record it somewhere secure and separate from the backup itself. Otherwise what you have is not quite a backup, and you'll find that out at the worst possible moment.
+With [S3-compatible storage](object-storage.md), back up the bucket with your store's own versioning or replication. With [stored files encrypted](object-storage.md#encrypting-stored-files) under `local`, the copies open only with the same `SECRET_KEY`.
+
+## Restoring
+
+Restore a backup once, on another machine or a VM, so you know it works before the day you need it. Into a fresh setup with the same compose file and the same `.env`:
+
+1. Start only the database:
+
+    ```bash
+    docker compose up -d db
+    ```
+
+2. Put the roles back. It says role `initiative` already exists, which is fine.
+
+    ```bash
+    docker compose exec -T db psql -U initiative -d postgres < initiative-roles-2026-11-07.sql
+    ```
+
+3. Put the database back:
+
+    ```bash
+    docker compose exec -T db psql -U initiative -d initiative < initiative-2026-11-07.sql
+    ```
+
+4. Put the uploads back beside the compose file:
+
+    ```bash
+    tar -xzf uploads-2026-11-07.tar.gz
+    ```
+
+5. Start Initiative:
+
+    ```bash
+    docker compose up -d
+    ```
+
+At start, Initiative sets its logins' passwords again from `SECRET_KEY` and repairs any grant the restore didn't bring back, then runs whatever migrations the image is newer than. An image older than the backup refuses to start and says so (see [If it won't start](#if-it-wont-start)).
 
 ## Updating
 
-Initiative ships as versioned Docker images:
-
 ```bash
-docker compose pull        # fetch the newer image
-docker compose up -d       # recreate the container
+docker compose pull
+docker compose up -d
 ```
 
-Database **migrations run automatically** at startup, so there's usually nothing else to do at all.
+Back up first. It's one command and the cheapest insurance you'll ever buy.
 
-Back up first anyway. It's the cheapest insurance available to you and it takes one command.
+Migrations run by themselves at start, before Initiative serves anything. Copies starting together take turns, so only one runs them. Migrations only go forward: going back to an older version means restoring the backup you took before updating.
 
-### Choosing a version
+A database from a release older than 0.53.2 first needs one start on a 0.53.x image, such as `ghcr.io/beyonders-studio/initiative:0.53.5`, and then the new one. The start-up message says so if that's you.
 
-- **`latest`** tracks the newest release.
-- **`stable`** tracks a release we have promoted after it spent a few days out in the world without a reported regression. See [Docker images](installation.md#docker-images).
-- **Pin one** (`ghcr.io/beyonders-studio/initiative:0.65`) if you'd rather update deliberately and read the changelog first.
-
-Initiative follows semantic versioning, and the changelog lists what changed in each release. Worth a skim before a jump, especially across minor versions.
+Initiative follows semantic versioning, and the [changelog](https://github.com/beyonders-studio/initiative/blob/main/CHANGELOG.md) lists what changed in each release. Which tag to follow (`latest`, `stable`, or a pinned version) is under [Docker images](installation.md#docker-images).
 
 ### Knowing what's running
 
-The running version is at `<your-server>/api/v1/version`, and in the app's sidebar footer. The web app also notices when the server's been updated and prompts people to refresh.
+| Where | What it says |
+|---|---|
+| `/api/v1/version` | `{"version": "0.78.0"}` |
+| The version in the sidebar's footer | Opens **Version Information**: the version running, the newest release, **Update available** or **Up to date**, and the changelog |
 
-### If it won't start
+The newest release comes from the project's GitHub releases, asked once every 6 hours and shared by everybody on your server. A server that can't reach GitHub shows it as **Unavailable** and asks again 15 minutes later.
 
-Rare, and recoverable. First, read the end of the log:
+When the server is updated, people with the app open are told a new version is ready and reload into it.
+
+### The phone and desktop apps
+
+The apps take the web part of each release from your server, so updating the server updates them on their next launch, with no app store involved. Each update is signed by the project, and an app accepts only a signed one. An image you built yourself carries none, so the apps stay on the version they have and say so.
+
+Now and then a release changes the apps' native part too. The server then tells an app that's too old to update from its store or the release's APK (or, on a computer, the latest desktop download), and the app keeps its current version until it's updated. The phone apps and the desktop app each have their own minimum, so a change to one never makes the other's users reinstall.
+
+## If it won't start
+
+It's rare, and recoverable. First, read the end of the log:
 
 ```bash
 docker compose logs initiative | tail -n 40
 ```
 
-If the last thing it says is a message framed in `=` signs telling you what to do (the image being older than the database, say), that message is the whole answer. Do what it says. A setting that stops it starting is named too, with why, and without its value printed.
+If the last thing it says is a message framed in lines of `=` telling you what to do, that message is the whole answer. The usual ones:
 
-Otherwise, find the report it wrote. The log is one JSON object per line, and the server keeps retrying, so there may be several; this prints the most recent one as plain text (it needs `jq`, which your package manager has):
+| Message | What to do |
+|---|---|
+| `This image is older than the database.` | Start the release that last upgraded the database, or a newer one. If it keeps starting the old image after a pull, look for a container left behind by an unfinished upgrade (Compose renames it to `<12 hex characters>_initiative`), remove it, and run `docker compose up -d` again. |
+| `Pre-v0.53.2 database detected` | Start once on a 0.53.x image first, as above. |
+| `DATABASE_URL_ADMIN connects as …, which does not hold the BYPASSRLS attribute.` | Give Initiative its owner connection and restart, or run the `ALTER ROLE` it prints as a superuser. |
+
+A setting that stops it starting is named too, with the reason and without its value.
+
+Otherwise, find the report it wrote. The log is one JSON object per line and the container keeps retrying, so there may be several. This prints the most recent as plain text, and needs `jq`, which your package manager has:
 
 ```bash
 docker compose logs --no-log-prefix initiative \
   | grep 'Initiative could not start' | tail -n 1 | jq -r .msg
 ```
 
-It lists the version, how the database is set up, where the migrations stopped, and the error. The passwords and keys the server is configured with are taken out, but give it a read before you post it. Then paste it into [an issue](https://github.com/beyonders-studio/initiative/issues).
+It lists the version, how the database is set up, the PostgreSQL version, where the migrations stopped, and the error. The passwords and keys the server is configured with are taken out, but read it over before you post it. Then paste it into [an issue](https://github.com/beyonders-studio/initiative/issues).
 
-The fix is almost always a newer release, which picks up from exactly where this one stopped. Going back to the older version means restoring the backup you took before updating. You took one. It was one command.
-
-### The mobile app
-
-The mobile apps update their web portion **over the air** — update the server and installed apps pick up the matching bundle, no app-store update needed. Occasionally a release changes the *native* part and needs a store or APK update; Initiative tracks that with the `MIN_NATIVE_VERSION` marker and the app prompts people when it's genuinely required. For everyday server updates, you don't need to think about it.
-
-## A healthy routine
-
-- [ ] **Nightly database backup**, a few days retained.
-- [ ] **Regular uploads backup** (or object-store snapshots).
-- [ ] **`SECRET_KEY` stored securely** alongside the backup process.
-- [ ] **Update promptly**, especially for security fixes — read the changelog, back up, pull, up.
-- [ ] **Occasionally restore into a throwaway environment**, to prove the whole thing actually works.
-
-## Related
-
-- [Installation](installation.md) — initial setup and volumes.
-- [Data & compliance](../security/data-and-compliance.md) — your responsibilities as the data owner.
-- [Object storage](object-storage.md) — if uploads live in S3.
+The fix is almost always a newer release, which picks up exactly where this one stopped. Going back to the older version means restoring the backup you took before updating. You took one. It was one command.

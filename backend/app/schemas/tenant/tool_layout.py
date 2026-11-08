@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Any, Dict, List, Literal, Optional, Union, get_args
+from typing import Annotated, Any, Literal, get_args
 
 from pydantic import AfterValidator, ConfigDict, Field, field_validator, model_validator
 
@@ -36,6 +36,7 @@ from app.core.tools import LAYOUT_KIND_TARGETS, Tool
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.query import DateBucket, FilterOp, SortDir
+from app.schemas.tenant.property import MAX_PROPERTY_FILTERS
 from app.services.marketplace import contract
 from app.services.marketplace.manifest_values import (
     IDENTIFIER_CHARS,
@@ -43,7 +44,6 @@ from app.services.marketplace.manifest_values import (
     MAX_METADATA_KEY_LENGTH,
     is_metadata_key,
 )
-from app.schemas.tenant.property import MAX_PROPERTY_FILTERS
 
 #: What one layout may hold. Every part of a tree counts as a
 #: node, as does every column.
@@ -112,27 +112,27 @@ class TaskFilterSpec(_Strict):
     """The task filters a preset holds, the shape every task list filters by.
     Unknown keys are refused."""
 
-    status_ids: List[int] = Field(default_factory=list, max_length=MAX_STATUS_IDS)
-    status_categories: List[TaskStatusCategory] = Field(default_factory=list)
+    status_ids: list[int] = Field(default_factory=list, max_length=MAX_STATUS_IDS)
+    status_categories: list[TaskStatusCategory] = Field(default_factory=list)
     #: The project's task types, by id.
-    type_ids: List[int] = Field(default_factory=list, max_length=MAX_STATUS_IDS)
-    priorities: List[TaskPriority] = Field(default_factory=list)
+    type_ids: list[int] = Field(default_factory=list, max_length=MAX_STATUS_IDS)
+    priorities: list[TaskPriority] = Field(default_factory=list)
     #: Only a list that holds several communities' tasks narrows by them.
-    community_ids: List[int] = Field(default_factory=list, max_length=MAX_COMMUNITY_IDS)
-    assignees: List[str] = Field(default_factory=list, max_length=MAX_ASSIGNEES)
-    tag_ids: List[int] = Field(default_factory=list, max_length=MAX_TAG_IDS)
-    properties: List[PresetPropertyFilter] = Field(
+    community_ids: list[int] = Field(default_factory=list, max_length=MAX_COMMUNITY_IDS)
+    assignees: list[str] = Field(default_factory=list, max_length=MAX_ASSIGNEES)
+    tag_ids: list[int] = Field(default_factory=list, max_length=MAX_TAG_IDS)
+    properties: list[PresetPropertyFilter] = Field(
         default_factory=list, max_length=MAX_PROPERTY_FILTERS
     )
-    plugins: List[PresetPluginFilter] = Field(
+    plugins: list[PresetPluginFilter] = Field(
         default_factory=list, max_length=MAX_PROPERTY_FILTERS
     )
-    due: Optional[DueToken] = None
+    due: DueToken | None = None
     include_archived: bool = False
 
     @field_validator("assignees")
     @classmethod
-    def _validate_assignees(cls, value: List[str]) -> List[str]:
+    def _validate_assignees(cls, value: list[str]) -> list[str]:
         for entry in value:
             if entry not in (ASSIGNEE_ME, ASSIGNEE_NONE) and not entry.isdigit():
                 raise ValueError("assignees entries must be a user id, 'me', or 'none'")
@@ -140,11 +140,11 @@ class TaskFilterSpec(_Strict):
 
     @field_validator("status_categories", "priorities")
     @classmethod
-    def _dedupe(cls, value: List[Any]) -> List[Any]:
+    def _dedupe(cls, value: list[Any]) -> list[Any]:
         return list(dict.fromkeys(value))
 
     @model_validator(mode="after")
-    def _field_filters_within_limit(self) -> "TaskFilterSpec":
+    def _field_filters_within_limit(self) -> TaskFilterSpec:
         # Property and plug-in filters share one limit, as a task list does.
         if len(self.properties) + len(self.plugins) > MAX_PROPERTY_FILTERS:
             raise ValueError(
@@ -157,15 +157,15 @@ class CalendarFilterSpec(_Strict):
     """The filters a preset on the initiative's calendar holds: what its tasks
     are, and the properties its events and tasks carry."""
 
-    status_categories: List[TaskStatusCategory] = Field(default_factory=list)
-    priorities: List[TaskPriority] = Field(default_factory=list)
-    properties: List[PresetPropertyFilter] = Field(
+    status_categories: list[TaskStatusCategory] = Field(default_factory=list)
+    priorities: list[TaskPriority] = Field(default_factory=list)
+    properties: list[PresetPropertyFilter] = Field(
         default_factory=list, max_length=MAX_PROPERTY_FILTERS
     )
 
     @field_validator("status_categories", "priorities")
     @classmethod
-    def _dedupe(cls, value: List[Any]) -> List[Any]:
+    def _dedupe(cls, value: list[Any]) -> list[Any]:
         return list(dict.fromkeys(value))
 
 
@@ -284,7 +284,7 @@ def _property_field(value: str) -> str:
 
 NamedFieldId = Annotated[str, AfterValidator(_named_field)]
 PropertyFieldId = Annotated[str, AfterValidator(_property_field)]
-CardFieldId = Union[TaskFieldId, FileFieldId, NamedFieldId]
+CardFieldId = TaskFieldId | FileFieldId | NamedFieldId
 
 
 #: The characters a built-in field's name is written in.
@@ -344,15 +344,15 @@ TaskDetailFieldId = Enum(
     {f.name: f.value for f in TaskFieldId if f.value in _PAGE},
     type=str,
 )
-ColumnFieldId = Union[TaskColumnFieldId, FileFieldId, NamedFieldId]
-DetailFieldId = Union[
-    TaskDetailFieldId,
-    EventDetailFieldId,
-    CounterDetailFieldId,
-    PostDetailFieldId,
-    FileFieldId,
-    NamedFieldId,
-]
+ColumnFieldId = TaskColumnFieldId | FileFieldId | NamedFieldId
+DetailFieldId = (
+    TaskDetailFieldId
+    | EventDetailFieldId
+    | CounterDetailFieldId
+    | PostDetailFieldId
+    | FileFieldId
+    | NamedFieldId
+)
 
 
 def _part_id(value: str) -> str:
@@ -368,12 +368,12 @@ def _part_id(value: str) -> str:
 
 
 class StackProps(_Strict):
-    direction: Optional[Literal["column", "row"]] = None
-    gap: Optional[Literal["xs", "sm"]] = None
-    wrap: Optional[bool] = None
+    direction: Literal["column", "row"] | None = None
+    gap: Literal["xs", "sm"] | None = None
+    wrap: bool | None = None
     #: Items keep their own width rather than filling the column.
-    align: Optional[Literal["start"]] = None
-    tone: Optional[Literal["muted"]] = None
+    align: Literal["start"] | None = None
+    tone: Literal["muted"] | None = None
 
 
 class FieldProps(_Strict):
@@ -382,13 +382,13 @@ class FieldProps(_Strict):
 
 class CardPart(_Strict):
     type: Literal["card"]
-    children: List[CardChild] = Field(default_factory=list)
+    children: list[CardChild] = Field(default_factory=list)
 
 
 class StackPart(_Strict):
     type: Literal["stack"]
-    props: Optional[StackProps] = None
-    children: List[CardChild] = Field(default_factory=list)
+    props: StackProps | None = None
+    children: list[CardChild] = Field(default_factory=list)
 
 
 class FieldPart(_Strict):
@@ -417,7 +417,7 @@ class PluginPart(_Strict):
 
 
 CardChild = Annotated[
-    Union[CardPart, StackPart, FieldPart, PropertiesPart, PluginPart],
+    CardPart | StackPart | FieldPart | PropertiesPart | PluginPart,
     Field(discriminator="type"),
 ]
 
@@ -435,7 +435,7 @@ class DetailFieldProps(_Strict):
     #: is filled. Only a field a person fills in can be required
     #: (``app.services.tenant.tool_layouts.REQUIREABLE``); a title always is.
     #: Left out of a read where it is not set, as it was before it existed.
-    required: Optional[bool] = Field(default=None, exclude_if=_unset)
+    required: bool | None = Field(default=None, exclude_if=_unset)
 
 
 class DetailFieldPart(_Strict):
@@ -445,23 +445,23 @@ class DetailFieldPart(_Strict):
 
 class SectionProps(_Strict):
     #: The initiative's own words, drawn as written.
-    title: Optional[str] = Field(default=None, max_length=100)
+    title: str | None = Field(default=None, max_length=100)
     #: Drawn folded until the reader opens it.
-    collapsed: Optional[bool] = None
+    collapsed: bool | None = None
 
 
 class SectionPart(_Strict):
     """A bordered group of a detail layout's parts."""
 
     type: Literal["section"]
-    props: Optional[SectionProps] = None
-    children: List[DetailPart] = Field(default_factory=list)
+    props: SectionProps | None = None
+    children: list[DetailPart] = Field(default_factory=list)
 
 
 class DetailStackPart(_Strict):
     type: Literal["stack"]
-    props: Optional[StackProps] = None
-    children: List[DetailPart] = Field(default_factory=list)
+    props: StackProps | None = None
+    children: list[DetailPart] = Field(default_factory=list)
 
 
 #: The parts a detail draws as its own, which edit or show more than one
@@ -491,25 +491,23 @@ OwnPartType = Literal[
 class OwnPartProps(_Strict):
     #: As a field's: a part that edits a value a person fills in (a task's
     #: dates) can be required.
-    required: Optional[bool] = Field(default=None, exclude_if=_unset)
+    required: bool | None = Field(default=None, exclude_if=_unset)
 
 
 class OwnPart(_Strict):
     """One of a detail's own parts."""
 
     type: OwnPartType
-    props: Optional[OwnPartProps] = Field(default=None, exclude_if=_unset)
+    props: OwnPartProps | None = Field(default=None, exclude_if=_unset)
 
 
 DetailPart = Annotated[
-    Union[
-        DetailStackPart,
-        SectionPart,
-        DetailFieldPart,
-        PropertiesPart,
-        PluginPart,
-        OwnPart,
-    ],
+    DetailStackPart
+    | SectionPart
+    | DetailFieldPart
+    | PropertiesPart
+    | PluginPart
+    | OwnPart,
     Field(discriminator="type"),
 ]
 
@@ -552,14 +550,12 @@ class LayoutPreset(_Strict):
 
     #: Left out for a shipped preset no one renamed, which each reader sees
     #: named in their own language.
-    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    name: str | None = Field(default=None, min_length=1, max_length=100)
     #: What a link to the preset carries; kept when it is renamed.
     slug: str = Field(min_length=1, max_length=MAX_SLUG_LENGTH, pattern=SLUG_PATTERN)
     #: Its tool's shape, which the service holds it to.
-    filters: Union[TaskFilterSpec, CalendarFilterSpec] = Field(
-        default_factory=TaskFilterSpec
-    )
-    sort: List[PresetSort] = Field(
+    filters: TaskFilterSpec | CalendarFilterSpec = Field(default_factory=TaskFilterSpec)
+    sort: list[PresetSort] = Field(
         default_factory=list, max_length=len(get_args(TaskSortField))
     )
 
@@ -570,10 +566,10 @@ class LayoutGrouping(_Strict):
 
     field: GroupingField
     #: For a date, the bucket of the calendar it groups by.
-    bucket: Optional[DateBucket] = None
+    bucket: DateBucket | None = None
     #: Each by its key: a status's, a person's or a tag's id, an option, a
     #: bucket's first day, or "" for the tasks with none.
-    hidden: List[Annotated[str, Field(max_length=MAX_SLUG_LENGTH)]] = Field(
+    hidden: list[Annotated[str, Field(max_length=MAX_SLUG_LENGTH)]] = Field(
         default_factory=list, max_length=MAX_HIDDEN_GROUPS
     )
 
@@ -592,29 +588,29 @@ class ListLayoutDefinition(_Strict):
     no ``presets`` the shipped presets and none with no ``groupings`` every
     field of what it lists that groups without a bucket."""
 
-    card: Optional[CardPart] = None
-    columns: Optional[List[ColumnFieldId]] = None
-    presets: Optional[List[LayoutPreset]] = Field(default=None, max_length=MAX_PRESETS)
-    groupings: Optional[List[LayoutGrouping]] = Field(
+    card: CardPart | None = None
+    columns: list[ColumnFieldId] | None = None
+    presets: list[LayoutPreset] | None = Field(default=None, max_length=MAX_PRESETS)
+    groupings: list[LayoutGrouping] | None = Field(
         default=None, max_length=MAX_GROUPINGS
     )
     #: What everyone starts grouped by, one of the groupings the list offers;
     #: none starts ungrouped. A person's own choice is kept over it.
-    group_by: Optional[GroupingField] = None
+    group_by: GroupingField | None = None
     #: A board's columns that take at most so many open tasks.
-    limits: Optional[List[ColumnLimit]] = Field(
+    limits: list[ColumnLimit] | None = Field(
         default=None, max_length=MAX_LIMITED_COLUMNS
     )
     #: Left out of the list's menu; none keeps what its tool ships.
-    hidden: Optional[bool] = None
+    hidden: bool | None = None
     #: How each scale or counter it shows is drawn, by the field's
     #: ``property:<id>``. One with none is drawn as a number.
-    displays: Optional[Dict[PropertyFieldId, FieldDisplay]] = Field(
+    displays: dict[PropertyFieldId, FieldDisplay] | None = Field(
         default=None, max_length=MAX_NODES
     )
 
     @model_validator(mode="after")
-    def _offers_what_it_starts_on(self) -> "ListLayoutDefinition":
+    def _offers_what_it_starts_on(self) -> ListLayoutDefinition:
         # With no groupings of its own, what a list offers is the registry's
         # answer, which the write checks against.
         offered = [grouping.field for grouping in self.groupings or ()]
@@ -634,8 +630,8 @@ class ListLayoutDefinition(_Strict):
     @field_validator("presets")
     @classmethod
     def _one_preset_per_slug(
-        cls, value: Optional[List[LayoutPreset]]
-    ) -> Optional[List[LayoutPreset]]:
+        cls, value: list[LayoutPreset] | None
+    ) -> list[LayoutPreset] | None:
         slugs = [preset.slug for preset in value or ()]
         if len(set(slugs)) != len(slugs):
             raise ValueError("each preset needs its own slug")
@@ -647,9 +643,9 @@ class DetailLayoutDefinition(_Strict):
     parts in order. A region it leaves out is drawn as shipped; what it places
     nowhere is not shown."""
 
-    header: Optional[List[DetailPart]] = None
-    main: Optional[List[DetailPart]] = None
-    side: Optional[List[DetailPart]] = None
+    header: list[DetailPart] | None = None
+    main: list[DetailPart] | None = None
+    side: list[DetailPart] | None = None
 
 
 # -- Requests -----------------------------------------------------------------
@@ -664,13 +660,13 @@ class DetailLayoutWrite(_Strict):
     kind: DetailLayoutKind
     #: The type of task a project's task page is for; required there, and
     #: nowhere else.
-    task_type_id: Optional[int] = Field(default=None, gt=0)
+    task_type_id: int | None = Field(default=None, gt=0)
     definition: DetailLayoutDefinition
 
 
 #: One layout as it is changed.
 ToolLayoutWrite = Annotated[
-    Union[ListLayoutWrite, DetailLayoutWrite], Field(discriminator="kind")
+    ListLayoutWrite | DetailLayoutWrite, Field(discriminator="kind")
 ]
 
 
@@ -695,7 +691,7 @@ class ListLayoutRead(SanitizedBaseModel):
     hidden: bool = False
     definition: ListLayoutDefinition
     #: When it was last changed; None as shipped.
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
 
 class DetailLayoutRead(SanitizedBaseModel):
@@ -706,16 +702,16 @@ class DetailLayoutRead(SanitizedBaseModel):
     kind: DetailLayoutKind
     #: The type of task a project's task page is for, and its name; None for
     #: every other detail.
-    task_type_id: Optional[int] = None
-    task_type_name: Optional[str] = None
+    task_type_id: int | None = None
+    task_type_name: str | None = None
     definition: DetailLayoutDefinition
     #: When it was last changed; None as shipped.
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
 
 #: One of a target's layouts.
 ToolLayoutRead = Annotated[
-    Union[ListLayoutRead, DetailLayoutRead], Field(discriminator="kind")
+    ListLayoutRead | DetailLayoutRead, Field(discriminator="kind")
 ]
 
 
@@ -736,7 +732,7 @@ class ToolLayoutSetRead(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    layouts: List[ToolLayoutRead]
+    layouts: list[ToolLayoutRead]
     #: Whether this reader may change them, computed server-side.
     can_configure: bool
 

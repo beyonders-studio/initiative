@@ -3,7 +3,6 @@
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-
 from app.db import cohorts
 from app.models.platform.guild import CommunityStatus
 from app.services.guild_sweeps import Scope, Visit, each_guild

@@ -10,8 +10,11 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.login_methods import LoginMethod
 from app.core.messages import AuthProviderMessages, GuildMessages
+from app.core.rules import SURFACE_CUSTOM_ROLES, SetBy, SignInRequirement
 from app.models.platform.guild import CommunityRole
+from app.services.platform import rules
 from app.testing.factories import (
     create_auth_provider,
     create_guild,
@@ -20,9 +23,6 @@ from app.testing.factories import (
     create_user,
     get_auth_headers,
 )
-from app.core.login_methods import LoginMethod
-from app.core.rules import SURFACE_CUSTOM_ROLES, SetBy, SignInRequirement
-from app.services.platform import rules
 
 
 async def _seat(session: AsyncSession, *, auth_options: list[str] | None = None):

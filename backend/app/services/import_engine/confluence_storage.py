@@ -22,9 +22,10 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
-from typing import Any, Callable, Optional, Union
+from typing import Any
 from urllib.parse import quote, urlsplit
 
 from app.core.search import SearchEntityType
@@ -237,20 +238,20 @@ class PageTarget:
     it: an ordinary link back to the source.
     """
 
-    slug: Optional[str] = None
-    url: Optional[str] = None
+    slug: str | None = None
+    url: str | None = None
 
 
 #: ``(content_title, space_key)`` → where a page link goes, or ``None``.
-PageResolver = Callable[[str, Optional[str]], Optional[PageTarget]]
+PageResolver = Callable[[str, str | None], PageTarget | None]
 #: ``account_id`` → the person's display name, or ``None``.
-UserResolver = Callable[[str], Optional[str]]
+UserResolver = Callable[[str], str | None]
 #: ``filename`` → the URL it is served from here, or ``None``.
-UploadResolver = Callable[[str], Optional[str]]
+UploadResolver = Callable[[str], str | None]
 #: ``filename`` → the ref of the file the attachment became, or ``None``.
-FileResolver = Callable[[str], Optional[str]]
+FileResolver = Callable[[str], str | None]
 #: The block listing the pages beneath this one, or ``None`` when it has none.
-ChildrenResolver = Callable[[], Optional[dict[str, Any]]]
+ChildrenResolver = Callable[[], dict[str, Any] | None]
 
 
 @dataclass
@@ -281,15 +282,15 @@ class StorageResult:
 class _Element:
     tag: str
     attrs: dict[str, str]
-    children: list[Union["_Element", str]] = field(default_factory=list)
+    children: list[_Element | str] = field(default_factory=list)
 
     def attr(self, name: str) -> str:
         return self.attrs.get(name) or ""
 
-    def elements(self) -> list["_Element"]:
+    def elements(self) -> list[_Element]:
         return [child for child in self.children if isinstance(child, _Element)]
 
-    def first(self, tag: str) -> Optional["_Element"]:
+    def first(self, tag: str) -> _Element | None:
         return next((child for child in self.elements() if child.tag == tag), None)
 
 
@@ -361,7 +362,7 @@ def _parse(xhtml: str) -> _Element:
     return builder.root
 
 
-def _text_of(element: Union[_Element, str]) -> str:
+def _text_of(element: _Element | str) -> str:
     if isinstance(element, str):
         return element
     return "".join(_text_of(child) for child in element.children)
@@ -434,7 +435,7 @@ def _tidy_inline(nodes: list[dict]) -> list[dict]:
     return out
 
 
-def _safe_url(url: str) -> Optional[str]:
+def _safe_url(url: str) -> str | None:
     """``url`` if it is one a link may carry: the web, mail, or a path on
     this app (where the fetch put an attachment)."""
     url = url.strip()
@@ -466,13 +467,13 @@ class _Walker:
     def __init__(
         self,
         *,
-        page: Optional[PageResolver],
-        user: Optional[UserResolver],
-        image: Optional[UploadResolver],
-        attachment: Optional[UploadResolver],
-        site_url: Optional[str],
-        children: Optional[ChildrenResolver] = None,
-        file: Optional[FileResolver] = None,
+        page: PageResolver | None,
+        user: UserResolver | None,
+        image: UploadResolver | None,
+        attachment: UploadResolver | None,
+        site_url: str | None,
+        children: ChildrenResolver | None = None,
+        file: FileResolver | None = None,
     ) -> None:
         self.children = children
         self.file = file
@@ -520,7 +521,7 @@ class _Walker:
 
     # -- blocks -------------------------------------------------------------
 
-    def blocks(self, nodes: list[Union[_Element, str]], *, fmt: int = 0) -> list[dict]:
+    def blocks(self, nodes: list[_Element | str], *, fmt: int = 0) -> list[dict]:
         """A run of siblings as blocks: loose text and inline elements are
         gathered into paragraphs, and each block element stands alone."""
         out: list[dict] = []
@@ -600,7 +601,7 @@ class _Walker:
         # div, section, a layout cell met out of place: its content counts.
         return self.blocks(element.children, fmt=fmt)
 
-    def file_card(self, macro: _Element, *, in_link: bool) -> Optional[list[dict]]:
+    def file_card(self, macro: _Element, *, in_link: bool) -> list[dict] | None:
         """A file Confluence shows as a card or a viewer: a link to where the
         file went, or its name. Counted among the page's attachments rather
         than as a loss. ``None`` for a macro that is not one."""
@@ -677,12 +678,12 @@ class _Walker:
             return self.blocks(fallback.children, fmt=fmt)
         return self.blocks(content.children, fmt=fmt) if content is not None else []
 
-    def list_node(self, element: _Element, list_type: str) -> Optional[dict]:
+    def list_node(self, element: _Element, list_type: str) -> dict | None:
         items: list[dict] = []
         for child in element.elements():
             if child.tag != "li":
                 continue
-            inline: list[Union[_Element, str]] = []
+            inline: list[_Element | str] = []
             nested: list[dict] = []
             for grandchild in child.children:
                 if isinstance(grandchild, _Element) and grandchild.tag in ("ul", "ol"):
@@ -700,11 +701,11 @@ class _Walker:
 
     def list_items(
         self,
-        inline: list[Union[_Element, str]],
+        inline: list[_Element | str],
         nested: list[dict],
         value: int,
         *,
-        checked: Optional[bool] = None,
+        checked: bool | None = None,
     ) -> list[dict]:
         """One source list item: its line, then — as the editor stores
         nesting — a sibling item holding each list beneath it."""
@@ -726,7 +727,7 @@ class _Walker:
             tag="ol" if list_type == "number" else "ul",
         )
 
-    def task_list(self, element: _Element) -> Optional[dict]:
+    def task_list(self, element: _Element) -> dict | None:
         items: list[dict] = []
         for task in element.elements():
             if task.tag != "ac:task":
@@ -734,7 +735,7 @@ class _Walker:
             status = task.first("ac:task-status")
             body = task.first("ac:task-body")
             done = status is not None and _text_of(status).strip() == "complete"
-            inline: list[Union[_Element, str]] = []
+            inline: list[_Element | str] = []
             nested: list[dict] = []
             for child in body.children if body else []:
                 if isinstance(child, _Element) and child.tag == "ac:task-list":
@@ -748,7 +749,7 @@ class _Walker:
             return None
         return self.list_wrapper("check", items)
 
-    def flat_line(self, nodes: list[Union[_Element, str]]) -> list[dict]:
+    def flat_line(self, nodes: list[_Element | str]) -> list[dict]:
         """Content that must be one line — a list item — with any blocks
         inside it laid end to end on line breaks."""
         out: list[dict] = []
@@ -960,7 +961,7 @@ class _Walker:
 
     def inline(
         self,
-        nodes: list[Union[_Element, str]],
+        nodes: list[_Element | str],
         *,
         fmt: int = 0,
         in_link: bool = False,
@@ -1124,7 +1125,7 @@ class _Walker:
 
     def image_node(self, element: _Element) -> list[dict]:
         alt = element.attr("ac:alt") or element.attr("alt") or element.attr("title")
-        src: Optional[str] = None
+        src: str | None = None
         if element.tag == "img":
             src = _safe_url(element.attr("src"))
         else:
@@ -1289,13 +1290,13 @@ def _span(raw: str) -> int:
 def storage_to_lexical(
     xhtml: Any,
     *,
-    page: Optional[PageResolver] = None,
-    user: Optional[UserResolver] = None,
-    image: Optional[UploadResolver] = None,
-    attachment: Optional[UploadResolver] = None,
-    site_url: Optional[str] = None,
-    children: Optional[ChildrenResolver] = None,
-    file: Optional[FileResolver] = None,
+    page: PageResolver | None = None,
+    user: UserResolver | None = None,
+    image: UploadResolver | None = None,
+    attachment: UploadResolver | None = None,
+    site_url: str | None = None,
+    children: ChildrenResolver | None = None,
+    file: FileResolver | None = None,
 ) -> StorageResult:
     """Convert one page body.
 

@@ -15,9 +15,8 @@ Declining deletes the row: there is no ``declined`` state, because the pair is
 back where it started and either may ask again.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import ConfigDict
 from sqlalchemy import (
@@ -28,7 +27,8 @@ from sqlalchemy import (
     Index,
     Integer,
 )
-from sqlmodel import Enum as SQLEnum, Field, SQLModel
+from sqlmodel import Enum as SQLEnum
+from sqlmodel import Field, SQLModel
 
 
 class ContactGrantKind(str, Enum):
@@ -101,10 +101,10 @@ class ContactGrant(SQLModel, table=True):
         )
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
-    responded_at: Optional[datetime] = Field(
+    responded_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )

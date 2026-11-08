@@ -22,7 +22,6 @@ from app.testing.factories import (
     get_auth_headers,
 )
 
-
 SMTP_PASSWORD = "smtp-pa55word"
 S3_SECRET = "s3-secret-access-key"
 

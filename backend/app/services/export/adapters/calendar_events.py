@@ -15,7 +15,7 @@ and what the worker replays here at render time.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func
@@ -27,11 +27,11 @@ from app.db.session import require_guild_context
 from app.models.platform.user import User
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.calendar_event import CalendarEvent
-from app.services.tenant import calendar_occurrences as occurrences_service
 from app.services.export.adapters._common import require_may_leave
 from app.services.export.contract import RenderItem, RenderRequest
 from app.services.export.engine import ExportError
-from app.services.tenant.ical_service import files_for_events, event_export_dict
+from app.services.tenant import calendar_occurrences as occurrences_service
+from app.services.tenant.ical_service import event_export_dict, files_for_events
 
 
 class CalendarEventsAdapter:
@@ -108,17 +108,17 @@ async def _reach(session: AsyncSession, events: list[CalendarEvent]) -> frozense
 
 def _filters(params: dict[str, Any]) -> dict[str, Any]:
     """The calendar page's selector, as the shared event query takes it."""
-    return dict(
-        initiative_id=params.get("initiative_id"),
-        guild_scope=params.get("scope") == "community",
-        calendar_ids=params.get("calendar_ids"),
-        exclude_calendar_ids=params.get("exclude_calendar_ids"),
-        property_filters=params.get("property_filters"),
-        start_after=_instant(params.get("start_after")),
-        start_before=_instant(params.get("start_before")),
-        tz=params.get("tz"),
-        whole_series=True,
-    )
+    return {
+        "initiative_id": params.get("initiative_id"),
+        "guild_scope": params.get("scope") == "community",
+        "calendar_ids": params.get("calendar_ids"),
+        "exclude_calendar_ids": params.get("exclude_calendar_ids"),
+        "property_filters": params.get("property_filters"),
+        "start_after": _instant(params.get("start_after")),
+        "start_before": _instant(params.get("start_before")),
+        "tz": params.get("tz"),
+        "whole_series": True,
+    }
 
 
 async def _conditions(session: AsyncSession, user: User, params: dict[str, Any]):
@@ -152,4 +152,4 @@ def _instant(value: str | None) -> datetime | None:
     except (TypeError, ValueError):
         raise ExportError(ExportMessages.EXPORT_INVALID_PARAMS)
     # A bound without a zone is read as UTC, as the calendar's own window is.
-    return instant if instant.tzinfo else instant.replace(tzinfo=timezone.utc)
+    return instant if instant.tzinfo else instant.replace(tzinfo=UTC)

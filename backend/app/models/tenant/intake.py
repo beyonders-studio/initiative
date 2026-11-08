@@ -22,7 +22,6 @@ therefore exactly as hard as reading the task it describes.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import (
     Boolean,
@@ -60,7 +59,7 @@ class IntakeBinding(CreatedByMixin, table=True):
     __tablename__ = "intake_bindings"
     __table_args__ = (UniqueConstraint("stream", name="uq_intake_bindings_stream"),)
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
 
     stream: IntakeStream = Field(
         sa_column=Column(String(length=STREAM_LENGTH), nullable=False)
@@ -81,7 +80,7 @@ class IntakeBinding(CreatedByMixin, table=True):
     # The status a new case starts in. NULL means the project's default, which
     # is what the task endpoints already fall back to — so a project whose
     # statuses are rearranged keeps working without anybody revisiting this row.
-    default_status_id: Optional[int] = Field(
+    default_status_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -92,7 +91,7 @@ class IntakeBinding(CreatedByMixin, table=True):
 
     # The type a new case is. NULL means the project's default, read against
     # the project when used, as the landing status is.
-    task_type_id: Optional[int] = Field(
+    task_type_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -106,7 +105,7 @@ class IntakeBinding(CreatedByMixin, table=True):
     # status: a filer is then never told the case is waiting on them, and
     # their answer moves nothing. Read, like the landing status, against the
     # project when used.
-    awaiting_filer_status_id: Optional[int] = Field(
+    awaiting_filer_status_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -114,7 +113,7 @@ class IntakeBinding(CreatedByMixin, table=True):
             nullable=True,
         ),
     )
-    active_status_id: Optional[int] = Field(
+    active_status_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -130,7 +129,7 @@ class IntakeBinding(CreatedByMixin, table=True):
         sa_column=Column(Boolean, nullable=False, server_default="true"),
     )
 
-    created_by: Optional[int] = Field(default=None, nullable=True)
+    created_by: int | None = Field(default=None, nullable=True)
 
 
 class IntakeCase(SQLModel, table=True):
@@ -153,7 +152,7 @@ class IntakeCase(SQLModel, table=True):
 
     __tablename__ = "intake_cases"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
 
     stream: IntakeStream = Field(
         sa_column=Column(String(length=STREAM_LENGTH), nullable=False)
@@ -169,7 +168,7 @@ class IntakeCase(SQLModel, table=True):
 
     #: NULL for a case nothing keys on — a report, a help request. A keyed case
     #: is one a repeating source can find again.
-    dedupe_key: Optional[str] = Field(
+    dedupe_key: str | None = Field(
         default=None,
         sa_column=Column(String(length=DEDUPE_KEY_LENGTH), nullable=True),
     )
@@ -195,7 +194,7 @@ class IntakeCase(SQLModel, table=True):
     #: topic, a security topic, an appeal. NULL where nobody chose one. Read
     #: by whoever handles the case, and by its filer, for whom it can change
     #: how the case talks (``IntakeStreamMeta.conversation_for``).
-    topic: Optional[str] = Field(
+    topic: str | None = Field(
         default=None,
         sa_column=Column(String(length=TOPIC_LENGTH), nullable=True),
     )
@@ -203,22 +202,22 @@ class IntakeCase(SQLModel, table=True):
     #: The account that filed the case, when a person did. A weak ref like
     #: every other on this plane: an erased account leaves a dangling id. What
     #: connects somebody to the case they filed, so they can follow it.
-    filer_user_id: Optional[int] = Field(
+    filer_user_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True, index=True)
     )
     #: What they called it, as they wrote it. Their own words and never
     #: changed: the task's title is the people handling it's to rename.
-    filer_subject: Optional[str] = Field(
+    filer_subject: str | None = Field(
         default=None,
         sa_column=Column(String(length=FILER_SUBJECT_LENGTH), nullable=True),
     )
     #: What the filer was last told about the case: the state they were shown,
     #: and the newest reply said to them. The ticket sweep compares these with
     #: the case as it is now and tells them only about what moved.
-    filer_notified_state: Optional[str] = Field(
+    filer_notified_state: str | None = Field(
         default=None, sa_column=Column(String(length=16), nullable=True)
     )
-    filer_notified_comment_id: Optional[int] = Field(
+    filer_notified_comment_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
 
@@ -232,7 +231,7 @@ class IdeaVote(SQLModel, table=True):
         UniqueConstraint("task_id", "user_id", name="uq_idea_votes_task_user"),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     task_id: int = Field(
         sa_column=Column(
             Integer,
@@ -249,6 +248,6 @@ class IdeaVote(SQLModel, table=True):
     )
     #: The status the voter was last told the idea was in. The vote sweep
     #: tells them when the idea's status is another.
-    notified_status_id: Optional[int] = Field(
+    notified_status_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )

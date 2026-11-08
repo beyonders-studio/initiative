@@ -8,50 +8,47 @@ calendar (``PUT /calendars/{id}/grants``), never per event.
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Annotated, Any, List, Optional, cast
+from datetime import UTC, datetime, timedelta
+from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import AwareDatetime
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.core import recurrence
-from app.services.tenant import attachments as attachments_service
-from app.services.tenant import overwrites
-from app.services.tenant import personal_items
-from app.services.tenant import required_fields
 from sqlmodel import select
 
+from app.api import resource_access, tool_copy
 from app.api.actor_route import ActorRoute
 from app.api.deps import (
     ActorContext,
     ActorSessionDep,
     ActorUserDep,
+    GuildContextDep,
     IncludeDeletedDep,
     RLSSessionDep,
-    plugin_scope,
     get_current_active_user,
-    GuildContextDep,
+    plugin_scope,
 )
+from app.core import recurrence
 from app.core.identity_boundary import PersonId
+from app.core.messages import CalendarEventMessages
+from app.core.tools import Tool
+from app.models.platform.notification import NotificationType
+from app.models.platform.user import User
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.calendar_event import (
     CalendarEvent,
     CalendarEventAttendee,
     RSVPStatus,
 )
-from app.models.platform.notification import NotificationType
-from app.models.platform.user import User
-from app.core.messages import CalendarEventMessages
+from app.schemas.recurrence import OccurrenceScope
 from app.schemas.tenant.calendar_event import (
     CalendarEventCreate,
-    CalendarEventUpdate,
     CalendarEventRead,
     CalendarEventRSVPUpdate,
+    CalendarEventUpdate,
     OccurrenceRequest,
     serialize_calendar_event,
 )
-from app.schemas.recurrence import OccurrenceScope
 from app.schemas.tenant.ical import (
     ICalImportError,
     ICalImportProblem,
@@ -60,14 +57,18 @@ from app.schemas.tenant.ical import (
     ICalParseRequest,
     ICalParseResult,
 )
-from app.api import resource_access, tool_copy
-from app.core.tools import Tool
+from app.services import notifications as notifications_service
 from app.services import permissions as permissions_service
 from app.services.permissions import Action
+from app.services.tenant import attachments as attachments_service
 from app.services.tenant import calendar_events as events_service
 from app.services.tenant import calendar_occurrences as occurrences_service
-from app.services.tenant import ical_service
-from app.services import notifications as notifications_service
+from app.services.tenant import (
+    ical_service,
+    overwrites,
+    personal_items,
+    required_fields,
+)
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 
@@ -101,9 +102,9 @@ def calendar_window(
     starts, nor span more than ``MAX_CALENDAR_WINDOW``.
     """
     if start_after.tzinfo is None:
-        start_after = start_after.replace(tzinfo=timezone.utc)
+        start_after = start_after.replace(tzinfo=UTC)
     if start_before.tzinfo is None:
-        start_before = start_before.replace(tzinfo=timezone.utc)
+        start_before = start_before.replace(tzinfo=UTC)
     if not timedelta(0) <= start_before - start_after <= MAX_CALENDAR_WINDOW:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -334,7 +335,7 @@ async def read_calendar_event(
     current_user: ActorUserDep,
     guild_context: CalendarsRead,
     include_deleted: IncludeDeletedDep = False,
-    occurrence: Optional[AwareDatetime] = Query(
+    occurrence: AwareDatetime | None = Query(
         default=None,
         description="One occurrence of a repeating event, whose answers to show.",
     ),
@@ -424,7 +425,7 @@ async def duplicate_calendar_event(
     session: ActorSessionDep,
     current_user: ActorUserDep,
     guild_context: CalendarsWrite,
-    occurrence: Optional[AwareDatetime] = Query(
+    occurrence: AwareDatetime | None = Query(
         default=None,
         description="One date of a repeating event, copied as an event of its own.",
     ),
@@ -518,7 +519,7 @@ async def update_calendar_event(
 
     if event.recurrence and scope == "following":
         at = occurrences_service.require_occurrence(event, at)
-        if at != event.start_at.astimezone(timezone.utc):
+        if at != event.start_at.astimezone(UTC):
             rest = await occurrences_service.split(session, event, at)
             event = await _refetch_event(session, rest.id)
         # The times sent are this occurrence's, which starts the new series.
@@ -661,7 +662,7 @@ async def _apply_update(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=CalendarEventMessages.ENDS_BEFORE_START,
             )
-        event.updated_at = datetime.now(timezone.utc)
+        event.updated_at = datetime.now(UTC)
         session.add(event)
         if event.series_id is not None:
             # What this occurrence now says differently from its series.
@@ -719,8 +720,8 @@ async def delete_calendar_event(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-    scope: Optional[OccurrenceScope] = Query(default=None),
-    occurrence: Optional[AwareDatetime] = Query(default=None),
+    scope: OccurrenceScope | None = Query(default=None),
+    occurrence: AwareDatetime | None = Query(default=None),
 ) -> None:
     """Soft-delete a calendar event. Requires write access on the calendar.
 
@@ -748,11 +749,7 @@ async def delete_calendar_event(
         # Everyone attending an occurrence that goes: each one's own row from
         # the one named on (every one, for all), and the series' attendees if
         # any occurrence that goes has no row of its own.
-        since = (
-            event.start_at
-            if scope == "all" or at is None
-            else at.astimezone(timezone.utc)
-        )
+        since = event.start_at if scope == "all" or at is None else at.astimezone(UTC)
         rows = [
             override
             for override in await occurrences_service.overrides(session, event)
@@ -761,8 +758,8 @@ async def delete_calendar_event(
         told_ids = [
             override.id
             for override in rows
-            if cast(datetime, override.original_start).astimezone(timezone.utc)
-            >= since.astimezone(timezone.utc)
+            if cast(datetime, override.original_start).astimezone(UTC)
+            >= since.astimezone(UTC)
         ]
         if occurrences_service.has_plain_from(
             event, since, [cast(datetime, override.original_start) for override in rows]
@@ -820,8 +817,8 @@ async def _scoped_list_target(
     session: AsyncSession,
     event: CalendarEvent,
     field: str,
-    scope: Optional[OccurrenceScope],
-    at: Optional[datetime],
+    scope: OccurrenceScope | None,
+    at: datetime | None,
 ) -> CalendarEvent:
     """The row a list change (attendees) is written to, as an update's scope
     picks it: the occurrence's own row, a new series from it, or the series."""
@@ -841,7 +838,7 @@ async def _scoped_list_target(
         return await _refetch_event(session, target.id)
     if event.recurrence and scope == "following":
         at = occurrences_service.require_occurrence(event, at)
-        if at != event.start_at.astimezone(timezone.utc):
+        if at != event.start_at.astimezone(UTC):
             rest = await occurrences_service.split(session, event, at)
             return await _refetch_event(session, rest.id)
     return event
@@ -909,7 +906,7 @@ async def restore_occurrence(
     """Bring back a skipped occurrence of the series."""
     series = await _repeating_or_404(session, event_id)
     await occurrences_service.bring_back(session, series, body.start)
-    series.updated_at = datetime.now(timezone.utc)
+    series.updated_at = datetime.now(UTC)
     session.add(series)
     return await _event_committed(session, series.id, context=guild_context)
 
@@ -927,7 +924,7 @@ async def add_occurrence(
     series.recurrence = recurrence.with_extra(
         series.recurrence or "", series.recurrence_shift, body.start
     )
-    series.updated_at = datetime.now(timezone.utc)
+    series.updated_at = datetime.now(UTC)
     session.add(series)
     return await _event_committed(session, series.id, context=guild_context)
 
@@ -940,12 +937,12 @@ async def add_occurrence(
 @router.put("/{event_id}/attendees", response_model=CalendarEventRead)
 async def set_attendees(
     event_id: int,
-    attendee_ids: List[PersonId],
+    attendee_ids: list[PersonId],
     session: ActorSessionDep,
     current_user: ActorUserDep,
     guild_context: CalendarsWrite,
-    scope: Optional[OccurrenceScope] = Query(default=None),
-    occurrence: Optional[AwareDatetime] = Query(default=None),
+    scope: OccurrenceScope | None = Query(default=None),
+    occurrence: AwareDatetime | None = Query(default=None),
 ) -> CalendarEventRead:
     """Set attendees. Requires write access on the calendar.
 

@@ -28,11 +28,7 @@ from app.models.platform.marketplace import UID_ALPHABET, UID_LENGTH
 from app.services.marketplace import contract
 
 __all__ = [
-    "ListingDefinitionError",
     "IDENTIFIER_CHARS",
-    "PATH_CHARS",
-    "PUBLIC_ID_CHARS",
-    "MAX_PUBLISHER_NAME_LENGTH",
     "MAX_HINT_LENGTH",
     "MAX_IDENTIFIER_LENGTH",
     "MAX_LABEL_LENGTH",
@@ -40,10 +36,14 @@ __all__ = [
     "MAX_NAME_LENGTH",
     "MAX_PATH_LENGTH",
     "MAX_PUBLIC_ID_LENGTH",
+    "MAX_PUBLISHER_NAME_LENGTH",
     "MAX_UNIQUE_SETTING_VALUE_LENGTH",
     "MAX_URL_LENGTH",
     "MIN_UNIQUE_SETTING_VALUE_LENGTH",
+    "PATH_CHARS",
+    "PUBLIC_ID_CHARS",
     "UNIQUE_SETTING_VALUE_CHARS",
+    "ListingDefinitionError",
     "check_identifier",
     "check_json_size",
     "check_metadata_key",

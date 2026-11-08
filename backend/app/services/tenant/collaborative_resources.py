@@ -31,8 +31,9 @@ persistence sweep all read it rather than each knowing about files:
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any
 
 from sqlalchemy import literal
 from sqlalchemy.orm import selectinload, undefer
@@ -55,7 +56,7 @@ class Collaborating:
 
     body: Any
     governing: Any
-    initiative_id: Optional[int]
+    initiative_id: int | None
 
 
 @dataclass(frozen=True)
@@ -64,10 +65,10 @@ class CollaborativeResource:
     tool: Tool
     model: type
     content_column: str
-    load: Callable[..., Awaitable[Optional[Collaborating]]]
+    load: Callable[..., Awaitable[Collaborating | None]]
     body_kind: Callable[[], Any]
     #: A path parameter that differs from ``<kind>_id``.
-    id_param: Optional[str] = None
+    id_param: str | None = None
 
     @property
     def resource_type(self) -> str:
@@ -87,7 +88,7 @@ class CollaborativeResource:
 
 async def _load_file(
     session: Any, resource_id: int, guild_id: int
-) -> Optional[Collaborating]:
+) -> Collaborating | None:
     from app.models.tenant.file import File
 
     statement = (
@@ -107,7 +108,7 @@ async def _load_file(
 
 async def _load_wiki_page(
     session: Any, resource_id: int, guild_id: int
-) -> Optional[Collaborating]:
+) -> Collaborating | None:
     """A page's body is its own; who may read or write it is the wiki's.
 
     That is the same rule the REST path applies — a page is the wiki's content

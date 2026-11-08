@@ -33,22 +33,23 @@ from __future__ import annotations
 import json
 import logging
 import time
-from datetime import datetime, timezone
-from typing import Any, Optional, Protocol, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import Any, Protocol
 
 from sqlalchemy import func, text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.errors import PluginChannelError
-from app.db.session import routed_guild_id
 from app.core.messages import PluginChannelMessages
 from app.db.event_capture import OUTBOX_CHANNEL
-from app.db.session import set_rls_context
-from app.models.platform.guild import LIVE_STATUS_VALUES, Guild, CommunityStatus
-from app.models.tenant.plugin_event_outbox import PluginEventOutbox
+from app.db.request_context import SystemGuild, Unattributed
+from app.db.session import routed_guild_id, set_rls_context
+from app.models.platform.guild import LIVE_STATUS_VALUES, CommunityStatus, Guild
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
+from app.models.tenant.plugin_event_outbox import PluginEventOutbox
 from app.services.marketplace.plugin_refs import (
     PluginNameRefused,
     ensure_plugin_guild_ref,
@@ -58,11 +59,10 @@ from app.services.marketplace.service_plugins import (
     CONNECTION_STATES,
     ENDPOINT_ID_PREFIX,
 )
+from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import plugin_config as plugin_config_service
 from app.services.tenant import plugin_connection_flows as flows
-from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import plugin_connections as connections_service
-from app.db.request_context import SystemGuild, Unattributed
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +99,7 @@ class RegisteredPlugin(Protocol):
     listing it speaks for. The registration snapshot carries both."""
 
     public_id: str
-    listing_uid: Optional[str]
+    listing_uid: str | None
 
 
 # --- which installs are this plug-in's ------------------------------------------
@@ -154,7 +154,7 @@ async def _install_guild_ref(session: AsyncSession, plugin: GuildPlugin) -> str:
         raise PluginChannelError(PluginChannelMessages.INSTALL_NOT_FOUND, 404) from exc
 
 
-async def _guild_row(session: AsyncSession, guild_id: int) -> Optional[Guild]:
+async def _guild_row(session: AsyncSession, guild_id: int) -> Guild | None:
     await set_rls_context(session, Unattributed())
     return (await session.exec(select(Guild).where(Guild.id == guild_id))).first()
 
@@ -399,7 +399,7 @@ async def report_config_state(
     plugin: GuildPlugin,
     *,
     state: str,
-    detail: Optional[str] = None,
+    detail: str | None = None,
 ) -> dict[str, Any]:
     """Record the plug-in's verdict on the configuration it was given.
 
@@ -420,7 +420,7 @@ async def report_config_state(
 
     plugin.config_state = state
     plugin.config_state_detail = cleaned
-    plugin.updated_at = datetime.now(timezone.utc)
+    plugin.updated_at = datetime.now(UTC)
     session.add(plugin)
     await session.commit()
     await session.refresh(plugin)
@@ -449,13 +449,13 @@ def set_connection_state(plugin: GuildPlugin, connection_id: str, state: str) ->
     if state == "ok":
         if plugin.config_state == "invalid" and plugin.config_state_detail not in about:
             return marked
-        verdict: tuple[str, Optional[str]] = ("ok", None)
+        verdict: tuple[str, str | None] = ("ok", None)
     else:
         verdict = ("invalid", f"{connection_id}_{state}")
     if (plugin.config_state, plugin.config_state_detail) == verdict:
         return marked
     plugin.config_state, plugin.config_state_detail = verdict
-    plugin.updated_at = datetime.now(timezone.utc)
+    plugin.updated_at = datetime.now(UTC)
     return True
 
 
@@ -476,7 +476,7 @@ def _mark_removed(plugin: GuildPlugin, connection_id: str, state: str) -> bool:
     if removed:
         entry[plugin_config_service.REMOVED_AT] = int(time.time())
     plugin.config = {**(plugin.config or {}), connection_id: entry}
-    plugin.updated_at = datetime.now(timezone.utc)
+    plugin.updated_at = datetime.now(UTC)
     return True
 
 
@@ -498,8 +498,8 @@ async def emit_event(
     *,
     event_type: str,
     payload: dict[str, Any],
-    initiative_id: Optional[int],
-    token_initiative_id: Optional[int],
+    initiative_id: int | None,
+    token_initiative_id: int | None,
 ) -> None:
     """Keep one event the plug-in emits (:func:`keep_event`), and commit it."""
     await keep_event(
@@ -521,8 +521,8 @@ async def keep_event(
     *,
     event_type: str,
     payload: dict[str, Any],
-    initiative_id: Optional[int],
-    token_initiative_id: Optional[int] = None,
+    initiative_id: int | None,
+    token_initiative_id: int | None = None,
 ) -> None:
     """Keep one event a plug-in emits, for the outbox poller to deliver: a
     container's, or one a declarative plug-in's webhook mapping emits.
@@ -582,7 +582,7 @@ async def stage_event(
     install_id: int,
     event_type: str,
     payload: dict[str, Any],
-    initiative_id: Optional[int] = None,
+    initiative_id: int | None = None,
 ) -> None:
     """Write one event to the routed community's plug-in outbox, in the
     caller's transaction, and wake the outbox drain once it commits."""

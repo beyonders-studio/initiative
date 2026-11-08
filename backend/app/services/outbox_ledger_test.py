@@ -1,7 +1,7 @@
 """The queue tables' shared rules: a claim is a lease, a recipient is served by
 one pass at a time, and a schedule lists every wait before a row is given up."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -29,7 +29,7 @@ async def test_a_claim_is_held_for_its_lease_and_its_recipient_waits(
         ],
     )
     await session.commit()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     [first] = await outbox_ledger.claim(session, NoticeOutboxItem, [served.id], now=now)
     assert (
@@ -60,7 +60,7 @@ async def test_each_wait_is_waited_once_then_the_row_is_given_up(
     )
     await session.commit()
     table = EmailOutboxItem.__table__
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     fail = outbox_ledger.back_off(
         table, table.c.user_id == user.id, now=now, spent="failed_at"
     ).returning(table.c.deliver_after, table.c.failed_at)

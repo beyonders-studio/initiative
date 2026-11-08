@@ -12,7 +12,7 @@ billing's sync, and its name is the deployment's.
 """
 
 from collections.abc import Awaitable, Callable
-from typing import Annotated, List
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.exc import IntegrityError
@@ -174,10 +174,10 @@ async def _flush_named(session: AsyncSession) -> None:
         ) from None
 
 
-@router.get("/", response_model=List[CustomRoleRead])
+@router.get("/", response_model=list[CustomRoleRead])
 async def list_custom_roles(
     session: RLSSessionDep, _context: GuildContextDep
-) -> List[CustomRoleRead]:
+) -> list[CustomRoleRead]:
     """The community's custom roles, for anybody in it: who holds what is
     shown beside each member."""
     return [_read(role) for role in await custom_roles_service.list_roles(session)]
@@ -258,10 +258,10 @@ async def delete_custom_role(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/holders", response_model=List[CustomRoleHolder])
+@router.get("/holders", response_model=list[CustomRoleHolder])
 async def list_custom_role_holders(
     session: RLSSessionDep, context: GuildContextDep
-) -> List[CustomRoleHolder]:
+) -> list[CustomRoleHolder]:
     """Who holds which role, for anybody in the community."""
     return [
         CustomRoleHolder(user_id=user_id, role_id=role_id)

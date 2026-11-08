@@ -13,11 +13,12 @@ that reads guild rows does.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator, Optional
 
-from fastapi import HTTPException, status as http_status
+from fastapi import HTTPException
+from fastapi import status as http_status
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -28,22 +29,22 @@ from app.core.intake import (
     meta,
     offered_streams,
 )
-from app.core.tools import Tool
 from app.core.messages import GuildMessages, InitiativeMessages, IntakeMessages
+from app.core.tools import Tool
 from app.db import cohorts, operations_schema
 from app.db.advisory_locks import LockNamespace, advisory_lock
+from app.db.request_context import SystemGuild
 from app.db.session import routed_guild_id, set_rls_context
 from app.models.platform.app_setting import AppSetting
-from app.models.platform.guild import Guild, CommunityStatus
+from app.models.platform.guild import CommunityStatus, Guild
 from app.models.platform.user import User
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task, TaskStatus, TaskType
-from app.services.tenant import task_types as task_types_service
 from app.services.marketplace.registration_lookup import invalidate_registrations
 from app.services.platform.intake import operations_guild_id
-from app.db.request_context import SystemGuild
+from app.services.tenant import task_types as task_types_service
 
 
 @dataclass(frozen=True)
@@ -51,23 +52,23 @@ class BindingView:
     """One stream's binding, with the names the settings page shows."""
 
     stream: IntakeStream
-    binding_id: Optional[int]
-    project_id: Optional[int]
-    project_name: Optional[str]
+    binding_id: int | None
+    project_id: int | None
+    project_name: str | None
     #: Whether the bound project has been archived or trashed since. Archived
     #: content takes no writes, so a stream pointed at one receives nothing
     #: until it is brought back or pointed somewhere else.
     project_archived: bool
-    initiative_id: Optional[int]
-    initiative_name: Optional[str]
-    default_status_id: Optional[int]
-    default_status_name: Optional[str]
-    task_type_id: Optional[int]
-    task_type_name: Optional[str]
+    initiative_id: int | None
+    initiative_name: str | None
+    default_status_id: int | None
+    default_status_name: str | None
+    task_type_id: int | None
+    task_type_name: str | None
     #: Which status means "waiting on whoever filed it", and which one a case
     #: returns to when they answer.
-    awaiting_filer_status_id: Optional[int]
-    active_status_id: Optional[int]
+    awaiting_filer_status_id: int | None
+    active_status_id: int | None
     isolated: bool
     #: Shares its initiative with another stream where one of the two keeps
     #: its initiative to itself. Flagged, never undone.
@@ -75,7 +76,7 @@ class BindingView:
     enabled: bool
     #: The most recent case this stream opened. The monitoring that matters on
     #: this page: is the thing on.
-    last_case_at: Optional[str]
+    last_case_at: str | None
 
 
 @asynccontextmanager
@@ -88,8 +89,8 @@ async def _route(guild_id: int) -> AsyncIterator[AsyncSession]:
 
 
 async def set_operations_guild(
-    session: AsyncSession, guild_id: Optional[int]
-) -> Optional[int]:
+    session: AsyncSession, guild_id: int | None
+) -> int | None:
     """Point this deployment's operations work at ``guild_id``, or at nothing.
 
     ``None`` unsets it, which stops every stream at once without touching the
@@ -135,7 +136,7 @@ async def _settings_row(session: AsyncSession) -> AppSetting:
     return row if row is not None else AppSetting(id=1)
 
 
-async def set_general_contact(session: AsyncSession, email: Optional[str]) -> None:
+async def set_general_contact(session: AsyncSession, email: str | None) -> None:
     """Set the deployment's catch-all contact address, or clear it."""
     row = await _settings_row(session)
     row.intake_general_contact = email
@@ -144,7 +145,7 @@ async def set_general_contact(session: AsyncSession, email: Optional[str]) -> No
 
 
 async def set_stream_contact(
-    session: AsyncSession, stream: IntakeStream, email: Optional[str]
+    session: AsyncSession, stream: IntakeStream, email: str | None
 ) -> None:
     """Set one stream's contact address, or clear it back to the general one."""
     row = await _settings_row(session)
@@ -159,7 +160,7 @@ async def set_stream_contact(
     await session.commit()
 
 
-async def contacts(session: AsyncSession) -> tuple[Optional[str], dict[str, str]]:
+async def contacts(session: AsyncSession) -> tuple[str | None, dict[str, str]]:
     """The general address and the own address of every stream this server
     takes, as set."""
     row = (await session.exec(select(AppSetting).where(AppSetting.id == 1))).first()
@@ -220,10 +221,10 @@ async def _write_binding(
     stream: IntakeStream,
     project: Project,
     project_id: int,
-    default_status_id: Optional[int],
-    task_type_id: Optional[int] = None,
-    awaiting_filer_status_id: Optional[int] = None,
-    active_status_id: Optional[int] = None,
+    default_status_id: int | None,
+    task_type_id: int | None = None,
+    awaiting_filer_status_id: int | None = None,
+    active_status_id: int | None = None,
     enabled: bool,
 ) -> IntakeBinding:
     """Create or update the binding row. Routed session; flushes, no commit.
@@ -329,7 +330,7 @@ async def _ensure_isolation(
 
 async def _blueprint_roles(
     session: AsyncSession, stream: IntakeStream, project_id: int
-) -> dict[str, Optional[int]]:
+) -> dict[str, int | None]:
     """The statuses and type a project set up from ``stream``'s blueprint
     plays each role with. No statuses for a stream with no conversation, where
     nobody is ever waited on; a type only for the Ideas board, whose type is
@@ -340,7 +341,7 @@ async def _blueprint_roles(
         WAITING_ON_REQUESTER,
     )
 
-    roles: dict[str, Optional[int]] = {
+    roles: dict[str, int | None] = {
         "awaiting_filer_status_id": None,
         "active_status_id": None,
         "task_type_id": None,
@@ -375,10 +376,10 @@ async def bind(
     *,
     stream: IntakeStream,
     project_id: int,
-    default_status_id: Optional[int] = None,
-    task_type_id: Optional[int] = None,
-    awaiting_filer_status_id: Optional[int] = None,
-    active_status_id: Optional[int] = None,
+    default_status_id: int | None = None,
+    task_type_id: int | None = None,
+    awaiting_filer_status_id: int | None = None,
+    active_status_id: int | None = None,
     enabled: bool = True,
 ) -> BindingView:
     """Route ``stream`` into ``project_id``, replacing any existing binding.
@@ -432,9 +433,9 @@ async def _require_operations_guild(session: AsyncSession) -> int:
 async def _view(
     session: AsyncSession,
     stream: IntakeStream,
-    binding: Optional[IntakeBinding],
-    project: Optional[Project],
-    initiative: Optional[Initiative],
+    binding: IntakeBinding | None,
+    project: Project | None,
+    initiative: Initiative | None,
 ) -> BindingView:
     if binding is None:
         return BindingView(
@@ -516,7 +517,7 @@ async def _view(
 
 async def list_bindings(
     session: AsyncSession,
-) -> tuple[Optional[int], list[BindingView]]:
+) -> tuple[int | None, list[BindingView]]:
     """Every stream this server takes and where it currently lands.
 
     Returns one view per stream, bound or not, so the settings page renders the

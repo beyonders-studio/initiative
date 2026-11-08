@@ -1,7 +1,8 @@
-from datetime import date, datetime, timezone
+import builtins
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Any, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import ConfigDict
 from sqlalchemy import (
@@ -21,17 +22,17 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
-from sqlmodel import Enum as SQLEnum, Field, Relationship, SQLModel
+from sqlmodel import Enum as SQLEnum
+from sqlmodel import Field, Relationship, SQLModel
 
+from app.core.tools import INSTALL_METADATA_KIND, PROPERTY_TARGETS
 from app.db.registry_checks import FROM_REGISTRY
 from app.models.tenant._mixins import CreatedByMixin
 
-from app.core.tools import INSTALL_METADATA_KIND, PROPERTY_TARGETS
-
 if TYPE_CHECKING:  # pragma: no cover
+    from app.models.platform.user_profile_view import MemberProfile
     from app.models.tenant.file import File
     from app.models.tenant.initiative import Initiative
-    from app.models.platform.user_profile_view import MemberProfile
 
 
 class MetadataType(str, Enum):
@@ -144,8 +145,8 @@ class MetadataDefinition(CreatedByMixin, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
-    initiative_id: Optional[int] = Field(
+    id: int | None = Field(default=None, primary_key=True)
+    initiative_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -154,13 +155,13 @@ class MetadataDefinition(CreatedByMixin, table=True):
             index=True,
         ),
     )
-    project_id: Optional[int] = Field(
+    project_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True, index=True)
     )
-    collection_id: Optional[int] = Field(
+    collection_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True, index=True)
     )
-    install_id: Optional[int] = Field(
+    install_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -170,7 +171,7 @@ class MetadataDefinition(CreatedByMixin, table=True):
         ),
     )
     #: A plug-in's metadata key, unique per install.
-    key: Optional[str] = Field(
+    key: str | None = Field(
         default=None, sa_column=Column(String(length=64), nullable=True)
     )
     #: A plug-in's list field: several values, each named by its ``ref``.
@@ -180,8 +181,8 @@ class MetadataDefinition(CreatedByMixin, table=True):
     )
     #: The item kinds a plug-in's pinned manifest declares the key as a field
     #: on: whoever can read an item of one of them reads its value there.
-    shown_on: List[str] = Field(
-        default_factory=lambda: [],
+    shown_on: builtins.list[str] = Field(
+        default_factory=builtins.list,
         sa_column=Column(
             ARRAY(String(length=32)), nullable=False, server_default=text("'{}'")
         ),
@@ -210,30 +211,30 @@ class MetadataDefinition(CreatedByMixin, table=True):
             Numeric(20, 10, asdecimal=False), nullable=False, server_default="0"
         ),
     )
-    color: Optional[str] = Field(
+    color: str | None = Field(
         default=None,
         sa_column=Column(String(length=9), nullable=True),
     )
-    options: Optional[List[dict]] = Field(
+    options: builtins.list[dict] | None = Field(
         default=None,
         sa_column=Column(JSONB, nullable=True),
     )
     #: The ISO 4217 code a ``currency`` definition's amounts are in; None for
     #: every other type.
-    currency: Optional[str] = Field(
+    currency: str | None = Field(
         default=None, sa_column=Column(String(length=3), nullable=True)
     )
     #: A ``counter`` definition's ``{step, min, max, initial}``
     #: (``CounterSettings``); None for every other type.
-    counter: Optional[dict] = Field(
+    counter: dict | None = Field(
         default=None, sa_column=Column(JSONB(none_as_null=True), nullable=True)
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
@@ -361,18 +362,16 @@ class MetadataValue(SQLModel, table=True):
             String(REF_LENGTH), primary_key=True, server_default=text("''")
         ),
     )
-    value_text: Optional[str] = Field(default=None, sa_type=Text, nullable=True)
-    value_number: Optional[Decimal] = Field(
-        default=None, sa_type=Numeric, nullable=True
-    )
-    value_boolean: Optional[bool] = Field(default=None, sa_type=Boolean, nullable=True)
-    value_date: Optional[date] = Field(default=None, sa_type=Date, nullable=True)
-    value_datetime: Optional[datetime] = Field(
+    value_text: str | None = Field(default=None, sa_type=Text, nullable=True)
+    value_number: Decimal | None = Field(default=None, sa_type=Numeric, nullable=True)
+    value_boolean: bool | None = Field(default=None, sa_type=Boolean, nullable=True)
+    value_date: date | None = Field(default=None, sa_type=Date, nullable=True)
+    value_datetime: datetime | None = Field(
         default=None, sa_type=DateTime(timezone=True), nullable=True
     )
-    value_user_id: Optional[int] = Field(default=None, nullable=True)
+    value_user_id: int | None = Field(default=None, nullable=True)
     #: A file field's file. Purging the file empties it.
-    value_file_id: Optional[int] = Field(
+    value_file_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -384,20 +383,20 @@ class MetadataValue(SQLModel, table=True):
             nullable=True,
         ),
     )
-    value_json: Optional[Any] = Field(default=None, sa_type=JSONB, nullable=True)
-    state: Optional[dict] = Field(default=None, sa_type=JSONB, nullable=True)
+    value_json: Any | None = Field(default=None, sa_type=JSONB, nullable=True)
+    state: dict | None = Field(default=None, sa_type=JSONB, nullable=True)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_type=DateTime(timezone=True),
         nullable=False,
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_type=DateTime(timezone=True),
         nullable=False,
     )
 
-    definition: Optional[MetadataDefinition] = Relationship()
+    definition: MetadataDefinition | None = Relationship()
     value_file: Optional["File"] = Relationship(
         sa_relationship_kwargs={"viewonly": True},
     )

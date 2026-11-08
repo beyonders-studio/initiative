@@ -23,42 +23,43 @@ import hashlib
 import logging
 import secrets
 import uuid
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Collection
+from typing import Any
 
 from sqlalchemy import text
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.clock import utcnow
 from app.core.config import settings
 from app.models.platform.auth_session import AuthSession
 from app.services.auth import session_lifetime
-from app.core.clock import utcnow
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "SESSION_PURGE_POLL_SECONDS",
+    "SESSION_RETENTION_DAYS",
     "IssuedSession",
     "LiveSession",
     "RefreshOutcome",
     "RotationResult",
     "create_session",
-    "get_live_session_by_refresh_token",
-    "list_live_for_user",
-    "live_chain_tips",
-    "rotate_session",
-    "revoke_session",
-    "revoke_chain",
-    "revoke_all_for_user",
     "delete_all_for_user",
     "follow_devices",
+    "get_live_session_by_refresh_token",
     "latest_of_install",
-    "purge_dead_sessions",
+    "list_live_for_user",
+    "live_chain_tips",
     "process_dead_session_purge",
-    "SESSION_PURGE_POLL_SECONDS",
-    "SESSION_RETENTION_DAYS",
+    "purge_dead_sessions",
+    "revoke_all_for_user",
+    "revoke_chain",
+    "revoke_session",
+    "rotate_session",
 ]
 
 # 256 bits of entropy — infeasible to guess, so the hash (not a slow KDF) is the

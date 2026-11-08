@@ -6,9 +6,9 @@ way to know is to ask two people with different standing the same question.
 """
 
 import json
-from typing import Any
+from datetime import UTC
 from pathlib import Path
-
+from typing import Any
 
 from app.core.file_types import FileType
 from app.core.messages import QueryMessages
@@ -689,7 +689,7 @@ async def test_a_trashed_task_is_not_in_the_answer(client, acting_user, session)
     managed. A dashboard is not where it is managed: what a board counts should
     be the same figure for everybody reading it, whoever asks.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     await create_task(session, a.project, title="kept")
@@ -702,7 +702,7 @@ async def test_a_trashed_task_is_not_in_the_answer(client, acting_user, session)
     )
     assert counted.json()["rows"] == [[2]]
 
-    binned.deleted_at = datetime.now(timezone.utc)
+    binned.deleted_at = datetime.now(UTC)
     session.add(binned)
     await session.commit()
 
@@ -729,13 +729,13 @@ async def test_the_trash_is_still_reachable_where_it_is_managed(
     Worth pinning beside the test above: the same reader, the same trashed row,
     asked for through the endpoint whose job is the trash — and it is there.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     binned = await create_task(session, a.project, title="binned")
     task_id = binned.id
 
-    binned.deleted_at = datetime.now(timezone.utc)
+    binned.deleted_at = datetime.now(UTC)
     session.add(binned)
     await session.commit()
 
@@ -808,7 +808,7 @@ class TestEveryShippedDashboardReportsOnLiveWork:
     async def test_none_of_them_counts_work_that_is_not_live(
         self, client, acting_user, session, reading_as
     ):
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from app.services import query as query_service
 
@@ -841,9 +841,9 @@ class TestEveryShippedDashboardReportsOnLiveWork:
         # Three kinds of row that must not reach a dashboard. The trash is the
         # database's rule; the other two are the statements' own.
         binned = await create_task(session, live, title="binned")
-        binned.deleted_at = datetime.now(timezone.utc)
+        binned.deleted_at = datetime.now(UTC)
         archived = await create_task(session, live, title="archived")
-        archived.archived_at = datetime.now(timezone.utc)
+        archived.archived_at = datetime.now(UTC)
         template = await create_project(
             session, actor.initiative, actor.user, is_template=True
         )

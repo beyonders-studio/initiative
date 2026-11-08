@@ -8,11 +8,10 @@ people carrying one group land.
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.testing import guild_of
 from app.core.messages import AuthProviderMessages, SettingsMessages
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
-from app.testing.schema_harness import route_session_to_guild
+from app.testing import guild_of
 from app.testing.factories import (
     create_auth_provider,
     create_guild,
@@ -22,6 +21,7 @@ from app.testing.factories import (
     create_user,
     get_auth_headers,
 )
+from app.testing.schema_harness import route_session_to_guild
 
 
 async def _seat(session: AsyncSession, *, auth_options: list[str] | None = None):
@@ -305,7 +305,7 @@ async def test_another_communitys_rule_is_not_there(
 async def test_an_ordinary_admin_reads_but_does_not_write(
     client: AsyncClient, session: AsyncSession
 ):
-    admin, guild = await _seat(session)
+    _admin, guild = await _seat(session)
     provider = await _connected(session, guild)
     ordinary = await create_user(session)
     await create_guild_membership(
@@ -323,7 +323,7 @@ async def test_an_ordinary_admin_reads_but_does_not_write(
 
 
 async def test_a_member_sees_none_of_it(client: AsyncClient, session: AsyncSession):
-    admin, guild = await _seat(session)
+    _admin, guild = await _seat(session)
     member = await create_user(session)
     await create_guild_membership(
         session, user=member, guild=guild, role=CommunityRole.member

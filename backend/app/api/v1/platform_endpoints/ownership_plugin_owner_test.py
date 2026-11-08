@@ -17,8 +17,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.messages import UserMessages
 from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.guild_plugin import GuildPlugin
+from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.services.tenant import ownership as ownership_service
 from app.testing import (
@@ -28,7 +28,6 @@ from app.testing import (
     create_project,
     route_session_to_guild,
 )
-
 
 _DEFINITION = {"plugin_kind": "service", "service": {"public_id": "tests.owner-plugin"}}
 _WRITES_PROJECTS = ["projects:write"]

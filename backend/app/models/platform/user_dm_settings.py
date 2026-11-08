@@ -9,12 +9,13 @@ An account with no row here reads as ``private`` — the most closed value —
 so a creation path that forgets to seed one is closed rather than open.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 from pydantic import ConfigDict
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, text
-from sqlmodel import Enum as SQLEnum, Field, SQLModel
+from sqlmodel import Enum as SQLEnum
+from sqlmodel import Field, SQLModel
 
 
 class DmPolicy(str, Enum):
@@ -60,10 +61,10 @@ class UserDmSettings(SQLModel, table=True):
         sa_column=Column(Boolean, nullable=False, server_default=text("true")),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

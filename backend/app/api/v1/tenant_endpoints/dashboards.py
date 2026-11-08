@@ -15,22 +15,22 @@ a viewer who cannot read a bound counter simply sees an empty widget.
 
 import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Annotated, Any, Awaitable, Callable, Optional
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.db.session import routed_guild_id
 from app.api import resource_access
 from app.api.deps import (
-    IncludeDeletedDep,
     GuildContext,
+    GuildContextDep,
+    IncludeDeletedDep,
     RLSSessionDep,
     get_current_active_user,
-    GuildContextDep,
 )
 from app.core.audit_events import AuditEventType
 from app.core.messages import (
@@ -39,40 +39,40 @@ from app.core.messages import (
     PluginDataMessages,
 )
 from app.core.tools import Tool
+from app.db.session import routed_context, routed_guild_id
 from app.models.platform.marketplace import (
     MarketplaceListingVersion,
 )
 from app.models.platform.user import User
 from app.models.tenant.dashboard import Dashboard, DashboardViewMode
 from app.models.tenant.guild_plugin import GuildPlugin
+from app.schemas.sql_query import QueryColumnDescription, QueryResponse
 from app.schemas.tenant.dashboard import (
-    DashboardDataResponse,
-    DashboardWidgetData,
-    DashboardInstalledListings,
     DashboardCreate,
+    DashboardDataResponse,
+    DashboardInstalledListings,
     DashboardRead,
     DashboardUpdate,
     DashboardViewModeRequest,
+    DashboardWidgetData,
     WidgetCatalog,
     build_widget_catalog,
 )
-from app.schemas.tenant.tool import serialize_tool
-from app.db.session import routed_context
-from app.schemas.sql_query import QueryColumnDescription, QueryResponse
 from app.schemas.tenant.plugin_data import PluginDataResponse
-from app.services.tenant import metadata as metadata_service
-from app.services.tenant import attachments as attachments_service
+from app.schemas.tenant.tool import serialize_tool
 from app.services import audit as audit_service
 from app.services import query as query_service
 from app.services.marketplace import plugin_data
-from app.services.query import plugins as query_plugins
 from app.services.marketplace.installs import (
     count_install,
     resolve_listing_install,
 )
+from app.services.query import plugins as query_plugins
+from app.services.tenant import attachments as attachments_service
 from app.services.tenant import dashboards as dashboards_service
-from app.services.tenant import view_as
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
+from app.services.tenant import view_as
 from app.services.tenant.dashboard_definition import (
     normalize_dashboard_config,
     normalize_dashboard_definition,
@@ -192,8 +192,8 @@ async def create_dashboard(
         session, Tool.dashboard, dashboard_in.initiative_id, current_user, guild_context
     )
 
-    listing_id: Optional[int] = None
-    listing_version: Optional[str] = None
+    listing_id: int | None = None
+    listing_version: str | None = None
     if dashboard_in.listing_uid:
         listing, version = await resolve_listing_install(
             session, dashboard_in.listing_uid, kind="dashboard"
@@ -290,7 +290,7 @@ async def update_dashboard(
         updated = True
 
     if updated:
-        dashboard.updated_at = datetime.now(timezone.utc)
+        dashboard.updated_at = datetime.now(UTC)
         session.add(dashboard)
         await attachments_service.claim_uploads(session, dashboard)
         await session.commit()
@@ -347,7 +347,7 @@ async def upgrade_dashboard(
     dashboard.definition = definition
     dashboard.config = config
     dashboard.listing_version = version.version
-    dashboard.updated_at = datetime.now(timezone.utc)
+    dashboard.updated_at = datetime.now(UTC)
     session.add(dashboard)
     await session.commit()
 
@@ -375,7 +375,7 @@ def _stored_binding(
     definition: dict[str, Any] | None,
     config: dict[str, Any] | None,
     widget_id: str,
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     """One widget's binding as the canvas resolves it.
 
     The instance config layers over the definition exactly as it does when the
@@ -593,7 +593,7 @@ async def set_view_mode(
     if dashboard.view_mode != wanted:
         previous = dashboard.view_mode
         dashboard.view_mode = wanted
-        dashboard.updated_at = datetime.now(timezone.utc)
+        dashboard.updated_at = datetime.now(UTC)
         session.add(dashboard)
         await audit_service.record(
             session,

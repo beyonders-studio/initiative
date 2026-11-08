@@ -25,7 +25,6 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 from starlette.requests import Request
 
-
 # App identity/shape — deliberately constants, not settings: the SPA, the
 # docs-CSP route, and the OpenAPI export all assume this prefix, so making it
 # configurable only creates ways to break them.

@@ -1,7 +1,6 @@
 """Payloads for signing in with a one-time code sent to an address."""
 
 from datetime import date
-from typing import Optional
 
 from pydantic import EmailStr, Field
 
@@ -16,11 +15,11 @@ class EmailOtpSend(SanitizedBaseModel):
     #: Checked before the address is looked at, so it answers for the request
     #: rather than for the address. ``None`` where the deployment configures no
     #: captcha provider, which is the default.
-    captcha_token: Optional[str] = None
+    captcha_token: str | None = None
     #: An invite this address was given, where the deployment asks for one.
     #: Carried so that asking about an unknown address can tell whether a
     #: sign-up would be allowed before it posts a code inviting one.
-    invite_code: Optional[str] = None
+    invite_code: str | None = None
 
 
 class EmailOtpSent(SanitizedBaseModel):
@@ -46,14 +45,14 @@ class EmailOtpRegister(SanitizedBaseModel):
 
     registration_ticket: str = Field(min_length=1, max_length=256)
     username: str = Field(min_length=1, max_length=64)
-    timezone: Optional[str] = None
-    invite_code: Optional[str] = None
-    community: Optional[NewCommunity] = None
+    timezone: str | None = None
+    invite_code: str | None = None
+    community: NewCommunity | None = None
     # The signed number the name check showed beside the handle, kept if
     # still free.
-    username_offer: Optional[str] = Field(default=None, max_length=1024)
+    username_offer: str | None = Field(default=None, max_length=1024)
     # Answers the directory's age question at sign-up; the date is not kept.
-    birthdate: Optional[date] = None
+    birthdate: date | None = None
     # The documents the form showed above its button, by slug: what pressing
     # it agreed to. Only these are recorded; any other required one is asked
     # for after sign-in.

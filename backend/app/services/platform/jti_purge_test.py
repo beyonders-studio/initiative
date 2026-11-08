@@ -9,12 +9,11 @@ own test module; here we pin the shared worker's gating and correctness.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-
+from datetime import UTC, datetime, timedelta
 
 from app.core import config as config_module
-from app.models.platform.plugin_assertion_jti import PluginAssertionJti
 from app.models.platform.billing import BillingJti
+from app.models.platform.plugin_assertion_jti import PluginAssertionJti
 from app.services.platform import jti_purge
 from app.services.platform.jti_purge import process_jti_blocklist_purges
 
@@ -38,7 +37,7 @@ def _configure(monkeypatch, *, billing: bool, plugin_platform: bool) -> None:
 
 
 async def _add(session, model, jti: str, *, expired: bool) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     delta = timedelta(hours=1)
     session.add(
         model(
@@ -68,7 +67,7 @@ async def _add_assertion(session, jti: str, *, expired: bool) -> None:
     ).one_or_none() or await create_plugin_service_registration(
         session, public_id="tests.jti-purge"
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     delta = timedelta(hours=1)
     session.add(
         PluginAssertionJti(

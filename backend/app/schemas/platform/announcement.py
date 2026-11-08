@@ -10,7 +10,6 @@ audience, authorship) in :class:`AnnouncementOperatorRead`.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import AliasChoices, Field, field_validator
 
@@ -47,34 +46,32 @@ class AnnouncementSection(SanitizedBaseModel):
     nothing, so at least one must be present.
     """
 
-    heading: Optional[str] = Field(default=None, max_length=160)
+    heading: str | None = Field(default=None, max_length=160)
     #: Start a new page here. Sections are one flowing list until a section
     #: says otherwise, and the reader pages through the groups that makes —
     #: which is all a "wizard" announcement is.
     starts_page: bool = False
-    body: Optional[RichTextStr] = Field(
-        default=None, max_length=MAX_SECTION_BODY_LENGTH
-    )
-    image_url: Optional[str] = Field(default=None, max_length=2048)
+    body: RichTextStr | None = Field(default=None, max_length=MAX_SECTION_BODY_LENGTH)
+    image_url: str | None = Field(default=None, max_length=2048)
     #: What the picture shows, for anyone who cannot see it.
-    image_alt: Optional[str] = Field(default=None, max_length=200)
+    image_alt: str | None = Field(default=None, max_length=200)
 
     @field_validator("image_url")
     @classmethod
-    def _check_image_url(cls, value: Optional[str]) -> Optional[str]:
+    def _check_image_url(cls, value: str | None) -> str | None:
         if value is None or value == "":
             return None
         # A protocol-relative "//host/x" is a remote URL wearing a path's
         # clothes, so it goes through the scheme check like any other.
         if value.startswith("/") and not value.startswith("//"):
             return value
-        if value.startswith("https://") or value.startswith("http://"):
+        if value.startswith(("https://", "http://")):
             return value
         raise ValueError("image_url must be a site-relative path or an http(s) URL")
 
     @field_validator("heading", "body", "image_alt")
     @classmethod
-    def _blank_to_none(cls, value: Optional[str]) -> Optional[str]:
+    def _blank_to_none(cls, value: str | None) -> str | None:
         if value is None:
             return None
         stripped = value.strip()
@@ -84,7 +81,7 @@ class AnnouncementSection(SanitizedBaseModel):
         return not (self.heading or self.body or self.image_url)
 
 
-def _validate_trigger_route(value: Optional[str]) -> Optional[str]:
+def _validate_trigger_route(value: str | None) -> str | None:
     """A trigger is a path pattern, so it looks like one.
 
     Only the shape is checked here: whether it matches anything is the SPA's
@@ -108,19 +105,19 @@ class AnnouncementRead(SanitizedBaseModel):
     title: str
     category: AnnouncementCategory
     sections: list[AnnouncementSection] = Field(default_factory=list)
-    published_at: Optional[datetime] = None
+    published_at: datetime | None = None
     #: True for notices shipped in the app's own source rather than authored
     #: in the operator surface; they cannot be edited from the UI.
     is_builtin: bool = False
     #: When this reader last acknowledged it, if they have.
-    dismissed_at: Optional[datetime] = None
+    dismissed_at: datetime | None = None
     #: How many acknowledgements this notice asks for, and how many this
     #: reader has given — the client shows the remainder and stops queueing it
     #: once they match.
     dismissals_required: int = 1
     dismiss_count: int = 0
     #: Route pattern this notice waits for, or None to queue it on sight.
-    trigger_route: Optional[str] = None
+    trigger_route: str | None = None
 
 
 class AnnouncementListResponse(SanitizedBaseModel):
@@ -130,7 +127,7 @@ class AnnouncementListResponse(SanitizedBaseModel):
 class AnnouncementOperatorRead(AnnouncementRead):
     """Everything about an announcement, for the people who write them."""
 
-    id: Optional[int] = None
+    id: int | None = None
     min_platform_role: UserRole = UserRole.member
     community_admins_only: bool = Field(
         default=False,
@@ -139,9 +136,9 @@ class AnnouncementOperatorRead(AnnouncementRead):
     audience_accounts: AnnouncementAudienceAccounts = (
         AnnouncementAudienceAccounts.everyone
     )
-    expires_at: Optional[datetime] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    expires_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class AnnouncementOperatorListResponse(SanitizedBaseModel):
@@ -159,14 +156,14 @@ class AnnouncementWrite(SanitizedBaseModel):
     audience_accounts: AnnouncementAudienceAccounts = (
         AnnouncementAudienceAccounts.everyone
     )
-    published_at: Optional[datetime] = None
-    expires_at: Optional[datetime] = None
+    published_at: datetime | None = None
+    expires_at: datetime | None = None
     dismissals_required: int = Field(default=1, ge=1, le=MAX_DISMISSALS_REQUIRED)
-    trigger_route: Optional[str] = Field(default=None, max_length=200)
+    trigger_route: str | None = Field(default=None, max_length=200)
 
     @field_validator("trigger_route")
     @classmethod
-    def _check_trigger_route(cls, value: Optional[str]) -> Optional[str]:
+    def _check_trigger_route(cls, value: str | None) -> str | None:
         return _validate_trigger_route(value)
 
     @field_validator("sections")
@@ -187,18 +184,18 @@ class AnnouncementWrite(SanitizedBaseModel):
 class AnnouncementUpdate(SanitizedBaseModel):
     """Body for editing an announcement — every field optional."""
 
-    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
-    category: Optional[AnnouncementCategory] = None
-    sections: Optional[list[AnnouncementSection]] = None
-    min_platform_role: Optional[UserRole] = None
-    community_admins_only: Optional[bool] = None
-    audience_accounts: Optional[AnnouncementAudienceAccounts] = None
-    published_at: Optional[datetime] = None
-    expires_at: Optional[datetime] = None
-    dismissals_required: Optional[int] = Field(
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    category: AnnouncementCategory | None = None
+    sections: list[AnnouncementSection] | None = None
+    min_platform_role: UserRole | None = None
+    community_admins_only: bool | None = None
+    audience_accounts: AnnouncementAudienceAccounts | None = None
+    published_at: datetime | None = None
+    expires_at: datetime | None = None
+    dismissals_required: int | None = Field(
         default=None, ge=1, le=MAX_DISMISSALS_REQUIRED
     )
-    trigger_route: Optional[str] = Field(default=None, max_length=200)
+    trigger_route: str | None = Field(default=None, max_length=200)
     #: Explicit unsets, because ``None`` on the fields above means "leave as is".
     clear_published_at: bool = False
     clear_expires_at: bool = False
@@ -206,14 +203,14 @@ class AnnouncementUpdate(SanitizedBaseModel):
 
     @field_validator("trigger_route")
     @classmethod
-    def _check_trigger_route(cls, value: Optional[str]) -> Optional[str]:
+    def _check_trigger_route(cls, value: str | None) -> str | None:
         return _validate_trigger_route(value)
 
     @field_validator("sections")
     @classmethod
     def _check_sections(
-        cls, value: Optional[list[AnnouncementSection]]
-    ) -> Optional[list[AnnouncementSection]]:
+        cls, value: list[AnnouncementSection] | None
+    ) -> list[AnnouncementSection] | None:
         if value is None:
             return None
         return AnnouncementWrite._check_sections(value)

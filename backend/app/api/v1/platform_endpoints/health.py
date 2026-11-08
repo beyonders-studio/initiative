@@ -43,13 +43,13 @@ import asyncio
 import logging
 import secrets
 import time
+from collections.abc import Awaitable, Callable
 from datetime import timedelta
-from typing import Awaitable, Callable
 
 import anyio
 from fastapi import APIRouter, Request, Response, status
-from pydantic import BaseModel, Field
 from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY, generate_latest
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -92,7 +92,7 @@ async def _ping(engine_name: str) -> None:
     The engine is read off the module rather than bound at import, so the
     connection tested is the one the process is serving requests with.
     """
-    from app.db import session as db_session  # noqa: PLC0415
+    from app.db import session as db_session
 
     target: AsyncEngine = getattr(db_session, engine_name)
     async with target.connect() as connection:
@@ -100,13 +100,13 @@ async def _ping(engine_name: str) -> None:
 
 
 async def _storage() -> None:
-    from app.services import storage  # noqa: PLC0415 — import cycle at module scope
+    from app.services import storage
 
     await anyio.to_thread.run_sync(storage.probe)
 
 
 async def _notify_bus() -> None:
-    from app.services.platform import notify_bus  # noqa: PLC0415
+    from app.services.platform import notify_bus
 
     if not notify_bus.bus.running:
         raise RuntimeError("not connected")
@@ -202,7 +202,7 @@ async def _count_platform_totals() -> None:
     checks. A count that fails leaves the previous one standing and says why
     in the log; the rest of the scrape is still answered.
     """
-    from app.db import session as db_session  # noqa: PLC0415
+    from app.db import session as db_session
 
     async def count() -> None:
         async with db_session.system_engine.connect() as connection:

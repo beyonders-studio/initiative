@@ -1,9 +1,9 @@
-from datetime import date, datetime, timedelta, timezone
 import hashlib
 import hmac
 import logging
 from dataclasses import dataclass, replace
-from typing import Any, Annotated
+from datetime import UTC, date, datetime, timedelta
+from typing import Annotated, Any
 from urllib.parse import urlencode
 
 from fastapi import (
@@ -20,28 +20,49 @@ from fastapi import (
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import delete as sql_delete, select
+from sqlmodel import delete as sql_delete
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
+from webauthn.helpers import bytes_to_base64url
 
 from app.api.deps import (
     CommunityIdPath,
     SessionDep,
+    SystemSessionDep,
     get_current_active_user,
     get_current_user_optional,
-    SystemSessionDep,
 )
-from app.db import post_commit
-from app.db import session as db_session
-from app.db.session import set_rls_context
+from app.api.v1.platform_endpoints.session_cookies import (
+    REFRESH_COOKIE_PATH,
+    clear_refresh_cookie,
+    clear_session_cookie,
+)
+from app.api.v1.platform_endpoints.session_opening import (
+    MOBILE_CALLBACK_URI,
+    PASSWORD_LEG,
+    SECOND_FACTOR_PURPOSES,
+    current_session_row,
+    first_leg_of,
+    mint_for,
+    open_session,
+    prove_password,
+    prove_second_factor,
+    require_login_method,
+    require_passkeys_allowed,
+    second_factor_outstanding,
+    set_password,
+    upgrade_session,
+)
+from app.core import audit_context, auth_context, usernames
+from app.core.audit_events import AuditEventType
 from app.core.config import API_V1_STR, is_device, settings
-from sqlmodel.ext.asyncio.session import AsyncSession
-from app.core import audit_context, auth_context
-from app.core.rate_limit import MAIL_SENDS, limiter
 from app.core.encryption import (
-    decrypt_field,
-    normalize_email,
     SALT_EMAIL,
     SALT_OIDC_CLIENT_SECRET,
+    decrypt_field,
+    normalize_email,
 )
+from app.core.identify import identify
 from app.core.login_methods import LoginMethod
 from app.core.messages import (
     AuthMessages,
@@ -50,9 +71,7 @@ from app.core.messages import (
     UserMessages,
 )
 from app.core.password_policy import validate_new_password
-from app.core import usernames
-from app.core.usernames import UsernameError
-from app.core.identify import identify
+from app.core.rate_limit import MAIL_SENDS, limiter
 from app.core.security import (
     REFRESH_COOKIE_NAME,
     create_handle_offer,
@@ -65,31 +84,15 @@ from app.core.user_input_validators import (
     is_valid_provider_slug,
     normalize_timezone,
 )
-from app.api.v1.platform_endpoints.session_cookies import (
-    REFRESH_COOKIE_PATH,
-    clear_refresh_cookie,
-    clear_session_cookie,
-)
-from app.api.v1.platform_endpoints.session_opening import (
-    PASSWORD_LEG,
-    SECOND_FACTOR_PURPOSES,
-    current_session_row,
-    MOBILE_CALLBACK_URI,
-    first_leg_of,
-    mint_for,
-    open_session,
-    prove_password,
-    prove_second_factor,
-    require_login_method,
-    require_passkeys_allowed,
-    second_factor_outstanding,
-    set_password,
-    upgrade_session,
-)
-from app.core.audit_events import AuditEventType
+from app.core.usernames import UsernameError
+from app.db import post_commit
+from app.db import session as db_session
+from app.db.request_context import Platform
+from app.db.session import set_rls_context
 from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.auth_provider_secret import AuthProviderSecret
 from app.models.platform.auth_session import AuthSession
+from app.models.platform.guild import CommunityRole, Guild
 from app.models.platform.user import (
     LOGIN_STATUSES,
     User,
@@ -97,43 +100,46 @@ from app.models.platform.user import (
     UserStatus,
     may_sign_in,
 )
-from app.models.platform.guild import Guild, CommunityRole
-from app.schemas.platform.token import Token
-from app.schemas.platform.second_factor import SecondFactorChallengeAnswer
+from app.models.platform.user_token import UserTokenPurpose
 from app.schemas.platform.auth import (
-    NativeSignInRedeem,
-    RefreshRequest,
     LoginProviderEntry,
     LoginProvidersResponse,
+    NativeSignInRedeem,
     PasswordResetRequest,
     PasswordResetSubmit,
+    RefreshRequest,
     UploadTokenResponse,
     UsernameAvailabilityResponse,
     UsernameSuggestionsResponse,
     VerificationConfirmRequest,
     VerificationSendResponse,
 )
+from app.schemas.platform.guild import NewCommunity
 from app.schemas.platform.passkey import (
     PasskeyRegistrationOptions,
     PasskeySignUpFinish,
     PasskeySignUpResult,
     PasskeySignUpStart,
 )
-from app.schemas.platform.guild import NewCommunity
+from app.schemas.platform.second_factor import SecondFactorChallengeAnswer
+from app.schemas.platform.token import Token
 from app.schemas.platform.user import UserCreate, UserRead
 from app.services import audit as audit_service
-from webauthn.helpers import bytes_to_base64url
-
-from app.services.auth import account_changes, addresses
+from app.services import email as email_service
+from app.services.auth import (
+    account_changes,
+    addresses,
+    native_handoff,
+    provider_registry,
+)
+from app.services.auth import challenges as challenge_service
 from app.services.auth import (
     guild_provider_connections as guild_connections,
 )
-from app.services.auth import challenges as challenge_service
-from app.services.auth import native_handoff
 from app.services.auth import passkeys as passkey_service
-from app.services.auth import totp as totp_service
 from app.services.auth import sessions as session_service
 from app.services.auth import subject as subject_service
+from app.services.auth import totp as totp_service
 from app.services.auth.assurance import (
     passkey_amr,
     read_assurance,
@@ -141,10 +147,6 @@ from app.services.auth.assurance import (
     record_for_provider,
     session_amr,
 )
-from app.services.platform import app_settings as app_settings_service
-from app.services.platform import legal as legal_service
-from app.services.platform import usernames as username_service
-from app.services.platform import users as users_service
 from app.services.auth.identity import (
     ResolutionOutcome,
     any_account_exists,
@@ -160,28 +162,26 @@ from app.services.auth.oidc.provider import (
     OidcFlowError,
     OidcProvider,
 )
-from app.services.auth import provider_registry
-from app.services.auth.provider_registry import (
-    frontend_callback_url,
-    provider_callback_url,
-)
 from app.services.auth.platform_provider import (
     PLATFORM_OIDC_SLUG,
     get_platform_provider,
     is_login_ready,
 )
+from app.services.auth.provider_registry import (
+    frontend_callback_url,
+    provider_callback_url,
+)
 from app.services.auth.sessions import RefreshOutcome
-from app.services.tenant.plugin_age import request_country
-from app.services.platform import auth_posture
-from app.services.platform import dm_settings as dm_settings_service
-from app.services import email as email_service
-from app.services.platform import user_tokens
-from app.services.platform import guilds as guilds_service
-from app.services.oidc_sync import extract_claim_values, sync_oidc_assignments
 from app.services.content_sockets import sockets as content_sockets
-from app.services.platform import provider_placement
-from app.models.platform.user_token import UserTokenPurpose
-from app.db.request_context import Platform
+from app.services.oidc_sync import extract_claim_values, sync_oidc_assignments
+from app.services.platform import app_settings as app_settings_service
+from app.services.platform import auth_posture, provider_placement, user_tokens
+from app.services.platform import dm_settings as dm_settings_service
+from app.services.platform import guilds as guilds_service
+from app.services.platform import legal as legal_service
+from app.services.platform import usernames as username_service
+from app.services.platform import users as users_service
+from app.services.tenant.plugin_age import request_country
 
 router = APIRouter()
 
@@ -451,19 +451,19 @@ async def _register_account(
                 session, code=normalized_invite, email=normalized_email
             )
             awaiting_invite_id = awaiting.id if awaiting is not None else None
-        user_kwargs: dict[str, Any] = dict(
+        user_kwargs: dict[str, Any] = {
             # Filled in by ``insert_with_handle`` below, which owns the insert
             # so it can redraw the number if another registration took it.
-            username="",
-            discriminator=0,
-            username_chosen=True,
-            hashed_password=hashed_password,
-            password_set_at=(
-                datetime.now(timezone.utc) if hashed_password is not None else None
+            "username": "",
+            "discriminator": 0,
+            "username_chosen": True,
+            "hashed_password": hashed_password,
+            "password_set_at": (
+                datetime.now(UTC) if hashed_password is not None else None
             ),
-            role=user_role,
-            status=UserStatus.active,
-        )
+            "role": user_role,
+            "status": UserStatus.active,
+        }
         if normalized_timezone is not None:
             user_kwargs["timezone"] = normalized_timezone
         user = User(**user_kwargs)
@@ -1135,7 +1135,7 @@ async def issue_upload_token(
         satisfied_claims=recorded.satisfied_claims,
         session_amr=recorded.session_amr,
         not_after=(
-            datetime.fromtimestamp(session_exp, timezone.utc)
+            datetime.fromtimestamp(session_exp, UTC)
             if session_exp is not None
             else None
         ),
@@ -1593,7 +1593,7 @@ async def _complete_provider_login(
     identity = resolution.identity
     matched = resolution.outcome is ResolutionOutcome.EMAIL_MATCH
     # Set where this sign-in proves an address the person added themselves.
-    proved_at = datetime.now(timezone.utc)
+    proved_at = datetime.now(UTC)
     proved_address: str | None = None
     proved_id: int | None = None
     # The address this provider asserts for the account. A provisioned account
@@ -1661,7 +1661,7 @@ async def _complete_provider_login(
                 identity_id=identity.id,
                 refresh_token=completion.refresh_token,
             )
-        identity.last_synced_at = datetime.now(timezone.utc)
+        identity.last_synced_at = datetime.now(UTC)
         system_session.add(identity)
     system_session.add(user)
     await system_session.commit()
@@ -1913,7 +1913,7 @@ async def confirm_verification(
     # Whether adding it was risky, as the request that added it found.
     risky = (record.change or {}).get("risky", True)
     if record.user_email_id is not None:
-        proved_at = datetime.now(timezone.utc)
+        proved_at = datetime.now(UTC)
         try:
             row = await addresses.verify_for_user(
                 system_session,
@@ -1936,7 +1936,7 @@ async def confirm_verification(
             proved_address = decrypt_field(row.email_encrypted, SALT_EMAIL)
             proved_id = row.id
 
-    record.consumed_at = datetime.now(timezone.utc)
+    record.consumed_at = datetime.now(UTC)
     system_session.add(record)
     if record.invite_id is not None:
         await _join_awaited_invite(

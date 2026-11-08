@@ -56,26 +56,26 @@ import hashlib
 import json
 import logging
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Collection, Mapping
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
-from typing import Any, Collection, Mapping, Optional, TypeVar
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.errors import CodedError
-from app.db.session import guild_context, routed_context, routed_guild_id
 from app.core.messages import (
+    GuildPluginMessages,
     PluginDataMessages,
     PluginServiceMessages,
-    GuildPluginMessages,
 )
 from app.core.security import (
     PluginPlatformSigningNotConfiguredError,
     plugin_platform_signing_enabled,
 )
+from app.db.session import guild_context, routed_context, routed_guild_id
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
 from app.schemas.tenant.plugin_data import (
@@ -84,12 +84,12 @@ from app.schemas.tenant.plugin_data import (
     PluginSummaryRead,
     PluginSummaryReturn,
 )
+from app.services.marketplace.community_status import community_status
+from app.services.marketplace.context_jwt import mint_context_token
 from app.services.marketplace.plugin_refs import (
     PluginNameRefused,
     ensure_plugin_guild_ref,
 )
-from app.services.marketplace.community_status import community_status
-from app.services.marketplace.context_jwt import mint_context_token
 from app.services.marketplace.registration_lookup import (
     RegistrationSnapshot,
     is_declarative,
@@ -107,29 +107,28 @@ from app.services.webhook_target_url import (
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T")
 
 __all__ = [
+    "MAX_CACHE_TTL_SECONDS",
     "MAX_INFLIGHT_PER_PLUGIN",
     "MAX_PARAMS_BYTES",
     "MAX_PARAM_VALUES",
     "MAX_RESPONSE_BYTES",
-    "MAX_CACHE_TTL_SECONDS",
     "REQUEST_TIMEOUT_SECONDS",
+    "CallingPlugin",
     "PluginDataError",
     "PluginDataResult",
-    "CallingPlugin",
     "cached_call",
     "clear_plugin_data_cache",
     "fetch_plugin_source",
-    "prepare_for_session",
-    "prepare_plugin_source",
     "find_param",
     "find_read_endpoint",
     "first_actor",
-    "row_columns",
+    "prepare_for_session",
+    "prepare_plugin_source",
     "project_returns",
     "resolve_param_options",
+    "row_columns",
     "validate_params",
 ]
 
@@ -206,8 +205,8 @@ def endpoint_by_id(
     definition: Mapping[str, Any] | None,
     endpoint_id: Any,
     *,
-    directions: Optional[Collection[str]] = None,
-) -> Optional[dict[str, Any]]:
+    directions: Collection[str] | None = None,
+) -> dict[str, Any] | None:
     """One endpoint of the *pinned* definition by its id, of one of
     ``directions`` (any, when none are given), or None.
 
@@ -225,7 +224,7 @@ def endpoint_by_id(
 
 def find_read_endpoint(
     definition: Mapping[str, Any] | None, endpoint_id: str
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     """One readable endpoint from the pinned definition, or None.
 
     Readable rather than declared, because this is the fetch path. A write and
@@ -373,9 +372,7 @@ def _coerce_scalar(field_spec: Mapping[str, Any], value: Any) -> str:
         return text
 
     if field_type == "url":
-        if " " in text or not (
-            text.startswith("https://") or text.startswith("http://")
-        ):
+        if " " in text or not (text.startswith(("https://", "http://"))):
             raise PluginDataError(PluginDataMessages.INVALID_PARAMS, 400)
         return text
 
@@ -449,9 +446,7 @@ def _required_connection_ids(endpoint: Mapping[str, Any]) -> tuple[list[str], bo
     return [], True
 
 
-def _request_connection(
-    request: Mapping[str, Any], actor: Optional[str]
-) -> Optional[str]:
+def _request_connection(request: Mapping[str, Any], actor: str | None) -> str | None:
     """The connection whose credential ``request`` carries on a call made as
     ``actor``: the one it names for every call, or, when it names one per
     actor, the one it names for ``actor``. ``None`` when it names none for
@@ -462,7 +457,7 @@ def _request_connection(
     return named if isinstance(named, str) else None
 
 
-def _connection_ids(endpoint: Mapping[str, Any], actor: Optional[str]) -> list[str]:
+def _connection_ids(endpoint: Mapping[str, Any], actor: str | None) -> list[str]:
     """The connections the endpoint's requests carry on a call made as
     ``actor`` (:func:`_request_connection`), once each."""
     named = (_request_connection(request, actor) for request in _requests(endpoint))
@@ -657,7 +652,7 @@ async def first_actor(
 
 async def _member_connection(
     session: AsyncSession, *, plugin_id: int, connection_id: str, user_id: int
-) -> Optional[GuildPluginUserConnection]:
+) -> GuildPluginUserConnection | None:
     return (
         await session.exec(
             select(GuildPluginUserConnection).where(
@@ -673,10 +668,10 @@ async def _member_connection(
 
 
 async def _load_registration(
-    public_id: Optional[str],
+    public_id: str | None,
     *,
-    guild_id: Optional[int],
-    plugin: Optional[GuildPlugin] = None,
+    guild_id: int | None,
+    plugin: GuildPlugin | None = None,
 ) -> RegistrationSnapshot:
     """Where this plug-in lives and whether the operator still allows it in
     community ``guild_id``: the registration for ``public_id``, or the one
@@ -716,7 +711,7 @@ class _CacheEntry:
 _cache: dict[str, _CacheEntry] = {}
 #: One in-flight upstream call per key, so concurrent viewers of the same
 #: dashboard collapse into a single request instead of a thundering herd.
-_pending: dict[str, "asyncio.Future[Any]"] = {}
+_pending: dict[str, asyncio.Future[Any]] = {}
 #: Upstream calls currently open per plug-in, for the per-worker cap.
 _inflight: dict[str, int] = {}
 
@@ -749,7 +744,7 @@ def _cache_key(
     canonical_params: str,
     refs: Mapping[str, str],
     fields: Mapping[str, Mapping[str, Any]],
-    actor: Optional[str] = None,
+    actor: str | None = None,
 ) -> str:
     """Every credential the response depended on, in one string.
 
@@ -946,12 +941,12 @@ class CallingPlugin:
     #: ``installation`` or ``member``.
     actor: str
     #: The member, by the called install's own reference for them.
-    member_ref: Optional[str] = None
+    member_ref: str | None = None
     #: The initiative the caller's token is narrowed to.
-    initiative_id: Optional[int] = None
+    initiative_id: int | None = None
 
 
-async def _call_plugin(
+async def _call_plugin[T](
     *,
     registration: RegistrationSnapshot,
     plugin: GuildPlugin,
@@ -962,12 +957,12 @@ async def _call_plugin(
     fields: Mapping[str, Mapping[str, Any]],
     transport: httpx.AsyncBaseTransport | None,
     read: Callable[[httpx.Request | Answered], Awaitable[T]],
-    caller: Optional[CallingPlugin] = None,
-    viewer: Optional[str] = None,
-    subject: Optional[Mapping[str, Any]] = None,
-    actor: Optional[str] = None,
-    item: Optional[Mapping[str, Any]] = None,
-    element: Optional[str] = None,
+    caller: CallingPlugin | None = None,
+    viewer: str | None = None,
+    subject: Mapping[str, Any] | None = None,
+    actor: str | None = None,
+    item: Mapping[str, Any] | None = None,
+    element: str | None = None,
 ) -> T:
     """One upstream call, under this worker's in-flight cap for the plug-in, and
     what ``read`` made of its answer. Sent once: nothing here retries.
@@ -1159,7 +1154,7 @@ async def prepare_plugin_source(
     params, canonical = validate_params(endpoint, raw_params)
     declared = endpoint.get("actors")
     actors = declared if isinstance(declared, list) and declared else None
-    actor: Optional[str] = None
+    actor: str | None = None
     if as_installation or actors is not None:
         actor, refs, fields = await first_actor(
             session,
@@ -1205,9 +1200,7 @@ async def prepare_plugin_source(
             read=read,
             actor=actor,
         )
-        return PluginDataResult(
-            rows=rows, values=values, fetched_at=datetime.now(timezone.utc)
-        )
+        return PluginDataResult(rows=rows, values=values, fetched_at=datetime.now(UTC))
 
     async def answer() -> PluginDataResult:
         result, cached = await cached_call(key, _effective_ttl(endpoint), call)
@@ -1247,7 +1240,7 @@ async def prepare_for_session(
     )
 
 
-async def cached_call(
+async def cached_call[T](
     key: str, ttl: int, call: Callable[[], Awaitable[T]]
 ) -> tuple[T, bool]:
     """``call``'s answer through the response cache, and whether it came from
@@ -1268,11 +1261,11 @@ async def cached_call(
         return await asyncio.shield(pending), False
 
     loop = asyncio.get_running_loop()
-    future: "asyncio.Future[Any]" = loop.create_future()
+    future: asyncio.Future[Any] = loop.create_future()
     _pending[key] = future
     try:
         result = await call()
-    except BaseException as exc:  # noqa: BLE001 - re-raised after the handoff
+    except BaseException as exc:
         if not future.done():
             future.set_exception(exc)
         # Nobody may be waiting; reading the result keeps asyncio from logging
@@ -1398,7 +1391,7 @@ OPTIONS_NEEDS_SIBLING = "needs-sibling"
 OPTIONS_UNRESOLVED = "unresolved"
 
 
-def find_param(endpoint: Mapping[str, Any], param_key: str) -> Optional[dict[str, Any]]:
+def find_param(endpoint: Mapping[str, Any], param_key: str) -> dict[str, Any] | None:
     """One declared parameter of an endpoint, or None."""
     declared = endpoint.get("params")
     for entry in declared if isinstance(declared, list) else []:
@@ -1408,7 +1401,7 @@ def find_param(endpoint: Mapping[str, Any], param_key: str) -> Optional[dict[str
 
 
 def _option_values(
-    rows: list[dict[str, Any]], key: str, label_key: Optional[str]
+    rows: list[dict[str, Any]], key: str, label_key: str | None
 ) -> list[dict[str, str]]:
     """The column a source names, as values a control can offer.
 
@@ -1477,7 +1470,7 @@ async def resolve_param_options(
     user_id: int,
     is_guild_admin: bool,
     transport: httpx.AsyncBaseTransport | None = None,
-) -> tuple[list[dict[str, str]], Optional[str]]:
+) -> tuple[list[dict[str, str]], str | None]:
     """The values one parameter permits, from the read its plug-in named.
 
     The parameter may be a read's, for a widget's binding, or a write's, for

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import html
 from enum import Enum
-from functools import lru_cache
-from typing import Annotated, Any, Dict, Final, get_args, get_origin, get_type_hints
+from functools import cache
+from typing import Annotated, Any, Final, get_args, get_origin, get_type_hints
 
 import nh3
 from pydantic import BaseModel, field_validator, model_validator
@@ -46,7 +46,7 @@ RichMentionStr = Annotated[RichTextStr, MARKDOWN_MENTIONS]
 """Rich text that may mention people, translated as :data:`MentionStr` is."""
 
 #: A Lexical editor state: a file's, a post's or a wiki page's body.
-LexicalState = Annotated[Dict[str, Any], LEXICAL_MENTIONS]
+LexicalState = Annotated[dict[str, Any], LEXICAL_MENTIONS]
 
 
 # ``#`` and ``@`` are syntax wherever a name is written or read back. A comment
@@ -142,7 +142,7 @@ def _annotation_has_marker(annotation: Any, marker: type) -> bool:
     return False
 
 
-@lru_cache(maxsize=None)
+@cache
 def _fields_marked(cls: type, marker: type) -> frozenset[str]:
     """Field names carrying ``marker``, resolved once per model.
 

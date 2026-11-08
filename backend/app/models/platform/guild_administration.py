@@ -1,8 +1,8 @@
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String
-from sqlmodel import Field, SQLModel, Relationship
 from pydantic import ConfigDict
+from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String
+from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:  # pragma: no cover
     from app.models.platform.guild import Guild
@@ -33,7 +33,7 @@ class GuildAdministration(SQLModel, table=True):
     __allow_unmapped__ = True
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     # The row is meaningless without its guild, and one guild has exactly one of
     # these — so NOT NULL, UNIQUE, and dropped with the guild.
     guild_id: int = Field(
@@ -49,14 +49,14 @@ class GuildAdministration(SQLModel, table=True):
     # enforcement input — enforcement reads only the paid rules and
     # guilds.status, so the FOSS app enforces numbers, not plans. A test pins
     # tier_name to the billing surface (billing_foss_test.py).
-    tier_name: Optional[str] = Field(
+    tier_name: str | None = Field(
         default=None, sa_column=Column(String(64), nullable=True)
     )
     #: The status billing last wrote, whether or not it landed on the guild.
     #: A suspended guild takes no status from billing; lifting the suspension
     #: on a billing-managed deployment returns it here (``active`` when
     #: billing never wrote one).
-    billing_status: Optional[str] = Field(
+    billing_status: str | None = Field(
         default=None, sa_column=Column(String(16), nullable=True)
     )
     #: The version of billing's state this guild holds: a write at a version

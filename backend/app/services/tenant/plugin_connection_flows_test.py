@@ -14,7 +14,7 @@ import asyncio
 import base64
 import time
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlencode, urlparse
 
@@ -55,9 +55,9 @@ from app.models.platform.plugin_service_registration import RegistrationKind
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.guild_plugin_secret import GuildPluginSecret
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
+from app.models.tenant.metadata import MetadataType
 from app.models.tenant.plugin_event_outbox import PluginEventOutbox
 from app.models.tenant.plugin_hook_delivery import PluginHookDelivery
-from app.models.tenant.metadata import MetadataType
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.plugin_schedule_run import PluginScheduleRun
 from app.services.marketplace import declarative as declarative_service
@@ -66,6 +66,7 @@ from app.services.marketplace.registration_lookup import (
     invalidate_registrations,
     load_registrations,
 )
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import (
     plugin_connection_flows,
     plugin_connections,
@@ -73,7 +74,6 @@ from app.services.tenant import (
     plugin_revocation,
     plugin_schedules,
 )
-from app.services.tenant import metadata as metadata_service
 from app.services.tenant.plugin_connections import load_connection_secrets
 from app.testing import (
     create_access_grant,
@@ -923,7 +923,7 @@ class TestTokens:
                 a.guild.id,
                 update(GuildPluginUserConnection)
                 .where(GuildPluginUserConnection.id == row.id)
-                .values(blocked_at=datetime.now(timezone.utc)),
+                .values(blocked_at=datetime.now(UTC)),
             )
 
         _during_refresh(monkeypatch, vendor, block)
@@ -1553,7 +1553,7 @@ class TestRevocation:
         assert [hook for hook in vendor.hooks if hook[0] == "revoke"] == []
         await sweep_timers.process_due_timers(outward=True)
 
-        name, body, authorization = next(h for h in vendor.hooks if h[0] == "revoke")
+        _name, body, authorization = next(h for h in vendor.hooks if h[0] == "revoke")
         assert body == {
             "connection": "hooked",
             "access_token": "gho_stored",
@@ -1615,7 +1615,7 @@ class TestRevocation:
 
         sent = [name for name, _body, _auth in vendor.hooks]
         assert sent == ["revoke", "uninstalled", "erase"]
-        name, body, _authorization = next(h for h in vendor.hooks if h[0] == "revoke")
+        _name, body, _authorization = next(h for h in vendor.hooks if h[0] == "revoke")
         assert body == {
             "connection": "hooked",
             "access_token": "gho_stored",
@@ -1734,7 +1734,7 @@ async def _deliveries_due(session: AsyncSession, guild_id: int) -> None:
     await route_session_to_guild(session, guild_id)
     await session.exec(
         update(PluginHookDelivery).values(
-            taken_until=datetime.now(timezone.utc) - timedelta(seconds=1)
+            taken_until=datetime.now(UTC) - timedelta(seconds=1)
         )
     )
     await session.commit()
@@ -1875,7 +1875,7 @@ class TestVendorWebhooks:
         await _delivered(session, seat.guild.id)
         [waiting] = await _deliveries(session, seat.guild.id)
         assert waiting.body is not None and waiting.attempts == 1
-        assert waiting.taken_until > datetime.now(timezone.utc)
+        assert waiting.taken_until > datetime.now(UTC)
 
         vendor.hook_status = 200
         await _deliveries_due(session, seat.guild.id)
@@ -1956,7 +1956,7 @@ async def _due(
     session: AsyncSession, guild_id: int, schedule_id: str | None = None
 ) -> None:
     """Bring every schedule in the community due, or only the one named."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await route_session_to_guild(session, guild_id)
     due = update(PluginScheduleRun).values(next_due_at=now - timedelta(seconds=1))
     if schedule_id is not None:
@@ -2014,7 +2014,7 @@ class TestSchedules:
         await _install(session, seat)
         worker = await role_session()
 
-        started = datetime.now(timezone.utc)
+        started = datetime.now(UTC)
         await _due(session, guild_id)
         await _run_due(worker, guild_id)
         run = (await _runs(session, guild_id))["check-installation"]
@@ -2056,7 +2056,7 @@ class TestSchedules:
         waits = []
         for _ in range(4):
             await _due(session, guild_id)
-            before = datetime.now(timezone.utc)
+            before = datetime.now(UTC)
             await _run_due(worker, guild_id)
             run = (await _runs(session, guild_id))["check-installation"]
             minutes = round((run.next_due_at - before).total_seconds() / 60)
@@ -2233,7 +2233,7 @@ class TestDeclarativePlugins:
         assert len(await _events(session, seat.guild.id)) == 1
         [recorded] = await _deliveries(session, seat.guild.id)
         assert recorded.body is None
-        assert recorded.expires_at > datetime.now(timezone.utc) + timedelta(hours=23)
+        assert recorded.expires_at > datetime.now(UTC) + timedelta(hours=23)
 
     async def test_a_delivery_whose_changes_failed_is_tried_again(
         self,
@@ -2416,13 +2416,13 @@ class TestDeclarativePlugins:
         queued = await client.post(DECLARATIVE_HOOKS, content=body, headers=headers)
         assert queued.status_code == 202, queued.text
         await route_session_to_guild(session, seat.guild.id)
-        long_ago = datetime.now(timezone.utc) - timedelta(days=2)
+        long_ago = datetime.now(UTC) - timedelta(days=2)
         await session.exec(update(PluginHookDelivery).values(expires_at=long_ago))
         await session.commit()
         async with cohorts.system_session(seat.guild.id) as worker:
             await set_rls_context(worker, SystemGuild(seat.guild.id))
             await plugin_hooks.expire_deliveries(
-                worker, SimpleNamespace(now=datetime.now(timezone.utc))
+                worker, SimpleNamespace(now=datetime.now(UTC))
             )
             await worker.commit()
         [waiting] = await _deliveries(session, seat.guild.id)
@@ -2433,7 +2433,7 @@ class TestDeclarativePlugins:
         assert len(await _events(session, seat.guild.id)) == 1
         [done] = await _deliveries(session, seat.guild.id)
         assert done.body is None
-        assert done.expires_at > datetime.now(timezone.utc) + timedelta(hours=23)
+        assert done.expires_at > datetime.now(UTC) + timedelta(hours=23)
 
     async def test_an_install_switched_on_is_delivered_to_at_once(
         self, client: AsyncClient, acting_user, session, vendor, declarative
@@ -3073,7 +3073,7 @@ class TestDeclarativeSchedules:
         for _ in range(2):
             vendor.api_answers = [answer]
             await _due(session, guild_id)
-            before = datetime.now(timezone.utc)
+            before = datetime.now(UTC)
             await _run_due(worker, guild_id)
             run = (await _runs(session, guild_id))["sync"]
             minutes = round((run.next_due_at - before).total_seconds() / 60)
@@ -3100,12 +3100,12 @@ class TestDeclarativeSchedules:
         seat = await acting_user(guild_role=CommunityRole.superadmin)
         guild_id = seat.guild.id
         await _declarative_install(session, seat, definition=_syncing())
-        since = datetime(2026, 10, 1, tzinfo=timezone.utc)
+        since = datetime(2026, 10, 1, tzinfo=UTC)
         await route_session_to_guild(session, guild_id)
         await session.exec(update(PluginScheduleRun).values(last_success_at=since))
         await session.commit()
         await _due(session, guild_id)
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
 
         await _run_due(await role_session(), guild_id)
 

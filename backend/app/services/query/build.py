@@ -25,8 +25,9 @@ description of the statement that follows refuses a column they do not have.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Optional, Sequence, Union
+from typing import Any
 
 from pglast import ast, parse_sql
 from pglast.enums import A_Expr_Kind, BoolExprType, LimitOption, SortByDir
@@ -87,12 +88,12 @@ class Column:
 
     field: str
     #: Reduce the column across the group, rather than returning it as it is.
-    aggregate: Optional[str] = None
+    aggregate: str | None = None
     #: Round a date down before grouping by it.
-    bucket: Optional[str] = None
+    bucket: str | None = None
     #: What the output column is called. Defaults to the field's own name, or
     #: the aggregate's, so a chart's legend reads as something.
-    alias: Optional[str] = None
+    alias: str | None = None
     #: Add the aggregate up along the grouping, so each row holds everything
     #: up to it: a burn-up rather than a count per week.
     running: bool = False
@@ -120,11 +121,11 @@ class Group:
     """
 
     logic: str = "and"
-    conditions: Sequence["Node"] = field(default_factory=tuple)
+    conditions: Sequence[Node] = field(default_factory=tuple)
 
 
 #: One line of a filter: a comparison, or a bracket around more of them.
-Node = Union[Condition, Group]
+Node = Condition | Group
 
 #: The words a bracket may be held together by.
 _LOGIC = {"and": BoolExprType.AND_EXPR, "or": BoolExprType.OR_EXPR}
@@ -145,25 +146,25 @@ class QuerySpec:
     """What somebody clicked, before it is a statement: about one dataset, one
     range of a spreadsheet, or one of a plug-in's read endpoints."""
 
-    dataset: Optional[str] = None
-    sheet: Optional[SheetCall] = None
-    plugin: Optional[PluginCall] = None
+    dataset: str | None = None
+    sheet: SheetCall | None = None
+    plugin: PluginCall | None = None
     columns: Sequence[Column] = field(default_factory=tuple)
     where: Sequence[Node] = field(default_factory=tuple)
     #: Columns to group by, named the way the select list names them.
     group_by: Sequence[str] = field(default_factory=tuple)
-    order_by: Optional[Sort] = None
-    limit: Optional[int] = None
+    order_by: Sort | None = None
+    limit: int | None = None
 
 
-def _split(name: str) -> tuple[Optional[str], str]:
+def _split(name: str) -> tuple[str | None, str]:
     """A field name, and the relation it is read through if it names one."""
     relation, _, field_name = name.rpartition(".")
     return (relation or None), field_name
 
 
 def _column_ref(
-    name: str, base: Optional[str] = None, whole: bool = False
+    name: str, base: str | None = None, whole: bool = False
 ) -> ast.ColumnRef:
     """One column, qualified by the relation it belongs to where it names one.
 
@@ -233,7 +234,7 @@ def _relative(days: Any) -> ast.Node:
 
 
 def _expression(
-    column: Column, base: Optional[str] = None, whole: bool = False
+    column: Column, base: str | None = None, whole: bool = False
 ) -> ast.Node:
     """The select-list expression for one column, innermost first: the field,
     rounded if it is bucketed, reduced if it is aggregated."""
@@ -329,7 +330,7 @@ def _value_node(is_viewer: bool, value: Any) -> ast.Node:
 
 
 def _predicate(
-    dataset_name: str, condition: Condition, base: Optional[str] = None
+    dataset_name: str, condition: Condition, base: str | None = None
 ) -> ast.Node:
     viewer = _viewer_value(dataset_name, condition)
     left = _column_ref(condition.field, base, whole=dataset_name in (SHEET, PLUGIN))
@@ -363,8 +364,8 @@ def _where(
     dataset_name: str,
     nodes: Sequence[Node],
     depth: int = 0,
-    base: Optional[str] = None,
-) -> Optional[ast.Node]:
+    base: str | None = None,
+) -> ast.Node | None:
     """Everything the description asks of a row.
 
     A list is AND-ed, which is what a reader means by writing two lines. A
@@ -384,8 +385,8 @@ def _where(
 
 
 def _node(
-    dataset_name: str, node: Node, depth: int, base: Optional[str] = None
-) -> Optional[ast.Node]:
+    dataset_name: str, node: Node, depth: int, base: str | None = None
+) -> ast.Node | None:
     if depth > MAX_GROUP_DEPTH:
         raise QueryError(QueryMessages.UNSUPPORTED_SYNTAX, "group depth")
     if isinstance(node, Group):

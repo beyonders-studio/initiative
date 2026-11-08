@@ -14,11 +14,12 @@ than the address it replaces.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, AsyncIterator, Optional, Sequence
+from typing import TYPE_CHECKING
 
 from limits import parse
 from sqlalchemy import String, cast, func, or_
@@ -76,7 +77,7 @@ class StreamAvailability:
     mode: TicketMode
     #: Who to write to about the stream, whatever the mode — a form whose
     #: filing turns out to have nowhere to go falls back to it.
-    contact: Optional[str]
+    contact: str | None
     #: The topics the form offers this person from here, in offering order.
     types: tuple[str, ...] = ()
 
@@ -85,7 +86,7 @@ class FilingTooFast(Exception):
     """This account has filed into the stream as often as its pace allows."""
 
 
-async def _contacts(session: AsyncSession) -> dict[IntakeStream, Optional[str]]:
+async def _contacts(session: AsyncSession) -> dict[IntakeStream, str | None]:
     """Every stream's contact address, from one read of the settings row.
 
     The stream's own address, else the deployment's general one — the rule
@@ -101,13 +102,13 @@ async def _contacts(session: AsyncSession) -> dict[IntakeStream, Optional[str]]:
     }
 
 
-def _fallback(contact: Optional[str]) -> StreamAvailability:
+def _fallback(contact: str | None) -> StreamAvailability:
     return StreamAvailability(
         mode=TicketMode.email if contact else TicketMode.none, contact=contact
     )
 
 
-async def feedback_goes(session: AsyncSession) -> Optional[TicketMode]:
+async def feedback_goes(session: AsyncSession) -> TicketMode | None:
     """Where feedback goes from here, when it isn't this server's own to take:
     nowhere while the deployment's switch is off, and to Initiative Cloud from
     any other server. ``None`` on Cloud with the switch on, where the stream
@@ -120,7 +121,7 @@ async def feedback_goes(session: AsyncSession) -> Optional[TicketMode]:
 
 
 async def availability(
-    session: AsyncSession, *, user: User, guild_id: Optional[int]
+    session: AsyncSession, *, user: User, guild_id: int | None
 ) -> dict[IntakeStream, StreamAvailability]:
     """What each stream offers ``user``, standing in ``guild_id`` if anywhere.
 
@@ -205,10 +206,10 @@ class FilerState(str, Enum):
 def derive_state(
     *,
     category: str,
-    status_id: Optional[int],
-    awaiting_status_id: Optional[int],
+    status_id: int | None,
+    awaiting_status_id: int | None,
     stream: IntakeStream,
-    topic: Optional[str] = None,
+    topic: str | None = None,
     trashed: bool = False,
 ) -> FilerState:
     """The state a case's status shows its filer.
@@ -235,13 +236,13 @@ class FiledTicket:
 
     task_id: int
     stream: IntakeStream
-    subject: Optional[str]
+    subject: str | None
     state: FilerState
     opened_at: datetime
-    updated_at: Optional[datetime]
-    status_id: Optional[int] = None
+    updated_at: datetime | None
+    status_id: int | None = None
     #: What it is about within its stream, as they chose.
-    topic: Optional[str] = None
+    topic: str | None = None
 
 
 @dataclass(frozen=True)
@@ -255,7 +256,7 @@ class TicketMessage:
     content: str
     created_at: datetime
     #: What they sent with it.
-    attachments: tuple["TicketAttachment", ...] = ()
+    attachments: tuple[TicketAttachment, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -289,7 +290,7 @@ class ReplyRefused(Exception):
 
 
 @asynccontextmanager
-async def _as_filer(user: User) -> AsyncIterator[Optional[AsyncSession]]:
+async def _as_filer(user: User) -> AsyncIterator[AsyncSession | None]:
     """A request session routed as ``user`` reading the cases they filed, or
     ``None`` where there is no operations community to read them in.
 
@@ -460,7 +461,7 @@ async def read_filed(user: User, task_id: int) -> FiledTicketDetail:
     if guild_id is None:
         raise TicketNotFound
     ticket = _ticket_from(row)
-    attached: dict[Optional[int], list[TicketAttachment]] = {}
+    attached: dict[int | None, list[TicketAttachment]] = {}
     for comment_id, *fields in sent:
         attached.setdefault(comment_id, []).append(TicketAttachment(*fields))
     messages = [
@@ -513,7 +514,7 @@ async def reply(
     user: User,
     detail: FiledTicketDetail,
     words: str,
-    evidence: Sequence["PreparedEvidence"] = (),
+    evidence: Sequence[PreparedEvidence] = (),
 ) -> None:
     """Add ``user``'s answer to a case they filed.
 

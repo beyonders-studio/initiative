@@ -14,23 +14,26 @@ rest. That is what keeps the second dataset from costing what the first one did.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from types import MappingProxyType
-from typing import Any, Mapping, Optional
+from typing import Any
 
 from sqlalchemy import (
     JSON,
     Boolean,
     Date,
     DateTime,
-    Enum as SAEnum,
     Integer,
     LargeBinary,
     Numeric,
     String,
     Text,
 )
-from sqlalchemy.types import TypeDecorator
+from sqlalchemy import (
+    Enum as SAEnum,
+)
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.types import TypeDecorator
 
 from app.schemas.query import FilterOp
 from app.services.fields.spec import (
@@ -89,13 +92,13 @@ def _base_type(sql_type: Any) -> Any:
     return sql_type
 
 
-def _referenced_table(col: Any) -> Optional[str]:
+def _referenced_table(col: Any) -> str | None:
     for fk in col.foreign_keys:
         return fk.target_fullname.split(".")[0]
     return None
 
 
-def control_for(col: Any, *, references: Optional[str] = None) -> Optional[ControlKind]:
+def control_for(col: Any, *, references: str | None = None) -> ControlKind | None:
     """Which control fills this column, or ``None`` if none can.
 
     Asked in the order the answers are trustworthy: what a column *references*
@@ -198,7 +201,7 @@ def derive_fields(
     return tuple(specs) + ((tags,) if tags is not None else ())
 
 
-def _tag_field(model: type[DeclarativeBase]) -> Optional[FieldSpec]:
+def _tag_field(model: type[DeclarativeBase]) -> FieldSpec | None:
     """The ``tag_ids`` filter, for a model that has tags.
 
     Nearly everything is taggable and everything taggable binds the same way,

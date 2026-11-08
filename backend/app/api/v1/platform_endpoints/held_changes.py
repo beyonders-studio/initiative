@@ -8,7 +8,7 @@ runs on the system engine, beside the rows a held change acts on.
 """
 
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
@@ -106,11 +106,11 @@ def _not_found() -> HTTPException:
     )
 
 
-@me_router.get("/held-change", response_model=Optional[HeldChangeRead])
+@me_router.get("/held-change", response_model=HeldChangeRead | None)
 async def read_held_change(
     current_user: CurrentUser,
     system_session: SystemSessionDep,
-) -> Optional[HeldChangeRead]:
+) -> HeldChangeRead | None:
     """The change this account has waiting, or nothing."""
     hold = await held_changes.pending_for_user(system_session, user_id=current_user.id)
     return await _read(system_session, hold) if hold else None

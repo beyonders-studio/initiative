@@ -19,7 +19,7 @@
     "body": "{{appName}} conserve quelques éléments dans ce navigateur pour fonctionner : ce qui vous garde connecté, le thème que vous avez choisi, ce que vous aviez ouvert.",
     "nothingOptional": "C'est tout. Rien d'autre n'est conservé, et rien ne vous suit sur d'autres sites.",
     "optionalIntro": "Au-delà, c'est vous qui décidez.",
-    "spamCheck": "Si vous créez un compte, le formulaire d'inscription charge une vérification anti-spam de {{provider}}, qui dépose son propre cookie.",
+    "spamCheck": "Le formulaire d'inscription, et celui qui vous envoie un code de connexion par e-mail, chargent une vérification anti-spam de {{provider}}, qui dépose son propre cookie.",
     "readMore": "Ce qui est conservé",
     "alwaysOn": "Toujours actifs",
     "rejectAll": "Refuser les optionnels",

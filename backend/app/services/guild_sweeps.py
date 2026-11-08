@@ -30,9 +30,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import audit_context, metrics
 from app.db import cohorts
-from app.db.session import set_rls_context
-from app.models.platform.guild import LIVE_STATUS_VALUES, Guild, CommunityStatus
 from app.db.request_context import SystemGuild, Unattributed
+from app.db.session import set_rls_context
+from app.models.platform.guild import LIVE_STATUS_VALUES, CommunityStatus, Guild
 
 logger = logging.getLogger(__name__)
 

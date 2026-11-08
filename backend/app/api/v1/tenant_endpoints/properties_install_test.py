@@ -9,7 +9,7 @@ definitions answer to ``properties``, and are read with any tool's scope too.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -18,16 +18,16 @@ from app.core.messages import InitiativeMessages, PluginMessages, PropertyMessag
 from app.models.tenant.metadata import MetadataType
 from app.services.marketplace import plugin_refs
 from app.testing import (
-    guild_url,
     create_guild_plugin,
     create_property_definition,
     guild_of,
+    guild_url,
     route_session_to_guild,
 )
 from app.testing.plugin_clients import (
     assert_names_nobody,
-    install_plugin,
     install_headers,
+    install_plugin,
     lift_person_and_guild_ids,
 )
 
@@ -69,7 +69,7 @@ async def _event(client: Any, session: Any, installed: Any, headers: dict) -> in
         json={"name": "The plug-in's", "initiative_id": installed.placed.id},
     )
     assert calendar.status_code == 201, calendar.text
-    start = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(days=1)
+    start = datetime.now(UTC).replace(microsecond=0) + timedelta(days=1)
     event = await client.post(
         guild_url(installed.guild.id, "/calendar-events/"),
         headers=headers,

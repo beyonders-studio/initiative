@@ -13,7 +13,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import AuthProviderMessages
 from app.models.platform.auth_provider import AuthProvider
-from app.models.platform.guild import Guild, CommunityStatus
+from app.models.platform.guild import CommunityStatus, Guild
 from app.models.platform.guild_provider_connection import GuildProviderConnection
 from app.schemas.platform.settings import CommunityNarrowingPending
 from app.services.auth import narrowing_approval

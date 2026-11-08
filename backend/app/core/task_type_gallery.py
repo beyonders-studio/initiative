@@ -17,7 +17,6 @@ types that each want a Location share one.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 #: The groups the gallery is shown in, in order.
 GALLERY_GROUPS: tuple[str, ...] = ("planning", "home", "groups", "making", "learning")
@@ -38,10 +37,10 @@ class GalleryStart:
     """What a new task of the type starts with. ``outline`` names a
     description in the catalogue (``taskTypes.gallery.outlines.<key>``)."""
 
-    outline: Optional[str] = None
-    priority: Optional[str] = None
-    recurrence: Optional[str] = None
-    recurrence_strategy: Optional[str] = None
+    outline: str | None = None
+    priority: str | None = None
+    recurrence: str | None = None
+    recurrence_strategy: str | None = None
 
 
 @dataclass(frozen=True)

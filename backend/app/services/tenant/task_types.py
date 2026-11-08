@@ -6,7 +6,8 @@ Nothing here commits, so a caller can compose it into a larger transaction.
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Optional
+from collections.abc import Iterable
+from typing import Any
 
 from pydantic import ValidationError
 from sqlmodel import col, delete, func, select
@@ -41,7 +42,7 @@ def _gallery_word(key: str, locale: str) -> str:
     return translate(f"taskTypes.gallery.{key}", locale, namespace="projects")
 
 
-def starting_values_of(task_type: TaskType) -> Optional[TaskTypeStartingValues]:
+def starting_values_of(task_type: TaskType) -> TaskTypeStartingValues | None:
     """What a new task of the type starts with, or None. A stored value this
     build no longer reads starts nothing rather than refusing the task."""
     if not task_type.starting_values:
@@ -54,8 +55,8 @@ def starting_values_of(task_type: TaskType) -> Optional[TaskTypeStartingValues]:
 
 
 def stored_starting_values(
-    values: Optional[TaskTypeStartingValues],
-) -> Optional[dict[str, Any]]:
+    values: TaskTypeStartingValues | None,
+) -> dict[str, Any] | None:
     """Starting values as the column holds them; None for nothing to start."""
     if values is None or values.is_empty():
         return None
@@ -64,7 +65,7 @@ def stored_starting_values(
 
 def gallery_starting_values(
     entry: GalleryType, locale: str
-) -> Optional[TaskTypeStartingValues]:
+) -> TaskTypeStartingValues | None:
     """What a gallery type starts a task with, its outline in ``locale``."""
     start = entry.start
     values = TaskTypeStartingValues(
@@ -200,7 +201,7 @@ async def get_default_type(session: AsyncSession, project_id: int) -> TaskType:
 
 async def get_project_type(
     session: AsyncSession, type_id: int, project_id: int
-) -> Optional[TaskType]:
+) -> TaskType | None:
     result = await session.exec(
         select(TaskType).where(
             TaskType.id == type_id, TaskType.project_id == project_id
@@ -214,7 +215,7 @@ async def name_taken(
     project_id: int,
     name: str,
     *,
-    excluding: Optional[int] = None,
+    excluding: int | None = None,
 ) -> bool:
     """Whether another of the project's types has this name, whatever its
     case."""

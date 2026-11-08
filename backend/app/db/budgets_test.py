@@ -32,7 +32,6 @@ from app.testing import (
     create_user,
     route_session_to_guild,
 )
-
 from conftest import TEST_DATABASE_URL
 
 pytestmark = pytest.mark.budget
@@ -186,7 +185,7 @@ async def _many_tasks(session: AsyncSession, project, count: int) -> None:
     )
     await session.exec(
         text(
-            f"INSERT INTO tasks ({columns}) SELECT {columns} FROM tasks, "  # noqa: S608
+            f"INSERT INTO tasks ({columns}) SELECT {columns} FROM tasks, "
             "generate_series(2, :count) WHERE id = :seed"
         ).bindparams(count=count, seed=seed.id)
     )

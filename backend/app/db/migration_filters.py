@@ -8,7 +8,8 @@ drift test proves exactly what ``alembic revision --autogenerate`` would see.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
+from typing import Any
 
 from sqlalchemy import ForeignKeyConstraint
 

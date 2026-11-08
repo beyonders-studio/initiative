@@ -31,8 +31,8 @@ nothing, whether or not the guild wanted it.
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Annotated, Any, Optional
+from datetime import UTC, datetime
+from typing import Annotated, Any
 
 from fastapi import (
     APIRouter,
@@ -49,12 +49,6 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
-    get_guild_seat_write_session,
-    refuse_closed_surface,
-    require_surface_open,
-)
-from app.core.rules import SURFACE_PLUGINS
-from app.api.deps import (
     AgeViewerDep,
     CurrentUser,
     GuildContextDep,
@@ -63,9 +57,12 @@ from app.api.deps import (
     SeatSessionDep,
     SeatWriteContextDep,
     SeatWriteSessionDep,
+    get_guild_seat_write_session,
+    refuse_closed_surface,
     require_first_party_session,
     require_grant_writes,
     require_seat,
+    require_surface_open,
 )
 from app.core.audit_events import AuditEventType
 from app.core.messages import (
@@ -75,6 +72,7 @@ from app.core.messages import (
 )
 from app.core.plugin_scopes import plugin_scope_target
 from app.core.rate_limit import limiter
+from app.core.rules import SURFACE_PLUGINS
 from app.db import post_commit
 from app.db.guild_standing import GuildContext
 from app.db.query import build_paginated_response, paginated_query
@@ -182,7 +180,7 @@ def _config_fields(config: dict, secrets: dict) -> dict[str, Any]:
     return fields
 
 
-async def _plugin_avatar(session: AsyncSession, plugin: GuildPlugin) -> Optional[str]:
+async def _plugin_avatar(session: AsyncSession, plugin: GuildPlugin) -> str | None:
     """The artwork for one install's listing."""
     avatars = await catalog_service.listing_avatars(session, [plugin.listing_uid])
     return avatars.get(plugin.listing_uid)
@@ -386,8 +384,8 @@ async def _read(
 
 
 async def _entitlement(
-    guild_id: int, listing_uid: Optional[str]
-) -> Optional[CommunityPluginEntitlementRead]:
+    guild_id: int, listing_uid: str | None
+) -> CommunityPluginEntitlementRead | None:
     """What the statement held for the install's listing says, if one is."""
     if not listing_uid:
         return None
@@ -678,7 +676,7 @@ async def upgrade_community_plugin(
     current_user: CurrentUser,
     guild_context: SeatWriteContextDep,
     viewer: AgeViewerDep,
-    payload: Optional[CommunityPluginUpgrade] = None,
+    payload: CommunityPluginUpgrade | None = None,
 ) -> CommunityPluginDetail:
     """Re-pin an installed plug-in to its listing's current version, now.
 
@@ -892,7 +890,7 @@ async def update_community_plugin(
         plugin.auto_update = data["auto_update"]
     if data.get("placed_initiative_ids") is not None:
         await _set_placement(session, plugin, data["placed_initiative_ids"])
-    plugin.updated_at = datetime.now(timezone.utc)
+    plugin.updated_at = datetime.now(UTC)
     session.add(plugin)
     after = {
         **audit_service.snapshot(plugin, _PLUGIN_SETTINGS_FIELDS),

@@ -16,7 +16,7 @@ about platform-wide privilege.
 from __future__ import annotations
 
 from enum import Enum
-from typing import TYPE_CHECKING, FrozenSet
+from typing import TYPE_CHECKING
 
 from app.models.platform.access_grant import AccessGrantPurpose, AccessLevel
 from app.models.platform.user import UserRole, UserStatus
@@ -133,12 +133,12 @@ class Capability(str, Enum):
 # Capability presets per platform role, least → most privileged. Each higher
 # tier is a strict superset of the tier below it, but the model itself does
 # not assume that — membership is explicit so the matrix can diverge later.
-_MEMBER: FrozenSet[Capability] = frozenset()
+_MEMBER: frozenset[Capability] = frozenset()
 
 # Moderation and nothing else: finding the account or community to act on,
 # acting on it, and asking for the ``moderate`` grant that reading held content
 # takes. No other grant — no settings, no billing, no plain read of a community.
-_MODERATOR: FrozenSet[Capability] = _MEMBER | {
+_MODERATOR: frozenset[Capability] = _MEMBER | {
     Capability.USERS_READ,
     Capability.COMMUNITIES_READ,
     Capability.CONTENT_MODERATE,
@@ -146,14 +146,14 @@ _MODERATOR: FrozenSet[Capability] = _MEMBER | {
     Capability.ACCESS_REQUEST,
 }
 
-_SUPPORT: FrozenSet[Capability] = _MODERATOR | {
+_SUPPORT: frozenset[Capability] = _MODERATOR | {
     Capability.USERS_AGE_UNBLOCK,
     Capability.USERS_MANAGE,
     Capability.ACCESS_REQUEST_ANY,
     Capability.BILLING_SUPPORT,
 }
 
-_OPERATOR: FrozenSet[Capability] = _SUPPORT | {
+_OPERATOR: frozenset[Capability] = _SUPPORT | {
     Capability.COMMUNITIES_MANAGE,
     Capability.BILLING_INSIGHTS,
     Capability.BILLING_CONTRACTS,
@@ -164,7 +164,7 @@ _OPERATOR: FrozenSet[Capability] = _SUPPORT | {
     Capability.ACCESS_APPROVE,
 }
 
-_OWNER: FrozenSet[Capability] = (
+_OWNER: frozenset[Capability] = (
     _OPERATOR
     | {
         Capability.CONFIG_MANAGE,
@@ -181,7 +181,7 @@ _OWNER: FrozenSet[Capability] = (
 }
 
 
-ROLE_CAPABILITIES: dict[UserRole, FrozenSet[Capability]] = {
+ROLE_CAPABILITIES: dict[UserRole, frozenset[Capability]] = {
     UserRole.member: _MEMBER,
     UserRole.moderator: _MODERATOR,
     UserRole.support: _SUPPORT,
@@ -204,12 +204,12 @@ ROLE_MAX_GRANT_MINUTES: dict[UserRole, int] = {
 }
 
 
-def capabilities_for(role: UserRole) -> FrozenSet[Capability]:
+def capabilities_for(role: UserRole) -> frozenset[Capability]:
     """Return the capability set granted by a standing platform role."""
     return ROLE_CAPABILITIES.get(role, _MEMBER)
 
 
-def roles_with_capability(capability: Capability) -> FrozenSet[UserRole]:
+def roles_with_capability(capability: Capability) -> frozenset[UserRole]:
     """Return every standing role whose preset grants ``capability``.
 
     Used to translate a capability into a role filter for queries (e.g.
@@ -235,7 +235,7 @@ def may_hold_grant(role: UserRole | str, purpose: str, level: str) -> bool:
     return bool(held & {Capability.ACCESS_REQUEST_ANY, Capability.DATA_BYPASS})
 
 
-def standing_capabilities(role: UserRole, status: UserStatus) -> FrozenSet[Capability]:
+def standing_capabilities(role: UserRole, status: UserStatus) -> frozenset[Capability]:
     """What a standing role grants an account in ``status``.
 
     A suspended account holds none: it is in time out, and its rung comes back
@@ -246,7 +246,7 @@ def standing_capabilities(role: UserRole, status: UserStatus) -> FrozenSet[Capab
     return capabilities_for(role)
 
 
-def user_has_capability(user: "User", capability: Capability) -> bool:
+def user_has_capability(user: User, capability: Capability) -> bool:
     """True iff the user's standing platform role grants ``capability``.
 
     This reflects *standing* privilege only. Time-bound PAM grants (cross-guild
@@ -267,14 +267,14 @@ def role_rank(role: UserRole) -> int:
     return _ROLE_ORDER.index(role)
 
 
-def may_act_on(actor: "User", target: "User") -> bool:
+def may_act_on(actor: User, target: User) -> bool:
     """Whether staff ``actor`` may act on ``target``'s account: never their
     own, and never one whose rung is above theirs. Every operator route that
     changes an account asks this."""
     return target.id != actor.id and role_rank(target.role) <= role_rank(actor.role)
 
 
-def can_assign_role(actor: "User", target_role: UserRole) -> bool:
+def can_assign_role(actor: User, target_role: UserRole) -> bool:
     """Whether ``actor`` may assign ``target_role`` to someone.
 
     Bounded delegation: you can only grant a role at or below your own rung of

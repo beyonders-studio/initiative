@@ -1,6 +1,6 @@
 import importlib.util
 from collections.abc import AsyncIterator, Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from types import ModuleType
 
@@ -102,14 +102,14 @@ async def test_old_tasks_keep_their_existing_continuation_and_consumed_count(
     first = await create_task(
         session,
         a.project,
-        due_date=datetime(2026, 10, 5, 9, tzinfo=timezone.utc),
+        due_date=datetime(2026, 10, 5, 9, tzinfo=UTC),
         recurrence_occurrence_count=2,
     )
     later = await create_task(
         session,
         a.project,
         series_id=first.id,
-        due_date=datetime(2026, 10, 9, 9, tzinfo=timezone.utc),
+        due_date=datetime(2026, 10, 9, 9, tzinfo=UTC),
         recurrence_carry={"due_date": "2026-10-07T09:00:00+00:00"},
         recurrence_occurrence_count=3,
         recurrence="RRULE:FREQ=WEEKLY\nRDATE:20261007T090000Z",
@@ -118,7 +118,7 @@ async def test_old_tasks_keep_their_existing_continuation_and_consumed_count(
         session,
         a.project,
         series_id=999999,
-        due_date=datetime(2026, 10, 8, 9, tzinfo=timezone.utc),
+        due_date=datetime(2026, 10, 8, 9, tzinfo=UTC),
         recurrence="RRULE:FREQ=DAILY;INTERVAL=3;COUNT=4",
         recurrence_occurrence_count=3,
     )
@@ -141,9 +141,9 @@ async def test_old_tasks_keep_their_existing_continuation_and_consumed_count(
         )
     ).all()
     anchors = {row[0]: (row[1], row[2]) for row in rows}
-    assert anchors[later.id] == (datetime(2026, 10, 7, 9, tzinfo=timezone.utc), 3)
+    assert anchors[later.id] == (datetime(2026, 10, 7, 9, tzinfo=UTC), 3)
     assert anchors[without_history.id] == (
-        datetime(2026, 10, 8, 9, tzinfo=timezone.utc),
+        datetime(2026, 10, 8, 9, tzinfo=UTC),
         3,
     )
     from app.services.tenant.task_series import next_dates
@@ -154,11 +154,11 @@ async def test_old_tasks_keep_their_existing_continuation_and_consumed_count(
     dates = await next_dates(
         session,
         later,
-        now=datetime(2026, 10, 10, tzinfo=timezone.utc),
+        now=datetime(2026, 10, 10, tzinfo=UTC),
         user_timezone="UTC",
     )
     assert dates is not None
-    assert dates[1] == datetime(2026, 10, 14, 9, tzinfo=timezone.utc)
+    assert dates[1] == datetime(2026, 10, 14, 9, tzinfo=UTC)
     await session.refresh(
         without_history,
         attribute_names=["recurrence_anchor", "recurrence_anchor_count"],
@@ -167,7 +167,7 @@ async def test_old_tasks_keep_their_existing_continuation_and_consumed_count(
         await next_dates(
             session,
             without_history,
-            now=datetime(2026, 10, 10, tzinfo=timezone.utc),
+            now=datetime(2026, 10, 10, tzinfo=UTC),
             user_timezone="UTC",
         )
         is None
@@ -182,7 +182,7 @@ async def test_a_backfill_exception_restores_force_rls_before_returning(
         session,
         a.project,
         recurrence="RRULE:FREQ=DAILY",
-        due_date=datetime(2026, 10, 5, tzinfo=timezone.utc),
+        due_date=datetime(2026, 10, 5, tzinfo=UTC),
     )
     await _prepare_migration_owner(session, a.guild.id)
     migration = _migration()
@@ -231,7 +231,7 @@ async def test_a_sql_backfill_error_rolls_back_columns_data_and_rls(
     session, acting_user, provisioner
 ):
     a = await acting_user(guild_role="member", initiative=True, project=True)
-    due = datetime(2026, 10, 5, tzinfo=timezone.utc)
+    due = datetime(2026, 10, 5, tzinfo=UTC)
     task = await create_task(
         session,
         a.project,
@@ -302,7 +302,7 @@ async def test_guarded_tasks_receive_the_backfill_and_keep_their_state(
     session, acting_user, provisioner, state
 ):
     a = await acting_user(guild_role="member", initiative=True, project=True)
-    moment = datetime(2026, 10, 5, tzinfo=timezone.utc)
+    moment = datetime(2026, 10, 5, tzinfo=UTC)
     task = await create_task(
         session,
         a.project,

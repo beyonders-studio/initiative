@@ -20,7 +20,8 @@ from typing import Any
 from sqlalchemy import event
 from sqlalchemy.orm import Session, with_loader_criteria
 from sqlalchemy.orm.session import ORMExecuteState
-from sqlmodel import SQLModel, select as sqlmodel_select
+from sqlmodel import SQLModel
+from sqlmodel import select as sqlmodel_select
 
 import app.db.base  # noqa: F401 — registers every model
 from app.models.tenant._mixins import soft_delete_models

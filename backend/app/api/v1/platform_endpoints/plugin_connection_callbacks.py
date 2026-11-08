@@ -22,7 +22,7 @@ Not part of the OpenAPI document: only a vendor sends a browser here.
 
 from __future__ import annotations
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
@@ -40,7 +40,7 @@ from app.services.tenant import plugin_connection_flows as flows_service
 router = APIRouter(include_in_schema=False)
 
 
-async def signed_in_person(request: Request, session: SessionDep) -> Optional[int]:
+async def signed_in_person(request: Request, session: SessionDep) -> int | None:
     """The person signed in to Initiative in this browser, or ``None``.
 
     Read from the session cookie alone, and held to what every signed-in
@@ -59,7 +59,7 @@ async def signed_in_person(request: Request, session: SessionDep) -> Optional[in
     return user.id
 
 
-SignedInDep = Annotated[Optional[int], Depends(signed_in_person)]
+SignedInDep = Annotated[int | None, Depends(signed_in_person)]
 
 
 def _redirect(url: str) -> RedirectResponse:
@@ -74,9 +74,9 @@ def _redirect(url: str) -> RedirectResponse:
 async def connection_setup(
     request: Request,
     signed_in: SignedInDep,
-    state: Optional[str] = Query(default=None, max_length=4096),
-    installation_id: Optional[str] = Query(default=None, max_length=64),
-    setup_action: Optional[str] = Query(default=None, max_length=32),
+    state: str | None = Query(default=None, max_length=4096),
+    installation_id: str | None = Query(default=None, max_length=64),
+    setup_action: str | None = Query(default=None, max_length=32),
 ) -> RedirectResponse:
     """The vendor's install page is done: go on to authorize, or say the
     install is waiting on somebody's approval."""
@@ -95,9 +95,9 @@ async def connection_setup(
 async def connection_callback(
     request: Request,
     signed_in: SignedInDep,
-    state: Optional[str] = Query(default=None, max_length=4096),
-    code: Optional[str] = Query(default=None, max_length=2048),
-    error: Optional[str] = Query(default=None, max_length=200),
+    state: str | None = Query(default=None, max_length=4096),
+    code: str | None = Query(default=None, max_length=2048),
+    error: str | None = Query(default=None, max_length=200),
 ) -> RedirectResponse:
     """The vendor's answer to the authorization request: exchange the code,
     store the connection, and land the person on how it went."""

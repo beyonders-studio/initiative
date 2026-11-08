@@ -10,7 +10,7 @@ from sqlalchemy import text
 
 from app.core import audit_context, metrics
 from app.db import session as db_session
-from app.testing import create_initiative, create_project, create_guild, create_user
+from app.testing import create_guild, create_initiative, create_project, create_user
 
 
 @pytest.fixture

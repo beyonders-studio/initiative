@@ -2,7 +2,6 @@
 
 from types import SimpleNamespace
 
-
 from app.services.export.adapters.tasks_table import _thread_comments
 
 

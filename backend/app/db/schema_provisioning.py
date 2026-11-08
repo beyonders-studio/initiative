@@ -35,8 +35,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
 from app.db import bootstrap
-from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db import session as db_session
+from app.db.advisory_locks import LockNamespace, advisory_lock
 
 logger = logging.getLogger(__name__)
 
@@ -160,9 +160,11 @@ SYSTEM_GUILD_MAINTENANCE_GRANTS: dict[str, tuple[str, ...]] = {
     # Content and search-index triggers must still record the scrub. Their
     # writes are column-scoped where possible; DELETE needs a table privilege.
     "event_outbox": (
-        "INSERT (txn_id, occurred_at, actor_user_id, actor_install_id, "
-        "initiative_id, resource_type, resource_id, action, changed, parents, "
-        "dac_tool, dac_id)",
+        (
+            "INSERT (txn_id, occurred_at, actor_user_id, actor_install_id, "
+            "initiative_id, resource_type, resource_id, action, changed, parents, "
+            "dac_tool, dac_id)"
+        ),
         # The poller's candidate scan: which transactions exist, in what order.
         # Nothing of what a row says — that is read per transaction, as the
         # subscription's owner, where RLS decides it.
@@ -177,8 +179,10 @@ SYSTEM_GUILD_MAINTENANCE_GRANTS: dict[str, tuple[str, ...]] = {
     ),
     "search_entries": (
         "SELECT (entity_type, entity_id)",
-        "INSERT (entity_type, entity_id, chunk_ix, initiative_id, dac_tool, "
-        "dac_id, title, body, archived, template, updated_at, tsv)",
+        (
+            "INSERT (entity_type, entity_id, chunk_ix, initiative_id, dac_tool, "
+            "dac_id, title, body, archived, template, updated_at, tsv)"
+        ),
         "DELETE",
     ),
 }
@@ -286,12 +290,12 @@ async def get_provisioning_bundle() -> ProvisioningBundle:
             render_guild_schema_ddl,
             split_operations,
         )
-        from app.db.tenancy import OPERATIONS_TABLES
         from app.db.registry_checks import (
             render_guild_registry_check_ddl,
             render_guild_registry_validate_ddl,
         )
         from app.db.search_index import render_guild_search_ddl
+        from app.db.tenancy import OPERATIONS_TABLES
         from app.db.timers import render_guild_timer_ddl
 
         engine = db_session.provisioning_engine
@@ -421,17 +425,12 @@ async def apply_guild_trigger_functions(conn: AsyncConnection) -> None:
     raw = await conn.get_raw_connection()
     # The write function first: both search trigger functions call it.
     await raw.driver_connection.execute(
-        "SET check_function_bodies = false;\n"
-        + "\n".join(
-            (
-                CAPTURE_FUNCTION_SQL,
-                WRITE_FUNCTION_SQL,
-                SEARCH_FUNCTION_SQL,
-                DEPENDENT_FUNCTION_SQL,
-                ARM_FUNCTION_SQL,
-                ARM_ON_WRITE_FUNCTION_SQL,
-            )
-        )
+        "SET check_function_bodies = false;\n" + f"{CAPTURE_FUNCTION_SQL}\n"
+        f"{WRITE_FUNCTION_SQL}\n"
+        f"{SEARCH_FUNCTION_SQL}\n"
+        f"{DEPENDENT_FUNCTION_SQL}\n"
+        f"{ARM_FUNCTION_SQL}\n"
+        f"{ARM_ON_WRITE_FUNCTION_SQL}"
     )
 
 
@@ -633,8 +632,10 @@ def _plugin_role_grant_statements(schema: str, plugin_role: str) -> list[str]:
         # Ids of the rows it writes come from the schema's sequences.
         f'GRANT USAGE ON ALL SEQUENCES IN SCHEMA "{schema}" TO "{plugin_role}"',
         f'GRANT plugin_install_base TO "{plugin_role}"',
-        f'GRANT "{plugin_role}" TO "{APP_LOGIN_ROLE}", "{SYSTEM_LOGIN_ROLE}" '
-        f"WITH INHERIT FALSE",
+        (
+            f'GRANT "{plugin_role}" TO "{APP_LOGIN_ROLE}", "{SYSTEM_LOGIN_ROLE}" '
+            f"WITH INHERIT FALSE"
+        ),
     ]
     return stmts
 
@@ -692,8 +693,10 @@ def _grant_statements(schema: str, guild_id: int) -> list[str]:
         ),
         # Full role: DML on its schema.
         f'GRANT USAGE ON SCHEMA "{schema}" TO "{role}"',
-        f'ALTER DEFAULT PRIVILEGES IN SCHEMA "{schema}" '
-        f'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO "{role}"',
+        (
+            f'ALTER DEFAULT PRIVILEGES IN SCHEMA "{schema}" '
+            f'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO "{role}"'
+        ),
         f'ALTER DEFAULT PRIVILEGES IN SCHEMA "{schema}" GRANT USAGE ON SEQUENCES TO "{role}"',
         f'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA "{schema}" TO "{role}"',
         f'GRANT USAGE ON ALL SEQUENCES IN SCHEMA "{schema}" TO "{role}"',
@@ -712,16 +715,24 @@ def _grant_statements(schema: str, guild_id: int) -> list[str]:
         # permission tables. Grant broadly (incl. default privileges for future
         # content tables) then REVOKE write on the protected set — coarse by design.
         f'GRANT USAGE ON SCHEMA "{schema}" TO "{support_role}"',
-        f'ALTER DEFAULT PRIVILEGES IN SCHEMA "{schema}" '
-        f'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO "{support_role}"',
-        f'ALTER DEFAULT PRIVILEGES IN SCHEMA "{schema}" '
-        f'GRANT USAGE ON SEQUENCES TO "{support_role}"',
-        f'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA "{schema}" '
-        f'TO "{support_role}"',
+        (
+            f'ALTER DEFAULT PRIVILEGES IN SCHEMA "{schema}" '
+            f'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO "{support_role}"'
+        ),
+        (
+            f'ALTER DEFAULT PRIVILEGES IN SCHEMA "{schema}" '
+            f'GRANT USAGE ON SEQUENCES TO "{support_role}"'
+        ),
+        (
+            f'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA "{schema}" '
+            f'TO "{support_role}"'
+        ),
         f'GRANT USAGE ON ALL SEQUENCES IN SCHEMA "{schema}" TO "{support_role}"',
         f'GRANT app_guild_base TO "{support_role}"',
-        f'GRANT "{support_role}" TO "{APP_LOGIN_ROLE}", "{SYSTEM_LOGIN_ROLE}" '
-        f"WITH INHERIT FALSE",
+        (
+            f'GRANT "{support_role}" TO "{APP_LOGIN_ROLE}", "{SYSTEM_LOGIN_ROLE}" '
+            f"WITH INHERIT FALSE"
+        ),
         # Query role: SELECT on the schema's tables and nothing else. No
         # sequences — a read names no sequence — and no DML at any level.
         #
@@ -731,14 +742,18 @@ def _grant_statements(schema: str, guild_id: int) -> list[str]:
         # no table. The floor it once inherited is revoked, for the schemas
         # provisioned while it did.
         f'GRANT USAGE ON SCHEMA "{schema}" TO "{query_role}"',
-        f'ALTER DEFAULT PRIVILEGES IN SCHEMA "{schema}" '
-        f'GRANT SELECT ON TABLES TO "{query_role}"',
+        (
+            f'ALTER DEFAULT PRIVILEGES IN SCHEMA "{schema}" '
+            f'GRANT SELECT ON TABLES TO "{query_role}"'
+        ),
         f'GRANT SELECT ON ALL TABLES IN SCHEMA "{schema}" TO "{query_role}"',
         f'REVOKE app_guild_base_ro FROM "{query_role}"',
         f'GRANT USAGE ON SCHEMA public TO "{query_role}"',
         f'GRANT SELECT ON public.current_guild_members TO "{query_role}"',
-        f'GRANT "{query_role}" TO "{APP_LOGIN_ROLE}", "{SYSTEM_LOGIN_ROLE}" '
-        f"WITH INHERIT FALSE",
+        (
+            f'GRANT "{query_role}" TO "{APP_LOGIN_ROLE}", "{SYSTEM_LOGIN_ROLE}" '
+            f"WITH INHERIT FALSE"
+        ),
         # Seat role: the full guild role's reach into the schema and the
         # shared floor, plus app_superadmin — the one shared floor carrying
         # the community's sign-in configuration. Composed from the guild role
@@ -746,8 +761,10 @@ def _grant_statements(schema: str, guild_id: int) -> list[str]:
         # it by the same default privilege that reaches that one.
         f'GRANT "{role}" TO "{seat_role}"',
         f'GRANT app_superadmin TO "{seat_role}"',
-        f'GRANT "{seat_role}" TO "{APP_LOGIN_ROLE}", "{SYSTEM_LOGIN_ROLE}" '
-        f"WITH INHERIT FALSE",
+        (
+            f'GRANT "{seat_role}" TO "{APP_LOGIN_ROLE}", "{SYSTEM_LOGIN_ROLE}" '
+            f"WITH INHERIT FALSE"
+        ),
     ]
     # Cap the support role: SELECT stays, writes are revoked on the permission
     # tables (these exist in every schema, so the REVOKE always applies).
@@ -971,7 +988,7 @@ async def deprovision_guild(guild_id: int) -> None:
             if await storage_keys.destroy(session, guild_id):
                 logger.info("deprovision guild %s: destroyed its storage key", guild_id)
             await session.commit()
-    except Exception:  # noqa: BLE001 — logged loudly; the row's FK cascades with the guild
+    except Exception:
         logger.exception("failed to destroy the storage key of guild %s", guild_id)
     # Remove the guild's stored blobs (the ``guild_<id>/`` storage namespace).
     # Best-effort and after the schema drop succeeds: a storage hiccup must not
@@ -985,7 +1002,7 @@ async def deprovision_guild(guild_id: int) -> None:
         logger.info(
             "deprovision guild %s: removed %d stored blob(s)", guild_id, removed
         )
-    except Exception:  # noqa: BLE001 — blob cleanup must not block teardown
+    except Exception:
         logger.exception("failed to purge stored blobs for guild %s", guild_id)
 
 
@@ -1061,7 +1078,7 @@ async def backfill_guild_schemas() -> BackfillSummary:
             stripped = await strip_template_registry_objects(conn)
         if stripped:
             logger.info("guild_template: removed %d rendered objects", stripped)
-    except Exception:  # noqa: BLE001 — never block boot on the template
+    except Exception:
         logger.exception("guild_template clean-up failed")
 
     async with db_session.provisioning_engine.begin() as conn:
@@ -1096,7 +1113,7 @@ async def backfill_guild_schemas() -> BackfillSummary:
         async with limit:
             try:
                 return await _backfill_guild(guild_id, wait=wait)
-            except Exception:  # noqa: BLE001 — one broken guild must not block boot
+            except Exception:
                 failed_guild_ids.append(guild_id)
                 logger.exception("guild schema back-fill failed for guild %s", guild_id)
                 return False

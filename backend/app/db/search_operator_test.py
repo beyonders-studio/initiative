@@ -16,7 +16,7 @@ from __future__ import annotations
 from sqlalchemy import func, select, text
 from sqlalchemy.dialects import postgresql
 
-import app.db.schema_provisioning as schema_provisioning
+from app.db import schema_provisioning
 from app.db.schema_provisioning import SEARCH_MATCH_FUNCTION, SEARCH_OPCLASS
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.search_entry import SearchEntry

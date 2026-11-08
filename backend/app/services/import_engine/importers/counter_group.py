@@ -16,8 +16,8 @@ from app.models.tenant.counter import Counter, CounterGroup, CounterViewMode
 from app.models.tenant.initiative import Initiative, PermissionKey
 from app.schemas.tenant.import_envelopes import CounterGroupEnvelope
 from app.services.import_engine.common import unique_name_in_initiative
-from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.context import ImportContext
+from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.importers._base import (
     NamesPeopleInPassing,
     PropertyRestore,

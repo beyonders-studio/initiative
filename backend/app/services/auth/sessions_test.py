@@ -11,8 +11,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import uuid
-from datetime import datetime, timedelta, timezone
-
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -27,7 +26,7 @@ from app.testing import create_user
 def _at(*, days: int = 0, minutes: int = 0) -> datetime:
     """A fixed instant offset from a stable base — keeps TTL math deterministic
     without ``datetime.now`` (and without the frozen-time helpers)."""
-    base = datetime(2026, 7, 6, 12, 0, 0, tzinfo=timezone.utc)
+    base = datetime(2026, 7, 6, 12, 0, 0, tzinfo=UTC)
     return base + timedelta(days=days, minutes=minutes)
 
 

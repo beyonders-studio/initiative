@@ -32,22 +32,23 @@ dropped rather than preserved, so a stored definition always has canonical shape
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Literal, Mapping
+from typing import Any, Literal
 
 from app.core.errors import CodedError
 from app.core.messages import DashboardMessages
 from app.models.platform.marketplace import UID_ALPHABET, UID_LENGTH
+from app.services.fields.spec import FieldType
 from app.services.marketplace.manifest_values import (
     IDENTIFIER_CHARS,
     MAX_IDENTIFIER_LENGTH,
 )
-from app.services.fields.spec import FieldType
 from app.services.marketplace.service_plugins import (
-    PLUGIN_WIDGET_TYPE_PREFIX,
     ENDPOINT_ID_CHARS,
     MAX_ENDPOINT_ID_LENGTH,
+    PLUGIN_WIDGET_TYPE_PREFIX,
 )
 from app.services.query.resolve import QueryError, resolve
 
@@ -513,7 +514,7 @@ def _check_plugin_param(value: Any) -> Any:
 
 def _check_plugin_scalar(value: Any) -> Any:
     """One value inside a parameter, of the types a manifest may declare."""
-    if isinstance(value, bool) or isinstance(value, int):
+    if isinstance(value, (bool, int)):
         return value
     if isinstance(value, str) and len(value) <= MAX_PLUGIN_PARAM_LENGTH:
         return value

@@ -12,15 +12,16 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core import security
 from app.core.config import settings as app_config
 from app.core.encryption import (
-    SALT_PLUGIN_PLATFORM_SIGNING_KEY,
     SALT_CAPTCHA_SECRET_KEY,
     SALT_FCM_SERVICE_ACCOUNT,
+    SALT_PLUGIN_PLATFORM_SIGNING_KEY,
     SALT_SMTP_PASSWORD,
     decrypt_field,
 )
 from app.core.login_methods import DEFAULT_LOGIN_METHODS, LoginMethod
 from app.models.platform.app_setting import AppSetting
 from app.services.marketplace import context_jwt
+from app.services.platform import rules
 from app.services.platform.app_settings import (
     GLOBAL_SETTINGS_ID,
     _seeded_login_methods,
@@ -31,7 +32,6 @@ from app.services.platform.app_settings import (
     load_plugin_platform_signing_key,
     seed_app_settings,
 )
-from app.services.platform import rules
 from app.testing import create_guild, route_session_to_guild
 
 

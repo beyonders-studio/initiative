@@ -13,7 +13,7 @@ RLS: guild-level placement with the ``own_row_*`` policy overlay
 (``app.db.tenancy.OWN_ROW_TABLES``).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import Column, DateTime, String
@@ -32,6 +32,6 @@ class ViewPreference(SQLModel, table=True):
     )
     value: Any = Field(sa_column=Column(JSONB, nullable=False))
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

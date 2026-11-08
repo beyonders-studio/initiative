@@ -10,7 +10,7 @@ Nothing here holds a secret going out. The token travels in, once; what comes
 back names the site and what is on it.
 """
 
-from typing import Annotated, List, Optional
+from typing import Annotated
 
 from pydantic import Field
 
@@ -43,7 +43,7 @@ class AtlassianJiraProject(SanitizedBaseModel):
     #: Roughly how many issues are in it, or ``None`` when the count could not
     #: be taken. Approximate by construction — Jira answers this one cheaply
     #: and inexactly, and an exact number would cost a search per project.
-    issue_count: Optional[int] = None
+    issue_count: int | None = None
 
 
 class AtlassianConfluenceSpace(SanitizedBaseModel):
@@ -53,7 +53,7 @@ class AtlassianConfluenceSpace(SanitizedBaseModel):
     key: str
     name: str
     #: How many pages are in it, or ``None`` when the count could not be taken.
-    page_count: Optional[int] = None
+    page_count: int | None = None
 
 
 class AtlassianProductProbe(SanitizedBaseModel):
@@ -68,15 +68,15 @@ class AtlassianProductProbe(SanitizedBaseModel):
     available: bool = False
     #: Why it is unavailable, as an ``IMPORT_SOURCE_*`` code, when it is.
     #: Absent when the product answered.
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class AtlassianJiraProbe(AtlassianProductProbe):
-    projects: List[AtlassianJiraProject] = []
+    projects: list[AtlassianJiraProject] = []
 
 
 class AtlassianConfluenceProbe(AtlassianProductProbe):
-    spaces: List[AtlassianConfluenceSpace] = []
+    spaces: list[AtlassianConfluenceSpace] = []
 
 
 #: A Jira project key as Jira itself allows one: a letter, then letters,
@@ -115,12 +115,12 @@ class AtlassianImportRequest(SanitizedBaseModel):
     #: (and, for spaces, wikis) switched on, and let this person create them —
     #: checked now, and again when the fetch starts and when it is applied.
     initiative_id: int
-    project_keys: List[
+    project_keys: list[
         Annotated[
             str, Field(min_length=1, max_length=50, pattern=JIRA_PROJECT_KEY_PATTERN)
         ]
     ] = Field(default=[], max_length=200)
-    space_keys: List[
+    space_keys: list[
         Annotated[
             str,
             Field(min_length=1, max_length=255, pattern=CONFLUENCE_SPACE_KEY_PATTERN),

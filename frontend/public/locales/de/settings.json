@@ -202,7 +202,7 @@
     "title": "Community-KI",
     "adminOnly": "Nur Community-Admins können KI-Verbindungen verwalten.",
     "disabledDescription": "KI-Funktionen sind für die Plattform deaktiviert.",
-    "managedByPlatform": "KI-Verbindungen werden auf Plattformebene verwaltet. Mitglieder legen ihren eigenen Schlüssel in ihren Profileinstellungen fest.",
+    "managedByPlatform": "KI-Verbindungen werden auf Plattformebene verwaltet.",
     "managedByServer": "Die Betreiber dieses Servers verwalten die KI für diese Community."
   },
   "platformAI": {
@@ -820,8 +820,8 @@
     },
     "roleDescriptions": {
       "member": "Standardzugriff auf die eigenen Communitys. Keine plattformweiten Berechtigungen.",
-      "support": "Schreibgeschützte Plattformeinsicht (Benutzer, Communitys) und kann zeitlich begrenzten Zugriff auf eine Community anfordern.",
-      "moderator": "Alles, was Support kann, plus Benutzerverwaltung (Sperren/Wiederaktivieren) und Inhaltsmoderation.",
+      "support": "Alles, was Moderator kann, plus Kontowiederherstellung (Anmeldung, zweiter Faktor, Wiederaktivierung), und kann zeitlich begrenzten Lese- oder Lese- & Schreibzugriff auf eine Community anfordern.",
+      "moderator": "Sieht die Benutzer und Communitys der Plattform, moderiert Konten und Inhalte, sperrt Konten und kann zeitlich begrenzten Moderationszugriff auf eine Community anfordern.",
       "operator": "Verwaltet Benutzer, Communitys und Rollen plattformweit, mit Community-übergreifendem Datenzugriff, und genehmigt Zugriffsanfragen.",
       "owner": "Vollständige Kontrolle, einschließlich der app-weiten Konfiguration (Authentifizierung, Branding, E-Mail, KI). Die einzige Rolle, die die Konfiguration verwalten kann."
     },
@@ -988,7 +988,7 @@
     "requestDescription": "Fordere temporären, eingeschränkten Zugriff auf eine Community an. Genehmiger gewähren ihn und er läuft automatisch ab.",
     "breakGlass": {
       "title": "Notfallzugriff",
-      "description": "Notfallzugriff auf eine Community selbst gewähren – sofort genehmigt, auf diese Community beschränkt und automatisch ablaufend. Lese- & Schreibzugriff entspricht einem vollen Community-Admin. Jeder Notfallzugriff wird protokolliert.",
+      "description": "Notfallzugriff auf eine Community selbst gewähren – sofort genehmigt, auf diese Community beschränkt und automatisch ablaufend. Damit kannst du vorhandene Inhalte bearbeiten und die Einstellungen der Community ändern. Jeder Notfallzugriff wird protokolliert.",
       "reasonPlaceholder": "Warum du Notfallzugriff brauchst (z. B. Vorfall #123)",
       "submit": "Notfallzugriff",
       "activated": "Notfallzugriff aktiviert",

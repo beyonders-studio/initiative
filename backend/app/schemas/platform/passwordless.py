@@ -1,6 +1,5 @@
 """Payloads for an account that signs in without a password."""
 
-from typing import Optional
 from pydantic import EmailStr, Field
 
 from app.schemas.base import RawTextStr, SanitizedBaseModel
@@ -12,7 +11,7 @@ class PasswordRemove(SanitizedBaseModel):
     signs nobody in with a password, a recent sign-in answers instead, and it
     is left out."""
 
-    current_password: Optional[str] = Field(default=None, max_length=256)
+    current_password: str | None = Field(default=None, max_length=256)
 
 
 class PasswordRecover(SanitizedBaseModel):

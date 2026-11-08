@@ -24,7 +24,7 @@ from app.core.encryption import SALT_FCM_SERVICE_ACCOUNT, decrypt_field
 #: its sibling modules use.
 _TTL_SECONDS = 30.0
 
-_resolved: "ResolvedPushConfig | None" = None
+_resolved: ResolvedPushConfig | None = None
 _loaded_at: float = 0.0
 
 
@@ -42,7 +42,7 @@ class ResolvedPushConfig:
 
 async def resolve_saved_service_account() -> str | None:
     """Decrypt the stored service-account JSON, or None when unset."""
-    from app.services.platform.app_settings import (  # noqa: PLC0415
+    from app.services.platform.app_settings import (
         load_app_setting_secrets,
     )
 
@@ -57,7 +57,7 @@ async def resolve_saved_service_account() -> str | None:
 async def refresh_push_config(session: AsyncSession) -> ResolvedPushConfig:
     """Reload the snapshot from ``app_settings`` and the stored credential."""
     global _resolved, _loaded_at
-    from app.services.platform.app_settings import get_app_settings  # noqa: PLC0415
+    from app.services.platform.app_settings import get_app_settings
 
     row = await get_app_settings(session)
     _resolved = ResolvedPushConfig(
@@ -76,7 +76,7 @@ async def ensure_push_config_fresh() -> ResolvedPushConfig:
     """Reload if stale or never loaded, on a session of its own."""
     if _resolved is not None and (time.monotonic() - _loaded_at) <= _TTL_SECONDS:
         return _resolved
-    from app.db import session as db_session  # noqa: PLC0415
+    from app.db import session as db_session
 
     async with db_session.SystemSessionLocal() as system_session:
         return await refresh_push_config(system_session)

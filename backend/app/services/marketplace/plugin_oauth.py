@@ -37,7 +37,7 @@ import logging
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import jwt
@@ -47,35 +47,38 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
+from app.core.config import API_V1_STR, settings
 from app.core.plugin_access_token import (
     ACCESS_TOKEN_LIFETIME_SECONDS,
-    seal_plugin_token,
     seal_install_token,
+    seal_plugin_token,
 )
 from app.core.plugin_scopes import (
     LEVEL_SCOPES,
-    PluginScopeAccess,
     InstallLevel,
+    PluginScopeAccess,
     UnknownPluginScope,
-    plugin_scope_target,
     expand,
     is_known_scope,
     is_standing_scope,
     parse_scope,
+    plugin_scope_target,
     validate_scopes,
 )
-from app.core.config import API_V1_STR, settings
 from app.db import cohorts
 from app.db.guild_standing import ISSUABLE_SCOPES_SQL
+from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
+from app.models.platform.guild import GuildMembership
 from app.models.platform.plugin_assertion_jti import ASSERTION_JTI_MAX_LENGTH
 from app.models.platform.plugin_service_registration import (
     RegistrationKind,
     registration_live_sql,
 )
-from app.models.platform.guild import GuildMembership
 from app.models.platform.user import User, UserStatus
 from app.models.tenant.plugin_member_consent import ConsentAccess, is_valid_purpose
+from app.services import audit as audit_service
 from app.services.marketplace import (
     plugin_installs,
     plugin_keys,
@@ -83,9 +86,6 @@ from app.services.marketplace import (
     registration_lookup,
 )
 from app.services.marketplace.registration_lookup import RegistrationSnapshot
-from app.db.request_context import SystemGuild
-from app.core.audit_events import AuditEventType
-from app.services import audit as audit_service
 from app.services.membership import live_membership_clause
 
 logger = logging.getLogger(__name__)
@@ -95,10 +95,10 @@ __all__ = [
     "GRANT_CLIENT_CREDENTIALS",
     "GRANT_JWT_BEARER",
     "INITIATIVE_RESOURCE_PREFIX",
+    "TOKEN_PATH",
     "InstallationListing",
     "IssuedToken",
     "OAuthError",
-    "TOKEN_PATH",
     "issue_token",
     "list_installations",
     "token_endpoint_url",
@@ -341,7 +341,7 @@ async def _verify_signed_assertion(
             text(_BURN_JTI_SQL),
             params={
                 "jti": jti,
-                "expires_at": datetime.fromtimestamp(expires_at, tz=timezone.utc),
+                "expires_at": datetime.fromtimestamp(expires_at, tz=UTC),
                 "public_id": issuer,
             },
         )

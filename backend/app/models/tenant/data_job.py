@@ -22,9 +22,9 @@ report and file must not be guild-wide-readable either. Owner or routed guild
 admin only.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import (
     ARRAY,
@@ -88,7 +88,7 @@ class DataJob(CreatedByMixin, table=True):
         Index("ix_data_jobs_direction_status", "direction", "status"),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     created_by: int = Field(foreign_key="users.id", nullable=False)
 
     # Plain string columns (no shared PG enum type to provision per schema);
@@ -113,21 +113,21 @@ class DataJob(CreatedByMixin, table=True):
     # Storage key relative to the guild prefix: an import's staged payload
     # ("imports/{uuid4hex}.json|.zip") or an export's artifact
     # ("exports/{id}.pdf").
-    file_ref: Optional[str] = Field(default=None)
-    error: Optional[str] = Field(default=None)
+    file_ref: str | None = Field(default=None)
+    error: str | None = Field(default=None)
     # When ``file_ref`` is deleted: an unconfirmed import payload's, or a
     # finished export artifact's.
-    expires_at: Optional[datetime] = Field(
+    expires_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
 
     # --- import only ---
     # Backup pre-flight summary (counts/names shown at confirm) — not content.
-    plan: Optional[dict[str, Any]] = Field(
+    plan: dict[str, Any] | None = Field(
         default=None, sa_column=Column(JSONB, nullable=True)
     )
     # Terminal report (per-entry outcomes, unmatched emails, renames).
-    result: Optional[dict[str, Any]] = Field(
+    result: dict[str, Any] | None = Field(
         default=None, sa_column=Column(JSONB, nullable=True)
     )
     # The secret a job needs to read a foreign site, for as long as that job
@@ -135,7 +135,7 @@ class DataJob(CreatedByMixin, table=True):
     # transition. Fernet-encrypted at rest under ``SALT_IMPORT_CREDENTIAL``
     # and re-keyed by the SECRET_KEY rotation. Not a field of
     # ``DataJobRead``, so it is never serialized.
-    secret_encrypted: Optional[str] = Field(
+    secret_encrypted: str | None = Field(
         default=None,
         sa_column=Column(
             Text, nullable=True, info={FERNET_SALT: SALT_IMPORT_CREDENTIAL}
@@ -143,14 +143,14 @@ class DataJob(CreatedByMixin, table=True):
     )
 
     # --- export only ---
-    template_id: Optional[str] = Field(default=None)
-    format: Optional[str] = Field(default=None)
+    template_id: str | None = Field(default=None)
+    format: str | None = Field(default=None)
     # Where a delivered archive was written, when it was too large to hand
     # back over HTTP. Exactly one of this and ``file_ref`` is set on a
     # finished export: the app either has the bytes or it does not, and a
     # delivered archive lives under the operator's retention rather than the
     # artifact GC's.
-    destination_ref: Optional[str] = Field(default=None)
+    destination_ref: str | None = Field(default=None)
     #: How many times the stale sweep has queued this export again.
     restarts: int = Field(
         default=0, sa_column=Column(Integer, nullable=False, server_default="0")
@@ -158,15 +158,15 @@ class DataJob(CreatedByMixin, table=True):
     # The initiatives whose content the artifact holds, recorded when it is
     # rendered. The download asks for each again; ``None`` is a job rendered
     # before this was recorded, whose artifact is not served.
-    initiative_ids: Optional[list[int]] = Field(
+    initiative_ids: list[int] | None = Field(
         default=None, sa_column=Column(ARRAY(Integer), nullable=True)
     )
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

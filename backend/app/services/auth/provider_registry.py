@@ -18,8 +18,9 @@ from sqlmodel import delete, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
+from app.core.config import API_V1_STR
+from app.core.config import settings as app_config
 from app.core.encryption import SALT_OIDC_CLIENT_SECRET, encrypt_field
-from app.core.config import API_V1_STR, settings as app_config
 from app.core.messages import AuthProviderMessages
 from app.db.errors import (
     STILL_REFERENCED_SQLSTATES,
@@ -33,8 +34,8 @@ from app.models.platform.oidc_claim_mapping import (
     OIDCMappingTargetType,
 )
 from app.schemas.platform.settings import (
-    AuthProviderOwnerRead,
     AuthProviderCreate,
+    AuthProviderOwnerRead,
     AuthProviderUpdate,
 )
 from app.services import audit as audit_service

@@ -1,6 +1,6 @@
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import (
     ARRAY,
@@ -110,15 +110,15 @@ class AuthSession(SQLModel, table=True):
     # Rotation chain: each refresh mints a new row pointing at the one it replaced;
     # reuse of an already-rotated token revokes the whole chain (theft detection).
     # Plain uuid, app-managed — no self-FK.
-    parent_id: Optional[uuid.UUID] = Field(
+    parent_id: uuid.UUID | None = Field(
         default=None, sa_column=Column(Uuid, nullable=True)
     )
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
-    last_used_at: Optional[datetime] = Field(
+    last_used_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     # Set by the service to now + REFRESH_TTL at creation (no default here).
@@ -132,33 +132,29 @@ class AuthSession(SQLModel, table=True):
     # Stamped once when the sign-in happens and carried through every rotation
     # unchanged, so renewing costs no extra read. NULL means the deployment
     # asked for no limit.
-    chain_expires_at: Optional[datetime] = Field(
+    chain_expires_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-    revoked_at: Optional[datetime] = Field(
+    revoked_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
 
     # Audit / "your active sessions" UX.
-    user_agent: Optional[str] = Field(
-        default=None, sa_column=Column(Text, nullable=True)
-    )
+    user_agent: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     # INET (not text): canonical normalisation + subnet queries; NULL when unknown.
     # Rejects a raw X-Forwarded-For list, forcing the service to store one client IP.
-    ip: Optional[str] = Field(default=None, sa_column=Column(INET, nullable=True))
-    device_name: Optional[str] = Field(
-        default=None, sa_column=Column(Text, nullable=True)
-    )
+    ip: str | None = Field(default=None, sa_column=Column(INET, nullable=True))
+    device_name: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     #: The installed copy of the phone or desktop app that opened it; NULL for a
     #: browser. A device stays signed in for longer than a browser does, and a
     #: new sign-in from the same install continues this one. Carried across
     #: every renewal and step-up.
-    install_id: Optional[uuid.UUID] = Field(
+    install_id: uuid.UUID | None = Field(
         default=None, sa_column=Column(Uuid, nullable=True)
     )
     #: When the sign-in this session continues began, where it took the place
     #: of another (a step-up, a replacement). Its own chain starts afresh, so
     #: this is what still says how long the person has been signed in here.
-    continues_since: Optional[datetime] = Field(
+    continues_since: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )

@@ -10,9 +10,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.api.deps import (
+    GuildContextDep,
     RLSSessionDep,
     get_current_active_user,
-    GuildContextDep,
 )
 from app.core.reactions import ReactionTarget
 from app.models.platform.user import User

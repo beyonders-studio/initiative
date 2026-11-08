@@ -13,8 +13,8 @@ work for any model that keeps one.
 
 import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Any, TypeVar
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import HTTPException, status
 from pydantic import BaseModel
@@ -31,7 +31,6 @@ from app.services.tenant import attachments as attachments_service
 
 logger = logging.getLogger(__name__)
 
-ReadT = TypeVar("ReadT", bound=BaseModel)
 
 #: Which commit failures prove nothing was written.
 #:
@@ -93,7 +92,7 @@ def _make_current(parent: Any, version: Any) -> None:
     from app.models.tenant.file import File
 
     parent.current_version = version
-    parent.updated_at = datetime.now(timezone.utc)
+    parent.updated_at = datetime.now(UTC)
     if isinstance(parent, File):
         parent.file_type = type_of_media(version.file_content_type)
 
@@ -253,7 +252,7 @@ async def release_files(guild_id: int, version: Any) -> None:
     attachments_service.delete_blobs(guild_id, released)
 
 
-def read(schema: type[ReadT], version: Any, parent: Any) -> ReadT:
+def read[ReadT: BaseModel](schema: type[ReadT], version: Any, parent: Any) -> ReadT:
     """``version`` in ``schema``, saying whether ``parent`` shows it."""
     current = version.id == parent.current_version_id
     return from_row(schema, version, is_current=current)

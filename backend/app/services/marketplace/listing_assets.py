@@ -16,7 +16,8 @@ copy there. That is how an owner-published listing arrives with its pictures.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 

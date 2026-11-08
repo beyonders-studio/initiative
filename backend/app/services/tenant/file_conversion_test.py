@@ -11,8 +11,8 @@ from docx.shared import Inches
 from httpx import AsyncClient
 from PIL import Image
 from sqlalchemy.exc import IntegrityError
-from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.file import FileVersion

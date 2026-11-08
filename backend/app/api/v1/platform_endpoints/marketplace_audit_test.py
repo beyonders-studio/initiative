@@ -16,7 +16,6 @@ from app.core.audit_events import AuditEventType
 from app.core.config import settings
 from app.testing import emitted
 
-
 RESCAN_URL = "/api/v1/marketplace/operator-catalog/rescan"
 
 

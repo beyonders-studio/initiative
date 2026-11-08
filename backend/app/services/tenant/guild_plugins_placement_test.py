@@ -8,11 +8,12 @@ initiatives, and the export that carries them.
 
 from __future__ import annotations
 
+from typing import Any, ClassVar
+
 import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.services.tenant.task_types import get_default_type
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.tool_layout import ToolLayout
 from app.services.export.guild_sections import SectionContext, _build_plugins
@@ -27,6 +28,7 @@ from app.services.tenant.guild_plugins import (
     surface_access,
 )
 from app.services.tenant.initiatives import get_moderator_role
+from app.services.tenant.task_types import get_default_type
 from app.testing import (
     create_guild,
     create_guild_plugin,
@@ -37,7 +39,6 @@ from app.testing import (
     marketplace_uid,
     route_session_to_guild,
 )
-
 
 PLACED_ID = "platform.placed"
 PLACED_UID = marketplace_uid("placed")
@@ -215,8 +216,12 @@ class TestExport:
 class TestSurfaceAccess:
     """The one decision behind opening a surface, without a database."""
 
-    PAGE = {"id": "e", "path": "/e", "scopes": ["community", "initiative"]}
-    ADMIN_ONLY = {**PAGE, "admin_only": True}
+    PAGE: ClassVar[dict[str, Any]] = {
+        "id": "e",
+        "path": "/e",
+        "scopes": ["community", "initiative"],
+    }
+    ADMIN_ONLY: ClassVar[dict[str, Any]] = {**PAGE, "admin_only": True}
 
     @staticmethod
     def _decide(page, *, initiative_id=1, roles=(10,), admin=False, held=(10,)):

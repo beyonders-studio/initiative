@@ -29,8 +29,10 @@ Markdown is GFM, because that is what the app's own renderer reads
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from datetime import UTC
+from typing import Any
 
 # How deep a document may nest before the walker stops descending is the one
 # limit every converter shares; content nested past it is left out.
@@ -63,8 +65,8 @@ _STYLE_ONLY_MARKS = frozenset(
     }
 )
 
-MediaResolver = Callable[[str, Optional[str]], Optional[str]]
-MentionResolver = Callable[[str, Optional[str]], Optional[str]]
+MediaResolver = Callable[[str, str | None], str | None]
+MentionResolver = Callable[[str, str | None], str | None]
 
 
 @dataclass
@@ -468,10 +470,10 @@ def _prefix(blocks: list[str], marker: str) -> str:
 
 def _iso_date(timestamp: Any) -> str:
     """An ADF date is milliseconds since the epoch, as a string."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     try:
         millis = int(timestamp)
     except (TypeError, ValueError):
         return ""
-    return datetime.fromtimestamp(millis / 1000, tz=timezone.utc).date().isoformat()
+    return datetime.fromtimestamp(millis / 1000, tz=UTC).date().isoformat()

@@ -2,7 +2,6 @@
 
 import uuid
 from types import SimpleNamespace
-from typing import Optional
 
 import pytest
 from httpx import AsyncClient
@@ -11,12 +10,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.api.v1.platform_endpoints import session_opening
 from app.api.v1.platform_endpoints import sessions as sessions_endpoints
 from app.api.v1.platform_endpoints import users as users_endpoints
+from app.api.v1.platform_endpoints.dm_transport_test import _registration
 from app.core import auth_context
 from app.core.security import get_password_hash
+from app.models.platform.dm_device import DmDevice
 from app.models.platform.user import UserStatus
 from app.services import content_sockets
-from app.services.platform import api_keys as api_keys_service
-from app.services.platform.ws_auth import authenticate_ws_token
 from app.services.content_sockets import (
     WS_CREDENTIAL_ENDED,
     ContentSockets,
@@ -25,8 +24,8 @@ from app.services.content_sockets import (
     Wire,
     resource_room,
 )
-from app.api.v1.platform_endpoints.dm_transport_test import _registration
-from app.models.platform.dm_device import DmDevice
+from app.services.platform import api_keys as api_keys_service
+from app.services.platform.ws_auth import authenticate_ws_token
 from app.testing import create_user, get_auth_headers
 
 CHROME_MAC = (
@@ -313,9 +312,9 @@ class _Socket:
     """Stands in for a content WebSocket: records the code it was closed with."""
 
     def __init__(self) -> None:
-        self.closed: Optional[int] = None
+        self.closed: int | None = None
 
-    async def close(self, code: Optional[int] = None) -> None:
+    async def close(self, code: int | None = None) -> None:
         self.closed = code
 
 

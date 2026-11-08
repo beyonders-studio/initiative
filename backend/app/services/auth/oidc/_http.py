@@ -129,21 +129,23 @@ async def _request_json(
     over_cap = False
     error_status: int | None = None
     try:
-        async with factory() as client:
-            async with client.stream(method, url, data=data, headers=headers) as resp:
-                if resp.status_code >= 400:
-                    # Read a bounded snippet of the error body for its OAuth
-                    # error code ({"error": "invalid_grant", ...}), the one
-                    # diagnostic the server operator needs in the logs.
-                    error_status = resp.status_code
-                    max_bytes = _ERROR_SNIPPET_MAX_BYTES
-                else:
-                    max_bytes = max_response_bytes
-                async for chunk in resp.aiter_bytes():
-                    body.extend(chunk)
-                    if len(body) > max_bytes:
-                        over_cap = True
-                        break
+        async with (
+            factory() as client,
+            client.stream(method, url, data=data, headers=headers) as resp,
+        ):
+            if resp.status_code >= 400:
+                # Read a bounded snippet of the error body for its OAuth
+                # error code ({"error": "invalid_grant", ...}), the one
+                # diagnostic the server operator needs in the logs.
+                error_status = resp.status_code
+                max_bytes = _ERROR_SNIPPET_MAX_BYTES
+            else:
+                max_bytes = max_response_bytes
+            async for chunk in resp.aiter_bytes():
+                body.extend(chunk)
+                if len(body) > max_bytes:
+                    over_cap = True
+                    break
     except httpx.HTTPError as exc:
         raise OidcHttpError(f"fetch failed for {url}: {exc}") from exc
     if error_status is not None:

@@ -13,7 +13,7 @@ project is fed. ``blueprints_test`` holds the files and the registry in step.
 from __future__ import annotations
 
 import json
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 
 from app.core.intake import IntakeStream, meta
@@ -35,7 +35,7 @@ REQUESTER_REPLIED = "Requester replied"
 PUBLISHED_TYPE = "Published"
 
 
-@lru_cache(maxsize=None)
+@cache
 def blueprint_for(stream: IntakeStream) -> ProjectExportEnvelope:
     """The committed envelope that sets ``stream`` up.
 

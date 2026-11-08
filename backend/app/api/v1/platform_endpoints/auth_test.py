@@ -37,16 +37,15 @@ from app.core.security import (
 from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.auth_session import AuthSession
 from app.models.platform.federated_identity import FederatedIdentity
-from app.models.platform.user_email import UserEmail
-from app.services.auth import addresses
-from app.services.platform import email_outbox
-from app.services.platform import app_settings as app_settings_service
-from app.services.platform import rules
 from app.models.platform.federated_identity_secret import FederatedIdentitySecret
 from app.models.platform.user import User, UserStatus
+from app.models.platform.user_email import UserEmail
+from app.services.auth import addresses
 from app.services.auth.oidc.flow_state import s256
 from app.services.auth.oidc.provider import OidcClientConfig, OidcProvider
 from app.services.auth.platform_provider import PLATFORM_OIDC_SLUG
+from app.services.platform import app_settings as app_settings_service
+from app.services.platform import email_outbox, rules
 from app.testing.captcha import captcha_switched_on
 from app.testing.factories import (
     create_auth_provider,
@@ -57,7 +56,11 @@ from app.testing.factories import (
 )
 from app.testing.oidc import (
     CLIENT_ID as OIDC_CLIENT_ID,
+)
+from app.testing.oidc import (
     ISSUER as OIDC_ISSUER,
+)
+from app.testing.oidc import (
     OTHER_KEY,
     FakeIdp,
     mint_id_token,
@@ -128,7 +131,7 @@ async def test_register_with_a_community_makes_it(
 ):
     """A registration that names a community makes it, with the new account as
     its superadmin; one that also carries an invite is refused."""
-    from app.models.platform.guild import Guild, GuildMembership, CommunityRole
+    from app.models.platform.guild import CommunityRole, Guild, GuildMembership
 
     await create_user(session)
     community = {"name": "Book Club", "description": "Monthly reads"}
@@ -268,7 +271,7 @@ async def test_register_with_invite_blocked_when_guild_full(
     seat = await create_user(session, email="reg-seat@example.com")
     # Minted while the seat is still free, redeemed after it is taken —
     # minting itself is capacity-gated, so the order here is the scenario.
-    invite, invite_code = await guild_service.create_guild_invite(
+    _invite, invite_code = await guild_service.create_guild_invite(
         session, guild_id=guild.id, created_by=seat.id, max_uses=5
     )
     await guild_service.ensure_membership(session, guild_id=guild.id, user_id=seat.id)
@@ -297,9 +300,9 @@ async def test_register_with_a_bound_invite_joins_on_confirming(
     from app.models.platform.guild import GuildMembership
     from app.models.platform.user import UserRole
     from app.models.platform.user_token import UserTokenPurpose
-    from app.services.platform import user_tokens
     from app.services import email as email_service
     from app.services.platform import guilds as guild_service
+    from app.services.platform import user_tokens
     from app.testing.factories import create_guild
 
     settings_row = await app_settings_service.get_app_settings(session)
@@ -314,7 +317,7 @@ async def test_register_with_a_bound_invite_joins_on_confirming(
     monkeypatch.setattr(email_service, "send_verification_email", _capture)
     admin = await create_user(session, email="bound-admin@example.com")
     guild = await create_guild(session, creator=admin)
-    invite, invite_code = await guild_service.create_guild_invite(
+    _invite, invite_code = await guild_service.create_guild_invite(
         session,
         guild_id=guild.id,
         created_by=admin.id,

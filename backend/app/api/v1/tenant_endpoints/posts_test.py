@@ -7,7 +7,7 @@ others, and when a notice becomes something other people can see.
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -24,16 +24,16 @@ from app.models.tenant.post import Post
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.schemas.tenant.post import MAX_POST_TEXT_CHARS
 from app.testing import (
-    strip_non_owner_grants,
     Actor,
     create_comment,
     create_post,
     create_resource_grant,
-    lexical_body,
     drain_notices,
     grant_role_permission,
+    lexical_body,
+    route_as,
+    strip_non_owner_grants,
 )
-from app.testing import route_as
 
 
 async def _posts_enabled(session: AsyncSession, initiative) -> None:
@@ -62,7 +62,7 @@ async def _draft(session: AsyncSession, actor: Actor, **fields: Any) -> Post:
         actor.initiative,
         actor.user,
         published_at=None,
-        scheduled_for=datetime.now(timezone.utc) + timedelta(days=1),
+        scheduled_for=datetime.now(UTC) + timedelta(days=1),
         **{"name": "Embargoed", **fields},
     )
 
@@ -349,7 +349,7 @@ async def test_board_orders_pins_first_then_newest(
 ):
     """The default order is the board: live pins on top, then reverse
     chronological."""
-    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    base = datetime(2026, 1, 1, tzinfo=UTC)
     old = await create_post(
         session, board.initiative, board.user, name="Old", created_at=base
     )
@@ -378,7 +378,7 @@ async def test_a_lapsed_pin_falls_back_into_the_feed(
 ):
     """An expiry in the past reads exactly like no pin: the post orders by its
     own age again, and nothing had to sweep the columns."""
-    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    base = datetime(2026, 1, 1, tzinfo=UTC)
     old = await create_post(
         session,
         board.initiative,
@@ -456,7 +456,7 @@ async def test_unpin_clears_the_expiry_with_it(
     """An expiry belongs to a pin; leaving one behind would silently apply to
     the next one."""
     post = await create_post(session, board.initiative, board.user)
-    expires = datetime.now(timezone.utc) + timedelta(days=3)
+    expires = datetime.now(UTC) + timedelta(days=3)
 
     await client.put(
         board.g(f"/posts/{post.id}/pin"),
@@ -481,7 +481,7 @@ async def test_pin_refuses_an_expiry_already_past(
     """A pin that is already over is a no-op that reads as a pin — refused
     rather than stored."""
     post = await create_post(session, board.initiative, board.user)
-    past = datetime.now(timezone.utc) - timedelta(days=1)
+    past = datetime.now(UTC) - timedelta(days=1)
 
     response = await client.put(
         board.g(f"/posts/{post.id}/pin"),
@@ -711,7 +711,7 @@ async def test_a_scheduled_notice_is_not_published_and_notifies_nobody(
     client: AsyncClient, acting_user, board: Actor, session
 ):
     b = await _joins(acting_user, board)
-    when = datetime.now(timezone.utc) + timedelta(days=1)
+    when = datetime.now(UTC) + timedelta(days=1)
 
     response = await client.post(
         board.g("/posts/"),
@@ -738,7 +738,7 @@ async def test_a_scheduled_notice_is_not_published_and_notifies_nobody(
 async def test_a_schedule_in_the_past_posts_it_now(client: AsyncClient, board: Actor):
     """An instant that has already gone is somebody asking for it now — the
     same thing an omitted schedule means, so it takes the same branch."""
-    when = datetime.now(timezone.utc) - timedelta(minutes=5)
+    when = datetime.now(UTC) - timedelta(minutes=5)
 
     response = await client.post(
         board.g("/posts/"),
@@ -830,11 +830,7 @@ async def test_a_published_notice_cannot_be_rescheduled(
     response = await client.patch(
         board.g(f"/posts/{post.id}"),
         headers=board.headers,
-        json={
-            "scheduled_for": (
-                datetime.now(timezone.utc) + timedelta(days=1)
-            ).isoformat()
-        },
+        json={"scheduled_for": (datetime.now(UTC) + timedelta(days=1)).isoformat()},
     )
     assert response.status_code == 409
     assert response.json()["detail"] == "POST_ALREADY_PUBLISHED"
@@ -874,7 +870,7 @@ async def test_the_board_dates_a_notice_by_when_it_went_up(
 ):
     """A notice written last week and published today leads a notice written
     yesterday — the board is a feed of what has been said, not of drafting."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await create_post(
         session,
         board.initiative,
@@ -934,7 +930,7 @@ async def test_setting_an_expiry_does_not_re_pin(
         headers=board.headers,
         json={
             "pinned": True,
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=3)).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(days=3)).isoformat(),
         },
     )
     assert second.status_code == 200
@@ -947,7 +943,7 @@ async def test_re_pinning_a_lapsed_pin_starts_a_new_one(
 ):
     """A pin whose expiry has passed reads as no pin at all, so pinning again
     is a new pin and takes today's date."""
-    stale = datetime.now(timezone.utc) - timedelta(days=5)
+    stale = datetime.now(UTC) - timedelta(days=5)
     post = await create_post(
         session,
         board.initiative,
@@ -955,7 +951,7 @@ async def test_re_pinning_a_lapsed_pin_starts_a_new_one(
         name="Lapsed",
         pinned_at=stale,
         pinned_by=board.user.id,
-        pin_expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+        pin_expires_at=datetime.now(UTC) - timedelta(days=1),
     )
 
     response = await client.put(

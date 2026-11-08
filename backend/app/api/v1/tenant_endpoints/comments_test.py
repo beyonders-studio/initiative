@@ -1,6 +1,6 @@
 """Endpoint tests for comments across every commentable surface."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import delete as sa_delete
@@ -14,17 +14,17 @@ from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.testing import (
     create_comment,
     create_resource_grant,
-    guild_of,
     create_task,
     create_wiki_page,
+    guild_of,
 )
-from app.testing.schema_harness import route_session_to_guild
 
 # One factory per tool, uniform (session, initiative, creator) shape. The
 # canonical registry rather than a copy of it: that one is checked against the
 # Tool enum at import time, so a new tool cannot reach these parametrized cases
 # without a factory behind it.
-from app.testing.factories import TOOL_FACTORIES  # noqa: E402
+from app.testing.factories import TOOL_FACTORIES
+from app.testing.schema_harness import route_session_to_guild
 
 
 async def _tool_entity(session, tool: Tool, initiative, creator):
@@ -293,7 +293,7 @@ async def test_a_trashed_resource_reads_back_for_its_deleted_event(
     it — access checked exactly as for a live one. That is what makes the
     ``deleted`` half of the bus actionable: the id still resolves.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.models.platform.guild import CommunityRole
     from app.testing import create_task
@@ -302,7 +302,7 @@ async def test_a_trashed_resource_reads_back_for_its_deleted_event(
     task = await create_task(session, a.project)
     task_id = task.id
 
-    task.deleted_at = datetime.now(timezone.utc)
+    task.deleted_at = datetime.now(UTC)
     session.add(task)
     await session.commit()
 
@@ -404,7 +404,7 @@ async def test_a_thread_pages_by_conversation(client, session, acting_user):
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     task = await create_task(session, a.project)
-    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
     roots = [
         await create_comment(
             session, a.user, task=task, created_at=start + timedelta(minutes=minute)

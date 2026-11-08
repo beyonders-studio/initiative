@@ -138,10 +138,11 @@ def _is_dynamic_sql_arg(node: ast.AST) -> bool:
         return any(isinstance(v, ast.FormattedValue) for v in node.values)
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod):  # "..." % x
         return True
-    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-        if node.func.attr == "format":  # "...".format(...)
-            return True
-    return False
+    return (  # "...".format(...)
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "format"
+    )
 
 
 def _callee_name(func: ast.AST) -> str | None:
@@ -164,20 +165,21 @@ def _scan_file(path: Path) -> list[str]:
             self.generic_visit(node)
             stack.pop()
 
-        def visit_FunctionDef(self, node):  # noqa: N802
+        def visit_FunctionDef(self, node):
             self._enter(node.name, node)
 
-        def visit_AsyncFunctionDef(self, node):  # noqa: N802
+        def visit_AsyncFunctionDef(self, node):
             self._enter(node.name, node)
 
-        def visit_ClassDef(self, node):  # noqa: N802
+        def visit_ClassDef(self, node):
             self._enter(node.name, node)
 
-        def visit_Call(self, node):  # noqa: N802
-            if _callee_name(node.func) in _SQL_CALLEES:
-                if any(_is_dynamic_sql_arg(a) for a in node.args):
-                    qual = ".".join(stack) or "<module>"
-                    found.append(f"{rel}::{qual}")
+        def visit_Call(self, node):
+            if _callee_name(node.func) in _SQL_CALLEES and any(
+                _is_dynamic_sql_arg(a) for a in node.args
+            ):
+                qual = ".".join(stack) or "<module>"
+                found.append(f"{rel}::{qual}")
             self.generic_visit(node)
 
     _V().visit(tree)

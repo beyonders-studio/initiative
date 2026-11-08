@@ -9,7 +9,7 @@ compare its answer with the capability registry's.
 from __future__ import annotations
 
 import secrets
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 import pytest
 from sqlalchemy import text
@@ -24,6 +24,7 @@ from app.db.public_rls import (
     Policy,
     policy_roles,
 )
+from app.db.request_context import Platform
 from app.db.session import set_rls_context
 from app.models.platform.ai_connection import PlatformAIConnection
 from app.models.platform.announcement import Announcement, AnnouncementImage
@@ -34,7 +35,6 @@ from app.testing import (
     create_guild,
     create_user,
 )
-from app.db.request_context import Platform
 
 pytestmark = pytest.mark.always
 
@@ -102,8 +102,10 @@ async def _the_settings_row(session: AsyncSession) -> Probe:
         await session.commit()
     return (
         "update",
-        "UPDATE public.app_settings SET light_accent_color = light_accent_color "
-        "WHERE id = 1",
+        (
+            "UPDATE public.app_settings SET light_accent_color = light_accent_color "
+            "WHERE id = 1"
+        ),
         {},
     )
 
@@ -149,8 +151,10 @@ async def _a_picture(session: AsyncSession) -> Probe:
     await session.commit()
     return (
         "update",
-        "UPDATE public.announcement_images SET created_at = created_at "
-        "WHERE sha256 = :sha",
+        (
+            "UPDATE public.announcement_images SET created_at = created_at "
+            "WHERE sha256 = :sha"
+        ),
         {"sha": digest},
     )
 

@@ -24,7 +24,8 @@ from __future__ import annotations
 import io
 import re
 import zipfile
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from app.services.export.stamp import markdown_stamp, stamp_docx
 from app.services.platform.csv_export import safe_filename_component

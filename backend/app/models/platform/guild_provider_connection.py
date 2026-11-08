@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     Boolean,
@@ -117,11 +116,11 @@ class GuildProviderConnection(SQLModel, table=True):
     #: ``claim_values`` clears it, so an agreement is always an agreement about
     #: what is written here now. ``auto_join`` waits for it; admitting people
     #: the community already has does not.
-    narrowing_approved_at: Optional[datetime] = Field(
+    narrowing_approved_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
-    narrowing_approved_by: Optional[int] = Field(
+    narrowing_approved_by: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
@@ -129,15 +128,15 @@ class GuildProviderConnection(SQLModel, table=True):
     )
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(
             DateTime(timezone=True),
             nullable=False,
-            onupdate=lambda: datetime.now(timezone.utc),
+            onupdate=lambda: datetime.now(UTC),
         ),
     )
 

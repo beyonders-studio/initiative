@@ -5,15 +5,15 @@ to hold before it may let its password go, what happens to the sessions and the
 device it was done from, and the one answer every refused recovery gets.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient, Response
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.login_methods import LoginMethod
 from app.core.audit_events import AuditEventType
+from app.core.login_methods import LoginMethod
 from app.core.messages import PasswordMessages
 from app.core.security import (
     REFRESH_COOKIE_NAME,
@@ -27,14 +27,11 @@ from app.models.platform.sign_in_lock import SignInLock
 from app.models.platform.user import User, UserStatus
 from app.models.platform.user_email import UserEmail
 from app.models.platform.user_passkey import UserPasskey
-from app.services.platform import email_outbox
-from app.services.auth import addresses
+from app.services.auth import addresses, sign_in_locks
 from app.services.auth import sessions as session_service
-from app.services.auth import sign_in_locks
 from app.services.auth import totp as totp_service
 from app.services.platform import app_settings as app_settings_service
-from app.services.platform import rules
-from app.services.platform import user_tokens
+from app.services.platform import email_outbox, rules, user_tokens
 from app.testing import (
     create_guild,
     create_guild_membership,
@@ -43,7 +40,6 @@ from app.testing import (
     get_auth_headers,
     get_auth_token,
 )
-
 
 PASSWORD = "correct-horse-battery-staple"
 NEW_PASSWORD = "a-different-horse-entirely"
@@ -123,7 +119,7 @@ async def _proof_headers(
         session, user_id=user.id, amr=["webauthn"], satisfied_providers=[]
     )
     row = issued.session
-    row.created_at = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
+    row.created_at = datetime.now(UTC) - timedelta(minutes=minutes_ago)
     session.add(row)
     await session.commit()
     return {
@@ -140,9 +136,7 @@ async def _rotated_headers(
     issued = await session_service.create_session(
         session, user_id=user.id, amr=["webauthn"], satisfied_providers=[]
     )
-    issued.session.created_at = datetime.now(timezone.utc) - timedelta(
-        minutes=minutes_ago
-    )
+    issued.session.created_at = datetime.now(UTC) - timedelta(minutes=minutes_ago)
     session.add(issued.session)
     await session.commit()
     rotated = await session_service.rotate_session(
@@ -790,7 +784,7 @@ async def _turn_off_the_factor(
 ) -> Response:
     from app.models.platform.user_totp import UserTotp
 
-    session.add(UserTotp(user_id=user.id, confirmed_at=datetime.now(timezone.utc)))
+    session.add(UserTotp(user_id=user.id, confirmed_at=datetime.now(UTC)))
     await session.commit()
     codes = await _issue_codes(session, user)
     return await client.post(

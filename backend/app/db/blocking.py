@@ -20,7 +20,7 @@ cannot drift.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from sqlalchemy import Table, case, exists, func, null, or_, select
 from sqlalchemy.sql.elements import ColumnElement

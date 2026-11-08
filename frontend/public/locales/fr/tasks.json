@@ -179,7 +179,7 @@
     "description": "Sélectionnez un projet de destination dans la communauté actuel. Vous ne pouvez déplacer des tâches que vers des projets où vous avez la permission de créer du travail.",
     "noProjects": "Vous n'avez encore aucun autre projet modifiable.",
     "searchPlaceholder": "Rechercher des projets…",
-    "statusResetWarning": "Déplacer cette tâche réinitialisera son statut à « À traiter ».",
+    "statusResetWarning": "Déplacer cette tâche lui donne le statut par défaut du projet de destination.",
     "moving": "Déplacement…",
     "moveTask": "Déplacer la tâche"
   },

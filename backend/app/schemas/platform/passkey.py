@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import date, datetime
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 from pydantic import AfterValidator, ConfigDict, EmailStr, Field
 
@@ -41,7 +41,7 @@ class PasskeyRead(SanitizedBaseModel):
     id: uuid.UUID
     name: str
     created_at: datetime
-    last_used_at: Optional[datetime] = None
+    last_used_at: datetime | None = None
     #: Whether the credential is synced by a password manager, so losing the
     #: device does not lose the key.
     backed_up: bool
@@ -51,7 +51,7 @@ class PasskeyRead(SanitizedBaseModel):
     #: How the authenticator can be reached — usb, nfc, ble, internal, hybrid.
     transports: list[str] = Field(default_factory=list)
     #: The authenticator model's identifier, when it reported one.
-    aaguid: Optional[str] = None
+    aaguid: str | None = None
 
 
 class PasskeyList(SanitizedBaseModel):
@@ -77,7 +77,7 @@ class PasskeyRegisterStart(SanitizedBaseModel):
     and an account with no usable password sends nothing."""
 
     name: TitleStr = Field(min_length=1, max_length=NAME_MAX_LENGTH)
-    current_password: Optional[str] = None
+    current_password: str | None = None
 
 
 class PasskeyRegistrationOptions(SanitizedBaseModel):
@@ -102,7 +102,7 @@ class PasskeyRename(SanitizedBaseModel):
 class PasskeyRemove(SanitizedBaseModel):
     """Removing a way in asks for the password, where there is one."""
 
-    current_password: Optional[str] = None
+    current_password: str | None = None
 
 
 class PasskeySignInStart(SanitizedBaseModel):
@@ -120,14 +120,14 @@ class _PasskeySignUpDetails(SanitizedBaseModel):
     # The name part of the handle. The number behind it is drawn server-side —
     # it is never anyone's to choose.
     username: str = Field(max_length=64)
-    timezone: Optional[str] = Field(default=None, max_length=64)
-    captcha_token: Optional[str] = Field(default=None, max_length=4096)
-    community: Optional[NewCommunity] = None
+    timezone: str | None = Field(default=None, max_length=64)
+    captcha_token: str | None = Field(default=None, max_length=4096)
+    community: NewCommunity | None = None
     # The signed number the name check showed beside the handle, kept if
     # still free.
-    username_offer: Optional[str] = Field(default=None, max_length=1024)
+    username_offer: str | None = Field(default=None, max_length=1024)
     # Answers the directory's age question at sign-up; the date is not kept.
-    birthdate: Optional[date] = None
+    birthdate: date | None = None
     # The documents the form showed above its button, by slug: what pressing
     # it agreed to. Only these are recorded; any other required one is asked
     # for after sign-in.
@@ -174,7 +174,7 @@ class PasskeySignUpResult(SanitizedBaseModel):
     token_type: str = "bearer"
     #: For the app, which keeps its own refresh token. A browser gets it as a
     #: cookie, and this stays absent.
-    refresh_token: Optional[str] = None
+    refresh_token: str | None = None
     codes: list[str] = Field(default_factory=list)
 
 

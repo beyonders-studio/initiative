@@ -19,13 +19,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.audit_events import AuditEventType
 from app.models.platform.guild import CommunityRole
 from app.testing import (
-    create_plugin_service_registration,
     create_guild_plugin,
     create_marketplace_listing,
+    create_plugin_service_registration,
     emitted,
     marketplace_uid,
 )
-
 
 CALENDAR_PLUGIN_UID = marketplace_uid("auditcalendar")
 UPGRADE_PLUGIN_UID = marketplace_uid("auditupgrade")

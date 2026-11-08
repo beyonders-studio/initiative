@@ -16,17 +16,17 @@ import pytest
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.db.request_context import SystemGuild
 from app.db.schema_provisioning import guild_role_name
 from app.db.session import (
-    _RLS_ESTABLISHED_INFO_KEY,
     _RLS_CONTEXT_INFO_KEY,
+    _RLS_ESTABLISHED_INFO_KEY,
     RLS_CONTEXT_MAX_AGE_SECONDS,
     StaleAuthorizationContext,
     set_rls_context,
 )
 from app.testing import create_guild, create_guild_membership, create_user, route_as
 from app.testing.schema_harness import route_session_to_guild
-from app.db.request_context import SystemGuild
 
 
 async def _scalar(session: AsyncSession, sql: str):

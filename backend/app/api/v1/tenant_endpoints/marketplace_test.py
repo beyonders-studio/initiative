@@ -22,14 +22,13 @@ from app.models.platform.publisher import Publisher
 from app.services.marketplace import catalog as catalog_service
 from app.services.marketplace.registration_lookup import invalidate_registrations
 from app.services.platform.intake_setup import set_operations_guild
-from app.testing.fake_vendor import declarative_plugin
 from app.testing import (
-    create_plugin_service_registration,
     create_guild_plugin,
     create_marketplace_listing,
+    create_plugin_service_registration,
     marketplace_uid,
 )
-
+from app.testing.fake_vendor import declarative_plugin
 
 PLUGIN_UID = "TYG4VVZKAWRMBZ"
 BUNDLED_UID = "J9H7S9T7GP7FAG"

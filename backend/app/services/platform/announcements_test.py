@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import struct
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from pydantic import ValidationError
@@ -62,7 +62,7 @@ def _write(**overrides) -> AnnouncementWrite:
         "title": "Board view is new",
         "category": AnnouncementCategory.feature,
         "sections": [AnnouncementSection(heading="Look", body="At this")],
-        "published_at": datetime.now(timezone.utc) - timedelta(minutes=1),
+        "published_at": datetime.now(UTC) - timedelta(minutes=1),
     }
     payload.update(overrides)
     return AnnouncementWrite(**payload)
@@ -94,7 +94,7 @@ async def test_a_draft_and_a_scheduled_notice_reach_nobody(session):
         session,
         author,
         title="Later",
-        published_at=datetime.now(timezone.utc) + timedelta(days=1),
+        published_at=datetime.now(UTC) + timedelta(days=1),
     )
 
     assert await service.list_for_user(session, user=reader) == []
@@ -107,8 +107,8 @@ async def test_an_expired_notice_stops_being_shown_anywhere(session):
     await _publish(
         session,
         author,
-        published_at=datetime.now(timezone.utc) - timedelta(days=2),
-        expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        published_at=datetime.now(UTC) - timedelta(days=2),
+        expires_at=datetime.now(UTC) - timedelta(hours=1),
     )
 
     assert await service.list_for_user(session, user=reader) == []
@@ -148,7 +148,7 @@ async def test_guild_admins_only_needs_an_admin_membership_somewhere(session):
 async def test_a_notice_for_existing_accounts_skips_the_ones_made_since(session):
     """A breaking change is about a transition somebody has to have made."""
     author = await create_user(session, role=UserRole.owner)
-    published = datetime.now(timezone.utc) - timedelta(days=7)
+    published = datetime.now(UTC) - timedelta(days=7)
 
     was_here = await create_user(session)
     was_here.created_at = published - timedelta(days=30)
@@ -172,7 +172,7 @@ async def test_a_notice_for_existing_accounts_skips_the_ones_made_since(session)
 async def test_a_notice_for_new_accounts_is_the_other_way_round(session):
     """The same line, read from the other side: an onboarding tip."""
     author = await create_user(session, role=UserRole.owner)
-    published = datetime.now(timezone.utc) - timedelta(days=7)
+    published = datetime.now(UTC) - timedelta(days=7)
 
     was_here = await create_user(session)
     was_here.created_at = published - timedelta(days=30)
@@ -196,7 +196,7 @@ async def test_a_notice_for_new_accounts_is_the_other_way_round(session):
 async def test_everyone_is_still_everyone(session):
     author = await create_user(session, role=UserRole.owner)
     reader = await create_user(session)
-    reader.created_at = datetime.now(timezone.utc) + timedelta(days=1)
+    reader.created_at = datetime.now(UTC) + timedelta(days=1)
     session.add(reader)
     await session.commit()
     await _publish(session, author)
@@ -211,7 +211,7 @@ async def test_a_builtin_with_a_floor_skips_a_fresh_install(session, monkeypatch
         slug="test-upgrade-floor",
         title="Something moved in 0.65",
         category=AnnouncementCategory.breaking,
-        published_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        published_at=datetime.now(UTC) - timedelta(hours=1),
         sections=(AnnouncementSection(body="It moved."),),
         only_upgrading_from_below="0.65.0",
     )
@@ -235,7 +235,7 @@ async def test_a_builtin_with_a_floor_skips_a_deployment_already_past_it(
         slug="test-upgrade-floor-past",
         title="Something moved in 0.65",
         category=AnnouncementCategory.breaking,
-        published_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        published_at=datetime.now(UTC) - timedelta(hours=1),
         sections=(AnnouncementSection(body="It moved."),),
         only_upgrading_from_below="0.65.0",
     )
@@ -419,7 +419,7 @@ async def test_a_builtin_notice_is_merged_in_and_can_be_dismissed(session, monke
         slug="test-breaking-change",
         title="Something moved",
         category=AnnouncementCategory.breaking,
-        published_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        published_at=datetime.now(UTC) - timedelta(hours=1),
         sections=(AnnouncementSection(body="It moved over there."),),
     )
     monkeypatch.setattr(builtins_module, "BUILTIN_ANNOUNCEMENTS", (builtin,))
@@ -500,7 +500,7 @@ async def test_the_pruner_keeps_referenced_pictures_and_drops_the_rest(session):
     used = await service.store_image(session, data=_png(padding=1))
     orphan = await service.store_image(session, data=_png(padding=2))
     # Both predate the grace period; only one is pointed at.
-    long_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    long_ago = datetime.now(UTC) - timedelta(days=30)
     used.created_at = long_ago
     orphan.created_at = long_ago
     session.add(used)
@@ -535,7 +535,7 @@ async def test_re_uploading_an_old_orphan_survives_the_next_sweep(session):
     """
     data = _png(padding=7)
     first = await service.store_image(session, data=data)
-    first.created_at = datetime.now(timezone.utc) - timedelta(days=30)
+    first.created_at = datetime.now(UTC) - timedelta(days=30)
     session.add(first)
     await session.commit()
 
@@ -550,7 +550,7 @@ async def test_re_uploading_an_old_orphan_survives_the_next_sweep(session):
 async def test_the_janitor_sweeps_what_no_write_would_have(session):
     """An editor that uploaded and was closed leaves bytes no save will reach."""
     abandoned = await service.store_image(session, data=_png(padding=9))
-    abandoned.created_at = datetime.now(timezone.utc) - timedelta(days=30)
+    abandoned.created_at = datetime.now(UTC) - timedelta(days=30)
     session.add(abandoned)
     await session.commit()
 

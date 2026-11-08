@@ -12,11 +12,11 @@ real ``app_user`` login role, not the superuser session).
 import pytest
 from sqlalchemy import text
 
-from app.db.public_rls import platform_tier, role_name
 from app.core.config import settings
+from app.db.public_rls import platform_tier, role_name
+from app.db.request_context import Platform
 from app.db.session import set_rls_context
 from app.models.platform.user import UserRole
-from app.db.request_context import Platform
 
 _TIERS = [role.value for role in UserRole]
 

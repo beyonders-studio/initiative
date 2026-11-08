@@ -18,10 +18,11 @@ import httpx
 import pytest
 
 from app.core.messages import PluginDataMessages
-from app.services.marketplace.registration_lookup import RegistrationSnapshot
 from app.services.marketplace import plugin_data as service
-from app.services.marketplace.registration_lookup import service_public_id
-
+from app.services.marketplace.registration_lookup import (
+    RegistrationSnapshot,
+    service_public_id,
+)
 
 URL = "http://127.0.0.1:9100/v1/endpoints"
 

@@ -23,10 +23,10 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Iterable, Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from functools import partial
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -76,12 +76,12 @@ async def record(
     session: AsyncSession,
     *,
     event_type: AuditEventType,
-    actor_user_id: Optional[int],
-    target_user_id: Optional[int] = None,
-    guild_id: Optional[int] = None,
-    target_type: Optional[str] = None,
-    target_id: Optional[int] = None,
-    detail: Optional[dict[str, Any]] = None,
+    actor_user_id: int | None,
+    target_user_id: int | None = None,
+    guild_id: int | None = None,
+    target_type: str | None = None,
+    target_id: int | None = None,
+    detail: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Stage one action's record for ``session``'s commit, and return it.
 
@@ -107,12 +107,12 @@ async def record(
 def emit(
     *,
     event_type: AuditEventType,
-    actor_user_id: Optional[int],
-    target_user_id: Optional[int] = None,
-    guild_id: Optional[int] = None,
-    target_type: Optional[str] = None,
-    target_id: Optional[int] = None,
-    detail: Optional[dict[str, Any]] = None,
+    actor_user_id: int | None,
+    target_user_id: int | None = None,
+    guild_id: int | None = None,
+    target_type: str | None = None,
+    target_id: int | None = None,
+    detail: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Write one line now, and return it.
 
@@ -136,12 +136,12 @@ def emit(
 def _envelope(
     *,
     event_type: AuditEventType,
-    actor_user_id: Optional[int],
-    target_user_id: Optional[int],
-    guild_id: Optional[int],
-    target_type: Optional[str],
-    target_id: Optional[int],
-    detail: Optional[dict[str, Any]],
+    actor_user_id: int | None,
+    target_user_id: int | None,
+    guild_id: int | None,
+    target_type: str | None,
+    target_id: int | None,
+    detail: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """The line, as both halves write it.
 
@@ -157,7 +157,7 @@ def _envelope(
         "schema_version": SCHEMA_VERSION,
         "event_uuid": str(uuid4()),
         "event_type": event_type.value,
-        "occurred_at": datetime.now(timezone.utc).isoformat(),
+        "occurred_at": datetime.now(UTC).isoformat(),
         "actor_user_id": actor_user_id,
         "target_user_id": target_user_id,
         "guild_id": guild_id,

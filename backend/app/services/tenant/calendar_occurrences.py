@@ -20,16 +20,20 @@ moving an event moves its answers, which its editors may do.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from types import EllipsisType
-from typing import Iterable
 
 from fastapi import HTTPException, status
 from sqlalchemy import (
     ColumnElement,
-    delete as sa_delete,
     exists,
     func,
+)
+from sqlalchemy import (
+    delete as sa_delete,
+)
+from sqlalchemy import (
     update as sa_update,
 )
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -58,7 +62,7 @@ _TAGS = tags_service.EXTRA_TAG_LINKS["calendar_event"]
 
 
 def _utc(value: datetime) -> datetime:
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def mark(override: CalendarEvent, fields: Iterable[str]) -> None:
@@ -386,7 +390,7 @@ async def _join(session: AsyncSession, event: CalendarEvent, user_id: int) -> No
         .values(
             calendar_event_id=event.id,
             user_id=user_id,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         .on_conflict_do_nothing(index_elements=["calendar_event_id", "user_id"])
     )

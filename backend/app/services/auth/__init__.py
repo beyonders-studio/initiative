@@ -20,8 +20,8 @@ __all__ = [
     "RefreshOutcome",
     "RotationResult",
     "create_session",
-    "rotate_session",
-    "revoke_session",
-    "revoke_chain",
     "revoke_all_for_user",
+    "revoke_chain",
+    "revoke_session",
+    "rotate_session",
 ]

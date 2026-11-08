@@ -10,15 +10,14 @@ from __future__ import annotations
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.db.schema_provisioning import provision_guild
 from app.db.request_context import SystemGuild, Unattributed
+from app.db.schema_provisioning import provision_guild
 from app.db.session import set_rls_context
-from app.models.platform.guild import Guild, CommunityCategory
+from app.models.platform.guild import CommunityCategory, Guild
 from app.models.platform.user import User
 from app.models.tenant.initiative import InitiativeJoinPolicy
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
-
 from seed import guilds, initiatives, projects
 from seed.common import Community
 

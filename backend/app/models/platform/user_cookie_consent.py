@@ -11,8 +11,7 @@ account yet. This is what carries the answer to the next browser, and what
 carries a change of mind back to the first one.
 """
 
-from datetime import datetime, timezone
-from typing import List
+from datetime import UTC, datetime
 
 from pydantic import ConfigDict
 from sqlalchemy import ARRAY, Column, DateTime, ForeignKey, Integer
@@ -39,7 +38,7 @@ class UserCookieConsent(SQLModel, table=True):
     #: elements, and a category added later is a value on the type rather than
     #: a column here. Empty means "asked, and allowed none" -- which is a real
     #: answer and not the same as having no row.
-    granted: List[str] = Field(
+    granted: list[str] = Field(
         default_factory=list,
         sa_column=Column(
             ARRAY(PGEnum(CookieCategory, name="cookie_category", create_type=False)),
@@ -54,6 +53,6 @@ class UserCookieConsent(SQLModel, table=True):
     #: Stamped by the server on every write, so two browsers comparing their
     #: answers are comparing one clock rather than their own.
     decided_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

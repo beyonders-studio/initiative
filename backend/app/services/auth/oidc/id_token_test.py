@@ -11,7 +11,7 @@ import base64
 import hashlib
 import hmac as stdlib_hmac
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
@@ -22,7 +22,6 @@ from app.services.auth.oidc.id_token import (
     IdTokenVerificationError,
     verify_id_token,
 )
-
 
 ISSUER = "https://idp.example.com"
 AUDIENCE = "client-123"
@@ -76,7 +75,7 @@ def _rsa_pyjwk() -> jwt.PyJWK:
 
 
 def _claims(**overrides) -> dict:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     base = {
         "iss": ISSUER,
         "sub": "user-1",
@@ -119,12 +118,12 @@ def _forge_hs256(claims: dict, secret: str) -> str:
 
 
 def _verify(token: str, **overrides):
-    kwargs = dict(
-        signing_key=RSA_PUB,
-        issuer=ISSUER,
-        audience=AUDIENCE,
-        nonce=NONCE,
-    )
+    kwargs = {
+        "signing_key": RSA_PUB,
+        "issuer": ISSUER,
+        "audience": AUDIENCE,
+        "nonce": NONCE,
+    }
     kwargs.update(overrides)
     return verify_id_token(token, **kwargs)
 
@@ -161,7 +160,7 @@ def test_pyjwk_signing_key_still_rejects_alg_confusion():
     """Even when the key is a ``PyJWK`` bound to RS256, an HS256 token is
     rejected by our allowlist — the header alg is checked against the allowlist
     regardless of the key object's bound alg."""
-    now = int(datetime.now(timezone.utc).timestamp())
+    now = int(datetime.now(UTC).timestamp())
     claims = {
         "iss": ISSUER,
         "sub": "user-1",
@@ -189,7 +188,7 @@ def test_hs256_confusion_rejected():
     """An HS256 token signed with the *public* key as the shared secret.
     HS256 isn't in the asymmetric allowlist, so it's refused before any
     signature check."""
-    now = int(datetime.now(timezone.utc).timestamp())
+    now = int(datetime.now(UTC).timestamp())
     claims = {
         "iss": ISSUER,
         "sub": "user-1",
@@ -230,7 +229,7 @@ def test_token_alg_outside_narrowed_allowlist_rejected():
 
 
 def test_expired_token_rejected():
-    token = _encode(_claims(exp=datetime.now(timezone.utc) - timedelta(minutes=5)))
+    token = _encode(_claims(exp=datetime.now(UTC) - timedelta(minutes=5)))
     with pytest.raises(IdTokenVerificationError):
         _verify(token)
 

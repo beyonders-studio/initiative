@@ -9,7 +9,7 @@ install's own references.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlmodel import select
@@ -21,28 +21,27 @@ from app.models.platform.notification import Notification, NotificationType
 from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.task import Task
 from app.testing import (
-    create_resource_grant,
-    guild_url,
     create_project,
     create_relationship,
+    create_resource_grant,
     create_task,
-    route_session_to_guild,
     drain_notices,
+    guild_url,
+    route_session_to_guild,
 )
 from app.testing.plugin_clients import (
     assert_names_nobody,
-    install_plugin,
     install_headers,
+    install_plugin,
     lift_person_and_guild_ids,
 )
-
 
 READ = ["projects:read"]
 WRITE = ["projects:read", "projects:write"]
 
 
 def _at(day: str) -> datetime:
-    return datetime.fromisoformat(day).replace(tzinfo=timezone.utc)
+    return datetime.fromisoformat(day).replace(tzinfo=UTC)
 
 
 async def _reference_for_seat(

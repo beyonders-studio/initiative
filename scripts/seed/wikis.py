@@ -15,7 +15,6 @@ from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.wiki import Wiki, WikiPage, WikiPageOrder, WikiReadingWidth
 from app.services.tenant import relationships as relationships_service
 from app.services.tenant.names import slugify
-
 from seed.common import Community, chip, heading, lexical, para, share, tag
 
 #: Each wiki, shared with the initiative for reading; the display settings
@@ -50,8 +49,10 @@ WIKIS: dict[str, list[dict]] = {
                     "turns travellers back the way they came.",
                     "sections": {
                         "Where to start": [
-                            "Start with Vallaki if the party has just arrived. Start "
-                            "with Castle Ravenloft if they have done something unwise.",
+                            (
+                                "Start with Vallaki if the party has just arrived. Start "
+                                "with Castle Ravenloft if they have done something unwise."
+                            ),
                             "Everything below is somewhere in this valley. Nothing leaves it.",
                         ],
                         "The weather": "Overcast, always. Rain most evenings. The sun "

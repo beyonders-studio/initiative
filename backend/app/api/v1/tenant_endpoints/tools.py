@@ -8,17 +8,17 @@ Only tasks keep hand-written tag routes — they are a tool's sub-resources,
 not tools themselves.
 """
 
-from datetime import datetime, timezone
-from typing import Annotated, List
+from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from sqlmodel import select
 
 from app.api import resource_access
 from app.api.deps import (
+    GuildContextDep,
     RLSSessionDep,
     get_current_active_user,
-    GuildContextDep,
 )
 from app.core.tools import Tool
 from app.models.platform.user import User
@@ -32,7 +32,7 @@ from app.services.tenant import tags as tags_service
 router = APIRouter()
 
 
-@router.put("/{tool}/{tool_id}/tags", response_model=List[TagSummary])
+@router.put("/{tool}/{tool_id}/tags", response_model=list[TagSummary])
 async def set_tool_tags(
     tool: Tool,
     tool_id: int,
@@ -40,7 +40,7 @@ async def set_tool_tags(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-) -> List[TagSummary]:
+) -> list[TagSummary]:
     """Set tags on any tool entity. Replaces all existing tags with the
     provided list and returns the entity's new tags. Requires write access."""
     row = await resource_access.load_authorized(
@@ -59,7 +59,7 @@ async def set_tool_tags(
         entity_id=row.id,
         tag_ids=tags_in.tag_ids,
     )
-    row.updated_at = datetime.now(timezone.utc)
+    row.updated_at = datetime.now(UTC)
     session.add(row)
     await required_fields.refuse_emptied(session, required)
     await session.commit()
@@ -110,7 +110,7 @@ async def set_tool_comment_settings(
         access="write",
     )
     row.comments_enabled = settings_in.comments_enabled
-    row.updated_at = datetime.now(timezone.utc)
+    row.updated_at = datetime.now(UTC)
     session.add(row)
     await session.commit()
 

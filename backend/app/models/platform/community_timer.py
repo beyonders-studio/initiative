@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Index, Integer, Text
 from sqlmodel import Field, SQLModel
@@ -23,10 +22,10 @@ class CommunityTimer(SQLModel, table=True):
         Index("ix_community_timers_due", "due_at"),
     )
 
-    id: Optional[int] = Field(
+    id: int | None = Field(
         default=None, sa_column=Column(BigInteger, primary_key=True, autoincrement=True)
     )
-    community_id: Optional[int] = Field(
+    community_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("guilds.id", ondelete="CASCADE"), nullable=True

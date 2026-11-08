@@ -5,7 +5,6 @@ from __future__ import annotations
 import importlib
 import pkgutil
 from enum import Enum
-from typing import Optional
 
 import pytest
 from pydantic import BaseModel, ValidationError
@@ -30,12 +29,12 @@ class _Color(str, Enum):
 
 class _Model(SanitizedBaseModel):
     name: str
-    display: Optional[TitleStr] = None
-    bio: Optional[str] = None
+    display: TitleStr | None = None
+    bio: str | None = None
     rich: RichTextStr = ""
-    rich_opt: Optional[RichTextStr] = None
+    rich_opt: RichTextStr | None = None
     raw: RawTextStr = ""
-    raw_opt: Optional[RawTextStr] = None
+    raw_opt: RawTextStr | None = None
     count: int = 0
     enabled: bool = False
     color: _Color = _Color.red

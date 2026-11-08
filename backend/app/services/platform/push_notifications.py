@@ -2,9 +2,10 @@ import asyncio
 import json
 import logging
 import uuid
-from contextlib import nullcontext
+from collections.abc import Sequence
+from contextlib import AbstractAsyncContextManager, nullcontext
 from dataclasses import dataclass
-from typing import Any, AsyncContextManager, Dict, Optional, Sequence
+from typing import Any
 
 import httpx
 from google.auth.transport.requests import Request
@@ -13,9 +14,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.notification import NotificationType
 from app.models.platform.push_token import PushToken
-from app.services.platform import push_tokens
-
-from app.services.platform import push_config, push_relay, user_notifications
+from app.services.platform import (
+    push_config,
+    push_relay,
+    push_tokens,
+    user_notifications,
+)
 from app.services.platform.push_config import ResolvedPushConfig
 
 logger = logging.getLogger(__name__)
@@ -104,7 +108,7 @@ PUSH_CHANNELS: dict[NotificationType, str] = {
 }
 
 
-def channel_for(notification_type: Optional[NotificationType]) -> str:
+def channel_for(notification_type: NotificationType | None) -> str:
     """Android channel id for a notification type."""
     if notification_type is None:
         return DEFAULT_CHANNEL
@@ -119,7 +123,7 @@ _credentials: tuple[str, service_account.Credentials] | None = None
 _refresh_lock = asyncio.Lock()
 
 
-async def _get_fcm_access_token(cfg: ResolvedPushConfig) -> Optional[str]:
+async def _get_fcm_access_token(cfg: ResolvedPushConfig) -> str | None:
     """An OAuth2 access token for the configured service account.
 
     Returns None if FCM is not configured or credentials are invalid.
@@ -159,10 +163,10 @@ async def send_push_notification(
     push_token: str,
     title: str,
     body: str,
-    data: Optional[Dict[str, Any]] = None,
-    channel_id: Optional[str] = None,
+    data: dict[str, Any] | None = None,
+    channel_id: str | None = None,
     platform: str = "android",
-    badge: Optional[int] = None,
+    badge: int | None = None,
 ) -> tuple[bool, bool]:
     """Send a push notification to one device with FCM's HTTP v1 API.
 
@@ -215,7 +219,7 @@ async def send_push_notification(
             "through the push relay" if via_relay else "through FCM",
         )
         return (False, True)
-    relay_server_id: Optional[str] = None
+    relay_server_id: str | None = None
     if via_relay:
         held = await push_relay.credentials(client)
         if held is None:
@@ -331,10 +335,10 @@ async def _send_to_devices(
     *,
     title: str,
     body: str,
-    data: Optional[Dict[str, Any]],
+    data: dict[str, Any] | None,
     channel_id: str,
-    badge: Optional[int] = None,
-    gate: AsyncContextManager[Any] | None = None,
+    badge: int | None = None,
+    gate: AbstractAsyncContextManager[Any] | None = None,
 ) -> _Outcome:
     """Send one push to each of these devices. ``gate`` bounds how many sends
     are in flight across a batch."""
@@ -376,7 +380,7 @@ class Push:
     notification_type: NotificationType
     title: str
     body: str
-    data: Dict[str, Any]
+    data: dict[str, Any]
     #: Only the devices these sign-ins registered; ``None`` for every device.
     session_ids: frozenset[uuid.UUID] | None = None
 

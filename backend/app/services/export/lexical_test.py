@@ -3,14 +3,12 @@
 import io
 import zipfile
 
-
 from app.services.export.lexical import (
     blocks_from_editor_state,
     editor_markdown,
     render_docx,
     render_markdown,
 )
-
 
 GUILD = 7
 
@@ -187,7 +185,7 @@ def test_asset_names_deduped_on_sanitize_collision():
     assert len(set(names)) == 2  # unique archive names
     # Blocks reference their own (deduped) names.
     assert {b["asset"] for b in blocks} == set(names)
-    content, content_type, _ = render_markdown(
+    content, _content_type, _ = render_markdown(
         {"title": "", "stem": "d", "blocks": blocks, "assets": assets},
         lambda key: key.encode(),
     )

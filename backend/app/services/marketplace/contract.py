@@ -36,12 +36,12 @@ from typing import Any
 
 __all__ = [
     "KIT_REVISION",
-    "discarded_terms",
     "KIT_VERSION",
     "PLUGIN_API_PATH",
     "SCHEMA_PATH",
     "cap",
     "charset",
+    "discarded_terms",
     "enum",
     "fields",
     "int_enum",

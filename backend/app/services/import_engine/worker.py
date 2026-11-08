@@ -39,7 +39,7 @@ import asyncio
 import json
 import logging
 from contextlib import AbstractAsyncContextManager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -54,11 +54,11 @@ from app.schemas.tenant.import_job import ContactCsvImportRequest
 from app.services import data_jobs
 from app.services.data_jobs import JobOutcome
 from app.services.import_engine import atlassian_job, contacts_csv
-from app.services.import_engine.atlassian import throttled
 from app.services.import_engine import engine as import_engine
-from app.services.platform import accounts as accounts_service
-from app.services.import_engine.contract import ImportEngineError
 from app.services.import_engine import limits as import_limits
+from app.services.import_engine.atlassian import throttled
+from app.services.import_engine.contract import ImportEngineError
+from app.services.platform import accounts as accounts_service
 
 logger = logging.getLogger(__name__)
 
@@ -217,7 +217,7 @@ async def _apply(session: AsyncSession, job: DataJob, *, guild_id: int) -> JobOu
         job.status = DataJobStatus.done
         job.result = result
         job.error = None
-    job.updated_at = datetime.now(timezone.utc)
+    job.updated_at = datetime.now(UTC)
     await asyncio.to_thread(import_engine.delete_payload, guild_id, job.file_ref)
     job.secret_encrypted = None
     job.file_ref = None
@@ -252,7 +252,7 @@ async def _fetch(
             await session.commit()
             raise atlassian_job.FetchCancelled
         job.plan = {"atlassian": summary.model_dump(mode="json")}
-        job.updated_at = datetime.now(timezone.utc)
+        job.updated_at = datetime.now(UTC)
         session.add(job)
         await session.commit()
 
@@ -287,7 +287,7 @@ async def _fetch(
         job.status = DataJobStatus.failed
         job.error = _error_code(exc)
         job.secret_encrypted = None
-        job.updated_at = datetime.now(timezone.utc)
+        job.updated_at = datetime.now(UTC)
         session.add(job)
         await session.commit()
         return _outcome(job, guild_id)
@@ -300,7 +300,7 @@ async def _fetch(
         session.add(job)
         await session.commit()
         return None
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     job.secret_encrypted = None
     job.status = DataJobStatus.staged
     job.file_ref = staged.payload_ref
@@ -350,7 +350,7 @@ async def _execute(session: AsyncSession, job: DataJob, *, guild_id: int) -> dic
             # Keeps the row's ``updated_at`` fresh, so the stale sweep knows
             # this apply is still running.
             await session.refresh(job, with_for_update=True)
-            job.updated_at = datetime.now(timezone.utc)
+            job.updated_at = datetime.now(UTC)
             session.add(job)
             await session.commit()
 

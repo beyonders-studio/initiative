@@ -6,12 +6,12 @@ recipient's rows on the system engine (``push_notifications.send_pushes``).
 """
 
 import uuid
-from datetime import datetime, timezone
-from typing import Iterable, List, Optional
+from collections.abc import Iterable
+from datetime import UTC, datetime
 
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy import and_, or_
-from sqlmodel import select, delete, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlmodel import delete, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.push_token import PushToken
@@ -24,7 +24,7 @@ async def register_push_token(
     user_id: int,
     push_token: str,
     platform: str,
-    session_id: Optional[uuid.UUID] = None,
+    session_id: uuid.UUID | None = None,
 ) -> PushToken:
     """Register or update a push notification token for a user.
 
@@ -32,7 +32,7 @@ async def register_push_token(
     token refresh/rotation without a race-condition between SELECT and INSERT.
     A sign-in keeps one registration: the session's other tokens are removed.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     stmt = (
         pg_insert(PushToken)
         .values(
@@ -45,11 +45,11 @@ async def register_push_token(
         )
         .on_conflict_do_update(
             index_elements=["user_id", "push_token"],
-            set_=dict(
-                platform=platform,
-                session_id=session_id,
-                updated_at=now,
-            ),
+            set_={
+                "platform": platform,
+                "session_id": session_id,
+                "updated_at": now,
+            },
         )
         .returning(PushToken)
     )
@@ -74,7 +74,7 @@ async def get_push_tokens_for_user(
     session: AsyncSession,
     *,
     user_id: int,
-) -> List[PushToken]:
+) -> list[PushToken]:
     """Get all active push tokens for a user."""
     stmt = (
         select(PushToken)
@@ -87,7 +87,7 @@ async def get_push_tokens_for_user(
     return list(result.all())
 
 
-async def live_for_user(session: AsyncSession, *, user_id: int) -> List[PushToken]:
+async def live_for_user(session: AsyncSession, *, user_id: int) -> list[PushToken]:
     """The recipient's devices whose sign-in still stands.
 
     A row stands while the session that registered it has a live chain. A
@@ -100,8 +100,8 @@ async def live_for_user(session: AsyncSession, *, user_id: int) -> List[PushToke
     tips = await session_service.live_chain_tips(
         session, session_ids={r.session_id for r in rows if r.session_id}
     )
-    live: List[PushToken] = []
-    ended: List[PushToken] = []
+    live: list[PushToken] = []
+    ended: list[PushToken] = []
     for row in rows:
         tip = tips.get(row.session_id) if row.session_id is not None else None
         if tip is None:
@@ -196,7 +196,7 @@ async def record_delivery(
         await session.exec(
             update(PushToken)
             .where(PushToken.user_id == user_id, PushToken.id.in_(delivered))
-            .values(last_used_at=datetime.now(timezone.utc))
+            .values(last_used_at=datetime.now(UTC))
         )
     dead = list(dead_tokens)
     if dead:

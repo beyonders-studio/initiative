@@ -17,8 +17,8 @@ registry refresh). A user request reads the catalog and writes its own guild
 schema; nothing about installing a listing writes here.
 """
 
-from datetime import datetime, timezone
-from typing import Any, List, Optional, TYPE_CHECKING
+from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import ConfigDict
 from sqlalchemy import (
@@ -35,9 +35,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Field, Relationship, SQLModel
-
-if TYPE_CHECKING:  # pragma: no cover
-    pass
 
 #: Length of a listing uid. Crockford base32 at 14 characters is short enough to
 #: read aloud or print, and long enough that codes are not guessable.
@@ -72,7 +69,7 @@ class MarketplaceListing(SQLModel, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     # The catalog UPC. Assigned by the publisher and carried in the manifest —
     # minting it per deployment would make the code deployment-specific, so a
     # shared link or a printed code would resolve to nothing anywhere else.
@@ -93,7 +90,7 @@ class MarketplaceListing(SQLModel, table=True):
     # The publisher record a registry listing arrived under, and whether that
     # record was verified when it was applied. NULL and false for every other
     # source.
-    publisher_id: Optional[int] = Field(
+    publisher_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -107,17 +104,17 @@ class MarketplaceListing(SQLModel, table=True):
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
     description: str = Field(sa_column=Column(String(500), nullable=False))
-    long_description: Optional[str] = Field(
+    long_description: str | None = Field(
         default=None, sa_column=Column(Text, nullable=True)
     )
     # Custom art, required: a listing is branded, not a default icon.
     avatar_url: str = Field(sa_column=Column(String(2000), nullable=False))
-    images: List[str] = Field(
+    images: list[str] = Field(
         default_factory=list,
         sa_column=Column(JSONB, nullable=False, server_default="[]"),
     )
 
-    latest_version_id: Optional[int] = Field(
+    latest_version_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -153,14 +150,14 @@ class MarketplaceListing(SQLModel, table=True):
     # The uid rather than a foreign key. Both rows come from one manifest, and a
     # referential cascade here would be a second mechanism for a lifecycle the
     # publish already owns.
-    bundled_with_uid: Optional[str] = Field(
+    bundled_with_uid: str | None = Field(
         default=None,
         sa_column=Column(String(UID_LENGTH), nullable=True, index=True),
     )
     # Who shared a ``local`` listing, when a member did: the one account that
     # may publish a new version of it or take it down. NULL for every other
     # source, and for one the operator uploaded.
-    submitted_by: Optional[int] = Field(
+    submitted_by: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -178,10 +175,10 @@ class MarketplaceListing(SQLModel, table=True):
     # counters its plug-in may report, and ``mandatory`` makes it part of every
     # community. Only two shapes exist: ``entitled`` with neither, or ``open``
     # and mandatory, which may meter.
-    access: Optional[str] = Field(
+    access: str | None = Field(
         default=None, sa_column=Column(String(16), nullable=True)
     )
-    meters: List[str] = Field(
+    meters: list[str] = Field(
         default_factory=list,
         sa_column=Column(ARRAY(Text), nullable=False, server_default=text("'{}'")),
     )
@@ -197,15 +194,15 @@ class MarketplaceListing(SQLModel, table=True):
     )
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
-    versions: List["MarketplaceListingVersion"] = Relationship(
+    versions: list["MarketplaceListingVersion"] = Relationship(
         back_populates="listing",
         sa_relationship_kwargs={
             "cascade": "all, delete-orphan",
@@ -231,7 +228,7 @@ class MarketplaceListingVersion(SQLModel, table=True):
         UniqueConstraint("listing_id", "version"),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     listing_id: int = Field(
         sa_column=Column(
             Integer,
@@ -250,27 +247,27 @@ class MarketplaceListingVersion(SQLModel, table=True):
     # skeleton. Held to the same validator as ``definition``, and installable
     # in its place when the installer asks to start from it. NULL on every
     # other kind, and on a listing that shows only what it installs.
-    example: Optional[dict[str, Any]] = Field(
+    example: dict[str, Any] | None = Field(
         default=None, sa_column=Column(JSONB, nullable=True)
     )
-    release_notes: Optional[str] = Field(
+    release_notes: str | None = Field(
         default=None, sa_column=Column(Text, nullable=True)
     )
     # Compared against this deployment's VERSION. A version that needs a newer
     # app is hidden from browse and refused on upgrade, rather than installing
     # something that cannot render.
-    min_app_version: Optional[str] = Field(
+    min_app_version: str | None = Field(
         default=None, sa_column=Column(String(32), nullable=True)
     )
     # The oldest plug-in API contract (``MAJOR.MINOR``) the version needs,
     # compared against the contract this deployment serves (the plug-in SDK
     # version it vendors). A version this deployment cannot run is refused on
     # install and upgrade. NULL runs on any contract.
-    min_plugin_api: Optional[str] = Field(
+    min_plugin_api: str | None = Field(
         default=None, sa_column=Column(String(32), nullable=True)
     )
     published_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     # A version a member shared that the operator has not yet approved. It is
@@ -281,7 +278,7 @@ class MarketplaceListingVersion(SQLModel, table=True):
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
 
-    listing: Optional[MarketplaceListing] = Relationship(
+    listing: MarketplaceListing | None = Relationship(
         back_populates="versions",
         sa_relationship_kwargs={"foreign_keys": "MarketplaceListingVersion.listing_id"},
     )

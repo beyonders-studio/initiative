@@ -1,6 +1,6 @@
 """Enrolling a factor, and which codes it takes."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pyotp
 import pytest
@@ -12,10 +12,9 @@ from app.models.platform.user_totp_secret import UserTotpSecret
 from app.services.auth import totp as totp_service
 from app.testing import create_user
 
-
 #: A fixed moment, so a test that reasons about 30-second intervals never
 #: straddles one.
-FIXED_NOW = datetime(2026, 9, 16, 12, 0, 0, tzinfo=timezone.utc)
+FIXED_NOW = datetime(2026, 9, 16, 12, 0, 0, tzinfo=UTC)
 
 
 @pytest.fixture

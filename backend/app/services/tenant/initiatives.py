@@ -1,45 +1,43 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-from datetime import datetime, timezone
 import logging
-from typing import Iterable
+from collections.abc import Iterable, Sequence
+from datetime import UTC, datetime
 
 from sqlalchemy import case, desc, func, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased, selectinload
-from sqlmodel import select, delete, update
+from sqlmodel import delete, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.db.query import ids_in
-from app.db.session import routed_guild_id
 from app.core.audit_events import AuditEventType
 from app.core.errors import CodedError
 from app.core.messages import InitiativeMessages
-from app.db.session import routed_context
-from app.models.tenant.resource_grant import ResourceGrant
+from app.core.tools import Tool
+from app.db.query import ids_in
+from app.db.session import routed_context, routed_guild_id
+from app.models.platform.guild import GUILD_ADMIN_ROLES, GuildMembership
+from app.models.platform.user import User
+from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.initiative import (
+    BUILTIN_MEMBER_ROLE,
+    BUILTIN_ROLE_PERMISSIONS,
+    BUILTIN_ROLES,
+    DEFAULT_PERMISSION_VALUES,
     INITIATIVE_CUSTOM_ROLES,
     INITIATIVE_MEMBER_PREFIX,
     INITIATIVE_TOOL_KEYS,
-    BUILTIN_ROLES,
     Initiative,
     InitiativeJoinPolicy,
     InitiativeJoinRequest,
     InitiativeMember,
     InitiativeRoleModel,
     InitiativeRule,
-    BUILTIN_MEMBER_ROLE,
-    BUILTIN_ROLE_PERMISSIONS,
-    DEFAULT_PERMISSION_VALUES,
     JoinRequestStatus,
     PermissionKey,
 )
-from app.core.tools import Tool
-from app.models.platform.guild import GUILD_ADMIN_ROLES, GuildMembership
-from app.models.platform.user import User
-from app.models.platform.user_profile_view import MemberProfile
+from app.models.tenant.resource_grant import ResourceGrant
 from app.schemas.platform.user import UserInitiativeRole, UserSummary
 from app.schemas.tenant.initiative import (
     InitiativeDefaultsRead,
@@ -48,7 +46,6 @@ from app.schemas.tenant.initiative import (
     InitiativeJoinRequestRead,
 )
 from app.services import audit as audit_service
-
 
 logger = logging.getLogger(__name__)
 
@@ -988,7 +985,7 @@ async def resolve_join_request(
         )
         .values(
             status=resolved,
-            resolved_at=datetime.now(timezone.utc),
+            resolved_at=datetime.now(UTC),
             resolved_by=resolver_id,
         )
     )

@@ -19,7 +19,8 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
-from typing import Any, Awaitable, Callable, Hashable, TypeVar, cast
+from collections.abc import Awaitable, Callable, Hashable
+from typing import Any, cast
 
 from sqlalchemy import event
 from sqlalchemy.orm import Session as SyncSession
@@ -31,7 +32,6 @@ logger = logging.getLogger(__name__)
 #: own; one that does not runs inside the commit, and must not use the session.
 Step = Callable[[], object]
 
-StepT = TypeVar("StepT", bound=Step)
 
 #: Where a session keeps the steps waiting for its commit, keyed by the
 #: transaction each was registered in and its key, and its commits'
@@ -45,7 +45,9 @@ _running: set[asyncio.Task[None]] = set()
 _cancel_on_settle: set[asyncio.Task[None]] = set()
 
 
-def after_commit(session: Any, step: StepT, key: Hashable | None = None) -> StepT:
+def after_commit[StepT: Step](
+    session: Any, step: StepT, key: Hashable | None = None
+) -> StepT:
     """Run ``step`` once ``session``'s transaction commits, and not at all if
     the transaction, or the savepoint the step was registered in, rolls back.
     A failure is logged with the step's name.

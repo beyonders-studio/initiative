@@ -131,7 +131,7 @@ class TestReadingTheDefinition:
 
 class TestSecretCustody:
     def test_a_secret_round_trips_for_the_one_caller_entitled_to_it(self):
-        config, secrets = _apply(VALID)
+        _config, secrets = _apply(VALID)
         assert decrypt_field(secrets["admin_token"], SALT_PLUGIN_CONFIG) == "shpat_abc"
         assert decrypt_connection_secrets(secrets) == {"admin_token": "shpat_abc"}
 
@@ -329,7 +329,7 @@ class TestPruningToANewDefinition:
         assert dropped == set()
 
     def test_a_dropped_connection_is_reported_for_revocation(self):
-        config, secrets, dropped = prune_to_definition(
+        config, _secrets, dropped = prune_to_definition(
             {"plugin_kind": "service", "connections": [ADMIN_CONNECTION]},
             {"admin": {"shop_domain": "example.test"}, "gone": {"key": "value"}},
             {},

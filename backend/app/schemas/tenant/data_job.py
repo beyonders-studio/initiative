@@ -5,8 +5,8 @@ are an import's pre-flight summary and terminal report. The row never carries
 imported or exported content — an export's artifact is fetched via the
 download route."""
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import AliasChoices, ConfigDict, Field, computed_field
 
@@ -31,22 +31,22 @@ class DataJobRead(SanitizedBaseModel):
     source: str
     params: dict[str, Any]
     status: DataJobStatus
-    error: Optional[str] = None
-    expires_at: Optional[datetime] = None
+    error: str | None = None
+    expires_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
     # Import only.
-    plan: Optional[dict[str, Any]] = None
-    result: Optional[dict[str, Any]] = None
+    plan: dict[str, Any] | None = None
+    result: dict[str, Any] | None = None
     # Export only.
-    template_id: Optional[str] = None
-    format: Optional[str] = None
+    template_id: str | None = None
+    format: str | None = None
     # Read from the row so ``delivered`` can be computed, and excluded from
     # the payload: the destination is a path on the server, which the operator
     # configured and already knows. A community administrator needs to know
     # that an archive was delivered rather than where this deployment keeps
     # its files.
-    destination_ref: Optional[str] = Field(default=None, exclude=True)
+    destination_ref: str | None = Field(default=None, exclude=True)
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -56,7 +56,7 @@ class DataJobRead(SanitizedBaseModel):
         return self.destination_ref is not None
 
 
-def file_expired(job: DataJob, now: Optional[datetime] = None) -> bool:
+def file_expired(job: DataJob, now: datetime | None = None) -> bool:
     """Whether the job's file is past its expiry: swept already, or still
     held with an ``expires_at`` that has passed and waiting for the next GC
     pass to delete it."""
@@ -66,8 +66,8 @@ def file_expired(job: DataJob, now: Optional[datetime] = None) -> bool:
         return False
     expires_at = job.expires_at
     if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    return expires_at <= (now or datetime.now(timezone.utc))
+        expires_at = expires_at.replace(tzinfo=UTC)
+    return expires_at <= (now or datetime.now(UTC))
 
 
 def serialize_data_job(job: DataJob, *, guild_id: int) -> DataJobRead:

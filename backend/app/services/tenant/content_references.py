@@ -27,7 +27,8 @@ already reads provenance to decide that, so it is stated once, there.
 
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
+from typing import Any
 
 from sqlalchemy.orm import undefer
 from sqlmodel import select

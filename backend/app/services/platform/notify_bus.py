@@ -37,8 +37,8 @@ did before this existed.
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
-from typing import Awaitable, Callable, Optional
 from urllib.parse import urlsplit, urlunsplit
 
 import asyncpg
@@ -87,8 +87,8 @@ class NotifyBus:
     """One held connection: listening for other workers, and telling them."""
 
     def __init__(self) -> None:
-        self._connection: Optional[asyncpg.Connection] = None
-        self._task: Optional[asyncio.Task] = None
+        self._connection: asyncpg.Connection | None = None
+        self._task: asyncio.Task | None = None
         self._handlers: dict[str, list[Handler]] = {}
         self._on_connect: list[OnConnect] = []
         self._lock = asyncio.Lock()
@@ -172,7 +172,7 @@ class NotifyBus:
         """Keep a listening connection up, reconnecting with backoff."""
         delay = _RECONNECT_DELAY_SECONDS
         while not self._stopping:
-            connection: Optional[asyncpg.Connection] = None
+            connection: asyncpg.Connection | None = None
             try:
                 connection = await asyncpg.connect(dsn=_dsn())
                 for channel in self._handlers:

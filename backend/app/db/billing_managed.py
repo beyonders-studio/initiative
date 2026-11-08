@@ -29,7 +29,7 @@ def billing_managed_sql(managed: bool) -> str:
     )
 
 
-async def apply_billing_managed(conn: "AsyncConnection", *, managed: bool) -> None:
+async def apply_billing_managed(conn: AsyncConnection, *, managed: bool) -> None:
     from sqlalchemy import text
 
     await conn.execute(text(billing_managed_sql(managed)))

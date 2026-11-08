@@ -11,7 +11,7 @@ lists keep theirs in that community (``/c/{community_id}/view-preferences``).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
@@ -23,10 +23,9 @@ from app.models.platform.user import User
 from app.models.platform.user_view_preference import UserViewPreference
 from app.schemas.platform.user_view_preference import (
     SCOPE_KEY_MAX_LENGTH,
-    UserViewPreferenceWrite,
     UserViewPreferencesMap,
+    UserViewPreferenceWrite,
 )
-
 
 router = APIRouter()
 
@@ -81,7 +80,7 @@ async def put_view_preference(
     )
     result = await session.exec(stmt)
     existing = result.one_or_none()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if existing is None:
         session.add(
             UserViewPreference(

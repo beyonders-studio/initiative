@@ -33,9 +33,9 @@ is nobody's business but the author's.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import ConfigDict
 from sqlalchemy import (
@@ -110,7 +110,7 @@ class Announcement(SQLModel, table=True):
         Index("ix_announcements_published_at", "published_at"),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     title: str = Field(sa_column=Column(String(200), nullable=False))
     category: str = Field(
         sa_column=Column(String(16), nullable=False, server_default="info"),
@@ -141,11 +141,11 @@ class Announcement(SQLModel, table=True):
     )
     #: NULL is a draft. A future timestamp is scheduled; both are invisible to
     #: everyone but the authors, and RLS is what makes that true.
-    published_at: Optional[datetime] = Field(
+    published_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: Past this, the notice stops being shown. Old news is worse than none.
-    expires_at: Optional[datetime] = Field(
+    expires_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: How many times a person has to acknowledge this before it stops coming
@@ -162,15 +162,15 @@ class Announcement(SQLModel, table=True):
     #: the screen it is about. Matched client-side against the route path
     #: (``*`` one segment, ``**`` the rest), because the server has no idea
     #: what the SPA's routes are.
-    trigger_route: Optional[str] = Field(
+    trigger_route: str | None = Field(
         default=None, sa_column=Column(String(200), nullable=True)
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
@@ -201,11 +201,11 @@ class AnnouncementReadReceipt(SQLModel, table=True):
         sa_column=Column(String(120), primary_key=True, nullable=False)
     )
     seen_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     #: The most recent dismissal, or None if they have never dismissed it.
-    dismissed_at: Optional[datetime] = Field(
+    dismissed_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: How many times they have dismissed it. Compared against the
@@ -238,6 +238,6 @@ class AnnouncementImage(SQLModel, table=True):
     #: to decide whether nobody wants it — and a re-upload is somebody
     #: wanting it.
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

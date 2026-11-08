@@ -1,7 +1,6 @@
 """The rules the deployment and each community store. See ``app.core.rules``."""
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     BigInteger,
@@ -16,7 +15,8 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PGEnum
+from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ENUM as PGEnum
 from sqlmodel import Field, SQLModel
 
 from app.core.login_methods import PRIMARY_LOGIN_METHODS, LoginMethod
@@ -48,7 +48,7 @@ def _updated_at() -> Column:
     return Column(
         DateTime(timezone=True),
         nullable=False,
-        onupdate=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(UTC),
     )
 
 
@@ -104,18 +104,14 @@ class PlatformRule(SQLModel, table=True):
     )
 
     key: str = Field(sa_column=Column(String(64), primary_key=True))
-    enabled: Optional[bool] = Field(
-        default=None, sa_column=Column(Boolean, nullable=True)
-    )
-    amount: Optional[int] = Field(
-        default=None, sa_column=Column(Integer, nullable=True)
-    )
-    choice: Optional[str] = Field(
+    enabled: bool | None = Field(default=None, sa_column=Column(Boolean, nullable=True))
+    amount: int | None = Field(default=None, sa_column=Column(Integer, nullable=True))
+    choice: str | None = Field(
         default=None, sa_column=Column(String(64), nullable=True)
     )
-    methods: Optional[list[str]] = Field(default=None, sa_column=_methods())
+    methods: list[str] | None = Field(default=None, sa_column=_methods())
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc), sa_column=_updated_at()
+        default_factory=lambda: datetime.now(UTC), sa_column=_updated_at()
     )
 
 
@@ -158,7 +154,7 @@ class CommunityRule(SQLModel, table=True):
         ),
     )
 
-    id: Optional[int] = Field(
+    id: int | None = Field(
         default=None, sa_column=Column(BigInteger, Identity(), primary_key=True)
     )
     guild_id: int = Field(
@@ -168,25 +164,21 @@ class CommunityRule(SQLModel, table=True):
     )
     key: str = Field(sa_column=Column(String(64), nullable=False))
     #: The member the row is about, or ``None`` for the whole community.
-    user_id: Optional[int] = Field(
-        default=None, sa_column=Column(Integer, nullable=True)
-    )
+    user_id: int | None = Field(default=None, sa_column=Column(Integer, nullable=True))
     #: Who wrote it (``app.core.rules.SetBy``).
     set_by: str = Field(
         default="community",
         sa_column=Column(String(16), nullable=False, server_default="community"),
     )
-    enabled: Optional[bool] = Field(
-        default=None, sa_column=Column(Boolean, nullable=True)
-    )
+    enabled: bool | None = Field(default=None, sa_column=Column(Boolean, nullable=True))
     #: Wide enough for a storage cap in bytes.
-    amount: Optional[int] = Field(
+    amount: int | None = Field(
         default=None, sa_column=Column(BigInteger, nullable=True)
     )
-    methods: Optional[list[str]] = Field(default=None, sa_column=_methods())
+    methods: list[str] | None = Field(default=None, sa_column=_methods())
     #: RESTRICT: deleting a provider a community requires must surface the
     #: conflict, never silently reopen the community.
-    provider_id: Optional[int] = Field(
+    provider_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -195,5 +187,5 @@ class CommunityRule(SQLModel, table=True):
         ),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc), sa_column=_updated_at()
+        default_factory=lambda: datetime.now(UTC), sa_column=_updated_at()
     )

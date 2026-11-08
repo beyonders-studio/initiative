@@ -10,7 +10,6 @@ route here answers 404.
 """
 
 from datetime import date
-from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException, Response, status
 from pydantic import BaseModel
@@ -33,15 +32,15 @@ class LegalDocumentRead(BaseModel):
     title: str
     #: What the portal calls this revision, and what an acceptance is recorded
     #: against. Null when the portal did not say.
-    version: Optional[str] = None
-    effective_date: Optional[date] = None
+    version: str | None = None
+    effective_date: date | None = None
     #: Digest of the exact bytes ``/legal/{slug}`` serves. Null for a
     #: document hosted elsewhere.
-    sha256: Optional[str] = None
+    sha256: str | None = None
     #: Where the document lives when the portal doesn't serve it (the
     #: customer's own contract, say): linked, and ``/legal/{slug}`` answers
     #: 404 for it.
-    url: Optional[str] = None
+    url: str | None = None
 
 
 class LegalIndexRead(BaseModel):
@@ -88,7 +87,7 @@ async def read_legal_index() -> LegalIndexRead:
 @router.get("/legal/{slug}", response_class=Response)
 async def read_legal_document(
     slug: str,
-    if_none_match: Optional[str] = Header(default=None, alias="If-None-Match"),
+    if_none_match: str | None = Header(default=None, alias="If-None-Match"),
 ) -> Response:
     _require_enabled()
     try:

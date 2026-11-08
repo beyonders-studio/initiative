@@ -37,7 +37,7 @@ stored, so the stored form has to be a fixed point.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from app.core import recurrence
@@ -471,10 +471,10 @@ def _instant(value: Any) -> datetime | None:
     a time without a zone. None for anything that is not a date."""
     parsed = _parse(value)
     if isinstance(parsed, datetime):
-        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
     if parsed is None:
         return None
-    return datetime.combine(parsed, datetime.min.time(), timezone.utc)
+    return datetime.combine(parsed, datetime.min.time(), UTC)
 
 
 def anchor_dates(tool: Tool, envelope: dict[str, Any]) -> dict[str, Any]:

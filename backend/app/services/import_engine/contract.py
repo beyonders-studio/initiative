@@ -97,7 +97,7 @@ class EnvelopeImporter(Protocol):
         hard ceiling (len(tasks), len(items), … — 1 for a lone file)."""
         ...
 
-    def people(self, validated: BaseModel) -> list["ManifestPerson"]:
+    def people(self, validated: BaseModel) -> list[ManifestPerson]:
         """Everybody this envelope quotes, most-quoted first.
 
         The same inventory a backup's manifest carries, read from one
@@ -118,7 +118,7 @@ class EnvelopeImporter(Protocol):
         envelope: BaseModel,
         target_initiative: Initiative,
         importer: User,
-        context: "ImportContext | None" = None,
+        context: ImportContext | None = None,
     ) -> EnvelopeImportResult:
         """Insert the envelope's rows (importer becomes owner, owner grant
         synthesized). Flush-only — the caller commits.

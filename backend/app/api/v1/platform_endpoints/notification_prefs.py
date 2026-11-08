@@ -5,28 +5,27 @@ resolve their subject from the credential rather than a path parameter.
 """
 
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 from sqlmodel import select
-
-from app.api.deps import UserSessionDep, get_current_active_user
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.db.session import get_system_session
+from app.api.deps import UserSessionDep, get_current_active_user
 from app.core.notification_categories import (
-    CATEGORY_SPECS,
     ALL_CHANNELS,
+    CATEGORY_SPECS,
     DIGEST_CATEGORIES,
     NotificationCategory,
 )
+from app.db.session import get_system_session
 from app.models.platform.guild import Guild, GuildMembership
 from app.models.platform.user import User
 from app.schemas.platform.notification_prefs import (
+    CommunityNotificationSettings,
     DigestSchedule,
     EmailSchedule,
-    CommunityNotificationSettings,
     NotificationCategoryRead,
     NotificationPreferencesRead,
     NotificationPreferencesUpdate,
@@ -171,7 +170,7 @@ async def read_my_notification_preferences(
         pause=(
             PauseRead(since=paused[0], until=paused[1])
             if (paused := prefs_service.pause_window(doc)) is not None
-            and paused[1] > datetime.now(timezone.utc)
+            and paused[1] > datetime.now(UTC)
             else None
         ),
         respect_presence=prefs_service.respects_presence(doc),
@@ -264,7 +263,7 @@ async def update_my_notification_preferences(
         doc.pop("pause", None)
     elif payload.pause_until is not None:
         doc["pause"] = {
-            "since": (payload.pause_from or datetime.now(timezone.utc)).isoformat(),
+            "since": (payload.pause_from or datetime.now(UTC)).isoformat(),
             "until": payload.pause_until.isoformat(),
         }
 

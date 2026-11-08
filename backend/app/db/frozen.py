@@ -39,7 +39,8 @@ and trigger carries one call rather than a chain of its own.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.exc import DBAPIError
@@ -51,22 +52,22 @@ from app.core.relationships import ENDPOINT_KINDS
 from app.core.tools import (
     ARCHIVE_TARGETS,
     KINDS,
-    PROPERTY_TARGETS,
     LAYOUT_INSTANCE_TABLES,
+    PROPERTY_TARGETS,
     Tool,
 )
 from app.db import gucs
+from app.db.errors import (
+    INSUFFICIENT_PRIVILEGE_SQLSTATE,
+    dbapi_constraint,
+    dbapi_sqlstate,
+)
 from app.db.initiative_rls import (
     COMMENT_PARENTS,
     INITIATIVE_PATHS,
     NAMED_PEOPLE,
     entity_tables,
     governing_path,
-)
-from app.db.errors import (
-    INSUFFICIENT_PRIVILEGE_SQLSTATE,
-    dbapi_constraint,
-    dbapi_sqlstate,
 )
 from app.db.soft_delete_filter import SOFT_DELETE_TABLES
 from app.models.tenant._mixins import ArchiveMixin, SoftDeleteMixin, archive_models
@@ -249,7 +250,7 @@ def row_is_frozen(row: Any) -> bool:
         return True
     try:
         unloaded = sa_inspect(row).unloaded
-    except Exception:  # noqa: BLE001 — not a mapped instance; nothing to walk
+    except Exception:  # not a mapped instance; nothing to walk
         return False
     if "initiative" in unloaded:
         return False
@@ -286,7 +287,7 @@ def ancestor_is_frozen(row: Any) -> bool:
         return False
     try:
         unloaded = sa_inspect(row).unloaded
-    except Exception:  # noqa: BLE001 — not a mapped instance; nothing to walk
+    except Exception:  # not a mapped instance; nothing to walk
         return False
     return any(
         attr not in unloaded and row_is_frozen(getattr(row, attr, None))
@@ -453,7 +454,7 @@ def render_resource_frozen_fn() -> str:
     for table in _dispatch_tables():
         lines = [
             f"      WHEN '{table}' THEN",
-            f"        SELECT * INTO fz FROM {table} WHERE id = rid;",  # noqa: S608
+            f"        SELECT * INTO fz FROM {table} WHERE id = rid;",
             "        IF NOT FOUND THEN RETURN true; END IF;",
         ]
         trashed = _trashed("fz", table)

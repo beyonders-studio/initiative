@@ -24,7 +24,6 @@ from app.testing import (
     route_session_to_guild,
 )
 
-
 _FAIL = text("UPDATE data_jobs SET status = 'failed'")
 
 

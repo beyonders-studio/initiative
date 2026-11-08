@@ -23,7 +23,7 @@ service layer validates against.
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import AwareDatetime, ConfigDict, Field
 
@@ -33,8 +33,8 @@ from app.schemas.base import RawTextStr, SanitizedBaseModel
 __all__ = [
     "MetadataTarget",
     "PluginConnectionRead",
-    "PluginConnectionsResponse",
     "PluginConnectionToken",
+    "PluginConnectionsResponse",
     "PluginInstallConfigRead",
     "PluginInstallationEvent",
     "PluginMemberConfigRead",
@@ -42,8 +42,8 @@ __all__ = [
     "PluginMetadataItems",
     "PluginMetadataValues",
     "PluginMetadataWrite",
-    "PluginStatusReport",
     "PluginStatusRead",
+    "PluginStatusReport",
 ]
 
 
@@ -55,7 +55,7 @@ class PluginMemberConfigRead(SanitizedBaseModel):
     connection_id: str
     connection_ref: str
     status: str
-    values: Dict[str, Any] = {}
+    values: dict[str, Any] = {}
 
 
 class PluginInstallConfigRead(SanitizedBaseModel):
@@ -76,11 +76,11 @@ class PluginInstallConfigRead(SanitizedBaseModel):
     listing_version: str
     enabled: bool
     config_state: str = "unverified"
-    config_state_detail: Optional[str] = None
+    config_state_detail: str | None = None
     needs_config: bool = False
-    connections: Dict[str, Dict[str, Any]] = {}
-    connection_refs: Dict[str, str] = {}
-    member_connections: List[PluginMemberConfigRead] = []
+    connections: dict[str, dict[str, Any]] = {}
+    connection_refs: dict[str, str] = {}
+    member_connections: list[PluginMemberConfigRead] = []
 
 
 class PluginConnectionRead(SanitizedBaseModel):
@@ -98,7 +98,7 @@ class PluginConnectionRead(SanitizedBaseModel):
     status: str
     blocked: bool = False
     #: What the plug-in itself reported the member connected as. Display only.
-    account_label: Optional[str] = None
+    account_label: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -106,7 +106,7 @@ class PluginConnectionRead(SanitizedBaseModel):
 class PluginConnectionsResponse(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    items: List[PluginConnectionRead] = []
+    items: list[PluginConnectionRead] = []
 
 
 class PluginConnectionToken(SanitizedBaseModel):
@@ -120,7 +120,7 @@ class PluginConnectionToken(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     access_token: str
-    expires_at: Optional[int] = None
+    expires_at: int | None = None
 
 
 class PluginStatusReport(SanitizedBaseModel):
@@ -132,7 +132,7 @@ class PluginStatusReport(SanitizedBaseModel):
 
     state: Literal["ok", "invalid"]
     #: A short code shown beside an ``invalid`` state, e.g. ``missing_scope``.
-    detail: Optional[str] = Field(default=None, max_length=120)
+    detail: str | None = Field(default=None, max_length=120)
 
 
 class PluginStatusRead(SanitizedBaseModel):
@@ -141,7 +141,7 @@ class PluginStatusRead(SanitizedBaseModel):
     community_ref: str
     install_id: int
     config_state: str
-    config_state_detail: Optional[str] = None
+    config_state_detail: str | None = None
 
 
 class PluginInstallationEvent(SanitizedBaseModel):
@@ -153,8 +153,8 @@ class PluginInstallationEvent(SanitizedBaseModel):
     """
 
     event_type: str = Field(max_length=200)
-    payload: Dict[str, Any] = {}
-    initiative_id: Optional[int] = None
+    payload: dict[str, Any] = {}
+    initiative_id: int | None = None
 
 
 MetadataTarget = Enum(
@@ -172,13 +172,13 @@ class PluginMetadataItem(SanitizedBaseModel):
 
     entity_type: str
     entity_id: int
-    values: Dict[str, Any] = {}
+    values: dict[str, Any] = {}
 
 
 class PluginMetadataItems(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    items: List[PluginMetadataItem] = []
+    items: list[PluginMetadataItem] = []
 
 
 class PluginMetadataWrite(SanitizedBaseModel):
@@ -190,10 +190,10 @@ class PluginMetadataWrite(SanitizedBaseModel):
     install's own values need none."""
 
     entity_type: MetadataTarget
-    entity_id: Optional[int] = None
-    values: Optional[Dict[str, Any]] = None
-    upsert: Optional[Dict[str, Any]] = None
-    remove: Optional[Dict[str, Any]] = None
+    entity_id: int | None = None
+    values: dict[str, Any] | None = None
+    upsert: dict[str, Any] | None = None
+    remove: dict[str, Any] | None = None
 
 
 class PluginMetadataValues(SanitizedBaseModel):
@@ -201,7 +201,7 @@ class PluginMetadataValues(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    values: Dict[str, Any] = {}
+    values: dict[str, Any] = {}
 
 
 class PluginEntitlementRead(SanitizedBaseModel):

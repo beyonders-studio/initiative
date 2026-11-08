@@ -7,7 +7,7 @@ any path.
 
 from __future__ import annotations
 
-from typing import Annotated, List, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
@@ -20,7 +20,7 @@ me_router = APIRouter()
 
 
 SearchQuery = Annotated[
-    Optional[str],
+    str | None,
     Query(
         max_length=128,
         description=(
@@ -37,7 +37,7 @@ async def list_people_sections(
     session: UserSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     search: SearchQuery = None,
-    guild_ids: Annotated[Optional[List[int]], Query(alias="community_ids")] = None,
+    guild_ids: Annotated[list[int] | None, Query(alias="community_ids")] = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=people_service.DEFAULT_PAGE_SIZE, ge=1, le=100),
 ) -> PeopleSectionsResponse:

@@ -17,14 +17,13 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.plugin_access_token import seal_install_token
 from app.core.audit_events import AuditEventType
+from app.core.plugin_access_token import seal_install_token
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.plugin_member_consent import PluginMemberConsent
 from app.services.marketplace.plugin_refs import ensure_plugin_ref
 from app.testing import emitted, route_session_to_guild
 from app.testing.plugin_clients import CLIENT, InstalledPlugin, install_plugin
-
 
 CONSENT_URL = "/api/v1/plugin-platform/consent-requests"
 

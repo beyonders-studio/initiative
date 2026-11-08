@@ -25,9 +25,9 @@ matching lives there because the routes do.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Iterable, Optional
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import case, func, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -40,8 +40,8 @@ from app.core.image_headers import validate_image
 from app.core.version import compare_versions
 from app.models.platform.announcement import (
     ANNOUNCEMENT_IMAGE_SPEC,
-    AnnouncementAudienceAccounts,
     Announcement,
+    AnnouncementAudienceAccounts,
     AnnouncementImage,
     AnnouncementReadReceipt,
     db_announcement_key,
@@ -49,8 +49,6 @@ from app.models.platform.announcement import (
 from app.models.platform.guild import GUILD_ADMIN_ROLES, GuildMembership
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User, UserRole
-from app.services.platform import app_settings as app_settings_service
-from app.services.platform import notice_outbox
 from app.schemas.platform.announcement import (
     IMAGE_PATH_PREFIX,
     AnnouncementOperatorRead,
@@ -59,6 +57,8 @@ from app.schemas.platform.announcement import (
     AnnouncementUpdate,
     AnnouncementWrite,
 )
+from app.services.platform import app_settings as app_settings_service
+from app.services.platform import notice_outbox
 
 #: How long an uploaded picture nothing points at is kept before the pruner
 #: takes it. Long enough to survive an editing session that uploads a
@@ -88,10 +88,10 @@ class _Audience:
     min_platform_role: UserRole
     guild_admins_only: bool
     audience_accounts: AnnouncementAudienceAccounts
-    published_at: Optional[datetime]
+    published_at: datetime | None
     #: Builtins only: an authored notice is written on a running deployment,
     #: so "which upgrade brought this" has no meaning for one.
-    only_upgrading_from_below: Optional[str] = None
+    only_upgrading_from_below: str | None = None
 
 
 @dataclass(frozen=True)
@@ -102,7 +102,7 @@ class _Reader:
     is_guild_admin: bool
     #: What this deployment was running before its current version, if it ever
     #: ran anything else. ``None`` on a fresh install.
-    previous_version: Optional[str]
+    previous_version: str | None
 
 
 def _audience_matches(rule: _Audience, reader: _Reader) -> bool:
@@ -131,13 +131,13 @@ def _account_age_matches(rule: _Audience, user: User) -> bool:
         return False
     created = user.created_at
     if created.tzinfo is None:
-        created = created.replace(tzinfo=timezone.utc)
+        created = created.replace(tzinfo=UTC)
     if rule.audience_accounts is AnnouncementAudienceAccounts.existing:
         return created < rule.published_at
     return created >= rule.published_at
 
 
-def _upgrade_matches(rule: _Audience, previous_version: Optional[str]) -> bool:
+def _upgrade_matches(rule: _Audience, previous_version: str | None) -> bool:
     """Whether this deployment upgraded into the notice from below its floor.
 
     A fresh install has no previous version at all, and that is the answer
@@ -173,7 +173,7 @@ async def administers_a_guild(session: AsyncSession, *, user_id: int) -> bool:
 
 
 def _is_live(
-    published_at: Optional[datetime], expires_at: Optional[datetime], now: datetime
+    published_at: datetime | None, expires_at: datetime | None, now: datetime
 ) -> bool:
     if published_at is None or published_at > now:
         return False
@@ -249,7 +249,7 @@ async def list_for_user(
     *,
     user: User,
     include_dismissed: bool = False,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> list[AnnouncementRead]:
     """Every live announcement this person is in the audience for.
 
@@ -261,7 +261,7 @@ async def list_for_user(
     retires a notice everywhere, and the row is unreadable on this path once
     it passes.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     reader = _Reader(
         user=user,
         is_guild_admin=await administers_a_guild(session, user_id=user.id),
@@ -314,13 +314,15 @@ async def list_for_user(
         if receipt is not None:
             item.dismissed_at = receipt.dismissed_at
             item.dismiss_count = receipt.dismiss_count
-            if receipt.dismiss_count >= item.dismissals_required:
-                if not include_dismissed:
-                    continue
+            if (
+                receipt.dismiss_count >= item.dismissals_required
+                and not include_dismissed
+            ):
+                continue
         visible.append(item)
 
     visible.sort(
-        key=lambda a: a.published_at or datetime.min.replace(tzinfo=timezone.utc),
+        key=lambda a: a.published_at or datetime.min.replace(tzinfo=UTC),
         reverse=True,
     )
     return visible
@@ -346,7 +348,7 @@ async def _find(
     return await _load_by_key(session, key=key)
 
 
-async def _load_by_key(session: AsyncSession, *, key: str) -> Optional[Announcement]:
+async def _load_by_key(session: AsyncSession, *, key: str) -> Announcement | None:
     prefix = "db:"
     if not key.startswith(prefix):
         return None
@@ -363,7 +365,7 @@ async def record_receipt(
     user_id: int,
     key: str,
     dismissed: bool,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> AnnouncementReadReceipt:
     """Note that this person has seen — or is done with — this announcement.
 
@@ -380,7 +382,7 @@ async def record_receipt(
     or lose an increment (both reading the same count). ``LEAST`` applies the
     cap inside the same statement that does the increment.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     announcement = await _find(session, key=key)
     required = announcement.dismissals_required if announcement is not None else 1
 
@@ -464,7 +466,7 @@ async def list_all(session: AsyncSession) -> list[AnnouncementOperatorRead]:
     items.extend(builtin_operator_read(b) for b in BUILTIN_ANNOUNCEMENTS)
     items.sort(
         key=lambda a: (
-            a.published_at or a.created_at or datetime.min.replace(tzinfo=timezone.utc)
+            a.published_at or a.created_at or datetime.min.replace(tzinfo=UTC)
         ),
         reverse=True,
     )
@@ -472,7 +474,7 @@ async def list_all(session: AsyncSession) -> list[AnnouncementOperatorRead]:
 
 
 async def create(session: AsyncSession, *, payload: AnnouncementWrite) -> Announcement:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     announcement = Announcement(
         title=payload.title,
         category=payload.category.value,
@@ -521,7 +523,7 @@ async def update(
         announcement.expires_at = None
     elif payload.expires_at is not None:
         announcement.expires_at = payload.expires_at
-    announcement.updated_at = datetime.now(timezone.utc)
+    announcement.updated_at = datetime.now(UTC)
     session.add(announcement)
     await session.flush()
     return announcement
@@ -582,7 +584,7 @@ async def store_image(session: AsyncSession, *, data: bytes) -> AnnouncementImag
         # putting this picture here *now* — so the clock the pruner reads
         # restarts. Without this, re-using a screenshot older than the grace
         # period would hand back a URL the very next sweep deletes.
-        existing.created_at = datetime.now(timezone.utc)
+        existing.created_at = datetime.now(UTC)
         session.add(existing)
         await session.flush()
         return existing
@@ -594,16 +596,14 @@ async def store_image(session: AsyncSession, *, data: bytes) -> AnnouncementImag
         width=image.width,
         height=image.height,
         data=data,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     session.add(stored)
     await session.flush()
     return stored
 
 
-async def read_image(
-    session: AsyncSession, *, sha256: str
-) -> Optional[AnnouncementImage]:
+async def read_image(session: AsyncSession, *, sha256: str) -> AnnouncementImage | None:
     return await session.get(AnnouncementImage, sha256)
 
 
@@ -624,7 +624,7 @@ async def process_announcement_image_purge() -> None:
 
 
 async def prune_unreferenced_images(
-    session: AsyncSession, *, now: Optional[datetime] = None
+    session: AsyncSession, *, now: datetime | None = None
 ) -> int:
     """Drop pictures no announcement points at any more.
 
@@ -632,7 +632,7 @@ async def prune_unreferenced_images(
     keeps it from taking a screenshot uploaded moments ago into an
     announcement still being written.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     cutoff = now - ORPHAN_IMAGE_GRACE
 
     referenced: set[str] = set()

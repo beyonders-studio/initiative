@@ -29,9 +29,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core import auth_context
 from app.core.auth_context import SessionCredential, claims_from_provider_auth
 from app.core.identify import CredentialKind, Identified
-from app.core.security import UploadTokenClaims
 from app.core.login_methods import SecondFactorRequirement
 from app.core.messages import AuthMessages
+from app.core.security import UploadTokenClaims
 from app.models.platform.api_key import UserApiKey
 from app.models.platform.user import User
 from app.schemas.platform.token import TokenPayload

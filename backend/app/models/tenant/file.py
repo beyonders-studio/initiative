@@ -1,10 +1,9 @@
-from datetime import datetime, timezone
-from typing import List, Optional, TYPE_CHECKING
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, ClassVar, Optional
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
-    case,
     Column,
     DateTime,
     ForeignKey,
@@ -14,6 +13,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    case,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -64,28 +64,28 @@ class File(
         UniqueConstraint("id", "initiative_id", name="uq_files_id_initiative"),
         {"implicit_returning": False},
     )
-    __mapper_args__ = {
+    __mapper_args__: ClassVar[dict[str, Any]] = {
         "properties": {
             "content": deferred(_CONTENT, raiseload=True),
             "yjs_state": deferred(_YJS_STATE, raiseload=True),
         }
     }
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     initiative_id: int = Field(
         foreign_key="initiatives.id", ondelete="CASCADE", nullable=False
     )
     name: str = Field(nullable=False, index=True, max_length=255)
     content: dict = Field(default_factory=dict, sa_column=_CONTENT)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
-    featured_image_url: Optional[str] = Field(
+    featured_image_url: str | None = Field(
         default=None,
         sa_column=Column(String(length=512), nullable=True),
     )
@@ -93,8 +93,8 @@ class File(
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default=text("false")),
     )
-    yjs_state: Optional[bytes] = Field(default=None, sa_column=_YJS_STATE)
-    yjs_updated_at: Optional[datetime] = Field(
+    yjs_state: bytes | None = Field(default=None, sa_column=_YJS_STATE)
+    yjs_updated_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
@@ -109,7 +109,7 @@ class File(
     #: (``use_alter``) and the pointer is written after the version row
     #: (``post_update``). A version a file points at cannot be deleted
     #: until it points elsewhere; deleting the file takes its versions.
-    current_version_id: Optional[int] = Field(
+    current_version_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -124,7 +124,7 @@ class File(
     )
 
     initiative: Optional["Initiative"] = Relationship(back_populates="files")
-    grants: List["ResourceGrant"] = Relationship(
+    grants: list["ResourceGrant"] = Relationship(
         sa_relationship_kwargs={
             "primaryjoin": (
                 "and_(foreign(ResourceGrant.resource_id) == File.id, "
@@ -133,7 +133,7 @@ class File(
             "viewonly": True,
         }
     )
-    versions: List["FileVersion"] = Relationship(
+    versions: list["FileVersion"] = Relationship(
         back_populates="file",
         sa_relationship_kwargs={
             "cascade": "all, delete-orphan",
@@ -171,7 +171,7 @@ class FileVersion(CreatedByMixin, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     file_id: int = Field(
         sa_column=Column(
             Integer,
@@ -187,37 +187,35 @@ class FileVersion(CreatedByMixin, table=True):
     file_content_type: str = Field(
         sa_column=Column(String(length=128), nullable=False),
     )
-    file_size: Optional[int] = Field(
+    file_size: int | None = Field(
         default=None,
         sa_column=Column(BigInteger, nullable=True),
     )
-    original_filename: Optional[str] = Field(
+    original_filename: str | None = Field(
         default=None,
         sa_column=Column(String(length=255), nullable=True),
     )
     #: A smaller picture of it, for a type the app makes one of
     #: (``FileTypeSpec.picture_format``); its own ``file_url`` when it is
     #: already small enough.
-    thumbnail_url: Optional[str] = Field(
+    thumbnail_url: str | None = Field(
         default=None,
         sa_column=Column(String(length=512), nullable=True),
     )
     #: ``pending`` until the ``thumbnails`` sweep has made it, then ``ready``,
     #: or ``failed`` for bytes it could not draw; ``NULL`` for a type that has
     #: no thumbnail.
-    thumbnail_state: Optional[str] = Field(
+    thumbnail_state: str | None = Field(
         default=None,
         sa_column=Column(Text, nullable=True),
     )
     #: A picture's size in pixels, as it is shown (turned upright), which a
     #: wall reserves its space by. Measured by the ``thumbnails`` sweep when it
     #: draws one; ``NULL`` until then, and for every other type.
-    width: Optional[int] = Field(default=None, sa_column=Column(Integer, nullable=True))
-    height: Optional[int] = Field(
-        default=None, sa_column=Column(Integer, nullable=True)
-    )
+    width: int | None = Field(default=None, sa_column=Column(Integer, nullable=True))
+    height: int | None = Field(default=None, sa_column=Column(Integer, nullable=True))
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 

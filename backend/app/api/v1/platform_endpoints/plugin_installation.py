@@ -36,7 +36,7 @@ so the table's policies decide which rows it reaches
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Annotated, Any, List, Optional
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, status
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -45,17 +45,17 @@ from app.api.deps import (
     CREDENTIAL_INSTALL,
     InstallAccessError,
     SessionDep,
+    SystemSessionDep,
     VerifiedInstall,
     establish_install_access,
     named_refs,
     oauth2_scheme,
-    SystemSessionDep,
 )
 from app.core import audit_context
 from app.core.body_limit import max_body
-from app.core.plugin_access_token import InstallAccessToken
 from app.core.identify import bearer_plugin_token
 from app.core.messages import AuthMessages, PluginChannelMessages
+from app.core.plugin_access_token import InstallAccessToken
 from app.db.guild_standing import InstallContext
 from app.db.session import clear_rls_context
 from app.models.platform.plugin_entitlement import (
@@ -70,8 +70,8 @@ from app.schemas.tenant.plugin_channel import (
     PluginConnectionsResponse,
     PluginConnectionToken,
     PluginEntitlementRead,
-    PluginInstallConfigRead,
     PluginInstallationEvent,
+    PluginInstallConfigRead,
     PluginMetadataItem,
     PluginMetadataItems,
     PluginMetadataValues,
@@ -83,8 +83,8 @@ from app.schemas.tenant.plugin_channel import (
 )
 from app.services.marketplace import plugin_entitlements, registration_lookup
 from app.services.marketplace.registration_lookup import RegistrationSnapshot
-from app.services.tenant import plugin_channels as channels_service
 from app.services.tenant import metadata as metadata_service
+from app.services.tenant import plugin_channels as channels_service
 
 # Not part of the OpenAPI document: only plug-in containers call these, never the
 # SPA, so the generated frontend client carries none of them.
@@ -123,7 +123,7 @@ class Installation:
     #: What the seam computed: the install's standing in its community.
     context: InstallContext
     #: The initiative the token is narrowed to, when it is.
-    initiative_id: Optional[int] = None
+    initiative_id: int | None = None
 
 
 async def _admit(
@@ -189,7 +189,7 @@ async def installation_caller(
     request: Request,
     session: SessionDep,
     # Declares the scheme for the API description; read by ``bearer_plugin_token``.
-    bearer: Annotated[Optional[str], Depends(oauth2_scheme)] = None,
+    bearer: Annotated[str | None, Depends(oauth2_scheme)] = None,
 ) -> Installation:
     """The install the token names, with the request's session left unrouted:
     the work runs on the system engine."""
@@ -199,7 +199,7 @@ async def installation_caller(
 async def routed_installation_caller(
     request: Request,
     session: SessionDep,
-    bearer: Annotated[Optional[str], Depends(oauth2_scheme)] = None,
+    bearer: Annotated[str | None, Depends(oauth2_scheme)] = None,
 ) -> Installation:
     """The install the token names, with the request's session routed as it:
     the route reads and writes as the install, under its policies."""
@@ -408,7 +408,7 @@ async def read_installation_metadata(
     installation: RoutedInstallationDep,
     session: SessionDep,
     entity_type: MetadataTarget,
-    entity_ids: Annotated[List[int], Query()] = [],
+    entity_ids: Annotated[list[int], Query()] = [],  # noqa: B006
 ) -> PluginMetadataItems:
     """The values this install keeps on each named item, or on itself with
     ``entity_type=plugin`` (``entity_ids`` is then not read), a list field's

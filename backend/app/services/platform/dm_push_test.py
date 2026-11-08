@@ -14,6 +14,7 @@ sign-in when it is renewed.
 
 import base64
 import uuid
+from datetime import UTC
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -569,7 +570,7 @@ class TestAGroupPush:
     """Which conversation first, then who spoke -- the way a lock screen reads."""
 
     async def _group(self, client, session, members):
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from app.models.platform.dm_conversation import (
             DmConversation,
@@ -589,7 +590,7 @@ class TestAGroupPush:
                 client, session, actor, seed=1 + 40 * i
             )
             devices[actor.user.id] = device_id
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         conversation = DmConversation(
             kind=DmConversationKind.group,
             roster_key=roster_key(actor.user.id for actor in members),

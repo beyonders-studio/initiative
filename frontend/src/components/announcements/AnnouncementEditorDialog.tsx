@@ -48,7 +48,7 @@ const CATEGORIES: AnnouncementCategory[] = [
   "info",
 ];
 
-const PLATFORM_ROLES = ["member", "support", "moderator", "operator", "owner"] as const;
+const PLATFORM_ROLES = ["member", "moderator", "support", "operator", "owner"] as const;
 
 //: Measured against the notice's publication date — see the backend enum.
 const AUDIENCE_ACCOUNTS: AnnouncementAudienceAccounts[] = ["everyone", "existing", "new"];

@@ -25,10 +25,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from webauthn.helpers import bytes_to_base64url
 
 from app.api.deps import (
-    FactorExemptUser,
-    require_first_party_session,
-    SystemSessionDep,
     CurrentUser,
+    FactorExemptUser,
+    SystemSessionDep,
+    require_first_party_session,
 )
 from app.api.v1.platform_endpoints.change_assessment import is_risky
 from app.api.v1.platform_endpoints.held_changes import (
@@ -47,10 +47,10 @@ from app.api.v1.platform_endpoints.session_opening import (
     upgrade_session,
 )
 from app.core.audit_events import AuditEventType
-from app.core.user_display import handle_of
 from app.core.login_methods import LoginMethod
 from app.core.messages import AuthMessages
 from app.core.rate_limit import limiter
+from app.core.user_display import handle_of
 from app.db.session import get_session
 from app.models.platform.account_change_hold import HeldChangeKind
 from app.models.platform.user import User, may_sign_in

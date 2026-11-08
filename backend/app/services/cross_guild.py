@@ -11,18 +11,17 @@ with its first rows in the list's order and how many it has, and the page is
 cut from their merge.
 """
 
-from typing import Any, Awaitable, Callable, Mapping, Optional, Sequence, TypeVar
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from typing import Any
 
 from sqlmodel import col, select
-
-from app.services.membership import live_membership_clause
-from app.services.platform import rules
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import auth_context
 from app.db import cohorts
 from app.db.guild_standing import GuildContext
 from app.db.query import effective_page_size, paginate_sequence
+from app.db.request_context import Platform, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.guild import (
     LIVE_STATUS_VALUES,
@@ -31,10 +30,8 @@ from app.models.platform.guild import (
     GuildMembership,
 )
 from app.models.platform.user import User, UserStatus
-from app.db.request_context import Platform, Unattributed
-
-T = TypeVar("T")
-R = TypeVar("R")
+from app.services.membership import live_membership_clause
+from app.services.platform import rules
 
 #: Where this session remembers each (user, guild)'s standing. On
 #: ``session.info``, so its lifetime is the session's — i.e. the request's.
@@ -52,7 +49,7 @@ async def member_guild_ids(
     session: AsyncSession,
     user_id: int,
     *,
-    restrict_to: Optional[Sequence[int]] = None,
+    restrict_to: Sequence[int] | None = None,
     guests: bool = True,
 ) -> list[int]:
     """Guild ids the user belongs to, sorted (optionally intersected with
@@ -111,7 +108,7 @@ async def member_guild_ids(
     return ids
 
 
-async def gather_across_guilds(
+async def gather_across_guilds[T](
     session: AsyncSession,
     readers: Mapping[int, Sequence[int]],
     fetch: Callable[[AsyncSession, int], Awaitable[list[T]]],
@@ -239,7 +236,7 @@ async def gather_across_guilds(
     return results
 
 
-async def page_across_guilds(
+async def page_across_guilds[R](
     session: AsyncSession,
     user_id: int,
     guild_ids: Sequence[int],

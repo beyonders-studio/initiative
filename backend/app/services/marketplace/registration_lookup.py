@@ -23,9 +23,10 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Mapping, Optional
+from typing import Any
 
 from jwt import PyJWK
 from sqlalchemy import literal_column
@@ -48,7 +49,6 @@ __all__ = [
     "CACHE_TTL_SECONDS",
     "InstallState",
     "RegistrationSnapshot",
-    "plugin_is_offered",
     "declarative_registration",
     "enabled_service_ids",
     "frame_origins",
@@ -58,6 +58,7 @@ __all__ = [
     "live_registration_clause",
     "load_registrations",
     "mandatory_registrations",
+    "plugin_is_offered",
     "registration_for_definition",
     "service_public_id",
 ]
@@ -73,13 +74,13 @@ class RegistrationSnapshot:
     """One registration, as everything outside the operator surface sees it."""
 
     public_id: str
-    listing_uid: Optional[str]
+    listing_uid: str | None
     #: Where Initiative's own server calls this plug-in. Empty for a registry
     #: container the operator has not placed yet, which is never live.
     base_url: str
     #: Where a person's browser loads its surfaces, when the plug-in answers there
     #: rather than at ``base_url``. Read through :attr:`browser_base`.
-    page_origin: Optional[str]
+    page_origin: str | None
     #: Origins this plug-in's surfaces may be framed from and postMessage'd to.
     allowed_origins: tuple[str, ...]
     #: Public verification keys this plug-in signs with — its client assertions at
@@ -103,21 +104,21 @@ class RegistrationSnapshot:
     scope_ceiling: tuple[str, ...] = ()
     #: Where the plug-in publishes its key set, when it does
     #: (:mod:`app.services.marketplace.plugin_keys`).
-    jwks_uri: Optional[str] = None
+    jwks_uri: str | None = None
     #: Initiative makes this plug-in's calls itself, from its manifest; it has no
     #: location and no keys.
     declarative: bool = False
     #: The plug-in is for the deployment's operations community alone.
     operations_only: bool = False
     #: The deployment's operations community when the snapshot was loaded.
-    operations_guild_id: Optional[int] = None
+    operations_guild_id: int | None = None
 
     @property
     def browser_base(self) -> str:
         """The base to build an address a browser will be sent to."""
         return browser_base(self)
 
-    def serves(self, guild_id: Optional[int]) -> bool:
+    def serves(self, guild_id: int | None) -> bool:
         """Whether this plug-in is for community ``guild_id``: any community,
         unless it is limited to the operations community and that is another
         one, or none is named."""
@@ -125,7 +126,7 @@ class RegistrationSnapshot:
             guild_id is not None and guild_id == self.operations_guild_id
         )
 
-    def live_in(self, guild_id: Optional[int]) -> bool:
+    def live_in(self, guild_id: int | None) -> bool:
         """Whether anything may flow through this plug-in in community
         ``guild_id``: the snapshot's spelling of ``registration_live_sql``
         asked for that community."""
@@ -187,9 +188,12 @@ async def load_registrations(*, force: bool = False) -> dict[str, RegistrationSn
     from app.services.marketplace.tuf_registry import configured_root_is_builtin
 
     global _cache, _loaded_at
-    if not force and _cache is not None:
-        if (time.monotonic() - _loaded_at) < CACHE_TTL_SECONDS:
-            return _cache
+    if (
+        not force
+        and _cache is not None
+        and (time.monotonic() - _loaded_at) < CACHE_TTL_SECONDS
+    ):
+        return _cache
 
     operations = (
         select(AppSetting.operations_guild_id)
@@ -278,8 +282,8 @@ def is_declarative(definition: Mapping[str, Any] | None) -> bool:
 
 
 def service_public_id(
-    definition: Mapping[str, Any] | None, *, listing_public_id: Optional[str] = None
-) -> Optional[str]:
+    definition: Mapping[str, Any] | None, *, listing_public_id: str | None = None
+) -> str | None:
     """The plug-in a pinned definition names, if it names one.
 
     Only a ``service`` plug-in has one — a tool instance mounts one of this build's
@@ -301,8 +305,8 @@ def service_public_id(
 
 
 async def registration_for_definition(
-    definition: Mapping[str, Any] | None, *, listing_uid: Optional[str] = None
-) -> Optional[RegistrationSnapshot]:
+    definition: Mapping[str, Any] | None, *, listing_uid: str | None = None
+) -> RegistrationSnapshot | None:
     """The registration behind an installed plug-in, or ``None``.
 
     ``None`` covers both "this plug-in has no service" and "this deployment has not
@@ -318,8 +322,8 @@ async def registration_for_definition(
 
 
 async def declarative_registration(
-    listing_uid: Optional[str],
-) -> Optional[RegistrationSnapshot]:
+    listing_uid: str | None,
+) -> RegistrationSnapshot | None:
     """The registration a declarative plug-in's listing, ``listing_uid``, applied."""
     return next(
         (
@@ -355,8 +359,8 @@ def _has_registration(definition: Mapping[str, Any] | None) -> bool:
 async def install_state(
     definition: dict[str, Any] | None,
     *,
-    guild_id: Optional[int],
-    listing_uid: Optional[str] = None,
+    guild_id: int | None,
+    listing_uid: str | None = None,
 ) -> InstallState:
     """The registration-derived state of one install in community ``guild_id``.
 
@@ -380,7 +384,7 @@ async def install_state(
     )
 
 
-async def enabled_service_ids(guild_id: Optional[int]) -> frozenset[str]:
+async def enabled_service_ids(guild_id: int | None) -> frozenset[str]:
     """Every plug-in service this deployment has wired up and switched on, for
     community ``guild_id`` (``None`` for no community).
 
@@ -403,8 +407,8 @@ async def enabled_service_ids(guild_id: Optional[int]) -> frozenset[str]:
 async def plugin_is_offered(
     definition: dict[str, Any] | None,
     *,
-    guild_id: Optional[int],
-    listing_uid: Optional[str] = None,
+    guild_id: int | None,
+    listing_uid: str | None = None,
 ) -> bool:
     """Whether this deployment offers the plug-in a listing describes to
     community ``guild_id``.

@@ -1,18 +1,12 @@
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from pydantic import AliasChoices, ConfigDict, Field, create_model
 
 from app.core.identity_boundary import GuildId
 from app.core.tools import DEFAULT_ENABLED_TOOLS, Tool
-from app.schemas.base import (
-    RichMentionStr,
-    SanitizedBaseModel,
-    TitleStr,
-    reject_null,
-)
-
+from app.models.platform.user import Presence
 from app.models.tenant.initiative import (
     BUILTIN_MEMBER_ROLE,
     DEFAULT_PERMISSION_VALUES,
@@ -20,7 +14,12 @@ from app.models.tenant.initiative import (
     JoinRequestStatus,
     PermissionKey,
 )
-from app.models.platform.user import Presence
+from app.schemas.base import (
+    RichMentionStr,
+    SanitizedBaseModel,
+    TitleStr,
+    reject_null,
+)
 from app.schemas.platform.user import UserSummary
 from app.schemas.query import PageMeta
 
@@ -70,14 +69,14 @@ _InitiativeToolSwitches = create_model(
 _InitiativeToolSwitchesPatch = create_model(
     "_InitiativeToolSwitchesPatch",
     __base__=SanitizedBaseModel,
-    **{t.view_permission: (Optional[bool], None) for t in Tool},
+    **{t.view_permission: (bool | None, None) for t in Tool},
 )
 
 
 class InitiativeBase(_InitiativeToolSwitches):
     name: str
-    description: Optional[RichMentionStr] = None
-    color: Optional[str] = Field(default=None, pattern=HEX_COLOR_PATTERN)
+    description: RichMentionStr | None = None
+    color: str | None = Field(default=None, pattern=HEX_COLOR_PATTERN)
 
 
 class InitiativeCreate(InitiativeBase):
@@ -88,17 +87,17 @@ class InitiativeCreate(InitiativeBase):
 
 
 class InitiativeUpdate(_InitiativeToolSwitchesPatch):
-    name: Optional[TitleStr] = None
-    description: Optional[RichMentionStr] = None
-    color: Optional[str] = Field(default=None, pattern=HEX_COLOR_PATTERN)
+    name: TitleStr | None = None
+    description: RichMentionStr | None = None
+    color: str | None = Field(default=None, pattern=HEX_COLOR_PATTERN)
     # Settable by whoever may already update the initiative (managers, guild
     # admins).
-    join_policy: Optional[InitiativeJoinPolicy] = None
+    join_policy: InitiativeJoinPolicy | None = None
     # Guild admins only — enforced in the endpoint, and only valid alongside a
     # resulting join_policy of 'open'.
-    auto_join: Optional[bool] = None
+    auto_join: bool | None = None
     # Settable by whoever may already update the initiative.
-    keep_content_in: Optional[bool] = None
+    keep_content_in: bool | None = None
 
     _required = reject_null(
         "name",
@@ -126,7 +125,7 @@ class InitiativeRoleRead(SanitizedBaseModel):
     # sharing and may manage sharing. Carried by the built-in moderator role.
     override_share_restrictions: bool = False
     position: int
-    permissions: Dict[PermissionKey, bool] = Field(default_factory=dict)
+    permissions: dict[PermissionKey, bool] = Field(default_factory=dict)
     member_count: int = 0
 
 
@@ -136,15 +135,15 @@ class InitiativeRoleCreate(SanitizedBaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     display_name: str = Field(..., min_length=1, max_length=100)
     is_manager: bool = False
-    permissions: Optional[Dict[PermissionKey, bool]] = None
+    permissions: dict[PermissionKey, bool] | None = None
 
 
 class InitiativeRoleUpdate(SanitizedBaseModel):
     """Update a role's display name and/or permissions."""
 
-    display_name: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    is_manager: Optional[bool] = None
-    permissions: Optional[Dict[PermissionKey, bool]] = None
+    display_name: str | None = Field(default=None, min_length=1, max_length=100)
+    is_manager: bool | None = None
+    permissions: dict[PermissionKey, bool] | None = None
 
 
 class InitiativeDefaultsRead(SanitizedBaseModel):
@@ -154,28 +153,26 @@ class InitiativeDefaultsRead(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     #: Each tool's switch the community set, by tool.
-    tools: Dict[Tool, bool] = Field(default_factory=dict)
+    tools: dict[Tool, bool] = Field(default_factory=dict)
     #: What the built-in member role may do, by permission, where it set it.
-    member_permissions: Dict[PermissionKey, bool] = Field(default_factory=dict)
+    member_permissions: dict[PermissionKey, bool] = Field(default_factory=dict)
     #: Whether managers may add roles of their own.
     custom_roles: bool = True
     #: For a community admin: the live initiatives whose own switch has each
     #: tool on, by tool. What a rule set here would override.
-    own_tools: Dict[Tool, List[int]] = Field(default_factory=dict)
+    own_tools: dict[Tool, list[int]] = Field(default_factory=dict)
     #: For a community admin: the live initiatives whose own built-in member
     #: role holds each permission, by permission.
-    own_member_permissions: Dict[PermissionKey, List[int]] = Field(default_factory=dict)
+    own_member_permissions: dict[PermissionKey, list[int]] = Field(default_factory=dict)
 
 
 class InitiativeDefaultsUpdate(SanitizedBaseModel):
     """The defaults to change. A ``null`` hands that tool or permission back
     to each initiative; an omitted one is left as it is."""
 
-    tools: Dict[Tool, Optional[bool]] = Field(default_factory=dict)
-    member_permissions: Dict[PermissionKey, Optional[bool]] = Field(
-        default_factory=dict
-    )
-    custom_roles: Optional[bool] = None
+    tools: dict[Tool, bool | None] = Field(default_factory=dict)
+    member_permissions: dict[PermissionKey, bool | None] = Field(default_factory=dict)
+    custom_roles: bool | None = None
 
 
 class ToolCountsByInitiativeResponse(SanitizedBaseModel):
@@ -184,7 +181,7 @@ class ToolCountsByInitiativeResponse(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    counts: Dict[Tool, Dict[int, int]] = Field(default_factory=dict)
+    counts: dict[Tool, dict[int, int]] = Field(default_factory=dict)
 
 
 class ToolCountsResponse(SanitizedBaseModel):
@@ -195,10 +192,10 @@ class ToolCountsResponse(SanitizedBaseModel):
 
     #: View name -> rows. ``active`` and ``archived`` for every tool, and
     #: ``templates`` for a tool that keeps them.
-    views: Dict[str, int]
+    views: dict[str, int]
     #: The tag tree beside the view asked for; ``None`` unless it was.
-    tag_counts: Optional[Dict[int, int]] = None
-    untagged_count: Optional[int] = None
+    tag_counts: dict[int, int] | None = None
+    untagged_count: int | None = None
 
 
 # Member schemas - updated to work with role_id
@@ -206,7 +203,7 @@ class InitiativeMemberAdd(SanitizedBaseModel):
     """Add a member to an initiative."""
 
     user_id: int
-    role_id: Optional[int] = None
+    role_id: int | None = None
 
 
 class InitiativeMemberUpdate(SanitizedBaseModel):
@@ -224,9 +221,9 @@ class InitiativeMemberRead(SanitizedBaseModel):
 
     #: With what they have put around their picture, which a roster draws.
     user: UserSummary
-    role_id: Optional[int] = None
-    role_name: Optional[str] = None
-    role_display_name: Optional[str] = None
+    role_id: int | None = None
+    role_name: str | None = None
+    role_display_name: str | None = None
     is_manager: bool = False
     #: Whether this member's role carries "Full access" — reaching every item
     #: in the initiative however it is shared, and managing that sharing. A
@@ -239,13 +236,13 @@ class InitiativeMemberRead(SanitizedBaseModel):
     presence: Presence = Presence.offline
     #: When their time in the community ends, for a guest. ``None`` for a
     #: member.
-    guest_until: Optional[datetime] = None
+    guest_until: datetime | None = None
 
 
 class InitiativeMemberListResponse(PageMeta):
     """One page of an initiative's roster, each member with their role."""
 
-    items: List[InitiativeMemberRead]
+    items: list[InitiativeMemberRead]
 
 
 class InitiativeCan(SanitizedBaseModel):
@@ -261,9 +258,9 @@ class InitiativeCan(SanitizedBaseModel):
     #: not a guest given items in it.
     roster: bool = False
     #: The tools the caller may open here.
-    view: List[Tool] = Field(default_factory=list)
+    view: list[Tool] = Field(default_factory=list)
     #: The tools the caller may make a new one of here.
-    create: List[Tool] = Field(default_factory=list)
+    create: list[Tool] = Field(default_factory=list)
 
 
 class InitiativeRead(InitiativeBase):
@@ -279,11 +276,11 @@ class InitiativeRead(InitiativeBase):
     #: The community this initiative was read in. Set by
     #: :func:`serialize_initiative`; a payload pydantic builds while validating
     #: another carries none until that serializer replaces it.
-    community_id: Optional[GuildId] = Field(
+    community_id: GuildId | None = Field(
         default=None, validation_alias=AliasChoices("community_id", "guild_id")
     )
     # Hidden from the main sidebar once set (see Initiative.archived_at).
-    archived_at: Optional[datetime] = None
+    archived_at: datetime | None = None
     # How guild members may join (see InitiativeJoinPolicy). Never consulted by
     # RLS — it governs how a membership row comes to exist, nothing more.
     join_policy: InitiativeJoinPolicy = InitiativeJoinPolicy.private
@@ -295,7 +292,7 @@ class InitiativeRead(InitiativeBase):
     can: InitiativeCan = Field(default_factory=InitiativeCan)
     member_count: int = 0
     #: The caller's role here, when they are a member.
-    role_display_name: Optional[str] = None
+    role_display_name: str | None = None
 
 
 class InitiativeDirectoryEntry(SanitizedBaseModel):
@@ -313,8 +310,8 @@ class InitiativeDirectoryEntry(SanitizedBaseModel):
 
     id: int
     name: str
-    description: Optional[str] = None
-    color: Optional[str] = None
+    description: str | None = None
+    color: str | None = None
     join_policy: InitiativeJoinPolicy
     # Whether new guild members are enrolled here on arrival. Discloses nothing
     # a card does not already: ``ck_initiatives_auto_join_open`` means only an
@@ -325,7 +322,7 @@ class InitiativeDirectoryEntry(SanitizedBaseModel):
     member_count: int = 0
     is_member: bool = False
     #: The caller's role here, when they are a member.
-    role_display_name: Optional[str] = None
+    role_display_name: str | None = None
     has_pending_request: bool = False
     # How many people are waiting at this door — the badge on a manager's card.
     # Zero for everyone who could not act on the queue anyway (see
@@ -337,7 +334,7 @@ class InitiativeDirectoryEntry(SanitizedBaseModel):
 class InitiativeJoinRequestCreate(SanitizedBaseModel):
     """A guild member knocking on a ``request``-policy initiative."""
 
-    message: Optional[str] = Field(
+    message: str | None = Field(
         default=None, max_length=JOIN_REQUEST_MESSAGE_MAX_LENGTH
     )
 
@@ -360,10 +357,10 @@ class InitiativeJoinRequestRead(SanitizedBaseModel):
     initiative_id: int
     user: UserSummary
     status: JoinRequestStatus
-    message: Optional[str] = None
+    message: str | None = None
     created_at: datetime
-    resolved_at: Optional[datetime] = None
-    resolved_by: Optional[int] = None
+    resolved_at: datetime | None = None
+    resolved_by: int | None = None
     prior_denials: int = 0
 
 
@@ -424,7 +421,7 @@ class InitiativeSummary(SanitizedBaseModel):
 
     id: int
     name: str
-    color: Optional[str] = None
+    color: str | None = None
 
 
 def initiative_can(initiative: "Initiative") -> InitiativeCan:
@@ -474,7 +471,7 @@ def serialize_initiative(
 def serialize_initiative_member(
     membership: "InitiativeMember",
     presence: Presence = Presence.offline,
-    guest_until: Optional[datetime] = None,
+    guest_until: datetime | None = None,
 ) -> InitiativeMemberRead:
     """One roster row: the member, the role they hold, how they appear and,
     for a guest, when they go. Reads ``membership.user`` and

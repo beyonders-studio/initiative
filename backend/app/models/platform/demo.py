@@ -7,18 +7,17 @@ they stay empty. Both are the system engine's alone: no request-path role
 reaches either.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import (
     CheckConstraint,
-    UniqueConstraint,
     Column,
     DateTime,
     ForeignKey,
     Integer,
     String,
+    UniqueConstraint,
 )
 from sqlmodel import Field, SQLModel
 
@@ -59,7 +58,7 @@ class DemoSandbox(SQLModel, table=True):
         sa_column=Column(String, nullable=False, index=True, server_default="pooled"),
     )
     #: The invite into the pitch that opened the copy.
-    invite_id: Optional[int] = Field(
+    invite_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -68,11 +67,11 @@ class DemoSandbox(SQLModel, table=True):
             index=True,
         ),
     )
-    claimed_at: Optional[datetime] = Field(
+    claimed_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: The account made for the visitor, deleted with the copy.
-    visitor_id: Optional[int] = Field(
+    visitor_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
@@ -90,7 +89,7 @@ class DemoLead(SQLModel, table=True):
         UniqueConstraint("invite_id", "email_hash", name="uq_demo_leads_invite_email"),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     invite_id: int = Field(
         sa_column=Column(
             Integer, ForeignKey("guild_invites.id", ondelete="CASCADE"), nullable=False
@@ -106,6 +105,6 @@ class DemoLead(SQLModel, table=True):
         )
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False, index=True),
     )

@@ -25,6 +25,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.messages import ExportMessages, InitiativeMessages
 from app.core.relationships import Related
 from app.core.tools import Tool, tool_envelope_type, tool_export_source
+from app.core.user_input_validators import resolve_zone
 from app.db import session as db_session
 from app.models.platform.user import User
 from app.models.tenant._mixins import tool_models
@@ -34,18 +35,17 @@ from app.models.tenant.task import Task
 from app.schemas.query import DateBucket
 from app.services.export.contract import RenderItem, RenderRequest
 from app.services.export.engine import ExportError
-from app.services.export.i18n import et, export_locale
 from app.services.export.filters import narrow, parse_filters
+from app.services.export.i18n import et, export_locale
 from app.services.permissions import (
     DAC_RESOURCES,
     EXPORT_ACCESS,
     require_export_access,
 )
 from app.services.platform.csv_export import safe_filename_component
+from app.services.tenant.initiative_tools import tool_on_in
 from app.services.tenant.initiatives import keeps_content_in
 from app.services.tenant.tool_listing import initiative_switch_clause
-from app.core.user_input_validators import resolve_zone
-from app.services.tenant.initiative_tools import tool_on_in
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from app.services.storage import StorageBackend
@@ -244,7 +244,7 @@ def storage_key_of(url: str | None) -> str:
 
 
 def asset_item(
-    storage: "StorageBackend",
+    storage: StorageBackend,
     version: FileVersion | None,
 ) -> RenderItem | None:
     """A stored file's bytes, zipped under ``assets/`` by its storage key

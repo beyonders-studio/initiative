@@ -12,7 +12,6 @@ import pathlib
 
 import pytest
 
-
 from app.core.builtin_announcements import BUILTIN_ANNOUNCEMENTS
 from app.core.version import compare_versions
 from app.schemas.platform.announcement import (

@@ -28,7 +28,6 @@ from app.testing import (
     emitted,
 )
 
-
 CONNECTION_ID = 41
 
 

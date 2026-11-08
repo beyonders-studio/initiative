@@ -21,9 +21,10 @@ for and Jira does not.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Callable, Iterable, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from app.core.relationships import RelationshipType
 from app.core.task_types import MAX_TASK_TYPES
@@ -99,7 +100,7 @@ def _status_key(status: dict) -> str:
 def collect_statuses(
     issue_type_statuses: Iterable[Any],
     *,
-    board_column_order: Optional[list[str]] = None,
+    board_column_order: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Every status this project can be in, in the order a person sees them.
 
@@ -193,9 +194,9 @@ def map_issue(
     status_names: set[str],
     default_status_name: str,
     include_comments: bool = False,
-    images: Optional[list[StoredImage]] = None,
-    guild_id: Optional[int] = None,
-) -> Optional[tuple[dict[str, Any], int]]:
+    images: list[StoredImage] | None = None,
+    guild_id: int | None = None,
+) -> tuple[dict[str, Any], int] | None:
     """One Jira issue as a task in the envelope.
 
     Returns the task and how many ADF nodes its description lost, or ``None``
@@ -230,7 +231,7 @@ def map_issue(
     urls = media_urls(images or [], guild_id=guild_id) if guild_id is not None else {}
     referenced: set[str] = set()
 
-    def media(identifier: str, alt: Optional[str]) -> Optional[str]:
+    def media(identifier: str, alt: str | None) -> str | None:
         for name in (alt, identifier):
             if name and name in urls:
                 referenced.add(name)
@@ -314,7 +315,7 @@ def comment_ref(comment_id: str) -> str:
     return f"jira-comment:{comment_id}"
 
 
-def _comment_id(value: Any) -> Optional[str]:
+def _comment_id(value: Any) -> str | None:
     """A comment id as Jira sends it — digits, as a string or a number."""
     if isinstance(value, bool):
         return None
@@ -322,7 +323,7 @@ def _comment_id(value: Any) -> Optional[str]:
     return text if text.isdigit() else None
 
 
-def _collect_mention(into: list[str]) -> Callable[[str, str], Optional[str]]:
+def _collect_mention(into: list[str]) -> Callable[[str, str], str | None]:
     """A mention resolver that notes each name and links none of them.
 
     Who a name is here is the people step's answer, which comes after the
@@ -330,7 +331,7 @@ def _collect_mention(into: list[str]) -> Callable[[str, str], Optional[str]]:
     the ones that were placed (``project_import``).
     """
 
-    def note(_account: str, name: str) -> Optional[str]:
+    def note(_account: str, name: str) -> str | None:
         name = name.strip()
         if name and name != "unknown" and name not in into:
             into.append(name)
@@ -548,7 +549,7 @@ def _external_ref(issue: dict) -> str:
     return f"jira:{key}" if key else ""
 
 
-def _date(value: Any) -> Optional[str]:
+def _date(value: Any) -> str | None:
     """A Jira ``duedate`` is a plain ``YYYY-MM-DD``; the envelope wants a
     datetime, so it becomes midnight UTC."""
     text = str(value or "").strip()
@@ -558,10 +559,10 @@ def _date(value: Any) -> Optional[str]:
         parsed = datetime.strptime(text, "%Y-%m-%d")
     except ValueError:
         return None
-    return parsed.replace(tzinfo=timezone.utc).isoformat()
+    return parsed.replace(tzinfo=UTC).isoformat()
 
 
-def _timestamp(value: Any) -> Optional[str]:
+def _timestamp(value: Any) -> str | None:
     """Jira stamps are ISO 8601 with a ``+0000``-style offset, which
     ``fromisoformat`` has accepted since 3.11."""
     text = str(value or "").strip()
@@ -680,12 +681,12 @@ class ProjectMapper:
         *,
         project: Any,
         issue_type_statuses: Iterable[Any],
-        board_column_order: Optional[list[str]] = None,
+        board_column_order: list[str] | None = None,
         app_version: str,
         site_url: str | None = None,
         field_catalog: Any = None,
         include_comments: bool = False,
-        guild_id: Optional[int] = None,
+        guild_id: int | None = None,
     ) -> None:
         statuses = collect_statuses(
             issue_type_statuses, board_column_order=board_column_order
@@ -717,8 +718,8 @@ class ProjectMapper:
         self,
         issues: Iterable[Any],
         *,
-        images_by_issue: Optional[dict[str, list[StoredImage]]] = None,
-        files_by_issue: Optional[dict[str, list[StoredImage]]] = None,
+        images_by_issue: dict[str, list[StoredImage]] | None = None,
+        files_by_issue: dict[str, list[StoredImage]] | None = None,
     ) -> None:
         """Map the next issues in Rank order.
 
@@ -808,14 +809,14 @@ def build_project_envelope(
     project: Any,
     issue_type_statuses: Iterable[Any],
     issues: Iterable[Any],
-    board_column_order: Optional[list[str]] = None,
+    board_column_order: list[str] | None = None,
     app_version: str,
     site_url: str | None = None,
     field_catalog: Any = None,
     include_comments: bool = False,
-    images_by_issue: Optional[dict[str, list[StoredImage]]] = None,
-    files_by_issue: Optional[dict[str, list[StoredImage]]] = None,
-    guild_id: Optional[int] = None,
+    images_by_issue: dict[str, list[StoredImage]] | None = None,
+    files_by_issue: dict[str, list[StoredImage]] | None = None,
+    guild_id: int | None = None,
 ) -> MappedProject:
     """A whole Jira project as the envelope an ordinary import applies.
 

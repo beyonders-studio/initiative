@@ -18,8 +18,7 @@ None of them names a guild. Like the catalog they describe they are
 platform-wide, and their only writer is the system engine.
 """
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from pydantic import ConfigDict
 from sqlalchemy import (
@@ -66,7 +65,7 @@ class MarketplaceTufMetadata(SQLModel, table=True):
     # The metadata file exactly as it was verified.
     data: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
@@ -90,37 +89,37 @@ class MarketplaceRegistryStatus(SQLModel, table=True):
     # SHA-256 of the trusted root the stored metadata was verified under. A
     # deployment pointed at a different root starts over rather than reading
     # metadata from another chain of trust.
-    root_sha256: Optional[str] = Field(
+    root_sha256: str | None = Field(
         default=None, sa_column=Column(String(DIGEST_LENGTH))
     )
     # The version of the newest root the last verified refresh reached.
-    root_version: Optional[int] = Field(default=None, sa_column=Column(Integer))
+    root_version: int | None = Field(default=None, sa_column=Column(Integer))
     # The snapshot version last applied. The same version again means the
     # repository has not changed, and its listings are not read again.
-    snapshot_version: Optional[int] = Field(default=None, sa_column=Column(Integer))
+    snapshot_version: int | None = Field(default=None, sa_column=Column(Integer))
     # When the verified timestamp stops being valid. Past it the catalogue from
     # the registry is stale until a refresh succeeds.
-    expires_at: Optional[datetime] = Field(
+    expires_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True))
     )
     # Where the last attempt read from: the registry URL, or ``bundle`` for an
     # uploaded bundle.
-    source: Optional[str] = Field(default=None, sa_column=Column(String(2000)))
-    last_attempt_at: Optional[datetime] = Field(
+    source: str | None = Field(default=None, sa_column=Column(String(2000)))
+    last_attempt_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True))
     )
     # When a refresh last completed with every listing applied.
-    last_success_at: Optional[datetime] = Field(
+    last_success_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True))
     )
     # Message code of the last refusal, or NULL after a clean refresh.
-    last_error: Optional[str] = Field(default=None, sa_column=Column(String(64)))
+    last_error: str | None = Field(default=None, sa_column=Column(String(64)))
     # How many listings the last verified repository carried.
     listing_count: int = Field(
         default=0, sa_column=Column(Integer, nullable=False, server_default="0")
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
@@ -138,7 +137,7 @@ class MarketplaceMedia(SQLModel, table=True):
     __allow_unmapped__ = True
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     sha256: str = Field(
         sa_column=Column(String(DIGEST_LENGTH), nullable=False, unique=True)
     )
@@ -148,8 +147,8 @@ class MarketplaceMedia(SQLModel, table=True):
     byte_size: int = Field(sa_column=Column(Integer, nullable=False))
     data: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
     # Where the bytes came from, for support questions about a mirrored image.
-    source_url: Optional[str] = Field(default=None, sa_column=Column(Text))
+    source_url: str | None = Field(default=None, sa_column=Column(Text))
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

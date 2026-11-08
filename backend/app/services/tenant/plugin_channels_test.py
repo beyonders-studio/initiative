@@ -6,12 +6,10 @@ install belongs to the calling plug-in — it is the whole of the isolation betw
 one plug-in's credentials and another's.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
-
 from app.services.tenant.plugin_channels import owns_install, set_connection_state
-
 
 SHOP_UID = "TESTAPP0000001"
 
@@ -43,7 +41,7 @@ def _plugin(
         secret_fields={},
         config_state="unverified",
         config_state_detail=None,
-        updated_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(UTC),
     )
 
 

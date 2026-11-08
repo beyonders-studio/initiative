@@ -44,23 +44,23 @@ caller cannot name what gets called: the source comes from the plug-in's own
 declaration, and it is fetched on the caller's own credentials.
 """
 
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import select
 
-from app.core.errors import CodedError
 from app.api import resource_access
 from app.api.deps import (
     AgeViewerDep,
-    RLSSessionDep,
-    GuildContextDep,
     CurrentUser,
     GuildContext,
+    GuildContextDep,
+    RLSSessionDep,
     SettingsRLSSessionDep,
     require_surface,
 )
 from app.core.audit_events import AuditEventType
+from app.core.errors import CodedError
 from app.core.messages import GuildPluginMessages, PluginDataMessages
 from app.core.rate_limit import PLUGIN_ACTIONS_PER_MEMBER, take_allowance
 from app.core.tools import Tool
@@ -82,7 +82,7 @@ from app.services import audit as audit_service
 from app.services.marketplace import plugin_actions
 from app.services.marketplace import plugin_data as plugin_data_service
 from app.services.marketplace.registration_lookup import registration_for_definition
-from app.services.marketplace.service_plugins import plugin_widget_type, is_admin_only
+from app.services.marketplace.service_plugins import is_admin_only, plugin_widget_type
 from app.services.tenant import plugin_age, view_as
 
 
@@ -256,7 +256,7 @@ async def read_plugin_data(
         ),
     ],
     params: Annotated[
-        Optional[str],
+        str | None,
         Query(description="The parameters on the form, as a JSON object."),
     ] = None,
 ) -> PluginDataResponse:
@@ -366,7 +366,7 @@ async def read_plugin_param_options(
         Query(description="Which of the endpoint's parameters to fill a menu for."),
     ],
     params: Annotated[
-        Optional[str],
+        str | None,
         Query(
             description=(
                 "What the form has answered so far, as a JSON object. Only the "

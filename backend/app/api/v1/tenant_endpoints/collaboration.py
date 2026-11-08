@@ -12,8 +12,7 @@ each socket hands over edits a tab made while its socket was closed.
 
 import json
 import logging
-from typing import Annotated, Optional
-
+from typing import Annotated
 
 from fastapi import (
     APIRouter,
@@ -22,21 +21,29 @@ from fastapi import (
     WebSocket,
     status,
 )
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.errors import CodedError
+from app.api import resource_access
+from app.api.content_socket import admit, hold_open
 from app.api.deps import (
     CommunityIdPath,
     CurrentUser,
+    GuildAccessError,
     SessionDep,
     establish_guild_access,
-    GuildAccessError,
     raise_for_guild_access,
 )
-from app.core.messages import FileMessages
 from app.core.body_limit import max_document_body
+from app.core.errors import CodedError
+from app.core.messages import FileMessages
+from app.core.request_audit import record_privileged_edit
+from app.core.user_display import display_name, handle_of
+from app.db.session import require_guild_context
 from app.models.platform.user import User
+from app.models.platform.user_profile_view import MemberProfile
 from app.schemas.tenant.collaboration import CollaborationHandover
-from sqlmodel.ext.asyncio.session import AsyncSession
+from app.services import permissions as permissions_service
+from app.services.content_sockets import RoomKey, Wire, resource_room, sockets
 from app.services.tenant.collaboration import (
     MSG_UPDATE,
     broadcast_awareness,
@@ -45,19 +52,11 @@ from app.services.tenant.collaboration import (
     user_has_connection,
 )
 from app.services.tenant.collaborative_resources import (
-    CollaborativeResource,
     Collaborating,
+    CollaborativeResource,
     registered_types,
     resource_for,
 )
-from app.db.session import require_guild_context
-from app.services import permissions as permissions_service
-from app.services.content_sockets import RoomKey, Wire, resource_room, sockets
-from app.api.content_socket import admit, hold_open
-from app.api import resource_access
-from app.core.request_audit import record_privileged_edit
-from app.core.user_display import display_name, handle_of
-from app.models.platform.user_profile_view import MemberProfile
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -97,7 +96,7 @@ class _Editing:
 
     async def __call__(
         self, session: AsyncSession, user: User
-    ) -> Optional[frozenset[RoomKey]]:
+    ) -> frozenset[RoomKey] | None:
         resolved = await self.spec.load(session, self.resource_id, self.guild_id)
         if resolved is None:
             return None

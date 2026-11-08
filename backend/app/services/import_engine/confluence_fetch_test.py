@@ -17,7 +17,6 @@ from app.services.import_engine.atlassian_test import answered
 from app.services.import_engine.contract import ImportEngineError
 from app.services.import_engine.jira_attachments import bundle_budget
 
-
 CREDENTIAL = atlassian.AtlassianCredential(
     site_url="https://acme.atlassian.net",
     email="someone@example.com",

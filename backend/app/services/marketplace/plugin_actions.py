@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from sqlalchemy import exists
@@ -129,8 +129,8 @@ def _failed(detail: str) -> PluginDataError:
 
 def _answers(
     action: Mapping[str, Any],
-    endpoint: Optional[Mapping[str, Any]],
-    params: Optional[Mapping[str, Any]],
+    endpoint: Mapping[str, Any] | None,
+    params: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     """What the reader answered for the parameters the action asks for, held
     to the endpoint's declaration of them (:func:`plugin_data.validate_params`,
@@ -148,7 +148,7 @@ def _answers(
 
 
 def _on_elements(
-    definition: Optional[Mapping[str, Any]], action_id: str, kind: str, element: str
+    definition: Mapping[str, Any] | None, action_id: str, kind: str, element: str
 ) -> bool:
     """Whether a list field on this kind of item offers the action on each of
     its elements, and ``element`` is one's ``ref``."""
@@ -194,10 +194,10 @@ async def _act(
     plugin: GuildPlugin,
     registration: RegistrationSnapshot,
     action: dict[str, Any],
-    endpoint: Optional[dict[str, Any]],
+    endpoint: dict[str, Any] | None,
     item: dict[str, Any],
     params: Mapping[str, Any],
-    element: Optional[str],
+    element: str | None,
     guild_id: int,
     user_id: int,
     transport: httpx.AsyncBaseTransport | None,
@@ -260,7 +260,7 @@ async def _act(
     installed = plugin_config.install_settings(plugin)
     answered = typed_params(endpoint, params) if endpoint is not None else {}
 
-    async def made(held: dict[str, Any]) -> Optional[dict[str, Any]]:
+    async def made(held: dict[str, Any]) -> dict[str, Any] | None:
         return await action_change(
             action["write"],
             item=item,
@@ -289,8 +289,8 @@ async def run_action(
     context: GuildContext,
     user_id: int,
     age_allows: bool,
-    params: Optional[Mapping[str, Any]] = None,
-    element: Optional[str] = None,
+    params: Mapping[str, Any] | None = None,
+    element: str | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> dict[str, Any]:
     """Run one of the install's actions on one item for the reader, and return

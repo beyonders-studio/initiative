@@ -8,6 +8,7 @@ existence at a given id included.
 
 import io
 import struct
+from datetime import UTC
 
 import pytest
 from httpx import AsyncClient
@@ -17,9 +18,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import (
     DEFAULT_BANNER,
-    Guild,
     CommunityRole,
     CommunityStatus,
+    Guild,
 )
 from app.models.platform.guild_image import (
     IMAGE_SPECS,
@@ -527,7 +528,7 @@ async def test_a_pam_grantee_reads_the_full_banner(
 ):
     """Break-glass reaches a guild's front page as a member does, for its
     window."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from app.models.platform.access_grant import AccessGrant
 
@@ -536,7 +537,7 @@ async def test_a_pam_grantee_reads_the_full_banner(
     operator = await create_user(
         session, email="operator@example.com", role=UserRole.operator
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     session.add(
         AccessGrant(
             user_id=operator.id,

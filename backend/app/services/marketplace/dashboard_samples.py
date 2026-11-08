@@ -21,9 +21,10 @@ from __future__ import annotations
 import hashlib
 import json
 import random
+from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any, Mapping, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from pglast import ast
 
@@ -51,7 +52,7 @@ __all__ = [
 
 #: The day samples are drawn around — the same one the canvas's own
 #: placeholder rows use, so a preview reads as one moment.
-SAMPLE_NOW = datetime(2026, 8, 3, tzinfo=timezone.utc)
+SAMPLE_NOW = datetime(2026, 8, 3, tzinfo=UTC)
 
 #: How many rows a sample widget shows, grouped or not.
 _GROUPED_ROWS = 5
@@ -141,7 +142,7 @@ def _value(column: Any, rng: random.Random, row: int, grouped: bool) -> Any:
 
 #: What each aggregate answers. ``None``: whatever its argument was — the
 #: largest date is a date.
-_AGGREGATE_TYPES: dict[str, Optional[FieldType]] = {
+_AGGREGATE_TYPES: dict[str, FieldType | None] = {
     "count": FieldType.number,
     "sum": FieldType.number,
     "avg": FieldType.number,
@@ -150,7 +151,7 @@ _AGGREGATE_TYPES: dict[str, Optional[FieldType]] = {
 }
 
 #: What each other function answers, where it is fixed.
-_FUNCTION_TYPES: dict[str, Optional[FieldType]] = {
+_FUNCTION_TYPES: dict[str, FieldType | None] = {
     "abs": FieldType.number,
     "round": FieldType.number,
     "length": FieldType.number,

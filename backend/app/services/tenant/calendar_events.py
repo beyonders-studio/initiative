@@ -8,19 +8,20 @@ needs.
 """
 
 from collections.abc import Mapping, Sequence
-from datetime import datetime, time, timedelta, timezone
-from typing import Any, List, Optional
+from datetime import UTC, datetime, time, timedelta
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import ColumnElement, and_, exists, or_
 from sqlalchemy import delete as sa_delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import recurrence
 from app.core.messages import CalendarEventMessages
+from app.core.tools import Tool
 from app.core.user_input_validators import resolve_zone
 from app.db.guild_standing import GuildContext
 from app.db.session import require_guild_context
@@ -31,7 +32,6 @@ from app.models.tenant.calendar_event import (
     CalendarEventAnswer,
     CalendarEventAttendee,
 )
-from app.core.tools import Tool
 from app.schemas.tenant.calendar_event import (
     CalendarEventSummary,
     serialize_calendar_event_summary,
@@ -39,11 +39,10 @@ from app.schemas.tenant.calendar_event import (
 from app.services import permissions as permissions_service
 from app.services.cross_guild import gather_across_guilds, member_guild_ids
 from app.services.tenant import calendar_occurrences as occurrences_service
-from app.services.tenant import named_people
 from app.services.tenant import metadata as metadata_service
+from app.services.tenant import named_people
 from app.services.tenant import tags as tags_service
 from app.services.tenant.tool_listing import initiative_switch_clause
-
 
 # ---------------------------------------------------------------------------
 # Query helpers
@@ -93,7 +92,7 @@ async def get_event(
 _NO_ZONE_INWARD = timedelta(hours=12)
 
 
-def _window_day(bound: datetime, inward: timedelta, tz: Optional[str]) -> datetime:
+def _window_day(bound: datetime, inward: timedelta, tz: str | None) -> datetime:
     """The day a window's bound falls on, as the UTC midnight all-day events
     are stored at.
 
@@ -102,13 +101,13 @@ def _window_day(bound: datetime, inward: timedelta, tz: Optional[str]) -> dateti
     the bounds moved twelve hours inward, which holds within twelve hours of
     UTC."""
     local = bound.astimezone(resolve_zone(tz)) if tz else bound + inward
-    return datetime.combine(local.date(), time(), timezone.utc)
+    return datetime.combine(local.date(), time(), UTC)
 
 
 def starts_in_window(
-    start_after: Optional[datetime],
-    start_before: Optional[datetime],
-    tz: Optional[str] = None,
+    start_after: datetime | None,
+    start_before: datetime | None,
+    tz: str | None = None,
 ) -> list[ColumnElement[bool]]:
     """An event starts in the window: a timed one by its instant, an all-day
     one by its date, a UTC date the same for every viewer (``_window_day``).
@@ -157,9 +156,9 @@ def starts_in_window(
 
 
 def series_in_window(
-    start_after: Optional[datetime],
-    start_before: Optional[datetime],
-    tz: Optional[str] = None,
+    start_after: datetime | None,
+    start_before: datetime | None,
+    tz: str | None = None,
 ) -> list[ColumnElement[bool]]:
     """:func:`starts_in_window`, for an export: a repeating event travels
     whole, so its changed occurrences come with it wherever they now fall."""
@@ -174,7 +173,7 @@ def occurrences(
     events: Sequence[CalendarEventSummary],
     start_after: datetime,
     start_before: datetime,
-    tz: Optional[str] = None,
+    tz: str | None = None,
     changed: Mapping[int, set[datetime]] | None = None,
     budget: int | None = None,
 ) -> list[CalendarEventSummary]:
@@ -257,14 +256,14 @@ async def guild_calendar_event_conditions(
     current_user: User,
     guild_context: GuildContext,
     *,
-    initiative_id: Optional[int] = None,
+    initiative_id: int | None = None,
     guild_scope: bool = False,
-    calendar_ids: Optional[List[int]] = None,
-    exclude_calendar_ids: Optional[List[int]] = None,
-    start_after: Optional[datetime] = None,
-    start_before: Optional[datetime] = None,
-    tz: Optional[str] = None,
-    property_filters: Optional[str] = None,
+    calendar_ids: list[int] | None = None,
+    exclude_calendar_ids: list[int] | None = None,
+    start_after: datetime | None = None,
+    start_before: datetime | None = None,
+    tz: str | None = None,
+    property_filters: str | None = None,
     whole_series: bool = False,
 ) -> list:
     """The WHERE every guild calendar-event read shares: the ``calendar-entries``
@@ -347,10 +346,10 @@ async def query_my_calendar_events(
     session: AsyncSession,
     current_user: User,
     *,
-    guild_ids: Optional[List[int]] = None,
+    guild_ids: list[int] | None = None,
     start_after: datetime,
     start_before: datetime,
-    tz: Optional[str] = None,
+    tz: str | None = None,
 ) -> list[CalendarEventSummary]:
     """Shared cross-guild calendar-event query for the ``/me/calendar-entries``
     aggregate: each repeating event is expanded into its occurrences in the
@@ -495,7 +494,7 @@ async def set_event_attendees(
             )
         )
     if wanted:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         await session.exec(
             pg_insert(CalendarEventAttendee)
             .values(

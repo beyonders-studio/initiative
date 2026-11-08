@@ -7,14 +7,13 @@ almost-right would fail at apply time, inside a worker, long after the person
 who started the import went away.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
 from app.schemas.tenant.project_export import ProjectExportEnvelope
 from app.services.import_engine import todoist_mapping as tm
-
 
 HEADER = (
     "TYPE,CONTENT,DESCRIPTION,PRIORITY,INDENT,AUTHOR,RESPONSIBLE,DATE,"
@@ -189,7 +188,7 @@ def test_a_repeating_date_is_due_on_its_next_date_and_repeats(
         _csv(f"task,T,,4,1,,,{phrase},en,{zone},,,,,"),
         selection="P",
         app_version="1.2.3",
-        now=datetime(2026, 9, 30, 15, tzinfo=timezone.utc),
+        now=datetime(2026, 9, 30, 15, tzinfo=UTC),
     )
     task = mapped.envelope["tasks"][0]
     assert (task["due_date"], task["recurrence"], task["recurrence_strategy"]) == (
@@ -231,7 +230,7 @@ def test_a_deadline_beside_a_repeat_is_when_it_stops(phrase, zone, deadline, due
         _csv(f"task,T,,4,1,,,{phrase},en,{zone},,,,{deadline},"),
         selection="P",
         app_version="1.2.3",
-        now=datetime(2026, 9, 30, 15, tzinfo=timezone.utc),
+        now=datetime(2026, 9, 30, 15, tzinfo=UTC),
     )
     task = mapped.envelope["tasks"][0]
     assert (task["due_date"], task.get("recurrence")) == (due, rule)

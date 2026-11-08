@@ -1,7 +1,7 @@
-from datetime import datetime, timezone
 import asyncio
 import logging
 import re
+from datetime import UTC, datetime
 from urllib.parse import quote, quote_plus
 
 from sqlalchemy import delete as sql_delete
@@ -10,6 +10,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+from app.core import usernames
 from app.core.audit_events import AuditEventType
 from app.core.config import settings
 from app.core.security import get_password_hash
@@ -33,7 +34,6 @@ from app.services.auth import addresses
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import dm_settings as dm_settings_service
 from app.services.platform import guilds as guilds_service
-from app.core import usernames
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ async def init_owner() -> None:
             username=usernames.random_name(),
             discriminator=usernames.random_discriminator(),
             hashed_password=get_password_hash(settings.FIRST_OWNER_PASSWORD),
-            password_set_at=datetime.now(timezone.utc),
+            password_set_at=datetime.now(UTC),
             role=UserRole.owner,
         )
         session.add(user)

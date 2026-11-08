@@ -33,14 +33,14 @@ from typing import TYPE_CHECKING, Any
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.file_types import FileType
 from app.core.identity_boundary import (
     STORED_MENTION,
     MentionForm,
     without_mention_names,
 )
-from app.core.file_types import FileType
-from app.core.user_display import handle_of
 from app.core.tools import Tool, tool_envelope_type
+from app.core.user_display import handle_of
 from app.models.platform.user import UserStatus
 from app.models.platform.user_profile_view import GuildMember, MemberProfile
 
@@ -183,7 +183,7 @@ def place_mentions(
     content: Any,
     handles: Iterable[str],
     *,
-    people: "PeopleMap",
+    people: PeopleMap,
     member_handles: Mapping[str, int],
 ) -> Any:
     """``content`` with each mention of a listed handle linked to whoever it
@@ -203,7 +203,7 @@ def place_markdown_mentions(
     text: str | None,
     handles: list[str],
     *,
-    context: "ImportContext | None",
+    context: ImportContext | None,
     initiative_member_handles: dict[str, int],
 ) -> str | None:
     """``text`` with each ``@<handle>`` it mentions linked to an account here.
@@ -251,9 +251,12 @@ def mention_handles_in(payload: Any) -> list[str]:
             listed = node.get("mention_handles")
             if isinstance(listed, list):
                 for handle in listed:
-                    if isinstance(handle, str) and handle.strip():
-                        if handle.strip() not in found:
-                            found.append(handle.strip())
+                    if (
+                        isinstance(handle, str)
+                        and handle.strip()
+                        and handle.strip() not in found
+                    ):
+                        found.append(handle.strip())
             for value in node.values():
                 walk(value)
         elif isinstance(node, list):

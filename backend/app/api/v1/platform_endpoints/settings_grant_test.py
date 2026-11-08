@@ -1,5 +1,6 @@
 """A grant for a community's settings, and nothing inside it."""
 
+from datetime import UTC
 from unittest.mock import AsyncMock
 
 import pytest
@@ -10,6 +11,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
 from app.services.platform import access_grants as access_grants_service
+from app.services.platform import rules
 from app.testing.factories import (
     create_auth_provider,
     create_guild,
@@ -19,7 +21,6 @@ from app.testing.factories import (
     create_user,
     get_auth_headers,
 )
-from app.services.platform import rules
 
 
 async def _request_and_approve(client, *, requester, approver, guild, rung):
@@ -424,7 +425,7 @@ async def test_a_grant_counts_only_while_its_holder_may_hold_it(
 ):
     """A settings grant answers to its holder's rung as it stands now: demoted
     to moderator, they keep a Moderate grant's reach and nothing else."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from app.models.platform.access_grant import AccessGrant
 
@@ -445,7 +446,7 @@ async def test_a_grant_counts_only_while_its_holder_may_hold_it(
     entry = await client.get(f"/api/v1/communities/{guild.id}", headers=headers)
     assert entry.status_code == 403, entry.text
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     session.add(
         AccessGrant(
             user_id=support.id,

@@ -9,7 +9,7 @@ Tests the initiative API endpoints at /api/v1/initiatives including:
 - Managing initiative members (add, remove, update roles)
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -29,21 +29,21 @@ from app.models.tenant.initiative import (
     InitiativeJoinRequest,
     InitiativeMember,
 )
-from app.services.tenant.initiative_tools import tool_on_sql
-from app.testing.schema_harness import route_session_to_guild
 from app.models.tenant.resource_grant import ResourceGrant
 from app.services import email as email_service
-from app.services.platform import email_outbox
 from app.services.content_sockets import sockets as content_sockets
+from app.services.platform import email_outbox
 from app.services.tenant import initiatives as initiatives_service
+from app.services.tenant.initiative_tools import tool_on_sql
 from app.testing import (
     create_resource_grant,
     create_tool_entity,
+    drain_notices,
     enable_all_tools,
     set_notification_prefs,
-    drain_notices,
 )
 from app.testing.factories import create_guild_membership, create_initiative
+from app.testing.schema_harness import route_session_to_guild
 from app.testing.sockets import open_account_socket
 
 
@@ -57,7 +57,7 @@ async def _live_grant(
     purpose: str = "content",
 ):
     """An approved, currently-live access grant — the PAM branch of GuildContext."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     session.add(
         AccessGrant(
             user_id=user.id,
@@ -844,8 +844,9 @@ async def test_update_initiative_member_role(
     )
 
     # Look up the PM role ID for this initiative
-    from app.models.tenant.initiative import InitiativeRoleModel
     from sqlmodel import select
+
+    from app.models.tenant.initiative import InitiativeRoleModel
 
     pm_role_stmt = select(InitiativeRoleModel).where(
         InitiativeRoleModel.initiative_id == admin.initiative.id,
@@ -1065,8 +1066,9 @@ async def test_cannot_demote_last_manager(
     manager = await acting_user(guild_role=CommunityRole.member, initiative=True)
 
     # Look up the member role ID for this initiative
-    from app.models.tenant.initiative import InitiativeRoleModel
     from sqlmodel import select
+
+    from app.models.tenant.initiative import InitiativeRoleModel
 
     member_role_stmt = select(InitiativeRoleModel).where(
         InitiativeRoleModel.initiative_id == manager.initiative.id,
@@ -1166,7 +1168,7 @@ async def test_directory_lists_only_joinable_initiatives(
         admin.user,
         name="Retired",
         join_policy="open",
-        archived_at=datetime.now(timezone.utc),
+        archived_at=datetime.now(UTC),
     )
 
     caller = await acting_user(guild_role=caller_role, guild=admin.guild)

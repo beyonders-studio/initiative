@@ -1,6 +1,6 @@
 """Wrong answers add up to a timed lock, each longer than the last within a day."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -10,8 +10,7 @@ from app.services.auth import sign_in_locks
 from app.services.auth.sign_in_locks import Outcome
 from app.testing import create_user
 
-
-START = datetime(2026, 9, 24, 12, 0, 0, tzinfo=timezone.utc)
+START = datetime(2026, 9, 24, 12, 0, 0, tzinfo=UTC)
 
 
 class Clock:

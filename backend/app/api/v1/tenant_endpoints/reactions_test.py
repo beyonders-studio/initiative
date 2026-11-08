@@ -18,13 +18,13 @@ from app.schemas.tenant.reaction import SUGGESTED_EMOJI
 from app.services.tenant.reactions import MAX_REACTIONS_PER_USER
 from app.testing import (
     create_comment,
-    create_reaction,
     create_post,
     create_project,
+    create_reaction,
     create_resource_grant,
     create_task,
-    guild_of,
     drain_notices,
+    guild_of,
 )
 from app.testing.schema_harness import route_session_to_guild
 
@@ -223,9 +223,10 @@ class TestReactionToggle:
         """A reaction button invites the double tap, and two requests can both
         find the reaction missing. The row already being there must read as the
         state converging, not as a duplicate-key crash."""
+        from sqlmodel import select
+
         from app.core.reactions import ReactionTarget
         from app.models.tenant.reaction import Reaction
-        from sqlmodel import select
 
         a = await acting_user(
             guild_role=CommunityRole.member, initiative=True, project=True
@@ -268,9 +269,10 @@ class TestReactionToggle:
         """The cap is counted after the insert rather than before, so a row
         that landed concurrently is still counted — and going over rolls the
         whole request back rather than leaving the extra behind."""
+        from sqlmodel import select
+
         from app.core.reactions import ReactionTarget
         from app.models.tenant.reaction import Reaction
-        from sqlmodel import select
 
         a = await acting_user(
             guild_role=CommunityRole.member, initiative=True, project=True
@@ -589,9 +591,10 @@ class TestReactionNotifications:
     async def test_author_hears_about_a_reaction_once(
         self, client, session, acting_user
     ):
+        from sqlmodel import select
+
         from app.models.platform.notification import Notification, NotificationType
         from app.models.tenant.batched_notice import BatchedNotice
-        from sqlmodel import select
 
         a = await acting_user(
             guild_role=CommunityRole.member, initiative=True, project=True
@@ -639,8 +642,9 @@ class TestReactionNotifications:
     async def test_reacting_to_your_own_post_notifies_nobody(
         self, client, session, acting_user
     ):
-        from app.models.platform.notification import Notification, NotificationType
         from sqlmodel import select
+
+        from app.models.platform.notification import Notification, NotificationType
 
         a = await acting_user(
             guild_role=CommunityRole.member, initiative=True, project=True
@@ -668,8 +672,9 @@ class TestReactionNotifications:
     ):
         """The point of the change: reactions digest on the bell too, so a
         second one on the same comment edits the line the first one wrote."""
-        from app.models.platform.notification import Notification, NotificationType
         from sqlmodel import select
+
+        from app.models.platform.notification import Notification, NotificationType
 
         a = await acting_user(
             guild_role=CommunityRole.member, initiative=True, project=True
@@ -731,9 +736,10 @@ class TestReactionNotifications:
     ):
         """Unread is the whole rollup window — once seen, the next reaction is
         news again."""
+        from sqlmodel import select
+
         from app.models.platform.notification import Notification, NotificationType
         from app.services.platform import user_notifications
-        from sqlmodel import select
 
         a = await acting_user(
             guild_role=CommunityRole.member, initiative=True, project=True
@@ -780,8 +786,9 @@ class TestReactionNotifications:
     ):
         """Un-reacting leaves no trace where the author has not looked yet —
         the same rule the queued digest line follows."""
-        from app.models.platform.notification import Notification, NotificationType
         from sqlmodel import select
+
+        from app.models.platform.notification import Notification, NotificationType
 
         a = await acting_user(
             guild_role=CommunityRole.member, initiative=True, project=True
@@ -856,8 +863,9 @@ class TestReactionNotifications:
         """A line written before reactions rolled up carries no reaction id, so
         it has to be matched on who reacted and with what — otherwise the first
         un-react after the upgrade leaves it standing forever."""
-        from app.models.platform.notification import Notification, NotificationType
         from sqlmodel import select
+
+        from app.models.platform.notification import Notification, NotificationType
 
         a = await acting_user(
             guild_role=CommunityRole.member, initiative=True, project=True
@@ -912,8 +920,9 @@ class TestReactionNotifications:
     async def test_taking_a_reaction_back_withdraws_the_queued_line(
         self, client, session, acting_user
     ):
-        from app.models.tenant.batched_notice import BatchedNotice
         from sqlmodel import select
+
+        from app.models.tenant.batched_notice import BatchedNotice
 
         a = await acting_user(
             guild_role=CommunityRole.member, initiative=True, project=True
@@ -951,9 +960,10 @@ async def test_a_reaction_is_its_reactors_to_change(session, acting_user, readin
     """Another member and the community's admin see someone's reaction but
     neither take it off nor add one in their name in the database: what they
     add is theirs."""
-    from app.models.tenant.reaction import Reaction
     from sqlalchemy.exc import DBAPIError
     from sqlmodel import select
+
+    from app.models.tenant.reaction import Reaction
 
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
@@ -1001,9 +1011,10 @@ class TestReactionLifecycle:
         go with the post: they name it by id, and nothing could remove them
         once it is gone. They are a member's own, which the admin purging
         never reaches, and the purge takes them all the same."""
-        from app.models.tenant.reaction import Reaction
-        from app.models.tenant.personal_item import PersonalItem
         from sqlmodel import select
+
+        from app.models.tenant.personal_item import PersonalItem
+        from app.models.tenant.reaction import Reaction
 
         a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
         await _posts_enabled(session, a.initiative)
