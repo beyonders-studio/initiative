@@ -23,7 +23,7 @@ vi.mock("@/hooks/useTickets", async () => ({
         mode: "form",
         contact: null,
         evidence: { max_files: 3, max_bytes: 1024, types: ["image/png"] },
-        types: [],
+        types: ["idea", "problem", "praise"],
       },
       support: { mode: "form", contact: null, evidence: null, types: ["account", "other"] },
     },
@@ -55,24 +55,27 @@ describe("FeedbackSheet", () => {
     return userEvent.setup();
   };
 
-  it("asks for a rating first, then sends it with the answers given and where the app was", async () => {
+  it("starts on an idea and sends what was written, the contact choice and where the app was", async () => {
     const user = open();
-    expect(await screen.findByText("Pick a star to rate it.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Send feedback" })).toBeNull();
+    const box = await screen.findByLabelText("What would you like Initiative to do?");
+    expect(box).toHaveFocus();
+    expect(screen.getByRole("radio", { name: "Suggest an idea" })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Send feedback" })).toBeDisabled();
+    expect(screen.getByText("Write something to send.")).toBeInTheDocument();
+    // Only something not right points at asking for help.
+    expect(
+      screen.queryByRole("button", { name: "Need somebody to sort it out for you? Ask for help" })
+    ).toBeNull();
 
-    await user.click(screen.getByRole("radio", { name: "4 stars: Really good" }));
-    await user.type(screen.getByLabelText(/What do you wish it did\?/), "Dark print.");
+    await user.type(box, "Dark print.");
     await user.click(screen.getByLabelText("You can contact me with questions about this"));
-    // Only a low rating points at asking for help.
-    expect(screen.queryByRole("button", { name: "Stuck on something? Ask for help" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Send feedback" }));
 
     expect(fileMutate).toHaveBeenCalledWith({
       ticket: {
         stream: "feedback",
-        rating: 4,
-        likes: null,
-        wishes: "Dark print.",
+        type: "idea",
+        body: "Dark print.",
         contactable: true,
         context: expect.objectContaining({ app_version: "0.0.0-test", route: "/c/$communityId" }),
       },
@@ -82,26 +85,34 @@ describe("FeedbackSheet", () => {
     expect(screen.getByText("Thanks for the feedback!")).toHaveFocus();
   });
 
-  it("keeps the draft when closed, and leaves the app's details out when asked", async () => {
+  it("keeps the kind and the draft when closed, and leaves the app's details out when asked", async () => {
     const user = open();
-    await user.click(await screen.findByRole("radio", { name: "2 stars: Needs work" }));
-    expect(screen.getByRole("button", { name: "Stuck on something? Ask for help" })).toBeVisible();
-    await user.type(screen.getByLabelText(/What do you like most\?/), "The board.");
+    await user.click(await screen.findByRole("radio", { name: "Something's not right" }));
+    expect(
+      screen.getByRole("button", { name: "Need somebody to sort it out for you? Ask for help" })
+    ).toBeVisible();
+    await user.type(screen.getByLabelText("What got in your way?"), "Export drops a row.");
 
     await user.keyboard("{Escape}");
-    expect(screen.queryByLabelText(/What do you like most\?/)).toBeNull();
+    expect(screen.queryByLabelText("What got in your way?")).toBeNull();
     act(() => openFeedback());
-    expect(await screen.findByLabelText(/What do you like most\?/)).toHaveValue("The board.");
-    expect(screen.getByRole("radio", { name: "2 stars: Needs work" })).toBeChecked();
+    expect(await screen.findByLabelText("What got in your way?")).toHaveValue(
+      "Export drops a row."
+    );
+    expect(screen.getByRole("radio", { name: "Something's not right" })).toBeChecked();
 
     await user.click(screen.getByRole("switch", { name: "Include your app version and page" }));
     await user.keyboard("{Control>}{Enter}{/Control}");
     expect(fileMutate).toHaveBeenCalledWith(
       expect.objectContaining({
-        ticket: expect.objectContaining({ rating: 2, likes: "The board.", context: null }),
+        ticket: expect.objectContaining({
+          type: "problem",
+          body: "Export drops a row.",
+          context: null,
+        }),
       })
     );
     await user.click(screen.getByRole("button", { name: "Discard" }));
-    expect(screen.getByText("Pick a star to rate it.")).toBeInTheDocument();
+    expect(screen.getByLabelText("What would you like Initiative to do?")).toHaveValue("");
   });
 });

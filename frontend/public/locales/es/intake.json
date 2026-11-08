@@ -244,26 +244,28 @@
     "error": "No se pudo enviar. Inténtalo de nuevo en un momento."
   },
   "feedback": {
-    "title": "¿Qué tal te funciona Initiative?",
-    "ratingLabel": "Tu valoración",
-    "star_one": "{{count}} estrella: {{label}}",
-    "star_other": "{{count}} estrellas: {{label}}",
-    "ratings": {
-      "1": "No muy bien",
-      "2": "Mejorable",
-      "3": "Está bien",
-      "4": "Muy bien",
-      "5": "Me encanta"
+    "title": "Cuéntanos qué piensas",
+    "kindLabel": "Tipo de comentario",
+    "kinds": {
+      "idea": {
+        "label": "Sugerir una idea",
+        "question": "¿Qué te gustaría que hiciera Initiative?",
+        "placeholder": "La idea, y en qué te ayudaría."
+      },
+      "problem": {
+        "label": "Algo no va bien",
+        "question": "¿Qué te ha estorbado?",
+        "placeholder": "Qué estabas haciendo y qué pasó."
+      },
+      "praise": {
+        "label": "Hacer un cumplido",
+        "question": "¿Qué es lo que te encanta?",
+        "placeholder": "Lo que le contarías a un amigo."
+      }
     },
-    "pickStar": "Elige una estrella para valorarlo.",
-    "optional": "Opcional",
-    "likesLabel": "¿Qué es lo que más te gusta?",
-    "likesPlaceholder": "Lo que le contarías a un amigo.",
-    "wishesLabel": "¿Qué te gustaría que hiciera?",
-    "wishesPlaceholder": "Una función que te encantaría, o algo que cambiarías.",
     "addPicture": "Añadir una imagen",
     "contactable": "Pueden contactarme si tienen preguntas sobre esto",
-    "stuck": "¿Te has atascado? Pedir ayuda",
+    "stuck": "¿Necesitas que alguien lo resuelva por ti? Pedir ayuda",
     "context": {
       "on": "Incluye la versión de la app y la página en la que estás.",
       "off": "Sin la versión de la app ni la página.",
@@ -280,6 +282,7 @@
       }
     },
     "discard": "Descartar",
+    "writeSomething": "Escribe algo para enviarlo.",
     "submit": "Enviar comentarios",
     "thanks": "¡Gracias por tu opinión!",
     "thanksBody": "El equipo lee cada una.",

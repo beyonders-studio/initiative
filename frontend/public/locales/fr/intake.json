@@ -244,26 +244,28 @@
     "error": "Impossible d'envoyer. Réessayez dans un instant."
   },
   "feedback": {
-    "title": "Comment se passe Initiative pour vous ?",
-    "ratingLabel": "Votre note",
-    "star_one": "{{count}} étoile : {{label}}",
-    "star_other": "{{count}} étoiles : {{label}}",
-    "ratings": {
-      "1": "Pas terrible",
-      "2": "À améliorer",
-      "3": "Correct",
-      "4": "Très bien",
-      "5": "J'adore"
+    "title": "Dites-nous ce que vous en pensez",
+    "kindLabel": "Type d'avis",
+    "kinds": {
+      "idea": {
+        "label": "Proposer une idée",
+        "question": "Que voudriez-vous qu'Initiative fasse ?",
+        "placeholder": "L'idée, et ce qu'elle vous permettrait de faire."
+      },
+      "problem": {
+        "label": "Quelque chose ne va pas",
+        "question": "Qu'est-ce qui vous a gêné ?",
+        "placeholder": "Ce que vous faisiez, et ce qui s'est passé."
+      },
+      "praise": {
+        "label": "Faire un compliment",
+        "question": "Qu'est-ce que vous aimez ?",
+        "placeholder": "Ce dont vous parleriez à un ami."
+      }
     },
-    "pickStar": "Choisissez une étoile pour noter.",
-    "optional": "Facultatif",
-    "likesLabel": "Qu'aimez-vous le plus ?",
-    "likesPlaceholder": "Ce dont vous parleriez à un ami.",
-    "wishesLabel": "Que voudriez-vous qu'il fasse ?",
-    "wishesPlaceholder": "Une fonctionnalité que vous adoreriez, ou quelque chose que vous changeriez.",
     "addPicture": "Ajouter une image",
     "contactable": "Vous pouvez me contacter si vous avez des questions à ce sujet",
-    "stuck": "Bloqué ? Demander de l'aide",
+    "stuck": "Besoin que quelqu'un s'en occupe ? Demander de l'aide",
     "context": {
       "on": "Inclut la version de l'application et la page où vous êtes.",
       "off": "Sans la version de l'application ni la page.",
@@ -280,6 +282,7 @@
       }
     },
     "discard": "Abandonner",
+    "writeSomething": "Écrivez quelque chose pour l'envoyer.",
     "submit": "Envoyer l'avis",
     "thanks": "Merci pour votre avis !",
     "thanksBody": "L'équipe lit chaque message.",

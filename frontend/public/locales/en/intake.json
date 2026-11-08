@@ -244,26 +244,28 @@
     "error": "Could not send that. Try again in a moment."
   },
   "feedback": {
-    "title": "How's Initiative working for you?",
-    "ratingLabel": "Your rating",
-    "star_one": "{{count}} star: {{label}}",
-    "star_other": "{{count}} stars: {{label}}",
-    "ratings": {
-      "1": "Not great",
-      "2": "Needs work",
-      "3": "It's okay",
-      "4": "Really good",
-      "5": "Love it"
+    "title": "Tell us what you think",
+    "kindLabel": "What kind of feedback",
+    "kinds": {
+      "idea": {
+        "label": "Suggest an idea",
+        "question": "What would you like Initiative to do?",
+        "placeholder": "The idea, and what it would help you do."
+      },
+      "problem": {
+        "label": "Something's not right",
+        "question": "What got in your way?",
+        "placeholder": "What you were doing, and what happened."
+      },
+      "praise": {
+        "label": "Give a compliment",
+        "question": "What do you love about it?",
+        "placeholder": "The part you'd tell a friend about."
+      }
     },
-    "pickStar": "Pick a star to rate it.",
-    "optional": "Optional",
-    "likesLabel": "What do you like most?",
-    "likesPlaceholder": "The part you'd tell a friend about.",
-    "wishesLabel": "What do you wish it did?",
-    "wishesPlaceholder": "A feature you'd love, or something you'd change.",
     "addPicture": "Add a picture",
     "contactable": "You can contact me with questions about this",
-    "stuck": "Stuck on something? Ask for help",
+    "stuck": "Need somebody to sort it out for you? Ask for help",
     "context": {
       "on": "Includes your app version and which page you're on.",
       "off": "Leaves out your app version and page.",
@@ -280,6 +282,7 @@
       }
     },
     "discard": "Discard",
+    "writeSomething": "Write something to send.",
     "submit": "Send feedback",
     "thanks": "Thanks for the feedback!",
     "thanksBody": "The team reads every one.",

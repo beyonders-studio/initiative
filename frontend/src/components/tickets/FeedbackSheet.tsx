@@ -1,14 +1,14 @@
 /**
- * The feedback sheet: a short review of how the app is working for somebody,
- * from wherever they are.
+ * The feedback sheet: telling the team about an idea, something that got in
+ * the way, or something somebody loves, from wherever they are.
  *
  * Opened by the account menu and the command palette, and drawn once by the
- * app shell. A rating out of five comes first; what they like most and what
- * they wish it did are theirs to answer or leave. They may tick that the team
- * can contact them about it. The page they are on, as its route with every id
- * left out, travels with it beside the app's version, the platform, the
- * language, the theme and the window's width, shown on asking and theirs to
- * leave out.
+ * app shell. The kind comes first, an idea to start, and picks the question
+ * the box asks; switching it keeps what was written. The sender may tick that
+ * the team can contact them about it. The page they are on, as its route with
+ * every id left out, travels with it beside the app's version, the platform,
+ * the language, the theme and the window's width, shown on asking and theirs
+ * to leave out.
  *
  * On a wide screen it docks beside the page, which stays in view and in
  * reach; on a phone it is a sheet from the bottom. Closing it keeps what was
@@ -21,14 +21,17 @@
 import { Capacitor } from "@capacitor/core";
 import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
 import { useMatches } from "@tanstack/react-router";
-import { Star } from "lucide-react";
+import { CircleAlert, Heart, Lightbulb, type LucideIcon } from "lucide-react";
 import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
-import { type FeedbackContext, SupportTopic } from "@/api/generated/initiativeAPI.schemas";
+import {
+  type FeedbackContext,
+  FeedbackTopic,
+  SupportTopic,
+} from "@/api/generated/initiativeAPI.schemas";
 import proudSvg from "@/assets/yonder/proud.svg";
 import talkingSvg from "@/assets/yonder/talking.svg";
-import { ScaleValue } from "@/components/properties/PropertyValueCell";
 import { HelpLink } from "@/components/support/HelpLink";
 import { ContactDialog } from "@/components/tickets/ContactDialog";
 import { EvidencePicker } from "@/components/tickets/Evidence";
@@ -46,29 +49,30 @@ import { Sheet, SheetContent, SheetTitle } from "@/ui/sheet";
 import { Switch } from "@/ui/switch";
 import { Textarea } from "@/ui/textarea";
 
-/** Match the column behind them, so an answer stops where the server would. */
-const ANSWER_MAX = 5000;
+/** Match the column behind it, so the box stops where the server would. */
+const BODY_MAX = 5000;
 
-const STARS = [1, 2, 3, 4, 5] as const;
-/** A rating out of five, or none yet. */
-type Rating = (typeof STARS)[number] | 0;
+/** The kinds, in the order they are offered, each with its picture. */
+const KINDS: [FeedbackTopic, LucideIcon][] = [
+  [FeedbackTopic.idea, Lightbulb],
+  [FeedbackTopic.problem, CircleAlert],
+  [FeedbackTopic.praise, Heart],
+];
 
 /** The context's fields, in the order they are shown. */
 const CONTEXT_FIELDS = ["app_version", "platform", "locale", "theme", "route", "viewport"] as const;
 
 interface Draft {
-  rating: Rating;
-  likes: string;
-  wishes: string;
+  kind: FeedbackTopic;
+  body: string;
   contactable: boolean;
   withContext: boolean;
   files: File[];
 }
 
 const EMPTY_DRAFT: Draft = {
-  rating: 0,
-  likes: "",
-  wishes: "",
+  kind: FeedbackTopic.idea,
+  body: "",
   contactable: false,
   withContext: true,
   files: [],
@@ -140,11 +144,9 @@ const FeedbackSheet = () => {
   const { data } = useTicketAvailability(communityId);
   const wide = atLeast(useWidthClass(), "sm");
   const [form, setForm] = useState(draft);
-  const [preview, setPreview] = useState<Rating>(0);
   const [seeing, setSeeing] = useState(false);
-  const [sent, setSent] = useState<Rating>(0);
-  const stars = useRef<HTMLDivElement>(null);
-  const wishesBox = useRef<HTMLTextAreaElement>(null);
+  const [sent, setSent] = useState(false);
+  const box = useRef<HTMLTextAreaElement>(null);
   const thanks = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
@@ -157,7 +159,7 @@ const FeedbackSheet = () => {
   const change = (next: Partial<Draft>) => setForm((current) => ({ ...current, ...next }));
   const file = useFileTicket({
     onSuccess: () => {
-      setSent(form.rating);
+      setSent(true);
       setForm(EMPTY_DRAFT);
     },
     onError: (err) => toast.error(getErrorMessage(err, "intake:feedback.error")),
@@ -170,21 +172,20 @@ const FeedbackSheet = () => {
   }
   if (feedback?.mode !== "form") return null;
 
+  const written = Boolean(form.body.trim());
   const send = () => {
-    if (!form.rating || pending) return;
+    if (!written || pending) return;
     file.mutate({
       ticket: {
         stream: "feedback",
-        rating: form.rating,
-        likes: form.likes.trim() || null,
-        wishes: form.wishes.trim() || null,
+        type: form.kind,
+        body: form.body.trim(),
         contactable: form.contactable,
         context: form.withContext ? context : null,
       },
       files: form.files,
     });
   };
-  const lit = preview || form.rating;
 
   return (
     <Sheet open onOpenChange={setSheetOpen} modal={!wide}>
@@ -202,8 +203,7 @@ const FeedbackSheet = () => {
         onInteractOutside={wide ? (event) => event.preventDefault() : undefined}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
-          const chosen = (selector: string) => stars.current?.querySelector<HTMLElement>(selector);
-          (chosen('[data-state="checked"]') ?? chosen('[role="radio"]'))?.focus();
+          box.current?.focus();
         }}
         onKeyDown={(event) => {
           if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
@@ -221,9 +221,6 @@ const FeedbackSheet = () => {
             <SheetTitle ref={thanks} tabIndex={-1} className="text-lg outline-none">
               {t("feedback.thanks")}
             </SheetTitle>
-            <span aria-hidden="true">
-              <ScaleValue value={sent * 20} display="stars" />
-            </span>
             <p className="text-muted-foreground text-sm">{t("feedback.thanksBody")}</p>
             <Button
               type="button"
@@ -242,156 +239,109 @@ const FeedbackSheet = () => {
               <SheetTitle className="text-base leading-snug">{t("feedback.title")}</SheetTitle>
             </div>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-4">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                {/* The kit's radio item draws a dot; a rating is drawn as stars. */}
-                <RadioGroupPrimitive.Root
-                  ref={stars}
-                  aria-label={t("feedback.ratingLabel")}
-                  orientation="horizontal"
-                  className="flex"
-                  value={form.rating ? String(form.rating) : ""}
-                  onValueChange={(value) => change({ rating: Number(value) as Rating })}
+              {/* The kit's radio item draws a dot; a kind is drawn as a tile. */}
+              <RadioGroupPrimitive.Root
+                aria-label={t("feedback.kindLabel")}
+                orientation="horizontal"
+                className="grid grid-cols-3 gap-1.5"
+                value={form.kind}
+                onValueChange={(kind) => change({ kind: kind as FeedbackTopic })}
+                disabled={pending}
+              >
+                {KINDS.map(([kind, Icon]) => (
+                  <RadioGroupPrimitive.Item
+                    key={kind}
+                    value={kind}
+                    className="flex flex-col items-center gap-1 rounded-lg border bg-card px-1.5 py-2.5 text-center text-xs leading-tight hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=checked]:border-primary data-[state=checked]:ring-1 data-[state=checked]:ring-primary"
+                  >
+                    <Icon aria-hidden className="size-[1.125rem] text-muted-foreground" />
+                    {t(`feedback.kinds.${kind}.label`)}
+                  </RadioGroupPrimitive.Item>
+                ))}
+              </RadioGroupPrimitive.Root>
+              <div className="space-y-1.5">
+                <Label htmlFor="feedback-body">{t(`feedback.kinds.${form.kind}.question`)}</Label>
+                <Textarea
+                  ref={box}
+                  id="feedback-body"
+                  rows={4}
+                  maxLength={BODY_MAX}
+                  value={form.body}
+                  onChange={(event) => change({ body: event.target.value })}
+                  placeholder={t(`feedback.kinds.${form.kind}.placeholder`)}
                   disabled={pending}
-                  onPointerLeave={() => setPreview(0)}
-                >
-                  {STARS.map((star) => (
-                    <RadioGroupPrimitive.Item
-                      key={star}
-                      value={String(star)}
-                      aria-label={t("feedback.star", {
-                        count: star,
-                        label: t(`feedback.ratings.${star}`),
-                      })}
-                      className="rounded-md p-1 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
-                      onPointerEnter={() => setPreview(star)}
-                    >
-                      <Star
-                        aria-hidden
-                        className={cn(
-                          "size-8",
-                          star <= lit ? "fill-current text-warning" : "text-muted-foreground/40"
-                        )}
-                      />
-                    </RadioGroupPrimitive.Item>
-                  ))}
-                </RadioGroupPrimitive.Root>
-                <span
-                  aria-hidden="true"
-                  className={cn("text-sm", lit ? "font-medium" : "text-muted-foreground")}
-                >
-                  {lit ? t(`feedback.ratings.${lit}`) : t("feedback.pickStar")}
-                </span>
+                />
               </div>
-
-              {form.rating ? (
-                <>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="feedback-likes">
-                      {t("feedback.likesLabel")}{" "}
-                      <span className="font-normal text-muted-foreground text-xs">
-                        {t("feedback.optional")}
-                      </span>
-                    </Label>
-                    <Textarea
-                      id="feedback-likes"
-                      rows={2}
-                      maxLength={ANSWER_MAX}
-                      value={form.likes}
-                      onChange={(event) => change({ likes: event.target.value })}
-                      placeholder={t("feedback.likesPlaceholder")}
-                      disabled={pending}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="feedback-wishes">
-                      {t("feedback.wishesLabel")}{" "}
-                      <span className="font-normal text-muted-foreground text-xs">
-                        {t("feedback.optional")}
-                      </span>
-                    </Label>
-                    <Textarea
-                      ref={wishesBox}
-                      id="feedback-wishes"
-                      rows={3}
-                      maxLength={ANSWER_MAX}
-                      value={form.wishes}
-                      onChange={(event) => change({ wishes: event.target.value })}
-                      placeholder={t("feedback.wishesPlaceholder")}
-                      disabled={pending}
-                    />
-                  </div>
-                  <EvidencePicker
-                    policy={feedback.evidence}
-                    files={form.files}
-                    onChange={(files) => change({ files })}
-                    disabled={pending}
-                    label={t("feedback.addPicture")}
-                    pasteFrom={wishesBox}
-                  />
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="feedback-contactable"
-                      checked={form.contactable}
-                      onCheckedChange={(checked) => change({ contactable: checked === true })}
-                      disabled={pending}
-                    />
-                    <Label htmlFor="feedback-contactable" className="font-normal">
-                      {t("feedback.contactable")}
-                    </Label>
-                  </div>
-                  {/* Somebody stuck needs an answer, which feedback is not. */}
-                  {form.rating <= 2 ? (
-                    <HelpLink
-                      topic={SupportTopic.other}
-                      communityId={communityId}
-                      label={t("feedback.stuck")}
-                    />
-                  ) : null}
-                </>
+              <EvidencePicker
+                policy={feedback.evidence}
+                files={form.files}
+                onChange={(files) => change({ files })}
+                disabled={pending}
+                label={t("feedback.addPicture")}
+                pasteFrom={box}
+              />
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="feedback-contactable"
+                  checked={form.contactable}
+                  onCheckedChange={(checked) => change({ contactable: checked === true })}
+                  disabled={pending}
+                />
+                <Label htmlFor="feedback-contactable" className="font-normal">
+                  {t("feedback.contactable")}
+                </Label>
+              </div>
+              {/* Somebody who needs it sorted needs an answer, which feedback is not. */}
+              {form.kind === FeedbackTopic.problem ? (
+                <HelpLink
+                  topic={SupportTopic.other}
+                  communityId={communityId}
+                  label={t("feedback.stuck")}
+                />
               ) : null}
             </div>
 
-            {form.rating ? (
-              <div className="space-y-2 border-t px-4 py-3">
-                <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                  <Switch
-                    checked={form.withContext}
-                    onCheckedChange={(withContext) => change({ withContext })}
-                    aria-label={t("feedback.context.switch")}
-                    disabled={pending}
-                  />
-                  <span className="min-w-0 flex-1">
-                    {form.withContext ? t("feedback.context.on") : t("feedback.context.off")}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    className="h-auto p-0 text-muted-foreground text-xs"
-                    aria-expanded={seeing}
-                    onClick={() => setSeeing(!seeing)}
-                  >
-                    {seeing ? t("feedback.context.hide") : t("feedback.context.show")}
-                  </Button>
-                </div>
-                {seeing ? (
-                  <dl
-                    className={cn(
-                      "grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 rounded-md bg-muted p-2 text-xs",
-                      !form.withContext && "line-through opacity-50"
-                    )}
-                  >
-                    {CONTEXT_FIELDS.filter((field) => context[field]).map((field) => (
-                      <div key={field} className="contents">
-                        <dt className="text-muted-foreground">
-                          {t(`feedback.context.fields.${field}`)}
-                        </dt>
-                        <dd className="break-all font-mono">{context[field]}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                ) : null}
-                <div className="flex items-center justify-end gap-2">
+            <div className="space-y-2 border-t px-4 py-3">
+              <div className="flex items-center gap-2 text-muted-foreground text-xs">
+                <Switch
+                  checked={form.withContext}
+                  onCheckedChange={(withContext) => change({ withContext })}
+                  aria-label={t("feedback.context.switch")}
+                  disabled={pending}
+                />
+                <span className="min-w-0 flex-1">
+                  {form.withContext ? t("feedback.context.on") : t("feedback.context.off")}
+                </span>
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 text-muted-foreground text-xs"
+                  aria-expanded={seeing}
+                  onClick={() => setSeeing(!seeing)}
+                >
+                  {seeing ? t("feedback.context.hide") : t("feedback.context.show")}
+                </Button>
+              </div>
+              {seeing ? (
+                <dl
+                  className={cn(
+                    "grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 rounded-md bg-muted p-2 text-xs",
+                    !form.withContext && "line-through opacity-50"
+                  )}
+                >
+                  {CONTEXT_FIELDS.filter((field) => context[field]).map((field) => (
+                    <div key={field} className="contents">
+                      <dt className="text-muted-foreground">
+                        {t(`feedback.context.fields.${field}`)}
+                      </dt>
+                      <dd className="break-all font-mono">{context[field]}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : null}
+              <div className="flex items-center gap-2">
+                {written || form.files.length ? (
                   <Button
                     type="button"
                     variant="ghost"
@@ -401,12 +351,15 @@ const FeedbackSheet = () => {
                   >
                     {t("feedback.discard")}
                   </Button>
-                  <Button type="button" size="sm" disabled={pending} onClick={send}>
-                    {t("feedback.submit")}
-                  </Button>
-                </div>
+                ) : null}
+                <span className="min-w-0 flex-1 text-muted-foreground text-xs" aria-live="polite">
+                  {written ? "" : t("feedback.writeSomething")}
+                </span>
+                <Button type="button" size="sm" disabled={!written || pending} onClick={send}>
+                  {t("feedback.submit")}
+                </Button>
               </div>
-            ) : null}
+            </div>
           </>
         )}
       </SheetContent>
