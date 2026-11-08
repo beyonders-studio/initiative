@@ -462,7 +462,6 @@ export const ColorField = <
           void save.save({ patch: { color } as P, shows: { color } as Partial<I> })
         }
         triggerLabel={label}
-        className="h-9"
       />
     </FieldFrame>
   );

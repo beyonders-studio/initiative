@@ -30,6 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { ImagePicker } from "@/ui/image-picker";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
@@ -228,10 +229,8 @@ export const AnnouncementEditorDialog = ({
               a max-height dialog gives Radix's viewport no height to fill. */}
           <div className="-mr-2 min-h-0 flex-1 overflow-y-auto pr-2">
             <div className="space-y-6 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="announcement-title">{t("operator.fields.title")}</Label>
+              <Field label={t("operator.fields.title")}>
                 <Input
-                  id="announcement-title"
                   value={state.title}
                   maxLength={200}
                   placeholder={t("operator.fields.titlePlaceholder")}
@@ -239,11 +238,10 @@ export const AnnouncementEditorDialog = ({
                     setState((previous) => ({ ...previous, title: event.target.value }))
                   }
                 />
-              </div>
+              </Field>
 
               <div className="grid grid-cols-pair gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="announcement-category">{t("operator.fields.category")}</Label>
+                <Field label={t("operator.fields.category")}>
                   <Select
                     value={state.category}
                     onValueChange={(value) =>
@@ -253,7 +251,7 @@ export const AnnouncementEditorDialog = ({
                       }))
                     }
                   >
-                    <SelectTrigger id="announcement-category">
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -264,10 +262,9 @@ export const AnnouncementEditorDialog = ({
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </Field>
 
-                <div className="space-y-2">
-                  <Label htmlFor="announcement-min-role">{t("operator.fields.minRole")}</Label>
+                <Field label={t("operator.fields.minRole")} hint={t("operator.fields.minRoleHint")}>
                   <Select
                     value={state.minPlatformRole}
                     onValueChange={(value) =>
@@ -277,7 +274,7 @@ export const AnnouncementEditorDialog = ({
                       }))
                     }
                   >
-                    <SelectTrigger id="announcement-min-role">
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -288,15 +285,13 @@ export const AnnouncementEditorDialog = ({
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-muted-foreground text-xs">
-                    {t("operator.fields.minRoleHint")}
-                  </p>
-                </div>
+                </Field>
 
-                <div className="col-span-full space-y-2">
-                  <Label htmlFor="announcement-accounts">
-                    {t("operator.fields.audienceAccounts")}
-                  </Label>
+                <Field
+                  label={t("operator.fields.audienceAccounts")}
+                  hint={t(`operator.accountsHint.${state.audienceAccounts}`)}
+                  className="col-span-full"
+                >
                   <Select
                     value={state.audienceAccounts}
                     onValueChange={(value) =>
@@ -306,7 +301,7 @@ export const AnnouncementEditorDialog = ({
                       }))
                     }
                   >
-                    <SelectTrigger id="announcement-accounts">
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -317,10 +312,7 @@ export const AnnouncementEditorDialog = ({
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-muted-foreground text-xs">
-                    {t(`operator.accountsHint.${state.audienceAccounts}`)}
-                  </p>
-                </div>
+                </Field>
               </div>
 
               <div className="flex items-center justify-between rounded-md border p-3">
@@ -342,12 +334,11 @@ export const AnnouncementEditorDialog = ({
               </div>
 
               <div className="grid grid-cols-pair gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="announcement-dismissals">
-                    {t("operator.fields.dismissalsRequired")}
-                  </Label>
+                <Field
+                  label={t("operator.fields.dismissalsRequired")}
+                  hint={t("operator.fields.dismissalsRequiredHint")}
+                >
                   <Input
-                    id="announcement-dismissals"
                     type="number"
                     min={1}
                     max={MAX_DISMISSALS_REQUIRED}
@@ -359,35 +350,22 @@ export const AnnouncementEditorDialog = ({
                       }))
                     }
                   />
-                  <p className="text-muted-foreground text-xs">
-                    {t("operator.fields.dismissalsRequiredHint")}
-                  </p>
-                </div>
+                </Field>
 
-                <div className="space-y-2">
-                  <Label htmlFor="announcement-trigger">{t("operator.fields.triggerRoute")}</Label>
+                <Field
+                  label={t("operator.fields.triggerRoute")}
+                  hint={!triggerProblem && t("operator.fields.triggerRouteHint")}
+                  error={triggerProblem && t(`operator.triggerErrors.${triggerProblem}`)}
+                >
                   <Input
-                    id="announcement-trigger"
                     value={state.triggerRoute}
                     maxLength={200}
                     placeholder="/c/*/i/*/projects/**"
-                    aria-invalid={triggerProblem !== null}
-                    aria-describedby="announcement-trigger-hint"
                     onChange={(event) =>
                       setState((previous) => ({ ...previous, triggerRoute: event.target.value }))
                     }
                   />
-                  <p
-                    id="announcement-trigger-hint"
-                    className={
-                      triggerProblem ? "text-destructive text-xs" : "text-muted-foreground text-xs"
-                    }
-                  >
-                    {triggerProblem
-                      ? t(`operator.triggerErrors.${triggerProblem}`)
-                      : t("operator.fields.triggerRouteHint")}
-                  </p>
-                </div>
+                </Field>
               </div>
 
               <div className="grid grid-cols-pair gap-4">
@@ -439,10 +417,11 @@ export const AnnouncementEditorDialog = ({
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="announcement-expires">{t("operator.fields.expiresAt")}</Label>
+                <Field
+                  label={t("operator.fields.expiresAt")}
+                  hint={t("operator.fields.expiresHint")}
+                >
                   <DateTimePicker
-                    id="announcement-expires"
                     includeTime
                     value={state.expiresAt}
                     placeholder={t("common:optional")}
@@ -450,10 +429,7 @@ export const AnnouncementEditorDialog = ({
                       setState((previous) => ({ ...previous, expiresAt: value }))
                     }
                   />
-                  <p className="text-muted-foreground text-xs">
-                    {t("operator.fields.expiresHint")}
-                  </p>
-                </div>
+                </Field>
               </div>
 
               <div className="space-y-3">

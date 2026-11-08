@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
-import { Label } from "@/ui/label";
+import { Field } from "@/ui/field";
 import { Textarea } from "@/ui/textarea";
 
 /** Matches the column behind it. */
@@ -47,17 +47,15 @@ export const WarnDialog = ({ open, onOpenChange, pending = false, onConfirm }: W
           <DialogTitle>{t("warn.title")}</DialogTitle>
           <DialogDescription>{t("warn.description")}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="warning-message">{t("warn.messageLabel")}</Label>
+        <Field label={t("warn.messageLabel")}>
           <Textarea
-            id="warning-message"
             value={message}
             maxLength={MESSAGE_MAX}
             rows={4}
             placeholder={t("warn.messagePlaceholder")}
             onChange={(e) => setMessage(e.target.value)}
           />
-        </div>
+        </Field>
         <DialogFooter
           submitLabel={t("warn.submit")}
           onSubmit={() => onConfirm(said)}

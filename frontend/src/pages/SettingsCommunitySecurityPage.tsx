@@ -45,6 +45,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
@@ -606,10 +607,11 @@ const GuestStayDialog = ({
           <DialogTitle>{t("communityAuth.guestStay.title")}</DialogTitle>
           <DialogDescription>{t("communityAuth.guestStay.description")}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="community-guest-max-days">{t("communityAuth.guestStay.label")}</Label>
+        <Field
+          label={t("communityAuth.guestStay.label")}
+          hint={t("communityAuth.guestStay.hint", { count: ceiling })}
+        >
           <Input
-            id="community-guest-max-days"
             type="number"
             min={1}
             max={ceiling}
@@ -618,10 +620,7 @@ const GuestStayDialog = ({
             placeholder={String(ceiling)}
             onChange={(event) => form.set({ days: event.target.value })}
           />
-          <p className="text-muted-foreground text-sm">
-            {t("communityAuth.guestStay.hint", { count: ceiling })}
-          </p>
-        </div>
+        </Field>
         <DialogFooter
           submitLabel={t("common:save")}
           pending={update.isPending}

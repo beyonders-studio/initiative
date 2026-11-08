@@ -26,8 +26,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Textarea } from "@/ui/textarea";
 
@@ -133,18 +133,14 @@ export const TaskTypeStartsWithDialog = ({
             <DialogDescription>{t("taskTypes.startsWith.description")}</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-2">
-            <Label htmlFor="starts-with-description">
-              {t("taskTypes.startsWith.descriptionLabel")}
-            </Label>
+          <Field label={t("taskTypes.startsWith.descriptionLabel")}>
             <Textarea
-              id="starts-with-description"
               value={draft.description}
               onChange={(event) => setDraft({ ...draft, description: event.target.value })}
               placeholder={t("taskTypes.startsWith.descriptionPlaceholder")}
               rows={5}
             />
-          </div>
+          </Field>
 
           <fieldset className="space-y-2">
             <legend className="font-medium text-sm">
@@ -202,8 +198,7 @@ export const TaskTypeStartsWithDialog = ({
             </Button>
           </fieldset>
 
-          <div className="space-y-2">
-            <Label htmlFor="starts-with-priority">{t("taskTypes.startsWith.priorityLabel")}</Label>
+          <Field label={t("taskTypes.startsWith.priorityLabel")}>
             <Select
               value={draft.priority ?? NO_PRIORITY}
               onValueChange={(value) =>
@@ -213,7 +208,7 @@ export const TaskTypeStartsWithDialog = ({
                 })
               }
             >
-              <SelectTrigger id="starts-with-priority">
+              <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -225,7 +220,7 @@ export const TaskTypeStartsWithDialog = ({
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
 
           <div className="space-y-2">
             <RecurrenceEditor

@@ -19,8 +19,8 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 
 /** The server's limit on the community's own name for the place. */
 const LABEL_MAX = 60;
@@ -88,28 +88,19 @@ export const CommunityLocationPanel = () => {
       </CardHeader>
       <CardContent>
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="community-location">{t("location.fieldLabel")}</Label>
-            <PlacePicker
-              id="community-location"
-              value={draft}
-              onChange={setDraft}
-              disabled={saving}
-            />
-          </div>
+          <Field label={t("location.fieldLabel")}>
+            <PlacePicker value={draft} onChange={setDraft} disabled={saving} />
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="community-location-label">{t("location.labelLabel")}</Label>
+          <Field label={t("location.labelLabel")} hint={t("location.labelHint")}>
             <Input
-              id="community-location-label"
               value={label}
               onChange={(event) => setLabel(event.target.value)}
               maxLength={LABEL_MAX}
               placeholder={t("location.labelPlaceholder")}
               disabled={saving}
             />
-            <p className="text-muted-foreground text-xs">{t("location.labelHint")}</p>
-          </div>
+          </Field>
 
           {activeCommunity.is_community && location ? (
             <p className="text-muted-foreground text-xs">{t("location.listedNote")}</p>

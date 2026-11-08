@@ -5,6 +5,7 @@ import * as React from "react";
 import { useTranslation } from "react-i18next";
 
 import { dialogOverlayClassName, dialogSurfaceClassName } from "@/ui/dialog";
+import { FieldContext } from "@/ui/field";
 import { cn } from "@/ui/lib/utils";
 
 // Radix draws a dialog's overlay only when it is modal, so the content can sit
@@ -84,7 +85,8 @@ const SheetContent = React.forwardRef<
         <X className="h-4 w-4" />
         <span className="sr-only">{t("close")}</span>
       </SheetPrimitive.Close>
-      {children}
+      {/* A sheet's fields are its own, not those of a field it opened from. */}
+      <FieldContext value={null}>{children}</FieldContext>
     </SheetPrimitive.Content>
   );
   return (

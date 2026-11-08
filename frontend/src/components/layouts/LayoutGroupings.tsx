@@ -18,6 +18,7 @@ import {
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
+import { Field } from "@/ui/field";
 import { Label } from "@/ui/label";
 import { cn } from "@/ui/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
@@ -159,13 +160,12 @@ export const LayoutGroupings = ({
           {translate("layouts:groupings.full", { count: MAX_GROUPINGS })}
         </p>
       ) : null}
-      <div className="space-y-1">
-        <Label htmlFor="layout-group-by">{translate("layouts:groupings.startsOn")}</Label>
+      <Field label={translate("layouts:groupings.startsOn")} className="space-y-1">
         <Select
           value={groupBy ?? NOT_GROUPED}
           onValueChange={(value) => change(entries, value === NOT_GROUPED ? null : value)}
         >
-          <SelectTrigger id="layout-group-by">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -177,7 +177,7 @@ export const LayoutGroupings = ({
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </Field>
     </div>
   );
 };

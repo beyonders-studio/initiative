@@ -24,8 +24,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 
 /**
  * Global handler for a community that requires a factor of the account's own.
@@ -228,10 +228,8 @@ export const SecondFactorStepUpDialog = () => {
               <DialogDescription>{t("factorStepUp.emailCodeSent")}</DialogDescription>
             </DialogHeader>
             <form className="space-y-4" onSubmit={submitEmailCode}>
-              <div className="space-y-2">
-                <Label htmlFor="step-up-email-code">{t("factorStepUp.emailCodeLabel")}</Label>
+              <Field label={t("factorStepUp.emailCodeLabel")}>
                 <Input
-                  id="step-up-email-code"
                   name="step-up-email-code"
                   inputMode="numeric"
                   autoComplete="one-time-code"
@@ -240,7 +238,7 @@ export const SecondFactorStepUpDialog = () => {
                   onChange={(event) => setCode(event.target.value)}
                   required
                 />
-              </div>
+              </Field>
               {error && <p className="text-destructive text-sm">{error}</p>}
               {/* A code lasts minutes and a few tries; a spent one is replaced
                   here rather than by starting the change over. */}
@@ -377,14 +375,13 @@ export const SecondFactorStepUpDialog = () => {
               </DialogFooter>
             ) : (
               <form className="space-y-4" onSubmit={handleSubmit}>
-                <div className="space-y-2">
-                  <Label htmlFor="step-up-code">
-                    {useRecoveryCode
-                      ? t("secondFactor.recoveryLabel")
-                      : t("secondFactor.codeLabel")}
-                  </Label>
+                <Field
+                  label={
+                    useRecoveryCode ? t("secondFactor.recoveryLabel") : t("secondFactor.codeLabel")
+                  }
+                  id="step-up-code"
+                >
                   <Input
-                    id="step-up-code"
                     name="step-up-code"
                     // A recovery code carries letters and dashes; a live code is
                     // six digits, and the numeric keypad is what a phone should
@@ -404,7 +401,7 @@ export const SecondFactorStepUpDialog = () => {
                     onChange={(event) => setCode(event.target.value)}
                     required
                   />
-                </div>
+                </Field>
                 {error && <p className="text-destructive text-sm">{error}</p>}
                 <button
                   type="button"

@@ -42,6 +42,7 @@ import { openExternal } from "@/lib/openExternal";
 import { localized } from "@/lib/widgets/widgetMeta";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
@@ -333,10 +334,9 @@ function ConnectionFieldInput({
   if (field.type === "select") {
     const current = typeof value === "string" ? value : (stored as string | undefined);
     return (
-      <div className="space-y-1.5">
-        <Label htmlFor={id}>{label}</Label>
+      <Field label={label} id={id} className="space-y-1.5">
         <Select value={current ?? ""} onValueChange={onChange}>
-          <SelectTrigger id={id}>
+          <SelectTrigger>
             <SelectValue placeholder={t("plugins:connections.choose")} />
           </SelectTrigger>
           <SelectContent>
@@ -347,7 +347,7 @@ function ConnectionFieldInput({
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </Field>
     );
   }
 

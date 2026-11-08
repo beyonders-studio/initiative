@@ -9,8 +9,8 @@ import { useCommunities } from "@/hooks/useCommunities";
 import type { InviteLinkLimits, useCommunityInvites } from "@/hooks/useCommunityInvites";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { useRelativeTime } from "@/ui/lib/useRelativeTime";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
@@ -33,26 +33,22 @@ export const InviteLimitFields = ({
   const { t } = useTranslation("communities");
   return (
     <>
-      <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-uses`}>{t("users.maxUsesLabel")}</Label>
+      <Field label={t("users.maxUsesLabel")}>
         <Input
-          id={`${idPrefix}-uses`}
           type="number"
           min={1}
           value={value.maxUses}
           onChange={(event) => onChange({ ...value, maxUses: Number(event.target.value) })}
         />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-days`}>{t("users.expiresDaysLabel")}</Label>
+      </Field>
+      <Field label={t("users.expiresDaysLabel")}>
         <Input
-          id={`${idPrefix}-days`}
           type="number"
           min={0}
           value={value.expiresDays}
           onChange={(event) => onChange({ ...value, expiresDays: Number(event.target.value) })}
         />
-      </div>
+      </Field>
     </>
   );
 };

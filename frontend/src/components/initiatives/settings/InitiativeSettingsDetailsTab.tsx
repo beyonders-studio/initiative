@@ -7,8 +7,8 @@ import { useInitiativeDefaults } from "@/hooks/useInitiativeRoles";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/ui/card";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { Textarea } from "@/ui/textarea";
 
 interface InitiativeSettingsDetailsTabProps {
@@ -61,38 +61,32 @@ export const InitiativeSettingsDetailsTab = ({
         <CardContent>
           <form className="space-y-4" onSubmit={onSaveDetails}>
             <div className="grid grid-cols-pair gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="initiative-name">{t("settings.nameLabel")}</Label>
+              <Field label={t("settings.nameLabel")}>
                 <Input
-                  id="initiative-name"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   maxLength={255}
                   disabled={!canManageMembers || isSaving}
                   required
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="initiative-color">{t("settings.colorLabel")}</Label>
+              </Field>
+              <Field label={t("settings.colorLabel")}>
                 <ColorPickerPopover
-                  id="initiative-color"
                   value={color}
                   onChange={setColor}
                   disabled={!canManageMembers || isSaving}
                 />
-              </div>
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="initiative-description">{t("settings.descriptionLabel")}</Label>
+            <Field label={t("settings.descriptionLabel")}>
               <Textarea
-                id="initiative-description"
                 rows={4}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder={t("settings.descriptionPlaceholder")}
                 disabled={!canManageMembers || isSaving}
               />
-            </div>
+            </Field>
             {canManageMembers ? (
               <Button type="submit" pending={isSaving}>
                 {isSaving ? t("settings.saving") : t("settings.saveChanges")}

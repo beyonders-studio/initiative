@@ -20,7 +20,7 @@ import { activityLastVisitKey } from "@/lib/activityLastVisit";
 import { communityPath } from "@/lib/communityUrl";
 import { getItem } from "@/lib/storage";
 import { Button } from "@/ui/button";
-import { Label } from "@/ui/label";
+import { Field } from "@/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 import type { HomeWidgetProps, HomeWidgetSettingsProps } from "./types";
@@ -93,14 +93,13 @@ export const ActivitySettings = ({ options, onChange }: HomeWidgetSettingsProps)
   const community = communityOf(options, communities);
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="activity-widget-community">{t("widgets.activity.community")}</Label>
+      <Field label={t("widgets.activity.community")}>
         <Select
           value={community ? String(community.id) : undefined}
           onValueChange={(value) => onChange({ ...options, communityId: Number(value) })}
           disabled={communities.length === 0}
         >
-          <SelectTrigger id="activity-widget-community">
+          <SelectTrigger>
             <SelectValue placeholder={t("widgets.activity.noCommunity")} />
           </SelectTrigger>
           <SelectContent>
@@ -111,11 +110,10 @@ export const ActivitySettings = ({ options, onChange }: HomeWidgetSettingsProps)
             ))}
           </SelectContent>
         </Select>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="activity-widget-view">{t("widgets.activity.view")}</Label>
+      </Field>
+      <Field label={t("widgets.activity.view")}>
         <Select value={viewOf(options)} onValueChange={(view) => onChange({ ...options, view })}>
-          <SelectTrigger id="activity-widget-view">
+          <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -126,7 +124,7 @@ export const ActivitySettings = ({ options, onChange }: HomeWidgetSettingsProps)
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </Field>
     </div>
   );
 };

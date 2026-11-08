@@ -52,6 +52,7 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/ui/empty";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
@@ -132,10 +133,9 @@ const Choice = <T extends string>({
   onChange: (option: T) => void;
   disabled?: boolean;
 }) => (
-  <div className="space-y-1.5">
-    <Label htmlFor={id}>{label}</Label>
+  <Field label={label} id={id} className="space-y-1.5">
     <Select value={value} onValueChange={(next) => onChange(next as T)} disabled={disabled}>
-      <SelectTrigger id={id} className="w-full">
+      <SelectTrigger className="w-full">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
@@ -146,7 +146,7 @@ const Choice = <T extends string>({
         ))}
       </SelectContent>
     </Select>
-  </div>
+  </Field>
 );
 
 export const FileTicketDialog = ({
@@ -367,21 +367,17 @@ export const FileTicketDialog = ({
                     onChange={setTopic}
                     disabled={pending}
                   />
-                  <div className="space-y-1.5">
-                    <Label htmlFor="ticket-subject">{t("help.subjectLabel")}</Label>
+                  <Field label={t("help.subjectLabel")} className="space-y-1.5">
                     <Input
-                      id="ticket-subject"
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
                       placeholder={t("help.subjectPlaceholder")}
                       maxLength={SUBJECT_MAX}
                       disabled={pending}
                     />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="ticket-body">{t("security.bodyLabel")}</Label>
+                  </Field>
+                  <Field label={t("security.bodyLabel")} className="space-y-1.5">
                     <TicketComposer
-                      id="ticket-body"
                       value={body}
                       onChange={(e) => setBody(e.target.value)}
                       placeholder={t("security.bodyPlaceholder")}
@@ -393,7 +389,7 @@ export const FileTicketDialog = ({
                       pagePicture={{ hidePeople: true }}
                       disabled={pending}
                     />
-                  </div>
+                  </Field>
                   {/* A report about this server stays here; one about the software
                       itself goes to the project. */}
                   <p className="text-muted-foreground text-xs">{t("security.softwareNote")}</p>

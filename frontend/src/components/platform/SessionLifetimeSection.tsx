@@ -16,8 +16,8 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { readOptionalWholeNumber } from "@/lib/text";
 import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 
 export const SessionLifetimeSection = () => {
   const query = usePlatformAuthSettings();
@@ -61,10 +61,8 @@ const SessionLifetimeForm = ({
       description={t("auth.sessionLifetime.description")}
     >
       <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1">
-          <Label htmlFor="session-max-hours">{t("auth.sessionLifetime.label")}</Label>
+        <Field label={t("auth.sessionLifetime.label")} className="space-y-1">
           <Input
-            id="session-max-hours"
             type="number"
             min={1}
             className="w-40"
@@ -72,11 +70,9 @@ const SessionLifetimeForm = ({
             onChange={(event) => setValue(event.target.value)}
             placeholder={t("auth.sessionLifetime.placeholder")}
           />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="session-idle-minutes">{t("auth.sessionLifetime.idleLabel")}</Label>
+        </Field>
+        <Field label={t("auth.sessionLifetime.idleLabel")} className="space-y-1">
           <Input
-            id="session-idle-minutes"
             type="number"
             min={1}
             className="w-40"
@@ -84,7 +80,7 @@ const SessionLifetimeForm = ({
             onChange={(event) => setIdle(event.target.value)}
             placeholder={t("auth.sessionLifetime.idlePlaceholder")}
           />
-        </div>
+        </Field>
         <Button
           disabled={!valid || !changed || update.isPending}
           onClick={() =>

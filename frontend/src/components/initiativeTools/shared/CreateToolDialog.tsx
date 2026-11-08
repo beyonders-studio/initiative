@@ -8,7 +8,6 @@ import { DEFAULT_GRANTS } from "@/components/access/grants";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useToolCreateAccess } from "@/hooks/useInitiativeAccess";
 import { useInitiatives } from "@/hooks/useInitiatives";
-import { toolKebabSingular } from "@/lib/tools";
 import type { DialogProps } from "@/types/dialog";
 import type { TranslateFn } from "@/types/i18n";
 import type { MutationOpts } from "@/types/mutation";
@@ -21,8 +20,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Textarea } from "@/ui/textarea";
 
@@ -93,7 +92,6 @@ export const CreateToolDialog = ({
   // translation signature rather than the statically-typed keys.
   const { t: translate } = useTranslation(text.ns);
   const t = translate as TranslateFn;
-  const idPrefix = `create-${toolKebabSingular(tool)}`;
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -173,10 +171,8 @@ export const CreateToolDialog = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor={`${idPrefix}-name`}>{t("name")}</Label>
+          <Field label={t("name")}>
             <Input
-              id={`${idPrefix}-name`}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("namePlaceholder")}
@@ -188,24 +184,21 @@ export const CreateToolDialog = ({
               }}
               autoFocus
             />
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor={`${idPrefix}-description`}>{t("description")}</Label>
+          <Field label={t("description")}>
             <Textarea
-              id={`${idPrefix}-description`}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t(text.descriptionPlaceholder ?? "descriptionPlaceholder")}
               rows={3}
             />
-          </div>
+          </Field>
 
           {extra?.field}
 
           {communityScope ? null : (
-            <div className="space-y-2">
-              <Label htmlFor={`${idPrefix}-initiative`}>{t("initiative")}</Label>
+            <Field label={t("initiative")}>
               {initiativeId ? (
                 <div className="rounded-md border px-3 py-2 text-sm">
                   {lockedInitiative?.name ?? t("selectInitiative")}
@@ -220,7 +213,7 @@ export const CreateToolDialog = ({
                     setGrants([...DEFAULT_GRANTS]);
                   }}
                 >
-                  <SelectTrigger id={`${idPrefix}-initiative`}>
+                  <SelectTrigger>
                     <SelectValue placeholder={t("selectInitiative")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -232,7 +225,7 @@ export const CreateToolDialog = ({
                   </SelectContent>
                 </Select>
               )}
-            </div>
+            </Field>
           )}
 
           <CreateAccessSection

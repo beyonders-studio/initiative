@@ -33,6 +33,7 @@ import { providerSignInHref } from "@/lib/returnPath";
 import { compactCode } from "@/lib/secondFactorAnswer";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 
@@ -440,10 +441,8 @@ const SignInCard = () => {
                   presenting a form that cannot work. */}
               {passwordLoginEnabled ? (
                 <>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">{t("login.emailLabel")}</Label>
+                  <Field label={t("login.emailLabel")} id="email">
                     <Input
-                      id="email"
                       name="email"
                       type="email"
                       placeholder={t("login.emailPlaceholder")}
@@ -455,7 +454,7 @@ const SignInCard = () => {
                       autoCapitalize="none"
                       required
                     />
-                  </div>
+                  </Field>
                   <div className="space-y-2">
                     <Label htmlFor="password">{t("login.passwordLabel")}</Label>
                     <Input

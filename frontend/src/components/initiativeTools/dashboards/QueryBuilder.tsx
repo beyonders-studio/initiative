@@ -41,6 +41,7 @@ import { joinRange, splitRange } from "@/lib/spreadsheet/range";
 import { type FilterLeaf, type FilterNode, toFilterFieldSpec } from "@/lib/widgets/conditions";
 import { withParamAnswer } from "@/lib/widgets/pluginParams";
 import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { listFormat } from "@/ui/lib/intl";
@@ -272,8 +273,7 @@ export function QueryBuilder({
 
   return (
     <div className="space-y-4">
-      <section className="space-y-2">
-        <Label>{t("dashboards:builder.dataset")}</Label>
+      <Field label={t("dashboards:builder.dataset")}>
         <Select
           value={reading ? SPREADSHEET : calling ? PLUGIN_DATA : (spec.dataset ?? undefined)}
           onValueChange={(choice) =>
@@ -303,12 +303,11 @@ export function QueryBuilder({
             </SelectItem>
           </SelectContent>
         </Select>
-      </section>
+      </Field>
 
       {reading && (
         <section className="grid grid-cols-pair gap-2">
-          <div className="space-y-1">
-            <Label>{t("dashboards:builder.spreadsheet")}</Label>
+          <Field label={t("dashboards:builder.spreadsheet")} className="space-y-1">
             <Select
               value={String(reading.file)}
               onValueChange={(file) => read({ file: Number(file) })}
@@ -324,9 +323,8 @@ export function QueryBuilder({
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>{t("dashboards:builder.sheet")}</Label>
+          </Field>
+          <Field label={t("dashboards:builder.sheet")} className="space-y-1">
             <Select
               value={parts.sheet ?? FIRST_SHEET}
               onValueChange={(name) =>
@@ -346,7 +344,7 @@ export function QueryBuilder({
                 )}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
           <div className="space-y-1">
             <Label htmlFor="builder-range">{t("dashboards:builder.range")}</Label>
             <Input
@@ -369,8 +367,7 @@ export function QueryBuilder({
 
       {calling && (
         <section className="grid grid-cols-pair gap-2">
-          <div className="space-y-1">
-            <Label>{t("dashboards:builder.plugin")}</Label>
+          <Field label={t("dashboards:builder.plugin")} className="space-y-1">
             <Select
               value={calling.plugin}
               onValueChange={(publicId) => {
@@ -389,9 +386,8 @@ export function QueryBuilder({
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>{t("dashboards:builder.endpoint")}</Label>
+          </Field>
+          <Field label={t("dashboards:builder.endpoint")} className="space-y-1">
             <Select
               value={calling.endpoint}
               onValueChange={(name) => call({ plugin: calling.plugin, endpoint: name })}
@@ -407,7 +403,7 @@ export function QueryBuilder({
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
           {/* The endpoint's own parameters, asked the way a plug-in widget's
               form asks them: a menu where the plug-in offers one, a field
               where it does not. */}

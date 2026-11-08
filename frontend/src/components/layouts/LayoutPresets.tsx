@@ -25,8 +25,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 
 import type { LayoutEdits } from "./LayoutEditor";
 import { TaskSortPicker } from "./TaskSortPicker";
@@ -237,16 +237,14 @@ const PresetDialog = ({
             </DialogTitle>
             <DialogDescription>{translate("layouts:presets.dialogHelp")}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="preset-name">{translate("layouts:presets.name")}</Label>
+          <Field label={translate("layouts:presets.name")}>
             <Input
-              id="preset-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
               maxLength={100}
               autoFocus
             />
-          </div>
+          </Field>
           {of.controls(filters, setFilters)}
           {sortable ? <TaskSortPicker value={sort} onChange={setSort} fields={fields} /> : null}
           <DialogFooter submitLabel={translate("common:done")} disabled={!trimmed} />

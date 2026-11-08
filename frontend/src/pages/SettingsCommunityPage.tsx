@@ -10,8 +10,8 @@ import { useCommunities } from "@/hooks/useCommunities";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { Button } from "@/ui/button";
 import { Card, CardContent } from "@/ui/card";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { Textarea } from "@/ui/textarea";
 
 export const SettingsCommunityPage = () => {
@@ -68,25 +68,21 @@ export const SettingsCommunityPage = () => {
       <Card>
         <CardContent className="pt-6">
           <form className="space-y-4" onSubmit={handleSave}>
-            <div className="space-y-2">
-              <Label htmlFor="community-name">{t("settings.nameLabel")}</Label>
+            <Field label={t("settings.nameLabel")}>
               <Input
-                id="community-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 maxLength={255}
                 required
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="community-description">{t("settings.descriptionLabel")}</Label>
+            </Field>
+            <Field label={t("settings.descriptionLabel")}>
               <Textarea
-                id="community-description"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 rows={3}
               />
-            </div>
+            </Field>
             {saveError ? <p className="text-destructive text-sm">{saveError}</p> : null}
             {saveMessage ? <p className="text-primary text-sm">{saveMessage}</p> : null}
             <Button type="submit" disabled={saving}>

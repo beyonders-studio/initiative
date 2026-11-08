@@ -9,6 +9,7 @@ import { Capability, hasCapability } from "@/lib/permissions";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { Field } from "@/ui/field";
 import { Label } from "@/ui/label";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Switch } from "@/ui/switch";
@@ -74,31 +75,29 @@ export const SettingsBrandingPage = () => {
             <p className="text-destructive text-sm">{t("branding.interfaceError")}</p>
           ) : (
             <form className="grid grid-cols-pair gap-6" onSubmit={handleInterfaceSubmit}>
-              <div className="space-y-3 rounded-lg border p-4">
-                <Label htmlFor="light-accent" className="font-medium text-sm">
-                  {t("branding.lightModeLabel")}
-                </Label>
+              <Field
+                label={t("branding.lightModeLabel")}
+                hint={t("branding.lightModeHelp")}
+                className="space-y-3 rounded-lg border p-4"
+              >
                 <ColorPickerPopover
-                  id="light-accent"
                   value={form.values.light}
                   onChange={(next) => form.set({ light: next })}
                   triggerLabel={t("branding.adjust")}
                 />
-                <p className="text-muted-foreground text-xs">{t("branding.lightModeHelp")}</p>
-              </div>
+              </Field>
 
-              <div className="space-y-3 rounded-lg border p-4">
-                <Label htmlFor="dark-accent" className="font-medium text-sm">
-                  {t("branding.darkModeLabel")}
-                </Label>
+              <Field
+                label={t("branding.darkModeLabel")}
+                hint={t("branding.darkModeHelp")}
+                className="space-y-3 rounded-lg border p-4"
+              >
                 <ColorPickerPopover
-                  id="dark-accent"
                   value={form.values.dark}
                   onChange={(next) => form.set({ dark: next })}
                   triggerLabel={t("branding.adjust")}
                 />
-                <p className="text-muted-foreground text-xs">{t("branding.darkModeHelp")}</p>
-              </div>
+              </Field>
 
               <CardFooter className="col-span-full flex flex-wrap gap-3 p-0 pt-2">
                 <Button type="submit" disabled={updateInterface.isPending}>

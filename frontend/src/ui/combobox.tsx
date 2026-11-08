@@ -10,11 +10,12 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useFieldControl } from "@/ui/field";
+import { fieldClass } from "@/ui/input";
 import { commandFilter } from "@/ui/lib/fuzzyMatch";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { cn } from "@/ui/lib/utils";
 
-import { Button } from "./button";
 import {
   Command,
   CommandEmpty,
@@ -79,8 +80,9 @@ export type ComboboxProps = {
    *  is taken; a promise that rejects keeps it, to try again. */
   onCreate?: (typed: string) => unknown;
   /** Opens the popover in place of the field: a button of the caller's own,
-   *  which names itself. `id`, `aria-label`, `placeholder` and `className`
-   *  are the field's, and go unused beside it. */
+   *  which names itself. It takes the id and description of a `Field` around
+   *  it; `aria-label`, `placeholder` and `className` are the field's, and go
+   *  unused beside it. */
   trigger?: ReactElement;
   /** The trigger's edge the popover lines up with: "end" for one at the end
    *  of a row. */
@@ -154,6 +156,7 @@ export const Combobox = (props: ComboboxProps) => {
     "aria-label": ariaLabel,
   } = props;
   const { t } = useTranslation("ui");
+  const field = useFieldControl({ id });
   const [ownOpen, setOwnOpen] = useState(false);
   const open = !disabled && (props.open ?? ownOpen);
   const [query, setQuery] = useState("");
@@ -246,16 +249,17 @@ export const Combobox = (props: ComboboxProps) => {
 
   const popover = (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
+      {/* The field's id and description reach a trigger of the caller's own too. */}
+      <PopoverTrigger asChild {...field}>
         {trigger ?? (
-          <Button
-            id={id}
-            variant="outline"
+          <button
+            type="button"
             role="combobox"
             aria-expanded={open}
             aria-label={ariaLabel}
             className={cn(
-              "w-full justify-between font-normal",
+              fieldClass,
+              "items-center justify-between gap-2",
               !chosenLabel && "text-muted-foreground"
             )}
             disabled={disabled}
@@ -264,7 +268,7 @@ export const Combobox = (props: ComboboxProps) => {
               {chosenLabel || placeholder || t("combobox.placeholder")}
             </span>
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-          </Button>
+          </button>
         )}
       </PopoverTrigger>
       <PopoverContent className="w-[320px] min-w-(--radix-popover-trigger-width) p-0" align={align}>

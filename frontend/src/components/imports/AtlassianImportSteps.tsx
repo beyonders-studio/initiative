@@ -19,6 +19,7 @@ import { getErrorCode, getErrorMessage, messageForCode } from "@/lib/errorMessag
 import { uploadInPieces } from "@/lib/resumableUpload";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { formatBytes } from "@/ui/lib/fileUtils";
@@ -157,26 +158,22 @@ export function AtlassianConnectStep({ onConnected, onUseExport }: AtlassianConn
 
   return (
     <form className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
-      <div className="space-y-2">
-        <Label htmlFor="jira-site">{t("wizard.atlassian.connect.siteLabel")}</Label>
+      <Field label={t("wizard.atlassian.connect.siteLabel")}>
         <Input
-          id="jira-site"
           value={siteUrl}
           placeholder={t("wizard.atlassian.connect.sitePlaceholder")}
           autoComplete="url"
           onChange={(event) => setSiteUrl(event.target.value)}
         />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="jira-email">{t("wizard.atlassian.connect.emailLabel")}</Label>
+      </Field>
+      <Field label={t("wizard.atlassian.connect.emailLabel")}>
         <Input
-          id="jira-email"
           type="email"
           value={email}
           autoComplete="email"
           onChange={(event) => setEmail(event.target.value)}
         />
-      </div>
+      </Field>
       <div className="space-y-2">
         <Label htmlFor="jira-token">{t("wizard.atlassian.connect.tokenLabel")}</Label>
         <Input
@@ -311,10 +308,9 @@ export function AtlassianExportStep({ initiatives, onStarted }: AtlassianExportS
         />
       </label>
 
-      <div className="space-y-2">
-        <Label htmlFor="export-initiative">{t("wizard.choose.initiativeLabel")}</Label>
+      <Field label={t("wizard.choose.initiativeLabel")}>
         <Select value={chosen} onValueChange={setInitiativeId}>
-          <SelectTrigger id="export-initiative">
+          <SelectTrigger>
             <SelectValue placeholder={t("wizard.choose.initiativePlaceholder")} />
           </SelectTrigger>
           <SelectContent>
@@ -325,7 +321,7 @@ export function AtlassianExportStep({ initiatives, onStarted }: AtlassianExportS
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </Field>
 
       <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
         <Label htmlFor="export-attachments" className="font-normal text-sm">
@@ -533,10 +529,14 @@ export function AtlassianChooseStep({
         />
       )}
 
-      <div className="space-y-2">
-        <Label htmlFor="atlassian-initiative">{t("wizard.choose.initiativeLabel")}</Label>
+      <Field
+        label={t("wizard.choose.initiativeLabel")}
+        hint={
+          wantsProjects && wantsSpaces ? t("wizard.atlassian.choose.initiativeHint") : undefined
+        }
+      >
         <Select value={chosen} onValueChange={setInitiativeId}>
-          <SelectTrigger id="atlassian-initiative">
+          <SelectTrigger>
             <SelectValue placeholder={t("wizard.choose.initiativePlaceholder")} />
           </SelectTrigger>
           <SelectContent>
@@ -547,12 +547,7 @@ export function AtlassianChooseStep({
             ))}
           </SelectContent>
         </Select>
-        {wantsProjects && wantsSpaces && (
-          <p className="text-muted-foreground text-xs">
-            {t("wizard.atlassian.choose.initiativeHint")}
-          </p>
-        )}
-      </div>
+      </Field>
 
       <div className="space-y-3 rounded-lg border p-3">
         <div className="flex items-center justify-between gap-3">

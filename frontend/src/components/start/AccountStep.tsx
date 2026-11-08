@@ -4,12 +4,12 @@ import { useTranslation } from "react-i18next";
 import { CaptchaWidget } from "@/components/auth/CaptchaWidget";
 import { LegalNotice } from "@/components/auth/LegalNotice";
 import { NewPasswordFields } from "@/components/auth/NewPasswordFields";
-import { StepField } from "@/components/start/stepParts";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useLegalIndex } from "@/hooks/useLegalDocuments";
 import { passkeysRunHere } from "@/lib/passkeys";
 import { checkNewPassword } from "@/lib/passwordPolicy";
 import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 
 /**
@@ -89,9 +89,8 @@ export const AccountStep = ({
     <form className="space-y-4" onSubmit={submitPassword}>
       {children}
       {formDoor ? (
-        <StepField id="start-email" label={t("register.emailLabel")}>
+        <Field label={t("register.emailLabel")}>
           <Input
-            id="start-email"
             type="email"
             value={email}
             onChange={(event) => onEmailChange(event.target.value)}
@@ -99,7 +98,7 @@ export const AccountStep = ({
             autoCapitalize="none"
             required
           />
-        </StepField>
+        </Field>
       ) : null}
       {passwordLoginEnabled ? (
         <NewPasswordFields

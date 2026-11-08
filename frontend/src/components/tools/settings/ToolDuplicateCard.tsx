@@ -33,8 +33,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** Whether this viewer may copy it: write on it, or read on a template, which
@@ -134,10 +134,9 @@ export const ToolDuplicateCard = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="duplicate-initiative">{t("toolSettings.duplicate.initiative")}</Label>
+            <Field label={t("toolSettings.duplicate.initiative")}>
               <Select value={destination} onValueChange={setInitiativeId}>
-                <SelectTrigger id="duplicate-initiative">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -148,11 +147,9 @@ export const ToolDuplicateCard = () => {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="duplicate-name">{t("name")}</Label>
+            </Field>
+            <Field label={t("name")}>
               <Input
-                id="duplicate-name"
                 value={name}
                 onChange={(event) => setTypedName(event.target.value)}
                 placeholder={t("toolSettings.namePlaceholder")}
@@ -160,7 +157,7 @@ export const ToolDuplicateCard = () => {
                   if (event.key === "Enter") submit();
                 }}
               />
-            </div>
+            </Field>
           </div>
           <DialogFooter
             submitLabel={t("toolSettings.duplicate.action")}

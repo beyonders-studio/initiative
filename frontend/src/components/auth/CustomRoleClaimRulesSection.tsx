@@ -38,8 +38,8 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
@@ -236,16 +236,13 @@ export const CustomRoleClaimRulesSection = ({ communityId }: { communityId: numb
             <DialogDescription>{t("customRoleRules.dialogDescription")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor={adding ? "role-rule-provider" : undefined}>
-                {t("communityAuth.rules.providerLabel")}
-              </Label>
+            <Field label={t("communityAuth.rules.providerLabel")}>
               {adding ? (
                 <Select
                   value={draft.providerId}
                   onValueChange={(providerId) => edit({ providerId })}
                 >
-                  <SelectTrigger id="role-rule-provider">
+                  <SelectTrigger>
                     <SelectValue placeholder={t("communityAuth.rules.providerPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -259,20 +256,17 @@ export const CustomRoleClaimRulesSection = ({ communityId }: { communityId: numb
               ) : (
                 <p className="text-sm">{providerName(Number(draft.providerId))}</p>
               )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="role-rule-group">{t("communityAuth.rules.groupLabel")}</Label>
+            </Field>
+            <Field label={t("communityAuth.rules.groupLabel")}>
               <Input
-                id="role-rule-group"
                 value={draft.claimValue}
                 onChange={(event) => edit({ claimValue: event.target.value })}
                 placeholder={t("communityAuth.rules.groupPlaceholder")}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="role-rule-role">{t("customRoleRules.roleLabel")}</Label>
+            </Field>
+            <Field label={t("customRoleRules.roleLabel")}>
               <Select value={draft.roleId} onValueChange={(roleId) => edit({ roleId })}>
-                <SelectTrigger id="role-rule-role">
+                <SelectTrigger>
                   <SelectValue placeholder={t("customRoleRules.rolePlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -283,7 +277,7 @@ export const CustomRoleClaimRulesSection = ({ communityId }: { communityId: numb
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           </div>
           <DialogFooter
             submitLabel={adding ? t("customRoleRules.add") : t("common:save")}

@@ -6,11 +6,12 @@ import { useTranslation } from "react-i18next";
 import { useSuggestUsernames } from "@/api/generated/auth/auth";
 import { BirthdateField } from "@/components/auth/BirthdateField";
 import type { useAgeConfirmation } from "@/components/auth/useAgeConfirmation";
-import { ContinueButton, StepField } from "@/components/start/stepParts";
+import { ContinueButton } from "@/components/start/stepParts";
 import { type HandleCheck, UsernameField } from "@/components/UsernameField";
 import { TIMEZONE_OPTIONS } from "@/lib/timezones";
 import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
+import { Field } from "@/ui/field";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 
 /** How long typing settles before the suggestions start from it. */
@@ -124,7 +125,7 @@ export const YouStep = ({
               disabled={busy}
             />
           </div>
-          <StepField id="start-timezone" label={t("settings:profile.timezoneLabel")}>
+          <Field label={t("settings:profile.timezoneLabel")}>
             <Combobox
               items={TIMEZONE_OPTIONS.map((tz) => ({ value: tz, label: tz }))}
               value={timezone}
@@ -132,7 +133,7 @@ export const YouStep = ({
               placeholder={t("settings:profile.timezonePlaceholder")}
               emptyMessage={t("settings:profile.timezoneEmpty")}
             />
-          </StepField>
+          </Field>
         </>
       )}
       {asksAge ? (

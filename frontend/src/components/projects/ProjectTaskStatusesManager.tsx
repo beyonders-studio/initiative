@@ -43,9 +43,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { IconPicker } from "@/ui/icon-picker";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { cn } from "@/ui/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
@@ -426,7 +426,7 @@ export const ProjectTaskStatusesManager = ({
               disabled={!canManage || createStatus.isPending}
             />
             <ColorPickerPopover
-              className="h-9 w-40"
+              className="w-40"
               value={newColor}
               onChangeComplete={(hex) => setNewColor(hex)}
               disabled={!canManage || createStatus.isPending}
@@ -539,10 +539,9 @@ export const ProjectTaskStatusesManager = ({
           {isOnlyStatus ? (
             <p className="text-muted-foreground text-sm">{t("statuses.onlyStatus")}</p>
           ) : (
-            <div className="space-y-2">
-              <Label htmlFor="fallback-status">{t("statuses.fallbackLabel")}</Label>
+            <Field label={t("statuses.fallbackLabel")}>
               <Select value={fallbackId} onValueChange={setFallbackId}>
-                <SelectTrigger id="fallback-status">
+                <SelectTrigger>
                   <SelectValue placeholder={t("statuses.chooseFallback")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -554,7 +553,7 @@ export const ProjectTaskStatusesManager = ({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           )}
           <DialogFooter
             submitLabel={t("common:delete")}
@@ -655,7 +654,6 @@ const SortableStatusRow = ({
       </TableCell>
       <TableCell>
         <ColorPickerPopover
-          className="h-9"
           value={draft?.color ?? status.color}
           onChangeComplete={(hex) => onFieldChange(status.id, "color", hex)}
           disabled={disabled}

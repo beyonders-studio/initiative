@@ -48,6 +48,7 @@ import { isValidProviderSlug } from "@/lib/providerSlug";
 import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 import { CopyButton } from "@/ui/copy-button";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Switch } from "@/ui/switch";
@@ -244,12 +245,8 @@ export const ConnectProviderWizard = ({
           {/* The blanks, each asked for on its own. Nobody should be editing
               the middle of a URL to supply a realm. */}
           {preset.blanks.map((blank) => (
-            <div key={blank.name} className="space-y-2">
-              <Label htmlFor={`provider-blank-${blank.name}`}>
-                {t(`authProviders.blanks.${blank.labelKey}`)}
-              </Label>
+            <Field key={blank.name} label={t(`authProviders.blanks.${blank.labelKey}`)}>
               <Input
-                id={`provider-blank-${blank.name}`}
                 value={blanks[blank.name] ?? ""}
                 placeholder={blank.example}
                 onChange={(event) => {
@@ -257,14 +254,12 @@ export const ConnectProviderWizard = ({
                   setBlanks((prev) => ({ ...prev, [blank.name]: event.target.value }));
                 }}
               />
-            </div>
+            </Field>
           ))}
 
           {isCustomPreset(preset) ? (
-            <div className="space-y-2">
-              <Label htmlFor="provider-issuer">{t("authProviders.issuerLabel")}</Label>
+            <Field label={t("authProviders.issuerLabel")}>
               <Input
-                id="provider-issuer"
                 type="url"
                 value={typedIssuer}
                 placeholder={t("authProviders.issuerPlaceholder")}
@@ -273,7 +268,7 @@ export const ConnectProviderWizard = ({
                   setTypedIssuer(event.target.value);
                 }}
               />
-            </div>
+            </Field>
           ) : (
             <div className="space-y-1">
               <Label>{t("authProviders.issuerLabel")}</Label>
@@ -325,25 +320,18 @@ export const ConnectProviderWizard = ({
             </p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="provider-client-id">{t("authProviders.clientIdLabel")}</Label>
-            <Input
-              id="provider-client-id"
-              value={clientId}
-              onChange={(event) => setClientId(event.target.value)}
-            />
-          </div>
+          <Field label={t("authProviders.clientIdLabel")}>
+            <Input value={clientId} onChange={(event) => setClientId(event.target.value)} />
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="provider-client-secret">{t("authProviders.clientSecretLabel")}</Label>
+          <Field label={t("authProviders.clientSecretLabel")}>
             <Input
-              id="provider-client-secret"
               type="password"
               value={clientSecret}
               placeholder={t("authProviders.secretPlaceholder")}
               onChange={(event) => setClientSecret(event.target.value)}
             />
-          </div>
+          </Field>
 
           <Button
             className="w-full"
@@ -358,10 +346,12 @@ export const ConnectProviderWizard = ({
 
       {step === "options" && (
         <form className="space-y-4" onSubmit={submit}>
-          <div className="space-y-2">
-            <Label htmlFor="provider-slug">{t("authProviders.slugLabel")}</Label>
+          <Field
+            label={t("authProviders.slugLabel")}
+            hint={!slugError && t("authProviders.slugHelp")}
+            error={slugError && t("authProviders.slugInvalid")}
+          >
             <Input
-              id="provider-slug"
               value={slug}
               maxLength={64}
               required
@@ -370,36 +360,22 @@ export const ConnectProviderWizard = ({
                 setSlug(event.target.value);
               }}
             />
-            {slugError ? (
-              <p className="text-destructive text-xs">{t("authProviders.slugInvalid")}</p>
-            ) : (
-              <p className="text-muted-foreground text-xs">{t("authProviders.slugHelp")}</p>
-            )}
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="provider-display-name">{t("authProviders.displayNameLabel")}</Label>
+          <Field label={t("authProviders.displayNameLabel")}>
             <Input
-              id="provider-display-name"
               value={displayName}
               required
               onChange={(event) => setDisplayName(event.target.value)}
             />
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label htmlFor="provider-scopes">{t("authProviders.scopesLabel")}</Label>
-            <Input
-              id="provider-scopes"
-              value={scopes}
-              onChange={(event) => setScopes(event.target.value)}
-            />
-            {shown && shown.scopes_supported.length > 0 ? (
-              <p className="text-muted-foreground text-xs">
-                {t("authProviders.scopesFromProvider")}
-              </p>
-            ) : null}
-          </div>
+          <Field
+            label={t("authProviders.scopesLabel")}
+            hint={shown?.scopes_supported.length ? t("authProviders.scopesFromProvider") : null}
+          >
+            <Input value={scopes} onChange={(event) => setScopes(event.target.value)} />
+          </Field>
 
           <div className="space-y-1">
             <Label>{t("authProviders.claimPathLabel")}</Label>

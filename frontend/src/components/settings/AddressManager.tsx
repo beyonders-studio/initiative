@@ -24,8 +24,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { Skeleton } from "@/ui/skeleton";
 
 /** A change to the list waiting on its confirmation. */
@@ -204,23 +204,22 @@ export const AddressManager = () => {
         </ul>
       )}
 
-      <form className="space-y-2" onSubmit={submit}>
-        <Label htmlFor="new-address">{t("settings:addresses.addLabel")}</Label>
-        <div className="flex flex-wrap gap-2">
-          <Input
-            id="new-address"
-            type="email"
-            className="min-w-48 flex-1"
-            value={pending}
-            onChange={(event) => setPending(event.target.value)}
-            placeholder={t("settings:addresses.addPlaceholder")}
-            autoComplete="email"
-          />
-          <Button type="submit" disabled={!pending.trim() || addAddress.isPending}>
-            {t("settings:addresses.addAction")}
-          </Button>
-        </div>
-        <p className="text-muted-foreground text-xs">{t("settings:addresses.addHelp")}</p>
+      <form onSubmit={submit}>
+        <Field label={t("settings:addresses.addLabel")} hint={t("settings:addresses.addHelp")}>
+          <div className="flex flex-wrap gap-2">
+            <Input
+              type="email"
+              className="min-w-48 flex-1"
+              value={pending}
+              onChange={(event) => setPending(event.target.value)}
+              placeholder={t("settings:addresses.addPlaceholder")}
+              autoComplete="email"
+            />
+            <Button type="submit" disabled={!pending.trim() || addAddress.isPending}>
+              {t("settings:addresses.addAction")}
+            </Button>
+          </div>
+        </Field>
       </form>
 
       <Dialog open={change !== null} onOpenChange={(open) => !open && closeChange()}>
@@ -242,17 +241,15 @@ export const AddressManager = () => {
               </DialogDescription>
             </DialogHeader>
             {passwordRequired ? (
-              <div className="space-y-2">
-                <Label htmlFor="address-password">{t("settings:addresses.passwordLabel")}</Label>
+              <Field label={t("settings:addresses.passwordLabel")}>
                 <Input
-                  id="address-password"
                   type="password"
                   autoComplete="current-password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   required
                 />
-              </div>
+              </Field>
             ) : null}
             {changeError ? <p className="text-destructive text-sm">{changeError}</p> : null}
             <DialogFooter

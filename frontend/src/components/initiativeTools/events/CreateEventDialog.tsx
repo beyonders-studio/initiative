@@ -26,7 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
-import { Label } from "@/ui/label";
+import { Field } from "@/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 import { eventRange } from "./EventDateTimeFields";
@@ -64,8 +64,7 @@ const CalendarPick = ({
   const { user } = useAuth();
   const draft = useContext(ItemDraftContext);
   return (
-    <div className="space-y-2">
-      <Label htmlFor="create-event-calendar">{t("calendar")}</Label>
+    <Field label={t("calendar")}>
       <Select
         value={event.calendar_id ? String(event.calendar_id) : ""}
         onValueChange={(value) => {
@@ -85,7 +84,7 @@ const CalendarPick = ({
           });
         }}
       >
-        <SelectTrigger id="create-event-calendar">
+        <SelectTrigger>
           <SelectValue placeholder={t("selectCalendar")} />
         </SelectTrigger>
         <SelectContent>
@@ -102,7 +101,7 @@ const CalendarPick = ({
           ))}
         </SelectContent>
       </Select>
-    </div>
+    </Field>
   );
 };
 

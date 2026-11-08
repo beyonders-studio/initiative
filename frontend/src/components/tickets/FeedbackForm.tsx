@@ -24,6 +24,7 @@ import { DeviceContextSwitch } from "@/components/tickets/DeviceContext";
 import { TicketComposer } from "@/components/tickets/TicketComposer";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
+import { Field } from "@/ui/field";
 import { Label } from "@/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
@@ -154,11 +155,9 @@ export const FeedbackForm = ({
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-        <div className="space-y-1.5">
-          <Label htmlFor="feedback-body">{t(`feedback.kinds.${draft.kind}.question`)}</Label>
+        <Field label={t(`feedback.kinds.${draft.kind}.question`)} className="space-y-1.5">
           <TicketComposer
             ref={box}
-            id="feedback-body"
             rows={4}
             maxLength={BODY_MAX}
             value={draft.body}
@@ -170,7 +169,7 @@ export const FeedbackForm = ({
             pagePicture={pagePicture}
             disabled={pending}
           />
-        </div>
+        </Field>
         <div className="flex items-center gap-2">
           <Checkbox
             id="feedback-contactable"

@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
 
-import { ContinueButton, StepField } from "@/components/start/stepParts";
+import { ContinueButton } from "@/components/start/stepParts";
 import type { StartAnswers } from "@/lib/startFlow";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Textarea } from "@/ui/textarea";
 
@@ -23,45 +24,37 @@ export const CommunityStep = ({
   const { t } = useTranslation("auth");
   return (
     <>
-      <StepField id="start-community-name" label={t(`start.${path}.nameLabel`)}>
+      <Field label={t(`start.${path}.nameLabel`)}>
         <Input
-          id="start-community-name"
           value={answers.communityName}
           onChange={(event) => update({ communityName: event.target.value })}
           maxLength={255}
         />
-      </StepField>
+      </Field>
       {path === "personal" ? (
-        <StepField id="start-list-name" label={t("start.personal.listLabel")}>
+        <Field label={t("start.personal.listLabel")}>
           <Input
-            id="start-list-name"
             value={answers.listName}
             onChange={(event) => update({ listName: event.target.value })}
             maxLength={255}
           />
-        </StepField>
+        </Field>
       ) : (
         <>
-          <StepField id="start-description" label={t("start.shared.descriptionLabel")}>
+          <Field label={t("start.shared.descriptionLabel")}>
             <Textarea
-              id="start-description"
               value={answers.description}
               onChange={(event) => update({ description: event.target.value })}
               rows={3}
             />
-          </StepField>
-          <StepField
-            id="start-initiative-name"
-            label={t("start.shared.initiativeLabel")}
-            hint={t("start.shared.initiativeHint")}
-          >
+          </Field>
+          <Field label={t("start.shared.initiativeLabel")} hint={t("start.shared.initiativeHint")}>
             <Input
-              id="start-initiative-name"
               value={answers.initiativeName}
               onChange={(event) => update({ initiativeName: event.target.value })}
               maxLength={255}
             />
-          </StepField>
+          </Field>
         </>
       )}
       <ContinueButton onClick={onContinue} disabled={disabled} />

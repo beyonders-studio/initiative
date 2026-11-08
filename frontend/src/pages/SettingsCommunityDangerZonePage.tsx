@@ -9,8 +9,8 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 
 export const SettingsCommunityDangerZonePage = () => {
   const { activeCommunity, communities, refreshCommunities, switchCommunity } = useCommunities();
@@ -165,19 +165,15 @@ export const SettingsCommunityDangerZonePage = () => {
         }}
       >
         {!passwordless && (
-          <div className="space-y-2">
-            <Label htmlFor="delete-community-password">
-              {t("settings.deleteConfirmPasswordLabel")}
-            </Label>
+          <Field label={t("settings.deleteConfirmPasswordLabel")}>
             <Input
-              id="delete-community-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder={t("settings.deleteConfirmPasswordPlaceholder")}
               autoComplete="current-password"
             />
-          </div>
+          </Field>
         )}
         {deleteError ? <p className="text-destructive text-sm">{deleteError}</p> : null}
       </ConfirmDialog>

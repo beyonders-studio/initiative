@@ -28,8 +28,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { Tabs, TabsBar, TabsTrigger } from "@/ui/tabs";
 
 export interface HomeViewTabsProps {
@@ -194,16 +194,14 @@ function RenameViewForm({ view, onSave }: { view: HomeViewEntry; onSave: (name: 
       <DialogHeader>
         <DialogTitle>{t("views.renameTitle")}</DialogTitle>
       </DialogHeader>
-      <div className="space-y-2">
-        <Label htmlFor="home-view-name">{t("views.nameLabel")}</Label>
+      <Field label={t("views.nameLabel")}>
         <Input
-          id="home-view-name"
           value={name}
           maxLength={MAX_VIEW_NAME_LENGTH}
           onChange={(event) => setName(event.target.value)}
           autoFocus
         />
-      </div>
+      </Field>
       <DialogFooter submitLabel={t("common:save")} disabled={!clean} />
     </form>
   );

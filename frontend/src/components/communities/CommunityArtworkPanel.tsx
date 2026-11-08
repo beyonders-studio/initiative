@@ -61,6 +61,7 @@ import { resolveHeaderlessApiUrl } from "@/lib/uploadUrl";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { Field } from "@/ui/field";
 import { ImagePicker } from "@/ui/image-picker";
 import { Label } from "@/ui/label";
 
@@ -285,19 +286,15 @@ export const CommunityArtworkPanel = ({ community }: { community: CommunityRead 
 
         <div className="space-y-2">
           <div className="flex flex-wrap items-end gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="community-banner-color">
-                {t("communities:settings.artwork.bannerColorLabel")}
-              </Label>
+            <Field label={t("communities:settings.artwork.bannerColorLabel")}>
               <ColorPickerPopover
-                id="community-banner-color"
                 value={draft.color}
                 disabled={busy !== null}
                 onChange={(next) => draftLook(withReadableText(next))}
                 onChangeComplete={(next) => commitLook(withReadableText(next))}
                 triggerLabel={t("communities:settings.artwork.bannerColorLabel")}
               />
-            </div>
+            </Field>
             <fieldset className="space-y-2" disabled={busy !== null}>
               <legend className="pb-2 font-medium text-sm">
                 {t("communities:settings.artwork.bannerTextColorLabel")}

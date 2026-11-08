@@ -28,8 +28,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { WizardDialog } from "@/ui/wizard-dialog";
 
 /** Below this, the set is worth replacing before it runs out. */
@@ -331,17 +331,15 @@ export const TwoFactorSection = () => {
       >
         {step === "password" ? (
           <form className="space-y-4" onSubmit={submitPassword}>
-            <div className="space-y-2">
-              <Label htmlFor="two-factor-password">{t("twoFactor.passwordLabel")}</Label>
+            <Field label={t("twoFactor.passwordLabel")}>
               <Input
-                id="two-factor-password"
                 type="password"
                 autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
               />
-            </div>
+            </Field>
             {error ? <p className="text-destructive text-sm">{error}</p> : null}
             <DialogFooter>
               <Button type="submit" disabled={begin.isPending || regenerate.isPending}>
@@ -364,10 +362,8 @@ export const TwoFactorSection = () => {
                 {secret}
               </code>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="two-factor-code">{t("twoFactor.codeLabel")}</Label>
+            <Field label={t("twoFactor.codeLabel")}>
               <Input
-                id="two-factor-code"
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 placeholder={t("twoFactor.codePlaceholder")}
@@ -375,7 +371,7 @@ export const TwoFactorSection = () => {
                 onChange={(event) => setCode(event.target.value)}
                 required
               />
-            </div>
+            </Field>
             {error ? <p className="text-destructive text-sm">{error}</p> : null}
             <DialogFooter>
               <Button type="submit" disabled={confirm.isPending || !code.trim()}>
@@ -402,28 +398,24 @@ export const TwoFactorSection = () => {
           </DialogHeader>
           <form className="space-y-4" onSubmit={submitDisable}>
             {passwordRequired ? (
-              <div className="space-y-2">
-                <Label htmlFor="two-factor-off-password">{t("twoFactor.passwordLabel")}</Label>
+              <Field label={t("twoFactor.passwordLabel")}>
                 <Input
-                  id="two-factor-off-password"
                   type="password"
                   autoComplete="current-password"
                   value={offPassword}
                   onChange={(event) => setOffPassword(event.target.value)}
                   required
                 />
-              </div>
+              </Field>
             ) : null}
-            <div className="space-y-2">
-              <Label htmlFor="two-factor-off-code">{t("twoFactor.codeOrRecoveryLabel")}</Label>
+            <Field label={t("twoFactor.codeOrRecoveryLabel")}>
               <Input
-                id="two-factor-off-code"
                 autoComplete="one-time-code"
                 value={offCode}
                 onChange={(event) => setOffCode(event.target.value)}
                 required
               />
-            </div>
+            </Field>
             {error ? <p className="text-destructive text-sm">{error}</p> : null}
             <DialogFooter>
               <Button type="submit" variant="destructive" disabled={disable.isPending}>

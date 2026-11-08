@@ -42,6 +42,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Skeleton } from "@/ui/skeleton";
@@ -143,16 +144,14 @@ export const CreatePostDialog = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="create-post-name">{t("name")}</Label>
+          <Field label={t("name")}>
             <Input
-              id="create-post-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder={t("namePlaceholder")}
               maxLength={255}
             />
-          </div>
+          </Field>
 
           <div className="space-y-2">
             <Label htmlFor="create-post-body">{t("body")}</Label>
@@ -201,17 +200,14 @@ export const CreatePostDialog = ({
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="create-post-schedule">{t("schedule.label")}</Label>
+          <Field label={t("schedule.label")} hint={t("schedule.hint")}>
             <DateTimePicker
-              id="create-post-schedule"
               includeTime
               value={scheduledFor}
               placeholder={t("schedule.placeholder")}
               onChange={setScheduledFor}
             />
-            <p className="text-muted-foreground text-xs">{t("schedule.hint")}</p>
-          </div>
+          </Field>
 
           <CreateAccessSection initiativeId={initiativeId} grants={grants} onChange={setGrants} />
         </div>

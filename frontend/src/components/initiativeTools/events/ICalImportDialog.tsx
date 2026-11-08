@@ -11,6 +11,7 @@ import { toast } from "@/lib/mascotToast";
 import { browserTimezone } from "@/lib/timezones";
 import type { DialogProps } from "@/types/dialog";
 import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
 import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { WizardDialog } from "@/ui/wizard-dialog";
@@ -155,13 +156,12 @@ export const ICalImportDialog = ({
           )}
 
           {parseResult && !fixedCalendarId && (
-            <div>
-              <Label>{t("calendars:import.selectCalendar")}</Label>
+            <Field label={t("calendars:import.selectCalendar")}>
               <Select
                 value={selectedCalendarId?.toString() ?? ""}
                 onValueChange={(v) => setSelectedCalendarId(Number(v))}
               >
-                <SelectTrigger className="mt-2">
+                <SelectTrigger>
                   <SelectValue placeholder={t("calendars:import.selectCalendar")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -172,7 +172,7 @@ export const ICalImportDialog = ({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           )}
 
           <div className="flex justify-end gap-2">

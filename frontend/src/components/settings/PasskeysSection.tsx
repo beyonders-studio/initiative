@@ -34,8 +34,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { WizardDialog } from "@/ui/wizard-dialog";
 
 /** The form, then the wait for the browser's own prompt. */
@@ -344,29 +344,25 @@ export const PasskeysSection = () => {
       >
         {step === "details" ? (
           <form className="space-y-4" onSubmit={submitAdd}>
-            <div className="space-y-2">
-              <Label htmlFor="passkey-name">{t("passkeys.nameLabel")}</Label>
+            <Field label={t("passkeys.nameLabel")}>
               <Input
-                id="passkey-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder={t("passkeys.namePlaceholder")}
                 maxLength={64}
                 required
               />
-            </div>
+            </Field>
             {passwordRequired ? (
-              <div className="space-y-2">
-                <Label htmlFor="passkey-password">{t("passkeys.passwordLabel")}</Label>
+              <Field label={t("passkeys.passwordLabel")}>
                 <Input
-                  id="passkey-password"
                   type="password"
                   autoComplete="current-password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   required
                 />
-              </div>
+              </Field>
             ) : null}
             {error ? <p className="text-destructive text-sm">{error}</p> : null}
             <DialogFooter>
@@ -396,16 +392,14 @@ export const PasskeysSection = () => {
             <DialogDescription>{t("passkeys.renamePrompt")}</DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={submitRename}>
-            <div className="space-y-2">
-              <Label htmlFor="passkey-rename">{t("passkeys.nameLabel")}</Label>
+            <Field label={t("passkeys.nameLabel")}>
               <Input
-                id="passkey-rename"
                 value={renameName}
                 onChange={(event) => setRenameName(event.target.value)}
                 maxLength={64}
                 required
               />
-            </div>
+            </Field>
             {renameError ? <p className="text-destructive text-sm">{renameError}</p> : null}
             <DialogFooter>
               <Button type="submit" disabled={rename.isPending || !renameName.trim()}>
@@ -431,17 +425,15 @@ export const PasskeysSection = () => {
           </DialogHeader>
           <form className="space-y-4" onSubmit={submitRemove}>
             {passwordRequired ? (
-              <div className="space-y-2">
-                <Label htmlFor="passkey-remove-password">{t("passkeys.passwordLabel")}</Label>
+              <Field label={t("passkeys.passwordLabel")}>
                 <Input
-                  id="passkey-remove-password"
                   type="password"
                   autoComplete="current-password"
                   value={removePassword}
                   onChange={(event) => setRemovePassword(event.target.value)}
                   required
                 />
-              </div>
+              </Field>
             ) : null}
             {removeError ? <p className="text-destructive text-sm">{removeError}</p> : null}
             <DialogFooter

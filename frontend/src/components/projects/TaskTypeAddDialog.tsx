@@ -19,8 +19,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { listFormat } from "@/ui/lib/intl";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
@@ -120,13 +120,12 @@ const TaskTypeAddForm = ({
           }}
         />
 
-        <div className="space-y-2">
-          <Label htmlFor="new-task-type-start-from">{t("taskTypes.startFromLabel")}</Label>
+        <Field label={t("taskTypes.startFromLabel")} hint={t("taskTypes.startFromHint")}>
           <Select
             value={start.kind === "type" ? String(start.id) : ""}
             onValueChange={(value) => setStart({ kind: "type", id: Number(value) })}
           >
-            <SelectTrigger id="new-task-type-start-from">
+            <SelectTrigger>
               <SelectValue placeholder={t("taskTypes.startFromPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
@@ -137,27 +136,17 @@ const TaskTypeAddForm = ({
               ))}
             </SelectContent>
           </Select>
-          <p className="text-muted-foreground text-xs">{t("taskTypes.startFromHint")}</p>
-        </div>
+        </Field>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="new-task-type-name">{t("taskTypes.nameLabel")}</Label>
+      <Field label={t("taskTypes.nameLabel")} error={nameTaken && t("errors:TASK_TYPE_NAME_TAKEN")}>
         <Input
-          id="new-task-type-name"
           value={name}
           onChange={(event) => setName(event.target.value)}
           placeholder={t("taskTypes.namePlaceholder")}
           maxLength={100}
-          aria-invalid={nameTaken || undefined}
-          aria-describedby={nameTaken ? "new-task-type-name-error" : undefined}
         />
-        {nameTaken ? (
-          <p id="new-task-type-name-error" className="text-destructive text-sm">
-            {t("errors:TASK_TYPE_NAME_TAKEN")}
-          </p>
-        ) : null}
-      </div>
+      </Field>
 
       <DialogFooter
         submitLabel={t("taskTypes.add")}
