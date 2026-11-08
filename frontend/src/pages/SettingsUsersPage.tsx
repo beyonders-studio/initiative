@@ -435,28 +435,6 @@ export const SettingsUsersPage = () => {
             {/* Named only beside the invites card; alone, the tab names it. */}
             {managesInvites ? <CardTitle>{t("users.usersTitle")}</CardTitle> : null}
             <CardDescription>{t("users.usersDescription")}</CardDescription>
-            {/* Three words that get mixed up constantly, explained where the
-                choice is actually made rather than in the help centre. */}
-            <dl className="mt-3 space-y-1 text-muted-foreground text-xs">
-              {roleOptions.map((roleOption) => (
-                <div key={roleOption} className="flex gap-1.5">
-                  <dt className="font-medium text-foreground">
-                    {t(`users.communityRole.${roleOption}` as never)}
-                  </dt>
-                  <dd>{t(`users.communityRoleHelp.${roleOption}` as never)}</dd>
-                </div>
-              ))}
-              {showsApiAccess ? (
-                <div className="flex gap-1.5">
-                  <dt className="font-medium text-foreground">{t("users.apiAccessColumn")}</dt>
-                  <dd>
-                    {apiAccessFixed
-                      ? t("settings:communityAuth.setByDeployment")
-                      : t("users.apiAccessHelp")}
-                  </dd>
-                </div>
-              ) : null}
-            </dl>
           </div>
           {managesMembers ? (
             <Button

@@ -216,7 +216,6 @@
     "handleColumn": "Handle",
     "apiAccessColumn": "API access",
     "apiAccessLabel": "Personal API keys for {{name}}",
-    "apiAccessHelp": "Whether this person's personal API keys reach this community. Turning it off stops keys they already made as well as new ones.",
     "apiAccessSaved": "API access saved",
     "apiAccessError": "Could not save API access"
   },
