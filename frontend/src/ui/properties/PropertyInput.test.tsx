@@ -26,6 +26,33 @@ const PropertyInput = ({
 );
 
 describe("PropertyInput", () => {
+  describe("user_reference type", () => {
+    it("searches the people of the property's own initiative", async () => {
+      const ada = { id: 7, name: "Ada Lovelace", initials: "AL" };
+      const searchMembers = vi.fn<NonNullable<PropertyInputProps["searchMembers"]>>(async () => [
+        ada,
+      ]);
+      const onChange = vi.fn();
+      renderWithProviders(
+        <PropertyInput
+          definition={def({ type: MetadataType.user_reference, initiative_id: 4 })}
+          value={null}
+          onChange={onChange}
+          searchMembers={searchMembers}
+        />
+      );
+
+      await userEvent.click(screen.getByRole("combobox"));
+      await userEvent.click(await screen.findByRole("option", { name: /Ada Lovelace/i }));
+
+      expect(searchMembers).toHaveBeenCalledWith(
+        { type: "initiative", initiativeId: 4 },
+        { search: "" }
+      );
+      expect(onChange).toHaveBeenCalledWith(7);
+    });
+  });
+
   describe("text type", () => {
     it("renders an <input type='text'> and calls onChange with the string", async () => {
       const onChange = vi.fn();
