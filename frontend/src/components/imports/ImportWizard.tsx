@@ -142,7 +142,7 @@ type Step =
  * the inbox notification.
  */
 export function ImportWizard({ open, onOpenChange, contactsInto }: ImportWizardProps) {
-  const { t, i18n } = useTranslation("imports");
+  const { t, i18n } = useTranslation(["imports", "common"]);
   const percent = numberFormat(i18n.resolvedLanguage ?? i18n.language, {
     style: "percent",
     maximumFractionDigits: 0,
