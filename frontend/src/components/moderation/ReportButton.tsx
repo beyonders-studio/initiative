@@ -14,7 +14,7 @@ import { Flag } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { FileTicketDialog } from "@/components/tickets/FileTicketDialog";
+import { FileTicketSheet } from "@/components/tickets/FileTicketSheet";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/ui/button";
@@ -72,7 +72,7 @@ export const ReportButton = ({
         </Tooltip>
       </TooltipProvider>
       {open && (
-        <FileTicketDialog
+        <FileTicketSheet
           open={open}
           onOpenChange={setOpen}
           ticket={{ stream: "moderation", targetType, targetId }}

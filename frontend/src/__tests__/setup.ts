@@ -320,3 +320,11 @@ beforeEach(() => {
   // Whether this device may sell is asked once per app run; each test is a run.
   resetStoreSelling();
 });
+
+// jsdom has no object URLs; a browser makes one for every chosen picture it
+// shows before sending.
+if (typeof URL.createObjectURL !== "function") {
+  let made = 0;
+  URL.createObjectURL = () => `blob:test/${++made}`;
+  URL.revokeObjectURL = () => undefined;
+}
