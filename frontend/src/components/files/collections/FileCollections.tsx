@@ -10,6 +10,8 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { AddToCollectionButton } from "@/components/files/collections/AddToCollectionButton";
 import { collectionMetadataSaves, useCollections } from "@/hooks/useCollections";
+import { itemSaves } from "@/hooks/useFieldSave";
+import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { PlacedPropertyField } from "@/lib/layouts/fieldEditors";
 import { collectionRoute } from "@/lib/tools";
@@ -102,6 +104,8 @@ const Values = ({
   properties: PropertySummary[];
 }) => {
   const { t } = useTranslation("files");
+  // The collection's own metadata are its definitions: none are read.
+  const env = usePropertyEnv({ initiativeId: collection.initiative_id, enabled: false });
   // One copy per read of the file, which a save's answer is held over.
   const values = useMemo(
     () => properties.filter((each) => each.collection_id === collection.id),
@@ -113,7 +117,8 @@ const Values = ({
       {collection.metadata.map((definition) => (
         <PlacedPropertyField
           key={definition.id}
-          kind={collectionMetadataSaves(collection.id)}
+          saves={itemSaves(collectionMetadataSaves(collection.id), fileId)}
+          env={env}
           id={fileId}
           properties={values}
           readOnly={!collection.can.edit}

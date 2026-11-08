@@ -17,7 +17,7 @@ import type {
   PropertySummary,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import type { FieldSaveKind } from "@/hooks/useFieldSave";
+import { type FieldSaveKind, itemSaves } from "@/hooks/useFieldSave";
 import { Button } from "@/ui/button";
 import { cn } from "@/ui/lib/utils";
 import { type MetadataOwner, ownProperties } from "@/ui/properties/propertyHelpers";
@@ -145,8 +145,13 @@ export const useItemContext = <C,>(): C => useDrawn().context as C;
 export const useItemHome = <H extends object = object>(): ItemHome<unknown, unknown> & H =>
   useDrawn().home as unknown as ItemHome<unknown, unknown> & H;
 
-const propertiesOf = (item: DetailItem, home: ItemHome<DetailItem, unknown>) => ({
-  kind: home.saves,
+const propertiesOf = (
+  item: DetailItem,
+  home: ItemHome<DetailItem, unknown>,
+  view: LayoutContext
+) => ({
+  saves: itemSaves(home.saves, item.id),
+  env: view.env.properties,
   id: item.id,
   properties: item.properties,
   readOnly: home.readOnly,
@@ -167,7 +172,7 @@ const ItemField = ({ id, item, view }: { id: string; item: DetailItem; view: Lay
   if (id.startsWith(PROPERTY_FIELD_PREFIX)) {
     return home.initiativeId === null ? null : (
       <PlacedPropertyField
-        {...propertiesOf(item, home)}
+        {...propertiesOf(item, home, view)}
         propertyId={Number(id.slice(PROPERTY_FIELD_PREFIX.length))}
       />
     );
@@ -180,13 +185,13 @@ const ItemField = ({ id, item, view }: { id: string; item: DetailItem; view: Lay
 
 /** Its properties, but for those the layout places on their own. A reader
  *  sees none where it holds none; a community's own tool has none to offer. */
-const ItemProperties = ({ item }: { item: DetailItem }) => {
+const ItemProperties = ({ item, view }: { item: DetailItem; view: LayoutContext }) => {
   const { home } = useDrawn();
   const placed = useContext(PlacedProperties);
   if (home.initiativeId === null) return null;
   if (home.readOnly && ownProperties(item.properties).every((each) => placed.has(each.property_id)))
     return null;
-  return <PropertiesField {...propertiesOf(item, home)} except={placed} />;
+  return <PropertiesField {...propertiesOf(item, home, view)} except={placed} />;
 };
 
 /** What can be done with the item, at the end of the row it is in. A row too
@@ -319,7 +324,9 @@ const partsOf = <I extends DetailItem>(
     field: (node: LayoutNode, item: I, view: LayoutContext) => (
       <ItemField id={String(node.props?.field)} item={item} view={view} />
     ),
-    properties: (_node: LayoutNode, item: I) => <ItemProperties item={item} />,
+    properties: (_node: LayoutNode, item: I, view: LayoutContext) => (
+      <ItemProperties item={item} view={view} />
+    ),
     actions: () => <ItemActions />,
     ...added,
     ...own,

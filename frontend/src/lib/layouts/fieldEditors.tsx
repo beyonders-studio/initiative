@@ -1,64 +1,40 @@
 /**
  * Field editors any detail shares (a task's, an event's): the title, the
- * tags and the custom properties, each saved on its own through the save of
- * the item's kind.
+ * colour and the custom properties, each saved on its own through the saves
+ * of the item's kind. What they read and look up comes in from the page
+ * around them, and what they change goes out through it.
  */
 
-import { useBlocker } from "@tanstack/react-router";
-import { Sparkles, X } from "lucide-react";
+import { X } from "lucide-react";
 import {
   type ReactNode,
   type RefObject,
+  type TextareaHTMLAttributes,
   useContext,
   useLayoutEffect,
   useRef,
-  useState,
 } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
-  type ContentKind,
   MetadataType,
   type PropertyDefinitionRead,
   type PropertySummary,
-  type TagSummary,
   type Tool,
-  type UserSummary,
 } from "@/api/generated/initiativeAPI.schemas";
-import { usePersonMention } from "@/components/comments/usePersonMention";
-import { useFileFieldFiles } from "@/components/files/useFileFieldFiles";
-import { MentionComposer } from "@/components/markdown/MentionComposer";
-import { SubscribeButton } from "@/components/SubscribeButton";
-import { TagPicker } from "@/components/tags";
-import { TagBadgeList } from "@/components/tags/TagBadge";
-import { TaskDescription } from "@/components/tasks/TaskDescription";
-import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useAuth } from "@/hooks/useAuth";
-import {
-  type FieldSaveKind,
-  type FieldSaveOptions,
-  type ItemFieldSave,
-  useHeldItem,
-  useItemFieldSave,
-} from "@/hooks/useFieldSave";
-import { usePastedImages } from "@/hooks/usePastedImages";
-import {
-  NO_DEFINITIONS,
-  useAppendPropertyOption,
-  useCreateProperty,
-  useOwnedDefinitions,
-} from "@/hooks/useProperties";
-import { type MemberSearchScope, useSearchMembers } from "@/hooks/useUsers";
-import { getHttpStatus } from "@/lib/errorMessage";
-import { currentServerKey } from "@/lib/offlineSession";
-import { getItem, removeItem, setItem } from "@/lib/storage";
-import { hasDisplayName, toMember } from "@/lib/userDisplay";
+import type { ItemFieldSave } from "@/hooks/useFieldSave";
 import { Button } from "@/ui/button";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
-import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { host } from "@/ui/host";
 import { cn } from "@/ui/lib/utils";
 import { AddPropertyButton } from "@/ui/properties/AddPropertyButton";
-import { PropertyInput } from "@/ui/properties/PropertyInput";
+import type { FileFieldFiles } from "@/ui/properties/FileFieldInput";
+import type { CreateProperty } from "@/ui/properties/NewPropertyForm";
+import {
+  PropertyInput,
+  type PropertyInputProps,
+  type SearchMembers,
+} from "@/ui/properties/PropertyInput";
 import { PropertyValueCell } from "@/ui/properties/PropertyValueCell";
 import {
   isEmptyPropertyValue,
@@ -80,6 +56,68 @@ import {
   sameJson,
   useFieldDraft,
 } from "./editing";
+
+/**
+ * What property editors read and change through, from the page around them
+ * (a view's `LayoutEnv` carries it as `properties`): the properties an item
+ * may hold, and making a property or an option, finding members and finding
+ * and reading files.
+ */
+export interface PropertyEnv {
+  /** What an item may hold: its initiative's properties, and its owner's
+   *  metadata where it has an owner. No data until they are read. */
+  definitions: {
+    data?: PropertyDefinitionRead[];
+    isLoading: boolean;
+    isError: boolean;
+    refetch: () => unknown;
+  };
+  /** Makes a property named from an item. */
+  createProperty: CreateProperty;
+  /** Adds an option to a select property. */
+  appendOption: PropertyInputProps["appendOption"];
+  /** Finds the people a person-valued property may name. */
+  searchMembers: SearchMembers;
+  /** What a file property picks from, links to and draws. */
+  files: FileFieldFiles;
+}
+
+/**
+ * How the page around an item saves its fields, each on its own. Both are
+ * hooks, which a field calls once each time it is drawn.
+ */
+export interface ItemSaves<I, P> {
+  /** One field's save, which its label names in what it says. */
+  useSave: (label: string) => ItemFieldSave<I, P>;
+  /** The item's properties as the page passed them, with what its saves
+   *  answered, and what they have not answered yet, shown over them. */
+  useShown: (properties: PropertySummary[]) => PropertySummary[];
+}
+
+/** A typed field a typeahead watches: the field, what it holds, and how that
+ *  is changed. */
+export interface TypeaheadField {
+  field: RefObject<HTMLTextAreaElement | null>;
+  text: string;
+  onChange: (text: string) => void;
+  /** Off while the field cannot be changed. */
+  enabled: boolean;
+}
+
+/** A list a field offers under it as it is typed: told of each change, its
+ *  `handlers` spread on the field, and `open` while the list is shown, which
+ *  then takes Escape for itself. */
+interface Typeahead {
+  open: boolean;
+  sync: (element: HTMLTextAreaElement, text: string) => void;
+  handlers: Pick<TextareaHTMLAttributes<HTMLTextAreaElement>, "onSelect" | "onBlur">;
+  popover: ReactNode;
+}
+
+const NO_TYPEAHEAD: Typeahead = { open: false, sync: () => {}, handlers: {}, popover: null };
+const useNoTypeahead = (): Typeahead => NO_TYPEAHEAD;
+
+const NO_DEFINITIONS: PropertyDefinitionRead[] = [];
 
 /** Without `field-sizing`, a textarea stays as many rows high as it was
  *  given, so it is grown to what it holds, again whenever its width changes. */
@@ -103,8 +141,6 @@ const useFittedHeight = (text: string) => {
   return box;
 };
 
-/** An item's title, which is its detail's heading, saved as `field`. It cannot be emptied: leaving it blank puts the
- *  saved one back. A reader who cannot change it sees the heading alone. */
 /** How a title's text is set, which its marks are set the same way to line up
  *  with it. */
 const TITLE_TEXT = "field-sizing-content py-1 font-semibold text-2xl tracking-tight sm:text-3xl";
@@ -147,6 +183,9 @@ const TitleMarks = ({
   );
 };
 
+/** An item's title, which is its detail's heading, saved as `field`. It cannot
+ *  be emptied: leaving it blank puts the saved one back. A reader who cannot
+ *  change it sees the heading alone. */
 export const TitleField = <I, P>({
   id,
   label,
@@ -156,11 +195,11 @@ export const TitleField = <I, P>({
   placeholder,
   field = "title",
   optional = false,
-  subscribe,
+  beside,
   marks,
   below,
   trailing,
-  mention,
+  useTypeahead = useNoTypeahead,
 }: {
   id: string;
   label: string;
@@ -172,24 +211,25 @@ export const TitleField = <I, P>({
   /** It may be emptied, and then reads as `placeholder` (a picture's title,
    *  which falls back to its file's name). */
   optional?: boolean;
-  /** The item, for a subscribe toggle beside its title. */
-  subscribe?: { kind: ContentKind; id: number };
+  /** Drawn beside the title, read or changed, once the item exists. */
+  beside?: ReactNode;
   /** Stretches of the title drawn marked, each with its own class. */
   marks?: readonly { start: number; end: number; className: string }[];
   /** Drawn under the title, inside its frame. */
   below?: ReactNode;
   /** Drawn at the end of the title's first line, beside the field. */
   trailing?: ReactNode;
-  /** `@` offers these people, and writes the picked one's handle. */
-  mention?: { members: MemberSearchScope; onPick?: (member: UserSummary) => void };
+  /** What the field offers as it is typed: a hook, the same one for as long
+   *  as the field is drawn. */
+  useTypeahead?: (field: TypeaheadField) => Typeahead;
 }) => {
   // One being added may be emptied while it is typed: Add waits for a title.
   const adding = useContext(ItemDraftContext) !== null;
   const besides = (title: ReactNode) =>
-    subscribe && !adding ? (
+    beside && !adding ? (
       <div className="flex min-w-0 grow basis-72 items-start gap-1">
         {title}
-        <SubscribeButton kind={subscribe.kind} entityId={subscribe.id} className="mt-0.5" />
+        {beside}
       </div>
     ) : (
       title
@@ -201,13 +241,11 @@ export const TitleField = <I, P>({
       : save.save({ patch: { [field]: title } as P, shows: { [field]: title } as Partial<I> });
   });
   const box = useFittedHeight(draft.value);
-  const people = usePersonMention({
+  const typing = useTypeahead({
     field: box,
     text: draft.value,
     onChange: draft.change,
-    members: mention?.members ?? { type: "community" },
-    enabled: mention !== undefined && !readOnly,
-    onPick: mention?.onPick,
+    enabled: !readOnly,
   });
   if (readOnly) {
     return besides(
@@ -242,18 +280,18 @@ export const TitleField = <I, P>({
             onChange={(event) => {
               const text = event.target.value.replace(/\s*[\r\n]+\s*/g, " ");
               draft.change(text);
-              people.sync(event.target, text);
+              typing.sync(event.target, text);
             }}
-            {...people.handlers}
+            {...typing.handlers}
             // A list open under the field takes Escape for itself.
-            data-picking={people.open || undefined}
+            data-picking={typing.open || undefined}
             placeholder={placeholder}
             className={cn(
               TITLE_TEXT,
               "relative min-h-0 resize-none shadow-none focus-visible:ring-0"
             )}
           />
-          {people.popover}
+          {typing.popover}
         </div>
         {/* Centred on the first line of the title, as tall as it is set. */}
         {trailing ? <div className="mt-1.5 shrink-0 sm:mt-2">{trailing}</div> : null}
@@ -263,54 +301,11 @@ export const TitleField = <I, P>({
   );
 };
 
-/** An item's tags, saved the moment they are picked. Clearing them offers
- *  Undo. A reader who cannot change them sees the tags alone, and nothing
- *  where there are none. */
-export const TagsField = <
-  I extends { tags: TagSummary[] },
-  P extends { tag_ids?: number[] | null },
->({
-  label,
-  tags,
-  save,
-  readOnly,
-  placeholder,
-}: {
-  label: string;
-  tags: TagSummary[];
-  save: ItemFieldSave<I, P>;
-  readOnly: boolean;
-  placeholder: string;
-}) => {
-  const edit = (picked: TagSummary[]): ItemEdit<I, P> => ({
-    patch: { tag_ids: picked.map((tag) => tag.id) } as P,
-    shows: { tags: picked } as Partial<I>,
-  });
-  if (readOnly) {
-    return tags.length ? (
-      <div className="space-y-2">
-        <p className="font-medium text-sm">{label}</p>
-        <TagBadgeList tags={tags} limit={tags.length} className="gap-2" />
-      </div>
-    ) : null;
-  }
-  return (
-    <FieldFrame label={label} save={save}>
-      <TagPicker
-        selectedTags={tags}
-        onChange={(picked) =>
-          void save.save(edit(picked), picked.length === 0 ? edit(tags) : undefined)
-        }
-        placeholder={placeholder}
-      />
-    </FieldFrame>
-  );
-};
-
-/** What the properties of an item take: its kind's save, the item, and who
- *  a person-valued property may name. */
+/** What the properties of an item take: how its fields are saved, the item,
+ *  who a person-valued property may name, and what they read and change
+ *  through. */
 type PropertiesProps<I extends { properties: PropertySummary[] }, P> = {
-  kind: FieldSaveKind<I, P>;
+  saves: ItemSaves<I, P>;
   id: number;
   properties: PropertySummary[];
   readOnly: boolean;
@@ -324,6 +319,8 @@ type PropertiesProps<I extends { properties: PropertySummary[] }, P> = {
   owner?: MetadataOwner;
   /** When the item last changed, which a signature made before it says. */
   updatedAt?: string | null;
+  /** Without it, they are read, not changed. */
+  env?: PropertyEnv;
 };
 
 /** The item's properties with `property` as it reads after `value`, added
@@ -347,16 +344,17 @@ const showing = (property: PropertySummary, value: unknown): PropertySummary => 
 /** One custom property, saved on its own as its kind says. Only it is sent,
  *  so a change to another property meanwhile still stands. */
 const PropertyField = <I extends { properties: PropertySummary[] }, P>({
-  kind,
-  id,
+  saves,
   properties,
   readOnly,
   initiativeId,
   canOpen,
   updatedAt,
+  env,
   property,
   placed = false,
 }: PropertiesProps<I, P> & {
+  env: PropertyEnv;
   property: PropertySummary;
   /** Placed on the layout on its own: it stays when emptied, so its button
    *  clears its value (a checkbox has no empty to click back to) rather than
@@ -364,11 +362,8 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
   placed?: boolean;
 }) => {
   const { t } = useTranslation(["properties", "common"]);
-  const save = useItemFieldSave(kind, id, property.name);
-  const appendOption = useAppendPropertyOption();
-  const searchMembers = useSearchMembers();
+  const save = saves.useSave(property.name);
   const adding = useContext(ItemDraftContext) !== null;
-  const files = useFileFieldFiles(initiativeId);
   const saved = normalizePropertyValue(property);
   const person = userReferenceValue(property);
   const edit = (value: unknown): ItemEdit<I, P> => ({
@@ -439,11 +434,16 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
         disabled={readOnly}
         initiativeId={initiativeId}
         canOpen={canOpen}
-        appendOption={appendOption}
-        searchMembers={searchMembers}
-        selectedUser={person && hasDisplayName(person) ? toMember(person) : null}
+        appendOption={env.appendOption}
+        searchMembers={env.searchMembers}
+        // A person the value names by id alone is looked up.
+        selectedUser={
+          person && (person.display_name?.trim() || person.username?.trim())
+            ? host.member(person)
+            : null
+        }
         updatedAt={updatedAt}
-        files={files}
+        files={env.files}
       />
     </FieldFrame>
   );
@@ -487,18 +487,6 @@ export const ColorField = <
   );
 };
 
-/** One holder per read of a row's properties, so a copy passed again is the
- *  same copy ({@link useHeldItem}). */
-const holders = new WeakMap<PropertySummary[], { properties: PropertySummary[] }>();
-const holderOf = (properties: PropertySummary[]) => {
-  let holder = holders.get(properties);
-  if (!holder) {
-    holder = { properties };
-    holders.set(properties, holder);
-  }
-  return holder;
-};
-
 /**
  * One property placed on the layout on its own: drawn whether or not the item
  * has a value for it yet, and saved on its own. A reader sees it only where it
@@ -515,32 +503,29 @@ export const PlacedPropertyField = <I extends { properties: PropertySummary[] },
   definitions?: PropertyDefinitionRead[];
 }) => {
   const { t } = useTranslation(["properties", "common"]);
-  const definitions = useOwnedDefinitions({
-    initiativeId: props.initiativeId ?? undefined,
-    owner: props.owner,
-    enabled: props.initiativeId !== null && given === undefined,
-  });
-  const { properties } = useHeldItem(
-    props.kind as unknown as FieldSaveKind<{ properties: PropertySummary[] }, P>,
-    props.id,
-    holderOf(props.properties)
-  );
-  const definition = (given ?? definitions.data)?.find((each) => each.id === propertyId);
+  const { env } = props;
+  const properties = props.saves.useShown(props.properties);
+  const definition = (given ?? env?.definitions.data)?.find((each) => each.id === propertyId);
   const held = properties.find((each) => each.property_id === propertyId);
   const property = held ?? (definition ? propertyStubFromDefinition(definition) : undefined);
   // Not loaded is not deleted: an editor is told, and can ask again.
-  if (!property && definitions.isError && !props.readOnly) {
+  if (!property && !given && env?.definitions.isError && !props.readOnly) {
     return (
       <div className="flex items-center gap-2 text-muted-foreground text-sm">
         <span>{t("loadError")}</span>
-        <Button type="button" variant="link" size="sm" onClick={() => void definitions.refetch()}>
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          onClick={() => void env.definitions.refetch()}
+        >
           {t("common:tryAgain")}
         </Button>
       </div>
     );
   }
   if (!property) return null;
-  if (props.readOnly) {
+  if (props.readOnly || !env) {
     if (isEmptyPropertyValue(property.value)) return null;
     return (
       <ReadField label={property.name}>
@@ -548,7 +533,7 @@ export const PlacedPropertyField = <I extends { properties: PropertySummary[] },
       </ReadField>
     );
   }
-  return <PropertyField {...props} properties={properties} property={property} placed />;
+  return <PropertyField {...props} env={env} properties={properties} property={property} placed />;
 };
 
 /** An item's custom properties, each saved on its own, and adding one. */
@@ -563,26 +548,15 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
   hideLabel?: boolean;
 }) => {
   const { t } = useTranslation("properties");
-  const { kind, id, readOnly, initiativeId } = props;
-  const { properties } = useHeldItem(
-    kind as unknown as FieldSaveKind<{ properties: PropertySummary[] }, P>,
-    id,
-    holderOf(props.properties)
-  );
-  // What can be added, read only where something can be.
-  const definitions = useOwnedDefinitions({
-    initiativeId: initiativeId ?? undefined,
-    owner: props.owner,
-    enabled: initiativeId !== null && !readOnly,
-  });
+  const { saves, id, initiativeId, env } = props;
+  const properties = saves.useShown(props.properties);
   // Its own values: a collection's metadata is the collection's, and a
   // plug-in's values are drawn as its fields.
   const listed = ownProperties(properties).filter((each) => !except?.has(each.property_id));
   // Where the item also holds its project's metadata, the panel says so.
   const label = t(props.owner ? "titleWithMetadata" : "title");
   const none = t(props.owner ? "noPropertiesOrMetadata" : "noMetadata");
-  const save = useItemFieldSave(kind, id, label);
-  const createProperty = useCreateProperty();
+  const save = saves.useSave(label);
   const add = (definition: PropertyDefinitionRead) => {
     if (properties.some((p) => p.property_id === definition.id)) return;
     void save.save({
@@ -594,7 +568,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
   };
   const sorted = [...listed].sort((a, b) => a.name.localeCompare(b.name));
   // A reader sees each value as it reads anywhere else: a link opens.
-  if (readOnly) {
+  if (props.readOnly || !env) {
     return (
       <div className="space-y-2">
         {hideLabel ? null : <p className="font-medium text-sm">{label}</p>}
@@ -637,323 +611,21 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
           <PropertyField
             key={`${id}:${property.property_id}`}
             {...props}
+            env={env}
             properties={properties}
             property={property}
           />
         ))
       )}
       <AddPropertyButton
-        definitions={definitions.data ?? NO_DEFINITIONS}
-        loading={definitions.isLoading}
+        definitions={env.definitions.data ?? NO_DEFINITIONS}
+        loading={env.definitions.isLoading}
         initiativeId={initiativeId ?? 0}
         owner={props.owner}
-        create={createProperty.mutateAsync}
+        create={env.createProperty}
         currentPropertyIds={[...listed.map((p) => p.property_id), ...(except ?? [])]}
         onAdd={add}
-        disabled={readOnly || !initiativeId}
-      />
-    </FieldFrame>
-  );
-};
-
-/** A description being written, and the one it was written over. */
-interface DescriptionDraft {
-  text: string;
-  base: string | null;
-}
-
-const readDescriptionDraft = (key: string): DescriptionDraft | null => {
-  try {
-    const stored = JSON.parse(getItem(key) ?? "null") as DescriptionDraft | null;
-    return stored && typeof stored.text === "string" ? stored : null;
-  } catch {
-    return null;
-  }
-};
-
-/** The preview of a description being edited reads the way the saved one will. */
-const renderDescription = (draft: string, onChange?: (draft: string) => void) => (
-  <TaskDescription content={draft} onChange={onChange} />
-);
-
-/**
- * An item's description, in a composer that opens on its preview, saved only
- * with Save (or Ctrl/Cmd+Enter). What is typed is a draft, kept on the device
- * until it is saved or discarded. The save names the description it was
- * written over, and one written over a description that has since changed is
- * refused, so the reader sees the other version and chooses.
- */
-export const DescriptionField = <I, P>({
-  field = "description",
-  kind,
-  id,
-  options,
-  label,
-  htmlId,
-  value,
-  readOnly,
-  preview = false,
-  initiativeId,
-  subject,
-  leaving,
-  placeholder,
-  suggest,
-  maxLength,
-}: {
-  /** What the item calls it. A save names the text
-   *  it was written over as `<field>_base`, which the server refuses once
-   *  that has changed. */
-  field?: string;
-  kind: FieldSaveKind<I, P>;
-  id: number;
-  /** What the detail adds to its saves. */
-  options: FieldSaveOptions<I, P>;
-  label: string;
-  htmlId: string;
-  /** The description as saved. */
-  value: string | null;
-  readOnly: boolean;
-  /** Drawn in the layout editor, where nothing is changed: a draft kept on
-   *  the device stays there. */
-  preview?: boolean;
-  initiativeId: number | null;
-  /** The item, as its references name it. */
-  subject: string;
-  /** Set when the page is left on purpose, so an open draft does not hold it. */
-  leaving: RefObject<boolean>;
-  placeholder: string;
-  /** Writes a description for the reader to start from (AI). */
-  suggest?: { label: string; run: () => Promise<string> };
-  /** The most characters it may hold, as the server allows. */
-  maxLength?: number;
-}) => {
-  const { t } = useTranslation("common");
-  const communityId = useActiveCommunityId();
-  const { user } = useAuth();
-  const uploadImage = usePastedImages();
-  // Saved by Save or by Retry. What was typed while it saved stays the draft,
-  // now written over the description just saved.
-  const save = useItemFieldSave(kind, id, label, {
-    ...options,
-    onSaved: (edit) => {
-      options.onSaved?.(edit);
-      const now = latest.current;
-      const saved = ((edit.shows as Record<string, unknown>)[field] as string | null) ?? null;
-      if (now) setDraft(now.text === (saved ?? "") ? null : { ...now, base: saved });
-    },
-  });
-  // Each account on each server keeps its own drafts on a shared device.
-  const key = `${kind.name}-${field}-draft:${user?.id}@${currentServerKey()}:${communityId}:${id}`;
-  const [draft, setDraftState] = useState(() => readDescriptionDraft(key));
-  const [discarding, setDiscarding] = useState(false);
-  const [suggesting, setSuggesting] = useState(false);
-  // The written description, and the draft it replaced, for Undo suggestion.
-  const [suggested, setSuggested] = useState<{
-    text: string;
-    before: DescriptionDraft | null;
-  } | null>(null);
-  // Read by the description written for the reader, which lands later.
-  const latest = useRef(draft);
-
-  const setDraft = (next: DescriptionDraft | null) => {
-    latest.current = next;
-    setDraftState(next);
-    void (next ? setItem(key, JSON.stringify(next)) : removeItem(key));
-    // A refused save belongs to the draft, and goes with it.
-    if (!next) save.reset();
-  };
-
-  const current = value ?? "";
-  // One being added is written straight into it: nothing is saved until Add.
-  // It names what it held when it was opened, so a change of an item that
-  // exists is refused where somebody wrote over it meanwhile.
-  const adding = useContext(ItemDraftContext) !== null;
-  const openedOn = useRef(value ?? null);
-  const write = (text: string) =>
-    void save.save({
-      patch: { [field]: text || null, [`${field}_base`]: openedOn.current } as P,
-      shows: { [field]: text || null } as Partial<I>,
-    });
-  // A reader who can no longer edit keeps the draft on the device, but sees
-  // the saved description and nothing that would write.
-  const open = readOnly || preview || adding ? null : draft;
-  const conflict = open !== null && getHttpStatus(save.error) === 409;
-  const dirty = open !== null && open.text !== (open.base ?? "");
-  const blocker = useBlocker({
-    shouldBlockFn: () => dirty && !leaving.current,
-    enableBeforeUnload: () => dirty && !leaving.current,
-    withResolver: true,
-  });
-
-  const submit = (base: string | null) => {
-    if (!open) return;
-    const description = open.text || null;
-    void save.save({
-      patch: { [field]: description, [`${field}_base`]: base } as P,
-      shows: { [field]: description } as Partial<I>,
-    });
-  };
-  const cancel = () => (dirty ? setDiscarding(true) : setDraft(null));
-  const startFrom = async () => {
-    if (!suggest) return;
-    setSuggesting(true);
-    try {
-      const text = await suggest.run();
-      setSuggested({ text, before: latest.current });
-      setDraft({ text, base: latest.current?.base ?? value });
-    } catch {
-      // The request says what went wrong.
-    } finally {
-      setSuggesting(false);
-    }
-  };
-
-  return (
-    <FieldFrame
-      label={label}
-      htmlFor={htmlId}
-      // The conflict below says what went wrong, and Retry would only repeat it.
-      save={conflict ? { ...save, state: "idle" } : save}
-      changed={
-        open !== null && !conflict && save.state !== "saving" && current !== (open.base ?? "")
-      }
-    >
-      {readOnly ? (
-        <>
-          {current ? (
-            <div className="rounded-md border border-border/70 border-dashed bg-muted/40 px-3 py-2">
-              <TaskDescription content={current} />
-            </div>
-          ) : (
-            <p className="text-muted-foreground text-sm italic">{t("descriptionField.none")}</p>
-          )}
-          {draft !== null ? (
-            <p className="text-muted-foreground text-xs">{t("descriptionField.draftKept")}</p>
-          ) : null}
-        </>
-      ) : (
-        <div className="space-y-2">
-          <MentionComposer
-            id={htmlId}
-            value={open?.text ?? current}
-            onChange={(text) =>
-              adding ? write(text) : setDraft({ text, base: open ? open.base : value })
-            }
-            initiativeId={initiativeId ?? 0}
-            subject={subject}
-            renderPreview={renderDescription}
-            onUploadImage={uploadImage}
-            defaultMode="preview"
-            placeholder={placeholder}
-            maxLength={maxLength}
-            onKeyDown={(event) => {
-              if (!open) return;
-              if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                event.preventDefault();
-                submit(open.base);
-              } else if (event.key === "Escape") {
-                event.preventDefault();
-                cancel();
-              }
-            }}
-            actions={
-              suggest ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-2 text-xs"
-                  onClick={() => void startFrom()}
-                  pending={suggesting}
-                >
-                  <Sparkles className="h-3 w-3" />
-                  {suggest.label}
-                </Button>
-              ) : null
-            }
-          />
-          {open === null ? null : conflict ? (
-            <div
-              role="alert"
-              className="space-y-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2"
-            >
-              <p className="text-sm">{t("fieldSave.changed")}</p>
-              <div className="rounded-md border bg-background px-3 py-2">
-                <TaskDescription content={current} />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" size="sm" onClick={() => submit(value)}>
-                  {t("fieldSave.overwrite")}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    save.reset();
-                    setDraft({ ...open, base: value });
-                  }}
-                >
-                  {t("fieldSave.keepEditing")}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                size="sm"
-                disabled={save.state === "saving"}
-                onClick={() => submit(open.base)}
-              >
-                {t("save")}
-              </Button>
-              <Button type="button" size="sm" variant="outline" onClick={cancel}>
-                {t("cancel")}
-              </Button>
-              {suggested !== null && open.text === suggested.text ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setDraft(suggested.before);
-                    setSuggested(null);
-                  }}
-                >
-                  {t("descriptionField.undoSuggestion")}
-                </Button>
-              ) : null}
-            </div>
-          )}
-        </div>
-      )}
-      <ConfirmDialog
-        open={discarding}
-        onOpenChange={setDiscarding}
-        title={t("descriptionField.unsavedTitle")}
-        confirmLabel={t("fieldSave.discard")}
-        cancelLabel={t("fieldSave.keepEditing")}
-        onConfirm={() => {
-          setDiscarding(false);
-          setDraft(null);
-        }}
-        destructive
-      />
-      <ConfirmDialog
-        open={blocker.status === "blocked"}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) blocker.reset?.();
-        }}
-        title={t("descriptionField.unsavedTitle")}
-        description={t("descriptionField.unsavedBody")}
-        confirmLabel={t("descriptionField.leave")}
-        cancelLabel={t("descriptionField.stay")}
-        onConfirm={() => {
-          setDraft(null);
-          blocker.proceed?.();
-        }}
-        destructive
+        disabled={!initiativeId}
       />
     </FieldFrame>
   );

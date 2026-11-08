@@ -14,7 +14,9 @@ import { PropertyTarget, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TagPicker } from "@/components/tags";
 import { useToolSettings } from "@/components/tools/settings/ToolSettingsContext";
 import { ToolTemplateCard } from "@/components/tools/settings/ToolTemplateCard";
+import { itemSaves } from "@/hooks/useFieldSave";
 import { propertySaves } from "@/hooks/useProperties";
+import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 import { useServerForm } from "@/hooks/useServerForm";
 import { useSetToolComments } from "@/hooks/useToolComments";
 import { useSetToolTags } from "@/hooks/useToolTags";
@@ -31,6 +33,7 @@ export const ToolSettingsDetailsPage = () => {
   const { t } = useTranslation(["common", "properties"]);
   const { tool, entity, update, detailsExtra, detailsInline } = useToolSettings();
   const canManage = entity.can.edit;
+  const propertyEnv = usePropertyEnv({ initiativeId: entity.initiative_id, enabled: canManage });
 
   // Name and description wait for Save, so a refetch arriving mid-sentence
   // must not take the sentence away.
@@ -155,7 +158,8 @@ export const ToolSettingsDetailsPage = () => {
           </CardHeader>
           <CardContent>
             <PropertiesField
-              kind={propertySaves[PropertyTarget[tool]]}
+              saves={itemSaves(propertySaves[PropertyTarget[tool]], entity.id)}
+              env={propertyEnv}
               id={entity.id}
               properties={entity.properties ?? []}
               readOnly={!canManage}

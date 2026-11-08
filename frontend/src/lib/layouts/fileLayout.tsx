@@ -8,6 +8,7 @@ import {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { collectionMetadataSaves } from "@/hooks/useCollections";
+import { itemSaves } from "@/hooks/useFieldSave";
 import { propertySaves } from "@/hooks/useProperties";
 import type { TranslateFn } from "@/types/i18n";
 import { nonEmptyPropertySummaries } from "@/ui/properties/propertyHelpers";
@@ -16,7 +17,13 @@ import { useItemContext } from "./DetailLayoutView";
 import { filledBy, PlacedProperties } from "./detailLayout";
 import { ReadField } from "./editing";
 import { PlacedPropertyField } from "./fieldEditors";
-import { FIELD_RENDERERS, isEmptyValue, type LayoutItem, PROPERTY_FIELD_PREFIX } from "./fields";
+import {
+  FIELD_RENDERERS,
+  isEmptyValue,
+  type LayoutEnv,
+  type LayoutItem,
+  PROPERTY_FIELD_PREFIX,
+} from "./fields";
 import { collectionFileFields, FILE_LAYOUT } from "./files";
 import { type InitiativeDetail, useInitiativeExtension } from "./initiativeExtension";
 import type { LayoutContext } from "./tree";
@@ -36,15 +43,18 @@ const useFileLayout = useItemContext<FileLayoutContext>;
 const FileProperty = ({
   file,
   propertyId,
+  env,
 }: {
   file: CollectionFileSummary;
   propertyId: number;
+  env: LayoutEnv;
 }) => {
   const { collection } = useFileLayout();
   const own = collection.metadata.some((each) => each.id === propertyId);
   return own ? (
     <PlacedPropertyField
-      kind={collectionMetadataSaves(collection.id)}
+      saves={itemSaves(collectionMetadataSaves(collection.id), file.id)}
+      env={env.properties}
       id={file.id}
       properties={file.metadata}
       readOnly={!collection.can.edit}
@@ -54,7 +64,7 @@ const FileProperty = ({
     />
   ) : (
     <PlacedPropertyField
-      kind={propertySaves[PropertyTarget.file]}
+      saves={itemSaves(propertySaves[PropertyTarget.file], file.id)}
       id={file.id}
       properties={file.properties}
       readOnly
@@ -78,7 +88,13 @@ const FileField = ({
 }) => {
   const t = useTranslation(["files", "common"]).t as TranslateFn;
   if (id.startsWith(PROPERTY_FIELD_PREFIX)) {
-    return <FileProperty file={file} propertyId={Number(id.slice(PROPERTY_FIELD_PREFIX.length))} />;
+    return (
+      <FileProperty
+        file={file}
+        propertyId={Number(id.slice(PROPERTY_FIELD_PREFIX.length))}
+        env={view.env}
+      />
+    );
   }
   const field = view.fields.get(id);
   const item = file as unknown as LayoutItem;
@@ -98,7 +114,7 @@ const FileField = ({
 /** The collection's metadata, then the properties the file holds, but for
  *  those the layout places on their own. A reader sees only those that hold a
  *  value. */
-const FileProperties = ({ file }: { file: CollectionFileSummary }) => {
+const FileProperties = ({ file, env }: { file: CollectionFileSummary; env: LayoutEnv }) => {
   const { collection } = useFileLayout();
   const placed = useContext(PlacedProperties);
   const ids = [
@@ -107,7 +123,7 @@ const FileProperties = ({ file }: { file: CollectionFileSummary }) => {
   ].filter((id) => !placed.has(id));
   return ids.map((id) => (
     // Keyed by the file too: moving to the next file starts afresh.
-    <FileProperty key={`${file.id}:${id}`} file={file} propertyId={id} />
+    <FileProperty key={`${file.id}:${id}`} file={file} propertyId={id} env={env} />
   ));
 };
 
@@ -123,7 +139,7 @@ export const FILE_DETAIL: InitiativeDetail<CollectionFileSummary, FileLayoutCont
     field: (node, file, view) => (
       <FileField id={String(node.props?.field)} file={file} view={view} />
     ),
-    properties: (_node, file) => <FileProperties file={file} />,
+    properties: (_node, file, view) => <FileProperties file={file} env={view.env} />,
   },
   home: (file, { collection }) => ({
     saves: collectionMetadataSaves(collection.id),

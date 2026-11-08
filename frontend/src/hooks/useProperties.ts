@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { setCollectionFileMetadata } from "@/api/generated/files/files";
@@ -106,14 +106,23 @@ export const useOwnedDefinitions = (options: {
         : undefined,
     [properties.data, metadata.data, owned]
   );
-  return {
-    data,
-    isLoading: properties.isLoading || (owned && metadata.isLoading),
-    isError: properties.isError || (owned && metadata.isError),
-    /** Whether `data` is a previous place's, shown while this one's is read. */
-    isPlaceholderData: properties.isPlaceholderData || (owned && metadata.isPlaceholderData),
-    refetch: () => Promise.all([properties.refetch(), metadata.refetch()]),
-  };
+  const isLoading = properties.isLoading || (owned && metadata.isLoading);
+  const isError = properties.isError || (owned && metadata.isError);
+  const isPlaceholderData = properties.isPlaceholderData || (owned && metadata.isPlaceholderData);
+  const { refetch: refetchProperties } = properties;
+  const { refetch: refetchMetadata } = metadata;
+  // The same answer from one render to the next while nothing in it changes.
+  return useMemo(
+    () => ({
+      data,
+      isLoading,
+      isError,
+      /** Whether `data` is a previous place's, shown while this one's is read. */
+      isPlaceholderData,
+      refetch: () => Promise.all([refetchProperties(), refetchMetadata()]),
+    }),
+    [data, isLoading, isError, isPlaceholderData, refetchProperties, refetchMetadata]
+  );
 };
 
 // ── Mutations ────────────────────────────────────────────────────────────────
@@ -198,7 +207,7 @@ export const usePromoteProperties = (
  */
 export const useAppendPropertyOption = () => {
   const { t } = useTranslation("properties");
-  const mutation = useCommunityMutation({
+  const { mutateAsync } = useCommunityMutation({
     mutationFn: async (
       communityId: number,
       vars: { definition: { id: number; options: PropertyOption[] }; label: string }
@@ -238,8 +247,11 @@ export const useAppendPropertyOption = () => {
     errorKey: "properties:input.optionAddFailed",
   });
 
-  return (definition: { id: number; options: PropertyOption[] }, label: string) =>
-    mutation.mutateAsync({ definition, label }).then(({ option }) => option);
+  return useCallback(
+    (definition: { id: number; options: PropertyOption[] }, label: string) =>
+      mutateAsync({ definition, label }).then(({ option }) => option),
+    [mutateAsync]
+  );
 };
 
 /** Anything that carries property values. */

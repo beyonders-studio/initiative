@@ -12,6 +12,7 @@ import { EntityLinkField } from "@/components/entities/EntityLinkField";
 import type { RelationsLayout } from "@/components/entities/RelationsSection";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 import type { LinkedRef } from "@/lib/relationships";
 import type { ToolRelationEntity } from "@/lib/tools";
 
@@ -107,12 +108,20 @@ const pluginField = (field: FieldDef, item: DetailItem) =>
  * and nothing a plug-in draws.
  */
 export const useInitiativeExtension = <I extends DetailItem>(
-  home: Pick<ItemHome<unknown, unknown>, "initiativeId">,
+  home: Pick<ItemHome<unknown, unknown>, "initiativeId" | "owner" | "readOnly">,
   kind: DetailLayoutReadKind
 ): DetailExtension<I> => {
   const { i18n } = useTranslation();
   const communityId = useActiveCommunityId();
-  const env = useProjectLayoutEnv(NO_TASK);
+  const projectEnv = useProjectLayoutEnv(NO_TASK);
+  // What the detail's property fields read and write, for a reader who may
+  // change the item.
+  const properties = usePropertyEnv({
+    initiativeId: home.initiativeId,
+    owner: home.owner,
+    enabled: !home.readOnly,
+  });
+  const env = useMemo(() => ({ ...projectEnv, properties }), [projectEnv, properties]);
   const plugins = usePluginsOnItems(home.initiativeId, true, pluginKindOf(kind));
   const adding = useContext(ItemDraftContext) !== null;
   const fields = useMemo(() => pluginFields(plugins, i18n.language), [plugins, i18n.language]);

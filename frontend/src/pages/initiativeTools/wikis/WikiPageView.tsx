@@ -28,10 +28,12 @@ import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateAc
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { useCollaboration } from "@/hooks/useCollaboration";
+import { itemSaves } from "@/hooks/useFieldSave";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
 import { propertySaves } from "@/hooks/useProperties";
+import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 import { useRouteId } from "@/hooks/useRouteId";
 import { useAddWikiPage, useUpdateWikiPage, useWiki, useWikiPage } from "@/hooks/useWikis";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -320,6 +322,10 @@ export const WikiPageView = () => {
   // A page's properties are about the page rather than part of reading it, so
   // they wait in a drawer of their own too.
   const [propertiesOpen, setPropertiesOpen] = useState(false);
+  const propertyEnv = usePropertyEnv({
+    initiativeId: wikiQuery.data?.initiative_id ?? null,
+    enabled: canWrite && propertiesOpen,
+  });
   // Reading or writing. Kept in the address, because the bar over the page and
   // the page's row in the tree both offer it from different React trees, and
   // because a page being edited is then a thing you can link to or reload into.
@@ -589,7 +595,8 @@ export const WikiPageView = () => {
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
             {page && propertiesInitiativeId !== null ? (
               <PropertiesField
-                kind={propertySaves[PropertyTarget.wiki_page]}
+                saves={itemSaves(propertySaves[PropertyTarget.wiki_page], page.id)}
+                env={propertyEnv}
                 id={page.id}
                 properties={page.properties ?? []}
                 readOnly={!canWrite}

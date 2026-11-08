@@ -10,6 +10,7 @@ import {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { CounterView } from "@/components/initiativeTools/counters/views/CounterView";
+import { SubscribeButton } from "@/components/SubscribeButton";
 import { counterSaves, type SteppedCount, useCounterGroup, useSetCount } from "@/hooks/useCounters";
 import { type ItemFieldSave, useItemFieldSave } from "@/hooks/useFieldSave";
 import { isAtMax, isAtMin } from "@/lib/counter-math";
@@ -60,7 +61,7 @@ const NameEditor = ({ item: counter, label }: EditorProps) => {
       save={useSave(counter, label)}
       readOnly={useCounterLayout().readOnly}
       placeholder={t("counterNamePlaceholder")}
-      subscribe={{ kind: "counter", id: counter.id }}
+      beside={<SubscribeButton kind="counter" entityId={counter.id} className="mt-0.5" />}
     />
   );
 };
