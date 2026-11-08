@@ -527,6 +527,11 @@ in `ci.yml`; `scripts/ci/check migrations` locally and before a push). That
 includes docstring and comment edits — nothing runs from those, but the check
 reads the file list, so leave merged files alone.
 
+The one exception is an edit the owner rules, for a revision that was wrong
+from the start: a commit on the branch names each merged file it edits in a trailer,
+`Edits-merged-migration: 20261109_0591_who_made_it.py`, and the check lists the
+file instead of failing. Pair it with a converging revision, as above.
+
 ### Rules for writing frontend code
 
 1. **React Query cache keys for the same data must match across components.** If the sidebar uses `["initiatives", communityId]` and a page uses `["initiatives", { communityId }]`, invalidation from one won't reach the other. Use prefix invalidation (`queryKey: ["initiatives"]`) when mutations should refresh all consumers.
