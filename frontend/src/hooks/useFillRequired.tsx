@@ -28,11 +28,14 @@ export const useFillRequired = <I extends Item, C, P>(detail: DetailKind<I, C, P
   const [asking, setAsking] = useState<Asking<I, C, P> | null>(null);
   const [pending, setPending] = useState(false);
   const home = asking ? detail.home(asking.item, asking.context) : null;
-  const definitions = useOwnedDefinitions({
+  const read = useOwnedDefinitions({
     initiativeId: home?.initiativeId ?? undefined,
     owner: home?.owner,
     enabled: home !== null && home.initiativeId !== null,
-  }).data;
+  });
+  // The read outlives each asking, so between two it can still hold the last
+  // place's definitions; the dialog waits for this place's.
+  const definitions = read.isPlaceholderData ? undefined : read.data;
   const dialog = asking ? (
     <FillRequiredDialog
       detail={detail}
