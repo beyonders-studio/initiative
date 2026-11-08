@@ -19,10 +19,10 @@ so a project with comments off still has task threads.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Optional, cast
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import ColumnElement, and_, exists, func, or_, tuple_
 from sqlalchemy.orm import aliased, selectinload
@@ -36,35 +36,35 @@ from app.core.messages import (
 )
 from app.core.tools import KINDS, Tool
 from app.db.initiative_rls import (
-    COMMENT_PARENTS,
     COMMENT_PARENT_COLUMNS as RLS_COMMENT_PARENT_COLUMNS,
+)
+from app.db.initiative_rls import (
+    COMMENT_PARENTS,
 )
 from app.db.query import ids_in
 from app.db.session import guild_context, install_context, routed_guild_id
 from app.db.soft_delete_filter import select_including_deleted
+from app.models.platform.notification import NotificationType
+from app.models.platform.user import User
 from app.models.tenant._mixins import tool_models
 from app.models.tenant.calendar import Calendar
+from app.models.tenant.collection import Collection
 from app.models.tenant.comment import Comment, CommentAudience, in_thread
-from app.models.platform.notification import NotificationType
 from app.models.tenant.counter import CounterGroup
 from app.models.tenant.dashboard import Dashboard
-from app.models.tenant.post import Post
-from app.models.tenant.collection import Collection
 from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative
+from app.models.tenant.post import Post
 from app.models.tenant.project import Project
-from app.models.tenant.wiki import Wiki, WikiPage
 from app.models.tenant.task import Task, TaskAssignee
-from app.models.platform.user import User
-from app.services import keyset_cursor
+from app.models.tenant.wiki import Wiki, WikiPage
+from app.services import keyset_cursor, notifications, reachability
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import content_references, personal_items
-from app.services import notifications
-from app.services import reachability
 from app.services.tenant.initiative_tools import tool_on_in, tool_on_sql
 from app.services.tenant.mention_parser import (
-    extract_mentioned_user_ids,
     extract_mentioned_task_ids,
+    extract_mentioned_user_ids,
 )
 
 if TYPE_CHECKING:
@@ -236,17 +236,17 @@ class _ParentContext:
 
     column: str
     entity_id: int
-    initiative_id: Optional[int]
+    initiative_id: int | None
     title: str
-    task: Optional[Task] = None
-    project: Optional[Project] = None
-    tool: Optional[Tool] = None
-    resource: Optional[SQLModel] = None
-    extra: Optional[ExtraCommentTarget] = None
-    extra_row: Optional[SQLModel] = None
+    task: Task | None = None
+    project: Project | None = None
+    tool: Tool | None = None
+    resource: SQLModel | None = None
+    extra: ExtraCommentTarget | None = None
+    extra_row: SQLModel | None = None
 
     @property
-    def ref_type(self) -> Optional[str]:
+    def ref_type(self) -> str | None:
         """What a notification about this thread is ABOUT — the extra's own
         kind where there is one, else the tool. Every one of them opens by its
         own id, so this is also where a link to the thread goes."""
@@ -255,7 +255,7 @@ class _ParentContext:
         return self.tool.value if self.tool is not None else None
 
 
-def _single_target(ids: Mapping[str, Optional[int]]) -> tuple[str, int]:
+def _single_target(ids: Mapping[str, int | None]) -> tuple[str, int]:
     provided = [(column, value) for column, value in ids.items() if value is not None]
     if len(provided) != 1:
         raise CommentValidationError(CommentMessages.PROVIDE_ONE_ENTITY)
@@ -275,7 +275,7 @@ async def _get_task_context(
     *,
     task_id: int,
     guild_id: int,
-) -> Optional[_ParentContext]:
+) -> _ParentContext | None:
     stmt = (
         select(Task, Project, Initiative)
         .join(Project, Project.id == Task.project_id)
@@ -307,7 +307,7 @@ async def _get_extra_context(
     *,
     entity_id: int,
     guild_id: int,
-) -> Optional[_ParentContext]:
+) -> _ParentContext | None:
     """One extra's row, resolved through the tool that answers for it.
 
     The anchor is loaded by the same call a comment ON that tool would make, so
@@ -354,7 +354,7 @@ async def _get_tool_context(
     *,
     entity_id: int,
     guild_id: int,
-) -> Optional[_ParentContext]:
+) -> _ParentContext | None:
     """Load one tool row with its initiative. The guild is checked through the
     initiative when the row has one, else through the row itself (a guild-level
     calendar names no initiative)."""
@@ -382,7 +382,7 @@ async def _load_parent(
     column: str,
     entity_id: int,
     guild_id: int,
-) -> Optional[_ParentContext]:
+) -> _ParentContext | None:
     if column == "task_id":
         return await _get_task_context(session, task_id=entity_id, guild_id=guild_id)
     extra = EXTRA_COMMENT_TARGETS.get(column)
@@ -423,7 +423,7 @@ async def _ensure_parent_access(
     session: AsyncSession,
     ctx: _ParentContext,
     *,
-    user: Optional[User],
+    user: User | None,
     access: str = "read",
 ) -> None:
     """Ensure the user can reach the comment's parent at ``access`` level.
@@ -479,7 +479,7 @@ async def _ensure_parent_access(
     raise CommentPermissionError(CommentMessages.PERMISSION_DENIED)
 
 
-def serialize_comment(comment: Comment, *, viewer_id: Optional[int] = None):
+def serialize_comment(comment: Comment, *, viewer_id: int | None = None):
     """The read shape of one comment. A task comment reports its task's
     project — resolved by whichever service call loaded the parent — through
     the same ``project_id`` field a project comment fills from its own column.
@@ -488,10 +488,8 @@ def serialize_comment(comment: Comment, *, viewer_id: Optional[int] = None):
     :func:`attach_reactions`; a comment that was never stamped serializes with
     none rather than issuing a query of its own here.
     """
-    from app.schemas.tenant.comment import CommentRead
+    from app.schemas.tenant.comment import CommentRead, CommentRemoval
     from app.services.tenant import reactions as reactions_service
-
-    from app.schemas.tenant.comment import CommentRemoval
 
     read = CommentRead.model_validate(comment)
     task_project_id = getattr(comment, "_task_project_id", None)
@@ -516,7 +514,7 @@ def serialize_comment(comment: Comment, *, viewer_id: Optional[int] = None):
     return read
 
 
-def removal_of(comment: Comment) -> Optional[tuple[str, Optional[str]]]:
+def removal_of(comment: Comment) -> tuple[str, str | None] | None:
     """Who took ``comment`` out of the conversation, and why: a moderator,
     with a reason, or its author. ``None`` while it stands."""
     if comment.removed_at is not None:
@@ -536,8 +534,8 @@ async def attach_reactions(session: AsyncSession, *comments: Comment) -> None:
     no relationship to the polymorphic reactions table, and a thread of fifty
     must not become fifty queries.
     """
-    from app.services.tenant import reactions as reactions_service
     from app.core.reactions import ReactionTarget
+    from app.services.tenant import reactions as reactions_service
 
     rows = [c for c in comments if c.id is not None]
     if not rows or install_context(session) is not None:
@@ -556,7 +554,7 @@ async def _get_comment(
     session: AsyncSession,
     *,
     comment_id: int,
-) -> Optional[Comment]:
+) -> Comment | None:
     stmt = select(Comment).where(Comment.id == comment_id)
     result = await session.exec(stmt)
     return result.one_or_none()
@@ -575,7 +573,7 @@ async def _resolved_parent(
     column: str,
     entity_id: int,
     guild_id: int,
-    user: Optional[User],
+    user: User | None,
     access: str,
 ) -> _ParentContext:
     """Load + authorize one comment parent, raising the comment-shaped errors.
@@ -599,7 +597,7 @@ async def _resolved_parent(
     return ctx
 
 
-def moderates_thread(session: AsyncSession, initiative_id: Optional[int]) -> bool:
+def moderates_thread(session: AsyncSession, initiative_id: int | None) -> bool:
     """Whether this request is in the moderation set of the initiative a
     thread is in (``moderation_acts.may_moderate``): it may take comments down
     and lock or unlock the thread.
@@ -638,7 +636,7 @@ async def _locked_now(session: AsyncSession, ctx: _ParentContext) -> bool:
     ).first() is not None
 
 
-def thread_key(guild_id: Optional[int], table: str, row_id: int) -> str:
+def thread_key(guild_id: int | None, table: str, row_id: int) -> str:
     """The advisory key one thread takes turns on, for writing in it and for
     locking it (``moderation_acts``)."""
     return f"{guild_id}:{table}:{row_id}"
@@ -666,7 +664,7 @@ async def get_comment_with_parent(
     session: AsyncSession,
     *,
     comment_id: int,
-    user: Optional[User],
+    user: User | None,
     guild_id: int,
     access: str = "read",
 ) -> tuple[Comment, _ParentContext]:
@@ -710,7 +708,7 @@ async def get_comment(
     session: AsyncSession,
     *,
     comment_id: int,
-    user: Optional[User],
+    user: User | None,
     guild_id: int,
 ) -> Comment:
     """One comment, gated exactly like listing its parent's thread.
@@ -728,7 +726,7 @@ async def get_comment(
 async def _ensure_said_to_a_filer(
     session: AsyncSession,
     *,
-    person: Optional[User],
+    person: User | None,
     column: str,
     entity_id: int,
 ) -> None:
@@ -764,8 +762,8 @@ async def create_comment(
     author: User | notifications.PluginAuthor,
     guild_id: int,
     content: str,
-    targets: Mapping[str, Optional[int]],
-    parent_comment_id: Optional[int] = None,
+    targets: Mapping[str, int | None],
+    parent_comment_id: int | None = None,
     audience: CommentAudience = CommentAudience.members,
 ) -> Comment:
     """Post one comment on one parent, and tell whoever it concerns.
@@ -1025,12 +1023,12 @@ async def _process_comment_notifications(
 async def list_comments(
     session: AsyncSession,
     *,
-    user: Optional[User],
+    user: User | None,
     guild_id: int,
-    targets: Mapping[str, Optional[int]],
+    targets: Mapping[str, int | None],
     limit: int,
-    cursor: Optional[str] = None,
-) -> "ThreadPage":
+    cursor: str | None = None,
+) -> ThreadPage:
     """One page of a thread, and the cursor for the next, or None at the end.
 
     A page is ``limit`` conversations — top-level comments, newest first —
@@ -1121,7 +1119,7 @@ class ThreadPage:
     """One page of a thread, and what the thread says about writing in it."""
 
     comments: Sequence[Comment]
-    next_cursor: Optional[str]
+    next_cursor: str | None
     #: A moderator closed it to new comments.
     locked: bool
     #: The reader moderates the initiative it is in.
@@ -1280,7 +1278,7 @@ async def update_comment(
 
     previous_content = comment.content
     comment.content = content
-    comment.updated_at = datetime.now(timezone.utc)
+    comment.updated_at = datetime.now(UTC)
     session.add(comment)
     await session.flush()
     let_go = attachments_service.upload_urls_in_markdown(
@@ -1308,9 +1306,9 @@ async def recent_activity(
     policies and the soft-delete filter decide which rows each leg reaches, and
     a thread whose comments or whose tool is switched off is left out.
     """
+    from app.core.reactions import ReactionTarget
     from app.schemas.tenant.comment import CommentAuthor, RecentActivityEntry
     from app.services.tenant import reactions as reactions_service
-    from app.core.reactions import ReactionTarget
 
     conditions = [
         Comment.parent_comment_id.is_(None),

@@ -1,6 +1,6 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import List, NamedTuple, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple, Optional
 
 from sqlalchemy import (
     Boolean,
@@ -34,11 +34,10 @@ from app.models.tenant._mixins import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    from app.models.tenant.project import Project
-    from app.models.platform.user_profile_view import MemberProfile
-    from app.models.tenant.file import File
     from app.models.tenant.calendar import Calendar
     from app.models.tenant.counter import CounterGroup
+    from app.models.tenant.file import File
+    from app.models.tenant.project import Project
 
 
 class InitiativeJoinPolicy(str, Enum):
@@ -179,7 +178,7 @@ class InitiativeRoleModel(CreatedByMixin, table=True):
         UniqueConstraint("id", "initiative_id", name="uq_initiative_roles_initiative"),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     initiative_id: int = Field(
         sa_column=Column(
             Integer,
@@ -203,11 +202,11 @@ class InitiativeRoleModel(CreatedByMixin, table=True):
     position: int = Field(default=0)  # for ordering in UI
 
     initiative: Optional["Initiative"] = Relationship(back_populates="roles")
-    permissions: List["InitiativeRule"] = Relationship(
+    permissions: list["InitiativeRule"] = Relationship(
         back_populates="role",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
-    members: List["InitiativeMember"] = Relationship(back_populates="role_ref")
+    members: list["InitiativeMember"] = Relationship(back_populates="role_ref")
 
 
 #: What a community may set for every initiative in it, kept as its
@@ -266,9 +265,9 @@ class InitiativeRule(SQLModel, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     #: The initiative, or ``None`` for the community's own.
-    initiative_id: Optional[int] = Field(
+    initiative_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -277,7 +276,7 @@ class InitiativeRule(SQLModel, table=True):
         ),
     )
     #: The role the rule is about.
-    initiative_role_id: Optional[int] = Field(
+    initiative_role_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True, index=True)
     )
     key: str = Field(sa_column=Column(String(64), nullable=False))
@@ -293,7 +292,7 @@ class InitiativeMember(SQLModel, table=True):
         foreign_key="initiatives.id", ondelete="CASCADE", primary_key=True
     )
     user_id: int = Field(foreign_key="users.id", primary_key=True, index=True)
-    role_id: Optional[int] = Field(
+    role_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -302,7 +301,7 @@ class InitiativeMember(SQLModel, table=True):
         ),
     )
     joined_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     #: The provider whose claims put this person here — see
@@ -312,7 +311,7 @@ class InitiativeMember(SQLModel, table=True):
     #: across that line uses. A provider that has been deleted therefore leaves
     #: an id that matches nothing, which reads as unmanaged and is the outcome
     #: the shared table's ``SET NULL`` produces.
-    oidc_provider_id: Optional[int] = Field(
+    oidc_provider_id: int | None = Field(
         default=None,
         sa_column=Column(Integer, nullable=True, index=True),
     )
@@ -354,7 +353,7 @@ class InitiativeJoinRequest(SQLModel, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     initiative_id: int = Field(
         sa_column=Column(
             Integer,
@@ -380,16 +379,16 @@ class InitiativeJoinRequest(SQLModel, table=True):
         ),
     )
     # Optional note from the requester to the initiative's managers.
-    message: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    message: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
-    resolved_at: Optional[datetime] = Field(
+    resolved_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     # The manager who approved or denied; NULL while pending.
-    resolved_by: Optional[int] = Field(
+    resolved_by: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -450,10 +449,10 @@ class Initiative(
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     name: str = Field(index=True, nullable=False)
-    description: Optional[str] = Field(default=None)
-    color: Optional[str] = Field(
+    description: str | None = Field(default=None)
+    color: str | None = Field(
         default=None,
         sa_column=Column(String(length=32), nullable=True),
     )
@@ -479,32 +478,32 @@ class Initiative(
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
-    memberships: List["InitiativeMember"] = Relationship(
+    memberships: list["InitiativeMember"] = Relationship(
         back_populates="initiative",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
-    roles: List["InitiativeRoleModel"] = Relationship(
+    roles: list["InitiativeRoleModel"] = Relationship(
         back_populates="initiative",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
-    projects: List["Project"] = Relationship(back_populates="initiative")
-    files: List["File"] = Relationship(
+    projects: list["Project"] = Relationship(back_populates="initiative")
+    files: list["File"] = Relationship(
         back_populates="initiative",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
-    calendars: List["Calendar"] = Relationship(
+    calendars: list["Calendar"] = Relationship(
         back_populates="initiative",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
-    counter_groups: List["CounterGroup"] = Relationship(
+    counter_groups: list["CounterGroup"] = Relationship(
         back_populates="initiative",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )

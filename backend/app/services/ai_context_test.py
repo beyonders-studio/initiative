@@ -1,7 +1,7 @@
 """What a task's checklist and description are written from."""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
@@ -65,7 +65,7 @@ async def test_a_task_is_told_with_its_links_and_newest_comments(
         session, a.user, task=task, content="reply", parent_comment_id=first.id
     )
     await create_comment(
-        session, a.user, task=task, content="", removed_at=datetime.now(timezone.utc)
+        session, a.user, task=task, content="", removed_at=datetime.now(UTC)
     )
 
     reading = await reading_as(a.user.id, a.guild.id)

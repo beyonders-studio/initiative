@@ -11,9 +11,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.core.search import SearchEntityType
 from app.services.content_sockets import RoomMember
 from app.services.tenant import collaboration as collaboration_module
-from app.core.search import SearchEntityType
 from app.services.tenant.collaboration import (
     CollaborationManager,
     CollaborationRoom,

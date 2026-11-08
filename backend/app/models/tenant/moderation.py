@@ -12,9 +12,8 @@ intake cases (tasks) in the operations guild, triaged and assigned by staff.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import (
     CheckConstraint,
@@ -43,7 +42,7 @@ class ModerationReport(SQLModel, table=True):
 
     __tablename__ = "moderation_reports"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
 
     # No index of its own: the migration's (initiative_id, outcome,
     # reported_at DESC) index leads on this column and answers both the
@@ -72,32 +71,32 @@ class ModerationReport(SQLModel, table=True):
 
     # NULL while open. Every outcome closes the report: it is either work or a
     # record, never both.
-    outcome: Optional[ReportOutcome] = Field(
+    outcome: ReportOutcome | None = Field(
         default=None, sa_column=Column(String(length=32), nullable=True)
     )
-    note: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    note: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     #: Who settled it, and when. Set by the act, not typed in.
-    decided_by: Optional[int] = Field(
+    decided_by: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
-    decided_at: Optional[datetime] = Field(
+    decided_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: The law the first ``illegal`` report named. Null for every other reason.
-    legal_basis: Optional[str] = Field(
+    legal_basis: str | None = Field(
         default=None, sa_column=Column(String(length=32), nullable=True)
     )
     #: The platform's case about the same target, when the platform was told
     #: as well: an ``illegal`` report goes to both at once. A weak reference;
     #: the case is in the operations community.
-    platform_case_id: Optional[int] = Field(
+    platform_case_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
-    platform_notified_at: Optional[datetime] = Field(
+    platform_notified_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: What settling it did to the target, in the moderation log.
-    action_id: Optional[int] = Field(
+    action_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
 
@@ -118,7 +117,7 @@ class ModerationReportReporter(SQLModel, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     # No index of its own: the unique constraint above leads on this column,
     # which is what reading a report's reporters looks up.
     report_id: int = Field(
@@ -135,7 +134,7 @@ class ModerationReportReporter(SQLModel, table=True):
         sa_column=Column(DateTime(timezone=True), nullable=False)
     )
     #: This reporter's own words.
-    detail: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    detail: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
 
 
 def _values(enum: type[Enum]) -> str:
@@ -164,7 +163,7 @@ class ModerationAction(CreatedByMixin, table=True):
         Index("ix_moderation_actions_target", "target_type", "target_id"),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     initiative_id: int = Field(
         sa_column=Column(
             Integer,
@@ -180,25 +179,25 @@ class ModerationAction(CreatedByMixin, table=True):
     )
     target_id: int = Field(sa_column=Column(Integer, nullable=False))
     #: Whose work it was, where it was somebody's.
-    subject_user_id: Optional[int] = Field(
+    subject_user_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
     #: A ``RemovalReason``, for a removal.
-    reason: Optional[str] = Field(
+    reason: str | None = Field(
         default=None, sa_column=Column(String(length=32), nullable=True)
     )
     #: The moderator's own words: why, for the log; for a warning, what the
     #: member was told.
-    note: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    note: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     #: The words a comment's removal took down, sealed.
-    snapshot: Optional[str] = Field(
+    snapshot: str | None = Field(
         default=None,
         sa_column=Column(
             Text, nullable=True, info={FERNET_SALT: SALT_MODERATION_SNAPSHOT}
         ),
     )
     #: The report it settled, when it settled one.
-    report_id: Optional[int] = Field(
+    report_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -207,14 +206,12 @@ class ModerationAction(CreatedByMixin, table=True):
         ),
     )
     #: The hold it ended, when the platform removed something it had held.
-    hold_id: Optional[int] = Field(
-        default=None, sa_column=Column(Integer, nullable=True)
-    )
+    hold_id: int | None = Field(default=None, sa_column=Column(Integer, nullable=True))
     #: The access grant it was done under, when a platform moderator did it.
-    via_grant_id: Optional[int] = Field(
+    via_grant_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

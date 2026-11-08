@@ -54,10 +54,10 @@ from app.api.actor_route import ActorRoute
 from app.api.deps import (
     ActorContext,
     ActorSessionDep,
-    RLSSessionDep,
-    plugin_scope_checked,
-    get_current_active_user,
     GuildContextDep,
+    RLSSessionDep,
+    get_current_active_user,
+    plugin_scope_checked,
 )
 from app.core import webhook_events
 from app.core.errors import CodedError

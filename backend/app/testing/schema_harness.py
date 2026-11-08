@@ -41,9 +41,11 @@ from sqlalchemy import event
 from sqlalchemy.orm import Session
 from sqlmodel import SQLModel
 
-from app.db.session import routed_guild_id
-
-from app.db.session import _RLS_CONTEXT_INFO_KEY, _RLS_ESTABLISHED_INFO_KEY
+from app.db.session import (
+    _RLS_CONTEXT_INFO_KEY,
+    _RLS_ESTABLISHED_INFO_KEY,
+    routed_guild_id,
+)
 from app.db.tenancy import GUILD_SCOPED_TABLES
 
 _installed = False

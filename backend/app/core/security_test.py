@@ -9,25 +9,24 @@ from __future__ import annotations
 
 import base64
 import uuid
+from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
-
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519, rsa
-from datetime import datetime, timedelta, timezone
 
 from app.core import security
 from app.core.config import settings
 from app.core.security import (
     AUTH_ACCESS_AUDIENCE,
     BILLING_PORTAL_HANDOFF_LIFETIME,
-    HandoffSigningNotConfiguredError,
     JWT_ALGORITHM,
     TOKEN_ISSUER,
     UPLOAD_TOKEN_AUDIENCE,
     UPLOAD_TOKEN_LIFETIME,
     UPLOAD_TOKEN_SCOPE,
+    HandoffSigningNotConfiguredError,
     UploadTokenError,
     create_upload_token,
     decode_session_token,
@@ -299,7 +298,7 @@ def test_verify_upload_token_rejects_wrong_audience_and_claims(handoff_signing_k
     with pytest.raises(UploadTokenError):
         verify_upload_token(handoff)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     claims = {
         "sub": "7",
         "aud": UPLOAD_TOKEN_AUDIENCE,
@@ -424,7 +423,7 @@ def test_decode_session_token_refuses_the_pre_session_shape():
         {
             "sub": "7",
             "ver": 2,
-            "exp": datetime.now(timezone.utc) + timedelta(minutes=10),
+            "exp": datetime.now(UTC) + timedelta(minutes=10),
         },
         settings.jwt_signing_key,
         algorithm=JWT_ALGORITHM,

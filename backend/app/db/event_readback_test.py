@@ -21,8 +21,7 @@ Between the two, a new evented table owes no new API surface.
 
 from __future__ import annotations
 
-
-import app.db.base  # noqa: F401 — register every model
+import app.db.base
 from app.db.event_capture import build_specs
 from app.db.initiative_rls import parent_types
 from app.main import app

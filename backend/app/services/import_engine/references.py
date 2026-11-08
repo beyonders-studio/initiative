@@ -37,6 +37,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy.orm import undefer
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.file_types import FileType
 from app.core.references import (
     REFERENCE_NODES,
     SOURCE_REF,
@@ -47,7 +48,6 @@ from app.core.references import (
     reference_as_text,
     reference_node_kind,
 )
-from app.core.file_types import FileType
 from app.core.search import SearchEntityType
 from app.core.tools import Tool, tool_envelope_type
 
@@ -247,7 +247,7 @@ def place_editor_references(content: Any, resolve: Callable[[str], int | None]) 
 
 
 def note_or_settle(
-    context: "ImportContext | None",
+    context: ImportContext | None,
     kind: SearchEntityType,
     entity_id: int | None,
     content: Any,
@@ -297,7 +297,7 @@ def _body_column(kind: SearchEntityType) -> tuple[type, str] | None:
 
 
 async def resolve_references(
-    session: AsyncSession, context: "ImportContext", *, author_id: int | None
+    session: AsyncSession, context: ImportContext, *, author_id: int | None
 ) -> int:
     """Place the exported references in every body the job noted, now that
     everything the job carries exists, and record the ``references`` edges
@@ -353,7 +353,7 @@ async def resolve_references(
             else None
         )
         if carry and has_source_references(carry.get("description")):
-            setattr(
+            setattr(  # noqa: B010 - ``row`` is any kind's row; only a task's has it
                 row,
                 "recurrence_carry",
                 {**carry, "description": _settle(carry["description"], resolve)},

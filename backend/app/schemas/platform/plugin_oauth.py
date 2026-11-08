@@ -7,12 +7,10 @@ protocol value rather than text for a person to read.
 """
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.platform.identity_ref import REF_MAX_LENGTH
-from app.schemas.base import TitleStr
 from app.models.tenant.plugin_member_consent import (
     LABEL_MAX_LENGTH,
     PURPOSE_MAX_LENGTH,
@@ -20,6 +18,7 @@ from app.models.tenant.plugin_member_consent import (
     ConsentStatus,
     is_valid_purpose,
 )
+from app.schemas.base import TitleStr
 
 
 class PluginAccessTokenResponse(BaseModel):
@@ -61,17 +60,17 @@ class PluginConsentRequestCreate(BaseModel):
     member: str = Field(min_length=1, max_length=REF_MAX_LENGTH)
     #: The plug-in's own id for what it wants to do as the member; absent for
     #: plug-in-wide consent.
-    purpose: Optional[str] = None
+    purpose: str | None = None
     #: What the purpose is, in the plug-in's own words. The member reads it as the
     #: plug-in's.
     label: TitleStr = Field(min_length=1, max_length=LABEL_MAX_LENGTH)
     #: The one initiative the purpose is bound to, when it is.
-    initiative_id: Optional[int] = Field(default=None, gt=0, le=2**31 - 1)
+    initiative_id: int | None = Field(default=None, gt=0, le=2**31 - 1)
     access: ConsentAccess
 
     @field_validator("purpose")
     @classmethod
-    def _purpose(cls, value: Optional[str]) -> Optional[str]:
+    def _purpose(cls, value: str | None) -> str | None:
         if value is not None and not is_valid_purpose(value):
             raise ValueError(
                 f"purpose is 1 to {PURPOSE_MAX_LENGTH} letters, digits or -_.:/@"
@@ -91,13 +90,13 @@ class PluginConsentRequestRead(BaseModel):
     """A request to act as a member, as it stands."""
 
     member: str
-    purpose: Optional[str] = None
+    purpose: str | None = None
     label: str
-    initiative_id: Optional[int] = None
+    initiative_id: int | None = None
     requested_access: ConsentAccess
     #: ``pending`` until the member answers; then ``granted``, ``declined``, or
     #: ``revoked`` when they withdrew what they allowed.
     status: ConsentStatus
     #: What the member allowed, while it stands.
-    granted_access: Optional[ConsentAccess] = None
+    granted_access: ConsentAccess | None = None
     requested_at: datetime

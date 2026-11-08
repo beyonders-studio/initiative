@@ -1,27 +1,30 @@
 """Claim sync: a user's first arrival in a guild beside auto-join enrolment,
 and leaving a tenant whose rules no longer grant a membership."""
 
+from datetime import UTC
+
 import pytest
 from sqlmodel import delete, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.rules import SetBy
 from app.db import cohorts, post_commit
+from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
-from app.models.platform.guild import GuildMembership, CommunityRole
-from app.models.platform.platform_provider_default import PlatformProviderDefault
+from app.models.platform.guild import CommunityRole, GuildMembership
 from app.models.platform.oidc_claim_mapping import (
     ClaimRuleAuthor,
     OIDCClaimMapping,
     OIDCMappingTargetType,
 )
-from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
+from app.models.platform.platform_provider_default import PlatformProviderDefault
+from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
 from app.models.tenant.custom_role import (
     CustomRole,
     CustomRoleClaimRule,
     CustomRoleMember,
 )
-from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
+from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
 from app.models.tenant.initiative import Initiative, InitiativeMember
 from app.services import oidc_sync
 from app.services.oidc_sync import sync_oidc_assignments
@@ -30,21 +33,19 @@ from app.services.tenant import custom_roles as custom_roles_service
 from app.services.tenant import plugin_revocation
 from app.services.tenant.initiatives import get_role_by_name
 from app.testing.factories import (
-    create_claim_rule,
-    create_guild_membership,
     NARROWED_CLAIM,
     NARROWED_VALUE,
-    create_guild_provider_connection,
     create_auth_provider,
+    create_claim_rule,
     create_guild,
+    create_guild_membership,
     create_guild_plugin,
+    create_guild_provider_connection,
     create_initiative,
     create_plugin_user_connection,
     create_user,
 )
-from app.db.request_context import SystemGuild, Unattributed
 from app.testing.schema_harness import route_session_to_guild
-
 
 #: What an arrival from the tenant the factory's connections narrow to carries.
 _ADMITTED = {NARROWED_CLAIM: NARROWED_VALUE}
@@ -569,7 +570,7 @@ async def test_claim_sync_keeps_an_under_age_answer_out_of_a_listed_guild(
     here is the answer already on the record, because there is no one to put
     the question to. A private guild is its own to answer for and admits them.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.services.platform import rules
 
@@ -589,7 +590,7 @@ async def test_claim_sync_keeps_an_under_age_answer_out_of_a_listed_guild(
     # The two are the two answers to one question, and ck_users_age_answer
     # holds them apart — so saying one is said is unsaying the other.
     newcomer = await create_user(session, age_confirmed_at=None)
-    newcomer.age_below_minimum_at = datetime.now(timezone.utc)
+    newcomer.age_below_minimum_at = datetime.now(UTC)
     session.add(newcomer)
     session.add(
         OIDCClaimMapping(

@@ -33,7 +33,7 @@ import secrets
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
 from typing import Any
 
@@ -283,7 +283,7 @@ async def create(
     state = await asyncio.to_thread(
         storage.start_parts, key, part_bytes=part_bytes, length=length
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     upload = PendingUpload(
         id=upload_id,
         created_by=user.id,
@@ -315,7 +315,7 @@ async def _live(session: AsyncSession, upload_id: str) -> PendingUpload:
     upload = await session.get(PendingUpload, upload_id, populate_existing=True)
     if upload is None:
         raise _refuse(status.HTTP_404_NOT_FOUND, ResumableMessages.NOT_FOUND)
-    if upload.expires_at <= datetime.now(timezone.utc):
+    if upload.expires_at <= datetime.now(UTC):
         raise _refuse(status.HTTP_410_GONE, ResumableMessages.EXPIRED)
     return upload
 

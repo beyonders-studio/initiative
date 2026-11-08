@@ -13,7 +13,7 @@ from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime
 from operator import attrgetter
-from typing import Any, Final, List, Optional
+from typing import Any, Final
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, exists, func, or_
@@ -45,8 +45,8 @@ from app.db.session import require_guild_context, routed_guild_id
 from app.models.platform.guild import Guild
 from app.models.platform.user import User
 from app.models.tenant.comment import Comment, in_thread
-from app.models.tenant.project import Project
 from app.models.tenant.metadata import PERSON_TYPES, MetadataDefinition
+from app.models.tenant.project import Project
 from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.task import RecurrenceStrategy, Task, TaskAssignee, TaskPriority
 from app.schemas.query import FilterCondition, FilterGroup, FilterOp, SortDir
@@ -194,8 +194,8 @@ def _build_task_filter_fields(
     *,
     guild_id: int,
     current_user_id: int | None,
-    property_definitions: Optional[dict[int, MetadataDefinition]] = None,
-    plugin_fields: Optional[dict] = None,
+    property_definitions: dict[int, MetadataDefinition] | None = None,
+    plugin_fields: dict | None = None,
 ) -> dict:
     """The ``allowed_fields`` mapping for a task filter, from the field registry.
 
@@ -556,7 +556,7 @@ async def load_task(session: AsyncSession, task_id: int) -> Task | None:
 
 def _confining_project_id(
     conditions: list[FilterCondition | FilterGroup],
-) -> Optional[int]:
+) -> int | None:
     """The single project this request is narrowed to, or ``None``.
 
     Only a plain top-level equality on one id confines a request to a project.
@@ -590,8 +590,8 @@ async def _allowed_project_ids(
     context: ActorContext,
     *,
     include_templates: bool = False,
-    project_id: Optional[int] = None,
-) -> Optional[set[int]]:
+    project_id: int | None = None,
+) -> set[int] | None:
     """Project ids whose tasks this request may see.
 
     The set stays explicitly guild-scoped either way; the sharing gate on top of
@@ -622,7 +622,7 @@ async def _allowed_project_ids(
     else:
         conditions.append(Project.id == project_id)
     if not include_templates:
-        conditions.append(Project.is_template == False)  # noqa: E712
+        conditions.append(Project.is_template == False)
     stmt = select(Project.id).join(Project.initiative).where(*conditions)
     result = await session.exec(stmt)
     return {pid for pid in result.all() if pid is not None}
@@ -651,7 +651,7 @@ async def _gather_global_task_reads(
     current_user: User,
     *,
     build_query,
-    guild_ids: Optional[List[int]],
+    guild_ids: list[int] | None,
     page: int,
     page_size: int,
     sort_fields: list | None = None,
@@ -862,13 +862,13 @@ class TaskListQuery:
     and the cross-guild /me aggregates so they stay in lockstep."""
 
     user_conditions: list
-    sort_fields: Optional[list]
-    tz: Optional[str]
+    sort_fields: list | None
+    tz: str | None
     # project_id narrows which projects the guild path checks access on; guild_ids
     # restricts the cross-guild fan-out. Every other field filters through
     # ``user_conditions`` via apply_filters, so no other scalar is extracted here.
-    project_id: Optional[int]
-    guild_ids: Optional[list]
+    project_id: int | None
+    guild_ids: list | None
     property_definitions: dict
     #: The plug-in fields the reader may filter by (``metadata.filter_fields``).
     plugin_fields: dict
@@ -882,7 +882,7 @@ def _property_value_leaves(
 
 
 def check_task_conditions(
-    conditions: Optional[str],
+    conditions: str | None,
 ) -> list[FilterCondition | FilterGroup]:
     """The task list's ``conditions``, parsed and checked without a database:
     the operators each field takes, and how many property filters one list
@@ -902,9 +902,9 @@ def check_task_conditions(
 
 async def parse_task_list_query(
     session,
-    conditions: Optional[str],
-    sorting: Optional[str],
-    tz: Optional[str],
+    conditions: str | None,
+    sorting: str | None,
+    tz: str | None,
     *,
     across_guilds_for: User | None = None,
 ) -> TaskListQuery:
@@ -1011,7 +1011,7 @@ async def _load_property_definitions_across_guilds(
     session: AsyncSession,
     current_user: User,
     needed: list[int],
-    guild_ids: Optional[list],
+    guild_ids: list | None,
 ) -> dict[int, MetadataDefinition]:
     """Load the property definitions a cross-guild ``/me`` list needs, routing
     into each of the user's guild schemas.
@@ -1113,9 +1113,9 @@ async def count_tasks_for_export(
     session,
     current_user: User,
     *,
-    conditions: Optional[str] = None,
-    sorting: Optional[str] = None,
-    tz: Optional[str] = None,
+    conditions: str | None = None,
+    sorting: str | None = None,
+    tz: str | None = None,
     include_archived: bool = False,
 ) -> int:
     """Row count for an export snapshot — the cheap pre-render signal for the
@@ -1138,9 +1138,9 @@ async def task_ids_for_export(
     session,
     current_user: User,
     *,
-    conditions: Optional[str] = None,
-    sorting: Optional[str] = None,
-    tz: Optional[str] = None,
+    conditions: str | None = None,
+    sorting: str | None = None,
+    tz: str | None = None,
     include_archived: bool = False,
     limit: int,
 ) -> list[int]:
@@ -1163,9 +1163,9 @@ async def query_task_reads_for_export(
     session,
     current_user: User,
     *,
-    conditions: Optional[str] = None,
-    sorting: Optional[str] = None,
-    tz: Optional[str] = None,
+    conditions: str | None = None,
+    sorting: str | None = None,
+    tz: str | None = None,
     include_archived: bool = False,
     max_rows: int,
 ) -> list[TaskListRead]:
@@ -1217,7 +1217,7 @@ async def task_reads_by_id(
 
 async def task_details_for_export(
     session, task_ids: list[int]
-) -> tuple[dict[int, tuple[Optional[str], list]], dict[int, list[Comment]]]:
+) -> tuple[dict[int, tuple[str | None, list]], dict[int, list[Comment]]]:
     """What a detailed report adds to listed tasks: each one's description and
     checklist, and its comments. Read under the caller's session, for tasks
     the list already let them see."""
@@ -1258,7 +1258,7 @@ async def _load_comments_for_tasks(
 
 
 def _task_calendar_window_clause(
-    start_after: Optional[datetime], start_before: Optional[datetime]
+    start_after: datetime | None, start_before: datetime | None
 ):
     """Keep only tasks that sit on a calendar within ``[start_after,
     start_before]`` — i.e. whose ``start_date`` OR ``due_date`` falls in the
@@ -1361,13 +1361,13 @@ async def query_guild_tasks(
     current_user: User,
     guild_context: ActorContext,
     *,
-    conditions: Optional[str] = None,
-    sorting: Optional[str] = None,
-    tz: Optional[str] = None,
+    conditions: str | None = None,
+    sorting: str | None = None,
+    tz: str | None = None,
     include_archived: bool = False,
-    start_after: Optional[datetime] = None,
-    start_before: Optional[datetime] = None,
-    initiative_id: Optional[int] = None,
+    start_after: datetime | None = None,
+    start_before: datetime | None = None,
+    initiative_id: int | None = None,
 ) -> list[TaskListRead]:
     """Fetch every guild task matching the filter (no pagination).
 
@@ -1402,12 +1402,12 @@ async def query_my_tasks_list(
     session: AsyncSession,
     current_user: User,
     *,
-    conditions: Optional[str] = None,
-    sorting: Optional[str] = None,
-    tz: Optional[str] = None,
+    conditions: str | None = None,
+    sorting: str | None = None,
+    tz: str | None = None,
     include_archived: bool = False,
-    start_after: Optional[datetime] = None,
-    start_before: Optional[datetime] = None,
+    start_after: datetime | None = None,
+    start_before: datetime | None = None,
 ) -> list[TaskListRead]:
     """Fetch every cross-guild assigned task matching the filter (no paging).
 

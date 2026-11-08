@@ -26,7 +26,8 @@ from app.testing.factories import (
     create_federated_identity,
     create_user,
 )
-from app.testing.oidc import ISSUER as OIDC_ISSUER, FakeIdp, mint_id_token
+from app.testing.oidc import ISSUER as OIDC_ISSUER
+from app.testing.oidc import FakeIdp, mint_id_token
 
 
 async def _a_provider(session: AsyncSession, **overrides):

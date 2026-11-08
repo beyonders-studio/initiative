@@ -24,7 +24,7 @@ rather than spread across the endpoints that serve it.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import insert
 from sqlmodel import delete, select
@@ -37,7 +37,6 @@ from app.models.platform.guild_image import (
     GuildImage,
     GuildImageVariant,
 )
-
 
 # --- reading -----------------------------------------------------------------
 
@@ -172,7 +171,7 @@ async def set_images(
     nobody.
     """
     await clear_images(session, guild_id=guild_id, variants=list(renditions))
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     rows = [
         {
             "guild_id": guild_id,

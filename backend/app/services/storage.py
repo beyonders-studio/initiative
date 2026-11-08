@@ -29,9 +29,10 @@ import logging
 import mimetypes
 import os
 import shutil
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, BinaryIO, Iterator, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, BinaryIO, Protocol, runtime_checkable
 from urllib.parse import quote
 
 from fastapi.responses import FileResponse, Response, StreamingResponse
@@ -148,7 +149,7 @@ class StorageBackend(Protocol):
     ) -> None: ...
 
     def write_file(
-        self, key: str, path: "Path", *, content_type: str | None = None
+        self, key: str, path: Path, *, content_type: str | None = None
     ) -> None:
         """Store what is already on disk, without reading it into memory first.
 
@@ -423,7 +424,7 @@ class S3Storage:
         self,
         *,
         bucket: str,
-        client: "BaseClient",
+        client: BaseClient,
         prefix: str = "",
     ) -> None:
         self._bucket = bucket
@@ -1342,7 +1343,7 @@ def build_upload_response(
 
 
 _local_backends: dict[str, LocalFilesystemStorage] = {}
-_s3_client: "BaseClient | None" = None
+_s3_client: BaseClient | None = None
 
 
 def reset_s3_client() -> None:
@@ -1364,7 +1365,7 @@ def _local(prefix: str = "") -> LocalFilesystemStorage:
     return backend
 
 
-def build_s3_client(cfg: "ResolvedStorageConfig | None" = None) -> "BaseClient":
+def build_s3_client(cfg: ResolvedStorageConfig | None = None) -> BaseClient:
     """Construct a boto3 S3 client from a resolved storage config (uncached).
 
     Used by the request-path client cache (:func:`_get_s3_client`) and by the
@@ -1408,7 +1409,7 @@ def build_s3_client(cfg: "ResolvedStorageConfig | None" = None) -> "BaseClient":
     return boto3.client("s3", **client_kwargs)
 
 
-def _get_s3_client() -> "BaseClient":
+def _get_s3_client() -> BaseClient:
     global _s3_client
     if _s3_client is None:
         _s3_client = build_s3_client()

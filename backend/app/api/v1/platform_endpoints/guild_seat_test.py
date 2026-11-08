@@ -1,23 +1,22 @@
 """The guild's top seat: who gets it, and who Postgres lets write as it."""
 
 import pytest
-from sqlalchemy import func
-from sqlmodel import select
 from httpx import AsyncClient
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.exc import DBAPIError
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.db.request_context import Platform
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
+from app.testing import route_as
 from app.testing.factories import (
     create_guild,
     create_guild_membership,
     create_user,
     get_auth_headers,
 )
-from app.testing import route_as
-from app.db.request_context import Platform
 
 
 async def test_whoever_makes_a_community_holds_its_seat(

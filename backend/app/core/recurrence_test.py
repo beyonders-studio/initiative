@@ -1,5 +1,5 @@
 import calendar
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from itertools import islice
 from zoneinfo import ZoneInfo
 
@@ -9,7 +9,6 @@ from dateutil.rrule import rrulestr
 from app.core import recurrence
 
 BERLIN = ZoneInfo("Europe/Berlin")
-UTC = timezone.utc
 
 # Monday 00:30 in Berlin is Sunday in UTC.
 EAST = datetime(2026, 10, 5, 0, 30, tzinfo=BERLIN)
@@ -44,11 +43,15 @@ def test_yearly_editor_clamps_each_selected_month(day, year_days, interval):
         ("FREQ=HOURLY;INTERVAL=4", "task", "RRULE:FREQ=HOURLY;INTERVAL=4"),
         ("RRULE:FREQ=HOURLY;BYHOUR=17,9", "event", "RRULE:FREQ=HOURLY;BYHOUR=17,9"),
         (
-            "RRULE:FREQ=WEEKLY;BYDAY=MO\nRDATE;VALUE=DATE:20261224\n"
-            "EXDATE:20261012T063000Z",
+            (
+                "RRULE:FREQ=WEEKLY;BYDAY=MO\nRDATE;VALUE=DATE:20261224\n"
+                "EXDATE:20261012T063000Z"
+            ),
             "event",
-            "RRULE:FREQ=WEEKLY;BYDAY=MO\nEXDATE:20261012T063000Z\n"
-            "RDATE;VALUE=DATE:20261224",
+            (
+                "RRULE:FREQ=WEEKLY;BYDAY=MO\nEXDATE:20261012T063000Z\n"
+                "RDATE;VALUE=DATE:20261224"
+            ),
         ),
     ],
 )

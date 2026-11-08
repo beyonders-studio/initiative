@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
-from typing import List, Optional, TYPE_CHECKING
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, ClassVar, Optional
 
 from sqlalchemy import Column, DateTime, String, Text
 from sqlmodel import Field, Relationship
@@ -17,10 +17,10 @@ from app.models.tenant._mixins import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
+    from app.models.platform.user_profile_view import MemberProfile
     from app.models.tenant.calendar_event import CalendarEvent
     from app.models.tenant.initiative import Initiative
     from app.models.tenant.resource_grant import ResourceGrant
-    from app.models.platform.user_profile_view import MemberProfile
 
 
 DEFAULT_CALENDAR_COLOR = "#6366f1"
@@ -48,21 +48,19 @@ class Calendar(
     # A tool row is written before anything has been shared, so it is read
     # back by no RETURNING clause: the id comes from the sequence first and
     # the INSERT stands alone. See app/db/initiative_rls.py.
-    __table_args__ = {"implicit_returning": False}
+    __table_args__: ClassVar[dict[str, bool]] = {"implicit_returning": False}
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     # NULL means a guild-level calendar: it belongs to the guild rather than to
     # any initiative, and who may read or write it is decided by its grants.
     # Everything else about a calendar — its events, its UI, its permission
     # computation — is unchanged, which is the point of reusing the table rather
     # than adding a parallel one.
-    initiative_id: Optional[int] = Field(
+    initiative_id: int | None = Field(
         default=None, foreign_key="initiatives.id", nullable=True, index=True
     )
     name: str = Field(index=True, nullable=False, max_length=255)
-    description: Optional[str] = Field(
-        default=None, sa_column=Column(Text, nullable=True)
-    )
+    description: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     color: str = Field(
         default=DEFAULT_CALENDAR_COLOR,
         sa_column=Column(
@@ -70,11 +68,11 @@ class Calendar(
         ),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
@@ -85,11 +83,11 @@ class Calendar(
             "viewonly": True,
         },
     )
-    events: List["CalendarEvent"] = Relationship(
+    events: list["CalendarEvent"] = Relationship(
         back_populates="calendar",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
-    grants: List["ResourceGrant"] = Relationship(
+    grants: list["ResourceGrant"] = Relationship(
         sa_relationship_kwargs={
             "primaryjoin": (
                 "and_(foreign(ResourceGrant.resource_id) == Calendar.id, "

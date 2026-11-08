@@ -13,9 +13,10 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Callable, Iterable, Mapping, Optional, Sequence
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import HTTPException, status
 from pydantic import ValidationError
@@ -29,8 +30,8 @@ from app.core.tools import (
     DETAIL_LAYOUTS,
     LAYOUT_DEFAULT,
     LAYOUT_KIND_TARGETS,
-    LISTS_HIDDEN_AS_SHIPPED,
     LIST_LAYOUTS,
+    LISTS_HIDDEN_AS_SHIPPED,
     TYPED_DETAILS,
     Tool,
 )
@@ -43,27 +44,27 @@ from app.schemas.tenant.tool_layout import (
     ASSIGNEE_ME,
     ASSIGNEE_NONE,
     MAX_DEFINITION_BYTES,
-    PLUGIN_FIELD_PREFIX,
-    PROPERTY_FIELD_PREFIX,
     MAX_DEPTH,
     MAX_NODES,
     MAX_PLUGIN_PARTS,
+    PLUGIN_FIELD_PREFIX,
+    PROPERTY_FIELD_PREFIX,
     CalendarFilterSpec,
     CardPart,
+    CounterDetailFieldId,
+    DetailFieldPart,
     DetailLayoutDefinition,
     DetailLayoutRead,
-    DetailFieldPart,
     DetailLayoutWrite,
     DetailStackPart,
-    CounterDetailFieldId,
     EventDetailFieldId,
     FieldPart,
     FileFieldId,
-    PostDetailFieldId,
     ListLayoutDefinition,
     ListLayoutRead,
     ListLayoutWrite,
     PluginPart,
+    PostDetailFieldId,
     SectionPart,
     StackPart,
     TaskDetailFieldId,
@@ -73,7 +74,6 @@ from app.schemas.tenant.tool_layout import (
     ToolLayoutRead,
     ToolLayoutWrite,
 )
-
 
 #: The parts any detail lays out with.
 _LAYOUT_PARTS = frozenset({"stack", "section", "field", "properties"})
@@ -176,7 +176,7 @@ class Target:
     #: what it holds (a collection).
     tool: str
     #: The instance, or None for the initiative's shared tool.
-    tool_id: Optional[int]
+    tool_id: int | None
     initiative_id: int
 
     def __post_init__(self) -> None:
@@ -266,7 +266,7 @@ def _stored_lists(rows: Iterable[ToolLayout]) -> dict[str, dict[str, Any]]:
 
 
 def _require_one_shown(
-    target: Target, rows: list[ToolLayout], kind: str, definition: Optional[dict]
+    target: Target, rows: list[ToolLayout], kind: str, definition: dict | None
 ) -> None:
     """A 400 unless the target still shows a list with ``kind`` stored as
     ``definition`` (None: drawn as shipped)."""
@@ -301,7 +301,7 @@ def read_set(
         row = stored.get(kind)
         return row.definition if row is not None else {}
 
-    def when(kind: str) -> Optional[datetime]:
+    def when(kind: str) -> datetime | None:
         row = stored.get(kind)
         return row.updated_at if row is not None else None
 
@@ -522,7 +522,7 @@ def _check_groupings(kind: str, definition: ListLayoutDefinition) -> None:
 
 
 #: The filters a tool's presets hold: the shape its list filters by.
-PRESET_FILTERS: dict[Tool, type[TaskFilterSpec] | type[CalendarFilterSpec]] = {
+PRESET_FILTERS: dict[Tool, type[TaskFilterSpec | CalendarFilterSpec]] = {
     Tool.project: TaskFilterSpec,
     Tool.calendar: CalendarFilterSpec,
 }
@@ -554,7 +554,7 @@ async def _locked_rows(session: AsyncSession, target: Target) -> list[ToolLayout
 
 
 async def _require_type(
-    session: AsyncSession, target: Target, task_type_id: Optional[int]
+    session: AsyncSession, target: Target, task_type_id: int | None
 ) -> None:
     """A 404 unless a type named is one of the target's own."""
     if task_type_id is None:
@@ -571,9 +571,9 @@ async def _keep(
     target: Target,
     kind: str,
     definition: dict[str, Any],
-    task_type_id: Optional[int] = None,
+    task_type_id: int | None = None,
     *,
-    rows: Optional[list[ToolLayout]] = None,
+    rows: list[ToolLayout] | None = None,
 ) -> None:
     """Store ``definition`` as the target's ``kind`` (for one type of item,
     when it is laid out per type), marking when it changed. The target's other
@@ -598,7 +598,7 @@ async def _keep(
         )
     elif row.definition != definition:
         row.definition = definition
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = datetime.now(UTC)
         session.add(row)
     await session.flush()
 
@@ -697,7 +697,7 @@ async def reset(
     session: AsyncSession,
     target: Target,
     kind: str,
-    task_type_id: Optional[int] = None,
+    task_type_id: int | None = None,
 ) -> None:
     """Draw one of the target's layouts as shipped again: for one type of
     item, when it is laid out per type."""
@@ -717,7 +717,7 @@ async def reset(
 
 #: A status's, a property's or a row of a tool's id where a layout is written,
 #: or None for one that has no counterpart there and is left out.
-IdMap = Callable[[int], Optional[int]]
+IdMap = Callable[[int], int | None]
 
 #: The groupings whose groups are the community's people, tags or projects.
 _COMMUNITY_GROUPINGS = frozenset(
@@ -737,9 +737,9 @@ class Remap:
     names) among them."""
 
     statuses: IdMap
-    properties: Optional[IdMap] = None
+    properties: IdMap | None = None
     #: The instance's task types, as its statuses are; None keeps them.
-    types: Optional[IdMap] = None
+    types: IdMap | None = None
     community: bool = True
     people: frozenset[int] = frozenset()
 
@@ -748,7 +748,7 @@ def remapped_definition(definition: dict[str, Any], remap: Remap) -> dict[str, A
     """``definition`` with its row ids as ``remap`` has them. Only what it
     holds is rewritten, so what it leaves out is still drawn as shipped."""
 
-    def field(value: Any) -> Optional[Any]:
+    def field(value: Any) -> Any | None:
         if _of_property(value):
             if remap.properties is None:
                 return value
@@ -892,7 +892,7 @@ async def copy_layouts(
     *,
     status_mapping: dict[int, int],
     type_mapping: dict[int, int],
-    fields: Optional[Mapping[int, int]] = None,
+    fields: Mapping[int, int] | None = None,
 ) -> None:
     """Give ``copy`` what ``source`` stored, its presets' statuses and its
     pages' types its own, and a collection's own fields (``fields``, by the
@@ -936,7 +936,7 @@ class Restored:
 
     kind: str
     definition: dict[str, Any]
-    task_type_id: Optional[int] = None
+    task_type_id: int | None = None
 
 
 async def restore_layouts(
@@ -949,7 +949,7 @@ async def restore_layouts(
     lists = LIST_LAYOUTS.get(target.tool, ())
     # Two pages for one type (two of the file's types are one here) keep the
     # first.
-    restored: set[tuple[str, Optional[int]]] = set()
+    restored: set[tuple[str, int | None]] = set()
     for layout in layouts:
         kind, definition = layout.kind, layout.definition
         task_type_id = layout.task_type_id if _typed(target, kind) else None
@@ -1016,7 +1016,7 @@ async def add_to_saved_details(
     initiative_ids: Iterable[int],
     nodes: list[dict[str, Any]],
     *,
-    only: Optional[Target] = None,
+    only: Target | None = None,
 ) -> None:
     """Add parts to the end of the side of every saved ``kind`` detail in these
     initiatives: what a plug-in shows as it arrives. A detail already holding
@@ -1075,7 +1075,7 @@ async def add_to_saved_lists(
     initiative_ids: Iterable[int],
     fields: list[str],
     *,
-    only: Optional[Target] = None,
+    only: Target | None = None,
 ) -> None:
     """Add a task's fields to the end of every saved board card and table in
     these initiatives: what a plug-in shows as it arrives. A list already
@@ -1224,7 +1224,7 @@ def _shown_once(definition: dict[str, Any], fields: frozenset[str]) -> dict[str,
 def _rewrite(
     session: AsyncSession,
     row: ToolLayout,
-    write: type[ListLayoutWrite] | type[DetailLayoutWrite],
+    write: type[ListLayoutWrite | DetailLayoutWrite],
     definition: dict[str, Any],
 ) -> None:
     """Store ``definition`` on ``row``, unless it is not a layout it could hold."""
@@ -1238,7 +1238,7 @@ def _rewrite(
     except (HTTPException, CodedError, ValidationError):
         return
     row.definition = definition
-    row.updated_at = datetime.now(timezone.utc)
+    row.updated_at = datetime.now(UTC)
     session.add(row)
 
 

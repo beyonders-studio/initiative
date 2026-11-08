@@ -25,7 +25,7 @@ always hold: :func:`may_run_as_initiative`.
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Any, Optional
+from typing import Any
 
 from app.core.tools import Tool
 from app.db.guild_standing import GuildContext
@@ -51,7 +51,7 @@ def may_run_as_initiative(context: GuildContext, initiative_id: int) -> bool:
     )
 
 
-def initiative_context(dashboard: Dashboard, routed: Any) -> Optional[Any]:
+def initiative_context(dashboard: Dashboard, routed: Any) -> Any | None:
     """The context this dashboard's statements run as, or ``None`` to run as
     the reader.
 

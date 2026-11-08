@@ -2,16 +2,17 @@
 
 import sys
 import unittest
-from unittest import mock
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from typing import ClassVar
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-import monthly_report  # noqa: E402
-from monthly_report import Release, Run  # noqa: E402
+import monthly_report
+from monthly_report import Release, Run
 
-T0 = datetime(2026, 9, 1, tzinfo=timezone.utc)
+T0 = datetime(2026, 9, 1, tzinfo=UTC)
 
 
 def at(hours: float) -> datetime:
@@ -76,8 +77,8 @@ class MonthTest(unittest.TestCase):
         self.assertEqual(
             monthly_report.month_bounds("2026-12"),
             (
-                datetime(2026, 12, 1, tzinfo=timezone.utc),
-                datetime(2027, 1, 1, tzinfo=timezone.utc),
+                datetime(2026, 12, 1, tzinfo=UTC),
+                datetime(2027, 1, 1, tzinfo=UTC),
             ),
         )
 
@@ -101,7 +102,7 @@ def run(id_, event, branch, created, minutes, conclusion="success", attempt=1):
 class ReportTest(unittest.TestCase):
     """The whole report, on API answers made up for September 2026."""
 
-    ci_runs = [
+    ci_runs: ClassVar[list[dict]] = [
         run(1, "pull_request", "fix/x", 1, 30),
         run(2, "push", "dev", 2, 40),
         run(3, "push", "main", 3, 90),  # not dev's gate

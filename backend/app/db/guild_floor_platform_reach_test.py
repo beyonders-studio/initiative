@@ -18,8 +18,9 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
-from app.db.session import set_rls_context
 from app.db.public_rls import SHARED_TABLE_REGISTRY, role_name
+from app.db.request_context import Platform, Unattributed
+from app.db.session import set_rls_context
 from app.models.platform.user import UserRole
 from app.testing import (
     create_auth_provider,
@@ -29,8 +30,6 @@ from app.testing import (
     create_user,
     route_as,
 )
-from app.db.request_context import Platform, Unattributed
-
 
 GUILD_FLOORS = ("app_guild_base", "app_guild_base_ro")
 PLATFORM_FLOOR = role_name("platform_base")

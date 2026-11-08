@@ -20,16 +20,15 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.messages import GuildPluginMessages, GuildMessages, MarketplaceMessages
+from app.core.messages import GuildMessages, GuildPluginMessages, MarketplaceMessages
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.calendar import Calendar
 from app.testing import (
-    create_plugin_service_registration,
     create_marketplace_listing,
+    create_plugin_service_registration,
     marketplace_uid,
     route_session_to_guild,
 )
-
 
 CALENDAR_PLUGIN_UID = marketplace_uid("guildcalendar")
 

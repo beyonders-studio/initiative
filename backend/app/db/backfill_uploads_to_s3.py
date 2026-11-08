@@ -30,8 +30,9 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app.core.config import settings
 from app.db import cohorts
-from app.db.advisory_locks import LockNamespace, advisory_lock, advisory_unlock
 from app.db import session as db_session
+from app.db.advisory_locks import LockNamespace, advisory_lock, advisory_unlock
+from app.db.request_context import SystemGuild
 from app.db.schema_provisioning import guild_schema_name
 from app.services import storage_config
 from app.services.storage import (
@@ -40,7 +41,6 @@ from app.services.storage import (
     StorageBackend,
     build_s3_client,
 )
-from app.db.request_context import SystemGuild
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +151,7 @@ def backfill_guild_dir(
                 continue
             dest.write(key, data, content_type=content_type)
             summary.copied += 1
-        except Exception:  # noqa: BLE001 — one bad blob must not abort the run
+        except Exception:
             logger.exception("failed to back up %s", label)
             summary.failed += 1
             summary.failed_keys.append(label)
@@ -176,9 +176,7 @@ async def _guild_upload_meta(
     rows = (
         await conn.execute(
             # schema = guild_schema_name(int), a digits-only identifier.
-            text(
-                f'SELECT filename, content_type, content_hash FROM "{schema}".uploads'  # noqa: S608
-            )
+            text(f'SELECT filename, content_type, content_hash FROM "{schema}".uploads')
         )
     ).all()
     return {row[0]: (row[1], row[2]) for row in rows if row[0]}
@@ -189,7 +187,7 @@ async def _guild_import_payloads(conn: AsyncConnection, schema: str) -> frozense
     rows = await conn.execute(
         # schema = guild_schema_name(int), a digits-only identifier.
         text(
-            f'SELECT file_ref FROM "{schema}".data_jobs '  # noqa: S608
+            f'SELECT file_ref FROM "{schema}".data_jobs '
             "WHERE direction = 'import' AND file_ref IS NOT NULL"
         )
     )
@@ -199,7 +197,7 @@ async def _guild_import_payloads(conn: AsyncConnection, schema: str) -> frozense
 async def backfill_uploads_to_s3(
     *,
     dry_run: bool = False,
-    on_progress: "Callable[[BackfillSummary], Awaitable[None]] | None" = None,
+    on_progress: Callable[[BackfillSummary], Awaitable[None]] | None = None,
 ) -> BackfillSummary:
     """Copy every guild's local blobs into S3. See module docstring.
 

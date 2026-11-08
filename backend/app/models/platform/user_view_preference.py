@@ -8,12 +8,11 @@ its shape and is responsible for keeping it small and resilient to
 stale references inside it.
 """
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
-from sqlalchemy import Column, DateTime, JSON, UniqueConstraint
+from sqlalchemy import JSON, Column, DateTime, UniqueConstraint
 from sqlmodel import Field, SQLModel
-
 
 # Schema-layer caps. Mirror these in any future migration; the DB itself
 # does not constrain length beyond the column type, so the request schema
@@ -30,13 +29,13 @@ class UserViewPreference(SQLModel, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(
         foreign_key="users.id", ondelete="CASCADE", index=True, nullable=False
     )
     scope_key: str = Field(max_length=MAX_SCOPE_KEY_LENGTH, nullable=False)
     value: Any = Field(sa_column=Column(JSON, nullable=False))
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

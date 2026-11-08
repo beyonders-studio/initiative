@@ -16,7 +16,6 @@ data (titles, names, tags, status names) is never touched.
 
 from __future__ import annotations
 
-
 from app.core.email_i18n import translate
 from app.models.platform.user import User
 

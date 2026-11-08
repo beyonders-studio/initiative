@@ -18,9 +18,9 @@ Two rules here are worth finding when you come back to this module:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from functools import partial
 import logging
+from datetime import UTC, datetime
+from functools import partial
 from typing import Any
 
 from sqlalchemy import or_, text
@@ -36,14 +36,17 @@ from app.models.platform.contact_grant import (
     canonical_pair,
 )
 from app.models.platform.user_ignore import UserIgnore
-from app.services.platform import contact_notifications
-from app.services.platform import connections_stream, user_stream
-from app.services.platform import presence as presence_service
-from app.services.platform import user_ignores
 from app.schemas.platform.dm import (
     ContactGrantRead,
     ContactGrantsResponse,
 )
+from app.services.platform import (
+    connections_stream,
+    contact_notifications,
+    user_ignores,
+    user_stream,
+)
+from app.services.platform import presence as presence_service
 
 
 class ContactGrantError(CodedError):
@@ -207,7 +210,7 @@ async def request(
         if kind is ContactGrantKind.message
         else ContactGrantState.pending
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     grant = ContactGrant(
         user_id_low=low,
         user_id_high=high,
@@ -260,7 +263,7 @@ async def accept(
         return grant
 
     grant.state = ContactGrantState.accepted
-    grant.responded_at = datetime.now(timezone.utc)
+    grant.responded_at = datetime.now(UTC)
     session.add(grant)
 
     if kind is ContactGrantKind.connection:
@@ -287,7 +290,7 @@ async def _open_message_grant(
     connection answers the same question it was asking.
     """
     existing = await _get(session, a, b, ContactGrantKind.message)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if existing is not None:
         if existing.state is not ContactGrantState.accepted:
             existing.state = ContactGrantState.accepted

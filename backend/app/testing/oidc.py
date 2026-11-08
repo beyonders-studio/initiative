@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import jwt
@@ -53,7 +53,7 @@ def mint_id_token(
 ) -> str:
     """A signed id_token with sane defaults; override any claim by keyword.
     Passing ``None`` for a claim removes it from the token entirely."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     claims = {
         "iss": issuer,
         "sub": "idp-subject-1",

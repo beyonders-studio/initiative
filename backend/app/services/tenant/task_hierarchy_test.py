@@ -1,9 +1,11 @@
 """A task's parent and parts: read onto list rows, written as its ``part_of``
 edge, grouped by, and made from a checklist line."""
 
-from datetime import datetime, timezone
+import itertools
+from datetime import UTC, datetime
 
 from httpx import AsyncClient
+from sqlmodel import select
 
 from app.core.messages import ChecklistMessages, RelationshipMessages, TaskMessages
 from app.core.relationships import RelationshipType
@@ -21,7 +23,6 @@ from app.testing.factories import (
     create_relationship,
     create_task,
 )
-from sqlmodel import select
 
 TASK = SearchEntityType.task
 
@@ -76,7 +77,7 @@ async def test_list_rows_carry_parent_and_progress(
     )
     open_ = await create_task(session, a.project, title="Shoot")
     shelved = await create_task(
-        session, a.project, title="Old", archived_at=datetime.now(timezone.utc)
+        session, a.project, title="Old", archived_at=datetime.now(UTC)
     )
     for part in (done, open_, shelved):
         await _part_of(session, a.guild, part, post)
@@ -185,7 +186,7 @@ async def test_a_loop_is_refused_however_deep_the_chain(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     chain = [await create_task(session, a.project) for _ in range(13)]
-    for whole, part in zip(chain, chain[1:]):
+    for whole, part in itertools.pairwise(chain):
         await _part_of(session, a.guild, part, whole)
 
     response = await client.patch(
@@ -228,9 +229,7 @@ async def test_grouped_by_parent_a_parent_leads_its_parts(
     other = await create_task(session, a.project, title="Another post", position=2)
     step = await create_task(session, a.project, title="Step")
     lone = await create_task(session, a.project, title="Lone")
-    shelved = await create_task(
-        session, a.project, archived_at=datetime.now(timezone.utc)
-    )
+    shelved = await create_task(session, a.project, archived_at=datetime.now(UTC))
     await _part_of(session, a.guild, step, post)
     # Its only part is archived, so it leads nothing.
     await _part_of(session, a.guild, shelved, other)
@@ -316,14 +315,14 @@ async def test_a_line_changed_since_it_was_read_is_kept(session, acting_user):
             task_id=post.id,
             item_id=read["id"],
             done=True,
-            now=datetime.now(timezone.utc),
+            now=datetime.now(UTC),
         ),
     )
 
     removed = await session.exec(
         checklist_service.remove_statement(),
         params=checklist_service.remove_params(
-            task_id=post.id, item=read, now=datetime.now(timezone.utc)
+            task_id=post.id, item=read, now=datetime.now(UTC)
         ),
     )
     assert removed.one_or_none() is None
@@ -332,7 +331,7 @@ async def test_a_line_changed_since_it_was_read_is_kept(session, acting_user):
     removed = await session.exec(
         checklist_service.remove_statement(),
         params=checklist_service.remove_params(
-            task_id=post.id, item=read, now=datetime.now(timezone.utc)
+            task_id=post.id, item=read, now=datetime.now(UTC)
         ),
     )
     assert [item["text"] for item in removed.one()[0]] == ["Concept"]

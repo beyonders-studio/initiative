@@ -13,14 +13,14 @@ from app.models.platform.guild import CommunityRole
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.testing import (
-    strip_non_owner_grants,
     create_calendar,
     create_calendar_event,
-    create_guild_plugin,
-    route_session_to_guild,
-    create_initiative,
     create_guild_calendar,
+    create_guild_plugin,
+    create_initiative,
     create_resource_grant,
+    route_session_to_guild,
+    strip_non_owner_grants,
 )
 
 CALENDAR_PLUGIN = {

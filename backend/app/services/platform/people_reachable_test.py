@@ -4,7 +4,7 @@ The two to keep are the last: an ignore governs what arrives, so it takes the
 account you ignored off your own roster and leaves you on theirs.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import text
 
@@ -102,7 +102,7 @@ async def test_a_member_below_the_minimum_age_is_not_listed(
     await _policy(session, ada.user, DmPolicy.community)
     await _policy(session, bram.user, DmPolicy.community)
     bram.user.age_confirmed_at = None
-    bram.user.age_below_minimum_at = datetime.now(timezone.utc)
+    bram.user.age_below_minimum_at = datetime.now(UTC)
     session.add(bram.user)
     await session.commit()
 

@@ -8,12 +8,12 @@ reads, create and update, and the event's attendee list.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlmodel import select
 
-from app.core.messages import PluginMessages, CalendarMessages
+from app.core.messages import CalendarMessages, PluginMessages
 from app.db import cohorts
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification, NotificationType
@@ -23,26 +23,26 @@ from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.services.marketplace import plugin_refs
 from app.services.tenant import subscription_notices
 from app.testing import (
-    guild_url,
     create_calendar,
-    create_resource_grant,
     create_calendar_event,
-    create_guild_plugin,
     create_guild_calendar,
-    guild_of,
-    route_session_to_guild,
+    create_guild_plugin,
+    create_resource_grant,
     drain_notices,
+    guild_of,
+    guild_url,
+    route_session_to_guild,
 )
 from app.testing.plugin_clients import (
     assert_names_nobody,
-    install_plugin,
     install_headers,
+    install_plugin,
     lift_person_and_guild_ids,
 )
 
 
 def _window() -> dict[str, str]:
-    start = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(days=1)
+    start = datetime.now(UTC).replace(microsecond=0) + timedelta(days=1)
     return {
         "start_at": start.isoformat(),
         "end_at": (start + timedelta(hours=1)).isoformat(),
@@ -384,7 +384,7 @@ async def test_an_attendee_it_does_not_know_is_unprocessable(
             select(ResourceGrant).where(
                 ResourceGrant.resource_type == "calendar",
                 ResourceGrant.resource_id == calendar.id,
-                ResourceGrant.all_initiative_members == True,  # noqa: E712
+                ResourceGrant.all_initiative_members == True,
             )
         )
     ).one()

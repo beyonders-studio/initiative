@@ -25,7 +25,9 @@ no signing key must fail closed rather than mint something no plug-in can verify
 So are the seat's own routes for placement and scopes.
 """
 
-from typing import Sequence
+from collections.abc import Sequence
+from datetime import UTC
+from typing import Any, ClassVar
 from urllib.parse import parse_qs, urlsplit
 
 import jwt
@@ -37,13 +39,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
 from app.core.messages import (
-    PluginServiceMessages,
-    GuildPluginMessages,
     GuildMessages,
+    GuildPluginMessages,
     InitiativeMessages,
+    PluginServiceMessages,
 )
-from app.models.platform.publisher import Publisher
 from app.models.platform.guild import CommunityRole
+from app.models.platform.publisher import Publisher
 from app.services.marketplace.plugin_refs import (
     ensure_plugin_guild_ref,
     ensure_plugin_ref,
@@ -55,13 +57,12 @@ from app.services.tenant.guild_plugins import (
 )
 from app.services.tenant.initiatives import get_moderator_role, get_role_by_name
 from app.testing import (
-    create_plugin_service_registration,
     create_guild_plugin,
+    create_plugin_service_registration,
     marketplace_uid,
     route_session_to_guild,
     sealed_vendor_values,
 )
-
 
 SERVICE_ID = "tests.widgetco"
 SERVICE_UID = marketplace_uid("widgetco")
@@ -1241,7 +1242,7 @@ class TestScopesRoute:
     """The seat grants an install a subset of what it asks for, within what the
     deployment allows it."""
 
-    CEILING = ["comments:read", "projects:read", "tags:read"]
+    CEILING: ClassVar[list[str]] = ["comments:read", "projects:read", "tags:read"]
 
     @staticmethod
     def _path(actor, plugin_id: int) -> str:
@@ -1391,7 +1392,7 @@ class TestConnectLaunch:
     authorization endpoint with this deployment's client, never the plug-in's own
     address. The whole trip is in ``plugin_connection_flows_test``."""
 
-    CONNECT_DEFINITION = {
+    CONNECT_DEFINITION: ClassVar[dict[str, Any]] = {
         "plugin_kind": "service",
         "service": {"public_id": SERVICE_ID, "protocol": 1},
         "features": [],
@@ -1517,14 +1518,14 @@ class TestUninstallStopsDeliveries:
     async def test_uninstalling_switches_off_what_that_install_registered(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
     ):
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from app.models.tenant.webhook_subscription import WebhookSubscription
 
         a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
         plugin = await _installed(session, a)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         theirs = WebhookSubscription(
             initiative_id=a.initiative.id,
             created_by=a.user.id,
@@ -1571,7 +1572,7 @@ class TestUninstallStopsDeliveries:
         while the install is still there to fail on — leaving a plug-in installed
         with its credentials and deliveries already gone.
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from app.models.tenant.webhook_subscription import WebhookSubscription
         from app.services.tenant import (
@@ -1581,7 +1582,7 @@ class TestUninstallStopsDeliveries:
         a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
         plugin = await _installed(session, a)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sub = WebhookSubscription(
             initiative_id=a.initiative.id,
             created_by=a.user.id,
@@ -1628,7 +1629,7 @@ class TestMinimumAge:
     async def _aged(self, session: AsyncSession, actor, years: int | None):
         """An age-limited install, and ``actor`` with a date of birth ``years``
         ago (or none)."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from app.db.session import SystemSessionLocal
         from app.services.platform import users as users_service
@@ -1642,7 +1643,7 @@ class TestMinimumAge:
             name="WidgetCo",
         )
         if years is not None:
-            today = datetime.now(timezone.utc).date()
+            today = datetime.now(UTC).date()
             async with SystemSessionLocal() as system_session:
                 await users_service.keep_birthdate(
                     system_session,

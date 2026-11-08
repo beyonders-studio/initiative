@@ -26,7 +26,6 @@ from app.db.public_rls import (
 from app.models.platform.user import UserRole
 from app.testing import as_role, create_user
 
-
 TABLE = "plugin_service_registrations"
 
 

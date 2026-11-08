@@ -199,6 +199,7 @@ def _published(tag: str) -> bool:
         ["docker", "manifest", "inspect", f"{RELEASE_IMAGE}:{tag.removeprefix('v')}"],
         capture_output=True,
         text=True,
+        check=False,
     )
     if result.returncode == 0:
         return True
@@ -692,6 +693,7 @@ def _explicit_logins_services(servers: dict[str, str]) -> Iterator[ssl.SSLContex
                     ],
                     capture_output=True,
                     text=True,
+                    check=False,
                 )
                 if root.returncode == 0:
                     break
@@ -701,7 +703,9 @@ def _explicit_logins_services(servers: dict[str, str]) -> Iterator[ssl.SSLContex
             yield ssl.create_default_context(cadata=root.stdout)
         finally:
             for name in names:
-                subprocess.run(["docker", "rm", "-f", name], capture_output=True)
+                subprocess.run(
+                    ["docker", "rm", "-f", name], capture_output=True, check=False
+                )
 
 
 @dataclass(frozen=True)
@@ -758,11 +762,12 @@ def _answering(name: str) -> None:
             ["docker", "inspect", "-f", "{{.State.Running}}", name],
             capture_output=True,
             text=True,
+            check=False,
         ).stdout.strip()
         if running != "true":
             break
         time.sleep(2)
-    subprocess.run(["docker", "logs", name])
+    subprocess.run(["docker", "logs", name], check=False)
     _fail(f"{name} did not start answering on {SERVED_AT}", [])
 
 
@@ -849,6 +854,7 @@ def _in_the_image(name: str) -> list[str]:
         + ["python", "-c", _IN_THE_IMAGE],
         capture_output=True,
         text=True,
+        check=False,
     )
     problems = result.stdout.splitlines()
     if result.returncode != 0:
@@ -927,7 +933,7 @@ def _boot(
         _answering(name)
         problems = [*_serving(setup), *_in_the_image(name)] if setup is not None else []
         if problems:
-            subprocess.run(["docker", "logs", name])
+            subprocess.run(["docker", "logs", name], check=False)
             _fail(f"{image} booted, but does not serve what it should", problems)
     finally:
         _run(["docker", "stop", "--time", "30", name], cwd=REPO)

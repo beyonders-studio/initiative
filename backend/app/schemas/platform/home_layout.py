@@ -1,6 +1,6 @@
 """Home layouts as the marketplace offers them to a person."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import ConfigDict
 
@@ -27,7 +27,7 @@ class HomeLayoutWidget(SanitizedBaseModel):
     id: str
     type: str
     grid: HomeLayoutGrid
-    options: Optional[Dict[str, Any]] = None
+    options: dict[str, Any] | None = None
 
 
 class HomeLayoutListing(SanitizedBaseModel):
@@ -44,10 +44,10 @@ class HomeLayoutListing(SanitizedBaseModel):
     name: str
     publisher: str
     description: str
-    long_description: Optional[str] = None
-    avatar_url: Optional[str] = None
+    long_description: str | None = None
+    avatar_url: str | None = None
     version: str
-    widgets: List[HomeLayoutWidget]
+    widgets: list[HomeLayoutWidget]
 
 
 class HomeLayoutListResponse(SanitizedBaseModel):
@@ -55,4 +55,4 @@ class HomeLayoutListResponse(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    items: List[HomeLayoutListing]
+    items: list[HomeLayoutListing]

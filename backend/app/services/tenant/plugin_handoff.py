@@ -56,14 +56,13 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from fastapi import HTTPException, status
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.db.guild_standing import GuildContext
-from app.db.session import routed_guild_id
-from app.core.messages import PluginServiceMessages, GuildPluginMessages
+from app.core.messages import GuildPluginMessages, PluginServiceMessages
 from app.core.security import (
     PLUGIN_HANDOFF_TOKEN_TYPE,
     TOKEN_ISSUER,
@@ -72,14 +71,13 @@ from app.core.security import (
     resolve_plugin_platform_signing_material,
     sign_eddsa,
 )
+from app.db.guild_standing import GuildContext
+from app.db.session import routed_guild_id
 from app.models.tenant.guild_plugin import GuildPlugin
-from sqlmodel.ext.asyncio.session import AsyncSession
-
 from app.services.marketplace import plugin_refs, registration_lookup
 from app.services.marketplace.community_status import community_status
 from app.services.marketplace.service_plugins import is_admin_only
 from app.services.tenant import plugin_age
-from app.services.tenant.plugin_age import AgeViewer
 from app.services.tenant.guild_plugins import (
     SurfaceAccess,
     declared_surfaces,
@@ -87,12 +85,13 @@ from app.services.tenant.guild_plugins import (
     surface_access,
     surface_renders_in,
 )
+from app.services.tenant.plugin_age import AgeViewer
 
 __all__ = [
     "PLUGIN_PAGE_HANDOFF_LIFETIME",
     "PageHandoff",
-    "page_by_id",
     "mint_page_handoff",
+    "page_by_id",
     "require_live_registration",
 ]
 
@@ -119,7 +118,7 @@ class PageHandoff:
 
 def page_by_id(
     definition: dict[str, Any] | None, surface_id: str, *, scope: str
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     """One declared page from a pinned definition, if it renders here.
 
     ``scope`` is where the surface is being opened from — the route's to state,
@@ -258,7 +257,7 @@ async def mint_page_handoff(
         ) from exc
     standing = await community_status(guild_id)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     audience = plugin_platform_audience(registration.public_id)
     payload: dict[str, Any] = {
         # One-shot marker: the plug-in blocklists a handoff once it has exchanged

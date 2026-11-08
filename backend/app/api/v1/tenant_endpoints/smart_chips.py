@@ -11,7 +11,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import RLSSessionDep, get_current_active_user, GuildContextDep
+from app.api.deps import GuildContextDep, RLSSessionDep, get_current_active_user
 from app.models.platform.user import User
 from app.schemas.tenant.smart_chip import (
     EmbedRead,

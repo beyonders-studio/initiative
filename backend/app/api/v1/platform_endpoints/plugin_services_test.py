@@ -21,7 +21,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.core.config import settings
-from app.core.messages import PluginServiceMessages, AuthMessages
+from app.core.messages import AuthMessages, PluginServiceMessages
 from app.models.platform.plugin_install import PluginInstall
 from app.models.platform.plugin_service_registration import (
     LISTING_STATED_FIELDS,
@@ -36,13 +36,12 @@ from app.testing import emitted
 from app.testing.factories import (
     create_guild,
     create_guild_plugin,
-    create_plugin_service_registration,
     create_marketplace_listing,
+    create_plugin_service_registration,
     create_user,
     get_auth_headers,
 )
 from app.testing.fake_vendor import declarative_github
-
 
 BASE = "/api/v1/plugin-services/"
 PUBLISHERS = "/api/v1/plugin-publishers/"

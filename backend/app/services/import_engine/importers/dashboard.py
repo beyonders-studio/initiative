@@ -24,9 +24,8 @@ from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.initiative import Initiative, PermissionKey
 from app.schemas.tenant.import_envelopes import DashboardEnvelope
 from app.services.import_engine.common import unique_name_in_initiative
-from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.context import ImportContext
-from app.services.import_engine.references import note_or_settle
+from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.importers._base import (
     NamesPeopleInPassing,
     PropertyRestore,
@@ -34,6 +33,7 @@ from app.services.import_engine.importers._base import (
     grant_ownership,
     parse_envelope,
 )
+from app.services.import_engine.references import note_or_settle
 
 
 class DashboardImporter(NamesPeopleInPassing):

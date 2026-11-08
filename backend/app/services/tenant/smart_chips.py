@@ -17,30 +17,31 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import ColumnElement, Table, and_, func, true
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from app.core import recurrence
+from app.core.file_types import FileType
+from app.core.references import REF_SEPARATOR
+from app.core.references import parse_ref as parse_bare_ref
+from app.core.search import SearchEntityType
 from app.core.smart_chips import (
     ACTIONABLE_CHIP_KINDS,
     SmartChipAspect,
     SmartChipTone,
 )
-from app.core.references import REF_SEPARATOR, parse_ref as parse_bare_ref
-from app.core import recurrence
-from app.core.search import SearchEntityType
-from app.db import reference_targets
 from app.core.user_display import display_name
+from app.db import reference_targets
 from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.contact import Contact
 from app.models.tenant.counter import Counter
-from app.core.file_types import FileType
 from app.models.tenant.project import Project
 from app.models.tenant.task import (
     Task,
@@ -63,9 +64,9 @@ class SmartChipValue:
 
     text: str
     tone: SmartChipTone = SmartChipTone.neutral
-    color: Optional[str] = None
-    date: Optional[datetime] = None
-    number: Optional[Decimal] = None
+    color: str | None = None
+    date: datetime | None = None
+    number: Decimal | None = None
 
 
 #: A reader takes the ids wanted and answers for the ones it can see.
@@ -155,13 +156,13 @@ async def _task_due(session: AsyncSession, ids: list[int]) -> dict[int, SmartChi
             .where(Task.id.in_(ids), Task.deleted_at.is_(None))
         )
     ).all()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     values: dict[int, SmartChipValue] = {}
     for task_id, due, category in rows:
         if due is None:
             values[task_id] = SmartChipValue(text="", tone=SmartChipTone.muted)
             continue
-        moment = due if due.tzinfo else due.replace(tzinfo=timezone.utc)
+        moment = due if due.tzinfo else due.replace(tzinfo=UTC)
         late = moment < now and category != TaskStatusCategory.done
         values[task_id] = SmartChipValue(
             text=moment.date().isoformat(),
@@ -251,10 +252,10 @@ async def _event_when(
             ).where(CalendarEvent.id.in_(ids), CalendarEvent.deleted_at.is_(None))
         )
     ).all()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     values: dict[int, SmartChipValue] = {}
     for event_id, start, repeat, shift in rows:
-        moment = start if start.tzinfo else start.replace(tzinfo=timezone.utc)
+        moment = start if start.tzinfo else start.replace(tzinfo=UTC)
         if repeat:
             try:
                 moment = recurrence.upcoming(repeat, moment, shift, now)
@@ -368,7 +369,7 @@ SMART_CHIP_SOURCES: dict[tuple[SearchEntityType, SmartChipAspect], Reader] = {
 
 def parse_ref(
     ref: str,
-) -> Optional[tuple[SearchEntityType, int, Optional[SmartChipAspect]]]:
+) -> tuple[SearchEntityType, int, SmartChipAspect | None] | None:
     """``task:12`` or ``task:12:status`` as its parts, or ``None`` for neither.
 
     Two shapes on purpose. A bare reference asks what the thing is called,
@@ -453,10 +454,8 @@ async def read_smart_chips(
     ids. A reference naming something that is gone, or that this caller cannot
     see, is left out of the answer.
     """
-    wanted: dict[tuple[SearchEntityType, Optional[SmartChipAspect]], list[int]] = {}
-    parsed: list[
-        tuple[str, tuple[SearchEntityType, Optional[SmartChipAspect]], int]
-    ] = []
+    wanted: dict[tuple[SearchEntityType, SmartChipAspect | None], list[int]] = {}
+    parsed: list[tuple[str, tuple[SearchEntityType, SmartChipAspect | None], int]] = []
     for ref in dict.fromkeys(refs[:MAX_REFS]):
         resolved = parse_ref(ref)
         if resolved is None:
@@ -495,7 +494,7 @@ async def read_smart_chips(
         )
 
     read: dict[
-        tuple[SearchEntityType, Optional[SmartChipAspect]], dict[int, SmartChipValue]
+        tuple[SearchEntityType, SmartChipAspect | None], dict[int, SmartChipValue]
     ] = {}
     for pair, ids in wanted.items():
         entity_type, aspect = pair

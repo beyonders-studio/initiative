@@ -55,7 +55,7 @@ listening at the time, and the sweep sends to rooms, not to arrivals.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import or_
@@ -64,11 +64,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db import cohorts
 from app.db.event_capture import OUTBOX_CHANNEL
+from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.tenant.event_outbox import EventOutbox
 from app.models.tenant.initiative import InitiativeMember
 from app.services.content_sockets import RoomKey, guild_room, initiative_room, sockets
-from app.db.request_context import SystemGuild
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +231,7 @@ def _ids(rows: list[EventOutbox]) -> set[int]:
 
 
 async def _rows_in_window(session: AsyncSession) -> list[EventOutbox]:
-    cutoff = datetime.now(timezone.utc) - timedelta(seconds=SWEEP_WINDOW_SECONDS)
+    cutoff = datetime.now(UTC) - timedelta(seconds=SWEEP_WINDOW_SECONDS)
     return list(
         await session.exec(
             select(EventOutbox)
@@ -266,9 +266,7 @@ async def missed_while_away(
     """
     if away_seconds > CATCHUP_MAX_SECONDS:
         return True
-    cutoff = datetime.now(timezone.utc) - timedelta(
-        seconds=away_seconds + CATCHUP_SLACK_SECONDS
-    )
+    cutoff = datetime.now(UTC) - timedelta(seconds=away_seconds + CATCHUP_SLACK_SECONDS)
     initiatives = [key[2] for key in rooms if key == initiative_room(guild_id, key[2])]
     async with cohorts.system_session(guild_id) as session:
         await set_rls_context(session, SystemGuild(guild_id))

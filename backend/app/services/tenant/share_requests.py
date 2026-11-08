@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
@@ -472,7 +472,7 @@ async def answer(
             )
         ).all()
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for r in found:
         tool = Tool(getattr(r.resource_type, "value", r.resource_type))
         r.resolved_at = now

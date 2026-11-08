@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 
@@ -36,9 +36,8 @@ from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.schemas.tenant.property import PropertySummary
 from app.schemas.tenant.task import TaskRead
 from app.services import compact
-from app.services.tenant import activity_feed
+from app.services.tenant import activity_feed, task_queries
 from app.services.tenant import relationships as relationships_service
-from app.services.tenant import task_queries
 
 #: Roughly how many characters a token holds, to keep a prompt near its budget.
 _CHARS_PER_TOKEN = 4
@@ -119,7 +118,7 @@ async def activity_context(
 ) -> ActivityContext:
     """The items people changed since ``since`` that the reader can see, in
     the whole community or in one tool, within about ``budget`` tokens."""
-    window = datetime.now(timezone.utc) - activity_feed.WINDOW
+    window = datetime.now(UTC) - activity_feed.WINDOW
     start = max(since, window) if since else window
     entries, _ = await activity_feed.feed(
         session,

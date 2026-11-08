@@ -14,9 +14,9 @@ the job that carries them.
 from __future__ import annotations
 
 from collections import defaultdict
-from functools import lru_cache
+from functools import cache
 from itertools import product
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, ValidationError, create_model
 from sqlmodel import select
@@ -33,7 +33,7 @@ from app.services.export.engine import ExportError
 _BOTH_WHEN_UNSET = ("archived",)
 
 
-@lru_cache(maxsize=None)
+@cache
 def filter_model(tool: Tool) -> type[BaseModel]:
     """The filters one tool's export takes: its list's own, and its
     content's."""
@@ -42,10 +42,7 @@ def filter_model(tool: Tool) -> type[BaseModel]:
     return create_model(
         f"{tool.value}_export_filters",
         __base__=list_filter_model(tool),
-        **{
-            name: (Optional[model], None)  # ty: ignore[invalid-type-form]
-            for name, model in _content(tool).items()
-        },
+        **{name: (model | None, None) for name, model in _content(tool).items()},
     )
 
 

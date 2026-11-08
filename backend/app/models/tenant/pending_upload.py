@@ -16,8 +16,8 @@ RLS: guild-level placement with the ``own_row_*`` policy overlay
 (``app.db.tenancy.OWN_ROW_TABLES``): owner or routed guild admin only.
 """
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import BigInteger, Column, DateTime, Text
 from sqlalchemy.dialects.postgresql import JSONB
@@ -34,7 +34,7 @@ class PendingUpload(CreatedByMixin, table=True):
     created_by: int = Field(foreign_key="users.id", nullable=False)
     #: The endpoint the file is for (``app.services.resumable.purposes``).
     purpose: str = Field(sa_column=Column(Text, nullable=False))
-    initiative_id: Optional[int] = Field(default=None, nullable=True)
+    initiative_id: int | None = Field(default=None, nullable=True)
     #: The name the person's file had, as the consuming endpoint will keep it.
     filename: str = Field(sa_column=Column(Text, nullable=False))
     length: int = Field(sa_column=Column(BigInteger, nullable=False))
@@ -48,19 +48,17 @@ class PendingUpload(CreatedByMixin, table=True):
         default_factory=dict,
         sa_column=Column(JSONB, nullable=False, server_default="{}"),
     )
-    lease_token: Optional[str] = Field(
-        default=None, sa_column=Column(Text, nullable=True)
-    )
-    lease_until: Optional[datetime] = Field(
+    lease_token: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    lease_until: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-    completed_at: Optional[datetime] = Field(
+    completed_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     expires_at: datetime = Field(
         sa_column=Column(DateTime(timezone=True), nullable=False, index=True)
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

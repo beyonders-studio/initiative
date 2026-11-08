@@ -24,13 +24,15 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+import math
 import random
 import time
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
-from typing import AsyncIterator, Awaitable, BinaryIO, Callable
+from typing import BinaryIO
 from urllib.parse import urlsplit
 
 import httpx
@@ -149,9 +151,9 @@ def _retry_after_seconds(response: httpx.Response) -> float | None:
         except (TypeError, ValueError):
             return None
         if when.tzinfo is None:
-            when = when.replace(tzinfo=timezone.utc)
-        seconds = (when - datetime.now(timezone.utc)).total_seconds()
-    if seconds != seconds:  # NaN
+            when = when.replace(tzinfo=UTC)
+        seconds = (when - datetime.now(UTC)).total_seconds()
+    if math.isnan(seconds):
         return None
     return max(0.0, seconds)
 

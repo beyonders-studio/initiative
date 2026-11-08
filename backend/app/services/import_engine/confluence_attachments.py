@@ -18,9 +18,10 @@ from __future__ import annotations
 import re
 import tempfile
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Awaitable, BinaryIO, Callable, Optional
+from typing import Any, BinaryIO
 
 from app.core.messages import ImportEngineMessages
 from app.services.data_jobs import while_beating
@@ -119,7 +120,7 @@ class PageFile:
     under in the wiki — by that page's slug."""
 
     stored: StoredImage
-    page_slug: Optional[str] = None
+    page_slug: str | None = None
 
 
 @dataclass
@@ -152,7 +153,7 @@ async def download_page_attachments(
     budget: AssetBudget,
     report: AttachmentReport,
     files_allowed: bool = True,
-    tick: Optional[Callable[[], Awaitable[None]]] = None,
+    tick: Callable[[], Awaitable[None]] | None = None,
 ) -> PageMedia:
     """Fetch one page's attachments, within the caps and the shared budget.
 

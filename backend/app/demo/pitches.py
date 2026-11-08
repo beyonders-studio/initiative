@@ -15,14 +15,14 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
 from sqlalchemy import exists, func, or_, tuple_, update
 from sqlmodel import col, select
-from sqlmodel.sql.expression import SelectOfScalar
 from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlmodel.sql.expression import SelectOfScalar
 
 from app.core import usernames
 from app.core.config import settings
@@ -287,7 +287,7 @@ async def delete_pitch(session: AsyncSession, pitch_id: int) -> bool:
     session."""
     if not await is_pitch(session, pitch_id):
         return False
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await session.exec(
         update(GuildInvite)
         .where(
@@ -451,7 +451,7 @@ async def make_link(
         session,
         guild_id=pitch_id,
         created_by=None,
-        expires_at=datetime.now(timezone.utc) + lifetime,
+        expires_at=datetime.now(UTC) + lifetime,
         max_uses=max_redemptions,
         guest_days=COPY_DAYS,
         guest_role=role,
@@ -464,7 +464,7 @@ async def revoke_link(session: AsyncSession, invite_id: int) -> bool:
     invite = await session.get(GuildInvite, invite_id)
     if invite is None or not await is_pitch(session, invite.guild_id):
         return False
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     invite.expires_at = min(invite.expires_at or now, now)
     session.add(invite)
     return True

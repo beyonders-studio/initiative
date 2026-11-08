@@ -15,12 +15,12 @@ write grant. The logic lives in ``app.services.marketplace.registrations`` and
 delegate.
 """
 
-from typing import Annotated, List
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.deps import require_capability, SystemSessionDep
+from app.api.deps import SystemSessionDep, require_capability
 from app.core.capabilities import Capability
 from app.core.messages import PluginServiceMessages
 from app.models.platform.publisher import Publisher
@@ -121,11 +121,11 @@ async def _definitions(
     )
 
 
-@router.get("/", response_model=List[PluginServiceRegistrationRead])
+@router.get("/", response_model=list[PluginServiceRegistrationRead])
 async def list_plugin_services(
     session: SystemSessionDep,
     _owner: PluginsManageDep,
-) -> List[PluginServiceRegistrationRead]:
+) -> list[PluginServiceRegistrationRead]:
     """Every plug-in service this deployment has wired up (``plugins.manage``)."""
     views = await registrations_service.registration_views(session)
     definitions = await _definitions(session, views)
@@ -192,13 +192,13 @@ async def update_plugin_service(
 
 
 @router.get(
-    "/{registration_id}/connect", response_model=List[PluginServicePublishedKey]
+    "/{registration_id}/connect", response_model=list[PluginServicePublishedKey]
 )
 async def read_plugin_service_keys(
     registration_id: int,
     session: SystemSessionDep,
     _owner: PluginsManageDep,
-) -> List[PluginServicePublishedKey]:
+) -> list[PluginServicePublishedKey]:
     """The keys the plug-in serves at ``{base_url}/.well-known/jwks.json``, each
     with its fingerprint, for the operator to confirm. Stores nothing."""
     keys = await registrations_service.published_keys(session, registration_id)
@@ -299,11 +299,11 @@ def _publisher_read(row: Publisher) -> PluginPublisherRead:
     )
 
 
-@publishers_router.get("/", response_model=List[PluginPublisherRead])
+@publishers_router.get("/", response_model=list[PluginPublisherRead])
 async def list_plugin_publishers(
     session: SystemSessionDep,
     _owner: PluginsManageDep,
-) -> List[PluginPublisherRead]:
+) -> list[PluginPublisherRead]:
     """Every publisher of plug-in services on this deployment (``plugins.manage``)."""
     rows = await publishers_service.list_publishers(session)
     return [_publisher_read(row) for row in rows]

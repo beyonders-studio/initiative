@@ -7,7 +7,7 @@ same shape as the ``fn_*_set_guild_id`` triggers beside it, and it covers writes
 that never pass through a flush.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import insert
 from sqlmodel import select
@@ -15,6 +15,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.counter import Counter, CounterGroup
+from app.testing import route_as, route_system
 from app.testing.factories import (
     create_counter,
     create_counter_group,
@@ -23,7 +24,6 @@ from app.testing.factories import (
     create_initiative,
     create_user,
 )
-from app.testing import route_as, route_system
 
 
 async def _workspace(session: AsyncSession):
@@ -78,7 +78,7 @@ async def test_a_write_that_skips_the_orm_is_stamped_too(session: AsyncSession):
     await _route(session, guild.id, actor.id)
     # A Core insert also skips the Python-side column defaults, so the
     # timestamps are supplied here; ``created_by`` is the database's job.
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await session.exec(
         insert(Counter).values(
             counter_group_id=group.id,

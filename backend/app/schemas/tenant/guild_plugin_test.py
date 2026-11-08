@@ -14,9 +14,8 @@ the other would put a stored credential in the payload, so the test reads the
 whole payload rather than checking the field somebody remembered.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
-
 
 from app.db.guild_standing import GuildContext
 from app.models.platform.guild import Guild
@@ -59,7 +58,7 @@ CONTEXT = GuildContext(
 
 
 def _plugin(**overrides) -> SimpleNamespace:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return SimpleNamespace(
         **{
             "id": 3,

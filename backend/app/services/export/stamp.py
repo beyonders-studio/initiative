@@ -12,7 +12,7 @@ iCalendar and passthrough files have nowhere to put it.
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from app.services.export.contract import RenderRequest
@@ -24,7 +24,7 @@ def stamp_export(request: RenderRequest, by: str) -> RenderRequest:
     """Return ``request`` with ``exported`` on every item rendered as a document,
     naming ``by`` — the exporter as the community names them
     (``user_display.name_here``)."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     exported: dict[str, Any] = {
         "date": {
             "year": now.year,
@@ -51,7 +51,7 @@ def exported_by(data: dict) -> str | None:
 
 def exported_at(data: dict) -> datetime | None:
     parts = (data.get("exported") or {}).get("date")
-    return datetime(**parts, tzinfo=timezone.utc) if parts else None
+    return datetime(**parts, tzinfo=UTC) if parts else None
 
 
 def markdown_stamp(data: dict) -> list[str]:

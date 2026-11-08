@@ -18,7 +18,6 @@ from __future__ import annotations
 from typing import Any
 
 from app.core.profile_decorations import DECORATION_KINDS, validate_decoration_id
-from app.services.marketplace.media import digest_of
 from app.services.marketplace.manifest_values import (
     MAX_NAME_LENGTH,
     ListingDefinitionError,
@@ -28,6 +27,7 @@ from app.services.marketplace.manifest_values import (
     require_list,
     require_mapping,
 )
+from app.services.marketplace.media import digest_of
 
 __all__ = ["MAX_PACK_DECORATIONS", "normalize_profile_pack_definition"]
 

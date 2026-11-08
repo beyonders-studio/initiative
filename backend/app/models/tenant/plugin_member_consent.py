@@ -26,9 +26,8 @@ the community's administration reads them and revokes (the ``own_row_*``
 policies in ``app.db.tenancy.OWN_ROW_TABLES``).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import (
     CheckConstraint,
@@ -108,7 +107,7 @@ class PluginMemberConsent(SQLModel, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
 
     install_id: int = Field(
         sa_column=Column(
@@ -124,14 +123,14 @@ class PluginMemberConsent(SQLModel, table=True):
 
     #: The plug-in's own id for what it wants to do as the member. ``None`` asks
     #: for app-wide consent.
-    purpose: Optional[str] = Field(
+    purpose: str | None = Field(
         default=None,
         sa_column=Column(String(PURPOSE_MAX_LENGTH), nullable=True),
     )
     #: What the plug-in says the purpose is, in its own words.
     label: str = Field(sa_column=Column(String(LABEL_MAX_LENGTH), nullable=False))
     #: The one initiative the purpose is bound to, when it is.
-    initiative_id: Optional[int] = Field(
+    initiative_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -143,34 +142,34 @@ class PluginMemberConsent(SQLModel, table=True):
     requested_access: str = Field(sa_column=Column(String(16), nullable=False))
     #: What the member allowed, never more than ``requested_access``. ``None``
     #: until they answer yes.
-    granted_access: Optional[str] = Field(
+    granted_access: str | None = Field(
         default=None, sa_column=Column(String(16), nullable=True)
     )
 
     requested_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
-    granted_at: Optional[datetime] = Field(
+    granted_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: When the member declined or withdrew it, or the community's
     #: administration withdrew it for them.
-    revoked_at: Optional[datetime] = Field(
+    revoked_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-    revoked_by_id: Optional[int] = Field(
+    revoked_by_id: int | None = Field(
         default=None,
         sa_column=Column(Integer, ForeignKey("users.id"), nullable=True),
     )
 
     #: How the member was signed in when they granted it.
-    confirmed_factor: Optional[str] = Field(
+    confirmed_factor: str | None = Field(
         default=None, sa_column=Column(String(32), nullable=True)
     )
 
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 

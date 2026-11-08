@@ -29,7 +29,6 @@ from app.services.auth.oidc.flow_state import (
     decode_flow_state,
 )
 
-
 # --- round-trip ---------------------------------------------------------------
 
 
@@ -216,7 +215,7 @@ def test_flow_state_is_immutable():
     # setattr rather than direct assignment: the runtime frozen-dataclass check is
     # what's under test, and static checkers rightly refuse the assignment form.
     with pytest.raises(AttributeError):
-        setattr(payload, "nonce", "overwritten")
+        setattr(payload, "nonce", "overwritten")  # noqa: B010
 
 
 def test_challenge_is_deterministic_for_a_verifier():

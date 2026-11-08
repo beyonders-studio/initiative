@@ -27,8 +27,9 @@ commits, on a session from the community's cohort, registered with
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, AsyncIterator, Mapping
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import event
 from sqlalchemy.engine import make_url
@@ -359,7 +360,7 @@ async def community_session(
         yield session
 
 
-def note_route(connection: "Connection | None", guild_id: int | None) -> None:
+def note_route(connection: Connection | None, guild_id: int | None) -> None:
     """Record that ``connection`` is serving ``guild_id``'s community, and
     count it when that community is outside the connection's cohort.
 

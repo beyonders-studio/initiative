@@ -1,6 +1,6 @@
 """Enrolling a factor, and signing in against it."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pyotp
 from httpx import AsyncClient, Response
@@ -17,7 +17,6 @@ from app.testing import (
     signed_in_headers,
 )
 
-
 PASSWORD = "correct-horse-battery-staple"
 
 
@@ -29,7 +28,7 @@ def _next_code(secret: str) -> str:
     rule working, not a problem to route around. One interval ahead is inside
     the drift a clock is allowed and is still ahead of the recorded one.
     """
-    at = datetime.now(timezone.utc) + timedelta(seconds=totp_service.TOTP_PERIOD)
+    at = datetime.now(UTC) + timedelta(seconds=totp_service.TOTP_PERIOD)
     return pyotp.TOTP(secret).at(at)
 
 
@@ -204,7 +203,7 @@ async def _wrong_code(client: AsyncClient, challenge: str) -> Response:
 async def test_five_wrong_codes_lock_the_password_too(
     client: AsyncClient, session: AsyncSession
 ):
-    _user, secret, _codes = await _enrol(client, session, "fivecodes@example.com")
+    _user, _secret, _codes = await _enrol(client, session, "fivecodes@example.com")
     challenge = (await _sign_in(client, "fivecodes@example.com")).json()["challenge"]
     for _ in range(5):
         assert (await _wrong_code(client, challenge)).status_code == 400
@@ -970,10 +969,10 @@ async def test_turning_it_off_from_a_new_sign_in_waits(
 
     factor = await totp_service.get_factor(session, user_id=user_id)
     assert factor is not None
-    factor.confirmed_at = datetime.now(timezone.utc)
+    factor.confirmed_at = datetime.now(UTC)
     session.add(factor)
     await session.commit()
-    due = datetime.now(timezone.utc) + held_changes.HOLD_FOR
+    due = datetime.now(UTC) + held_changes.HOLD_FOR
     assert await held_changes.apply_due(session, now=due) == 0
     assert await totp_service.is_enrolled(session, user_id=user_id)
 
@@ -983,7 +982,7 @@ async def test_turning_it_off_from_a_new_sign_in_waits(
         headers=headers,
     )
     assert held.status_code == 202, held.text
-    due = datetime.now(timezone.utc) + held_changes.HOLD_FOR
+    due = datetime.now(UTC) + held_changes.HOLD_FOR
     assert await held_changes.apply_due(session, now=due) == 1
     session.expire_all()
     assert not await totp_service.is_enrolled(session, user_id=user_id)

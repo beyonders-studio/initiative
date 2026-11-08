@@ -1,7 +1,8 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
+from pydantic import ConfigDict
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
@@ -15,9 +16,8 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlmodel import Enum as SQLEnum, Field, SQLModel, Relationship
-from pydantic import ConfigDict
-
+from sqlmodel import Enum as SQLEnum
+from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:  # pragma: no cover
     from app.models.platform.guild import GuildMembership
@@ -182,7 +182,7 @@ class User(SQLModel, table=True):
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
     __allow_unmapped__ = True
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     #: The name part of this account's handle — what a person picks and reads.
     #: Unique with ``discriminator``, case-insensitively (``ix_users_handle``);
     #: the vocabulary lives in ``app.core.usernames``.
@@ -200,14 +200,14 @@ class User(SQLModel, table=True):
     # NULL = no password set (SSO-only account) — password verification treats
     # a missing hash as "never a match", so such an account can only sign in
     # through its identity provider until it explicitly sets a password.
-    hashed_password: Optional[str] = Field(default=None)
+    hashed_password: str | None = Field(default=None)
     #: When this account's password was last set, as far as the record goes.
     #: NULL means one of two things a stored hash cannot tell apart: no
     #: password at all, or one set before this column existed — an account
     #: provisioned through an identity provider before ``20260720_0152`` carries
     #: a throwaway argon2 hash indistinguishable from a chosen one. Every place
     #: that sets a password stamps this, so the unknown set only shrinks.
-    password_set_at: Optional[datetime] = Field(
+    password_set_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
@@ -231,27 +231,27 @@ class User(SQLModel, table=True):
     # ``deleted`` account this is when the deletion was asked for, and so what
     # the erasure date is counted from — the same column, doing the same job,
     # as ``guilds.status_changed_at``.
-    status_changed_at: Optional[datetime] = Field(
+    status_changed_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: Why the account was suspended, when whoever suspended it said; the
     #: time-out screen shows it. Cleared when the suspension is lifted.
-    status_reason: Optional[str] = Field(
+    status_reason: str | None = Field(
         default=None, sa_column=Column(Text, nullable=True)
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     #: Where this user's picture is: a path this API serves
     #: (``/api/v1/users/{id}/avatar/{sha256}``, bytes in ``user_avatars``) or a
     #: URL somewhere else, from an OIDC ``picture`` claim. One or the other,
     #: never both — see ``app.services.platform.user_avatars``.
-    avatar_url: Optional[str] = Field(default=None, nullable=True)
+    avatar_url: str | None = Field(default=None, nullable=True)
     token_version: int = Field(
         default=1,
         sa_column=Column(Integer, nullable=False, server_default="1"),
@@ -320,7 +320,7 @@ class User(SQLModel, table=True):
     #: running a community directory keeps for the accounts that joined one.
     #: Whether it is asked for at all is the platform owner's switch
     #: (the rule ``community_age_gate_enabled``).
-    age_confirmed_at: Optional[datetime] = Field(
+    age_confirmed_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
@@ -330,7 +330,7 @@ class User(SQLModel, table=True):
     #: asked again until somebody with the standing to put it right lifts it.
     #: Never set at the same time as ``age_confirmed_at``; the two are the two
     #: answers to one question (``ck_users_age_answer``).
-    age_below_minimum_at: Optional[datetime] = Field(
+    age_below_minimum_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
@@ -341,7 +341,7 @@ class User(SQLModel, table=True):
     #: (``ck_users_age_account_answer``). While it stands the account is
     #: scheduled for erasure and no sign-in calls that off (:func:`may_sign_in`);
     #: ``users.age_unblock`` is what clears it.
-    age_below_account_minimum_at: Optional[datetime] = Field(
+    age_below_account_minimum_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
@@ -350,7 +350,7 @@ class User(SQLModel, table=True):
         sa_column=Column(String(64), nullable=False, server_default="UTC"),
     )
     # Lead time (minutes) for the scheduled event reminder. NULL = reminders off.
-    event_reminder_minutes_before: Optional[int] = Field(
+    event_reminder_minutes_before: int | None = Field(
         default=15,
         sa_column=Column(Integer, nullable=True, server_default="15"),
     )
@@ -360,15 +360,15 @@ class User(SQLModel, table=True):
     #: already reading the same news in the app. Never serialized to any
     #: response: it belongs to no profile family, which is what decides where a
     #: column goes (see ``app.db.user_columns``).
-    last_active_at: Optional[datetime] = Field(
+    last_active_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
-    last_overdue_notification_at: Optional[datetime] = Field(
+    last_overdue_notification_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
-    last_coming_up_digest_at: Optional[datetime] = Field(
+    last_coming_up_digest_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
@@ -419,10 +419,10 @@ class User(SQLModel, table=True):
     #
     # ``guild_memberships`` is the exception, and stays: it is a ``public``
     # table, and the cascade here goes with the row it names.
-    guild_memberships: List["GuildMembership"] = Relationship(
+    guild_memberships: list["GuildMembership"] = Relationship(
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
-    api_keys: List["UserApiKey"] = Relationship(back_populates="user")
+    api_keys: list["UserApiKey"] = Relationship(back_populates="user")
 
 
-from app.models.platform.api_key import UserApiKey  # noqa: E402  # isort:skip
+from app.models.platform.api_key import UserApiKey  # isort:skip

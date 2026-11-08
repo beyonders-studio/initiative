@@ -28,11 +28,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Awaitable, BinaryIO, Callable, Optional
+from typing import Any, BinaryIO
 
 from app.core.messages import ImportEngineMessages
 from app.services.import_engine import jira_attachments, jira_mapping, jira_sprints
+from app.services.import_engine import limits as import_limits
 from app.services.import_engine.atlassian import (
     AtlassianCredential,
     Heartbeat,
@@ -42,7 +44,6 @@ from app.services.import_engine.atlassian import (
     throttled,
 )
 from app.services.import_engine.contract import ImportEngineError
-from app.services.import_engine import limits as import_limits
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +143,7 @@ class FetchReport:
     #: Why sprints will not come over at all, as a code — the target
     #: initiative has no calendars, or the importer cannot create one there.
     #: ``None`` when they will.
-    sprints_skipped: Optional[str] = None
+    sprints_skipped: str | None = None
 
 
 async def fetch_issue_type_statuses(
@@ -159,7 +160,7 @@ async def fetch_issue_type_statuses(
 
 async def fetch_board_column_order(
     credential: AtlassianCredential, project_key: str
-) -> Optional[list[str]]:
+) -> list[str] | None:
     """The board's columns as status ids, or ``None`` when there is no board.
 
     A project can have none, and a board this token cannot read is the same
@@ -206,7 +207,7 @@ async def iter_issue_pages(
     max_issues: int,
     include_comments: bool = False,
     include_attachments: bool = False,
-    walk: Optional[Walk] = None,
+    walk: Walk | None = None,
 ) -> AsyncIterator[list[Any]]:
     """Every issue in the project, in Rank order, a page at a time.
 
@@ -358,11 +359,11 @@ async def fetch_project_envelope(
     max_issues: int,
     field_catalog: Any = None,
     include_comments: bool = False,
-    image_budget: Optional[jira_attachments.AssetBudget] = None,
-    store: Optional[jira_attachments.AssetSink] = None,
-    guild_id: Optional[int] = None,
+    image_budget: jira_attachments.AssetBudget | None = None,
+    store: jira_attachments.AssetSink | None = None,
+    guild_id: int | None = None,
     files_allowed: bool = False,
-    tick: Optional[Heartbeat] = None,
+    tick: Heartbeat | None = None,
 ) -> FetchedProject:
     """One Jira project as an envelope, how many issues it cost, and what its
     issues are linked to.
@@ -381,7 +382,7 @@ async def fetch_project_envelope(
     statuses = await fetch_issue_type_statuses(credential, key)
     column_ids = await fetch_board_column_order(credential, key)
 
-    column_names: Optional[list[str]] = None
+    column_names: list[str] | None = None
     if column_ids:
         names_by_id = {
             str(status.get("id")): str(status.get("name") or "")
@@ -406,7 +407,7 @@ async def fetch_project_envelope(
         include_comments=include_comments,
         guild_id=guild_id,
     )
-    download: Optional[jira_attachments.Downloader] = None
+    download: jira_attachments.Downloader | None = None
     if image_budget is not None and guild_id is not None:
         if store is None:
             raise ValueError("attachments need somewhere to be stored")
@@ -591,13 +592,13 @@ async def fetch_projects(
     guild_id: int,
     app_version: str,
     jql_extra: str | None = None,
-    progress: Optional[Callable[[FetchReport], Awaitable[None]]] = None,
+    progress: Callable[[FetchReport], Awaitable[None]] | None = None,
     sprints_blocked_by: str | None = None,
     include_comments: bool = True,
     include_attachments: bool = True,
     link_pages: bool = False,
-    asset_budget: Optional[jira_attachments.AssetBudget] = None,
-    store: Optional[jira_attachments.AssetSink] = None,
+    asset_budget: jira_attachments.AssetBudget | None = None,
+    store: jira_attachments.AssetSink | None = None,
     files_allowed: bool = False,
 ) -> JiraFetched:
     """Read the chosen projects and return what was read plus what it found.

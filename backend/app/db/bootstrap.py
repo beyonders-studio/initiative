@@ -804,19 +804,19 @@ async def warn_if_ownership_was_never_handed_over() -> None:
                     )
                 ).all()
             )
-    except Exception:  # noqa: BLE001 — a diagnostic must never hold up boot
+    except Exception:
         logger.debug("ownership check could not run", exc_info=True)
         return
     if not owners:
         return
 
     if settings.DATABASE_URL_BOOTSTRAP:
+        named = " and ".join(repr(owner) for owner in owners)
         remedy = (
-            "%s is the owner connection, so the move was attempted and\n"
+            f"{owner_setting()} is the owner connection, so the move was attempted and\n"
             "found nothing it could take. Point it at a login with rights\n"
-            "over %s -- the owner of the database, or a superuser -- and\n"
+            f"over {named} -- the owner of the database, or a superuser -- and\n"
             "start once.\n"
-            % (owner_setting(), " and ".join(repr(owner) for owner in owners))
         )
     else:
         remedy = (

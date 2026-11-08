@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import (
@@ -53,7 +53,7 @@ class Collection(
         {"implicit_returning": False},
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     initiative_id: int = Field(
         sa_column=Column(
             Integer,
@@ -63,21 +63,19 @@ class Collection(
         ),
     )
     name: str = Field(nullable=False, max_length=255)
-    description: Optional[str] = Field(
-        default=None, sa_column=Column(Text, nullable=True)
-    )
-    cover_file_id: Optional[int] = Field(
+    description: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    cover_file_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("files.id", ondelete="SET NULL"), nullable=True
         ),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
@@ -113,8 +111,8 @@ class CollectionFile(SQLModel, table=True):
     collection_id: int = Field(primary_key=True)
     file_id: int = Field(primary_key=True, index=True)
     initiative_id: int = Field(nullable=False)
-    added_by: Optional[int] = Field(default=None, foreign_key="users.id")
+    added_by: int | None = Field(default=None, foreign_key="users.id")
     added_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

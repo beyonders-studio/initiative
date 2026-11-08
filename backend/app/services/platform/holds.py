@@ -28,12 +28,10 @@ Nothing is said to the author: held content reads as absent.
 
 from __future__ import annotations
 
-from contextlib import nullcontext
-
 import logging
+from contextlib import nullcontext
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 from fastapi import status
 from sqlalchemy import update
@@ -49,8 +47,8 @@ from app.core.moderation import HoldReason, HoldRelease, HoldVia, LegalBasis
 from app.core.search import SearchEntityType
 from app.core.tools import plural_of
 from app.db import cohorts, gucs
-from app.db.guild_standing import GuildContext
 from app.db.base import MODELS_BY_TABLE
+from app.db.guild_standing import GuildContext
 from app.db.query import ids_in
 from app.db.request_context import SystemGuild
 from app.db.session import raise_flag, routed_guild_id, set_rls_context
@@ -85,7 +83,7 @@ def model_for(target_type: str) -> type[HoldMixin]:
 
 async def _seen_in(
     session: AsyncSession, target_type: str, target_id: int
-) -> tuple[bool, Optional[int]]:
+) -> tuple[bool, int | None]:
     """Whether the reader's own session sees the target, and its initiative.
     Read under the reader's row security, so what they can't see isn't
     there."""
@@ -107,7 +105,7 @@ async def _seen_in(
     return True, initiative_id
 
 
-def _via(context: GuildContext, initiative_id: Optional[int]) -> HoldVia:
+def _via(context: GuildContext, initiative_id: int | None) -> HoldVia:
     """Who is placing the hold: the platform, under a ``moderate`` grant, or
     one of the community's moderators — its admin, or Full access in the
     content's initiative."""
@@ -259,8 +257,8 @@ class HoldWhy:
     illegal, and a note only the platform reads."""
 
     reason: HoldReason
-    legal_basis: Optional[LegalBasis] = None
-    note: Optional[str] = None
+    legal_basis: LegalBasis | None = None
+    note: str | None = None
 
 
 @dataclass(frozen=True)
@@ -268,11 +266,11 @@ class HoldRequest:
     target_type: str
     target_id: int
     reason: HoldReason
-    legal_basis: Optional[LegalBasis] = None
-    note: Optional[str] = None
+    legal_basis: LegalBasis | None = None
+    note: str | None = None
     #: The case the platform is holding it under. A community moderator's
     #: hold opens its own.
-    case_task_id: Optional[int] = None
+    case_task_id: int | None = None
 
 
 async def _open_case(guild_id: int, request: HoldRequest) -> int:
@@ -324,7 +322,7 @@ async def _require_case(case_task_id: int) -> None:
 
 
 async def _note_on_case(
-    case_task_id: Optional[int], kind: case_activity.ActivityKind, words: str
+    case_task_id: int | None, kind: case_activity.ActivityKind, words: str
 ) -> bool:
     """Note ``words`` on the operations case, where there is one to note it
     on. Best effort: the hold stands whether or not its case hears of it.
@@ -356,7 +354,7 @@ async def place(
     guild_id: int,
     placed_by: int,
     request: HoldRequest,
-    opened_case_task_id: Optional[int] = None,
+    opened_case_task_id: int | None = None,
 ) -> ContentHold:
     """Hold ``request``'s target in ``guild_id``'s community.
 
@@ -413,13 +411,16 @@ async def place(
         else nullcontext()
     )
     async with keeping as locked:
-        if naming and request.case_task_id is not None:
-            # A case's holds sit in the community it is about: that is where
-            # the keeping of its files looks for them.
-            if await claim_subject_guild(case_task_id, guild_id) == "other":
-                raise HoldError(
-                    HoldMessages.CASE_OTHER_COMMUNITY, status.HTTP_400_BAD_REQUEST
-                )
+        # A case's holds sit in the community it is about: that is where
+        # the keeping of its files looks for them.
+        if (
+            naming
+            and request.case_task_id is not None
+            and await claim_subject_guild(case_task_id, guild_id) == "other"
+        ):
+            raise HoldError(
+                HoldMessages.CASE_OTHER_COMMUNITY, status.HTTP_400_BAD_REQUEST
+            )
         # Holding something in the operations community itself — the case's
         # own task, or what holds it — is written on the session that holds
         # the case's lock, rather than waiting on it.
@@ -556,7 +557,7 @@ async def release(
             )
         elif target is not None and outcome is HoldRelease.purge:
             released = await hard_purge_entity(system, target)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         hold.released_at = now
         hold.released_by = released_by
         hold.release_outcome = outcome.value
@@ -648,14 +649,14 @@ async def _remove_released(
 class HoldView:
     hold: ContentHold
     #: What the held thing is called, read as the platform reads it.
-    label: Optional[str]
-    note: Optional[str]
+    label: str | None
+    note: str | None
 
 
 async def listed(
     session: AsyncSession,
     *,
-    case_task_id: Optional[int] = None,
+    case_task_id: int | None = None,
     open_only: bool = False,
 ) -> list[HoldView]:
     """The holds ``session`` may read — none, but for the system engine and a
@@ -680,7 +681,7 @@ async def listed(
     return views
 
 
-def open_note(note: Optional[str]) -> Optional[str]:
+def open_note(note: str | None) -> str | None:
     if not note:
         return None
     try:
@@ -690,7 +691,7 @@ def open_note(note: Optional[str]) -> Optional[str]:
         return None
 
 
-async def _label(session: AsyncSession, hold: ContentHold) -> Optional[str]:
+async def _label(session: AsyncSession, hold: ContentHold) -> str | None:
     try:
         model = model_for(hold.target_type)
     except HoldError:
@@ -715,7 +716,7 @@ async def _label(session: AsyncSession, hold: ContentHold) -> Optional[str]:
 async def remind_due(session: AsyncSession, guild_id: int) -> int:
     """Note on each case whose hold in ``guild_id`` has stood another 30 days.
     ``session`` is the sweep's, routed into the community."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     due = (
         await session.exec(
             select(ContentHold)

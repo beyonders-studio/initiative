@@ -14,7 +14,7 @@ resurfaces the children automatically (see ``soft_delete.py``).
 
 from __future__ import annotations
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import Subquery, Text, cast, func, literal, select, union_all
@@ -24,22 +24,23 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
     GuildContext,
+    GuildContextDep,
     RLSSessionDep,
     get_current_active_user,
     require_surface,
-    GuildContextDep,
 )
 from app.core.audit_events import AuditEventType
 from app.core.messages import TrashMessages
 from app.core.tools import TRASH_TARGETS, plural_of
+from app.core.user_display import display_name
 from app.db.base import MODELS_BY_TABLE
 from app.db.query import build_paginated_response
 from app.db.soft_delete_filter import SOFT_DELETE_MODELS, select_including_deleted
-from app.models.tenant.comment import Comment
-from app.models.tenant.task import Task
 from app.models.platform.guild import AdminSurface
 from app.models.platform.user import User, UserStatus
 from app.models.platform.user_profile_view import MemberProfile
+from app.models.tenant.comment import Comment
+from app.models.tenant.task import Task
 from app.schemas.tenant.trash import (
     EntityType,
     RestoreResponse,
@@ -48,17 +49,14 @@ from app.schemas.tenant.trash import (
 )
 from app.services import audit as audit_service
 from app.services.platform import guilds as guilds_service
-from app.services.tenant import ownership as ownership_service
-from app.core.user_display import display_name
 from app.services.tenant import attachments as attachments_service
-from app.services.tenant import column_limits
-from app.services.tenant import content_references
+from app.services.tenant import column_limits, content_references
+from app.services.tenant import ownership as ownership_service
 from app.services.tenant.lifecycle_tree import CASCADE_PARENTS
 from app.services.tenant.soft_delete import (
     hard_purge_entity,
     restore_entity,
 )
-
 
 router = APIRouter()
 
@@ -92,7 +90,7 @@ def _truncate(value: str, *, limit: int = _NAME_LIMIT) -> str:
     return value[: limit - 1] + "…"
 
 
-def _trashed(only_deleted_by: Optional[int]) -> Subquery:
+def _trashed(only_deleted_by: int | None) -> Subquery:
     """This guild's trash listing, one UNION ALL leg per trashable model.
 
     ``only_deleted_by`` narrows to one user's deletions (the personal view);
@@ -159,7 +157,7 @@ async def trash_page(
     session: AsyncSession,
     guild_id: int,
     *,
-    only_deleted_by: Optional[int],
+    only_deleted_by: int | None,
     limit: int,
     offset: int = 0,
 ) -> tuple[list[TrashItem], int]:

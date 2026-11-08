@@ -8,7 +8,7 @@ leave the app is off.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import ColumnElement, and_, exists, func, update
 from sqlmodel import select
@@ -102,7 +102,7 @@ async def ensure_persona(
     ):
         raise HandleTaken(handle)
     if user.age_confirmed_at is None:
-        user.age_confirmed_at = datetime.now(timezone.utc)
+        user.age_confirmed_at = datetime.now(UTC)
         session.add(user)
     await session.exec(
         update(GuildMembership)
@@ -125,7 +125,7 @@ async def create(session: AsyncSession, *, handle: str | None = None) -> User:
         username_chosen=True,
         # Listed communities seat only accounts that answered the age
         # question, and nobody can answer it for the host or a persona.
-        age_confirmed_at=None if handle is None else datetime.now(timezone.utc),
+        age_confirmed_at=None if handle is None else datetime.now(UTC),
     )
     session.add(user)
     await session.flush()

@@ -85,9 +85,11 @@ async def test_the_request_path_cannot_mint_or_change_one(session, role_session)
     s = await role_session("app_user")
     for statement, params in (
         (
-            "INSERT INTO public.identity_refs "
-            "(ref, entity_type, entity_id, purpose, created_at) "
-            "VALUES ('ucli_minted_by_a_request', 'user', :u, 'client', now())",
+            (
+                "INSERT INTO public.identity_refs "
+                "(ref, entity_type, entity_id, purpose, created_at) "
+                "VALUES ('ucli_minted_by_a_request', 'user', :u, 'client', now())"
+            ),
             {"u": user.id},
         ),
         (

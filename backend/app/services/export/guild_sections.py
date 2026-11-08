@@ -26,8 +26,9 @@ Two rules the builders hold to:
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -259,10 +260,8 @@ async def _build_plugins(ctx: SectionContext) -> tuple[dict[str, Any], int] | No
     from sqlmodel import select
 
     from app.models.tenant.guild_plugin import GuildPlugin
-    from app.services.export.provenance import builtin_listing_uids
-
     from app.schemas.tenant.backup_export import ManifestSkipped
-    from app.services.export.provenance import THIRD_PARTY_REASON
+    from app.services.export.provenance import THIRD_PARTY_REASON, builtin_listing_uids
 
     rows = list(
         await ctx.session.exec(select(GuildPlugin).order_by(GuildPlugin.id.asc()))
@@ -411,10 +410,10 @@ EXEMPT: dict[str, str] = {
 }
 
 __all__ = [
+    "EXEMPT",
     "GUILD_SECTIONS",
-    "sections_for",
+    "SECTION_TABLES",
     "GuildSection",
     "SectionContext",
-    "SECTION_TABLES",
-    "EXEMPT",
+    "sections_for",
 ]

@@ -10,7 +10,7 @@ real unions rather than bare strings and a client cannot name a control or an
 operator this build does not have.
 """
 
-from typing import Any, List
+from typing import Any
 
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.query import FilterOp
@@ -29,7 +29,7 @@ class FieldDescription(SanitizedBaseModel):
     kind: ControlKind
     #: The operators this control offers. Already narrowed to what the engine
     #: accepts, so anything here compiles.
-    ops: List[FilterOp]
+    ops: list[FilterOp]
     #: Whether the control picks several values at once.
     multiple: bool
     #: Whether a list may be ordered by this field.
@@ -38,7 +38,7 @@ class FieldDescription(SanitizedBaseModel):
     #: read off the column that stores them. A client offers these rather than
     #: keeping its own copy, so a value added by a migration shows up on its
     #: own. Empty for a field whose values a lookup has to enumerate.
-    options: List[str] = []
+    options: list[str] = []
 
 
 class RelationDescription(SanitizedBaseModel):
@@ -82,16 +82,16 @@ class FieldCatalogResponse(SanitizedBaseModel):
     """Every field a dataset offers, in the order a client lists them."""
 
     dataset: str
-    fields: List[FieldDescription]
+    fields: list[FieldDescription]
     #: What else it can be read alongside. A client offering a related field
     #: reads that dataset's own description for what may be named.
-    relations: List[RelationDescription] = []
+    relations: list[RelationDescription] = []
     #: What a new statement leaves out until its author says otherwise —
     #: archived rows and templates. A starting point rather than a rule: the
     #: conditions arrive as ordinary filter rows, and deleting one asks the
     #: question it was keeping out. The trash is NOT here; the query surface
     #: removes it in the database, and nothing can ask for it back.
-    default_filters: List[DefaultFilter] = []
+    default_filters: list[DefaultFilter] = []
     #: The fields a list of it can be grouped by, beside the custom
     #: properties that group (``property:<id>``).
-    groupings: List[GroupingDescription] = []
+    groupings: list[GroupingDescription] = []

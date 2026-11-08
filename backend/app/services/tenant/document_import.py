@@ -22,8 +22,9 @@ import posixpath
 import re
 import zipfile
 import zlib
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import IO, Iterator, Optional
+from typing import IO
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 from defusedxml import DefusedXmlException
@@ -117,7 +118,7 @@ def _too_large() -> FileContentError:
     )
 
 
-def _part(package: zipfile.ZipFile, name: str) -> Optional[IO[bytes]]:
+def _part(package: zipfile.ZipFile, name: str) -> IO[bytes] | None:
     """A part of the package, open, or ``None`` when it has none by that name."""
     try:
         return package.open(name)
@@ -178,7 +179,7 @@ class _Container:
         self.element = element
         #: Open lists, outermost first: ``(level, which list, list, its last
         #: item)``.
-        self.lists: list[tuple[int, object, Element, Optional[Element]]] = []
+        self.lists: list[tuple[int, object, Element, Element | None]] = []
 
     def block(self, tag: str) -> Element:
         self.lists.clear()
@@ -249,7 +250,7 @@ _DOCX_RUN_FORMATS = (
 )
 
 
-def _on(element: Optional[Element]) -> Optional[bool]:
+def _on(element: Element | None) -> bool | None:
     """A run property: ``None`` when absent, else whether it is on."""
     if element is None:
         return None
@@ -260,10 +261,10 @@ def _on(element: Optional[Element]) -> Optional[bool]:
 class _WordStyle:
     name: str = ""
     based_on: str = ""
-    outline: Optional[int] = None
+    outline: int | None = None
     num_id: str = ""
     ilvl: int = 0
-    run: Optional[Element] = None
+    run: Element | None = None
 
 
 class _Docx:
@@ -393,9 +394,7 @@ class _Docx:
                 target = SubElement(container.item(level, ordered, num_id), "p")
         self.inline(target, paragraph, base)
 
-    def heading_level(
-        self, properties: Optional[Element], style_id: str
-    ) -> Optional[int]:
+    def heading_level(self, properties: Element | None, style_id: str) -> int | None:
         direct = (
             _val(properties.find(f"{_W}outlineLvl")) if properties is not None else ""
         )
@@ -413,8 +412,8 @@ class _Docx:
         return None
 
     def list_level(
-        self, properties: Optional[Element], style_id: str
-    ) -> Optional[tuple[int, bool, str]]:
+        self, properties: Element | None, style_id: str
+    ) -> tuple[int, bool, str] | None:
         """The level a list paragraph sits at, whether it is numbered, and
         the list it belongs to."""
         num_id, ilvl = "", 0
@@ -567,11 +566,11 @@ class _Docx:
             _picture(target, name, alt.strip(), width, height)
 
 
-def _val(element: Optional[Element]) -> str:
+def _val(element: Element | None) -> str:
     return (element.get(f"{_W}val") or "") if element is not None else ""
 
 
-def _int(raw: Optional[str]) -> int:
+def _int(raw: str | None) -> int:
     return int(raw) if raw and raw.isdigit() else 0
 
 
@@ -589,7 +588,7 @@ def _unwrapped(element: Element) -> list[Element]:
     return [element]
 
 
-def _children(element: Optional[Element]) -> list[Element]:
+def _children(element: Element | None) -> list[Element]:
     """An element's children, with Word's wrappers opened up."""
     if element is None:
         return []
@@ -751,7 +750,7 @@ class _Odt:
         container: _Container,
         listed: Element,
         level: int,
-        inherited: Optional[str],
+        inherited: str | None,
         key: int,
         depth: int,
     ) -> None:
@@ -764,7 +763,7 @@ class _Odt:
         for item in listed:
             if item.tag not in (f"{_TEXT}list-item", f"{_TEXT}list-header"):
                 continue
-            entry: Optional[_Container] = None
+            entry: _Container | None = None
             for child in item:
                 if child.tag == f"{_TEXT}list":
                     self.read_list(container, child, level + 1, style_name, key, depth)
@@ -942,7 +941,7 @@ def _odt_formats(properties: Element) -> dict[str, bool]:
     return formats
 
 
-def _pixels(raw: Optional[str]) -> int:
+def _pixels(raw: str | None) -> int:
     match = _LENGTH.match((raw or "").strip())
     if not match or match.group(2) not in _PX_PER_UNIT:
         return 0

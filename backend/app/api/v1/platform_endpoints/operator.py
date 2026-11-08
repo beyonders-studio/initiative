@@ -1,8 +1,8 @@
 import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Annotated, Literal, Optional
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import case, func
@@ -15,62 +15,64 @@ from app.api.deps import (
     require_capability,
 )
 from app.api.v1.platform_endpoints.session_opening import require_login_method
-from app.core.login_methods import LoginMethod
-from app.db.query import build_paginated_response, paginated_query
 from app.core.audit_events import AuditEventType
-from app.core.user_display import handle_of
 from app.core.capabilities import (
     Capability,
-    capabilities_for,
     can_assign_role,
+    capabilities_for,
     may_act_on,
     role_rank,
     user_has_capability,
 )
-from app.models.platform.user import User, UserStatus
-from app.models.platform.user_email import UserEmail
-from app.models.platform.user_token import UserToken, UserTokenPurpose
-from app.schemas.platform.user import (
-    OperatorUserListResponse,
-    OperatorUserRead,
-    AccountDeletionResponse,
-    UserAction,
-)
-from app.schemas.platform.auth import VerificationSendResponse
-from app.schemas.platform.operator import (
-    OperatorAccountCaseRead,
-    OperatorSuspensionUpdate,
-    ProfileField,
-    OperatorUsernameUpdate,
-    PlatformRoleUpdate,
-    OperatorUserDeleteRequest,
-    OperatorDeletionEligibilityResponse,
-    CommunityBlockerInfo,
-)
+from app.core.login_methods import LoginMethod
 from app.core.messages import (
+    AuthMessages,
     GuildMessages,
     OperatorMessages,
-    AuthMessages,
     SettingsMessages,
     UserMessages,
 )
-from app.services.platform import account_stream
-from app.services.platform import case_activity, grant_cases
-from app.services.platform import api_keys as api_keys_service
-from app.services.platform import user_tokens
-from app.services.platform import csv_export
+from app.core.user_display import handle_of
+from app.db.query import build_paginated_response, paginated_query
+from app.models.platform.user import User, UserStatus
+from app.models.platform.user_email import UserEmail
+from app.models.platform.user_token import UserToken, UserTokenPurpose
+from app.schemas.platform.auth import VerificationSendResponse
+from app.schemas.platform.operator import (
+    CommunityBlockerInfo,
+    OperatorAccountCaseRead,
+    OperatorDeletionEligibilityResponse,
+    OperatorSuspensionUpdate,
+    OperatorUserDeleteRequest,
+    OperatorUsernameUpdate,
+    PlatformRoleUpdate,
+    ProfileField,
+)
+from app.schemas.platform.user import (
+    AccountDeletionResponse,
+    OperatorUserListResponse,
+    OperatorUserRead,
+    UserAction,
+)
+from app.services import audit as audit_service
 from app.services import email as email_service
-from app.services.auth import addresses
+from app.services import notifications as notifications_service
+from app.services.auth import addresses, sign_in_locks
 from app.services.auth import challenges as challenge_service
 from app.services.auth import sessions as session_service
-from app.services.auth import sign_in_locks
 from app.services.auth import totp as totp_service
 from app.services.content_sockets import sockets as content_sockets
-from app.services import notifications as notifications_service
-from app.services.platform import user_avatars as user_avatars_service
-from app.services import audit as audit_service
-from app.services.platform import usernames as username_service
+from app.services.platform import (
+    account_stream,
+    case_activity,
+    csv_export,
+    grant_cases,
+    user_tokens,
+)
+from app.services.platform import api_keys as api_keys_service
 from app.services.platform import guilds as guilds_service
+from app.services.platform import user_avatars as user_avatars_service
+from app.services.platform import usernames as username_service
 from app.services.platform import users as users_service
 
 logger = logging.getLogger(__name__)
@@ -142,15 +144,15 @@ class ActCase:
     named. ``what`` says what the act did, where the route knows better than
     its name."""
 
-    task_id: Optional[int] = None
-    what: Optional[str] = None
+    task_id: int | None = None
+    what: str | None = None
 
 
 async def _act_case(
     request: Request,
     actor: Annotated[User, Depends(get_current_active_user)],
     case_task_id: Annotated[
-        Optional[int],
+        int | None,
         Query(
             gt=0,
             description=(
@@ -232,7 +234,7 @@ def _user_actions(
 ) -> list[UserAction]:
     """What ``actor`` may do to ``target``, from their capabilities, their
     rung and the account's state: each route's own refusals, asked up front."""
-    can = lambda capability: user_has_capability(actor, capability)  # noqa: E731
+    can = lambda capability: user_has_capability(actor, capability)
     acts = may_act_on(actor, target)
     live = target.status in (UserStatus.active, UserStatus.suspended)
     actions: list[UserAction] = []
@@ -350,14 +352,14 @@ _USER_SORT_FIELDS = {
 async def list_all_users(
     session: UserSessionDep,
     current_user: UsersReadDep,
-    search: Optional[str] = Query(
+    search: str | None = Query(
         default=None,
         description=(
             "Matches the handle's name part; a whole handle (`foobar#1234`) "
             "pins one account."
         ),
     ),
-    sort_by: Optional[Literal["id", "username", "status"]] = None,
+    sort_by: Literal["id", "username", "status"] | None = None,
     sort_dir: Literal["asc", "desc"] = "asc",
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -478,7 +480,7 @@ async def export_platform_users_csv(
             f"{csv_export.safe_filename_component(single_user.username)}.csv"
         )
     else:
-        datestamp = datetime.now(timezone.utc).date().isoformat()
+        datestamp = datetime.now(UTC).date().isoformat()
         filename = f"platform-users-{datestamp}.csv"
 
     # Nothing changed, so the endpoint has no commit of its own to ride: the
@@ -556,7 +558,7 @@ async def sign_user_out_everywhere(
     await session_service.revoke_all_for_user(session, user_id=user_id)
     # The access tokens already handed out stop working with the sessions.
     user.token_version += 1
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     session.add(user)
     await audit_service.record(
         session,
@@ -608,7 +610,7 @@ async def clear_profile_field(
         user.custom_status = {}
     else:
         user.profile_decorations = {}
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     session.add(user)
     await audit_service.record(
         session,
@@ -796,7 +798,7 @@ async def reactivate_user(
         )
 
     user.status = UserStatus.active
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     session.add(user)
     await audit_service.record(
         session,
@@ -930,7 +932,7 @@ async def set_user_username(
         session, user=user, name=payload.username, keep_discriminator=True
     )
 
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     session.add(user)
     await notifications_service.queue_username_changed(
         session, user=user, previous_handle=previous_handle
@@ -1007,7 +1009,7 @@ async def set_user_suspension(
 
     act_case.what = "suspended" if payload.suspended else "lifted the suspension of"
     user.status = UserStatus.suspended if payload.suspended else UserStatus.active
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     user.status_changed_at = user.updated_at
     user.status_reason = (
         (payload.reason or "").strip() or None if payload.suspended else None
@@ -1147,7 +1149,7 @@ async def clear_age_block(
     user.age_below_minimum_at = None
     user.age_below_account_minimum_at = None
     user.age_confirmed_at = None
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     session.add(user)
 
     await audit_service.record(
@@ -1229,7 +1231,7 @@ async def update_platform_role(
         f"changed the platform role ({previous_role.value} to {payload.role.value}) of"
     )
     user.role = payload.role
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     session.add(user)
     await audit_service.record(
         session,

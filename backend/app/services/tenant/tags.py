@@ -20,17 +20,22 @@ the same reason — an edge to a trashed tag is not an assignment anyone can see
 and every count and filter here agrees on that.
 """
 
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Iterable, Mapping, Sequence, Type
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import (
     BigInteger,
     and_,
-    delete as sa_delete,
     exists,
     literal,
+)
+from sqlalchemy import (
+    delete as sa_delete,
+)
+from sqlalchemy import (
     update as sa_update,
 )
 from sqlalchemy.sql import Select
@@ -38,6 +43,7 @@ from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import SQLModel, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+import app.db.base  # noqa: F401 — registers every model, so each is found by table
 from app.core.messages import TagMessages
 from app.core.relationships import (
     Provenance,
@@ -47,29 +53,28 @@ from app.core.relationships import (
 )
 from app.core.search import SearchEntityType
 from app.core.tools import KINDS, TAGGABLE_EXTRAS, Tool
-import app.db.base  # noqa: F401 — registers every model, so each is found by table
 from app.models.tenant._mixins import tool_models
 from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.tag import Tag
 from app.schemas.tenant.tag import tag_summaries
 
 __all__ = [
+    "EXTRA_TAG_LINKS",
     "TAG_LINKS",
     "TOOL_TAG_LINKS",
-    "EXTRA_TAG_LINKS",
     "TagLinkSpec",
-    "annotate_tags",
     "active_tag_ids",
+    "annotate_tags",
     "bulk_edit_tags",
     "copy_entity_tags",
+    "first_tag_name",
     "replace_entity_tags",
     "set_entity_tags",
     "spec_for",
-    "tag_edge",
     "tag_counts_for",
+    "tag_edge",
     "tag_summaries",
     "tagged_entity_ids",
-    "first_tag_name",
     "untagged_clause",
     "validate_guild_tag_ids",
 ]
@@ -88,7 +93,7 @@ class TagLinkSpec:
     what varies between a project's tags and a task's is one string.
     """
 
-    entity: Type[SQLModel]
+    entity: type[SQLModel]
     kind: SearchEntityType
 
     def node_of(self, entity_id: int) -> int:
@@ -131,7 +136,7 @@ TAG_LINKS: dict[str, TagLinkSpec] = {
 
 #: The same registry keyed by model, so a caller holding entities need not also
 #: say what they are. Derived, never a second list.
-_SPEC_BY_MODEL: dict[Type[SQLModel], TagLinkSpec] = {
+_SPEC_BY_MODEL: dict[type[SQLModel], TagLinkSpec] = {
     spec.entity: spec for spec in TAG_LINKS.values()
 }
 
@@ -321,7 +326,7 @@ def _new_edge(spec: TagLinkSpec, entity_id: int, tag_id: int) -> EntityRelations
         target_type=SearchEntityType.tag.value,
         target_id=tag_id,
         provenance=Provenance.manual.value,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
 
@@ -454,5 +459,5 @@ async def bulk_edit_tags(
         await session.exec(
             sa_update(spec.entity)
             .where(spec.entity.id.in_(entity_ids))
-            .values(updated_at=datetime.now(timezone.utc))
+            .values(updated_at=datetime.now(UTC))
         )

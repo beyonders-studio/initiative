@@ -22,7 +22,6 @@ from app.testing.factories import (
     get_auth_headers,
 )
 
-
 BASE = "/api/v1/plugin-services/"
 PUBLISHERS = "/api/v1/plugin-publishers/"
 PLUGIN_URL = "http://127.0.0.1:9100"

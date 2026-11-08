@@ -14,8 +14,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
 from app.db.public_rls import PLATFORM_SUSPENDED, platform_tier, role_name
-from app.testing import as_role, create_user
 from app.models.platform.notification import NotificationType
+from app.testing import as_role, create_user
 
 pytestmark = pytest.mark.always
 
@@ -111,8 +111,10 @@ async def test_a_suspended_account_reads_its_own_rows(session):
     "statement",
     [
         "UPDATE users SET timezone = 'UTC' WHERE id = :uid",
-        "INSERT INTO notifications (user_id, type, data) "
-        f"VALUES (:uid, '{NotificationType.account_suspended.value}', '{{}}')",
+        (
+            "INSERT INTO notifications (user_id, type, data) "
+            f"VALUES (:uid, '{NotificationType.account_suspended.value}', '{{}}')"
+        ),
         "DELETE FROM notifications WHERE user_id = :uid",
     ],
 )

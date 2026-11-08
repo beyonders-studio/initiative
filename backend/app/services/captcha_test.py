@@ -8,6 +8,8 @@ load-bearing invariants.
 
 from __future__ import annotations
 
+from typing import Self
+
 import pytest
 from fastapi import HTTPException
 
@@ -42,7 +44,7 @@ class _FakeAsyncClient:
         self.last_url: str | None = None
         self.last_data: dict | None = None
 
-    async def __aenter__(self) -> "_FakeAsyncClient":
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *_exc) -> None:

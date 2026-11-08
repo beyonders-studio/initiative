@@ -36,11 +36,11 @@ from webauthn.helpers.structs import (
     UserVerificationRequirement,
 )
 
+from app.core import native_apps
+from app.core.clock import utcnow
 from app.models.platform.auth_challenge import AuthChallenge
 from app.models.platform.user import User
 from app.models.platform.user_passkey import UserPasskey
-from app.core import native_apps
-from app.core.clock import utcnow
 from app.services.auth import challenges as challenge_service
 from app.services.auth.challenges import ChallengePurpose
 from app.services.auth.oidc.flow_state import s256

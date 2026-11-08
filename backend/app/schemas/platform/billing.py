@@ -18,7 +18,7 @@ import binascii
 import json
 from datetime import date
 from enum import Enum
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 import jwt
 from pydantic import (
@@ -35,8 +35,6 @@ from pydantic import (
 from app.core.messages import BillingMessages
 from app.core.rules import COMMUNITY_RULES, SYNCED_RULES, Slot
 from app.core.security import PUBLIC_KEY_JWT_ALGORITHM
-from app.models.platform.identity_ref import REF_MAX_LENGTH
-from app.models.platform.marketplace import UID_LENGTH
 from app.models.platform.guild import (
     BILLING_SETTABLE_STATUSES,
     MEMBER_ROLE_SURFACES,
@@ -44,6 +42,8 @@ from app.models.platform.guild import (
     CommunityRole,
     CommunityStatus,
 )
+from app.models.platform.identity_ref import REF_MAX_LENGTH
+from app.models.platform.marketplace import UID_LENGTH
 from app.models.tenant.custom_role import (
     CUSTOM_ROLE_NAME_MAX_LENGTH,
     CUSTOM_ROLE_RUNGS,
@@ -115,7 +115,7 @@ class SyncedCustomRole(SanitizedBaseModel):
     surfaces: list[AdminSurface] = Field(max_length=len(AdminSurface))
 
     @model_validator(mode="after")
-    def _on_its_rung(self) -> "SyncedCustomRole":
+    def _on_its_rung(self) -> SyncedCustomRole:
         if self.base_rung not in CUSTOM_ROLE_RUNGS or (
             self.base_rung is CommunityRole.member
             and not set(self.surfaces) <= MEMBER_ROLE_SURFACES
@@ -133,10 +133,10 @@ class CommunityFields(SanitizedBaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    tier_name: Optional[str] = Field(max_length=64)
-    max_storage_bytes: Optional[int] = Field(ge=0)
-    max_users: Optional[int] = Field(ge=1)
-    max_guests: Optional[int] = Field(ge=0)
+    tier_name: str | None = Field(max_length=64)
+    max_storage_bytes: int | None = Field(ge=0)
+    max_users: int | None = Field(ge=1)
+    max_guests: int | None = Field(ge=0)
     feature_keys: list[str] = Field(max_length=64)
     status: CommunityStatus
     #: The deployment's other rules for the community, whole: a rule left out
@@ -232,14 +232,14 @@ class NoticeItem(SanitizedBaseModel):
     #: The day the notice is about: the trial's end, or the day a paused
     #: community goes on hold.
     day: date
-    recipient_user_ref: Optional[str] = Field(default=None, max_length=REF_MAX_LENGTH)
+    recipient_user_ref: str | None = Field(default=None, max_length=REF_MAX_LENGTH)
 
 
 class ChangesRequest(BillingBatch):
     """Body of ``changes``: the log after ``after`` (an opaque cursor this
     deployment handed out, or None for the start)."""
 
-    after: Optional[str] = Field(default=None, max_length=64)
+    after: str | None = Field(default=None, max_length=64)
     limit: int = Field(default=BATCH_MAX, ge=1, le=BATCH_MAX)
 
 

@@ -2,22 +2,22 @@
 active, secrets go from jobs that are over, and the apply's session is drawn
 from the community's cohort."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import text
 
 from app.core.config import settings
 from app.db import cohorts
+from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
-from app.models.platform.guild import Guild, CommunityRole, CommunityStatus
+from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.tenant.data_job import DataJob, DataJobStatus
 from app.services import data_jobs
 from app.services.guild_sweeps import Scope, each_guild
 from app.services.import_engine import worker as import_worker
 from app.services.storage import get_guild_storage
 from app.testing import create_guild, create_import_job, route_session_to_guild
-from app.db.request_context import SystemGuild
 
 
 @pytest.fixture(autouse=True)
@@ -46,7 +46,7 @@ async def test_gc_reaches_a_community_that_is_not_active(acting_user, session):
         status=DataJobStatus.staged,
         file_ref=key,
         secret_encrypted="sealed",
-        expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        expires_at=datetime.now(UTC) - timedelta(hours=1),
     )
     guild = await session.get(Guild, a.guild.id)
     guild.status = CommunityStatus.read_only.value
@@ -84,7 +84,7 @@ async def test_gc_clears_a_secret_only_from_a_job_that_is_over(
         a.user,
         status=status,
         secret_encrypted="sealed",
-        expires_at=datetime.now(timezone.utc) + expires_in if expires_in else None,
+        expires_at=datetime.now(UTC) + expires_in if expires_in else None,
     )
 
     await each_guild([(Scope.PROVISIONED, data_jobs.expire_files)], name="t")

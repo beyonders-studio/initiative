@@ -10,12 +10,15 @@ from fastapi import (
     status,
 )
 
+from app.api.content_socket import hold_open, read_auth_frame
 from app.api.deps import (
     AccountHolder,
     AccountHolderSessionDep,
     UserSessionDep,
     get_current_active_user,
 )
+from app.core.messages import NotificationMessages
+from app.core.notification_categories import category_of
 from app.db.cohorts import request_sessionmaker
 from app.models.platform.user import User
 from app.schemas.platform.notification import (
@@ -29,16 +32,6 @@ from app.schemas.platform.notification import (
     SubjectReadResponse,
     UnreadPlacesResponse,
 )
-from app.core.notification_categories import category_of
-from app.core.messages import NotificationMessages
-from app.services.platform import (
-    notification_policy,
-    notification_subjects,
-    presence,
-)
-from app.services.platform import user_notifications as notifications_service
-from app.services.platform.ws_auth import authenticate_ws_token
-from app.api.content_socket import hold_open, read_auth_frame
 from app.services.content_sockets import (
     Credential,
     Subscriber,
@@ -47,6 +40,13 @@ from app.services.content_sockets import (
     account_room,
     sockets,
 )
+from app.services.platform import (
+    notification_policy,
+    notification_subjects,
+    presence,
+)
+from app.services.platform import user_notifications as notifications_service
+from app.services.platform.ws_auth import authenticate_ws_token
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

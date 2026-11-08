@@ -15,7 +15,7 @@ notified. The member answers on their own consent screen; the plug-in learns the
 answer here, or from the token endpoint (``consent_required``).
 """
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
@@ -26,9 +26,9 @@ from app.api.deps import (
     establish_install_access,
     oauth2_scheme,
 )
-from app.core.plugin_access_token import InstallAccessToken
 from app.core.identify import bearer_plugin_token
-from app.core.messages import PluginMessages, AuthMessages
+from app.core.messages import AuthMessages, PluginMessages
+from app.core.plugin_access_token import InstallAccessToken
 from app.core.rate_limit import (
     CONSENT_REQUESTS_PER_INSTALL,
     NEW_CONSENT_REQUESTS_PER_MEMBER,
@@ -86,7 +86,7 @@ async def request_member_consent(
     payload: PluginConsentRequestCreate,
     session: SessionDep,
     # Declares the scheme for the API description; read by ``bearer_plugin_token``.
-    bearer: Annotated[Optional[str], Depends(oauth2_scheme)] = None,
+    bearer: Annotated[str | None, Depends(oauth2_scheme)] = None,
 ) -> PluginConsentRequestRead:
     """Ask a member to let this plug-in act as them, for one purpose.
 

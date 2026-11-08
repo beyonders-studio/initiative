@@ -18,9 +18,9 @@ derivation, and the two kinds that are deliberately not referenceable.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Sequence
 
 from sqlalchemy import Select, Table, case, func, literal, null, select, text
 from sqlalchemy.dialects.postgresql import array as pg_array
@@ -32,10 +32,10 @@ from app.core.relationships import PERSON, EndpointKind
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
 from app.core.user_display import display_name
+from app.db.authorization import standing_arg
 from app.db.blocking import open_expr
 from app.db.initiative_rls import INITIATIVE_PATHS
 from app.db.search_index import SEARCH_SOURCES
-from app.db.authorization import standing_arg
 from app.models.platform.user_profile_view import MemberProfile
 
 

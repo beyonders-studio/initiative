@@ -29,15 +29,14 @@ caller is only reading facts off.
 
 from __future__ import annotations
 
-from collections.abc import Collection
+from collections.abc import Collection, Iterable, Sequence
 from datetime import timedelta
-from typing import Iterable, Sequence
 
 from sqlmodel import col, select
 
 from app.models.platform.user import User
 
-__all__ = ["load", "load_one", "load_all", "load_event_reminder_leads"]
+__all__ = ["load", "load_all", "load_event_reminder_leads", "load_one"]
 
 
 async def load(

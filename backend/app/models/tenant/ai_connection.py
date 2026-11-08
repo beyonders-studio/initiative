@@ -10,9 +10,9 @@ and the system engine read. A trigger keeps ``has_api_key`` in step with it,
 so what a member reads is whether the connection has a key.
 """
 
+from pydantic import ConfigDict
 from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlmodel import Field, SQLModel
-from pydantic import ConfigDict
 
 from app.core.encryption import FERNET_SALT, SALT_AI_API_KEY
 from app.models.platform.ai_connection import AIConnectionColumns

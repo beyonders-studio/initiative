@@ -42,13 +42,14 @@ routing of one community and the standing of another.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, fields, replace
-from typing import TYPE_CHECKING, Any, Optional, Sequence
+from typing import TYPE_CHECKING, Any
 
 from app.core.capabilities import may_hold_grant
 from app.core.plugin_scopes import (
-    PLUGIN_SCOPE_PREFIX,
     LEVEL_SCOPES,
+    PLUGIN_SCOPE_PREFIX,
     STANDING_SCOPES,
     InstallLevel,
 )
@@ -61,14 +62,10 @@ from app.models.platform.access_grant import (
     AccessLevel,
     SettingsLevel,
 )
-from app.models.platform.plugin_service_registration import (
-    RegistrationKind,
-    registration_live_sql,
-)
 from app.models.platform.guild import (
     GUILD_LADDER,
-    AdminSurface,
     LIVE_STATUS_VALUES,
+    AdminSurface,
     CommunityRole,
     CommunityStatus,
 )
@@ -79,30 +76,34 @@ from app.models.platform.identity_ref import (
     IdentityPurpose,
     ref_prefix,
 )
+from app.models.platform.plugin_service_registration import (
+    RegistrationKind,
+    registration_live_sql,
+)
 from app.models.platform.user import UserRole, UserStatus
-from app.models.tenant.plugin_member_consent import ConsentAccess
 from app.models.tenant.initiative import (
     BUILTIN_MEMBER_ROLE,
+    DEFAULT_PERMISSION_VALUES,
     INITIATIVE_CUSTOM_ROLES,
     INITIATIVE_MEMBER_PREFIX,
     INITIATIVE_TOOL_PREFIX,
-    DEFAULT_PERMISSION_VALUES,
     PermissionKey,
 )
+from app.models.tenant.plugin_member_consent import ConsentAccess
 
 if TYPE_CHECKING:  # pragma: no cover
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.models.platform.access_grant import AccessGrant
-    from app.models.platform.guild import Guild, GuildMembership, CommunityRole
+    from app.models.platform.guild import Guild, GuildMembership
 
 __all__ = [
-    "ActorContext",
-    "GuildContext",
     "INSTALL_STANDING_SQL",
     "ISSUABLE_SCOPES_SQL",
-    "InstallContext",
     "STANDING_SQL",
+    "ActorContext",
+    "GuildContext",
+    "InstallContext",
     "compute_guild_standing",
     "compute_install_standing",
     "named_ref_candidates",
@@ -807,7 +808,7 @@ class GuildContext:
     values.
     """
 
-    guild: "Guild"
+    guild: Guild
     user_id: int
     #: The community, as a number. Held rather than read off ``guild``: a
     #: cross-guild gather clears the session's identity map between
@@ -815,17 +816,17 @@ class GuildContext:
     #: object still being attached to a session.
     guild_id: int
     #: The membership row, when there is one. ``None`` for a grantee.
-    membership: Optional["GuildMembership"] = None
+    membership: GuildMembership | None = None
     #: That row's role, as a value. Held rather than read off the row for the
     #: reason ``guild_id`` is: what somebody is in a community must not depend
     #: on an object still being attached to a session.
-    guild_role: Optional[str] = None
+    guild_role: str | None = None
     #: The live content grant, when access is by one rather than by membership.
-    grant: Optional["AccessGrant"] = None
+    grant: AccessGrant | None = None
     #: The live settings grant, independent of content access, and the rung it
     #: confers.
-    settings_grant: Optional["AccessGrant"] = None
-    settings_grant_level: Optional[str] = None
+    settings_grant: AccessGrant | None = None
+    settings_grant_level: str | None = None
     #: True when the community is in ``read_only`` status and access is by real
     #: membership: the session is routed into the SELECT-only ``guild_<id>_ro``
     #: role, so content writes are refused by Postgres. Never set on the grant
@@ -834,7 +835,7 @@ class GuildContext:
 
     # --- What the standing statement returned --------------------------------
     #: The community the standing was computed for; ``None`` until it has been.
-    standing_guild_id: Optional[int] = None
+    standing_guild_id: int | None = None
     #: The membership row's role is ``admin`` or ``superadmin``. Computed from
     #: that row by the database; no grant sets it.
     guild_admin: bool = False
@@ -842,7 +843,7 @@ class GuildContext:
     #: a live ``superadmin`` settings grant.
     guild_seat: bool = False
     #: The rung a live settings grant lends here, or ``None``.
-    settings_rung: Optional[str] = None
+    settings_rung: str | None = None
     #: A live content grant covers this request, at read / read_write.
     pam_read: bool = False
     pam_write: bool = False
@@ -880,7 +881,7 @@ class GuildContext:
     # --- Identity ------------------------------------------------------------
 
     @property
-    def role(self) -> "CommunityRole":
+    def role(self) -> CommunityRole:
         """The seat this request holds in the community.
 
         A grantee holds ``support`` — a first-class identity for granted access
@@ -922,7 +923,7 @@ class GuildContext:
         return self.holds_every_surface or self.settings_rung is not None
 
     @property
-    def rung(self) -> "CommunityRole":
+    def rung(self) -> CommunityRole:
         """The rung this request administers the community at.
 
         The membership row's, or the one a live settings grant lends for its
@@ -934,7 +935,7 @@ class GuildContext:
             return CommunityRole(self.settings_rung)
         return self.role
 
-    def reaches(self, rung: "CommunityRole", *, settings: bool = False) -> bool:
+    def reaches(self, rung: CommunityRole, *, settings: bool = False) -> bool:
         """Whether this request carries what ``rung`` carries, by the standing.
 
         The community's ladder asked of a request rather than of a row: the
@@ -1005,12 +1006,12 @@ class GuildContext:
     # --- The two grant axes --------------------------------------------------
 
     @property
-    def settings_level(self) -> Optional[str]:
+    def settings_level(self) -> str | None:
         """The rung a settings grant confers, read off the grant itself."""
         return self.settings_grant_level
 
     @property
-    def grant_content(self) -> Optional[str]:
+    def grant_content(self) -> str | None:
         """The content grant's level as the database found it: ``read``,
         ``read_write``, ``moderate``, or ``None`` when no live grant covers
         this request."""
@@ -1035,7 +1036,7 @@ class GuildContext:
             return self.pam_write
         return self.pam_read or self.pam_write
 
-    def overrides_sharing(self, initiative_id: Optional[int]) -> bool:
+    def overrides_sharing(self, initiative_id: int | None) -> bool:
         """Whether this request holds "Full access" in ``initiative_id`` — the
         initiative-scoped sibling of the admin leg."""
         if initiative_id is None:
@@ -1044,7 +1045,7 @@ class GuildContext:
 
     # --- The standing --------------------------------------------------------
 
-    def with_standing(self, row: dict[str, Any]) -> "GuildContext":
+    def with_standing(self, row: dict[str, Any]) -> GuildContext:
         """This context completed with what the standing statement returned."""
         return replace(self, **_standing_fields(self, row))
 
@@ -1068,17 +1069,17 @@ class InstallContext:
     #: the seat's grant together, which the standing computes.
     token_scopes: frozenset[str]
     #: The one initiative the token is narrowed to, when it is.
-    scope_initiative_id: Optional[int] = None
+    scope_initiative_id: int | None = None
     #: The member a member token acts for, and the purpose they consented to
     #: (``None`` for app-wide consent). ``None`` for the install itself. A write
     #: that names its author, such as the owner grant on something created,
     #: names this member.
-    member_user_id: Optional[int] = None
-    purpose: Optional[str] = None
+    member_user_id: int | None = None
+    purpose: str | None = None
 
     # --- What the install standing statement returned -------------------------
     #: The community the standing was computed for; ``None`` until it has been.
-    standing_guild_id: Optional[int] = None
+    standing_guild_id: int | None = None
     #: The community is in use, the install is on, and its registration is
     #: live and the client the token names.
     live: bool = False
@@ -1112,7 +1113,7 @@ class InstallContext:
     install_read: tuple[str, ...] = ()
     install_write: tuple[str, ...] = ()
     #: What this install calls its community, when it has been named to it.
-    guild_ref: Optional[str] = None
+    guild_ref: str | None = None
     #: The references this request named that resolve in the install's own
     #: sector, as ``(ref, entity_type, entity_id)``. For this request only:
     #: the replay writes the standing, and names nobody.
@@ -1126,7 +1127,7 @@ class InstallContext:
         that may act answers it."""
         return self.live
 
-    def overrides_sharing(self, initiative_id: Optional[int]) -> bool:
+    def overrides_sharing(self, initiative_id: int | None) -> bool:
         """Whether the request holds "Full access" in ``initiative_id``: the
         member a member token acts for, by their role, or the install itself,
         by the moderator standing."""
@@ -1179,7 +1180,7 @@ class InstallContext:
         return False
 
     @property
-    def grant_content(self) -> Optional[str]:
+    def grant_content(self) -> str | None:
         return None
 
     def grant_satisfies(
@@ -1196,7 +1197,7 @@ class InstallContext:
             self.install_write if access == "write" else self.install_read
         )
 
-    def with_standing(self, row: dict[str, Any]) -> "InstallContext":
+    def with_standing(self, row: dict[str, Any]) -> InstallContext:
         """This context completed with what the install standing statement
         returned."""
         return replace(
@@ -1248,7 +1249,7 @@ def _named_members(value: Any) -> frozenset[int]:
 
 
 def standing_values(
-    context: "GuildContext | InstallContext | None",
+    context: GuildContext | InstallContext | None,
 ) -> dict[gucs.Guc, Any]:
     """The standing ``context`` carries, as the routing statement writes it.
 
@@ -1262,7 +1263,7 @@ def standing_values(
     return {guc: getattr(context, guc.bind, None) for guc in gucs.STANDING}
 
 
-async def compute_guild_standing(session: "AsyncSession") -> dict[str, Any]:
+async def compute_guild_standing(session: AsyncSession) -> dict[str, Any]:
     """Run :data:`STANDING_SQL` and return the row it wrote.
 
     The routed session has just had every standing key cleared, so what this
@@ -1293,7 +1294,7 @@ def named_ref_candidates(values: Sequence[str]) -> list[str]:
 
 
 async def compute_install_standing(
-    session: "AsyncSession", named_refs: Sequence[str] = ()
+    session: AsyncSession, named_refs: Sequence[str] = ()
 ) -> dict[str, Any]:
     """Run :data:`INSTALL_STANDING_SQL` and return the row it wrote.
 

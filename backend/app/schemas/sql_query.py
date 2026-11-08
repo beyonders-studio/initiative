@@ -5,7 +5,7 @@ query may name two columns the same thing — ``SELECT t.id, p.id`` is legal and
 gives both the name ``id``. A mapping would keep one of the two.
 """
 
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal
 
 from pydantic import Field
 
@@ -26,7 +26,7 @@ class QueryRequest(SanitizedBaseModel):
     #: scope, so a surface that belongs to one initiative says so and the rows
     #: come back narrowed to it. Omitted means the whole guild the reader
     #: reaches.
-    initiative_id: Optional[int] = Field(default=None, gt=0)
+    initiative_id: int | None = Field(default=None, gt=0)
 
 
 class QueryColumnDescription(SanitizedBaseModel):
@@ -39,7 +39,7 @@ class QueryColumnDescription(SanitizedBaseModel):
     #: For a date rounded with ``date_trunc``, the unit it is rounded to —
     #: ``day``, ``week``, ``month``, ``quarter`` or ``year``. A chart labels
     #: its points by this rather than by guessing from the dates.
-    grain: Optional[str] = None
+    grain: str | None = None
     #: A SQL DATE is a calendar label, encoded at UTC midnight rather than a
     #: timestamp to convert into the viewer's timezone.
     date_only: bool = False
@@ -51,9 +51,9 @@ class QuerySheetDescription(SanitizedBaseModel):
     #: The name the statement reads it under.
     alias: str
     #: The workbook's visible sheets, for picking one.
-    sheets: List[str]
+    sheets: list[str]
     #: Its columns, described as a dataset's fields are.
-    fields: List[FieldDescription]
+    fields: list[FieldDescription]
 
 
 class QueryPluginDescription(SanitizedBaseModel):
@@ -63,19 +63,19 @@ class QueryPluginDescription(SanitizedBaseModel):
     #: The name the statement reads it under.
     alias: str
     #: Its columns, described as a dataset's fields are.
-    fields: List[FieldDescription]
+    fields: list[FieldDescription]
 
 
 class QueryShapeResponse(SanitizedBaseModel):
     """What a statement would return, without returning it."""
 
-    columns: List[QueryColumnDescription]
+    columns: list[QueryColumnDescription]
     #: The datasets the statement reads.
-    relations: List[str]
+    relations: list[str]
     #: The ranges of spreadsheets it reads.
-    sheets: List[QuerySheetDescription] = []
+    sheets: list[QuerySheetDescription] = []
     #: The plug-in endpoints it reads.
-    plugins: List[QueryPluginDescription] = []
+    plugins: list[QueryPluginDescription] = []
 
 
 class QueryResponse(SanitizedBaseModel):
@@ -84,13 +84,13 @@ class QueryResponse(SanitizedBaseModel):
     #: The output columns, in order, named and typed. Names are not necessarily
     #: distinct; the statement is prepared to run either way, so saying what it
     #: returns costs nothing extra here.
-    columns: List[QueryColumnDescription]
+    columns: list[QueryColumnDescription]
     #: One list per row, positional against ``columns``.
-    rows: List[List[Any]]
+    rows: list[list[Any]]
     #: Whether there were more rows than one query returns.
     truncated: bool
     #: The datasets the statement read.
-    relations: List[str]
+    relations: list[str]
 
 
 class QueryColumnSpec(SanitizedBaseModel):
@@ -98,10 +98,10 @@ class QueryColumnSpec(SanitizedBaseModel):
 
     field: str = Field(min_length=1, max_length=100)
     #: Reduce the column across the group rather than returning it as it is.
-    aggregate: Optional[str] = Field(default=None, max_length=20)
+    aggregate: str | None = Field(default=None, max_length=20)
     #: Round a date down before grouping by it.
-    bucket: Optional[str] = Field(default=None, max_length=20)
-    alias: Optional[str] = Field(default=None, max_length=100)
+    bucket: str | None = Field(default=None, max_length=20)
+    alias: str | None = Field(default=None, max_length=100)
     #: Add a count or a total up along the grouping: a running total.
     running: bool = False
 
@@ -125,12 +125,12 @@ class QueryFilterGroupSpec(SanitizedBaseModel):
     """
 
     logic: Literal["and", "or"] = "and"
-    conditions: List["QueryFilterNode"] = Field(max_length=20)
+    conditions: list["QueryFilterNode"] = Field(max_length=20)
 
 
 #: One line of a filter: a comparison, or a bracket around more of them. The
 #: group comes first so a bracket is read as one.
-QueryFilterNode = Union[QueryFilterGroupSpec, QueryConditionSpec]
+QueryFilterNode = QueryFilterGroupSpec | QueryConditionSpec
 
 QueryFilterGroupSpec.model_rebuild()
 
@@ -147,7 +147,7 @@ class QuerySheetSpec(SanitizedBaseModel):
     file: int = Field(gt=0)
     #: The range in A1 notation, its sheet before the last ``!``. Omitted
     #: reads the first visible sheet's filled area.
-    range: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    range: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class QueryPluginSpec(SanitizedBaseModel):
@@ -158,7 +158,7 @@ class QueryPluginSpec(SanitizedBaseModel):
     #: The endpoint's name after the plug-in's prefix.
     endpoint: str = Field(min_length=1, max_length=100)
     #: Its parameters by name: a value, or a list of them.
-    params: Dict[str, Union[str, int, bool, List[Union[str, int, bool]]]] = Field(
+    params: dict[str, str | int | bool | list[str | int | bool]] = Field(
         default_factory=dict, max_length=12
     )
 
@@ -172,21 +172,21 @@ class QueryBuildRequest(SanitizedBaseModel):
     range of a spreadsheet, or one of a plug-in's read endpoints.
     """
 
-    dataset: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    sheet: Optional[QuerySheetSpec] = None
-    plugin: Optional[QueryPluginSpec] = None
-    columns: List[QueryColumnSpec] = Field(min_length=1, max_length=20)
-    where: List[QueryFilterNode] = Field(default_factory=list, max_length=20)
+    dataset: str | None = Field(default=None, min_length=1, max_length=100)
+    sheet: QuerySheetSpec | None = None
+    plugin: QueryPluginSpec | None = None
+    columns: list[QueryColumnSpec] = Field(min_length=1, max_length=20)
+    where: list[QueryFilterNode] = Field(default_factory=list, max_length=20)
     # As many as there are columns: what a statement is grouped by is drawn
     # from what it shows.
-    group_by: List[str] = Field(default_factory=list, max_length=20)
-    order_by: Optional[QuerySortSpec] = None
-    limit: Optional[int] = Field(default=None, gt=0, le=10_000)
+    group_by: list[str] = Field(default_factory=list, max_length=20)
+    order_by: QuerySortSpec | None = None
+    limit: int | None = Field(default=None, gt=0, le=10_000)
     #: Which initiative the answer is about. A statement names datasets, not a
     #: scope, so a surface that belongs to one initiative says so and the rows
     #: come back narrowed to it. Omitted means the whole guild the reader
     #: reaches.
-    initiative_id: Optional[int] = Field(default=None, gt=0)
+    initiative_id: int | None = Field(default=None, gt=0)
 
 
 class QueryVocabulary(SanitizedBaseModel):
@@ -199,22 +199,22 @@ class QueryVocabulary(SanitizedBaseModel):
     """
 
     #: The relations a statement may name. The registry's own datasets.
-    datasets: List[str]
+    datasets: list[str]
     #: The functions it may call, spelled as they are written.
-    functions: List[str]
+    functions: list[str]
     #: The names that are not columns and are resolved from the request rather
     #: than from the statement. ``me`` is the reader, so a saved statement that
     #: uses it answers per person without holding anybody's id.
-    tokens: List[str] = []
+    tokens: list[str] = []
 
 
 class QueryBuildResponse(SanitizedBaseModel):
     """The statement, and what it would return."""
 
     sql: str
-    columns: List[QueryColumnDescription]
-    relations: List[str]
+    columns: list[QueryColumnDescription]
+    relations: list[str]
     #: The range it reads, when it reads one.
-    sheets: List[QuerySheetDescription] = []
+    sheets: list[QuerySheetDescription] = []
     #: The plug-in endpoint it reads, when it reads one.
-    plugins: List[QueryPluginDescription] = []
+    plugins: list[QueryPluginDescription] = []

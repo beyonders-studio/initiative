@@ -130,8 +130,7 @@ class OidcDiscovery:
 
 def _normalize_issuer(issuer: str) -> str:
     base = issuer.strip()
-    if base.endswith(_WELL_KNOWN_SUFFIX):
-        base = base[: -len(_WELL_KNOWN_SUFFIX)]
+    base = base.removesuffix(_WELL_KNOWN_SUFFIX)
     return base.rstrip("/")
 
 

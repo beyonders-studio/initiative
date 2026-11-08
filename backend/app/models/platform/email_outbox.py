@@ -22,12 +22,12 @@ for the system engine, nothing for the bare login. There is no endpoint over
 it; what the recipient sees is the email.
 """
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import (
-    Boolean,
     BigInteger,
+    Boolean,
     Column,
     DateTime,
     ForeignKey,
@@ -57,7 +57,7 @@ class EmailOutboxItem(SQLModel, table=True):
         Index("ix_email_outbox_user", "user_id"),
     )
 
-    id: Optional[int] = Field(
+    id: int | None = Field(
         default=None, sa_column=Column(BigInteger, primary_key=True, autoincrement=True)
     )
     user_id: int = Field(
@@ -68,7 +68,7 @@ class EmailOutboxItem(SQLModel, table=True):
     #: The bell line this is the email of, where one was written. It is what
     #: lets the worker drop a line the recipient has already read in the app.
     #: Nullable because a category with the bell switched off still emails.
-    notification_id: Optional[int] = Field(
+    notification_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("notifications.id", ondelete="SET NULL"), nullable=True
@@ -80,7 +80,7 @@ class EmailOutboxItem(SQLModel, table=True):
     #: Which community this happened in, for the digest's headings. Null for
     #: the things that belong to no community — direct messages, connections,
     #: account notices.
-    guild_id: Optional[int] = Field(
+    guild_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("guilds.id", ondelete="CASCADE"), nullable=True
@@ -95,11 +95,9 @@ class EmailOutboxItem(SQLModel, table=True):
     headline: str = Field(sa_column=Column(Text, nullable=False))
     #: An HTML fragment. Its interpolated values were escaped when it was built.
     body: str = Field(sa_column=Column(Text, nullable=False))
-    link: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    link: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     #: The call-to-action's wording, where the single-row layout draws a button.
-    link_label: Optional[str] = Field(
-        default=None, sa_column=Column(Text, nullable=True)
-    )
+    link_label: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     #: An account-security letter: sent at once, on its own, to every address
     #: the account has proved, whatever its notification settings.
     security: bool = Field(
@@ -108,14 +106,14 @@ class EmailOutboxItem(SQLModel, table=True):
     )
     #: The one address a security letter goes to, encrypted like every stored
     #: address. NULL sends it to every address the account has proved.
-    recipient_encrypted: Optional[str] = Field(
+    recipient_encrypted: str | None = Field(
         default=None,
         sa_column=Column(Text, nullable=True, info={FERNET_SALT: SALT_EMAIL}),
     )
     #: The account notice a security letter is, which its "This wasn't me"
     #: link answers. NULL draws no such link. The address a removal took
     #: (``undo.email``) is sealed like ``recipient_encrypted``.
-    change: Optional[dict[str, Any]] = Field(
+    change: dict[str, Any] | None = Field(
         default=None,
         sa_column=Column(
             JSONB,
@@ -124,27 +122,27 @@ class EmailOutboxItem(SQLModel, table=True):
         ),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     #: The earliest this may go out.
     deliver_after: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     #: Held by the pass that is sending it, so two workers cannot both send.
     #: Older than the lease means the pass that took it never finished.
-    claimed_at: Optional[datetime] = Field(
+    claimed_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     attempts: int = Field(
         default=0, sa_column=Column(Integer, nullable=False, server_default="0")
     )
-    sent_at: Optional[datetime] = Field(
+    sent_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: Set once the attempts are spent. Kept until the sweep, so "did that go
     #: out" has an answer for a while.
-    failed_at: Optional[datetime] = Field(
+    failed_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )

@@ -17,7 +17,7 @@ statement's transaction opens.
 from __future__ import annotations
 
 import asyncio
-from typing import Awaitable, Callable, Iterable, Mapping, Optional
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -38,7 +38,7 @@ from app.services.query.resolve import (
 #: make, or none where only its columns are wanted.
 Prepared = tuple[
     tuple[tuple[str, str], ...],
-    Optional[Callable[[], Awaitable[plugin_data.PluginDataResult]]],
+    Callable[[], Awaitable[plugin_data.PluginDataResult]] | None,
 ]
 
 

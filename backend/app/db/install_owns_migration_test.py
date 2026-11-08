@@ -13,9 +13,7 @@ import importlib.util
 from pathlib import Path
 from types import ModuleType
 
-
 from app.db.plugin_rls import INSTALL_OWNS_WHAT_IT_CREATES
-
 
 _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 

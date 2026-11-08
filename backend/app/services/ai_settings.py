@@ -21,27 +21,26 @@ Resolution (member M generating in guild G):
 from __future__ import annotations
 
 import logging
-from functools import partial
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from functools import partial
 
 from fastapi import HTTPException
 from sqlalchemy import func, text, update
 from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.rules import SURFACE_AI_CONNECTIONS
-from app.db import cohorts, post_commit
-from app.db.session import routed_guild_id, set_rls_context
 from app.core.audit_events import AuditEventType
 from app.core.encryption import SALT_AI_API_KEY, decrypt_field, encrypt_field
 from app.core.messages import AIMessages, GuildMessages
+from app.core.rules import SURFACE_AI_CONNECTIONS
+from app.db import cohorts, post_commit
 from app.db import session as db_session
+from app.db.request_context import SystemGuild
+from app.db.session import routed_guild_id, set_rls_context
 from app.models.platform.ai_connection import PlatformAIConnection
 from app.models.platform.guild import CommunityStatus, Guild
 from app.models.tenant.ai_connection import GuildAIConnection, GuildAIConnectionKey
-from app.services.platform.app_settings import get_app_settings, locked_settings
-from app.services.platform import rules
 from app.schemas.ai_settings import (
     AIConfigMode,
     AIConnectionCommunity,
@@ -59,12 +58,13 @@ from app.schemas.ai_settings import (
 from app.services import ai_provider
 from app.services import audit as audit_service
 from app.services.ai_provider import AIRequestError, Target
+from app.services.platform import rules
+from app.services.platform.app_settings import get_app_settings, locked_settings
 from app.services.webhook_target_url import (
     WebhookTargetUrlError,
     WebhookTargetUrlPrivateError,
     assert_target_url_is_public_async,
 )
-from app.db.request_context import SystemGuild
 
 logger = logging.getLogger(__name__)
 

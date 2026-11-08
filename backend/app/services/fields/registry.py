@@ -20,21 +20,22 @@ never changes within a process.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import Enum
-from functools import lru_cache
-from typing import Any, Callable
+from functools import cache
+from typing import Any
 
+from app.schemas.query import FilterOp
 from app.services.fields import calendar_events as calendar_events_dataset
 from app.services.fields import members as members_dataset
 from app.services.fields import projects as projects_dataset
 from app.services.fields import properties as property_datasets
 from app.services.fields import relationships as relationships_dataset
 from app.services.fields import task_assignees as task_assignees_dataset
-from app.services.fields import tools as tool_datasets
 from app.services.fields import task_statuses as task_statuses_dataset
 from app.services.fields import task_types as task_types_dataset
 from app.services.fields import tasks as tasks_dataset
-from app.schemas.query import FilterOp
+from app.services.fields import tools as tool_datasets
 from app.services.fields.spec import Dataset, FieldContext, FieldSpec, SortContext
 
 #: Every dataset, by the name a consumer refers to it by. One entry per
@@ -74,7 +75,7 @@ DatasetName = Enum("DatasetName", {name: name for name in _BUILDERS}, type=str)
 DatasetName.__doc__ = "A dataset the field registry describes."
 
 
-@lru_cache(maxsize=None)
+@cache
 def _built() -> dict[str, Dataset]:
     return {name: build() for name, build in _BUILDERS.items()}
 

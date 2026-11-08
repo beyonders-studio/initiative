@@ -9,8 +9,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from datetime import datetime, timezone
-
+from datetime import UTC, datetime
 
 from app.services.tenant.webhook_dispatcher import _sign
 
@@ -54,7 +53,7 @@ def test_sign_differs_when_timestamp_changes():
 def test_sign_round_trips_through_verifier():
     """Signing then verifying must succeed for the same inputs."""
     secret = "shared-with-receiver"
-    timestamp = str(int(datetime.now(timezone.utc).timestamp()))
+    timestamp = str(int(datetime.now(UTC).timestamp()))
     body = json.dumps({"event_type": "task.created"}).encode()
 
     sig = _sign(secret, timestamp, body)

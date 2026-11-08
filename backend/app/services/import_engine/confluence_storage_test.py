@@ -717,7 +717,7 @@ def test_the_children_macro_is_the_list_of_pages_beneath():
 @pytest.mark.skipif(not FIXTURES.exists(), reason="no pages captured")
 def test_an_emoticon_stored_by_name_is_its_glyph():
     result = real("26476563")
-    line = [t for kind, t in outline(result) if t.startswith("Emoji nodes")][0]
+    line = next(t for kind, t in outline(result) if t.startswith("Emoji nodes"))
     assert ":warning:" not in line and "\u26a0" in line
 
 

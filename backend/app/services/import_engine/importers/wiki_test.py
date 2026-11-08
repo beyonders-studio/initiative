@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 from app.services.import_engine.importers.wiki import WikiImporter, _place_references
 
 

@@ -13,7 +13,7 @@ they hang off.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -24,10 +24,9 @@ from app.services.tenant.attachments import (
     delete_blobs,
     release_unclaimed_pasted_images,
 )
+from app.services.tenant.held import holds_under
 from app.services.tenant.lifecycle_tree import parents_first
 from app.services.tenant.soft_delete import hard_purge_entities
-from app.services.tenant.held import holds_under
-
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +105,7 @@ async def purge_guild(session: AsyncSession, guild_id: int) -> None:
     retention resumes, with the original ``purge_at`` stamps, when it returns
     to active.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     released = await _run_purge_pass(session, now=now, guild_id=guild_id)
     released |= await release_unclaimed_pasted_images(session, now=now)
     await session.commit()

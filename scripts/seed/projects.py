@@ -9,7 +9,7 @@ Templates and Archive tabs have the same variety the active list does.
 from __future__ import annotations
 
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import update
 
@@ -17,16 +17,16 @@ from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
 from app.models.tenant._mixins import archive_models
-from app.models.tenant.project import Project
 from app.models.tenant.personal_item import PersonalItem, ViewSource
+from app.models.tenant.project import Project
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.task import (
     Task,
     TaskAssignee,
     TaskPriority,
     TaskStatus,
-    TaskType,
     TaskStatusCategory,
+    TaskType,
 )
 from app.schemas.tenant.task import mint_checklist_item_id
 from app.services.tenant import relationships as relationships_service
@@ -34,7 +34,6 @@ from app.services.tenant.archive import archive_entity
 from app.services.tenant.task_completion import sync_completed_at
 from app.services.tenant.task_statuses import ensure_default_statuses
 from app.services.tenant.task_types import ensure_default_types
-
 from seed.common import NOW, Community, share, tag
 
 _DUNGEON_AREAS = [
@@ -1535,7 +1534,7 @@ async def seed(c: Community) -> None:
             )
         return kept[key]
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for name, project in BOOKMARKS[c.key]:
         row(name, project).bookmarked_at = now
         c.ids["bookmarks"].append(c.projects[project].id)

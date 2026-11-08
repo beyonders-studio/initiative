@@ -11,7 +11,6 @@ would be one place to get that wrong for all of them at once.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List
 
 from pydantic import ConfigDict, Field
 
@@ -46,4 +45,4 @@ class TimelineResponse(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     #: Newest period first, matching the order of the feed the rail scrolls.
-    buckets: List[TimelineBucket] = Field(default_factory=list)
+    buckets: list[TimelineBucket] = Field(default_factory=list)

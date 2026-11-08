@@ -11,7 +11,7 @@ the gates then answer.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import delete, event, text
@@ -19,14 +19,14 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 
 from app.api.deps import InstallAccessError
+from app.core.file_types import FileType
 from app.db.guild_standing import InstallContext
-from app.db.schema_provisioning import guild_schema_name, GuildRoleKind, guild_role_name
+from app.db.schema_provisioning import GuildRoleKind, guild_role_name, guild_schema_name
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import User, UserStatus
-from app.models.tenant.plugin_member_consent import PluginMemberConsent, ConsentAccess
-from app.core.file_types import FileType
 from app.models.tenant.file import File
 from app.models.tenant.initiative import InitiativeMember
+from app.models.tenant.plugin_member_consent import ConsentAccess, PluginMemberConsent
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.testing import (
     create_file,
@@ -36,7 +36,7 @@ from app.testing import (
 )
 from app.testing.plugin_clients import CLIENT, InstalledPlugin, install_plugin
 
-_NOW = datetime.now(timezone.utc)
+_NOW = datetime.now(UTC)
 
 
 async def _member(acting_user, installed: InstalledPlugin, *, role: str = "member"):

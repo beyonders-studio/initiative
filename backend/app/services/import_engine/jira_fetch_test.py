@@ -17,10 +17,10 @@ import pytest
 
 from app.core.messages import ImportEngineMessages
 from app.services.import_engine import atlassian, jira_fetch
+from app.services.import_engine import limits as import_limits
 from app.services.import_engine.atlassian_bundle import BundleWriter
 from app.services.import_engine.atlassian_test import answered
 from app.services.import_engine.contract import ImportEngineError
-from app.services.import_engine import limits as import_limits
 
 
 @pytest.fixture(autouse=True)
@@ -230,7 +230,7 @@ async def test_a_narrowing_narrows_rather_than_replaces(monkeypatch):
     calls = _site(monkeypatch, issues=[])
     await _bundle(monkeypatch, jql_extra="created >= -30d")
 
-    jql = [c for c in calls if "search/jql" in c["url"]][0]["json"]["jql"]
+    jql = next(c for c in calls if "search/jql" in c["url"])["json"]["jql"]
     assert jql == 'project = "ACME" AND (created >= -30d) ORDER BY Rank ASC'
 
 

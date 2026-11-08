@@ -7,6 +7,8 @@ a PAM grant — these are platform actions about an account, not access to a
 guild's content.
 """
 
+from datetime import UTC
+
 import pytest
 from httpx import AsyncClient
 from sqlmodel import select
@@ -21,8 +23,8 @@ from app.testing import (
     create_guild,
     create_guild_membership,
     create_user,
-    emitted,
     drain_notices,
+    emitted,
 )
 from app.testing.factories import get_auth_headers
 
@@ -374,7 +376,7 @@ class TestRevokingApiKeys:
     async def test_support_switches_off_the_keys_that_still_work(
         self, client, session, capfd
     ):
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         from app.services.platform import api_keys as api_keys_service
 
@@ -387,7 +389,7 @@ class TestRevokingApiKeys:
             session,
             user=subject,
             name="old",
-            expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+            expires_at=datetime.now(UTC) - timedelta(days=1),
         )
         listed = await client.get(
             "/api/v1/operator/users", headers=get_auth_headers(support)

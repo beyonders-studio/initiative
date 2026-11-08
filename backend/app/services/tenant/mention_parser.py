@@ -14,11 +14,10 @@ Content therefore holds no name for ``anonymize_user_mentions`` to take out;
 it takes out what a collaboration state may still hold.
 """
 
-from typing import Optional, Set
-
 from pycrdt import Doc, Text, XmlElement, XmlText
 from pycrdt._base import base_types
-from sqlalchemy import Text as SqlText, cast
+from sqlalchemy import Text as SqlText
+from sqlalchemy import cast
 from sqlmodel import col, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -26,9 +25,8 @@ from app.core.identity_boundary import STORED_MENTION
 from app.core.references import references_in_text
 from app.core.search import SearchEntityType
 from app.db import gucs
-from app.db.session import raise_flag
+from app.db.session import raise_flag, routed_guild_id
 from app.models.tenant.batched_notice import BatchedNotice
-from app.db.session import routed_guild_id
 
 # Placeholder written over an anonymized user's name in a digest row.
 # Matches the frontend's rendering of anonymized users
@@ -36,12 +34,12 @@ from app.db.session import routed_guild_id
 ANONYMIZED_MENTION_NAME = "Deleted user"
 
 
-def extract_mentioned_user_ids(content: str) -> Set[int]:
+def extract_mentioned_user_ids(content: str) -> set[int]:
     """Extract all user IDs mentioned in the content."""
     return {int(user_id) for _, user_id in STORED_MENTION.findall(content)}
 
 
-def extract_mentioned_task_ids(content: str) -> Set[int]:
+def extract_mentioned_task_ids(content: str) -> set[int]:
     """Extract all task IDs mentioned in the content.
 
     Read through the reference vocabulary rather than a pattern of its own: a
@@ -55,7 +53,7 @@ def extract_mentioned_task_ids(content: str) -> Set[int]:
     }
 
 
-def nameless_state(state: bytes) -> Optional[bytes]:
+def nameless_state(state: bytes) -> bytes | None:
     """A collaboration state with no mention of somebody by id holding a name,
     or ``None`` where none held one.
 

@@ -21,32 +21,34 @@ same member uncorrelated across plug-ins and guilds.
 
 from __future__ import annotations
 
-from typing import Any, Optional, Sequence
+from collections.abc import Sequence
+from typing import Any
 
-from sqlalchemy import delete as sa_delete, func
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models.tenant.guild_plugin import GuildPlugin
+from app.core.clock import utcnow
 from app.db.cohorts import as_system
+from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
 from app.models.tenant.plugin_connection_secret import PluginConnectionSecret
-from app.core.clock import utcnow
 from app.services.tenant.plugin_config import mint_connection_ref
 from app.services.tenant.plugin_revocation import queue_revocations_for_rows
 
 __all__ = [
     "block_member_connection",
     "connection_tallies",
-    "delete_plugin_connections",
     "delete_guild_connections",
     "delete_member_connections",
+    "delete_plugin_connections",
     "disconnect",
     "get_connection",
     "is_blocked",
-    "list_plugin_connections",
     "list_member_connections",
+    "list_plugin_connections",
     "revoke_all",
     "unblock_member_connection",
 ]
@@ -57,7 +59,7 @@ __all__ = [
 
 async def get_connection(
     session: AsyncSession, *, plugin_id: int, connection_id: str, user_id: int
-) -> Optional[GuildPluginUserConnection]:
+) -> GuildPluginUserConnection | None:
     """One member's row for one connection, if it exists.
 
     Under the table's policies this returns the caller's row when the caller is
@@ -98,7 +100,7 @@ async def list_plugin_connections(
     session: AsyncSession,
     *,
     plugin_id: int,
-    user_ids: Optional[Sequence[int]] = None,
+    user_ids: Sequence[int] | None = None,
 ) -> list[GuildPluginUserConnection]:
     """Every member's connection for one install — the admin's Members view.
     ``user_ids`` narrows it to those members, one page of that view.
@@ -458,6 +460,6 @@ async def _installs_by_plugin_id(
     }
 
 
-def is_blocked(row: Optional[Any]) -> bool:
+def is_blocked(row: Any | None) -> bool:
     """Whether a member has been stopped from connecting this one."""
     return row is not None and row.blocked_at is not None

@@ -3,7 +3,7 @@ ordered for the reader, and the catch-up written from it."""
 
 import json
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -232,9 +232,9 @@ async def test_a_feed_since_a_moment_reads_the_changes_after_it(
     def ids(entries):
         return {e.entity_id for e in entries if e.entity_type == "task"}
 
-    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
+    yesterday = datetime.now(UTC) - timedelta(days=1)
     assert ids(await _feed(reading_as, b, since=yesterday)) == {new.id}
-    long_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    long_ago = datetime.now(UTC) - timedelta(days=30)
     assert ids(await _feed(reading_as, b, since=long_ago)) == {old.id, new.id}
 
 
@@ -301,7 +301,7 @@ async def test_a_catch_up_with_nothing_new_sends_nothing(
     a, b = await _start(session, acting_user)
     asked = _answering(monkeypatch, "Unused.")
     capfd.readouterr()
-    asked_from = datetime.now(timezone.utc) - timedelta(days=30)
+    asked_from = datetime.now(UTC) - timedelta(days=30)
 
     response = await client.post(
         b.g("/activity/catch-up"),

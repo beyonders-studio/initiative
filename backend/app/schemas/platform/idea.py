@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
 
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.query import PageMeta
@@ -14,7 +13,7 @@ class IdeaStatusRead(SanitizedBaseModel):
 
     id: int
     name: str
-    color: Optional[str] = None
+    color: str | None = None
     #: ``todo``, ``in_progress`` or ``done``; a ``done`` idea is closed.
     category: str
 
@@ -31,13 +30,13 @@ class IdeaRead(SanitizedBaseModel):
     #: A closed idea keeps its votes and takes no change to them.
     closed: bool
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
     #: Only on one idea's own page.
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class IdeaListRead(PageMeta):
     """A page of the published ideas, and every status of the board."""
 
-    items: List[IdeaRead]
-    statuses: List[IdeaStatusRead]
+    items: list[IdeaRead]
+    statuses: list[IdeaStatusRead]

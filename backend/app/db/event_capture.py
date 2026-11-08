@@ -49,8 +49,9 @@ id in the outbox resolvable without owing new API surface per table.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from sqlalchemy import Column
 from sqlmodel import SQLModel
@@ -193,7 +194,7 @@ def _singular(table: str) -> str:
     ``ies`` was a ``y``, and otherwise the ``s`` comes off."""
     if table.endswith("ies"):
         return table[:-3] + "y"
-    return table[:-1] if table.endswith("s") else table
+    return table.removesuffix("s")
 
 
 def _owner_of(column: Column[Any]) -> str | None:
@@ -231,7 +232,7 @@ def _borrowed(
         if not answers[parent]:
             return "NULL"
         return (
-            f"(SELECT {answers[parent]} FROM {parent} {_PARENT_ALIAS} "  # noqa: S608
+            f"(SELECT {answers[parent]} FROM {parent} {_PARENT_ALIAS} "
             f"WHERE {_PARENT_ALIAS}.id = {resource_id_expr})"
         )
 

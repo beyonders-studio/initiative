@@ -9,7 +9,6 @@ internal addressing detail and never appear here.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
 
 from pydantic import ConfigDict, Field
 
@@ -53,50 +52,50 @@ class RelatedEnd(SanitizedBaseModel):
 
     type: EndpointKind
     id: int
-    title: Optional[str] = None
-    initiative_id: Optional[int] = None
+    title: str | None = None
+    initiative_id: int | None = None
     #: When the far end last changed, for the surfaces that order by recency.
     #: None for a kind that records no such moment.
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
     #: The tool this thing is addressed inside, and which one. A task is
     #: addressed in its project and an event in its calendar, so these are what
     #: an address is built from for the kinds that have no page of their own.
     #: The same pair a search hit carries, from the same declaration.
-    tool: Optional[Tool] = None
-    tool_id: Optional[int] = None
+    tool: Tool | None = None
+    tool_id: int | None = None
     #: What that tool is called. A list of links is a list of mixed things, and
     #: a name is often not enough to tell two of them apart — six projects run
     #: from one template hold six tasks called "Do a thing". None for a far end
     #: that IS a tool.
-    tool_title: Optional[str] = None
+    tool_title: str | None = None
     #: What it shows of itself besides its name: a picture, an emoji, or a
     #: colour. At most one is set, and most kinds set none — those draw as their
     #: kind's own icon. A caller renders what it is given.
     #: Pictures to draw. A file has its featured image at most, a person their
     #: avatar.
-    image_urls: List[str] = Field(default_factory=list)
-    icon: Optional[str] = None
-    color: Optional[str] = None
+    image_urls: list[str] = Field(default_factory=list)
+    icon: str | None = None
+    color: str | None = None
     #: What sort of thing it is within its kind, for the kinds whose icon is not
     #: fixed: a spreadsheet, a whiteboard and a PDF are all files, and none
     #: of them should be drawn as a scroll. The same three facts a recent item
     #: carries, plus where a smart link points, so a client picks the icon with
     #: the helper it already has. Only files set any of these.
-    file_type: Optional[str] = None
-    mime_type: Optional[str] = None
-    original_filename: Optional[str] = None
-    smart_link_url: Optional[str] = None
+    file_type: str | None = None
+    mime_type: str | None = None
+    original_filename: str | None = None
+    smart_link_url: str | None = None
     #: A person's handle as their profile is addressed by, ``/u/<handle>``.
     #: None for every other kind.
-    handle: Optional[str] = None
+    handle: str | None = None
     #: Whether the far end is still outstanding — whether, were this a
     #: ``depends_on`` edge, it would still be holding the anchor up. None for a
     #: kind that has no notion of finishing, which is most of them: a file
     #: is never "done". See :mod:`app.db.blocking`.
-    is_open: Optional[bool] = None
+    is_open: bool | None = None
     #: When the far end starts, for an event: what a contact's page orders
     #: what is coming up by. None for every other kind.
-    starts_at: Optional[datetime] = None
+    starts_at: datetime | None = None
 
 
 class RelationshipRead(SanitizedBaseModel):
@@ -115,8 +114,8 @@ class RelationshipRead(SanitizedBaseModel):
     direction: str
     other: RelatedEnd
     provenance: str
-    confidence: Optional[float] = None
-    created_by: Optional[int] = None
+    confidence: float | None = None
+    created_by: int | None = None
     created_at: datetime
 
 
@@ -140,8 +139,8 @@ class LinkedTaskRead(SanitizedBaseModel):
 
     id: int
     title: str
-    start_date: Optional[datetime] = None
-    due_date: Optional[datetime] = None
+    start_date: datetime | None = None
+    due_date: datetime | None = None
     project_id: int
     project_name: str
     initiative_id: int
@@ -153,8 +152,8 @@ class TaskEdgesRead(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    edges: List[TaskEdgeRead]
-    others: List[LinkedTaskRead]
+    edges: list[TaskEdgeRead]
+    others: list[LinkedTaskRead]
 
 
 class NeighbourhoodNode(SanitizedBaseModel):
@@ -188,5 +187,5 @@ class NeighbourhoodRead(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    nodes: List[NeighbourhoodNode]
-    edges: List[NeighbourhoodEdge]
+    nodes: list[NeighbourhoodNode]
+    edges: list[NeighbourhoodEdge]

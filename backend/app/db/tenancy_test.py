@@ -15,10 +15,10 @@ from app.db import base  # noqa: F401  # populates SQLModel.metadata with every 
 from app.db.tenancy import (
     ALL_CLASSIFIED_TABLES,
     GUILD_LEVEL_TABLES,
-    MANAGED_TABLES,
     GUILD_SCOPED_TABLES,
     INITIATIVE_SCOPED_TABLES,
     LEDGER_TABLES,
+    MANAGED_TABLES,
     OWN_ROW_TABLES,
     PRIVATE_ROW_SHARED_READ,
     PRIVATE_ROW_TABLES,

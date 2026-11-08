@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Text
 from sqlmodel import Field, SQLModel
@@ -31,7 +30,7 @@ class AuthProviderSecret(SQLModel, table=True):
         )
     )
 
-    client_secret_encrypted: Optional[str] = Field(
+    client_secret_encrypted: str | None = Field(
         default=None,
         sa_column=Column(
             Text, nullable=True, info={FERNET_SALT: SALT_OIDC_CLIENT_SECRET}
@@ -39,16 +38,16 @@ class AuthProviderSecret(SQLModel, table=True):
     )
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         # onupdate (Python-side, no DDL) so secret rotation via the provider-CRUD
         # service bumps this without the endpoint having to remember.
         sa_column=Column(
             DateTime(timezone=True),
             nullable=False,
-            onupdate=lambda: datetime.now(timezone.utc),
+            onupdate=lambda: datetime.now(UTC),
         ),
     )

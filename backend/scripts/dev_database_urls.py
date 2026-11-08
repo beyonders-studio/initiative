@@ -21,7 +21,7 @@ from sqlalchemy.engine import make_url
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.core.config import ENV_FILES, Settings  # noqa: E402
+from app.core.config import ENV_FILES, Settings
 
 URLS = (
     "DATABASE_URL",

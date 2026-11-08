@@ -1,7 +1,7 @@
 import csv
 import io
 import re
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 from app.models.platform.user import User
 

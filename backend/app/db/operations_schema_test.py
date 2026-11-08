@@ -18,9 +18,9 @@ from sqlmodel import select
 from app.api.deps import FilerAccessError, establish_filer_access
 from app.core.intake import IntakeStream
 from app.db import operations_schema
-from app.db.tenancy import OPERATIONS_TABLES
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
+from app.db.tenancy import OPERATIONS_TABLES
 from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.evidence import Evidence
 from app.models.tenant.intake import IntakeBinding, IntakeCase

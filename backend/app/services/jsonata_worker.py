@@ -19,8 +19,9 @@ from __future__ import annotations
 import json
 import math
 import sys
+from collections.abc import Callable
 from functools import lru_cache
-from typing import Any, Callable, Optional
+from typing import Any
 
 import jsonata
 from jsonata.parser import Parser
@@ -92,7 +93,7 @@ def _parsed(expression: str) -> jsonata.Jsonata:
     return parsed
 
 
-def _run(expression: str, document: Any, millis: Optional[int], bounds: tuple) -> Any:
+def _run(expression: str, document: Any, millis: int | None, bounds: tuple) -> Any:
     time_ms, depth, _ = bounds
     parsed = _parsed(expression)
     parsed.environment.set_runtime_bounds(time_ms, depth)
@@ -103,7 +104,7 @@ def _run(expression: str, document: Any, millis: Optional[int], bounds: tuple) -
 
 def answer(request: dict[str, Any], bounds: tuple) -> dict[str, Any]:
     """What one request answers: a value, undefined, or an error."""
-    document = request["document"] if "document" in request else None
+    document = request.get("document")
     try:
         value = _run(request["expression"], document, request.get("millis"), bounds)
         if value is _UNDEFINED:
@@ -131,7 +132,7 @@ def answer(request: dict[str, Any], bounds: tuple) -> dict[str, Any]:
             "replace": True,
             "transient": True,
         }
-    except Exception as error:  # noqa: BLE001 - every evaluation failure is one answer
+    except Exception as error:  # every evaluation failure is one answer
         return {"error": str(error) or type(error).__name__}
 
 

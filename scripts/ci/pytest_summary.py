@@ -86,9 +86,11 @@ def render(run: Run, title: str = "Backend tests") -> str:
             worker = next(iter(run.workers))
             out += [
                 "",
-                f"All {total} failures are on {worker}. That usually means one test left "
-                "its database connection in a bad state for the tests after it on that "
-                "worker: look at its first failure, not each one.",
+                (
+                    f"All {total} failures are on {worker}. That usually means one test left "
+                    "its database connection in a bad state for the tests after it on that "
+                    "worker: look at its first failure, not each one."
+                ),
             ]
     if run.failures:
         out += ["", "#### Failures", ""]

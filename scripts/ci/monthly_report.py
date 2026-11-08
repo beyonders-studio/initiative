@@ -26,7 +26,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from statistics import median
 
 API = "https://api.github.com"
@@ -52,13 +52,13 @@ VERSION_TAG = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 
 
 def parse_time(value: str) -> datetime:
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return datetime.fromisoformat(value)
 
 
 def month_bounds(month: str) -> tuple[datetime, datetime]:
     year, number = (int(part) for part in month.split("-"))
-    start = datetime(year, number, 1, tzinfo=timezone.utc)
-    end = datetime(year + number // 12, number % 12 + 1, 1, tzinfo=timezone.utc)
+    start = datetime(year, number, 1, tzinfo=UTC)
+    end = datetime(year + number // 12, number % 12 + 1, 1, tzinfo=UTC)
     return start, end
 
 
@@ -243,8 +243,10 @@ def report(repo: str, month: str) -> str:
     }
     if capped:
         lines += [
-            "> **Undercounted:** the runs API stops at 1,000 runs a query, "
-            f"and these weeks reached it: {', '.join(capped)}.",
+            (
+                "> **Undercounted:** the runs API stops at 1,000 runs a query, "
+                f"and these weeks reached it: {', '.join(capped)}."
+            ),
             "",
         ]
 

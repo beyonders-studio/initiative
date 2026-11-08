@@ -1,8 +1,7 @@
 """Resolution order, each community's mute and rows, and the quiet-hours
 window."""
 
-from datetime import datetime, timezone
-
+from datetime import UTC, datetime
 
 from app.core.notification_categories import Channel, NotificationCategory
 from app.services.platform.notification_prefs import (
@@ -148,7 +147,7 @@ def test_quiet_hours_needs_both_ends_and_a_real_span():
 
 
 def _at(hour: int, minute: int = 0) -> datetime:
-    return datetime(2026, 9, 9, hour, minute, tzinfo=timezone.utc)
+    return datetime(2026, 9, 9, hour, minute, tzinfo=UTC)
 
 
 def test_quiet_hours_wraps_overnight():

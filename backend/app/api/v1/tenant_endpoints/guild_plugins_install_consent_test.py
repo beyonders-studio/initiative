@@ -11,14 +11,14 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.messages import GuildPluginMessages, GuildMessages, MarketplaceMessages
+from app.core.messages import GuildMessages, GuildPluginMessages, MarketplaceMessages
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.services.tenant.initiatives import get_role_by_name
 from app.testing import (
-    create_plugin_service_registration,
     create_initiative,
     create_marketplace_listing,
+    create_plugin_service_registration,
     marketplace_uid,
     route_session_to_guild,
 )

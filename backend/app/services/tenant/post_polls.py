@@ -35,11 +35,13 @@ there to protect.
 """
 
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.orm import selectinload
-from sqlmodel import delete as sa_delete, select, update as sa_update
+from sqlmodel import delete as sa_delete
+from sqlmodel import select
+from sqlmodel import update as sa_update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db.advisory_locks import LockNamespace, advisory_lock
@@ -222,7 +224,7 @@ def write_poll(
     are, ids and all — which is also what makes "everything but the choices
     stays editable" true rather than merely permitted.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if poll is None:
         poll = PostPoll(post_id=post.id, created_at=now)
     poll.question = (data.question or "").strip() or None
@@ -253,7 +255,7 @@ async def cast_vote(
     await retract_vote(session, poll, user_id=user_id)
     if not chosen:
         return
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for option_id in chosen:
         session.add(
             PostPollVote(

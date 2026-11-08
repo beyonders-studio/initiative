@@ -13,7 +13,7 @@ There is nothing on the row to edit, so no UPDATE policy and no UPDATE grant:
 a row is (who, whom, when), and stopping is a delete.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import ConfigDict
 from sqlalchemy import (
@@ -54,6 +54,6 @@ class UserIgnore(SQLModel, table=True):
         )
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

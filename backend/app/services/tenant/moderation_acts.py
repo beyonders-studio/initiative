@@ -31,8 +31,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from fastapi import status
 from sqlalchemy import func
@@ -52,8 +51,8 @@ from app.core.reactions import ReactionTarget
 from app.core.search import SearchEntityType
 from app.core.tools import plural_of
 from app.db import cohorts
-from app.db.guild_standing import GuildContext
 from app.db.base import MODELS_BY_TABLE
+from app.db.guild_standing import GuildContext
 from app.db.query import paginated_query
 from app.db.request_context import SystemGuild
 from app.db.session import routed_guild_id, set_rls_context
@@ -71,7 +70,7 @@ class ActError(CodedError):
     """An act that can't be done, and why."""
 
 
-def may_moderate(context: GuildContext, initiative_id: Optional[int]) -> bool:
+def may_moderate(context: GuildContext, initiative_id: int | None) -> bool:
     """Whether this request is in ``initiative_id``'s moderation set: the
     community's admin, Full access in the initiative, or the platform under
     a ``moderate`` grant."""
@@ -147,7 +146,7 @@ async def is_held(guild_id: int, target_type: str, target_id: int) -> bool:
     return held is not None
 
 
-def platform_grant_id(context: Optional[GuildContext]) -> Optional[int]:
+def platform_grant_id(context: GuildContext | None) -> int | None:
     """The moderate grant the reader acts under, where they act for the
     platform rather than as one of the community's own moderators."""
     if context is None or not context.pam_moderate or context.grant is None:
@@ -162,10 +161,10 @@ def platform_grant_id(context: Optional[GuildContext]) -> Optional[int]:
 class Who:
     """Who did it, and on what grounds, for the log row."""
 
-    actor_id: Optional[int]
-    report_id: Optional[int] = None
-    hold_id: Optional[int] = None
-    via_grant_id: Optional[int] = None
+    actor_id: int | None
+    report_id: int | None = None
+    hold_id: int | None = None
+    via_grant_id: int | None = None
 
 
 #: The audit line an act the platform took writes beside its log row.
@@ -187,10 +186,10 @@ async def _record(
     initiative_id: int,
     target_type: str,
     target_id: int,
-    subject_user_id: Optional[int] = None,
-    reason: Optional[RemovalReason] = None,
-    note: Optional[str] = None,
-    snapshot: Optional[str] = None,
+    subject_user_id: int | None = None,
+    reason: RemovalReason | None = None,
+    note: str | None = None,
+    snapshot: str | None = None,
 ) -> ModerationAction:
     row = ModerationAction(
         initiative_id=initiative_id,
@@ -235,7 +234,7 @@ async def _record(
     return row
 
 
-def open_snapshot(action: ModerationAction) -> Optional[str]:
+def open_snapshot(action: ModerationAction) -> str | None:
     """The words a removal took down, for the moderation set."""
     if not action.snapshot:
         return None
@@ -251,7 +250,7 @@ def open_snapshot(action: ModerationAction) -> Optional[str]:
 
 async def _place(
     system: AsyncSession, row: HoldMixin, target_type: str, *, going: bool
-) -> tuple[Optional[tuple[str, int]], Optional[str]]:
+) -> tuple[tuple[str, int] | None, str | None]:
     """Where a notice about acting on ``row`` opens: what it is said on, or
     where it lived. Returns the thing to resolve the notice against, or, for
     a tool's own row that is going to the trash, the path to its list.
@@ -291,9 +290,9 @@ async def _place(
 async def _tell(
     system: AsyncSession,
     notification_type: NotificationType,
-    recipient: Optional[int],
+    recipient: int | None,
     *,
-    place: tuple[Optional[tuple[str, int]], Optional[str]],
+    place: tuple[tuple[str, int] | None, str | None],
     key: str,
     values: dict[str, str],
     data: dict[str, object],
@@ -344,7 +343,7 @@ async def remove_on(
     target_type: str,
     initiative_id: int,
     reason: RemovalReason,
-    note: Optional[str] = None,
+    note: str | None = None,
 ) -> Removed:
     """Take ``row`` down on ``system``, a session routed into its community
     as the platform. The caller commits.
@@ -381,7 +380,7 @@ async def remove_on(
             snapshot=words,
         )
         row.content = ""
-        row.removed_at = datetime.now(timezone.utc)
+        row.removed_at = datetime.now(UTC)
         row.removed_reason = reason.value
         row.removal_id = action.id
         system.add(row)
@@ -426,7 +425,7 @@ async def remove_on(
 
 
 async def _restore_on(
-    system: AsyncSession, removal: ModerationAction, who: Who, note: Optional[str]
+    system: AsyncSession, removal: ModerationAction, who: Who, note: str | None
 ) -> ModerationAction:
     from app.services.tenant import content_references
     from app.services.tenant.soft_delete import restore_entity
@@ -493,9 +492,9 @@ class ActRequest:
     target_type: str
     target_id: int
     #: For a removal.
-    reason: Optional[RemovalReason] = None
+    reason: RemovalReason | None = None
     #: Why, for the log; for a warning, what the member is told.
-    note: Optional[str] = None
+    note: str | None = None
 
 
 async def act(
@@ -505,7 +504,7 @@ async def act(
     guild_id: int,
     actor_id: int,
     request: ActRequest,
-    report_id: Optional[int] = None,
+    report_id: int | None = None,
 ) -> ModerationAction:
     """Do ``request``, as a moderator of the content's initiative.
 
@@ -590,7 +589,7 @@ async def act(
             if not locking and not locked:
                 raise ActError(ModerationMessages.NOT_LOCKED, status.HTTP_409_CONFLICT)
             row.comments_locked_at = (  # type: ignore[attr-defined]
-                datetime.now(timezone.utc) if locking else None
+                datetime.now(UTC) if locking else None
             )
             system.add(row)
             await system.flush()
@@ -684,7 +683,7 @@ async def restore(
     guild_id: int,
     actor_id: int,
     action_id: int,
-    note: Optional[str] = None,
+    note: str | None = None,
 ) -> ModerationAction:
     """Put back what removal ``action_id`` took down. Read on the moderator's
     own session, where the log is theirs to read; written as the platform."""
@@ -755,7 +754,7 @@ async def _standing(
 class LogEntry:
     action: ModerationAction
     #: The words a comment's removal took down.
-    snapshot: Optional[str]
+    snapshot: str | None
     #: Whether this removal is the one standing on its target, so restoring
     #: it is open.
     restorable: bool

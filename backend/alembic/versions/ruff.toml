@@ -1,0 +1,7 @@
+# A merged revision is never edited (AGENTS.md, "Never edit a migration"), so
+# the revisions keep the rules they were written under rather than following
+# ruff's default rule set as it grows.
+extend = "../../pyproject.toml"
+
+[lint]
+select = ["E4", "E7", "E9", "F", "G"]

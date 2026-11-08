@@ -9,11 +9,11 @@ What is read is already on the session row, in the account's own notices and
 in its held changes; nothing new is kept to answer it.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import Request
-from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import col, func, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.v1.platform_endpoints.session_opening import (
     current_session_row,
@@ -48,7 +48,7 @@ async def risky_session(
     system_session: AsyncSession, row: AuthSession, *, now: datetime | None = None
 ) -> bool:
     """Whether a change made on the session ``row`` is risky."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     if carries_passkey(row.amr):
         return False
     since = await signed_in_since(system_session, session_id=row.id)

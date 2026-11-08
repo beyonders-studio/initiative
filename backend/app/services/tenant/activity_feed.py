@@ -40,9 +40,9 @@ subscribers are told from (``subscription_notices``), read as each of them.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import BigInteger, DateTime, Integer, Text, bindparam, text
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -276,11 +276,11 @@ class FeedEntry:
     entity_type: str
     entity_id: int
     title: str
-    initiative_id: Optional[int]
-    initiative_name: Optional[str]
-    tool: Optional[str]
-    tool_id: Optional[int]
-    tool_title: Optional[str]
+    initiative_id: int | None
+    initiative_name: str | None
+    tool: str | None
+    tool_id: int | None
+    tool_title: str | None
     latest: datetime
     verbs: list[str]
     actors: list[MemberProfile]
@@ -290,9 +290,9 @@ class FeedEntry:
 async def readable_tools(
     session: AsyncSession,
     *,
-    initiative_id: Optional[int] = None,
-    tool: Optional[Tool] = None,
-    tool_id: Optional[int] = None,
+    initiative_id: int | None = None,
+    tool: Tool | None = None,
+    tool_id: int | None = None,
 ) -> dict[str, list[int]]:
     """The tools the reader can open, by kind, narrowed to one initiative or one
     tool where those are given: what the feed's scan is held to."""
@@ -323,11 +323,11 @@ def verb_params() -> dict[str, Any]:
 
 
 def query(
-    tools: dict[str, list[int]], *, reader_id: int, since: Optional[datetime] = None
+    tools: dict[str, list[int]], *, reader_id: int, since: datetime | None = None
 ) -> tuple[Any, dict]:
     """The candidates' statement over ``tools``, from ``since`` where that is
     inside the :data:`WINDOW`, and its parameters."""
-    start = datetime.now(timezone.utc) - WINDOW
+    start = datetime.now(UTC) - WINDOW
     params: dict[str, Any] = {
         "reader": reader_id,
         "since": max(since, start) if since else start,
@@ -346,7 +346,7 @@ def batch_query(txns: list[int], *, reader_id: int) -> tuple[Any, dict]:
     who did it (``verb:person:install``), newest first."""
     return _statement(None), {
         "reader": reader_id,
-        "since": datetime.now(timezone.utc) - WINDOW,
+        "since": datetime.now(UTC) - WINDOW,
         "txns": txns,
         **verb_params(),
     }
@@ -390,10 +390,10 @@ async def feed(
     *,
     reader_id: int,
     view: FeedView = FeedView.all,
-    initiative_id: Optional[int] = None,
-    tool: Optional[Tool] = None,
-    tool_id: Optional[int] = None,
-    since: Optional[datetime] = None,
+    initiative_id: int | None = None,
+    tool: Tool | None = None,
+    tool_id: int | None = None,
+    since: datetime | None = None,
     page: int = 1,
     page_size: int = PAGE_SIZE,
 ) -> tuple[list[FeedEntry], bool]:
@@ -424,7 +424,7 @@ async def feed(
             return Verb.commented.value in (row["verbs"] or ())
         return True
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     ranked = sorted(
         (row for row in rows if wanted(row)),
         key=lambda row: (

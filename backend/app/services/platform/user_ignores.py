@@ -13,7 +13,7 @@ as it was.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,8 +22,8 @@ from sqlmodel import col, func, select
 from app.db.query import build_paginated_response, paginated_query
 from app.models.platform.user_ignore import UserIgnore
 from app.models.platform.user_profile_view import user_profiles
-from app.services.platform import connections_stream
 from app.schemas.platform.dm import IgnoredAccountRead, IgnoredAccountsResponse
+from app.services.platform import connections_stream
 
 
 async def list_ignored(
@@ -81,7 +81,7 @@ async def add(session: AsyncSession, *, user_id: int, ignored_user_id: int) -> N
         .values(
             user_id=user_id,
             ignored_user_id=ignored_user_id,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         .on_conflict_do_nothing(index_elements=["user_id", "ignored_user_id"])
     )

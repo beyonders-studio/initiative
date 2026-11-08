@@ -67,7 +67,7 @@ def test_validate_number_accepts_int_float_and_string():
     defn = _make_definition(MetadataType.number)
 
     cols_int = _validate_value_for_type(defn, 10)
-    assert cols_int["value_number"] == Decimal("10")
+    assert cols_int["value_number"] == Decimal(10)
 
     cols_float = _validate_value_for_type(defn, 2.5)
     assert cols_float["value_number"] == Decimal("2.5")

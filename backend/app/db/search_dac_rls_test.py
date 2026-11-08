@@ -14,12 +14,10 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from app.testing import Actor
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.initiative import InitiativeRoleModel
 from app.models.tenant.search_entry import SearchEntry
-from app.testing import create_tag, create_task
-
+from app.testing import Actor, create_tag, create_task
 
 #: The ``acting_user`` fixture: called with role keywords, yields an actor.
 ActingUser = Callable[..., Awaitable[Actor]]

@@ -18,7 +18,7 @@ writes the guild's own schema: a tool's listing through that tool's importer
 (below), a plug-in through the guild's plug-in routes.
 """
 
-from typing import Annotated, List, Optional
+from typing import Annotated
 
 from fastapi import (
     APIRouter,
@@ -33,11 +33,14 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
 from app.api.deps import (
-    RLSSessionDep,
-    GuildContextDep,
     CurrentUser,
+    GuildContextDep,
+    RLSSessionDep,
 )
+from app.core.audit_events import AuditEventType
 from app.core.messages import ImportEngineMessages, MarketplaceMessages
+from app.core.user_display import handle_of
+from app.db import cohorts
 from app.db.query import build_paginated_response
 from app.db.session import routed_guild_id
 from app.models.platform.marketplace import MarketplaceListing
@@ -56,8 +59,13 @@ from app.schemas.platform.marketplace import (
     MarketplaceShareResult,
     serialize_listing_summary,
 )
+from app.services import audit as audit_service
 from app.services.marketplace import catalog as catalog_service
-from app.services.marketplace import plugin_entitlements, registration_lookup
+from app.services.marketplace import (
+    local_listings,
+    plugin_entitlements,
+    registration_lookup,
+)
 from app.services.marketplace.definitions import TOOL_LISTING_KINDS
 from app.services.marketplace.installs import (
     count_install,
@@ -65,26 +73,21 @@ from app.services.marketplace.installs import (
     listing_is_offered,
     resolve_listing_install,
 )
-from app.services.marketplace import local_listings
 from app.services.marketplace.listing_assets import (
     MAX_IMAGE_BYTES,
     MAX_LISTING_IMAGES,
     UploadedImageError,
     store_uploaded_image,
 )
-from app.services.tenant import guild_plugins as guild_plugins_service
-from app.services.tenant.attachments import FileTooLargeError, read_upload_bounded
 from app.services.marketplace.publish_profile import export_for_listing
 from app.services.marketplace.tool_listings import (
     example_is_generated,
     install_tool_listing,
     listing_example,
 )
-from app.core.audit_events import AuditEventType
-from app.core.user_display import handle_of
-from app.db import cohorts
-from app.services import audit as audit_service
 from app.services.platform import app_settings as app_settings_service
+from app.services.tenant import guild_plugins as guild_plugins_service
+from app.services.tenant.attachments import FileTooLargeError, read_upload_bounded
 
 router = APIRouter()
 
@@ -111,9 +114,9 @@ async def list_marketplace_listings(
     session: RLSSessionDep,
     current_user: CurrentUser,
     guild_context: GuildContextDep,
-    kind: Optional[ListingKind] = Query(default=None),  # type: ignore[valid-type]
-    search: Optional[str] = Query(default=None, max_length=200),
-    source: Optional[List[ListingSource]] = Query(default=None),  # type: ignore[valid-type]
+    kind: ListingKind | None = Query(default=None),  # type: ignore[valid-type]
+    search: str | None = Query(default=None, max_length=200),
+    source: list[ListingSource] | None = Query(default=None),  # type: ignore[valid-type]
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=24, ge=1, le=MAX_PAGE_SIZE),
 ) -> MarketplaceListingPage:
@@ -356,10 +359,10 @@ async def share_to_marketplace(
     entity_id: Annotated[int, Form()],
     name: Annotated[str, Form()],
     description: Annotated[str, Form()],
-    example_entity_id: Annotated[Optional[int], Form()] = None,
-    long_description: Annotated[Optional[str], Form()] = None,
-    release_notes: Annotated[Optional[str], Form()] = None,
-    listing_uid: Annotated[Optional[str], Form()] = None,
+    example_entity_id: Annotated[int | None, Form()] = None,
+    long_description: Annotated[str | None, Form()] = None,
+    release_notes: Annotated[str | None, Form()] = None,
+    listing_uid: Annotated[str | None, Form()] = None,
     images: Annotated[list[UploadFile], File()] = [],  # noqa: B006 — FastAPI reads the default, never mutates it
 ) -> MarketplaceShareResult:
     """Share an item from this community to the deployment's marketplace.

@@ -15,7 +15,6 @@ from app.core.messages import MarketplaceRegistryMessages as Codes
 from app.services.marketplace import tuf_registry
 from app.testing.tuf_repository import BASE_URL, TufRepository
 
-
 STATUS_URL = "/api/v1/marketplace/registry/status"
 SETTINGS_URL = "/api/v1/marketplace/registry/settings"
 REFRESH_URL = "/api/v1/marketplace/registry/refresh"

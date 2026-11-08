@@ -8,7 +8,7 @@ registered channels together.
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -151,14 +151,13 @@ async def test_delivery_reads_stamps_and_prunes_the_devices(session, monkeypatch
     is not sent to and is dropped too. The same value registered by another
     account is left alone. Each send carries the recipient's unread count."""
     from app.models.platform.push_token import PushToken
-    from app.services.platform import push_notifications, push_tokens
-    from app.testing import create_user
 
     # FCM's switch moved onto the settings row in 0368, so the gate is the
     # resolved config rather than the env var. Patched here instead of seeded
     # through the cache so this test still asserts only what it is about --
     # which devices are sent to and kept.
-    from app.services.platform import push_config
+    from app.services.platform import push_config, push_notifications, push_tokens
+    from app.testing import create_user
 
     async def _enabled():
         return push_config.ResolvedPushConfig(
@@ -219,7 +218,7 @@ async def test_delivery_reads_stamps_and_prunes_the_devices(session, monkeypatch
             session_id=sid,
         )
     recipient_id, bystander_id = recipient.id, bystander.id
-    for read_at in (None, None, datetime.now(timezone.utc)):
+    for read_at in (None, None, datetime.now(UTC)):
         session.add(
             Notification(
                 user_id=recipient_id,
@@ -259,7 +258,6 @@ async def test_access_token_is_reused_until_it_lapses(monkeypatch):
     from app.services.platform import push_config, push_notifications
 
     built: list[dict] = []
-    made: list["_Credentials"] = []
 
     class _Credentials:
         def __init__(self, info):
@@ -274,6 +272,7 @@ async def test_access_token_is_reused_until_it_lapses(monkeypatch):
             self.valid = True
             self.token = f"token-{len(built)}"
 
+    made: list[_Credentials] = []
     monkeypatch.setattr(
         push_notifications.service_account.Credentials,
         "from_service_account_info",

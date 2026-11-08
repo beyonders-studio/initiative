@@ -23,11 +23,15 @@ from sqlalchemy import func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.errors import CodedError
 from app.core.config import settings
+from app.core.errors import CodedError
+from app.core.user_display import name_here
+from app.core.user_input_validators import resolve_zone
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.models.platform.user import User
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
+from app.services.data_jobs import while_beating
+from app.services.export import limits as export_limits
 from app.services.export.contract import (
     RenderBackend,
     RenderedArtifact,
@@ -35,18 +39,13 @@ from app.services.export.contract import (
     RenderRequest,
 )
 from app.services.export.local_backend import LocalRenderBackend
+from app.services.import_engine.atlassian import HEARTBEAT_SECONDS
 from app.services.storage import (
     ReadableBlob,
     StorageBackend,
     blob_pieces,
     get_guild_storage,
 )
-from app.services.export import limits as export_limits
-from app.services.data_jobs import while_beating
-from app.services.import_engine.atlassian import HEARTBEAT_SECONDS
-from app.core.user_input_validators import resolve_zone
-from app.core.user_display import name_here
-
 
 #: Called once per rendered artifact, so a job can show it is still going.
 Heartbeat = Callable[[], Awaitable[None]]
@@ -259,9 +258,8 @@ async def _inline_with_stored(
             or "application/octet-stream",
             content=blob,
         )
-    handle = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
-    handle.close()
-    path = Path(handle.name)
+    with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as handle:
+        path = Path(handle.name)
     try:
         await _write_archive(request, path, _no_heartbeat)
     except BaseException:
@@ -413,9 +411,8 @@ async def _stream_zip_to_storage(
     # Same naming as the eager path so the download endpoint recovers the same
     # filename: `exports/{job_id}-{stem}.zip`, prefix stripped on the way out.
     key = f"exports/{job_id}-{stem}.zip"
-    handle = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
-    handle.close()
-    tmp_path = Path(handle.name)
+    with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as handle:
+        tmp_path = Path(handle.name)
     try:
         await _write_archive(request, tmp_path, heartbeat)
         size = tmp_path.stat().st_size

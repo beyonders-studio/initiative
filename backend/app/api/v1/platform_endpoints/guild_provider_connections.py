@@ -21,7 +21,7 @@ and written on the system engine (``guild_provider_connections`` and
 ``auth_providers`` carry no request-path grants).
 """
 
-from typing import Annotated, List
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.exc import IntegrityError
@@ -29,24 +29,23 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
     CommunityIdPath,
+    GuildContext,
     SeatSessionDep,
     SeatWriteSessionDep,
-    get_guild_seat_write_session,
-    require_surface_open,
-    GuildContext,
-    require_surface,
-    get_current_active_user,
     SystemSessionDep,
+    get_current_active_user,
+    get_guild_seat_write_session,
+    require_surface,
+    require_surface_open,
 )
 from app.core.audit_events import AuditEventType
 from app.core.guild_auth_options import CommunityAuthOption
 from app.core.messages import AuthProviderMessages, CustomRoleMessages
 from app.core.rules import SURFACE_CUSTOM_ROLES
-from app.models.tenant.custom_role import CustomRole, CustomRoleClaimRule
 from app.models.platform.guild import AdminSurface
 from app.models.platform.user import User
+from app.models.tenant.custom_role import CustomRole, CustomRoleClaimRule
 from app.schemas.platform.settings import (
-    ConnectableProviderRead,
     CommunityClaimRuleCreate,
     CommunityClaimRuleRead,
     CommunityClaimRulesResponse,
@@ -54,6 +53,7 @@ from app.schemas.platform.settings import (
     CommunityProviderConnectionCreate,
     CommunityProviderConnectionRead,
     CommunityProviderConnectionUpdate,
+    ConnectableProviderRead,
 )
 from app.schemas.tenant.custom_role import (
     CustomRoleClaimRuleCreate,
@@ -91,13 +91,13 @@ async def _require_connection_option(
 
 @router.get(
     "/{community_id}/auth/connections",
-    response_model=List[CommunityProviderConnectionRead],
+    response_model=list[CommunityProviderConnectionRead],
 )
 async def list_community_provider_connections(
     guild_id: CommunityIdPath,
     _guild_context: MembersContext,
     system_session: SystemSessionDep,
-) -> List[CommunityProviderConnectionRead]:
+) -> list[CommunityProviderConnectionRead]:
     await guild_entitlements.require_auth_option(
         system_session, guild_id, CommunityAuthOption.providers
     )
@@ -106,13 +106,13 @@ async def list_community_provider_connections(
 
 @router.get(
     "/{community_id}/auth/connections/available",
-    response_model=List[ConnectableProviderRead],
+    response_model=list[ConnectableProviderRead],
 )
 async def list_connectable_providers(
     guild_id: CommunityIdPath,
     _guild_context: MembersContext,
     system_session: SystemSessionDep,
-) -> List[ConnectableProviderRead]:
+) -> list[ConnectableProviderRead]:
     """The providers this community may choose from: the ones on offer, plus
     the ones it already connects to. Names only — a community picks a provider
     by name, and one registered for a single customer is nobody else's to
@@ -285,13 +285,13 @@ def _role_rule_read(rule: CustomRoleClaimRule) -> CustomRoleClaimRuleRead:
 
 @router.get(
     "/{community_id}/auth/role-rules",
-    response_model=List[CustomRoleClaimRuleRead],
+    response_model=list[CustomRoleClaimRuleRead],
 )
 async def list_custom_role_claim_rules(
     guild_id: CommunityIdPath,
     session: SeatSessionDep,
     system_session: SystemSessionDep,
-) -> List[CustomRoleClaimRuleRead]:
+) -> list[CustomRoleClaimRuleRead]:
     """Which custom role each group gives, in the order a sign-in reads them:
     the first rule whose group it carries decides. Kept in the community's own
     schema, beside the roles they name."""
@@ -358,7 +358,7 @@ async def create_custom_role_claim_rule(
 
 @router.put(
     "/{community_id}/auth/role-rules/order",
-    response_model=List[CustomRoleClaimRuleRead],
+    response_model=list[CustomRoleClaimRuleRead],
     dependencies=[_ROLE_RULES_OPEN],
 )
 async def order_custom_role_claim_rules(
@@ -367,7 +367,7 @@ async def order_custom_role_claim_rules(
     session: SeatWriteSessionDep,
     system_session: SystemSessionDep,
     current_user: CurrentUserDep,
-) -> List[CustomRoleClaimRuleRead]:
+) -> list[CustomRoleClaimRuleRead]:
     """Put the rules in a new order; it names every rule once."""
     await _require_connection_option(system_session, guild_id)
     if not await custom_roles_service.order_claim_rules(session, payload.rule_ids):

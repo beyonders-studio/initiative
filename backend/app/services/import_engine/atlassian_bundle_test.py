@@ -7,8 +7,8 @@ import pytest
 
 from app.services.import_engine.atlassian_bundle import BundleWriter, merge_people
 from app.services.import_engine.backup import read_manifest
-from app.services.import_engine.zip_bounds import open_zip
 from app.services.import_engine.jira_attachments import StoredImage
+from app.services.import_engine.zip_bounds import open_zip
 
 
 def test_somebody_in_both_products_is_asked_about_once():
@@ -77,9 +77,8 @@ async def test_files_are_written_as_they_arrive_and_listed_when_named(tmp_path):
 
 
 async def test_a_listed_file_that_never_arrived_is_refused():
-    with BundleWriter() as writer:
-        with pytest.raises(RuntimeError):
-            _finish(writer, images=[_stored("missing.png")])
+    with BundleWriter() as writer, pytest.raises(RuntimeError):
+        _finish(writer, images=[_stored("missing.png")])
 
 
 def test_an_unfinished_bundle_leaves_no_file_behind():

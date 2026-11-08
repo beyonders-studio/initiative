@@ -12,7 +12,7 @@ adds, and the audience a notice reaches.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from fastapi import HTTPException
@@ -20,29 +20,29 @@ from sqlalchemy import ColumnElement, delete
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 
-from app.core.errors import CodedError
 from app.api import resource_access
+from app.core.errors import CodedError
 from app.core.tools import Tool
 from app.db import session as db_session
 from app.db.guild_standing import GuildContext
 from app.db.request_context import Member
 from app.db.session import _RLS_CONTEXT_INFO_KEY
-from app.models.platform.guild import Guild, CommunityRole, CommunityStatus
+from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.platform.user import UserRole
 from app.models.tenant.calendar_event import CalendarEventAttendee
 from app.models.tenant.file import File
 from app.models.tenant.initiative import InitiativeMember
-from app.models.tenant.project import Project
 from app.models.tenant.metadata import MetadataType, MetadataValue
 from app.models.tenant.personal_item import PersonalItem
+from app.models.tenant.project import Project
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.models.tenant.task import TaskAssignee
 from app.services.permissions import (
     DAC_RESOURCES,
-    audience,
     TOOL_CAN,
     Action,
     actions_of,
+    audience,
     client_access,
     granted_scope_clause,
     listing_scope_clause,
@@ -223,7 +223,7 @@ async def _remove_from_initiative(session, initiative, user) -> None:
 
 async def _freeze(session, guild) -> None:
     guild.status = CommunityStatus.read_only.value
-    guild.status_changed_at = datetime.now(timezone.utc)
+    guild.status_changed_at = datetime.now(UTC)
     session.add(guild)
     await session.commit()
 
@@ -319,7 +319,7 @@ async def test_a_role_grant_elevates_over_a_users_own(
 
     role_id = await _role_id_of(session, w.initiative, w.co_member.user)
     await w.grant("read", user=w.co_member.user)
-    row, context = await w.as_reader(w.co_member.user)
+    row, _context = await w.as_reader(w.co_member.user)
     assert actions_of(row) == frozenset()
 
     await create_resource_grant(
@@ -803,7 +803,7 @@ async def test_leaving_the_community_takes_you_off_its_own_content(
             user_id=member_id,
             entity_type="project",
             entity_id=named["project"].id,
-            subscribed_at=datetime.now(timezone.utc),
+            subscribed_at=datetime.now(UTC),
         )
     )
     await session.commit()

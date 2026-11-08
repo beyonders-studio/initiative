@@ -11,21 +11,20 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.db import post_commit
-from app.models.platform.guild import GUILD_ADMIN_ROLES, GuildMembership, CommunityRole
-from app.services import audit as audit_service
-from app.services.auth import guild_provider_connections as guild_connections
-from app.services.guild_sweeps import Scope, each_guild
-from app.services.platform import provider_placement
-from app.services.platform import account_stream
-from app.services.platform import guilds as guilds_service
-from app.services.tenant import custom_roles as custom_roles_service
-from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
-from app.models.tenant.initiative import InitiativeMember, InitiativeRoleModel
+from app.models.platform.guild import GUILD_ADMIN_ROLES, CommunityRole, GuildMembership
 from app.models.platform.oidc_claim_mapping import (
     ClaimRuleAuthor,
     OIDCClaimMapping,
     OIDCMappingTargetType,
 )
+from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
+from app.models.tenant.initiative import InitiativeMember, InitiativeRoleModel
+from app.services import audit as audit_service
+from app.services.auth import guild_provider_connections as guild_connections
+from app.services.guild_sweeps import Scope, each_guild
+from app.services.platform import account_stream, provider_placement
+from app.services.platform import guilds as guilds_service
+from app.services.tenant import custom_roles as custom_roles_service
 
 logger = logging.getLogger(__name__)
 
@@ -204,11 +203,9 @@ async def sync_oidc_assignments(
             continue
         gid = mapping.guild_id
         role = mapping.guild_role
-        if gid not in guild_roles:
-            guild_roles[gid] = role
-        elif _GUILD_ROLE_PRIORITY.get(role, 0) > _GUILD_ROLE_PRIORITY.get(
-            guild_roles[gid], 0
-        ):
+        if gid not in guild_roles or _GUILD_ROLE_PRIORITY.get(
+            role, 0
+        ) > _GUILD_ROLE_PRIORITY.get(guild_roles[gid], 0):
             guild_roles[gid] = role
         if mapping.target_type == OIDCMappingTargetType.initiative:
             initiative_rules.setdefault(gid, []).append(mapping)

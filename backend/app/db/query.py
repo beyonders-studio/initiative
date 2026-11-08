@@ -21,8 +21,7 @@ from sqlalchemy import Select, and_, any_, asc, bindparam, desc, not_, or_
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.schemas.query import FilterCondition, FilterGroup, FilterOp, SortField, SortDir
-
+from app.schemas.query import FilterCondition, FilterGroup, FilterOp, SortDir, SortField
 
 # Hard limits to prevent abuse via oversized payloads.
 _MAX_CONDITIONS = 50

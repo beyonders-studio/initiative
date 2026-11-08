@@ -14,15 +14,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models.platform.guild import CommunityRole
 from app.models.platform.push_token import PushToken
 from app.models.platform.user import UserRole
-from app.services.platform import notification_policy, push_tokens
+from app.services.platform import notification_policy, push_tokens, rules
 from app.testing import (
     create_guild,
     create_user,
     get_auth_headers,
     guild_administration,
 )
-from app.services.platform import rules
-
 
 PLATFORM = "/api/v1/settings/notifications"
 

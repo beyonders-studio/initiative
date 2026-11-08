@@ -7,7 +7,6 @@ from app.services.import_engine import engine as import_engine
 from app.services.storage import LocalFilesystemStorage, S3Storage
 from app.services.storage_test import FakeS3Client
 
-
 _PAYLOAD = b"PK\x03\x04" + bytes(range(256)) * 600  # spans several read chunks
 
 

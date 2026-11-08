@@ -78,6 +78,40 @@ package = false
 # Ruff's default rules, plus the logging-format rules (arguments passed to the
 # logger rather than formatted into the message).
 extend-select = ["G"]
+ignore = [
+    # Where a failure must not spread (a sweep, a socket, an export's optional
+    # part), the app catches every exception on purpose and logs its type, not
+    # its text; BLE001, S110 and S112 flag exactly that.
+    "BLE001",
+    "S110",
+    "S112",
+    # A type check on decoded input (JSON, a form field) is invalid input, so it
+    # raises ValueError: pydantic validators and the parsers' callers catch that.
+    "TRY004",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Pydantic copies a field's default for each instance, so `tags: list[str] = []`
+# is not shared state. Ruff only recognises a model whose BaseModel base is in
+# the same file, and these subclass SanitizedBaseModel from app/schemas/base.py.
+"app/schemas/**" = ["RUF012"]
+"app/services/import_engine/{backup,contract}.py" = ["RUF012"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI declares where a parameter comes from as its default.
+extend-immutable-calls = [
+    "fastapi.Body",
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Header",
+    "fastapi.Path",
+    "fastapi.Query",
+    "fastapi.Security",
+    # Frozen dataclasses, so one default instance is safe to share.
+    "app.services.tenant.search.Filters",
+    "upgrade_from_release.Setup",
+]
 
 [tool.ty.rules]
 # Full default rule set is enforced (CI runs `scripts/ci/check ty`).

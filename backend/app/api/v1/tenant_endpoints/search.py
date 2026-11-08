@@ -12,7 +12,7 @@ kinds the install may read.
 
 from __future__ import annotations
 
-from typing import Annotated, List, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
@@ -20,15 +20,15 @@ from app.api.actor_route import ActorRoute
 from app.api.deps import (
     ActorContext,
     ActorSessionDep,
-    RLSSessionDep,
-    plugin_scope_checked,
-    get_current_active_user,
     GuildContextDep,
+    RLSSessionDep,
+    get_current_active_user,
+    plugin_scope_checked,
 )
 from app.core.references import parse_ref
 from app.core.search import SearchEntityType
-from app.db.plugin_rls import SEARCH_ENTRY_READ_SCOPE
 from app.db.guild_standing import InstallContext
+from app.db.plugin_rls import SEARCH_ENTRY_READ_SCOPE
 from app.db.search_index import entity_types
 from app.models.platform.user import User
 from app.schemas.tenant.search import SearchResults, SearchSuggestion
@@ -75,16 +75,14 @@ async def search_community(
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
     search: str = Query(description="What to search for.", max_length=1000),
-    types: Optional[List[SearchEntityType]] = Query(
+    types: list[SearchEntityType] | None = Query(
         default=None, description=_TYPE_DESCRIPTION
     ),
-    initiative_id: Optional[int] = Query(
+    initiative_id: int | None = Query(
         default=None, description="Restrict to one initiative."
     ),
     include_archived: bool = Query(default=False, description=_ARCHIVED_DESCRIPTION),
-    is_template: Optional[bool] = Query(
-        default=None, description=_TEMPLATE_DESCRIPTION
-    ),
+    is_template: bool | None = Query(default=None, description=_TEMPLATE_DESCRIPTION),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=search_service.MAX_PAGE_SIZE),
 ) -> SearchResults:
@@ -107,23 +105,21 @@ async def search_community(
     )
 
 
-@router.get("/recent", response_model=List[SearchSuggestion])
+@router.get("/recent", response_model=list[SearchSuggestion])
 async def recent_community(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-    types: Optional[List[SearchEntityType]] = Query(
+    types: list[SearchEntityType] | None = Query(
         default=None, description=_TYPE_DESCRIPTION
     ),
-    initiative_id: Optional[int] = Query(
+    initiative_id: int | None = Query(
         default=None, description="Restrict to one initiative."
     ),
-    is_template: Optional[bool] = Query(
-        default=None, description=_TEMPLATE_DESCRIPTION
-    ),
-    subject: Optional[str] = Query(default=None, description=_SUBJECT_DESCRIPTION),
+    is_template: bool | None = Query(default=None, description=_TEMPLATE_DESCRIPTION),
+    subject: str | None = Query(default=None, description=_SUBJECT_DESCRIPTION),
     limit: int = Query(default=search_service.SUGGEST_LIMIT, ge=1),
-) -> List[SearchSuggestion]:
+) -> list[SearchSuggestion]:
     """What a picker offers before anything has been typed.
 
     The most recently changed things the caller could name, taking the same
@@ -143,23 +139,21 @@ async def recent_community(
     )
 
 
-@router.get("/suggest", response_model=List[SearchSuggestion])
+@router.get("/suggest", response_model=list[SearchSuggestion])
 async def suggest_community(
     session: ActorSessionDep,
     guild_context: SuggestByEntityType,
     search: str = Query(description="What to jump to.", max_length=200),
-    types: Optional[List[SearchEntityType]] = Query(
+    types: list[SearchEntityType] | None = Query(
         default=None, description=_TYPE_DESCRIPTION
     ),
-    initiative_id: Optional[int] = Query(
+    initiative_id: int | None = Query(
         default=None, description="Restrict to one initiative."
     ),
-    is_template: Optional[bool] = Query(
-        default=None, description=_TEMPLATE_DESCRIPTION
-    ),
-    subject: Optional[str] = Query(default=None, description=_SUBJECT_DESCRIPTION),
+    is_template: bool | None = Query(default=None, description=_TEMPLATE_DESCRIPTION),
+    subject: str | None = Query(default=None, description=_SUBJECT_DESCRIPTION),
     limit: int = Query(default=search_service.SUGGEST_LIMIT, ge=1),
-) -> List[SearchSuggestion]:
+) -> list[SearchSuggestion]:
     """Titles for the command palette — a way to reach one thing quickly.
 
     Takes the same ``types`` as the search itself, so the palette and the

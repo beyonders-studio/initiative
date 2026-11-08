@@ -17,7 +17,6 @@ from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.services import ai_settings as ai_settings_service
 from app.testing import billing_boundary, billing_guild_ref
 
-
 PLATFORM_MODE = "/api/v1/settings/ai/platform/mode"
 PLATFORM_CONNS = "/api/v1/settings/ai/platform/connections"
 

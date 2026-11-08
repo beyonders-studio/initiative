@@ -9,6 +9,7 @@ back).
 
 from datetime import datetime
 from types import SimpleNamespace
+
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 

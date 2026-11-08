@@ -66,8 +66,8 @@ It is written on the system engine by ``plugins.manage`` (owner) endpoints, by
 boot reconciliation from ``PLUGIN_SERVICES_CONFIG``, and by listing applies.
 """
 
-from datetime import datetime, timezone
-from typing import List, Optional, Protocol
+from datetime import UTC, datetime
+from typing import Protocol
 
 from pydantic import ConfigDict
 from sqlalchemy import (
@@ -90,9 +90,9 @@ __all__ = [
     "IMAGE_REFERENCE_MAX_LENGTH",
     "LISTING_STATED_FIELDS",
     "MAX_PLUGIN_ID_LENGTH",
+    "BrowserAddressed",
     "PluginServiceRegistration",
     "RegistrationKind",
-    "BrowserAddressed",
     "RegistrationSource",
     "browser_base",
     "registration_live_sql",
@@ -139,7 +139,7 @@ class RegistrationSource:
 def registration_live_sql(
     registration: str = "plugin_service_registrations",
     publisher: str = "publishers",
-    community: Optional[str] = None,
+    community: str | None = None,
 ) -> str:
     """Whether a registration is live, as a SQL boolean over one registration
     row and its publisher's row, named by ``registration`` and ``publisher``.
@@ -183,7 +183,7 @@ class PluginServiceRegistration(SQLModel, table=True):
     __allow_unmapped__ = True
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     # '<publisher>.<slug>', matching the listing's public_id. Unique: one
     # registration per plug-in per deployment.
     public_id: str = Field(
@@ -192,7 +192,7 @@ class PluginServiceRegistration(SQLModel, table=True):
     # The catalog uid of the listing this registration's plug-in facts come from,
     # written by that listing's apply. Null until the listing arrives; such a
     # row reaches no install.
-    listing_uid: Optional[str] = Field(
+    listing_uid: str | None = Field(
         default=None, sa_column=Column(String(14), nullable=True, index=True)
     )
     # The publisher the public_id's prefix names.
@@ -208,19 +208,19 @@ class PluginServiceRegistration(SQLModel, table=True):
     # hang off it, and a ``jwks_uri`` must share its origin. Every consumer of
     # this column is Initiative's own server calling the plug-in. NULL until the
     # operator places it, and not live until they do.
-    base_url: Optional[str] = Field(
+    base_url: str | None = Field(
         default=None, sa_column=Column(String(1000), nullable=True)
     )
     # Base of the service's browser surface: the iframe a page opens in and the
     # page a member is sent to for an interactive connection. Unset means the
     # plug-in answers both surfaces at one address, which is the ordinary case and
     # what every registration written before this column existed says.
-    page_origin: Optional[str] = Field(
+    page_origin: str | None = Field(
         default=None, sa_column=Column(String(1000), nullable=True)
     )
     # Origins this plug-in's pages may be framed from and postMessage'd
     # to. Defaults to the browser base's own origin.
-    allowed_origins: List[str] = Field(
+    allowed_origins: list[str] = Field(
         default_factory=list,
         sa_column=Column(JSONB, nullable=False, server_default="[]"),
     )
@@ -230,16 +230,16 @@ class PluginServiceRegistration(SQLModel, table=True):
     # replacement alongside the current entry while JWTs signed by the first
     # drain out; every entry carries a ``kid``, which is what a JWT names.
     # Public keys only. Null on a plug-in that has not been provisioned with one.
-    jwks: Optional[dict] = Field(default=None, sa_column=Column(JSONB, nullable=True))
+    jwks: dict | None = Field(default=None, sa_column=Column(JSONB, nullable=True))
     # Where the plug-in publishes that key set instead, on ``base_url``'s own
     # origin over https. Fetched and cached for a minute; either or both may
     # be set, and a key found in either verifies.
-    jwks_uri: Optional[str] = Field(
+    jwks_uri: str | None = Field(
         default=None, sa_column=Column(String(1000), nullable=True)
     )
     # The most an install of this plug-in may be granted (see module docstring),
     # from its listing. Only scopes ``app.core.plugin_scopes`` defines are kept.
-    scope_ceiling: List[str] = Field(
+    scope_ceiling: list[str] = Field(
         default_factory=list,
         sa_column=Column(ARRAY(Text), nullable=False, server_default=text("'{}'")),
     )
@@ -275,7 +275,7 @@ class PluginServiceRegistration(SQLModel, table=True):
     )
     # The container image its listing names, pinned by digest
     # (``<repository>@sha256:<hex>``). NULL when the listing names none.
-    image_digest: Optional[str] = Field(
+    image_digest: str | None = Field(
         default=None,
         sa_column=Column(String(IMAGE_REFERENCE_MAX_LENGTH), nullable=True),
     )
@@ -283,9 +283,7 @@ class PluginServiceRegistration(SQLModel, table=True):
     # beside Initiative: ``{"service": <YAML text>, "base_url": <address on
     # the Compose network>}``, its placeholders unfilled. NULL when the listing
     # carries none.
-    compose: Optional[dict] = Field(
-        default=None, sa_column=Column(JSONB, nullable=True)
-    )
+    compose: dict | None = Field(default=None, sa_column=Column(JSONB, nullable=True))
     # What the operator supplies for the plug-in's vendor client, by the key the
     # listing's manifest declares under ``vendor``. Every value is a Fernet
     # ciphertext under ``SALT_PLUGIN_VENDOR``, secret or not.
@@ -300,12 +298,12 @@ class PluginServiceRegistration(SQLModel, table=True):
     )
     # The keys the listing's manifest marks required, kept in step whenever the
     # registration or its listing is written.
-    vendor_required: List[str] = Field(
+    vendor_required: list[str] = Field(
         default_factory=list,
         sa_column=Column(ARRAY(Text), nullable=False, server_default=text("'{}'")),
     )
     # Whether every required key holds a value. Computed by the database.
-    vendor_ready: Optional[bool] = Field(
+    vendor_ready: bool | None = Field(
         default=None,
         sa_column=Column(
             Boolean,
@@ -314,11 +312,11 @@ class PluginServiceRegistration(SQLModel, table=True):
         ),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
@@ -331,7 +329,7 @@ class BrowserAddressed(Protocol):
     """
 
     base_url: str
-    page_origin: Optional[str]
+    page_origin: str | None
 
 
 def browser_base(registration: BrowserAddressed) -> str:

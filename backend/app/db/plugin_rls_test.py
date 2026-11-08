@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from sqlmodel import SQLModel
 
-from app.db import base  # noqa: F401  # populates SQLModel.metadata with every table
 from app.core.plugin_scopes import PluginScopeResource
+from app.db import base  # noqa: F401  # populates SQLModel.metadata with every table
 from app.db.plugin_rls import PLUGIN_TABLE_ACCESS, PluginTableKind
 from app.db.tenancy import GUILD_SCOPED_TABLES
 

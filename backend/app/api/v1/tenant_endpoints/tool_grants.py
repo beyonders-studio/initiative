@@ -33,7 +33,7 @@ on the resource, with the tool's write scope beside the sharing scope
 # stringized annotations re-evaluate it where that local is out of scope.
 
 from enum import Enum
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Path
 
@@ -43,10 +43,10 @@ from app.api.deps import (
     ActorContext,
     ActorSessionDep,
     ActorUserDep,
-    RLSSessionDep,
-    plugin_scope,
-    get_current_active_user,
     GuildContextDep,
+    RLSSessionDep,
+    get_current_active_user,
+    plugin_scope,
 )
 from app.api.v1.tenant_endpoints.tool_lists import TOOL_LISTS, ToolListSpec
 from app.core.tools import Tool
@@ -79,7 +79,7 @@ def _mount(
         session: Any,
         entity_id: int,
         grants: list[ResourceGrantSchema],
-        current_user: Optional[User],
+        current_user: User | None,
         guild_context: ActorContext,
     ):
         await resource_access.set_resource_grants(

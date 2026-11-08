@@ -19,30 +19,30 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 
+from app.core.file_types import FileType
 from app.core.tools import Tool
-from app.db.plugin_rls import PLUGIN_REFUSED_TABLES, PLUGIN_TABLE_ACCESS
 from app.db.authorization import IN_POLICY
 from app.db.guild_ddl import PLUGIN_POLICY_TABLES, render_guild_rls_ddl
 from app.db.install_standing_test import (
     _install,
     _route,
 )
+from app.db.plugin_rls import PLUGIN_REFUSED_TABLES, PLUGIN_TABLE_ACCESS
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.comment import Comment
-from app.core.file_types import FileType
 from app.models.tenant.file import File
 from app.models.tenant.initiative import InitiativeMember
 from app.models.tenant.project import Project
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.models.tenant.tag import Tag
 from app.testing import (
-    create_resource_grant,
     create_calendar,
     create_calendar_event,
     create_comment,
     create_file,
+    create_resource_grant,
     create_tag,
     route_as,
     route_session_to_guild,
@@ -57,7 +57,7 @@ _INSTALL_LEG = IN_POLICY.install_id
 
 _POLICY = re.compile(
     r"^CREATE POLICY (\w+) ON (\w+) AS (PERMISSIVE|RESTRICTIVE) FOR (\w+)\n  (.*?);$",
-    re.M | re.S,
+    re.MULTILINE | re.DOTALL,
 )
 
 

@@ -1,11 +1,10 @@
 from datetime import datetime
-from typing import Any, List
+from typing import Any
 
 from pydantic import AliasChoices, ConfigDict, Field
 
-from app.schemas.base import SanitizedBaseModel
-
 from app.models.platform.notification import NotificationType
+from app.schemas.base import SanitizedBaseModel
 
 
 class NotificationRead(SanitizedBaseModel):
@@ -51,7 +50,7 @@ class NotificationAlertRead(SanitizedBaseModel):
 class NotificationListResponse(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    notifications: List[NotificationRead]
+    notifications: list[NotificationRead]
     #: Every unread notification the reader has, on the first page; null on
     #: the pages after it.
     unread_count: int | None = None
@@ -84,7 +83,7 @@ class UnreadPlacesResponse(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    places: List[NotificationPlace]
+    places: list[NotificationPlace]
 
 
 class SubjectReadRequest(SanitizedBaseModel):
@@ -101,7 +100,7 @@ class SubjectReadResponse(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     #: The comments the read lines named.
-    comment_ids: List[int]
+    comment_ids: list[int]
     #: Where a rolled-up comment line began: every comment after it by somebody
     #: else was unread. Null when no such line was.
     since: datetime | None = None

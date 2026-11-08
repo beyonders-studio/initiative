@@ -24,8 +24,8 @@ therefore serve any number of subscribers, and retention is a plain age sweep.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import (
     BigInteger,
@@ -51,7 +51,7 @@ ACTIONS = (ACTION_CREATED, ACTION_UPDATED, ACTION_DELETED)
 class EventOutbox(SQLModel, table=True):
     __tablename__ = "event_outbox"
 
-    id: Optional[int] = Field(
+    id: int | None = Field(
         default=None,
         sa_column=Column(BigInteger, primary_key=True, autoincrement=True),
     )
@@ -62,7 +62,7 @@ class EventOutbox(SQLModel, table=True):
     txn_id: int = Field(sa_column=Column(BigInteger, nullable=False, index=True))
 
     occurred_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False, index=True),
     )
 
@@ -77,7 +77,7 @@ class EventOutbox(SQLModel, table=True):
     # longer exists resolves to guild-admin-only).
     #
     # actor_user_id is NULL for a system-attributed write (background jobs).
-    actor_user_id: Optional[int] = Field(
+    actor_user_id: int | None = Field(
         default=None,
         sa_column=Column(Integer, nullable=True),
     )
@@ -87,7 +87,7 @@ class EventOutbox(SQLModel, table=True):
     # a plug-in leaves its history in place. Set independently of actor_user_id,
     # so a plug-in acting as its community names no person, and one acting for a
     # member names both.
-    actor_install_id: Optional[int] = Field(
+    actor_install_id: int | None = Field(
         default=None,
         sa_column=Column(Integer, nullable=True),
     )
@@ -98,7 +98,7 @@ class EventOutbox(SQLModel, table=True):
     # disclosure for a row every member can already read. The trigger only
     # writes NULL where a registry says to; an initiative-scoped row whose
     # lookup fails is skipped instead.
-    initiative_id: Optional[int] = Field(
+    initiative_id: int | None = Field(
         default=None,
         sa_column=Column(Integer, nullable=True, index=True),
     )
@@ -135,7 +135,5 @@ class EventOutbox(SQLModel, table=True):
     # capture trigger, like the pair a search entry carries, so the read policy
     # asks a person's sharing without walking the chain. NULL for a change that
     # sits under no tool (a tag), which answers to the initiative gate alone.
-    dac_tool: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
-    dac_id: Optional[int] = Field(
-        default=None, sa_column=Column(Integer, nullable=True)
-    )
+    dac_tool: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    dac_id: int | None = Field(default=None, sa_column=Column(Integer, nullable=True))

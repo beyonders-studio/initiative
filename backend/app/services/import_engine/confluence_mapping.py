@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import quote
 
 from app.services.import_engine.confluence_attachments import (
@@ -41,13 +41,13 @@ class SourcePage:
 
     id: str
     title: str
-    parent_id: Optional[str]
-    position: Optional[int]
+    parent_id: str | None
+    position: int | None
     #: The storage-format body. ``None`` for a folder, which has none.
-    body: Optional[str]
-    author_id: Optional[str] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    body: str | None
+    author_id: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
     labels: tuple[str, ...] = ()
 
     @property
@@ -62,12 +62,12 @@ class SourceComment:
     id: str
     #: The storage-format body.
     body: str
-    parent_id: Optional[str] = None
-    author_id: Optional[str] = None
-    created_at: Optional[str] = None
+    parent_id: str | None = None
+    author_id: str | None = None
+    created_at: str | None = None
     #: The words an inline comment was anchored to, quoted above it — the
     #: wiki's comments sit under the page rather than beside a sentence.
-    selection: Optional[str] = None
+    selection: str | None = None
     #: An inline comment somebody marked resolved: the discussion is over.
     resolved: bool = False
 
@@ -100,7 +100,7 @@ class MappedSpace:
     comments: int = 0
 
 
-def read_page(raw: Any, labels: tuple[str, ...] = ()) -> Optional[SourcePage]:
+def read_page(raw: Any, labels: tuple[str, ...] = ()) -> SourcePage | None:
     """A v2 page object as a :class:`SourcePage`, or ``None`` if it is not
     one — the site's data is somebody else's, and a malformed row is skipped
     rather than trusted."""
@@ -129,7 +129,7 @@ def read_page(raw: Any, labels: tuple[str, ...] = ()) -> Optional[SourcePage]:
     )
 
 
-def read_folder(raw: Any) -> Optional[SourcePage]:
+def read_folder(raw: Any) -> SourcePage | None:
     """A v2 folder object as a body-less :class:`SourcePage`."""
     if not isinstance(raw, dict):
         return None
@@ -148,9 +148,7 @@ def read_folder(raw: Any) -> Optional[SourcePage]:
     )
 
 
-def read_comment(
-    raw: Any, *, parent_id: Optional[str] = None
-) -> Optional[SourceComment]:
+def read_comment(raw: Any, *, parent_id: str | None = None) -> SourceComment | None:
     """A v2 footer or inline comment as a :class:`SourceComment`, or ``None``
     for one that is malformed or has nothing in it."""
     if not isinstance(raw, dict):
@@ -215,10 +213,10 @@ def build_wiki_envelope(
     users: dict[str, str],
     site_url: str,
     app_version: str,
-    max_bytes: Optional[int] = None,
-    media: Optional[dict[str, PageMedia]] = None,
+    max_bytes: int | None = None,
+    media: dict[str, PageMedia] | None = None,
     files_allowed: bool = True,
-    comments: Optional[dict[str, list[SourceComment]]] = None,
+    comments: dict[str, list[SourceComment]] | None = None,
 ) -> MappedSpace:
     """The space's pages as one wiki envelope.
 
@@ -236,7 +234,7 @@ def build_wiki_envelope(
     """
     space_key = str(space.get("key") or "").strip()
     by_id = {page.id: page for page in pages}
-    children: dict[Optional[str], list[SourcePage]] = {}
+    children: dict[str | None, list[SourcePage]] = {}
     for page in pages:
         parent = page.parent_id if page.parent_id in by_id else None
         children.setdefault(parent, []).append(page)
@@ -247,7 +245,7 @@ def build_wiki_envelope(
     ordered: list[SourcePage] = []
     seen: set[str] = set()
 
-    def walk(parent: Optional[str]) -> None:
+    def walk(parent: str | None) -> None:
         for page in children.get(parent, []):
             if page.id in seen:
                 continue
@@ -271,7 +269,7 @@ def build_wiki_envelope(
         taken.add(slugs[page.id])
     slug_by_title = {page.title.casefold(): slugs[page.id] for page in ordered}
 
-    def resolve_page(title: str, key: Optional[str]) -> Optional[PageTarget]:
+    def resolve_page(title: str, key: str | None) -> PageTarget | None:
         if key and key != space_key:
             return PageTarget(url=page_url(site_url, key, title))
         slug = slug_by_title.get(title.strip().casefold())
@@ -282,7 +280,7 @@ def build_wiki_envelope(
     mapped = MappedSpace(envelope={})
     envelope_pages: list[dict[str, Any]] = []
     budget = max_bytes
-    positions: Counter[Optional[str]] = Counter()
+    positions: Counter[str | None] = Counter()
     for page in ordered:
         parent = page.parent_id if page.parent_id in by_id else None
         position = positions[parent]
@@ -405,7 +403,7 @@ def _thread_order(comments: list[SourceComment]) -> list[SourceComment]:
     a reply is written after what it answers. A reply to something that did
     not come stands at the top of the thread."""
     known = {comment.id for comment in comments}
-    replies: dict[Optional[str], list[SourceComment]] = {}
+    replies: dict[str | None, list[SourceComment]] = {}
     for comment in comments:
         parent = comment.parent_id if comment.parent_id in known else None
         replies.setdefault(parent, []).append(comment)
@@ -415,7 +413,7 @@ def _thread_order(comments: list[SourceComment]) -> list[SourceComment]:
     ordered: list[SourceComment] = []
     seen: set[str] = set()
 
-    def walk(parent: Optional[str]) -> None:
+    def walk(parent: str | None) -> None:
         for comment in replies.get(parent, []):
             if comment.id in seen:
                 continue
@@ -545,7 +543,7 @@ def _is_blank(content: dict[str, Any]) -> bool:
     )
 
 
-def _description(space: dict[str, Any]) -> Optional[str]:
+def _description(space: dict[str, Any]) -> str | None:
     description = space.get("description")
     plain = description.get("plain") if isinstance(description, dict) else None
     value = plain.get("value") if isinstance(plain, dict) else None
@@ -553,19 +551,19 @@ def _description(space: dict[str, Any]) -> Optional[str]:
     return text or None
 
 
-def _id(value: Any) -> Optional[str]:
+def _id(value: Any) -> str | None:
     if isinstance(value, bool) or value is None:
         return None
     text = str(value).strip()
     return text if text.isdigit() else None
 
 
-def _position(value: Any) -> Optional[int]:
+def _position(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     return int(value)
 
 
-def _text(value: Any) -> Optional[str]:
+def _text(value: Any) -> str | None:
     text = str(value).strip() if isinstance(value, str) else ""
     return text or None

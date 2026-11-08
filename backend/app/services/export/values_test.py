@@ -1,6 +1,6 @@
 """How export cells write a plug-in field's value and a moment."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 from app.models.tenant.metadata import MetadataType
@@ -31,7 +31,7 @@ def test_a_plug_in_value_is_written_as_the_page_draws_its_kind():
 
 
 def test_a_moment_keeps_its_time_in_the_readers_zone():
-    noon = datetime(2026, 10, 20, 19, 30, tzinfo=timezone.utc)
+    noon = datetime(2026, 10, 20, 19, 30, tzinfo=UTC)
     assert moment(noon, "America/Los_Angeles") == "2026-10-20 12:30 PDT"
     assert moment("2026-10-20T19:30:00+00:00", None) == "2026-10-20 19:30 UTC"
     signed = SimpleNamespace(

@@ -13,16 +13,16 @@ Capability and ownership checks happen at the endpoint as well.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from datetime import datetime, timedelta
-from typing import Optional, Sequence, cast
+from typing import cast
 
 from fastapi import status
-from sqlalchemy import or_, update as sa_update
+from sqlalchemy import or_
+from sqlalchemy import update as sa_update
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.errors import CodedError
-from app.core.messages import AccessGrantMessages
 from app.core.capabilities import (
     ROLE_MAX_GRANT_MINUTES,
     Capability,
@@ -30,10 +30,14 @@ from app.core.capabilities import (
     may_hold_grant,
     roles_with_capability,
 )
+from app.core.clock import utcnow
+from app.core.email_i18n import translate
+from app.core.errors import CodedError
 from app.core.login_methods import LoginMethod
+from app.core.messages import AccessGrantMessages
+from app.core.user_display import handle_of
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.query import paginated_query
-from app.core.email_i18n import translate
 from app.models.platform.access_grant import (
     LEVEL_LABEL_KEYS,
     AccessGrant,
@@ -42,23 +46,20 @@ from app.models.platform.access_grant import (
     AccessLevel,
     CommunityNotice,
 )
-from app.models.platform.guild import Guild, CommunityStatus
+from app.models.platform.guild import CommunityStatus, Guild
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User, UserRole, UserStatus
 from app.models.platform.user_passkey import UserPasskey
 from app.models.platform.user_totp import UserTotp
-from app.schemas.platform.user import UserIdentity
 from app.schemas.platform.access_grant import (
     AccessGrantCreate,
     AccessGrantRead,
     BreakGlassCreate,
 )
+from app.schemas.platform.user import UserIdentity
 from app.services import email as email_service
-from app.services.platform import auth_posture, grant_cases
+from app.services.platform import auth_posture, grant_cases, notice_outbox
 from app.services.platform import guilds as guilds_service
-from app.services.platform import notice_outbox
-from app.core.user_display import handle_of
-from app.core.clock import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ def max_minutes_for_role(role: UserRole) -> int:
     return min(role_cap, MAX_DURATION_MINUTES)
 
 
-def _capped_duration(requested: Optional[int], role: UserRole) -> int:
+def _capped_duration(requested: int | None, role: UserRole) -> int:
     """Resolve a requested duration for a grantee of ``role`` to the effective
     one, or raise if it exceeds that role's maximum."""
     cap = max_minutes_for_role(role)
@@ -108,7 +109,7 @@ def break_glass_max_minutes(role: UserRole) -> int:
     return min(max_minutes_for_role(role), BREAK_GLASS_MAX_MINUTES)
 
 
-def _break_glass_duration(requested: Optional[int], role: UserRole) -> int:
+def _break_glass_duration(requested: int | None, role: UserRole) -> int:
     """Resolve a break-glass window against ``break_glass_max_minutes``.
     Defaults to ``BREAK_GLASS_DEFAULT_MINUTES``."""
     cap = break_glass_max_minutes(role)
@@ -151,9 +152,9 @@ async def _tell(
     lines: Sequence[dict],
     push_key: str,
     email_event: str,
-    guild_name: Optional[str],
-    levels: Optional[Sequence[str]] = None,
-    requester: Optional[str] = None,
+    guild_name: str | None,
+    levels: Sequence[str] | None = None,
+    requester: str | None = None,
 ) -> None:
     """Write down a PAM event for ``recipient``: a bell line for each of
     ``lines``, with one push and one email riding the first.
@@ -387,7 +388,7 @@ async def break_glass(
     purpose: AccessGrantPurpose = AccessGrantPurpose.content,
     level: str,
     community_notice: CommunityNotice = CommunityNotice.none,
-    issued_at: Optional[datetime] = None,
+    issued_at: datetime | None = None,
 ) -> AccessGrant:
     """Self-issue a time-bound break-glass grant for ``actor`` to one guild.
 
@@ -536,7 +537,7 @@ async def reconcile_break_glass_pair(
     return replaced
 
 
-async def get_grant(session: AsyncSession, grant_id: int) -> Optional[AccessGrant]:
+async def get_grant(session: AsyncSession, grant_id: int) -> AccessGrant | None:
     return await session.get(AccessGrant, grant_id)
 
 
@@ -545,7 +546,7 @@ async def approve(
     *,
     grant: AccessGrant,
     approver: User,
-    duration_minutes: Optional[int] = None,
+    duration_minutes: int | None = None,
 ) -> AccessGrant:
     if grant.status != AccessGrantStatus.pending.value:
         raise AccessGrantError(AccessGrantMessages.NOT_PENDING)
@@ -702,7 +703,7 @@ async def get_live_grant(
     user_id: int,
     guild_id: int,
     purpose: AccessGrantPurpose = AccessGrantPurpose.content,
-) -> Optional[AccessGrant]:
+) -> AccessGrant | None:
     """Return the user's currently-live grant of ``purpose`` for ``guild_id``,
     if any — content unless another is named."""
     grants = await get_live_grants(session, user_id=user_id, guild_id=guild_id)
@@ -712,8 +713,8 @@ async def get_live_grant(
 async def list_grants(
     session: AsyncSession,
     *,
-    user_id: Optional[int] = None,
-    statuses: Optional[list[str]] = None,
+    user_id: int | None = None,
+    statuses: list[str] | None = None,
     live_only: bool = False,
     page: int = 1,
     page_size: int = 50,
@@ -824,7 +825,7 @@ async def _enrichment(
 
 
 async def to_read(
-    grants: list[AccessGrant], *, system_session: Optional[AsyncSession] = None
+    grants: list[AccessGrant], *, system_session: AsyncSession | None = None
 ) -> list[AccessGrantRead]:
     """Serialize grants, batch-loading display enrichment (user/guild names)
     and the case each serves.
@@ -882,20 +883,20 @@ async def to_read(
 
 __all__ = [
     "AccessGrantError",
-    "request_grants",
-    "break_glass",
-    "get_grant",
+    "AccessLevel",
     "approve",
-    "deny",
-    "revoke",
+    "break_glass",
+    "break_glass_max_minutes",
     "cancel_own_pending",
+    "deny",
+    "expire_due",
+    "get_grant",
     "get_live_grant",
     "get_live_grants",
     "list_grants",
-    "expire_due",
-    "process_grant_expiry",
-    "to_read",
     "max_minutes_for_role",
-    "break_glass_max_minutes",
-    "AccessLevel",
+    "process_grant_expiry",
+    "request_grants",
+    "revoke",
+    "to_read",
 ]

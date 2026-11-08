@@ -1,5 +1,3 @@
-from typing import List
-
 from pydantic import ConfigDict, Field
 
 from app.schemas.base import RawTextStr, SanitizedBaseModel
@@ -25,4 +23,4 @@ class ChangelogResponse(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    entries: List[ChangelogEntry] = Field(default_factory=list)
+    entries: list[ChangelogEntry] = Field(default_factory=list)

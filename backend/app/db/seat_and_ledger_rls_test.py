@@ -16,19 +16,20 @@ policies allow.
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 
+from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
 from app.models.tenant.ai_connection import GuildAIConnection, GuildAIConnectionKey
-from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.guild_plugin import GuildPlugin
+from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.webhook_subscription import WebhookSubscription
 from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import webhook_refs
@@ -41,7 +42,6 @@ from app.testing import (
     route_as,
     route_session_to_guild,
 )
-from app.db.request_context import SystemGuild
 
 
 async def _as(role_session, *, user_id: int, guild_id: int, settings=False):
@@ -339,7 +339,7 @@ async def test_secret_fields_follow_the_stored_values(
 
 async def _subscription(session, *, guild_id: int, initiative_id, user_id: int):
     await route_session_to_guild(session, guild_id)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     sub = WebhookSubscription(
         initiative_id=initiative_id,
         created_by=user_id,

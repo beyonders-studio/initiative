@@ -15,13 +15,14 @@ clause needs a session already routed into the right guild (``RLSSessionDep``
 or ``set_rls_context``), exactly like any other guild-scoped query.
 """
 
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from sqlalchemy import ColumnElement, func, or_, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models.platform.guild import GuildMembership, CommunityRole
 from app.db.authorization import standing_arg
+from app.models.platform.guild import CommunityRole, GuildMembership
 
 
 def live_membership_clause(membership: Any = GuildMembership) -> ColumnElement[bool]:

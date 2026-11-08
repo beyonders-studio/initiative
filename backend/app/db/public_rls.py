@@ -67,18 +67,18 @@ __all__ = [
     "PLATFORM_SUSPENDED",
     "PLATFORM_TIER_ROLES",
     "PUBLIC_RLS",
+    "SHARED_TABLE_REGISTRY",
     "Grants",
     "Policy",
-    "SHARED_TABLE_REGISTRY",
     "SharedTable",
     "TableRls",
     "apply_public_rls",
     "apply_public_rls_if_changed",
+    "ensure_public_rls",
     "existing_public_tables",
     "platform_tier",
     "policy_name",
     "policy_roles",
-    "ensure_public_rls",
     "public_rls_digest",
     "render_public_rls_ddl",
     "render_table_rls",
@@ -2889,7 +2889,7 @@ async def apply_public_rls_if_changed(conn: AsyncConnection) -> bool:
         await conn.execute(
             text(f"COMMENT ON SCHEMA public IS '{STAMP_PREFIX}{digest}'")
         )
-    except Exception:  # noqa: BLE001 — the render applied; only the stamp did not
+    except Exception:  # the render applied; only the stamp did not
         logger.warning(
             "public RLS applied but the public schema could not be stamped; "
             "it will be re-applied on every boot until the schema is owned by "

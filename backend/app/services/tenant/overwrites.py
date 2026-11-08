@@ -5,8 +5,6 @@ written over (its base). One written over a version that has since moved on
 would undo that move, so it is refused instead.
 """
 
-from typing import Optional
-
 from fastapi import HTTPException, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -14,7 +12,7 @@ from app.core.messages import CommonMessages
 
 
 async def refuse_written_over(
-    session: AsyncSession, row: object, column: str, base: Optional[str]
+    session: AsyncSession, row: object, column: str, base: str | None
 ) -> None:
     """Refuse ``row``'s ``column`` written over ``base`` unless that is still
     what it holds. The row is locked until the write commits, so a write

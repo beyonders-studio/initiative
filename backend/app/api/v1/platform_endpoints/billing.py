@@ -55,9 +55,8 @@ from app.schemas.platform.billing import (
 )
 from app.services.marketplace import plugin_entitlements
 from app.services.platform import billing as billing_service
-from app.services.platform import billing_changes
+from app.services.platform import billing_changes, identity_refs
 from app.services.platform import guilds as guilds_service
-from app.services.platform import identity_refs
 
 router = APIRouter(include_in_schema=False)
 logger = logging.getLogger(__name__)

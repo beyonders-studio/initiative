@@ -18,8 +18,9 @@ A problem with the *software* rather than this server goes to the project
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Optional, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 from app.core.intake import IntakeStream, SecurityTopic
 from app.models.platform.user import User
@@ -42,13 +43,13 @@ async def report(
     topic: SecurityTopic,
     subject: str,
     body: str,
-    evidence: Sequence["PreparedEvidence"] = (),
-    now: Optional[datetime] = None,
+    evidence: Sequence[PreparedEvidence] = (),
+    now: datetime | None = None,
 ) -> int:
     """File a security report as a case the filer follows. Returns the
     case's task id. Their subject and words open the case, said to them; the
     description is the platform's summary."""
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     outcome = await open_case(
         IntakeStream.security,
         title=subject,
@@ -69,12 +70,12 @@ async def report(
 
 
 async def account_compromised(
-    *, user_id: int, what_changed: str, now: Optional[datetime] = None
-) -> Optional[int]:
+    *, user_id: int, what_changed: str, now: datetime | None = None
+) -> int | None:
     """File that ``user_id`` says a change to their credentials wasn't
     theirs. One case per account while it is open: a second link joins it.
     Returns the case's task id, or ``None`` where nothing is bound."""
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     outcome = await open_case(
         IntakeStream.security,
         title="An account says a credential change wasn't theirs",
@@ -96,8 +97,8 @@ async def account_compromised(
 
 
 def security_txt(
-    *, contact: Optional[str], form_url: Optional[str], now: Optional[datetime] = None
-) -> Optional[str]:
+    *, contact: str | None, form_url: str | None, now: datetime | None = None
+) -> str | None:
     """This server's ``security.txt``, or ``None`` with no address to name.
 
     A ``Contact`` line for the address, one for the form where security
@@ -105,7 +106,7 @@ def security_txt(
     """
     if not contact:
         return None
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     address = contact if ":" in contact else f"mailto:{contact}"
     lines = [f"Contact: {address}"]
     if form_url:

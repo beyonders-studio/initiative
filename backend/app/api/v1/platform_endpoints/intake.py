@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.api.deps import SystemSessionDep, get_current_active_user
 from app.api.v1.platform_endpoints.operator import ConfigManageDep
 from app.core.intake import IntakeStream, Source, meta, offered_streams
 from app.core.messages import IntakeMessages
@@ -34,7 +35,6 @@ from app.schemas.platform.intake import (
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import auth_posture, intake_setup
 from app.services.platform.intake_setup import BindingView
-from app.api.deps import get_current_active_user, SystemSessionDep
 
 router = APIRouter()
 

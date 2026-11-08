@@ -15,8 +15,7 @@ and only where ``public.dm_apparent_permission`` already says ``open``.
 """
 
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from pydantic import ConfigDict
 from sqlalchemy import (
@@ -58,26 +57,26 @@ class DmDevice(SQLModel, table=True):
     fingerprint_key: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
     #: The device's Ed25519 signature over its keys and account. NULL for a
     #: device registered before signing, until it next opens and signs itself.
-    signature: Optional[bytes] = Field(
+    signature: bytes | None = Field(
         default=None, sa_column=Column(LargeBinary, nullable=True)
     )
     #: The sign-in this key store last collected under, at the live row its
     #: chain has reached. A plain uuid, as ``push_tokens.session_id`` is:
     #: session rows are purged on their own schedule.
-    session_id: Optional[uuid.UUID] = Field(
+    session_id: uuid.UUID | None = Field(
         default=None, sa_column=Column(Uuid, nullable=True, index=True)
     )
     #: Derived at registration from the user agent.
     #: Never typed by hand — a device list nobody has to curate is one people
     #: actually read.
-    label: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    label: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     #: Moved on every collection, so Settings › Security can surface a device
     #: that has stopped syncing before its queue copy grows without bound.
     last_seen_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

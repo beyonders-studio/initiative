@@ -9,9 +9,8 @@ community admin — the moderator who placed a hold can't read it back.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import CheckConstraint, Column, DateTime, Integer, String, Text
 from sqlmodel import Field, SQLModel
@@ -56,7 +55,7 @@ class ContentHold(SQLModel, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     #: The ``SearchEntityType`` held, and its id.
     target_type: str = Field(
         sa_column=Column(String(length=TARGET_TYPE_LENGTH), nullable=False)
@@ -64,38 +63,38 @@ class ContentHold(SQLModel, table=True):
     target_id: int = Field(sa_column=Column(Integer, nullable=False, index=True))
     #: The operations case working it. A weak reference: the case is in
     #: another community.
-    case_task_id: Optional[int] = Field(
+    case_task_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
     #: Who placed it. A weak reference, like every person on this row.
-    placed_by: Optional[int] = Field(
+    placed_by: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
     placed_via: str = Field(sa_column=Column(String(length=16), nullable=False))
     reason: str = Field(sa_column=Column(String(length=32), nullable=False))
-    legal_basis: Optional[str] = Field(
+    legal_basis: str | None = Field(
         default=None, sa_column=Column(String(length=32), nullable=True)
     )
     #: Free text — who asked, a reference number — sealed, and read only by
     #: the platform.
-    note: Optional[str] = Field(
+    note: str | None = Field(
         default=None,
         sa_column=Column(Text, nullable=True, info={FERNET_SALT: SALT_HOLD_NOTE}),
     )
     placed_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     #: When the case was last reminded the hold is still in place.
-    reminded_at: Optional[datetime] = Field(
+    reminded_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-    released_at: Optional[datetime] = Field(
+    released_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-    released_by: Optional[int] = Field(
+    released_by: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
-    release_outcome: Optional[str] = Field(
+    release_outcome: str | None = Field(
         default=None, sa_column=Column(String(length=16), nullable=True)
     )

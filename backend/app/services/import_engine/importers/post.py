@@ -10,7 +10,7 @@ sharing is not carried: the people who answered it are not the people here.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel
@@ -27,8 +27,8 @@ from app.services.import_engine.common import (
     load_initiative_member_handles,
     unique_name_in_initiative,
 )
-from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.context import ImportContext
+from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.importers._base import (
     NamesPeopleInPassing,
     PropertyRestore,
@@ -37,9 +37,8 @@ from app.services.import_engine.importers._base import (
     parse_envelope,
 )
 from app.services.import_engine.mentions import place_mentions
-from app.services.import_engine.references import note_or_settle
 from app.services.import_engine.people import PeopleMap
-
+from app.services.import_engine.references import note_or_settle
 
 #: What ``posts.name`` holds, and how much of it to leave for the " (2)" that
 #: ``unique_name_in_initiative`` may append when the board already has this headline.
@@ -101,7 +100,7 @@ class PostImporter(NamesPeopleInPassing):
             # for the same reason the pin is not: it said when this notice
             # mattered on the board it came from, and re-running it here would
             # hide an import until a date that has nothing to do with this one.
-            published_at=datetime.now(timezone.utc),
+            published_at=datetime.now(UTC),
         )
         session.add(post)
         await session.flush()

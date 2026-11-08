@@ -22,7 +22,7 @@ from datetime import datetime
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlmodel import Field, SQLModel
 
-__all__ = ["PluginAssertionJti", "ASSERTION_JTI_MAX_LENGTH"]
+__all__ = ["ASSERTION_JTI_MAX_LENGTH", "PluginAssertionJti"]
 
 #: The widest ``jti`` an assertion may carry.
 ASSERTION_JTI_MAX_LENGTH = 128

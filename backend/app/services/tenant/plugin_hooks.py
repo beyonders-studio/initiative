@@ -41,8 +41,9 @@ import hashlib
 import hmac
 import json
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any, Mapping, Optional
+from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import func, or_, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -79,8 +80,8 @@ from app.services.marketplace.vendor_values import (
     load_vendor_values,
 )
 from app.services.tenant import guild_plugins as guild_plugins_service
-from app.services.tenant import plugin_connection_flows as flows
 from app.services.tenant import metadata
+from app.services.tenant import plugin_connection_flows as flows
 from app.services.tenant.plugin_channels import (
     PluginChannelError,
     keep_event,
@@ -135,7 +136,7 @@ def _verified(
 
 def _route_value(
     route: Mapping[str, Any], headers: Mapping[str, str], body: bytes
-) -> Optional[str]:
+) -> str | None:
     """The value a ``webhooks.route`` reads from a delivery, as the install
     index stores it, or ``None``: the header it names, or the value at its
     ``path`` (keys joined by ``.``) in the JSON body."""
@@ -165,7 +166,7 @@ def _vendor_headers(headers: Mapping[str, str], signature: str) -> dict[str, str
     }
 
 
-async def _webhooks(registration: RegistrationSnapshot) -> Optional[dict[str, Any]]:
+async def _webhooks(registration: RegistrationSnapshot) -> dict[str, Any] | None:
     """The ``webhooks`` block of the listing's current definition, which
     checks and routes a delivery before any install is known."""
     async with db_session.SystemSessionLocal() as session:
@@ -174,7 +175,7 @@ async def _webhooks(registration: RegistrationSnapshot) -> Optional[dict[str, An
     return webhooks if isinstance(webhooks, dict) else None
 
 
-def _route_spec(route: Any) -> Optional[tuple[str, str]]:
+def _route_spec(route: Any) -> tuple[str, str] | None:
     """Where a ``webhooks.route`` reads its value: a header, or a body path."""
     if not isinstance(route, Mapping):
         return None
@@ -258,7 +259,7 @@ async def _queue(
             or _route_value(pinned["route"], headers, body) != indexed
         ):
             return
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         await session.exec(
             pg_insert(PluginHookDelivery)
             .values(
@@ -299,10 +300,10 @@ def next_due(now: datetime) -> Any:
     )
 
 
-async def _claim(session: AsyncSession) -> Optional[Row]:
+async def _claim(session: AsyncSession) -> Row | None:
     """Hold the community's oldest waiting delivery no visit holds, or
     return ``None``."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     due = (
         select(PluginHookDelivery.install_id, PluginHookDelivery.delivery_id)
         .where(
@@ -357,13 +358,12 @@ async def _settle(session: AsyncSession, row: Row, *, done: bool) -> None:
             "body": None,
             "taken_until": None,
             "attempts": attempts,
-            "expires_at": datetime.now(timezone.utc) + DELIVERY_TTL,
+            "expires_at": datetime.now(UTC) + DELIVERY_TTL,
         }
         if done
         else {
             "attempts": attempts,
-            "taken_until": datetime.now(timezone.utc)
-            + RETRY_AFTER * 2 ** (attempts - 1),
+            "taken_until": datetime.now(UTC) + RETRY_AFTER * 2 ** (attempts - 1),
         }
     )
     await session.exec(
@@ -377,7 +377,7 @@ async def _settle(session: AsyncSession, row: Row, *, done: bool) -> None:
     await session.commit()
 
 
-async def run_due(session: AsyncSession, guild_id: int) -> Optional[datetime]:
+async def run_due(session: AsyncSession, guild_id: int) -> datetime | None:
     """Map or forward each of the community's waiting deliveries, on a session
     routed into it, as the version each install is pinned to, and answer
     when the next comes due. A delivery whose install is gone, off, no
@@ -433,7 +433,7 @@ async def run_due(session: AsyncSession, guild_id: int) -> Optional[datetime]:
             await session.rollback()
             done = False
         await _settle(session, row, done=done)
-    return (await session.exec(next_due(datetime.now(timezone.utc)))).first()
+    return (await session.exec(next_due(datetime.now(UTC)))).first()
 
 
 async def _forward(

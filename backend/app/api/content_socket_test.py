@@ -8,7 +8,6 @@ its sharing admits the reader.
 
 import asyncio
 import json
-from typing import Optional
 
 import pytest
 from fastapi import status
@@ -30,14 +29,14 @@ class InboundWebSocket:
     def __init__(
         self,
         frames: list[dict],
-        cookies: Optional[dict] = None,
-        headers: Optional[dict] = None,
+        cookies: dict | None = None,
+        headers: dict | None = None,
     ) -> None:
         self._frames = list(frames)
         self.cookies = cookies or {}
         self.headers = headers or {}
         self.accepted = False
-        self.closed: Optional[int] = None
+        self.closed: int | None = None
         self.sent: list[dict] = []
         self.seated = asyncio.Event()
 
@@ -155,7 +154,7 @@ async def _watch(guild_id: int, group_id: int, token: str) -> InboundWebSocket:
     serving = asyncio.create_task(
         serve_tool_stream(websocket, guild_id, Tool.counter_group, group_id)  # type: ignore[arg-type]
     )
-    done, _ = await asyncio.wait(
+    _done, _ = await asyncio.wait(
         {serving, asyncio.create_task(websocket.seated.wait())},
         return_when=asyncio.FIRST_COMPLETED,
     )

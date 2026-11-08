@@ -11,7 +11,7 @@ views stay in ``public``, and a view of a community that is gone leaves it.
 from __future__ import annotations
 
 import importlib.util
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -56,7 +56,7 @@ async def test_the_views_move_into_the_community_unchanged(session) -> None:
     owner = await create_user(session)
     member = await create_user(session)
     guild = await create_guild(session, creator=owner)
-    at = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    at = datetime(2026, 10, 1, tzinfo=UTC)
     await route_session_to_guild(session, guild.id)
     for person, key, value in (
         (owner.id, "view:project:12", {"layout": "table", "parts": {"table": {}}}),

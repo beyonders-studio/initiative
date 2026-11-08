@@ -11,8 +11,7 @@ image. ``app.core.image_headers`` explains why.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -92,7 +91,7 @@ async def get_avatar(session: AsyncSession, *, user_id: int) -> UserAvatar | Non
 
 
 async def store_avatar(
-    session: AsyncSession, *, user: "User", avatar: ValidatedImage
+    session: AsyncSession, *, user: User, avatar: ValidatedImage
 ) -> str:
     """Write ``avatar`` as the user's picture, replacing any it had.
 
@@ -117,7 +116,7 @@ async def store_avatar(
         "width": avatar.width,
         "height": avatar.height,
         "data": avatar.data,
-        "created_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(UTC),
     }
     statement = pg_insert(UserAvatar).values(**values)
     await session.exec(
@@ -133,7 +132,7 @@ async def store_avatar(
 
 
 async def delete_avatar(
-    session: AsyncSession, *, user_id: int, user: "User | None" = None
+    session: AsyncSession, *, user_id: int, user: User | None = None
 ) -> bool:
     """Remove the user's picture. True when there was one.
 

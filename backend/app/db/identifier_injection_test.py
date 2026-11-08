@@ -16,15 +16,14 @@ from functools import partial
 import pytest
 
 from app.db.public_rls import platform_tier, role_name
+from app.db.request_context import Platform
 from app.db.schema_provisioning import (
     GuildRoleKind,
     guild_role_name,
     guild_schema_name,
 )
-from app.db.request_context import Platform
 from app.db.session import set_rls_context
 from app.models.platform.user import UserRole
-
 
 _GUILD_ID_BUILDERS = {
     "schema": guild_schema_name,

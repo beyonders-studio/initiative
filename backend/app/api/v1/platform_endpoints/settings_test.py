@@ -15,29 +15,29 @@ import logging
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import text
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.testing import community_plan
 from app.core.intake import IntakeStream
 from app.core.messages import GuildMessages
+from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
-from app.models.platform.guild import Guild, CommunityRole, CommunityStatus
 from app.models.platform.access_grant import AccessLevel
+from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.platform.user import UserRole
 from app.models.tenant.intake import IntakeBinding
 from app.services import email as email_service
 from app.testing import (
+    community_plan,
     create_guild,
     create_guild_membership,
     create_initiative,
     create_project,
     create_user,
-    guild_administration,
     drain_notices,
+    guild_administration,
     make_operations_community,
 )
-from sqlmodel import select
-from app.db.request_context import SystemGuild, Unattributed
 
 GUILDS = "/api/v1/settings/communities"
 
@@ -381,7 +381,7 @@ async def test_raising_cap_reopens_joins(
     invitee = await acting_user()
     # Minted while the seat is still free, redeemed after it is taken —
     # minting itself is capacity-gated, so the order here is the scenario.
-    invite, invite_code = await guild_service.create_guild_invite(
+    _invite, invite_code = await guild_service.create_guild_invite(
         session, guild_id=guild.id, created_by=operator.user.id, max_uses=5
     )
     await guild_service.ensure_membership(

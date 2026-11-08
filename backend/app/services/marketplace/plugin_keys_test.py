@@ -16,7 +16,6 @@ from jwt.algorithms import ECAlgorithm, OKPAlgorithm
 from app.services.marketplace import plugin_keys
 from app.services.marketplace.registration_lookup import RegistrationSnapshot
 
-
 BASE = "https://127.0.0.1:9443"
 JWKS_URI = f"{BASE}/.well-known/jwks.json"
 

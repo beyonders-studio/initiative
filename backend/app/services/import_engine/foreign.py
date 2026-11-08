@@ -11,8 +11,8 @@ here rather than at the route, so every caller gets the same answer.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from app.core.messages import ImportEngineMessages
 from app.services.import_engine import (
@@ -80,7 +80,7 @@ def read_preview(source: ForeignSource, content: str) -> list[SourceOption]:
     """
     try:
         return source.preview(content)
-    except Exception as exc:  # noqa: BLE001 - any parse failure is one answer
+    except Exception as exc:
         raise ImportEngineError(ImportEngineMessages.IMPORT_FILE_UNREADABLE) from exc
 
 
@@ -92,8 +92,8 @@ def build(
         return source.build(content, selection=selection, app_version=app_version)
     except ImportEngineError:
         raise
-    except Exception as exc:  # noqa: BLE001 - as above
+    except Exception as exc:
         raise ImportEngineError(ImportEngineMessages.IMPORT_FILE_UNREADABLE) from exc
 
 
-__all__ = ["ForeignSource", "SOURCES", "build", "get_source", "read_preview"]
+__all__ = ["SOURCES", "ForeignSource", "build", "get_source", "read_preview"]

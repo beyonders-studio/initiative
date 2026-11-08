@@ -375,10 +375,10 @@ async def test_nothing_is_said_when_the_connecting_login_owns_its_objects(
 async def test_an_object_owned_elsewhere_is_seen(session):
     """A table in a guild schema owned by another login is what the signal is
     looking for."""
-    from app.db.bootstrap import _FOREIGN_OWNERS
-    from app.db.public_rls import SHARED_TABLE_REGISTRY
     from sqlalchemy import text
 
+    from app.db.bootstrap import _FOREIGN_OWNERS
+    from app.db.public_rls import SHARED_TABLE_REGISTRY
     from conftest import RUN_ID
 
     other = f"owner_probe_{RUN_ID}"
@@ -567,7 +567,6 @@ async def test_the_handover_claims_an_object_owned_by_a_third_login(session):
 
     from app.db.bootstrap import _TRANSFER_STATEMENTS
     from app.db.public_rls import SHARED_TABLE_REGISTRY
-
     from conftest import RUN_ID
 
     provisioner = login_roles()[0].name
@@ -614,7 +613,6 @@ async def test_the_handover_leaves_alone_what_the_target_already_owns(session):
 
     from app.db.bootstrap import _TRANSFER_STATEMENTS
     from app.db.public_rls import SHARED_TABLE_REGISTRY
-
     from conftest import RUN_ID
 
     provisioner = login_roles()[0].name

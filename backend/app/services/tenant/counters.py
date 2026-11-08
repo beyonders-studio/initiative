@@ -5,21 +5,21 @@ Initiative; Counters are independent numeric values clamped to optional
 [min, max] bounds.
 """
 
-from datetime import datetime, timezone
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Optional, Sequence
 
-from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy.orm import selectinload, undefer
 from sqlalchemy import func, literal, update
+from sqlalchemy.orm import selectinload, undefer
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.db.query import ids_in
 from app.models.tenant.counter import (
     COUNTER_LIMIT,
     Counter,
     CounterGroup,
 )
-from app.db.query import ids_in
 from app.schemas.tenant.counter import (
     CounterPreview,
     CounterSortDirection,
@@ -29,7 +29,6 @@ from app.schemas.tenant.tool import from_row
 from app.services.permissions import with_tool
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
-
 
 # ---------------------------------------------------------------------------
 # Query helpers
@@ -137,7 +136,7 @@ async def get_counter(
 # ---------------------------------------------------------------------------
 
 
-def clamp(value: Decimal, lo: Optional[Decimal], hi: Optional[Decimal]) -> Decimal:
+def clamp(value: Decimal, lo: Decimal | None, hi: Decimal | None) -> Decimal:
     if lo is not None and value < lo:
         value = lo
     if hi is not None and value > hi:
@@ -146,7 +145,7 @@ def clamp(value: Decimal, lo: Optional[Decimal], hi: Optional[Decimal]) -> Decim
 
 
 def _touch(counter: Counter) -> None:
-    counter.updated_at = datetime.now(timezone.utc)
+    counter.updated_at = datetime.now(UTC)
 
 
 async def set_count(session: AsyncSession, counter: Counter, value: Decimal) -> Counter:
@@ -161,7 +160,7 @@ async def step_counter(
     counter_id: int,
     *,
     up: bool,
-    amount: Optional[Decimal] = None,
+    amount: Decimal | None = None,
 ) -> None:
     """Move a counter by ``amount``, or by its own step, within its bounds.
 
@@ -182,7 +181,7 @@ async def step_counter(
                 Counter.max,
                 COUNTER_LIMIT,
             ),
-            updated_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(UTC),
         )
     )
 
@@ -197,7 +196,7 @@ async def reset_counter(session: AsyncSession, counter: Counter) -> Counter:
 async def reset_all_counters(
     session: AsyncSession, group: CounterGroup
 ) -> CounterGroup:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for counter in group.counters or []:
         counter.count = clamp(counter.initial_count, counter.min, counter.max)
         counter.updated_at = now
@@ -245,7 +244,7 @@ async def sort_counters(
 
     counters.sort(key=key, reverse=direction == CounterSortDirection.desc)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for index, counter in enumerate(counters):
         counter.position = Decimal(index + 1)
         counter.updated_at = now

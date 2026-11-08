@@ -15,7 +15,6 @@ from app.models.platform.guild import CommunityRole
 from app.schemas.tenant.archive import ArchivableType
 from app.testing import create_counter_group, create_file
 
-
 #: The wire name of every archivable tool (and the collection, a sub-tool with
 #: a list of its own), paired with the list route that has to be able to show
 #: it once it is archived. Read off the ``Tool`` enum, so a new tool joins this

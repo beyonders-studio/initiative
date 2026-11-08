@@ -11,12 +11,11 @@ from sqlalchemy.orm import undefer
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.services.tenant.task_types import get_default_type
+from app.core.file_types import FileType
 from app.db.schema_provisioning import guild_schema_name
 from app.db.soft_delete_filter import SOFT_DELETE_MODELS, select_including_deleted
 from app.db.tenancy import GUILD_SCOPED_TABLES
 from app.models.platform.user import User
-from app.core.file_types import FileType
 from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
@@ -27,6 +26,7 @@ from app.services.tenant.soft_delete import (
     restore_entity,
     soft_delete_entity,
 )
+from app.services.tenant.task_types import get_default_type
 from app.testing.factories import (
     create_file,
     create_guild,
@@ -392,8 +392,8 @@ async def test_trash_listing_dedupes_nested_comment_replies(
     otherwise a user could click Restore on the reply, leaving its
     parent_comment_id pointing at a still-trashed row.
     """
-    from app.models.tenant.comment import Comment
     from app.models.platform.guild import CommunityRole
+    from app.models.tenant.comment import Comment
     from app.testing.factories import (
         create_guild_membership,
         get_auth_headers,
@@ -917,16 +917,16 @@ async def _file(
     from app.core.tools import Tool
     from app.models.tenant._mixins import tool_models
     from app.models.tenant.calendar_event import CalendarEvent
+    from app.models.tenant.collection import Collection
     from app.models.tenant.comment import Comment
     from app.models.tenant.counter import Counter
-    from app.models.tenant.collection import Collection
     from app.models.tenant.wiki import Wiki, WikiPage
     from app.testing.factories import (
         TOOL_FACTORIES,
         create_calendar_event,
+        create_collection,
         create_comment,
         create_counter,
-        create_collection,
         create_task,
         create_wiki_page,
     )

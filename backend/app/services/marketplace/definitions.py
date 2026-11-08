@@ -26,25 +26,25 @@ an id in that namespace is only ever claimed by a listing shipped in this build.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from app.core.tools import BULK_EXPORT_TOOLS, Tool
 from app.models.platform.publisher import FIRST_PARTY_PUBLISHER_PREFIX, publisher_prefix
+from app.services.marketplace.home_layouts import normalize_home_layout_definition
 from app.services.marketplace.manifest_values import (
-    MAX_PUBLISHER_NAME_LENGTH,
     MAX_NAME_LENGTH,
+    MAX_PUBLISHER_NAME_LENGTH,
     ListingDefinitionError,
     check_single_line,
     clean_text,
     fail,
 )
-from app.services.marketplace.home_layouts import normalize_home_layout_definition
 from app.services.marketplace.profile_packs import (
     normalize_profile_pack_definition,
 )
 from app.services.marketplace.service_plugins import (
-    plugin_widget_type,
     normalize_service_plugin_definition,
+    plugin_widget_type,
 )
 from app.services.marketplace.tool_listings import (
     normalize_tool_example,
@@ -52,23 +52,23 @@ from app.services.marketplace.tool_listings import (
 )
 
 __all__ = [
-    "ListingDefinitionError",
-    "LISTING_KINDS",
-    "TOOL_LISTING_KINDS",
-    "LISTING_AUDIENCES",
+    "GUILD_INSTALLABLE_PLUGIN_KINDS",
     "KIND_AUDIENCE",
-    "kinds_for_audience",
+    "LISTING_AUDIENCES",
+    "LISTING_KINDS",
     "LISTING_SOURCES",
     "LOCAL_SOURCE",
-    "PLUGIN_KINDS",
-    "GUILD_INSTALLABLE_PLUGIN_KINDS",
     "MOUNTABLE_TOOLS",
+    "PLUGIN_KINDS",
     "RESERVED_PUBLIC_ID_PREFIX",
-    "published_by_us",
-    "plugin_widget_type",
-    "normalize_publisher",
+    "TOOL_LISTING_KINDS",
+    "ListingDefinitionError",
+    "kinds_for_audience",
     "normalize_listing_definition",
     "normalize_listing_example",
+    "normalize_publisher",
+    "plugin_widget_type",
+    "published_by_us",
     "reserved_prefix_problem",
 ]
 
@@ -208,7 +208,7 @@ def normalize_publisher(raw: Any) -> str:
     return name or ""
 
 
-def reserved_prefix_problem(public_id: str, *, source: str) -> Optional[str]:
+def reserved_prefix_problem(public_id: str, *, source: str) -> str | None:
     """Why this source may not publish under this id, or ``None``.
 
     ``core.*`` names listings shipped in this repository, so the id itself
@@ -230,7 +230,7 @@ def reserved_prefix_problem(public_id: str, *, source: str) -> Optional[str]:
 
 
 def _normalize_plugin_definition(
-    definition: Any, *, public_id: Optional[str]
+    definition: Any, *, public_id: str | None
 ) -> dict[str, Any]:
     """A plug-in's body: which kind it is, and what that kind needs.
 
@@ -271,7 +271,7 @@ def _normalize_plugin_definition(
 
 
 def normalize_listing_definition(
-    kind: str, definition: Any, *, public_id: Optional[str] = None
+    kind: str, definition: Any, *, public_id: str | None = None
 ) -> dict[str, Any]:
     """Validate and canonicalize a listing's definition for its kind.
 
@@ -296,7 +296,7 @@ def normalize_listing_definition(
 
 def normalize_listing_example(
     kind: str, example: Any, definition: dict[str, Any]
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Validate a listing's example, or ``None`` when it has none.
 
     Only a tool's listing carries one — the same envelope filled in, or for a

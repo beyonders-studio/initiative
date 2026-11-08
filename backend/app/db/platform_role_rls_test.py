@@ -24,7 +24,6 @@ from app.db.public_rls import platform_tier, role_name
 from app.models.platform.user import UserRole
 from app.testing import as_role, create_guild, create_user
 
-
 # --- users ----------------------------------------------------------------
 
 

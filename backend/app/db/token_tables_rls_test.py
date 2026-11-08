@@ -10,7 +10,7 @@ superuser setup session to the role under test, so table grants and policies
 are enforced as they are on a real request.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import text
@@ -26,7 +26,6 @@ from app.db.public_rls import (
 from app.models.platform.user import UserRole
 from app.testing import as_role, create_user
 
-
 PLATFORM_FLOOR = role_name("platform_base")
 REQUEST_FLOORS = ("app_user", "app_guild_base", "app_guild_base_ro", PLATFORM_FLOOR)
 VERBS = ("SELECT", "INSERT", "UPDATE", "DELETE")
@@ -41,7 +40,7 @@ async def _user_token(session, user_id: int) -> None:
         params={
             "u": user_id,
             "t": f"hash-{user_id}",
-            "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+            "exp": datetime.now(UTC) + timedelta(hours=1),
         },
     )
 

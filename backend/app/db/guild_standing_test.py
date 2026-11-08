@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 from app.db.guild_standing import GuildContext
 from app.models.platform.guild import CommunityRole
 

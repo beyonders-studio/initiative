@@ -22,15 +22,15 @@ import binascii
 import uuid
 from collections.abc import Collection, Iterable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from fastapi import status
 from sqlalchemy import delete, func, insert, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-from fastapi import status
 
 from app.core.errors import CodedError
 from app.core.messages import DirectMessageTransportMessages as Messages
@@ -670,7 +670,7 @@ async def create_conversation(
     if not opened:
         # Somebody else's request got there first and wrote the roster with it.
         return conversation
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for member_id in members:
         session.add(
             DmConversationMember(
@@ -767,9 +767,8 @@ async def create_group_conversation(
     conversation = await _conversation_with_roster(
         session, kind=DmConversationKind.group, member_ids=members
     )
-    opened = False
     if conversation is None:
-        conversation, opened = await _open_conversation(
+        conversation, _ = await _open_conversation(
             session, kind=DmConversationKind.group, member_ids=members
         )
 
@@ -782,7 +781,7 @@ async def create_group_conversation(
             )
         ).all()
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     invited: list[int] = []
     for member_id in members:
         if member_id in present:
@@ -813,7 +812,7 @@ async def accept_invitation(
             DmConversationMember.user_id == user_id,
             DmConversationMember.accepted_at.is_(None),
         )
-        .values(accepted_at=datetime.now(timezone.utc))
+        .values(accepted_at=datetime.now(UTC))
     )
     if not updated.rowcount:
         raise DmTransportError(Messages.NO_INVITATION)
@@ -1150,7 +1149,7 @@ async def send(
     if rows:
         # A Core insert, deliberately: the ORM would ask for the new id back,
         # and nothing here needs it.
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         await session.exec(
             insert(DmQueueItem).values([{**row, "created_at": now} for row in rows])
         )
@@ -1249,7 +1248,7 @@ async def collect(
             )
         ).all()
     )
-    device.last_seen_at = datetime.now(timezone.utc)
+    device.last_seen_at = datetime.now(UTC)
     session.add(device)
     await session.flush()
     return DmQueueResponse(
@@ -1322,7 +1321,7 @@ async def send_verification(
     await _clear_expired_verifications(
         session,
         user_id=user_id,
-        cutoff=datetime.now(timezone.utc) - VERIFICATION_TTL,
+        cutoff=datetime.now(UTC) - VERIFICATION_TTL,
     )
     waiting = (
         await session.exec(
@@ -1353,7 +1352,7 @@ async def collect_verification(
     there is nothing to acknowledge afterwards.
     """
     await _own_device(session, user_id=user_id, device_id=device_id)
-    cutoff = datetime.now(timezone.utc) - VERIFICATION_TTL
+    cutoff = datetime.now(UTC) - VERIFICATION_TTL
     rows = (
         await session.exec(
             delete(DmVerificationItem)

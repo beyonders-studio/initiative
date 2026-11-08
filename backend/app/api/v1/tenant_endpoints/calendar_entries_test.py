@@ -6,7 +6,7 @@ union of calendar events + task markers over a date window. They must be a union
 would return for the same actor, never more.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -31,7 +31,7 @@ from app.testing.factories import (
     create_user,
 )
 
-NOW = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 6, 15, 12, 0, tzinfo=UTC)
 WINDOW_START = (NOW - timedelta(days=30)).isoformat()
 WINDOW_END = (NOW + timedelta(days=30)).isoformat()
 
@@ -422,8 +422,8 @@ async def test_me_entries_aggregate_across_guilds(
     """Entries from every guild, narrowed by ``guild_ids``; the guilds share
     one budget of repeating occurrences."""
     user = await create_user(session, email="cal-me@example.com")
-    g1, i1, p1, cal1 = await _guild_with_project(session, user, name="Alpha")
-    g2, i2, p2, cal2 = await _guild_with_project(session, user, name="Beta")
+    g1, _i1, p1, cal1 = await _guild_with_project(session, user, name="Alpha")
+    g2, _i2, p2, cal2 = await _guild_with_project(session, user, name="Beta")
 
     weekly = "RRULE:FREQ=WEEKLY"
     event1 = await create_calendar_event(

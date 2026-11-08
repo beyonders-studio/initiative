@@ -46,8 +46,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass, field, replace
-from typing import Any, Awaitable, Callable, Iterable, Mapping, Optional
+from typing import Any
 
 from app.db import post_commit
 from app.db.session import routed_guild_id
@@ -96,17 +97,17 @@ class RevocationIntent:
     plugin_id: int
     listing_uid: str
     connection_id: str
-    connection_ref: Optional[str] = None
-    user_id: Optional[int] = None
+    connection_ref: str | None = None
+    user_id: int | None = None
     reason: str = "revoked"
-    public_id: Optional[str] = None
+    public_id: str | None = None
     #: The plug-in is declarative, and is named by its listing.
     declarative: bool = False
-    flow: Optional[dict[str, Any]] = None
+    flow: dict[str, Any] | None = None
     fields: dict[str, Any] = field(default_factory=dict)
     sealed_tokens: dict[str, str] = field(default_factory=dict)
     #: When the stored access token lapses, from the connection's values.
-    expires_at: Optional[int] = None
+    expires_at: int | None = None
 
 
 def _intent_for(
@@ -119,8 +120,8 @@ def _intent_for(
     config: Mapping[str, Any] | None,
     secrets: Mapping[str, Any] | None,
     reason: str,
-    connection_ref: Optional[str] = None,
-    user_id: Optional[int] = None,
+    connection_ref: str | None = None,
+    user_id: int | None = None,
 ) -> RevocationIntent:
     """An intent for one connection's stored values, read before they go."""
     connection = None

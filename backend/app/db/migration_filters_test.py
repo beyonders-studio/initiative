@@ -8,7 +8,6 @@ from app.db import base  # noqa: F401 — registers every model on the metadata
 from app.db.migration_filters import strip_cross_schema_foreign_keys
 from app.db.tenancy import GUILD_SCOPED_TABLES
 
-
 #: A guild table carrying both kinds of key: one to a table in its own schema
 #: and one to ``public.users``.
 _TABLE = "wiki_pages"

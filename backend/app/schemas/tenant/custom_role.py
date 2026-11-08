@@ -1,6 +1,6 @@
 """A community's custom roles, as its settings read and write them."""
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 from pydantic import Field, StringConstraints, field_validator
 
@@ -39,15 +39,15 @@ class CustomRoleCreate(SanitizedBaseModel):
 
 
 class CustomRoleUpdate(SanitizedBaseModel):
-    name: Optional[TitleStr] = Field(
+    name: TitleStr | None = Field(
         default=None, min_length=1, max_length=CUSTOM_ROLE_NAME_MAX_LENGTH
     )
-    surfaces: Optional[list[AdminSurface]] = None
+    surfaces: list[AdminSurface] | None = None
 
 
 class CustomRoleAssignment(SanitizedBaseModel):
     #: The role to give, or ``None`` to take the person's role off.
-    role_id: Optional[int] = None
+    role_id: int | None = None
 
 
 class CustomRoleHolder(SanitizedBaseModel):
@@ -80,8 +80,8 @@ class CustomRoleClaimRuleUpdate(SanitizedBaseModel):
     """Change the group a rule reads or the role it gives. Its provider and
     its place in the order are not changed here."""
 
-    claim_value: Optional[GroupName] = None
-    role_id: Optional[int] = None
+    claim_value: GroupName | None = None
+    role_id: int | None = None
 
 
 class CustomRoleClaimRuleRead(SanitizedBaseModel):

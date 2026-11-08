@@ -47,11 +47,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.core.config import settings  # noqa: E402
-from app.core.intake import IntakeStream  # noqa: E402
-from app.db.session import SystemSessionLocal  # noqa: E402
-
-from seed import (  # noqa: E402
+from seed import (
     access_grants,
     accounts,
     calendars,
@@ -71,7 +67,11 @@ from seed import (  # noqa: E402
     tickets,
     wikis,
 )
-from seed.state import clean, seed_status  # noqa: E402
+from seed.state import clean, seed_status
+
+from app.core.config import settings
+from app.core.intake import IntakeStream
+from app.db.session import SystemSessionLocal
 
 #: Each community's content, in the order it is written. Tags come first so
 #: anything can carry one; archiving waits for the end (see ``projects``).

@@ -7,7 +7,6 @@ from decimal import Decimal
 from app.core.tools import Tool
 from app.models.tenant.counter import Counter, CounterGroup, CounterViewMode
 from app.models.tenant.resource_grant import ResourceAccessLevel
-
 from seed.common import Community, share
 
 #: Each group, shared the way ``share`` reads it. A counter is ``(name, colour,

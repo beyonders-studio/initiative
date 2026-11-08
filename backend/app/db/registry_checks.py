@@ -48,8 +48,10 @@ def render_guild_registry_check_ddl() -> str:
         name = constraint.name
         lines += [
             f"ALTER TABLE {table.name} DROP CONSTRAINT IF EXISTS {name};",
-            f"ALTER TABLE {table.name} ADD CONSTRAINT {name}"
-            f" CHECK ({constraint.sqltext}) NOT VALID;",
+            (
+                f"ALTER TABLE {table.name} ADD CONSTRAINT {name}"
+                f" CHECK ({constraint.sqltext}) NOT VALID;"
+            ),
         ]
     return "\n".join(lines)
 

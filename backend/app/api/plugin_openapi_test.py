@@ -15,9 +15,9 @@ from fastapi import Depends, FastAPI
 from fastapi.routing import APIRoute
 from httpx import AsyncClient
 
+from app.api.deps import ActorContext, plugin_scope, route_plugin_scope_declaration
 from app.api.plugin_openapi import COMMUNITY_PREFIX, build_plugin_openapi
 from app.db.search_index import written_columns
-from app.api.deps import ActorContext, plugin_scope, route_plugin_scope_declaration
 from app.main import app, plugin_openapi
 from app.services.marketplace.plugin_api import PLUGIN_API_VERSION
 from app.services.tenant.attachments import _upload_columns

@@ -63,12 +63,11 @@ next pass.
 from __future__ import annotations
 
 import asyncio
-
 import logging
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Table, and_, func, or_, text
@@ -81,23 +80,23 @@ from app.core.plugin_scopes import (
     LEVEL_SCOPES,
     InstallLevel,
     UnknownPluginScope,
-    plugin_scope_target,
     expand,
+    plugin_scope_target,
 )
+from app.db.request_context import SystemGuild, SystemMaintenance
 from app.db.session import (
     set_rls_context,
 )
-from app.models.tenant.plugin_event_outbox import PluginEventOutbox
-from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.event_outbox import EventOutbox
 from app.models.tenant.guild_plugin import GuildPlugin
+from app.models.tenant.plugin_event_outbox import PluginEventOutbox
+from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.webhook_delivery import WebhookDelivery
 from app.models.tenant.webhook_subscription import WebhookSubscription
 from app.services import outbox_ledger, sweep_timers
 from app.services.marketplace.registration_lookup import load_registrations
 from app.services.tenant import room_sink, webhook_refs
 from app.services.tenant.webhook_dispatcher import deliver
-from app.db.request_context import SystemGuild, SystemMaintenance
 
 if TYPE_CHECKING:
     from app.services.tenant.expiry import Expiring
@@ -151,7 +150,7 @@ class InstallReach:
         live: bool | None,
         placed: Iterable[int] | None,
         granted_scopes: Iterable[str] | None,
-    ) -> "InstallReach":
+    ) -> InstallReach:
         readable: set[str] = set()
         plugins: set[str] = set()
         for scope in granted_scopes or ():
@@ -224,12 +223,13 @@ def _matches(
         and row.initiative_id != subscription.initiative_id
     ):
         return False
-    if subscription.fields and row.action == "updated":
-        # created/deleted report no columns — the whole row came or went — so a
-        # column filter has nothing to say about them and does not apply.
-        if not set(row.changed) & set(subscription.fields):
-            return False
-    return True
+    # created/deleted report no columns — the whole row came or went — so a
+    # column filter has nothing to say about them and does not apply.
+    return not (
+        subscription.fields
+        and row.action == "updated"
+        and not set(row.changed) & set(subscription.fields)
+    )
 
 
 def _matches_plugin_event(
@@ -256,11 +256,9 @@ def _matches_plugin_event(
             lands_in = subscription.initiative_id
         if lands_in != subscription.initiative_id:
             return False
-    if subscription.plugin_install_id is not None and (
-        reach is None or not reach.hears_plugin(emitter, lands_in)
-    ):
-        return False
-    return True
+    return subscription.plugin_install_id is None or (
+        reach is not None and reach.hears_plugin(emitter, lands_in)
+    )
 
 
 def _matches_demo_event(
@@ -748,7 +746,7 @@ async def drain_guild(
     session: AsyncSession, guild_id: int, *, now: datetime | None = None
 ) -> None:
     """Deliver what the community's subscriptions are owed."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     # Read the subscription roster with full guild authority: which targets are
     # registered is guild configuration, not initiative content. What each of
     # them may then SEE is decided per subscription in _drain_subscription:

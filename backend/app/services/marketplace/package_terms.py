@@ -31,8 +31,8 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
-from typing import Callable, Collection, Mapping
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -44,8 +44,8 @@ from app.models.platform.marketplace import (
     MarketplaceListing,
 )
 from app.models.platform.plugin_entitlement import METER_PATTERN
-from app.services.marketplace.catalog import REGISTRY_SOURCE
 from app.models.platform.publisher import publisher_prefix
+from app.services.marketplace.catalog import REGISTRY_SOURCE
 from app.services.marketplace.registry_entries import RegistryError, listing_path
 
 __all__ = [
