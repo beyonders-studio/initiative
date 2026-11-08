@@ -1,5 +1,5 @@
 import inspect
-from typing import Annotated, List, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
@@ -8,11 +8,11 @@ from app.api.deps import (
     ActorContext,
     ActorSessionDep,
     ActorUserDep,
+    GuildContextDep,
     IncludeDeletedDep,
     RLSSessionDep,
-    plugin_scope,
     get_current_active_user,
-    GuildContextDep,
+    plugin_scope,
 )
 from app.models.platform.user import User
 from app.schemas.tenant.comment import (
@@ -33,7 +33,7 @@ CommentsRead = Annotated[ActorContext, Depends(plugin_scope("comments:read"))]
 CommentsWrite = Annotated[ActorContext, Depends(plugin_scope("comments:write"))]
 
 
-def comment_targets(**ids: Optional[int]) -> dict[str, Optional[int]]:
+def comment_targets(**ids: int | None) -> dict[str, int | None]:
     """The thread a request names: one optional query id per comment parent."""
     return ids
 
@@ -43,7 +43,7 @@ comment_targets.__signature__ = inspect.Signature(
         inspect.Parameter(
             field,
             inspect.Parameter.KEYWORD_ONLY,
-            annotation=Optional[int],
+            annotation=int | None,
             default=Query(default=None, gt=0),
         )
         for field in COMMENT_TARGET_FIELDS
@@ -78,13 +78,13 @@ async def create_comment(
     return response
 
 
-@router.get("/recent", response_model=List[RecentActivityEntry])
+@router.get("/recent", response_model=list[RecentActivityEntry])
 async def recent_comments(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
     limit: int = Query(default=10, ge=1, le=50),
-) -> List[RecentActivityEntry]:
+) -> list[RecentActivityEntry]:
     """Return the most recent comments across the guild.
 
     Only returns comments on parents the current user has DAC permission to
@@ -101,9 +101,9 @@ async def list_comments(
     session: ActorSessionDep,
     current_user: ActorUserDep,
     guild_context: CommentsRead,
-    targets: Annotated[dict[str, Optional[int]], Depends(comment_targets)],
+    targets: Annotated[dict[str, int | None], Depends(comment_targets)],
     limit: int = Query(default=20, ge=1, le=100),
-    cursor: Optional[str] = Query(default=None),
+    cursor: str | None = Query(default=None),
 ) -> CommentListResponse:
     """One page of a thread: ``limit`` conversations, newest first, each with
     every reply under it. Follow ``next_cursor`` for older conversations."""

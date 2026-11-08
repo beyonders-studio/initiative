@@ -1,5 +1,5 @@
 from datetime import date
-from typing import List, Literal, Optional
+from typing import Literal
 
 from pydantic import AliasChoices, ConfigDict, Field
 
@@ -56,7 +56,7 @@ class UserStatsResponse(SanitizedBaseModel):
         le=100,
         description="Percentage of completed tasks finished before due date",
     )
-    avg_completion_days: Optional[float] = Field(
+    avg_completion_days: float | None = Field(
         None,
         description="Average days from start_date to completion (only tasks with start_date)",
     )
@@ -69,13 +69,13 @@ class UserStatsResponse(SanitizedBaseModel):
     backlog_trend: Literal["Growing", "Shrinking"] = Field(
         ..., description="Trend based on tasks assigned vs completed this week"
     )
-    velocity_data: List[VelocityWeekData] = Field(
+    velocity_data: list[VelocityWeekData] = Field(
         ..., description="Weekly velocity data for last 12 weeks"
     )
-    heatmap_data: List[HeatmapDayData] = Field(
+    heatmap_data: list[HeatmapDayData] = Field(
         ..., description="Daily activity data for last 365 days"
     )
-    community_breakdown: List[CommunityTaskBreakdown] = Field(
+    community_breakdown: list[CommunityTaskBreakdown] = Field(
         ...,
         description="Task completion breakdown by guild",
         validation_alias=AliasChoices("community_breakdown", "guild_breakdown"),

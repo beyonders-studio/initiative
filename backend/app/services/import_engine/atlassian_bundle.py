@@ -19,9 +19,10 @@ import json
 import tempfile
 import zipfile
 from collections import Counter
-from datetime import datetime, timezone
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Self
 
 from app.core.tools import Tool, tool_envelope_type
 from app.services.import_engine.common import handle_key
@@ -91,18 +92,17 @@ class BundleWriter:
     """
 
     def __init__(self) -> None:
-        handle = tempfile.NamedTemporaryFile(
+        with tempfile.NamedTemporaryFile(
             prefix="import-bundle-", suffix=".zip", delete=False
-        )
-        handle.close()
-        self.path = Path(handle.name)
+        ) as handle:
+            self.path = Path(handle.name)
         self._archive: zipfile.ZipFile | None = zipfile.ZipFile(
             self.path, "w", zipfile.ZIP_DEFLATED
         )
         self._assets: set[str] = set()
         self._lock = asyncio.Lock()
 
-    def __enter__(self) -> "BundleWriter":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_exc: object) -> None:
@@ -298,7 +298,7 @@ class BundleWriter:
             "type": "initiative-backup",
             "schema_version": 1,
             "app_version": app_version,
-            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "exported_at": datetime.now(UTC).isoformat(),
             "source_instance_url": site_url,
             "guild": {"id": guild_id, "name": guild_name},
             "include_uploads": bool(assets),

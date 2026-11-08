@@ -43,9 +43,9 @@ bought it.
 from __future__ import annotations
 
 import logging
-from collections.abc import Collection
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Optional
+from typing import Any
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -59,15 +59,15 @@ from app.models.platform.notification import NotificationType
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.services.marketplace import registration_lookup
 from app.services.marketplace.definitions import GUILD_INSTALLABLE_PLUGIN_KINDS
-from app.services.platform import rules
 from app.services.marketplace.installs import (
     ListingInstallError,
     resolve_listing_install,
 )
+from app.services.platform import rules
 from app.services.tenant import guild_plugins as guild_plugins_service
+from app.services.tenant import metadata, plugin_schedules
 from app.services.tenant import plugin_config as plugin_config_service
 from app.services.tenant import plugin_connections as connections_service
-from app.services.tenant import metadata, plugin_schedules
 from app.services.tenant import plugin_revocation as revocation_service
 
 logger = logging.getLogger(__name__)
@@ -82,10 +82,10 @@ __all__ = [
     "decline_version",
     "notify_pending_updates",
     "reconcile_repinned",
+    "update_guild",
     "update_offer",
     "updates_target_path",
     "upgrade_asks",
-    "update_guild",
 ]
 
 
@@ -165,7 +165,7 @@ async def _ceiling(definition: dict, listing_uid: str) -> tuple[str, ...]:
 class UpdateOffer:
     """The version an install could move to, and what it would ask for."""
 
-    update: "PendingUpdate"
+    update: PendingUpdate
     asks: UpgradeAsks
 
     @property
@@ -302,7 +302,7 @@ async def apply_version(
 
 
 async def reconcile_repinned(
-    guild_id: int, plugin: GuildPlugin, *, session: Optional[AsyncSession] = None
+    guild_id: int, plugin: GuildPlugin, *, session: AsyncSession | None = None
 ) -> None:
     """Bring what follows an install's pinned definition into line with it
     once it has moved: its schedules, and which of its values are shown.
@@ -392,7 +392,7 @@ async def _update_guild(
     session: AsyncSession,
     guild_id: int,
     *,
-    asked: Optional[list[AskedUpdate]] = None,
+    asked: list[AskedUpdate] | None = None,
 ) -> int:
     """Apply what the catalog offers to one guild's tracking installs.
 

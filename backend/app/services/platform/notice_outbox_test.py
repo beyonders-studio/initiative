@@ -2,7 +2,7 @@
 delivered once, says no more than the community allows, and a push nobody
 answered is tried again without a second bell line."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlmodel import select
@@ -19,6 +19,7 @@ from app.services.platform import (
     notice_outbox,
     notification_policy,
     push_notifications,
+    rules,
 )
 from app.testing import (
     create_guild,
@@ -28,7 +29,6 @@ from app.testing import (
     set_notification_prefs,
 )
 from app.testing.sockets import settle
-from app.services.platform import rules
 
 
 @pytest.fixture
@@ -114,14 +114,14 @@ async def test_a_notice_is_delivered_once_and_only_if_its_request_commits(
     await set_rls_context(session, Unattributed())
     for user in (recipient, actor):
         await session.refresh(user)
-    await _deliver(session, datetime.now(timezone.utc))
+    await _deliver(session, datetime.now(UTC))
     assert await _lines(session, recipient.id) == []
     assert pushed == [] and mailed == []
 
     await _mention(session, guild_id, recipient, actor)
     await session.commit()
-    await _deliver(session, datetime.now(timezone.utc))
-    await _deliver(session, datetime.now(timezone.utc))
+    await _deliver(session, datetime.now(UTC))
+    await _deliver(session, datetime.now(UTC))
 
     [line] = await _lines(session, recipient.id)
     assert mailed == [(recipient.id, line.id)]
@@ -183,7 +183,7 @@ async def test_a_push_of_its_own_writes_no_line(session: AsyncSession, fcm):
     await rules.put(session, "allow_push_notifications", False, guild_id=guild.id)
     await session.commit()
 
-    await _deliver(session, datetime.now(timezone.utc))
+    await _deliver(session, datetime.now(UTC))
 
     title, _body = notification_policy.redacted_line(
         category_of(NotificationType.overdue_tasks), "en"
@@ -206,7 +206,7 @@ async def test_a_push_nobody_answered_is_tried_again_without_a_second_line(
     answer["now"] = (False, False)
     await _mention(session, guild.id, recipient, actor)
     await session.commit()
-    start = datetime.now(timezone.utc)
+    start = datetime.now(UTC)
     await _deliver(session, start)
     [row] = await _waiting(session)
     assert row.attempts == 1 and row.bell_written_at is not None
@@ -247,7 +247,7 @@ async def test_a_retry_follows_the_communitys_switches_as_they_stand_then(
     for _ in range(2):
         await _mention(session, guild.id, recipient, actor)
     await session.commit()
-    start = datetime.now(timezone.utc)
+    start = datetime.now(UTC)
     await _deliver(session, start)
     assert len(pushed) == 2
 
@@ -263,7 +263,7 @@ async def test_a_retry_follows_the_communitys_switches_as_they_stand_then(
     answer["now"] = (False, False)
     await _mention(session, guild.id, recipient, actor)
     await session.commit()
-    at = datetime.now(timezone.utc)
+    at = datetime.now(UTC)
     await _deliver(session, at)
     await rules.put(session, "allow_push_notifications", False, guild_id=guild.id)
     await session.commit()
@@ -290,7 +290,7 @@ async def test_a_bell_line_that_cannot_be_written_is_never_given_up(
     monkeypatch.setattr(notifications, "deliver_notices", _broken)
     await _mention(session, guild.id, recipient, actor)
     await session.commit()
-    at = datetime.now(timezone.utc)
+    at = datetime.now(UTC)
     for wait in (*notice_outbox.BACKOFF_SECONDS, notice_outbox.BACKOFF_SECONDS[-1]):
         await _deliver(session, at)
         at += timedelta(seconds=wait + 1)
@@ -346,14 +346,14 @@ async def test_a_reaction_taken_back_while_its_line_waits_leaves_nothing(
         await _enqueue(
             guild_id, "reaction", {"entry": {"id": 7, "emoji": "+1", "reactor_id": 3}}
         )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await _deliver(session, now)
     monkeypatch.setattr(notifications, "_roll_up_reaction", working)
 
     await _enqueue(
         here.id, "withdraw", {"reaction_id": 7, "reactor_id": 3, "emoji": "+1"}
     )
-    await _deliver(session, datetime.now(timezone.utc))
+    await _deliver(session, datetime.now(UTC))
     await _deliver(session, now + timedelta(seconds=31))
 
     assert await _waiting(session) == []
@@ -377,7 +377,7 @@ async def test_a_delivered_line_is_announced_to_the_desktop(
 
     await _mention(session, guild.id, recipient, actor)
     await session.commit()
-    await _deliver(session, datetime.now(timezone.utc))
+    await _deliver(session, datetime.now(UTC))
     await settle()
 
     [line] = await _lines(session, recipient.id)
@@ -403,7 +403,7 @@ async def test_no_desktop_alert_where_it_is_refused(
 
     await _mention(session, guild.id, recipient, actor)
     await session.commit()
-    await _deliver(session, datetime.now(timezone.utc))
+    await _deliver(session, datetime.now(UTC))
     await settle()
 
     assert len(await _lines(session, recipient.id)) == 1
@@ -439,7 +439,7 @@ async def test_a_reaction_alerts_the_desktop_once_per_line(
             ],
         )
         await session.commit()
-        await _deliver(session, datetime.now(timezone.utc))
+        await _deliver(session, datetime.now(UTC))
     await settle()
 
     [line] = await _lines(session, recipient.id)

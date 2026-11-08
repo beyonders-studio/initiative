@@ -271,9 +271,9 @@ def test_a_csv_with_too_many_cells_is_refused_rather_than_trimmed(monkeypatch) -
 
 
 def test_a_workbook_with_too_many_tabs_is_refused() -> None:
-    from openpyxl import Workbook
-
     import io as _io
+
+    from openpyxl import Workbook
 
     book = Workbook()
     for index in range(70):

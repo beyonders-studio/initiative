@@ -5,16 +5,16 @@ Covers the color/icon fields added for customizable status appearance,
 including category-driven defaults and PATCH behavior around category changes.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from httpx import AsyncClient
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from sqlmodel import select
-
+from app.db.soft_delete_filter import select_including_deleted
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.initiative import InitiativeMember, InitiativeRoleModel
 from app.models.tenant.task import Task, TaskStatusCategory
-from app.db.soft_delete_filter import select_including_deleted
 from app.services.tenant import archive as archive_service
 from app.services.tenant import task_statuses as task_statuses_service
 from app.services.tenant.soft_delete import soft_delete_entity
@@ -318,7 +318,7 @@ async def test_initiative_statuses_skip_archived_and_template_projects(
         a.initiative,
         a.user,
         name="Archived",
-        archived_at=datetime.now(timezone.utc),
+        archived_at=datetime.now(UTC),
     )
     await create_task_status(
         session, archived, name="Archived Only", category=TaskStatusCategory.todo
@@ -597,7 +597,7 @@ async def test_delete_into_done_advances_a_recurring_task(
     done = next(
         status for status in statuses if status.category == TaskStatusCategory.done
     )
-    due = datetime(2026, 9, 16, 12, 0, tzinfo=timezone.utc)
+    due = datetime(2026, 9, 16, 12, 0, tzinfo=UTC)
     recurring = await create_task(
         session,
         a.project,
@@ -631,7 +631,7 @@ async def test_delete_into_done_advances_a_recurring_task(
     assert completed.completed_at is not None
     assert completed.recurrence is None
     assert successor.task_status_id == successor_status.id
-    assert successor.due_date == datetime(2026, 9, 17, 12, 0, tzinfo=timezone.utc)
+    assert successor.due_date == datetime(2026, 9, 17, 12, 0, tzinfo=UTC)
     assert successor.recurrence == "RRULE:FREQ=DAILY"
 
 
@@ -871,7 +871,7 @@ async def test_delete_into_done_completes_frozen_tasks_without_recurring_them(
         a.project,
         title="Archived weekly",
         task_status_id=blocked.id,
-        due_date=datetime(2026, 9, 16, 12, 0, tzinfo=timezone.utc),
+        due_date=datetime(2026, 9, 16, 12, 0, tzinfo=UTC),
         recurrence="RRULE:FREQ=WEEKLY",
         recurrence_strategy="fixed",
     )

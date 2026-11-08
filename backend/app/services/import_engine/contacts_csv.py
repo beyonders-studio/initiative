@@ -26,7 +26,7 @@ import asyncio
 import csv
 import io
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from functools import cache
 from typing import Any
 
@@ -54,6 +54,8 @@ from app.schemas.tenant.import_job import (
     ContactCsvColumn,
     ContactCsvImportRequest,
     ContactCsvPreview,
+)
+from app.schemas.tenant.import_job import (
     ContactCsvTarget as Target,
 )
 from app.schemas.tenant.tag import TagCreate
@@ -511,7 +513,7 @@ async def start_import(
         params={"initiative_id": request.initiative_id},
         file_ref=payload_ref,
         status=DataJobStatus.queued,
-        expires_at=datetime.now(timezone.utc)
+        expires_at=datetime.now(UTC)
         + timedelta(hours=import_limits.IMPORT_STAGED_TTL_HOURS),
     )
     session.add(job)

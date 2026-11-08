@@ -18,7 +18,6 @@ from app.models.platform.user import UserRole
 from app.testing import emitted
 from app.testing.factories import create_auth_provider, create_user, get_auth_headers
 
-
 BASE = "/api/v1/settings/auth/providers/"
 SECRET = "s3cret-value"
 ISSUER = "https://idp.example.com"

@@ -18,9 +18,9 @@ import json
 import asyncpg
 import pytest
 
-from conftest import TEST_DATABASE_URL
 from app.core.config import settings
 from app.services.platform import notify_bus, user_stream
+from conftest import TEST_DATABASE_URL
 
 
 async def _wait_for(predicate, timeout: float = 5.0) -> bool:

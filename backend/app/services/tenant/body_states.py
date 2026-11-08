@@ -21,7 +21,8 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Callable, Optional, Protocol
+from collections.abc import Callable
+from typing import Any, Protocol
 
 from pycrdt import Doc, Map
 
@@ -42,7 +43,7 @@ class BodyState(Protocol):
         writing anything into it does not, and the content is the body."""
         ...
 
-    async def render(self, state: bytes) -> Optional[dict]:
+    async def render(self, state: bytes) -> dict | None:
         """The content ``state`` reads as, or ``None`` when it holds no body
         to read."""
         ...
@@ -71,7 +72,7 @@ def _same(a: Any, b: Any) -> bool:
     return json.dumps(_js(a), sort_keys=True) == json.dumps(_js(b), sort_keys=True)
 
 
-def _written(state: Optional[bytes], write: Callable[[Doc], None]) -> bytes:
+def _written(state: bytes | None, write: Callable[[Doc], None]) -> bytes:
     """What ``write`` changes in ``state``, as an update from a Yjs client of
     its own; the whole state when there is none to start from."""
     doc = Doc()
@@ -89,7 +90,7 @@ def _read(state: bytes) -> Doc:
     return doc
 
 
-def _editor_state(content: Any) -> Optional[dict]:
+def _editor_state(content: Any) -> dict | None:
     """``content`` as the editor can start from it, or ``None`` for an empty
     file. A body nobody has written is stored as ``{}``, or as a root with
     no children, and the editor refuses both as a starting state."""
@@ -106,7 +107,7 @@ class _Lexical:
         # The editor reads any state as a document, an empty one included.
         return True
 
-    async def render(self, state: bytes) -> Optional[dict]:
+    async def render(self, state: bytes) -> dict | None:
         return without_mention_names(
             await editor_engine.render(state), MentionForm.lexical
         )
@@ -119,7 +120,7 @@ _SCENE_MAP = "excalidraw"
 _SCENE_KEY = "scene"
 
 
-def _scene(value: Any) -> Optional[dict]:
+def _scene(value: Any) -> dict | None:
     """The scene a whiteboard's live value holds, or ``None`` for none."""
     if not isinstance(value, str):
         return None
@@ -147,7 +148,7 @@ class _Whiteboard:
     def holds_body(self, state: bytes) -> bool:
         return _read(state).get(_SCENE_MAP, type=Map).get(_SCENE_KEY) is not None
 
-    async def render(self, state: bytes) -> Optional[dict]:
+    async def render(self, state: bytes) -> dict | None:
         scene = _scene(_read(state).get(_SCENE_MAP, type=Map).get(_SCENE_KEY))
         return None if scene is None else self._normalized(scene)
 
@@ -210,7 +211,7 @@ class _Spreadsheet:
         doc = _read(state)
         return any(len(doc.get(key, type=Map)) for key in (_SHEETS, _META, *_PARTS))
 
-    async def render(self, state: bytes) -> Optional[dict]:
+    async def render(self, state: bytes) -> dict | None:
         from app.services.tenant.files import FileContentError
 
         doc = _read(state)
@@ -240,7 +241,7 @@ class _Spreadsheet:
             return None
 
     @staticmethod
-    def _sheet(sheet_id: Optional[str], container: Any) -> tuple[Any, str, dict]:
+    def _sheet(sheet_id: str | None, container: Any) -> tuple[Any, str, dict]:
         def part(key: str) -> dict:
             value = container.get(key)
             return dict(value.items()) if isinstance(value, Map) else {}
@@ -280,7 +281,7 @@ class _Spreadsheet:
         def write(doc: Doc) -> None:
             root = doc.get(_SHEETS, type=Map)
             wanted = [sheet["id"] for sheet in content["sheets"]]
-            for sheet_id in [key for key in root.keys() if key not in wanted]:
+            for sheet_id in [key for key in root if key not in wanted]:
                 del root[sheet_id]
             for order, sheet in enumerate(content["sheets"]):
                 container = root.get(sheet["id"])
@@ -316,7 +317,8 @@ def _dig(content: dict, path: tuple[str, ...]) -> Any:
 
 def _sync(target: Map, wanted: dict) -> None:
     """Make ``target`` hold ``wanted``, writing only the entries that differ."""
-    for key in [key for key in target.keys() if key not in wanted]:
+    # pycrdt types Map.__iter__ as returning an Iterable, so iterate its keys.
+    for key in [key for key in target.keys() if key not in wanted]:  # noqa: SIM118
         del target[key]
     for key, value in wanted.items():
         if key not in target or not _same(target[key], value):
@@ -334,7 +336,7 @@ _BY_KIND: dict[str, BodyState] = {
 }
 
 
-def for_row(row: Any) -> Optional[BodyState]:
+def for_row(row: Any) -> BodyState | None:
     """How a stored row's body moves between its views: a file's by its
     type, a wiki page's as prose."""
     from app.models.tenant.file import File
@@ -342,7 +344,7 @@ def for_row(row: Any) -> Optional[BodyState]:
     return for_kind(row.file_type) if isinstance(row, File) else LEXICAL
 
 
-def for_kind(kind: Any) -> Optional[BodyState]:
+def for_kind(kind: Any) -> BodyState | None:
     """How a body of ``kind`` — a file type, ``lexical`` for any Lexical
     body — moves between its views; ``None`` for one with no live editor."""
     return _BY_KIND.get(getattr(kind, "value", kind))

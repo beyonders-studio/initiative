@@ -24,8 +24,8 @@ import hmac
 import logging
 import threading
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -59,9 +59,9 @@ class _Bucket:
     raw_key: str
     count: int = 0
     #: The newest counted line's facts, for the case should this trip.
-    event_uuid: Optional[str] = None
-    subject_user: Optional[int] = None
-    subject_guild: Optional[int] = None
+    event_uuid: str | None = None
+    subject_user: int | None = None
+    subject_guild: int | None = None
 
 
 @dataclass
@@ -88,21 +88,21 @@ def window_start(at: datetime, window: timedelta) -> datetime:
     """The start of the fixed window ``at`` falls in."""
     seconds = window.total_seconds()
     stamp = at.timestamp()
-    return datetime.fromtimestamp(stamp - stamp % seconds, tz=timezone.utc)
+    return datetime.fromtimestamp(stamp - stamp % seconds, tz=UTC)
 
 
-def _int(value: Any) -> Optional[int]:
+def _int(value: Any) -> int | None:
     return value if isinstance(value, int) else None
 
 
-def observe(envelope: Envelope, *, now: Optional[datetime] = None) -> None:
+def observe(envelope: Envelope, *, now: datetime | None = None) -> None:
     """Count ``envelope`` for every rule that watches it. Never raises: a
     rule that can't count must not lose the line it was shown."""
     rules = BY_WATCHED.get(str(envelope.get("event_type")))
     if not rules:
         return
     try:
-        moment = now or datetime.now(timezone.utc)
+        moment = now or datetime.now(UTC)
         for rule in rules:
             if rule.when is not None and not rule.when(envelope):
                 continue
@@ -133,7 +133,7 @@ def _count(rule: SecurityRule, raw: str, envelope: Envelope, moment: datetime) -
         bucket.subject_guild = _int(envelope.get("guild_id"))
 
 
-def signal(kind: Signal, *, source_ip: Optional[str] = None) -> None:
+def signal(kind: Signal, *, source_ip: str | None = None) -> None:
     """Count one high-volume rejection — a cross-site refusal, a 429, a
     refused captcha — against where the request came from: the request's own
     address, else ``source_ip`` where there is no request context (a refused
@@ -221,7 +221,7 @@ class Crossing:
     count: int
     bucket: _Bucket
     #: The ``security.threshold_crossed`` line, once written.
-    line: Optional[dict[str, Any]] = None
+    line: dict[str, Any] | None = None
 
 
 #: Crossings stamped whose case could not be opened yet: retried on every
@@ -248,7 +248,7 @@ async def flush() -> list[Crossing]:
             crossings = []
     # Cases a failed attempt left unopened go first, then this flush's. One
     # whose window has long passed is given up on: the audit line stands.
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     waiting = [
         crossing
         for crossing in _unopened
@@ -375,10 +375,10 @@ def _span(window: timedelta) -> str:
     return f"{minutes} minutes"
 
 
-async def forget_old(session: AsyncSession, *, now: Optional[datetime] = None) -> int:
+async def forget_old(session: AsyncSession, *, now: datetime | None = None) -> int:
     """Drop windows no rule can still read. ``session`` is the system
     engine's, unrouted. Returns how many went."""
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     result = await session.exec(
         text("DELETE FROM security_signal_windows WHERE window_start < :before"),
         params={"before": moment - 2 * LONGEST_WINDOW},

@@ -1,7 +1,7 @@
 """The hourly pass that works out each community's engagement levels, and the
 gates on what it writes."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import delete, update
@@ -14,12 +14,12 @@ from app.models.tenant.engagement_level import EngagementLevel
 from app.models.tenant.event_outbox import EventOutbox
 from app.models.tenant.personal_item import PersonalItem, ViewSource
 from app.services.guild_sweeps import Scope, each_guild
+from app.services.platform import rules
 from app.services.tenant import engagement_levels
 from app.services.tenant.engagement_levels import HALF_LIFE
 from app.services.tenant.personal_items import WINDOW
 from app.testing import create_task, guild_administration
 from app.testing.routing import route_as
-from app.services.platform import rules
 
 
 async def _pass(guild_id: int) -> None:
@@ -56,7 +56,7 @@ async def _three_people(session: AsyncSession, acting_user):
 async def _all_opened(
     session: AsyncSession, people, task, source: ViewSource = ViewSource.direct
 ) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for person in people:
         session.add(
             PersonalItem(
@@ -180,7 +180,7 @@ async def test_each_person_counts_once_and_old_engagement_fades(
         await session.exec(
             update(PersonalItem)  # type: ignore[arg-type]
             .where(PersonalItem.user_id == person.user.id)  # type: ignore[arg-type]
-            .values(viewed_at=datetime.now(timezone.utc) - age)
+            .values(viewed_at=datetime.now(UTC) - age)
         )
         await session.commit()
 

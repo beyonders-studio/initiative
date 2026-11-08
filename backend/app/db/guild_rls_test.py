@@ -18,6 +18,7 @@ from sqlalchemy import text
 
 from app.core.reactions import ReactionTarget
 from app.core.relationships import PERSON
+from app.db.guild_ddl import _QUERY_TOMBSTONES
 from app.db.initiative_rls import (
     COMMENT_PARENTS,
     CONTENT_KIND_TABLES,
@@ -32,13 +33,12 @@ from app.db.schema_provisioning import (
     guild_schema_name,
     provision_guild_schema,
 )
-from app.db.guild_ddl import _QUERY_TOMBSTONES
 from app.db.soft_delete_filter import SOFT_DELETE_TABLES
 from app.db.tenancy import (
-    MANAGED_TABLES,
     GUILD_LEVEL_TABLES,
     INITIATIVE_SCOPED_TABLES,
     LEDGER_TABLES,
+    MANAGED_TABLES,
     OWN_ROW_TABLES,
     PRIVATE_ROW_SHARED_READ,
     PRIVATE_ROW_TABLES,
@@ -530,9 +530,9 @@ def test_every_declared_hop_walks_a_real_column_to_a_real_table():
     the registry names something the models do not, which is the drift this
     is here to catch.
     """
-    import app.db.base  # noqa: F401 — imported for its side effect
     from sqlmodel import SQLModel
 
+    import app.db.base  # noqa: F401 — imported for its side effect
     from app.db.initiative_rls import INITIATIVE_PATHS, governing_path
 
     # app.db.base registers every model, so the metadata is complete whether

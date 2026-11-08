@@ -15,8 +15,7 @@ place somebody in itself.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -81,7 +80,7 @@ async def agree(
     *,
     agreed: bool,
     actor_user_id: int,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> GuildProviderConnection:
     """Record the answer on the connection.
 
@@ -95,9 +94,7 @@ async def agree(
             )
         )
     ).one()
-    connection.narrowing_approved_at = (
-        (now or datetime.now(timezone.utc)) if agreed else None
-    )
+    connection.narrowing_approved_at = (now or datetime.now(UTC)) if agreed else None
     connection.narrowing_approved_by = actor_user_id if agreed else None
     session.add(connection)
     await audit_service.record(

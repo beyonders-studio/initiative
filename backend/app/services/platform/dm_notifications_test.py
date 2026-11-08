@@ -7,6 +7,7 @@ sender and counts the messages without ever carrying one.
 """
 
 import base64
+from datetime import UTC
 from unittest.mock import AsyncMock, patch
 
 from sqlalchemy import text
@@ -315,7 +316,7 @@ class TestAGroupLine:
     """A group thread has no name, so the line is named by who is on it."""
 
     async def _group(self, client, session, members):
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from app.models.platform.dm_conversation import (
             DmConversation,
@@ -333,7 +334,7 @@ class TestAGroupLine:
             actor.user.id: await _register(client, actor, seed=1 + 40 * i)
             for i, actor in enumerate(members)
         }
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         conversation = DmConversation(
             kind=DmConversationKind.group,
             roster_key=roster_key(actor.user.id for actor in members),

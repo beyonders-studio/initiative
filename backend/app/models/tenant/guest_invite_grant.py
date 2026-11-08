@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     CheckConstraint,
@@ -44,7 +43,7 @@ class GuestInviteGrant(CreatedByMixin, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     invite_id: int = Field(sa_column=Column(Integer, nullable=False, index=True))
     initiative_id: int = Field(
         sa_column=Column(
@@ -54,16 +53,16 @@ class GuestInviteGrant(CreatedByMixin, table=True):
         )
     )
     #: The item, with ``level``; all three NULL for the whole initiative.
-    resource_type: Optional[Tool] = Field(
+    resource_type: Tool | None = Field(
         default=None, sa_column=Column(String(length=32), nullable=True)
     )
-    resource_id: Optional[int] = Field(
+    resource_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
-    level: Optional[ResourceAccessLevel] = Field(
+    level: ResourceAccessLevel | None = Field(
         default=None, sa_column=Column(String(length=16), nullable=True)
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

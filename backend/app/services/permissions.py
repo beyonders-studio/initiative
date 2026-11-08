@@ -32,26 +32,25 @@ from sqlalchemy.orm import joinedload, undefer
 from sqlmodel import select
 
 from app.core.audit_events import AuditEventType
-from app.db.guild_standing import ActorContext, InstallContext
-from app.services import audit as audit_service
-from app.core.tools import Tool
-
-from app.models.platform.guild import GuildMembership
-from app.models.tenant.project import Project
-from app.models.tenant.initiative import InitiativeMember, InitiativeRoleModel
-from app.db.frozen import ancestor_is_frozen, row_is_frozen
-from app.db.authorization import standing_arg
 from app.core.messages import (
     CommonMessages,
     ExportMessages,
     InitiativeMessages,
-    SharingMessages,
     ProjectMessages,
+    SharingMessages,
 )
+from app.core.tools import Tool
+from app.db.authorization import standing_arg
+from app.db.frozen import ancestor_is_frozen, row_is_frozen
+from app.db.guild_standing import ActorContext, InstallContext
+from app.models.platform.guild import GuildMembership
+from app.models.tenant.initiative import InitiativeMember, InitiativeRoleModel
+from app.models.tenant.project import Project
 from app.models.tenant.resource_grant import (
     ResourceAccessLevel,
     ResourceGrant,
 )
+from app.services import audit as audit_service
 
 
 def granted_scope_clause(

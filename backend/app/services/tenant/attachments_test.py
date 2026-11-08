@@ -282,9 +282,9 @@ def test_a_program_is_refused_whatever_it_is_named(content, filename):
 @pytest.mark.parametrize(
     ("name", "shown"),
     [
-        ("report‮gnp.exe", "reportgnp.exe"),
+        ("report\u202egnp.exe", "reportgnp.exe"),
         ("  notes.txt. ", "notes.txt"),
-        ("​", None),
+        ("\u200b", None),
         ("a" * 300 + ".pdf", "a" * 251 + ".pdf"),
     ],
 )

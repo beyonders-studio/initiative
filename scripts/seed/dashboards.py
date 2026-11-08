@@ -9,7 +9,6 @@ from app.models.tenant.counter import Counter
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.services.tenant.dashboard_definition import normalize_dashboard_definition
-
 from seed.common import Community, share
 
 

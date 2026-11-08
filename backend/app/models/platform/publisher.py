@@ -18,8 +18,7 @@ guild data. It is written on the system engine only. An installed plug-in's
 standing reads ``id`` and ``enabled`` of its own registration's publisher.
 """
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, Column, DateTime, String
 from sqlmodel import Field, SQLModel
@@ -68,7 +67,7 @@ class Publisher(SQLModel, table=True):
 
     __tablename__ = "publishers"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     # The ``public_id`` prefix this publisher's plug-ins carry. Unique: one
     # publisher per prefix.
     prefix: str = Field(
@@ -93,6 +92,6 @@ class Publisher(SQLModel, table=True):
         sa_column=Column(String(16), nullable=False, server_default="operator"),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

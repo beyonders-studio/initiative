@@ -1,10 +1,7 @@
-from typing import List, Optional
-
 from pydantic import ConfigDict, Field
 
-from app.schemas.base import SanitizedBaseModel
-
 from app.models.tenant.task import TaskStatusCategory
+from app.schemas.base import SanitizedBaseModel
 
 # Accepts #RGB, #RRGGBB, and #RRGGBBAA — matching the 4/7/9 char lengths the
 # model column allows. Keeps arbitrary strings ("red", "notcolor", …) out of
@@ -24,23 +21,23 @@ class TaskStatusBase(SanitizedBaseModel):
 class TaskStatusCreate(SanitizedBaseModel):
     name: str = Field(min_length=1, max_length=100)
     category: TaskStatusCategory
-    position: Optional[int] = Field(default=None, ge=0)
+    position: int | None = Field(default=None, ge=0)
     is_default: bool = False
-    color: Optional[str] = Field(
+    color: str | None = Field(
         default=None, min_length=4, max_length=9, pattern=HEX_COLOR_PATTERN
     )
-    icon: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    icon: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class TaskStatusUpdate(SanitizedBaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    category: Optional[TaskStatusCategory] = None
-    position: Optional[int] = Field(default=None, ge=0)
-    is_default: Optional[bool] = None
-    color: Optional[str] = Field(
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    category: TaskStatusCategory | None = None
+    position: int | None = Field(default=None, ge=0)
+    is_default: bool | None = None
+    color: str | None = Field(
         default=None, min_length=4, max_length=9, pattern=HEX_COLOR_PATTERN
     )
-    icon: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    icon: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class TaskStatusRead(TaskStatusBase):
@@ -53,7 +50,7 @@ class TaskStatusRead(TaskStatusBase):
 
 
 class TaskStatusDeleteRequest(SanitizedBaseModel):
-    fallback_status_id: Optional[int] = None
+    fallback_status_id: int | None = None
 
 
 class TaskStatusReorderItem(SanitizedBaseModel):
@@ -62,7 +59,7 @@ class TaskStatusReorderItem(SanitizedBaseModel):
 
 
 class TaskStatusReorderRequest(SanitizedBaseModel):
-    items: List[TaskStatusReorderItem]
+    items: list[TaskStatusReorderItem]
 
 
 class InitiativeTaskStatusRead(SanitizedBaseModel):

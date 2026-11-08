@@ -2,12 +2,12 @@ import asyncio
 import functools
 import logging
 import time
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, AsyncGenerator, Optional, Sequence
+from typing import Any
 
-from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from asyncpg.exceptions import InvalidCatalogNameError
@@ -24,13 +24,18 @@ from sqlalchemy.pool import NullPool
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.requests import HTTPConnection
 
+from alembic import command
 from app.core import metrics
-from app.core.plugin_access_token import InstallAccessToken
 from app.core.config import settings
 from app.core.identify import bearer_plugin_token
+from app.core.plugin_access_token import InstallAccessToken
 from app.core.tools import Tool
-from app.db import base  # noqa: F401  # ensure models are imported for Alembic
-from app.db import cohorts, gucs, post_commit
+from app.db import (
+    base,  # noqa: F401  # ensure models are imported for Alembic
+    cohorts,
+    gucs,
+    post_commit,
+)
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.guild_standing import (
     GuildContext,
@@ -658,12 +663,12 @@ async def _apply_stored_context(session: AsyncSession) -> None:
 class SavedContext:
     """A session's stored context, as :func:`save_rls_context` found it."""
 
-    context: Optional[RequestContext]
-    established: Optional[float]
+    context: RequestContext | None
+    established: float | None
     #: The tier the request authenticated as. A routing records it, so it is
     #: put back with the rest: the caller on the other side is still the same
     #: request, and one that had recorded none has none again.
-    tier: Optional[str]
+    tier: str | None
 
 
 def save_rls_context(session: AsyncSession) -> SavedContext:

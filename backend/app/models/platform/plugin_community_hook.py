@@ -23,8 +23,8 @@ clears the claim as it settles. A claim that lapses, a sender that died, is
 simply claimed again.
 """
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import (
     BigInteger,
@@ -63,7 +63,7 @@ class PluginCommunityHook(SQLModel, table=True):
         Index("ix_plugin_community_hooks_done_at", "done_at"),
     )
 
-    id: Optional[int] = Field(
+    id: int | None = Field(
         default=None, sa_column=Column(BigInteger, primary_key=True, autoincrement=True)
     )
     guild_id: int = Field(
@@ -77,7 +77,7 @@ class PluginCommunityHook(SQLModel, table=True):
     )
     #: The install the hook is about, as the token's ``plugin_install_id``.
     #: Null when the community no longer has one to name.
-    install_id: Optional[int] = Field(
+    install_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
     #: One of ``community_hooks.COMMUNITY_HOOK_NAMES``.
@@ -87,24 +87,24 @@ class PluginCommunityHook(SQLModel, table=True):
         sa_column=Column(JSONB, nullable=False, server_default="{}"),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     #: The earliest the worker may send it: now, or later after a failure.
     next_attempt_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     attempts: int = Field(
         default=0, sa_column=Column(Integer, nullable=False, server_default="0")
     )
     #: When the plug-in answered it, or the worker gave up on it.
-    done_at: Optional[datetime] = Field(
+    done_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: Who is sending it, until when: while this is in the future no other
     #: sender sends to the plug-in in the community.
-    claimed_until: Optional[datetime] = Field(
+    claimed_until: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     #: How it ended: ``delivered`` (a 2xx), ``not_taken`` (a 404: the plug-in
@@ -112,11 +112,11 @@ class PluginCommunityHook(SQLModel, table=True):
     #: waiting), ``gave_up``, ``unnamed`` (the plug-in may not be named here),
     #: or, for a hook sent at once, ``answered``, ``failed`` or ``lapsed`` (its
     #: sender died).
-    outcome: Optional[str] = Field(
+    outcome: str | None = Field(
         default=None, sa_column=Column(String(16), nullable=True)
     )
     #: What the last failed attempt met, for an operator reading the table.
-    last_error: Optional[str] = Field(
+    last_error: str | None = Field(
         default=None,
         sa_column=Column(String(HOOK_ERROR_MAX_LENGTH), nullable=True),
     )

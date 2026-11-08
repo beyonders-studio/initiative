@@ -13,10 +13,10 @@ from starlette.requests import HTTPConnection
 from app.core.config import Settings, settings
 from app.db import cohorts
 from app.db import session as db_session
+from app.db.request_context import SystemGuild
 from app.db.session import get_session, set_rls_context
 from app.services.cross_guild import gather_across_guilds
 from app.testing import create_guild, create_user, platform_session
-from app.db.request_context import SystemGuild
 
 
 def _connection(path_params: dict[str, str]) -> HTTPConnection:

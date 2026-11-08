@@ -6,6 +6,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.encryption import SALT_OIDC_CLIENT_SECRET, decrypt_field
+from app.db.request_context import Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.auth_provider_secret import AuthProviderSecret
@@ -24,8 +25,6 @@ from app.testing.factories import (
     create_user,
     get_auth_headers,
 )
-from app.db.request_context import Unattributed
-
 
 BASE = "/api/v1/settings/auth/providers/"
 

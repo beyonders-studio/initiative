@@ -10,9 +10,9 @@ deployment provides; it tells the plug-in ``erase``, after ``uninstalled``.
 
 from __future__ import annotations
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy import update
 from sqlmodel import select
@@ -200,7 +200,7 @@ class TestErasing:
                 PluginCommunityHook.guild_id == a.guild.id,
                 PluginCommunityHook.hook == "erase",
             )
-            .values(done_at=datetime.now(timezone.utc), outcome=settled)
+            .values(done_at=datetime.now(UTC), outcome=settled)
         )
         await session.commit()
         assert await _install(client, a)

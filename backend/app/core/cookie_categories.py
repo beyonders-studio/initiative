@@ -19,8 +19,8 @@ refusal of something nobody was doing.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import Enum
-from typing import Callable
 
 from app.core.config import Settings
 

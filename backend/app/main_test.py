@@ -6,14 +6,14 @@ import json
 
 import pytest
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
-from fastapi.exceptions import RequestValidationError
 from httpx import ASGITransport, AsyncClient
+from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route
-from sqlmodel.ext.asyncio.session import AsyncSession
 
 import app.main as main_module
 from app.core.config import API_V1_STR, Settings, settings

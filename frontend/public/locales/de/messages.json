@@ -1,7 +1,7 @@
 {
   "title": "Meine Nachrichten",
   "backToNav": "Zurück zur Navigation",
-  "encryptedNotice": "Ende-zu-Ende-verschlüsselt. Nur du und die andere Person können sie lesen.",
+  "encryptedNotice": "Ende-zu-Ende-verschlüsselt. Nur die Personen in dieser Unterhaltung können sie lesen.",
   "empty": {
     "title": "Ein Gespräch auswählen"
   },

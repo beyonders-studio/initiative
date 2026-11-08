@@ -20,8 +20,7 @@ from app.services.platform import csv_export
 def _parse(body: bytes) -> list[list[str]]:
     """Strip the UTF-8 BOM and parse the CSV body into a list of rows."""
     text = body.decode("utf-8")
-    if text.startswith("﻿"):
-        text = text[1:]
+    text = text.removeprefix("﻿")
     return list(csv.reader(io.StringIO(text)))
 
 

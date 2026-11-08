@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
-
 from pydantic import BaseModel, ConfigDict
 
 from app.core.search import SearchEntityType
@@ -26,14 +24,14 @@ class SearchHit(BaseModel):
     entity_type: SearchEntityType
     entity_id: int
     title: str
-    snippet: Optional[str] = None
-    initiative_id: Optional[int] = None
-    tool: Optional[Tool] = None
-    tool_id: Optional[int] = None
+    snippet: str | None = None
+    initiative_id: int | None = None
+    tool: Tool | None = None
+    tool_id: int | None = None
 
 
 class SearchResults(PageMeta):
-    items: List[SearchHit]
+    items: list[SearchHit]
     #: True when nothing matched what was typed and these are the closest
     #: titles instead — so a reader is told which of the two they are reading.
     fuzzy: bool = False
@@ -49,9 +47,9 @@ class SearchSuggestion(BaseModel):
     #: A comment's is the start of what was written, so it mentions as the
     #: comment does.
     title: MentionStr
-    initiative_id: Optional[int] = None
-    tool: Optional[Tool] = None
-    tool_id: Optional[int] = None
+    initiative_id: int | None = None
+    tool: Tool | None = None
+    tool_id: int | None = None
     #: Whether this reader may change the thing, not only open it. A picker
     #: needs it to know which links are theirs to make: a relation describing
     #: its source is the source's to assert, so a thing somebody can only read
@@ -62,5 +60,5 @@ class SearchSuggestion(BaseModel):
     #: template hold six tasks called "Do a thing", and the only difference
     #: between them is which project they are in. ``tool_title`` is None for a
     #: row that IS a tool — a project does not live in a project.
-    tool_title: Optional[str] = None
-    initiative_name: Optional[str] = None
+    tool_title: str | None = None
+    initiative_name: str | None = None

@@ -10,16 +10,16 @@ registry can name them. The unit half is what fails on a rename instead of a
 request failing at runtime.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.relationships import ENDPOINT_KINDS
 from app.core.search import SearchEntityType
-from app.models.platform.guild import CommunityRole
 from app.db.blocking import OPEN_WHEN, blocking_kinds, open_expr
 from app.db.reference_targets import resolve_many
+from app.models.platform.guild import CommunityRole
 from app.models.tenant.task import TaskStatusCategory
 from app.testing.factories import (
     create_calendar,
@@ -94,7 +94,7 @@ async def test_a_task_is_open_until_it_is_done(session: AsyncSession, acting_use
 async def test_an_event_blocks_until_it_has_passed(session: AsyncSession, acting_user):
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     calendar = await create_calendar(session, a.initiative, a.user)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     upcoming = await create_calendar_event(
         session,
         calendar,
@@ -127,7 +127,7 @@ async def test_a_recurring_event_has_no_opinion(session: AsyncSession, acting_us
     through an event that recurs forever."""
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     calendar = await create_calendar(session, a.initiative, a.user)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     event = await create_calendar_event(
         session,
         calendar,
@@ -235,7 +235,7 @@ async def test_an_archived_task_neither_holds_a_project_open_nor_closes_it(
         session, a.project, status_category=TaskStatusCategory.todo
     )
     await route_session_to_guild(session, a.guild.id)
-    shelved.archived_at = datetime.now(timezone.utc)
+    shelved.archived_at = datetime.now(UTC)
     session.add(shelved)
     await session.commit()
 

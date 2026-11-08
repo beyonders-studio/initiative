@@ -35,7 +35,7 @@ from app.core.encryption import SALT_CAPTCHA_SECRET_KEY, decrypt_field
 #: been rotated should start being used about as promptly as a new S3 key.
 _TTL_SECONDS = 30.0
 
-_resolved: "ResolvedCaptchaConfig | None" = None
+_resolved: ResolvedCaptchaConfig | None = None
 _loaded_at: float = 0.0
 
 
@@ -70,7 +70,7 @@ async def resolve_saved_secret() -> str | None:
     On a system-engine session of its own: ``app_setting_secrets`` is granted to
     no request-path role.
     """
-    from app.services.platform.app_settings import (  # noqa: PLC0415
+    from app.services.platform.app_settings import (
         load_app_setting_secrets,
     )
 
@@ -87,7 +87,7 @@ async def refresh_captcha_config(session: AsyncSession) -> ResolvedCaptchaConfig
     whatever ``session`` is.
     """
     global _resolved, _loaded_at
-    from app.services.platform.app_settings import get_app_settings  # noqa: PLC0415
+    from app.services.platform.app_settings import get_app_settings
 
     row = await get_app_settings(session)
     _resolved = ResolvedCaptchaConfig(
@@ -107,7 +107,7 @@ async def ensure_captcha_config_fresh() -> ResolvedCaptchaConfig:
     """
     if _resolved is not None and (time.monotonic() - _loaded_at) <= _TTL_SECONDS:
         return _resolved
-    from app.db import session as db_session  # noqa: PLC0415
+    from app.db import session as db_session
 
     async with db_session.SystemSessionLocal() as system_session:
         return await refresh_captcha_config(system_session)

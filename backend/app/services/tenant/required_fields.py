@@ -18,8 +18,9 @@ one, a copy) are not, and the item shows the field as missing.
 from __future__ import annotations
 
 import inspect
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any
 
 from sqlalchemy import exists, func, or_
 from sqlmodel import col, select
@@ -54,7 +55,7 @@ class Required:
 
     row: Any
     #: The collection whose file page it is, for a file.
-    collection_id: Optional[int]
+    collection_id: int | None
     #: Each by its key: a built-in field's id, a part's type, or
     #: ``property:<id>``; in the order the layout places them.
     keys: tuple[str, ...]
@@ -63,7 +64,7 @@ class Required:
     filled: frozenset[str]
 
 
-def _layout_of(row: Any, collection_id: Optional[int]) -> Optional[Any]:
+def _layout_of(row: Any, collection_id: int | None) -> Any | None:
     """The query for the stored page layout that governs ``row``: its type's
     task page, its initiative's event or posts page, or the collection's file
     page. None for an item no layout requires anything of."""
@@ -100,7 +101,7 @@ def _layout_of(row: Any, collection_id: Optional[int]) -> Optional[Any]:
     return None
 
 
-def _text(value: Optional[str]) -> bool:
+def _text(value: str | None) -> bool:
     return bool((value or "").strip())
 
 
@@ -140,7 +141,7 @@ _BUILT_IN: dict[type, dict[str, Callable[[AsyncSession, Any], Any]]] = {
 }
 
 
-def _property_id(key: str) -> Optional[int]:
+def _property_id(key: str) -> int | None:
     if not key.startswith(PROPERTY_FIELD_PREFIX):
         return None
     return int(key.removeprefix(PROPERTY_FIELD_PREFIX))
@@ -193,8 +194,8 @@ async def required_of(
     context: ActorContext,
     row: Any,
     *,
-    collection_id: Optional[int] = None,
-) -> Optional[Required]:
+    collection_id: int | None = None,
+) -> Required | None:
     """What ``row``'s page layout requires of this request, and what of it the
     row holds now. None when the request is not a person's, or the layout
     requires nothing. A required property that has since been deleted, or
@@ -255,7 +256,7 @@ async def refuse_missing(
     session: AsyncSession,
     context: ActorContext,
     *rows: Any,
-    collection_id: Optional[int] = None,
+    collection_id: int | None = None,
 ) -> None:
     """Refuse a person adding ``rows`` (items of one page: a new task, or the
     files put in a collection) without each field their page requires. Called
@@ -273,7 +274,7 @@ async def refuse_missing(
         )
 
 
-async def refuse_emptied(session: AsyncSession, before: Optional[Required]) -> None:
+async def refuse_emptied(session: AsyncSession, before: Required | None) -> None:
     """Refuse a person's write that empties a field the item's page requires
     and the item held before it (``before``, read by :func:`required_of`).
     A field it lacked already may stay empty."""

@@ -15,26 +15,28 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, AsyncIterator, BinaryIO
+from typing import Any, BinaryIO
 
 from sqlalchemy import func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.db.advisory_locks import LockNamespace, advisory_lock
-from app.db import gucs
-from app.db.session import raise_flag, routed_guild_id
+from app.core.legacy_references import UNMAPPED, rewrite_body, rewrite_ref, rewrite_text
 from app.core.messages import ImportEngineMessages
+from app.core.tools import Tool, tool_envelope_type, tool_for_create_permission
+from app.db import gucs
+from app.db.advisory_locks import LockNamespace, advisory_lock
+from app.db.session import raise_flag, routed_guild_id
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import User
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.initiative import Initiative
-from app.core.legacy_references import UNMAPPED, rewrite_body, rewrite_ref, rewrite_text
-from app.core.tools import Tool, tool_envelope_type, tool_for_create_permission
 from app.schemas.tenant.import_job import BackupPlanPerson, EnvelopeImportPlan
+from app.services.import_engine import limits as import_limits
 from app.services.import_engine.common import (
     handle_key,
     load_guild_member_handles,
@@ -45,7 +47,6 @@ from app.services.import_engine.contract import (
     ImportEngineError,
     InlineImport,
 )
-from app.services.import_engine import limits as import_limits
 from app.services.tenant.initiative_tools import tool_on_in
 
 # Statuses that count against the per-user active-job cap.
@@ -339,7 +340,7 @@ async def start_envelope_import(
         if unplaced
         else None,
         status=DataJobStatus.staged if unplaced else DataJobStatus.queued,
-        expires_at=datetime.now(timezone.utc)
+        expires_at=datetime.now(UTC)
         + timedelta(hours=import_limits.IMPORT_STAGED_TTL_HOURS),
     )
     session.add(job)
@@ -357,7 +358,7 @@ async def apply_one_envelope(
     user: User,
     people_map: Any = None,
     exclude_properties: Any = None,
-) -> "EnvelopeImportResult":
+) -> EnvelopeImportResult:
     """Apply one envelope and then resolve the links it asserted.
 
     A lone envelope is the degenerate case of the deferred pass, not a
@@ -466,12 +467,11 @@ def _spool_to_file(source: BinaryIO, max_bytes: int) -> Path:
     ``IMPORT_TOO_LARGE`` once it passes ``max_bytes``."""
     import tempfile
 
-    handle = tempfile.NamedTemporaryFile(
+    with tempfile.NamedTemporaryFile(
         prefix="import-upload-", suffix=".zip", delete=False
-    )
-    path = Path(handle.name)
-    try:
-        with handle:
+    ) as handle:
+        path = Path(handle.name)
+        try:
             total = 0
             while True:
                 chunk = source.read(min(_SPOOL_CHUNK_BYTES, max_bytes + 1 - total))
@@ -483,9 +483,9 @@ def _spool_to_file(source: BinaryIO, max_bytes: int) -> Path:
                         ImportEngineMessages.IMPORT_TOO_LARGE, status_code=413
                     )
                 handle.write(chunk)
-    except BaseException:
-        path.unlink(missing_ok=True)
-        raise
+        except BaseException:
+            path.unlink(missing_ok=True)
+            raise
     return path
 
 
@@ -518,15 +518,15 @@ def _spool_payload(guild_id: int, payload_ref: str) -> tuple[Path, bool] | None:
         return Path(blob.path), False
     if blob.stream is None:
         return None
-    handle = tempfile.NamedTemporaryFile(prefix="import-payload-", delete=False)
-    try:
-        with handle:
+    with tempfile.NamedTemporaryFile(prefix="import-payload-", delete=False) as handle:
+        path = Path(handle.name)
+        try:
             for chunk in blob.stream:
                 handle.write(chunk)
-    except BaseException:
-        Path(handle.name).unlink(missing_ok=True)
-        raise
-    return Path(handle.name), True
+        except BaseException:
+            path.unlink(missing_ok=True)
+            raise
+    return path, True
 
 
 @asynccontextmanager

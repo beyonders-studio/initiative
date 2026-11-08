@@ -21,7 +21,7 @@ const meta = {
   },
   options: {
     tone: {
-      label: { en: "Colour", de: "Farbe", es: "Color", fr: "Couleur" },
+      label: { en: "Color", de: "Farbe", es: "Color", fr: "Couleur" },
       values: {
         accent: { en: "Accent", de: "Akzent", es: "Acento", fr: "Accent" },
         positive: { en: "Green", de: "Grün", es: "Verde", fr: "Vert" },

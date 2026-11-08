@@ -13,7 +13,7 @@ disagree about what "the top" means.
 """
 
 from collections.abc import Iterable, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, cast
 
 from sqlalchemy.orm import selectinload, undefer
@@ -298,7 +298,7 @@ async def mark_read(
 
     if not post_ids:
         return 0
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # Sharing (including the "Full access" override) is the table's own policy,
     # so the statement asks only what this endpoint adds to it.
     readable = (

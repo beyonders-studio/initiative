@@ -34,7 +34,7 @@ import logging.config
 import smtplib
 import sys
 import traceback
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import asyncpg
@@ -252,7 +252,7 @@ class JsonFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         line: dict[str, Any] = {
-            "ts": datetime.fromtimestamp(record.created, timezone.utc)
+            "ts": datetime.fromtimestamp(record.created, UTC)
             .isoformat(timespec="milliseconds")
             .replace("+00:00", "Z"),
             "level": record.levelname,

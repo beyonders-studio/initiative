@@ -27,11 +27,11 @@ once the index can be read again.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Collection
 import logging
 import time
+from collections.abc import Collection
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 from sqlalchemy import func
@@ -288,7 +288,7 @@ async def record_acceptance(
     """
     if not legal_documents_enabled():
         return
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for document in await required_documents():
         if shown is not None and document.slug not in shown:
             continue

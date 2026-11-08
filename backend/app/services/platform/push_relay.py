@@ -111,7 +111,7 @@ SERVER_NAME = "Initiative server"
 async def _load_stored() -> tuple[str, str] | None:
     """The stored credential, or None. One that no longer decrypts under
     ``SECRET_KEY`` is cleared, so the next registration can replace it."""
-    from app.db import session as db_session  # noqa: PLC0415
+    from app.db import session as db_session
 
     async with db_session.SystemSessionLocal() as system_session:
         row = (
@@ -136,8 +136,8 @@ async def _load_stored() -> tuple[str, str] | None:
 async def _store(server_id: str, key: str) -> tuple[str, str] | None:
     """Keep a new registration unless another process already kept one, and
     answer whichever is stored."""
-    from app.db import session as db_session  # noqa: PLC0415
-    from app.services.platform.app_settings import (  # noqa: PLC0415
+    from app.db import session as db_session
+    from app.services.platform.app_settings import (
         _ensure_secrets_row,
     )
 
@@ -159,7 +159,7 @@ async def _store(server_id: str, key: str) -> tuple[str, str] | None:
 
 async def _clear_stored(server_id: str) -> None:
     """Clear the stored credential, if it is still this one."""
-    from app.db import session as db_session  # noqa: PLC0415
+    from app.db import session as db_session
 
     async with db_session.SystemSessionLocal() as system_session:
         await system_session.exec(

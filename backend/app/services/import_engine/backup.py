@@ -30,35 +30,34 @@ from __future__ import annotations
 import asyncio
 import logging
 import zipfile
-from datetime import datetime, timedelta, timezone
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Awaitable, BinaryIO, Callable, Optional
+from typing import Any, BinaryIO
 
 from pydantic import ConfigDict
-
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.db import gucs
-from app.db.session import raise_flag, routed_guild_id
+from app.core.messages import ImportEngineMessages
 from app.core.references import format_ref
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
 from app.core.tools import BULK_EXPORT_TOOLS, Tool, tool_envelope_type
-from app.core.messages import ImportEngineMessages
+from app.db import gucs
+from app.db.session import raise_flag, routed_guild_id
 from app.models.platform.user import User
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.schemas.base import SanitizedBaseModel
-from app.schemas.tenant.import_envelopes import EnvelopePropertyValue
-from app.schemas.tenant.project_export import ProjectExportPropertyDefinition
 from app.schemas.tenant.backup_export import (
     BACKUP_SCHEMA_VERSION,
     MIN_SUPPORTED_IMPORT_VERSION,
     BackupManifest,
     ManifestEntry,
 )
+from app.schemas.tenant.import_envelopes import EnvelopePropertyValue
 from app.schemas.tenant.import_job import (
     BackupImportPlan,
     BackupImportResult,
@@ -66,6 +65,7 @@ from app.schemas.tenant.import_job import (
     BackupPlanPerson,
     EntryResult,
 )
+from app.schemas.tenant.project_export import ProjectExportPropertyDefinition
 from app.services.import_engine import engine as import_engine
 from app.services.import_engine import limits as import_limits
 from app.services.import_engine.archive_assets import (
@@ -81,25 +81,25 @@ from app.services.import_engine.common import (
     unique_name,
     unique_name_in_initiative,
 )
-from app.services.tenant.attachments import claim_shown
-from app.services.import_engine.contract import (
-    EnvelopeImportResult,
-    ImportEngineError,
-)
 from app.services.import_engine.context import (
     ImportContext,
     excluded_property_names,
     exported_from_here,
 )
+from app.services.import_engine.contract import (
+    EnvelopeImportResult,
+    ImportEngineError,
+)
 from app.services.import_engine.links import resolve_page_links
 from app.services.import_engine.references import resolve_references
-from app.services.marketplace.publish_profile import shift_dates
 from app.services.import_engine.zip_bounds import (
     json_cap,
     open_zip,
     read_json_member,
     read_member,
 )
+from app.services.marketplace.publish_profile import shift_dates
+from app.services.tenant.attachments import claim_shown
 
 # Apply order within an initiative — convention, not correctness (cross-tool
 # references in envelopes are display text only).
@@ -345,7 +345,7 @@ async def stage_backup_job(
         file_ref=payload_ref,
         plan=plan.model_dump(mode="json"),
         status=status,
-        expires_at=datetime.now(timezone.utc)
+        expires_at=datetime.now(UTC)
         + timedelta(hours=import_limits.IMPORT_STAGED_TTL_HOURS),
     )
     session.add(job)
@@ -401,8 +401,8 @@ async def apply_backup(
     bundle creates, as members, where everything the bundle made is shared with
     the initiative's members to edit."""
     from app.api.deps import establish_guild_access
-    from app.services.import_engine.importers import IMPORTERS
     from app.models.platform.guild import CommunityRole
+    from app.services.import_engine.importers import IMPORTERS
     from app.services.platform import guilds as guilds_service
     from app.services.tenant import initiatives as initiatives_service
 
@@ -411,7 +411,7 @@ async def apply_backup(
         max_json_bytes = json_cap(fetched=fetched)
         result = BackupImportResult()
         shift_days = (
-            round((datetime.now(timezone.utc) - anchor) / timedelta(days=1))
+            round((datetime.now(UTC) - anchor) / timedelta(days=1))
             if anchor is not None
             else 0
         )
@@ -933,8 +933,8 @@ class _CollectionRecord(SanitizedBaseModel):
 
     id: int
     name: str
-    description: Optional[str] = None
-    cover_file_id: Optional[int] = None
+    description: str | None = None
+    cover_file_id: int | None = None
     file_ids: list[int] = []
     tags: list[str] = []
     properties: list[EnvelopePropertyValue] = []
@@ -1202,9 +1202,9 @@ class _GalleryPicture(SanitizedBaseModel):
     model_config = ConfigDict(extra="ignore")
 
     storage_key: str
-    title: Optional[str] = None
-    caption: Optional[str] = None
-    original_filename: Optional[str] = None
+    title: str | None = None
+    caption: str | None = None
+    original_filename: str | None = None
     tags: list[str] = []
     properties: list[EnvelopePropertyValue] = []
 
@@ -1215,8 +1215,8 @@ class _Gallery(SanitizedBaseModel):
     model_config = ConfigDict(extra="ignore")
 
     name: str
-    description: Optional[str] = None
-    cover: Optional[str] = None
+    description: str | None = None
+    cover: str | None = None
     tags: list[str] = []
     properties: list[EnvelopePropertyValue] = []
     images: list[_GalleryPicture] = []

@@ -13,17 +13,16 @@ before there is anybody to scope a policy to.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from sqlalchemy import delete, update
-from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.errors import CodedError
 from app.core.encryption import (
     SALT_EMAIL,
     decrypt_field,
@@ -31,6 +30,7 @@ from app.core.encryption import (
     hash_email,
     normalize_email,
 )
+from app.core.errors import CodedError
 from app.core.messages import AddressMessages
 from app.models.platform.user import User
 from app.models.platform.user_email import UserEmail
@@ -127,7 +127,7 @@ async def note_sign_in(
     await session.exec(
         update(UserEmail)
         .where(UserEmail.email_hash == hash_email(email))
-        .values(last_login_at=now or datetime.now(timezone.utc))
+        .values(last_login_at=now or datetime.now(UTC))
     )
 
 
@@ -300,7 +300,7 @@ def _build_address(
     now: datetime | None = None,
 ) -> UserEmail:
     """The row, unattached — so a caller can stage it inside a savepoint."""
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     normalized = normalize_email(email)
     return UserEmail(
         user_id=user_id,
@@ -323,7 +323,7 @@ async def note_assertion(
     """Record that ``provider_id`` asserts this address, or refresh when it
     last did. Providers do not displace one another — two directories can name
     the same address and each keeps its own standing claim."""
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     await session.exec(
         pg_insert(UserEmailAssertion)
         .values(
@@ -366,7 +366,7 @@ async def ensure_address(
     Never primary. Which address receives account mail is its owner's to
     choose, not a directory's.
     """
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     digest = hash_email(email)
     existing = await _by_hash(session, digest)
 
@@ -538,7 +538,7 @@ async def verify_for_user(
     if holder is not None and holder.user_id != user_id:
         raise AddressError(AddressMessages.ADDRESS_TAKEN)
 
-    row.verified_at = now or datetime.now(timezone.utc)
+    row.verified_at = now or datetime.now(UTC)
     session.add(row)
     try:
         # Two claims on one address can be proven at the same moment; the
@@ -750,17 +750,17 @@ async def prove_at_sign_in(
     retirement and the account never sits with nothing.
     """
     from app.core.audit_events import AuditEventType
+    from app.db import post_commit
     from app.models.platform.user_passkey import UserPasskey
     from app.services import audit as audit_service
     from app.services import content_sockets
     from app.services.auth import totp as totp_service
-    from app.db import post_commit
     from app.services.platform import user_tokens
 
     result = await session.exec(
         update(UserEmail)
         .where(UserEmail.id == address_id, UserEmail.verified_at.is_(None))
-        .values(verified_at=now or datetime.now(timezone.utc))
+        .values(verified_at=now or datetime.now(UTC))
     )
     if not result.rowcount:
         return False

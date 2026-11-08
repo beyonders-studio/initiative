@@ -2,22 +2,23 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlmodel import select
 
 from app.core.intake import CaseField, IntakeStream
+from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.intake import IntakeBinding, IntakeCase
+from app.models.tenant.metadata import MetadataDefinition
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
-from app.services.tenant import task_statuses as task_statuses_service
-from app.models.tenant.metadata import MetadataDefinition
 from app.services.platform import case_activity
 from app.services.platform import intake as intake_service
 from app.services.platform.intake import CaseFiler, CaseRefs
+from app.services.tenant import task_statuses as task_statuses_service
 from app.testing import (
     create_guild,
     create_initiative,
@@ -26,7 +27,6 @@ from app.testing import (
     create_user,
     make_operations_community,
 )
-from app.db.request_context import SystemGuild
 
 
 async def _bind(session, *, guild, project, stream, **overrides):
@@ -214,7 +214,7 @@ async def test_a_stream_bound_to_an_archived_project_is_not_bound(session, bound
     project = (
         await session.exec(select(Project).where(Project.id == bound["project"].id))
     ).one()
-    project.archived_at = datetime.now(timezone.utc)
+    project.archived_at = datetime.now(UTC)
     session.add(project)
     await session.commit()
 
@@ -258,7 +258,7 @@ async def test_a_sustained_run_makes_one_case(session, bound):
 
 async def test_every_occurrence_is_counted_and_moves_last_seen(session, bound):
     """``last_seen_at`` says when the source was last seen, not when we spoke."""
-    start = datetime.now(timezone.utc)
+    start = datetime.now(UTC)
     first = await intake_service.open_case(
         IntakeStream.support,
         title="Refused sign-ins",
@@ -288,7 +288,7 @@ async def test_every_occurrence_is_counted_and_moves_last_seen(session, bound):
 
 
 async def test_a_crossing_past_the_window_moves_the_mark(session, bound):
-    start = datetime.now(timezone.utc)
+    start = datetime.now(UTC)
     first = await intake_service.open_case(
         IntakeStream.support,
         title="Refused sign-ins",
@@ -336,7 +336,7 @@ async def _notes_on(session, guild_id: int, task_id: int) -> list[Comment]:
 async def test_a_repeat_says_what_it_brought_on_the_case(session, bound):
     """A second report of the same thing carries somebody's words, so they
     reach the case every time — not only a counter moving underneath it."""
-    start = datetime.now(timezone.utc)
+    start = datetime.now(UTC)
     first = await intake_service.open_case(
         IntakeStream.support,
         title="Reported comment 7",
@@ -364,7 +364,7 @@ async def test_a_repeat_says_what_it_brought_on_the_case(session, bound):
 
 async def test_a_repeat_with_nothing_new_is_noted_once_per_window(session, bound):
     """A sustained run is a trail of recurrences, not a comment per event."""
-    start = datetime.now(timezone.utc)
+    start = datetime.now(UTC)
     first = await intake_service.open_case(
         IntakeStream.support,
         title="Refused sign-ins",

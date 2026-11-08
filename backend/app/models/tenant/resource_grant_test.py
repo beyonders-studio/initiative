@@ -5,9 +5,9 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.messages import SharingMessages
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.project import Project
-from app.core.messages import SharingMessages
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.schemas.tenant.resource_grant import ResourceGrantSchema
 from app.services import permissions as permissions_service

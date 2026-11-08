@@ -89,8 +89,10 @@ def test_a_login_both_fields_name_keeps_the_verbs_of_each(monkeypatch):
     assert to_login == [
         'REVOKE ALL ON TABLE public."storage_backfill_state" FROM "shared";',
         'REVOKE ALL ON TABLE public."storage_backfill_state" FROM "shared";',
-        'GRANT SELECT, INSERT, UPDATE ON TABLE public."storage_backfill_state" '
-        'TO "shared";',
+        (
+            'GRANT SELECT, INSERT, UPDATE ON TABLE public."storage_backfill_state" '
+            'TO "shared";'
+        ),
     ]
     last_revoke = max(i for i, s in enumerate(statements) if s.startswith("REVOKE"))
     assert last_revoke < min(

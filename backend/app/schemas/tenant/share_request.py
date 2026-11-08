@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import Field, model_validator
@@ -29,9 +28,9 @@ class ShareStanding(SanitizedBaseModel):
     resource_id: int
     initiative_id: int
     #: The rung they hold, or ``None`` where they can't open it.
-    level: Optional[ResourceAccessLevel] = None
+    level: ResourceAccessLevel | None = None
     #: The rung they asked for and nobody has answered yet.
-    pending: Optional[ResourceAccessLevel] = None
+    pending: ResourceAccessLevel | None = None
 
 
 class HiddenFiles(SanitizedBaseModel):
@@ -47,14 +46,14 @@ class ShareRequestCreate(SanitizedBaseModel):
     reader can't open."""
 
     resource_type: Tool
-    resource_id: Optional[int] = None
-    collection_id: Optional[int] = None
-    wiki_id: Optional[int] = None
+    resource_id: int | None = None
+    collection_id: int | None = None
+    wiki_id: int | None = None
     level: ResourceAccessLevel = ResourceAccessLevel.read
-    message: Optional[str] = Field(default=None, max_length=MAX_MESSAGE_LENGTH)
+    message: str | None = Field(default=None, max_length=MAX_MESSAGE_LENGTH)
 
     @model_validator(mode="after")
-    def _one_target(self) -> "ShareRequestCreate":
+    def _one_target(self) -> ShareRequestCreate:
         _askable(self.level)
         named = [x for x in (self.resource_id, self.collection_id, self.wiki_id) if x]
         if len(named) != 1:
@@ -83,9 +82,9 @@ class ShareRequestRead(SanitizedBaseModel):
     initiative_id: int
     user: UserSummary
     #: When the requester's time as a guest ends; ``None`` for a member.
-    guest_until: Optional[datetime] = None
+    guest_until: datetime | None = None
     level: ResourceAccessLevel
-    message: Optional[str] = None
+    message: str | None = None
     created_at: datetime
 
 
@@ -95,13 +94,13 @@ class ShareRequestAnswer(SanitizedBaseModel):
     ids: list[int] = Field(min_length=1, max_length=500)
     approve: bool
     #: The rung a yes gives; the one asked for where it is left out.
-    level: Optional[ResourceAccessLevel] = None
+    level: ResourceAccessLevel | None = None
     #: Whether a yes reaches the requester or the whole initiative.
     scope: ShareRequestScope = ShareRequestScope.user
     #: Whether a no is told to the requester.
     tell: bool = False
 
     @model_validator(mode="after")
-    def _level(self) -> "ShareRequestAnswer":
+    def _level(self) -> ShareRequestAnswer:
         _askable(self.level)
         return self

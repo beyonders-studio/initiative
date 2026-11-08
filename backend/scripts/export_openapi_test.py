@@ -17,7 +17,6 @@ from pathlib import Path
 
 import pytest
 
-
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 SCRIPT = BACKEND_DIR / "scripts" / "export_openapi.py"
 
@@ -41,6 +40,7 @@ def test_export_runs_without_app_env(tmp_path, flags, path):
         capture_output=True,
         text=True,
         timeout=120,
+        check=False,
     )
     assert result.returncode == 0, result.stderr
 

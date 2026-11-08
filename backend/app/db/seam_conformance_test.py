@@ -31,8 +31,9 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Awaitable, Callable, get_args
+from typing import get_args
 
 import pytest
 from fastapi.routing import APIWebSocketRoute
@@ -60,10 +61,10 @@ from app.db.request_context import (
 )
 from app.db.schema_provisioning import guild_schema_name
 from app.db.session import routed_context, set_rls_context
+from app.main import app
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
 from app.models.tenant.resource_grant import ResourceAccessLevel
-from app.main import app
 from app.services.content_sockets import sockets
 from app.testing import (
     Actor,
@@ -71,11 +72,11 @@ from app.testing import (
     create_counter_group,
     create_file,
     create_project,
+    create_resource_grant,
+    create_user,
     create_wiki,
     create_wiki_page,
     get_auth_token,
-    create_resource_grant,
-    create_user,
     route_as,
     route_as_install,
 )

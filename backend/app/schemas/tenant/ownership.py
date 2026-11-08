@@ -1,7 +1,7 @@
 """Payloads for the guild-admin content-ownership screens, and the owning plug-in
 a read model names."""
 
-from typing import Any, List, Optional
+from typing import Any
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -19,10 +19,10 @@ class OwnerPluginSummary(SanitizedBaseModel):
 
     id: int
     name: str
-    avatar_url: Optional[str] = None
+    avatar_url: str | None = None
 
 
-def owner_profile(row: Any) -> Optional[UserPublic]:
+def owner_profile(row: Any) -> UserPublic | None:
     """The person holding ``row``'s owner grant, or None when nobody does or a
     plug-in does. Read off the grants the loader brings with their users:
     ownership is recorded there and nowhere else."""
@@ -57,10 +57,10 @@ class OwnedContentResponse(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    items: List[OwnedContentItem] = Field(default_factory=list)
+    items: list[OwnedContentItem] = Field(default_factory=list)
     counts: dict[str, int] = Field(default_factory=dict)
     total: int = 0
-    eligible_plugins: List[OwnerPluginSummary] = Field(default_factory=list)
+    eligible_plugins: list[OwnerPluginSummary] = Field(default_factory=list)
 
 
 class OwnershipTransferRequest(SanitizedBaseModel):
@@ -68,8 +68,8 @@ class OwnershipTransferRequest(SanitizedBaseModel):
     (``new_owner_id``), or an installed plug-in that may own all of it
     (``new_owner_plugin_id``). Exactly one is set."""
 
-    new_owner_id: Optional[int] = None
-    new_owner_plugin_id: Optional[int] = None
+    new_owner_id: int | None = None
+    new_owner_plugin_id: int | None = None
 
     @model_validator(mode="after")
     def exactly_one_recipient(self) -> "OwnershipTransferRequest":

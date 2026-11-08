@@ -1,6 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import (
     CheckConstraint,
@@ -47,11 +46,11 @@ class BatchedNotice(SQLModel, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", nullable=False)
     kind: BatchedNoticeKind = Field(sa_column=Column(String(32), nullable=False))
     #: Who did it. Nullable: the line outlives their account.
-    actor_id: Optional[int] = Field(
+    actor_id: int | None = Field(
         default=None,
         sa_column=Column(Integer, ForeignKey("users.id"), nullable=True),
     )
@@ -64,24 +63,24 @@ class BatchedNotice(SQLModel, table=True):
     #: The task's title, or the title of what the reacted-to thing is on.
     title: str = Field(sa_column=Column(String(255), nullable=False))
     #: An assignment's project.
-    project_id: Optional[int] = Field(
+    project_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=True
         ),
     )
-    project_name: Optional[str] = Field(
+    project_name: str | None = Field(
         default=None, sa_column=Column(String(255), nullable=True)
     )
     #: A reaction's own row, so un-reacting can withdraw a line that has not
     #: gone out yet.
-    reaction_id: Optional[int] = Field(default=None, nullable=True, index=True)
-    emoji: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    reaction_id: int | None = Field(default=None, nullable=True, index=True)
+    emoji: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
-    processed_at: Optional[datetime] = Field(
+    processed_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )

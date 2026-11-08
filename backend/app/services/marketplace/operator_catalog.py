@@ -48,7 +48,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -72,8 +72,8 @@ __all__ = [
     "MAX_PROBLEM_REASON",
     "OPERATOR_SOURCE",
     "OperatorCatalogScanRunning",
-    "ScanProblem",
     "OperatorScanResult",
+    "ScanProblem",
     "operator_catalog_dir",
     "scan_operator_catalog",
 ]
@@ -144,7 +144,7 @@ class OperatorScanResult:
         return len(self.problems)
 
 
-def operator_catalog_dir() -> Optional[Path]:
+def operator_catalog_dir() -> Path | None:
     """The configured directory, or ``None`` when the feature is off."""
     configured = (settings.MARKETPLACE_EXTRA_CATALOG_DIR or "").strip()
     return Path(configured) if configured else None
@@ -226,7 +226,7 @@ def _read_directory(
 
 async def _source_conflict(
     session: AsyncSession, manifest: dict[str, Any]
-) -> Optional[str]:
+) -> str | None:
     """Why this manifest may not take a listing another source published.
 
     Both catalog identities are unique and neither is reassignable, so a
@@ -239,7 +239,7 @@ async def _source_conflict(
     uid = str(manifest.get("uid", ""))
     public_id = str(manifest.get("public_id", ""))
 
-    candidates: list[Optional[MarketplaceListing]] = []
+    candidates: list[MarketplaceListing | None] = []
     if uid:
         candidates.append(await get_listing_by_uid(session, uid))
     if public_id:
@@ -295,7 +295,7 @@ _scan_lock = asyncio.Lock()
 
 
 async def scan_operator_catalog(
-    session: AsyncSession, *, directory: Optional[Path] = None
+    session: AsyncSession, *, directory: Path | None = None
 ) -> OperatorScanResult:
     """Publish the directory's listings; retire the ones it no longer holds.
 

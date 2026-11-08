@@ -12,7 +12,6 @@ from app.db.session import SystemSessionLocal, set_rls_context
 from app.models.platform.access_grant import AccessGrant
 from app.services.auth import addresses
 from app.services.platform import rules
-
 from seed.accounts import USERS
 
 

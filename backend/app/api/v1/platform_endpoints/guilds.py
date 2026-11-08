@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Annotated, List
+from typing import Annotated
 
 from fastapi import (
     APIRouter,
@@ -16,9 +16,12 @@ from fastapi import (
     UploadFile,
     status,
 )
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
     CommunityIdPath,
+    GuildAccessError,
     GuildContext,
     SeatPaymentSessionDep,
     SeatSessionDep,
@@ -26,52 +29,50 @@ from app.api.deps import (
     SettingsContextDep,
     SettingsRLSSessionDep,
     SettingsSeatWriteContextDep,
+    SystemSessionDep,
     UploadUserDep,
     UserSessionDep,
-    GuildAccessError,
     establish_guild_access,
+    get_current_active_user,
     holds_guild_role,
     raise_for_guild_access,
     require_surface,
-    get_current_active_user,
-    SystemSessionDep,
 )
 from app.api.v1.platform_endpoints.password_recheck import (
     require_password_or_recent_proof,
 )
 from app.core import auth_context
-from app.core.intake import IntakeStream
-from app.db.query import build_paginated_response
+from app.core.audit_events import AuditEventType
 from app.core.capabilities import Capability, user_has_capability
 from app.core.config import settings
-from app.core.login_methods import SecondFactorRequirement
-from app.schemas.ai_settings import AIConfigMode
+from app.core.guild_auth_options import CommunityAuthOption
 from app.core.image_headers import image_response, validate_image
+from app.core.intake import IntakeStream
+from app.core.login_methods import SecondFactorRequirement
 from app.core.messages import BillingMessages, GuildMessages, ImageMessages
 from app.core.rate_limit import limiter
+from app.core.rules import COMMUNITY_RULES, OPTION_RULES, SignInRequirement
 from app.core.security import (
     HandoffSigningNotConfiguredError,
     create_billing_portal_handoff_token,
 )
-from app.services.platform.identity_refs import billing_refs
 from app.db import cohorts, post_commit
+from app.db.query import build_paginated_response
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
-from app.core.audit_events import AuditEventType
-from app.services import audit as audit_service
-from app.services import email as email_service
+from app.demo.copies import account_copy as demo_account_copy
+from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.guild import (
     GUILD_ADMIN_ROLES,
+    LIVE_STATUS_VALUES,
     AdminSurface,
-    assignable_roles,
-    Guild,
     CommunityCategory,
-    GuildMembership,
     CommunityRole,
     CommunityStatus,
-    LIVE_STATUS_VALUES,
+    Guild,
+    GuildMembership,
+    assignable_roles,
 )
-from app.demo.copies import account_copy as demo_account_copy
 from app.models.platform.guild_administration import GuildAdministration
 from app.models.platform.guild_image import (
     BANNER_VARIANTS,
@@ -79,52 +80,47 @@ from app.models.platform.guild_image import (
     GuildImageVariant,
 )
 from app.models.platform.user import User, UserStatus
+from app.schemas.ai_settings import AIConfigMode
 from app.schemas.platform.billing import BillingPortalHandoffResponse
 from app.schemas.platform.guild import (
-    DirectoryCommunityPage,
-    DirectoryCommunityRead,
-    CommunityBannerRead,
-    CommunityCan,
-    CommunityEntitlementsRead,
+    CommunityAuthPolicyRead,
     CommunityAuthSettingsRead,
     CommunityAuthSettingsUpdate,
-    CommunityAuthPolicyRead,
+    CommunityBannerRead,
+    CommunityBillingSummaryRead,
+    CommunityCan,
     CommunityCreate,
     CommunityDeletionRequest,
-    CommunityMembershipUpdate,
-    CommunityRead,
+    CommunityEntitlementsRead,
+    CommunityGuestExtend,
     CommunityInviteAcceptRequest,
     CommunityInviteCreate,
-    CommunityGuestExtend,
-    CommunityInviteGrant,
     CommunityInviteCreated,
+    CommunityInviteGrant,
     CommunityInviteRead,
-    CommunityPaymentIssueRead,
-    CommunityBillingSummaryRead,
     CommunityInviteStatus,
+    CommunityMembershipUpdate,
     CommunityOrderUpdate,
+    CommunityPaymentIssueRead,
+    CommunityRead,
     CommunityUpdate,
+    DirectoryCommunityPage,
+    DirectoryCommunityRead,
     LeaveCommunityEligibilityResponse,
     MemberApiAccessUpdate,
     MemberDisplayNameUpdate,
 )
-from app.models.platform.auth_provider import AuthProvider
-from app.core.rules import COMMUNITY_RULES, OPTION_RULES, SignInRequirement
-from app.core.guild_auth_options import CommunityAuthOption
+from app.services import audit as audit_service
+from app.services import email as email_service
 from app.services.auth import guild_provider_connections as provider_connections
-from app.services.platform import auth_posture
-from app.services.platform import rules
-from app.services.platform import billing_ping
+from app.services.content_sockets import sockets as content_sockets
+from app.services.platform import auth_posture, billing_ping, guild_entitlements, rules
 from app.services.platform import guild_images as images_service
-from app.services.tenant.attachments import FileTooLargeError, read_upload_bounded
-from app.services.platform import guild_entitlements
 from app.services.platform import guilds as guilds_service
 from app.services.platform import intake as intake_service
-from app.services.content_sockets import sockets as content_sockets
+from app.services.platform.identity_refs import billing_refs
 from app.services.tenant import plugin_connections as plugin_connections_service
-from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession
-
+from app.services.tenant.attachments import FileTooLargeError, read_upload_bounded
 
 #: The configuration surface's guards, by the part of administering the
 #: community each route is (``require_surface``).
@@ -379,11 +375,11 @@ _GUILD_PROFILE_FIELDS = (
 )
 
 
-@router.get("/", response_model=List[CommunityRead])
+@router.get("/", response_model=list[CommunityRead])
 async def list_communities(
     session: UserSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
-) -> List[CommunityRead]:
+) -> list[CommunityRead]:
     """The communities the caller belongs to, in the order they keep them.
 
     Every community-scoped route takes one of these ids as its
@@ -434,7 +430,7 @@ async def list_communities(
             if membership.role.reaches(CommunityRole.admin)
         ],
     )
-    payloads: List[CommunityRead] = []
+    payloads: list[CommunityRead] = []
     for (
         guild,
         membership,
@@ -739,12 +735,12 @@ async def create_community(
     return await _guild_read(session, guild, membership=membership)
 
 
-@router.get("/{community_id}/invites", response_model=List[CommunityInviteRead])
+@router.get("/{community_id}/invites", response_model=list[CommunityInviteRead])
 async def list_community_invites(
     guild_id: CommunityIdPath,
     _guild_context: InvitesWriteContext,
     session: SettingsRLSSessionDep,
-) -> List[CommunityInviteRead]:
+) -> list[CommunityInviteRead]:
     invites = await guilds_service.list_guild_invites(session, guild_id=guild_id)
     grants = await guilds_service.guest_invite_grants(
         session, invite_ids=[invite.id for invite in invites if invite.guest_days]

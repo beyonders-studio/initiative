@@ -4,32 +4,32 @@ icon: lucide/rocket
 
 # Getting started
 
-This section gets you from "I have never seen this before" to "I know where things are". Read it in order, or skip straight to whatever you're stuck on. Nobody is marking it.
+This section gets you from "I have never seen this before" to "I know where things are." Read it in order, or skip to whatever you're stuck on. Nobody is grading it.
 
-You don't need experience with project management software. You don't need to know what a Kanban board is, and you certainly don't need to know why it's called that. If you have ever written a shopping list, you are overqualified.
+You don't need to know anything about project management, or what a Kanban board is, or why it's called that. If you've ever written a grocery list, you're overqualified.
 
 ## What you'll need
 
-- **A browser.** Computer, tablet, phone, whatever's nearest. There is nothing to install.
-- **Either a web address or an invite link** for your group's Initiative. Somebody in the group usually sends you one. If *you* are the one setting this up for everybody, you want the [server guide](../running-a-server/index.md) instead, and our sympathies.
-- **Optional: [the app](install-the-app.md)**, if you'd like an icon on your home screen, or notifications on your phone or computer.
+- **A browser** on whatever's nearest: a computer, a tablet or a phone.
+- **An invite link or your server's address.** Somebody in your group usually sends you one. If you're the one setting Initiative up for everybody, you want the [server guide](../running-a-server/index.md) instead, and you have our sympathy.
+- **The app, if you'd like it.** It puts Initiative on your home screen and sends notifications to your phone or computer. See [Installing the app](install-the-app.md).
 
 !!! info "Nobody's set anything up yet?"
-    Then somebody has to run it somewhere. Hosting it yourself is free and open source; a paid hosted version is on the way for people who'd rather not. See [Self-host or let us host it](../self-host-or-hosted.md).
+    Then it has to run somewhere. You can host it yourself for free, or pay us to host it for you. See [Self-host or let us host it](../self-host-or-hosted.md).
 
-## The five steps
+## Five steps
 
 <div class="grid cards" markdown>
 
 -   :material-account-plus-outline: __1. Create your account__
 
-    Sign up with an email, or your work login.
+    Sign up with an email address, or with your work or school sign-in.
 
-    [:octicons-arrow-right-24: Create an account](create-account.md)
+    [:octicons-arrow-right-24: Create your account](create-account.md)
 
 -   :material-login-variant: __2. Sign in__
 
-    Log in, recover a forgotten password, set up the app.
+    Get in, and get back in when you've forgotten your password.
 
     [:octicons-arrow-right-24: Signing in](signing-in.md)
 
@@ -41,20 +41,20 @@ You don't need experience with project management software. You don't need to kn
 
 -   :material-account-group-outline: __4. Join your group__
 
-    Accept an invite, or start a workspace of your own.
+    Accept an invite, or start a community of your own.
 
     [:octicons-arrow-right-24: Your first community](your-first-community.md)
 
--   :material-account-circle-outline: __5. Find your own corner__
+-   :material-account-circle-outline: __5. Find your own pages__
 
-    One list of what *you* owe, gathered from every group at once.
+    Everything you owe, gathered from every community you're in.
 
     [:octicons-arrow-right-24: Your space](../guides/your-space.md)
 
 </div>
 
-## Actually in a hurry?
+## In a hurry?
 
-If somebody sent you an invite link: **click it, make your account, you're in.** The link already knows which group you're joining, so there's nothing to look up and nothing you can type wrong.
+If somebody sent you an invite link, open it, make your account, and you're in. The link already knows which group you're joining, so there's nothing to look up and nothing to type wrong.
 
-Everything else on this page will still be here later. It isn't going anywhere.
+The rest of this section will be here whenever you want it.

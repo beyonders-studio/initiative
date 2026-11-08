@@ -1,7 +1,7 @@
 """Collections: seen through the files in them, changed by the initiative's
 file makers, gone to the trash once their last file leaves."""
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from httpx import AsyncClient
 from sqlmodel import select, update
@@ -467,7 +467,7 @@ async def test_a_collection_lists_its_files_by_when_each_was_added(
         await session.exec(
             update(CollectionFile)  # type: ignore[arg-type]
             .where(CollectionFile.file_id == file.id)
-            .values(added_at=datetime(2026, month, 10, tzinfo=timezone.utc))
+            .values(added_at=datetime(2026, month, 10, tzinfo=UTC))
         )
     await session.commit()
     path = f"/collections/{collection.id}/files"

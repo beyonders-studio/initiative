@@ -14,9 +14,9 @@ import pytest
 from pglast import ast, parse_sql
 
 from app.core.messages import QueryMessages
+from app.core.search import SearchEntityType
 from app.services.fields.spec import FieldType
 from app.services.query import QueryError, resolve
-from app.core.search import SearchEntityType
 from app.services.query.resolve import (
     PluginCall,
     PluginRows,
@@ -192,8 +192,10 @@ class TestNamesResolveThroughTheRegistry:
             # Inside an expression, and inside a window, the word is a column.
             "SELECT name AS content FROM files ORDER BY lower(content)",
             "SELECT name AS content, count(*) AS n FROM files GROUP BY lower(content)",
-            "SELECT count(*) AS n, sum(count(*)) OVER (ORDER BY n) AS t "
-            "FROM tasks GROUP BY title",
+            (
+                "SELECT count(*) AS n, sum(count(*)) OVER (ORDER BY n) AS t "
+                "FROM tasks GROUP BY title"
+            ),
         ],
     )
     def test_an_output_alias_inside_an_expression_is_a_column(self, sql):
@@ -420,14 +422,20 @@ class TestShapesATileAsks:
         [
             "SELECT count(*) AS n FROM tasks",
             "SELECT title, due_date FROM tasks WHERE due_date < now() ORDER BY due_date",
-            "SELECT date_trunc('month', created_at) AS m, count(*) AS n "
-            "FROM tasks GROUP BY m ORDER BY m",
-            "SELECT p.name, count(*) AS n FROM projects p "
-            "JOIN tasks k ON k.project_id = p.id "
-            "WHERE p.archived_at IS NULL GROUP BY p.name ORDER BY n DESC LIMIT 10",
+            (
+                "SELECT date_trunc('month', created_at) AS m, count(*) AS n "
+                "FROM tasks GROUP BY m ORDER BY m"
+            ),
+            (
+                "SELECT p.name, count(*) AS n FROM projects p "
+                "JOIN tasks k ON k.project_id = p.id "
+                "WHERE p.archived_at IS NULL GROUP BY p.name ORDER BY n DESC LIMIT 10"
+            ),
             "SELECT title FROM tasks WHERE title ILIKE '%bug%' LIMIT 50",
-            "SELECT count(*) AS n FROM tasks "
-            "WHERE due_date BETWEEN '2026-01-01' AND '2026-12-31'",
+            (
+                "SELECT count(*) AS n FROM tasks "
+                "WHERE due_date BETWEEN '2026-01-01' AND '2026-12-31'"
+            ),
         ],
     )
     def test_it_resolves(self, sql):
@@ -541,13 +549,19 @@ class TestWindows:
     @pytest.mark.parametrize(
         "sql",
         [
-            "SELECT date_trunc('week', completed_at) AS week, "
-            "sum(count(*)) OVER (ORDER BY date_trunc('week', completed_at)) AS total "
-            "FROM tasks GROUP BY 1",
-            "SELECT title, row_number() OVER (PARTITION BY priority ORDER BY due_date) "
-            "AS r FROM tasks",
-            "SELECT title, lag(title, 1) OVER w AS prev FROM tasks "
-            "WINDOW w AS (ORDER BY due_date)",
+            (
+                "SELECT date_trunc('week', completed_at) AS week, "
+                "sum(count(*)) OVER (ORDER BY date_trunc('week', completed_at)) AS total "
+                "FROM tasks GROUP BY 1"
+            ),
+            (
+                "SELECT title, row_number() OVER (PARTITION BY priority ORDER BY due_date) "
+                "AS r FROM tasks"
+            ),
+            (
+                "SELECT title, lag(title, 1) OVER w AS prev FROM tasks "
+                "WINDOW w AS (ORDER BY due_date)"
+            ),
         ],
     )
     def test_it_resolves(self, sql):
@@ -678,8 +692,10 @@ class TestTheReaderIsANameAStatementMayUse:
         for sql in (
             "SELECT count(*) AS n FROM tasks WHERE me = created_by",
             "SELECT count(*) AS n FROM tasks WHERE created_by IN (me, 3)",
-            "SELECT CASE WHEN created_by = me THEN 'mine' ELSE 'theirs' END AS whose, "
-            "count(*) AS n FROM tasks GROUP BY 1",
+            (
+                "SELECT CASE WHEN created_by = me THEN 'mine' ELSE 'theirs' END AS whose, "
+                "count(*) AS n FROM tasks GROUP BY 1"
+            ),
         ):
             assert "app.current_user_id" in resolve(sql).sql
 
@@ -749,14 +765,18 @@ class TestAConstantACastNamesTheTypeOf:
     ("sql", "grains"),
     [
         (
-            "SELECT date_trunc('month', due_date) AS m, count(*) AS n "
-            "FROM tasks GROUP BY 1",
+            (
+                "SELECT date_trunc('month', due_date) AS m, count(*) AS n "
+                "FROM tasks GROUP BY 1"
+            ),
             ("month", None),
         ),
         ("SELECT DATE_TRUNC('Quarter', due_date) FROM tasks", ("quarter",)),
         (
-            "SELECT date_trunc('month', due_date)::date AS month, count(*) AS n "
-            "FROM tasks GROUP BY 1",
+            (
+                "SELECT date_trunc('month', due_date)::date AS month, count(*) AS n "
+                "FROM tasks GROUP BY 1"
+            ),
             ("month", None),
         ),
         ("SELECT CAST(date_trunc('week', due_date) AS date) FROM tasks", ("week",)),
@@ -828,8 +848,10 @@ def test_a_sheet_is_read_like_a_dataset_once_its_cells_are():
         ("SELECT a FROM sheet('Budget') AS s(a, b)", QueryMessages.UNSUPPORTED_SYNTAX),
         ("SELECT nope FROM sheet('Budget', 'Q3!A1:C')", QueryMessages.UNKNOWN_FIELD),
         (
-            "SELECT region FROM sheet('Budget', 'Q3!A1:C') AS a "
-            "JOIN sheet('Budget', 'Q3!A1:C') AS b ON a.region = b.region",
+            (
+                "SELECT region FROM sheet('Budget', 'Q3!A1:C') AS a "
+                "JOIN sheet('Budget', 'Q3!A1:C') AS b ON a.region = b.region"
+            ),
             QueryMessages.AMBIGUOUS_FIELD,
         ),
         (

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import jwt
@@ -21,8 +21,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from jwt.algorithms import RSAAlgorithm
 
 from app.services.auth.oidc.id_token import verify_id_token
-from app.services.auth.oidc.jwks import JwksResolver, JwksResolutionError
-
+from app.services.auth.oidc.jwks import JwksResolutionError, JwksResolver
 
 JWKS_URI = "https://idp.example.com/jwks"
 ISSUER = "https://idp.example.com"
@@ -55,7 +54,7 @@ def _jwks(*entries: dict) -> dict:
 
 
 def _sign(priv, *, kid: str | None = None, **claim_overrides) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     claims = {
         "iss": ISSUER,
         "sub": "user-1",

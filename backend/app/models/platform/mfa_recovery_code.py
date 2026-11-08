@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     Column,
@@ -38,7 +37,7 @@ class MfaRecoveryCode(SQLModel, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
 
     user_id: int = Field(
         sa_column=Column(
@@ -50,11 +49,11 @@ class MfaRecoveryCode(SQLModel, table=True):
 
     code_hash: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
 
-    used_at: Optional[datetime] = Field(
+    used_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

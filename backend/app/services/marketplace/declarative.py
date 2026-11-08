@@ -40,9 +40,10 @@ import asyncio
 import json
 import logging
 import re
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Callable, Mapping, Optional
+from datetime import UTC, datetime
+from typing import Any
 from urllib.parse import parse_qsl, quote, urljoin, urlsplit
 
 import httpx
@@ -54,17 +55,17 @@ from app.db import cohorts
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
 from app.services.marketplace import expressions
+from app.services.marketplace.expressions import UNDEFINED, ExpressionError
 from app.services.marketplace.plugin_data import (
-    _connection_ids,
-    endpoint_by_id,
     MAX_RESPONSE_BYTES,
-    PluginDataError,
-    _request_connection,
     REQUEST_TIMEOUT_SECONDS,
+    PluginDataError,
+    _connection_ids,
+    _request_connection,
     _required_connection_ids,
     _resolve_connections,
+    endpoint_by_id,
 )
-from app.services.marketplace.expressions import UNDEFINED, ExpressionError
 from app.services.marketplace.registration_lookup import RegistrationSnapshot
 from app.services.marketplace.service_plugins import (
     DEFAULT_AUTH_HEADER,
@@ -111,7 +112,7 @@ _STATE_REFUSED = 422
 class _Outcome(Exception):
     """A call's answer, decided wherever it is: a code, or a passing failure."""
 
-    def __init__(self, code: Optional[str] = None, *, detail: str = "") -> None:
+    def __init__(self, code: str | None = None, *, detail: str = "") -> None:
         super().__init__(detail or code or TRANSIENT_CODE)
         self.code = code
         self.detail = detail
@@ -135,7 +136,7 @@ class _Answer:
 @dataclass
 class _Page:
     number: int = 1
-    url: Optional[str] = None
+    url: str | None = None
     cursor: Any = UNDEFINED
 
 
@@ -143,7 +144,7 @@ def _clock(now: datetime) -> tuple[int, str]:
     """A run's time, as ``$millis()`` and ``now`` read it."""
     millis = int(now.timestamp() * 1000)
     return millis, (
-        datetime.fromtimestamp(millis / 1000, tz=timezone.utc)
+        datetime.fromtimestamp(millis / 1000, tz=UTC)
         .isoformat(timespec="milliseconds")
         .replace("+00:00", "Z")
     )
@@ -206,11 +207,11 @@ class _Url:
         )
         self.path = quote(_remove_dot_segments(parts.path or "/"), safe=_PATH_SAFE)
         before_fragment, hashed, _ = text.partition("#")
-        self.query: Optional[str] = (
+        self.query: str | None = (
             quote(parts.query, safe=_QUERY_SAFE) if "?" in before_fragment else None
         )
         self.fragment = parts.fragment if hashed else None
-        self._params: Optional[list[tuple[str, str]]] = None
+        self._params: list[tuple[str, str]] | None = None
 
     def _pairs(self) -> list[tuple[str, str]]:
         if self._params is None:
@@ -267,7 +268,7 @@ _LINK = r"^\s*<([^>]*)>(.*)$"
 _REL = r';\s*rel="?([^";]*)"?'
 
 
-def _next_link(header: Optional[str], base: str) -> Optional[str]:
+def _next_link(header: str | None, base: str) -> str | None:
     """The address a Link header gives as ``rel="next"``, if any."""
     for link in (header or "").split(","):
         found = re.match(_LINK, link)
@@ -292,11 +293,11 @@ class _Run:
     def __init__(
         self,
         definition: Mapping[str, Any],
-        rules: Optional[list[dict[str, Any]]],
+        rules: list[dict[str, Any]] | None,
         *,
         credentials: Credentials,
         now: datetime,
-        actor: Optional[str] = None,
+        actor: str | None = None,
     ) -> None:
         auth = definition.get("auth") or {}
         self.hosts: list[str] = list(definition.get("hosts") or [])
@@ -413,7 +414,7 @@ class _Run:
             headers[self.auth_header] = (
                 f"{self.auth_prefix} {token}" if self.auth_prefix else token
             )
-        content: Optional[bytes] = None
+        content: bytes | None = None
         if rendered["body"] is not UNDEFINED:
             content = json.dumps(
                 rendered["body"], ensure_ascii=False, separators=(",", ":")
@@ -518,7 +519,7 @@ def _matches(status: int | str, actual: int) -> bool:
     return status[0] == str(actual)[0]
 
 
-def _by_default(status: int) -> Optional[str]:
+def _by_default(status: int) -> str | None:
     """What an answer outside 2xx means when no rule says; ``None`` is a
     passing failure."""
     if status in (401, 403):
@@ -530,7 +531,7 @@ def _by_default(status: int) -> Optional[str]:
     return None
 
 
-def _fits(answer: Any, returns: list[dict[str, Any]]) -> Optional[str]:
+def _fits(answer: Any, returns: list[dict[str, Any]]) -> str | None:
     """Why a mapped answer does not fit the declared returns, or ``None``."""
     if not isinstance(answer, dict):
         return (
@@ -564,7 +565,7 @@ async def _stepped(
     base: dict[str, Any],
     where: str,
     *,
-    connection: Optional[Callable[[Mapping[str, Any]], dict[str, Any]]] = None,
+    connection: Callable[[Mapping[str, Any]], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Make ``spec``'s request, or its named steps in turn, over ``base``, and
     answer what its map reads: ``base``, each earlier step's answer as
@@ -602,9 +603,9 @@ async def run_endpoint(
     credentials: Credentials,
     now: datetime,
     installed: Mapping[str, Any],
-    item: Optional[Mapping[str, Any]] = None,
-    element: Optional[str] = None,
-    actor: Optional[str] = None,
+    item: Mapping[str, Any] | None = None,
+    element: str | None = None,
+    actor: str | None = None,
 ) -> dict[str, Any]:
     """One declarative endpoint's answer: its result, or ``{"unavailable":
     <code>}``.
@@ -687,7 +688,7 @@ async def after_connect(
     params: Mapping[str, str],
     access_token: str,
     installed: Mapping[str, Any],
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> flows.AfterConnect:
     """A declarative ``after_connect``: its request or steps made with the
     token the flow just obtained, its map's ``{values, account_label}``, and a
@@ -705,7 +706,7 @@ async def after_connect(
         definition,
         [],
         credentials={"": access_token},
-        now=now or datetime.now(timezone.utc),
+        now=now or datetime.now(UTC),
     )
     base: dict[str, Any] = {"params": dict(params), "now": run.now, **installed}
     try:
@@ -739,7 +740,7 @@ async def health_state(
     fields: Mapping[str, Any],
     access_token: str,
     installed: Mapping[str, Any],
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> str:
     """A connection's health check: its request made with the connection's
     credential, and the state its ``states`` read from the answer.
@@ -754,7 +755,7 @@ async def health_state(
         definition,
         None,
         credentials={"": access_token},
-        now=now or datetime.now(timezone.utc),
+        now=now or datetime.now(UTC),
     )
     document: dict[str, Any] = {
         "params": {},
@@ -792,10 +793,10 @@ async def action_change(
     held: Mapping[str, Any],
     installed: Mapping[str, Any],
     result: Any = UNDEFINED,
-    params: Optional[Mapping[str, Any]] = None,
-    element: Optional[str] = None,
-    now: Optional[datetime] = None,
-) -> Optional[dict[str, Any]]:
+    params: Mapping[str, Any] | None = None,
+    element: str | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any] | None:
     """The change a declarative action's ``write`` answers, as the SDK's
     ``runAction`` reads it: the one Initiative makes to the plug-in's values
     on the action's own item, or ``None`` when it answers nothing.
@@ -812,7 +813,7 @@ async def action_change(
     answer that is not a change, raises :class:`PluginDataError` as the
     plug-in being unavailable.
     """
-    millis, at = _clock(now or datetime.now(timezone.utc))
+    millis, at = _clock(now or datetime.now(UTC))
     document: dict[str, Any] = {
         "item": dict(item),
         "held": dict(held),
@@ -850,13 +851,13 @@ class Delivered:
     and the connection state it sets."""
 
     #: The emit endpoint's id and its payload.
-    event: Optional[tuple[str, dict[str, Any]]] = None
+    event: tuple[str, dict[str, Any]] | None = None
     #: What the matched row's ``write`` answered: the changes the install makes
     #: to its values (``metadata.apply_changes``), :data:`UNDEFINED`
     #: when the row has no ``write`` or it answered nothing.
     writes: Any = UNDEFINED
     #: The connection and its state.
-    status: Optional[tuple[str, str]] = None
+    status: tuple[str, str] | None = None
     #: Why ``events`` or ``status`` answered nothing, when an expression of
     #: theirs failed or a payload did not fit: the same delivery fails the
     #: same way again.
@@ -870,7 +871,7 @@ async def map_delivery(
     payload: Any,
     connection: Mapping[str, Any],
     installed: Mapping[str, Any],
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> Delivered:
     """One webhook delivery, as a declarative plug-in's ``webhooks`` map it: the
     first ``events`` row whose ``when`` holds gives the event it emits, its
@@ -886,7 +887,7 @@ async def map_delivery(
     may answer if asked again raises :class:`ExpressionError` with
     ``transient`` set.
     """
-    millis, at = _clock(now or datetime.now(timezone.utc))
+    millis, at = _clock(now or datetime.now(UTC))
     document = {
         "headers": {name.lower(): value for name, value in headers.items()},
         "payload": payload,
@@ -902,7 +903,7 @@ async def map_delivery(
     }
     failures: list[str] = []
 
-    async def first(what: str) -> Optional[tuple[int, dict[str, Any]]]:
+    async def first(what: str) -> tuple[int, dict[str, Any]] | None:
         """The first row of ``what`` whose ``when`` holds."""
         for index, row in enumerate(webhooks.get(what) or []):
             try:
@@ -915,7 +916,7 @@ async def map_delivery(
                 return None
         return None
 
-    event: Optional[tuple[str, dict[str, Any]]] = None
+    event: tuple[str, dict[str, Any]] | None = None
     writes: Any = UNDEFINED
     matched = await first("events")
     if matched is not None:
@@ -945,7 +946,7 @@ async def map_delivery(
                 if exc.transient:
                     raise
                 failures.append(f"events/{index}/write: the expression failed")
-    status: Optional[tuple[str, str]] = None
+    status: tuple[str, str] | None = None
     matched = await first("status")
     if matched is not None:
         status = (matched[1]["connection"], matched[1]["state"])
@@ -964,7 +965,7 @@ async def run_schedule(
     plugin: GuildPlugin,
     guild_id: int,
     schedule: Mapping[str, Any],
-    since: Optional[str],
+    since: str | None,
 ) -> Any:
     """One run of an install's declarative schedule, as the SDK's
     ``runSchedule`` makes it: its read is made as the installation, with the
@@ -1007,7 +1008,7 @@ async def run_schedule(
         # A community connection the read names is not made: the run is
         # skipped rather than failed, until it is.
         raise PluginDataError(PluginChannelMessages.CONNECTION_NO_TOKEN, 409) from exc
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     run = _Run(plugin.definition, None, credentials={}, now=now)
     steps = endpoint.get("steps") or [{"request": endpoint["request"]}]
     connection = without_tokens(
@@ -1084,7 +1085,7 @@ def typed_params(
     }
 
 
-def _refusal(connection: Optional[Mapping[str, Any]]) -> PluginDataError:
+def _refusal(connection: Mapping[str, Any] | None) -> PluginDataError:
     """A call refused for want of ``connection``: a member's own is theirs to
     connect, and the community's is its admins' to configure."""
     return PluginDataError(
@@ -1099,8 +1100,8 @@ def request_refusal(
     definition: Any,
     endpoint: Mapping[str, Any],
     refs: Mapping[str, str],
-    actor: Optional[str],
-) -> Optional[PluginDataError]:
+    actor: str | None,
+) -> PluginDataError | None:
     """Why the endpoint's requests cannot be made as ``actor`` with the
     handles ``refs``, before any token is asked for: one naming no connection
     for ``actor`` (one per actor, on a call made as another or as none), a
@@ -1131,7 +1132,7 @@ async def _credentials(
     guild_id: int,
     endpoint: Mapping[str, Any],
     refs: Mapping[str, str],
-    actor: Optional[str],
+    actor: str | None,
 ) -> tuple[dict[str, str], dict[str, dict[str, Any]], bool]:
     """Each connection the endpoint's requests carry on a call made as
     ``actor``: its token and non-secret fields, and whether any is a
@@ -1211,10 +1212,10 @@ async def _answered(
     params: Mapping[str, Any],
     refs: Mapping[str, str],
     fields: Mapping[str, Mapping[str, Any]],
-    actor: Optional[str],
-    item: Optional[Mapping[str, Any]] = None,
-    element: Optional[str] = None,
-    now: Optional[datetime] = None,
+    actor: str | None,
+    item: Mapping[str, Any] | None = None,
+    element: str | None = None,
+    now: datetime | None = None,
 ) -> tuple[dict[str, Any], bool]:
     """One endpoint's answer for a call made as ``actor``, and whether a
     member's own connection was used. The credentials come first, outside
@@ -1236,7 +1237,7 @@ async def _answered(
                 params=params,
                 connections={**used, **fields},
                 credentials=tokens,
-                now=now or datetime.now(timezone.utc),
+                now=now or datetime.now(UTC),
                 installed=install_settings(plugin),
                 item=item,
                 element=element,
@@ -1258,9 +1259,9 @@ async def call_endpoint(
     params: Mapping[str, Any],
     refs: Mapping[str, str],
     fields: Mapping[str, Mapping[str, Any]],
-    actor: Optional[str],
-    item: Optional[Mapping[str, Any]] = None,
-    element: Optional[str] = None,
+    actor: str | None,
+    item: Mapping[str, Any] | None = None,
+    element: str | None = None,
 ) -> dict[str, Any]:
     """One declarative endpoint of an install, answered as a container
     answers: ``{endpoint, actor, result}``.

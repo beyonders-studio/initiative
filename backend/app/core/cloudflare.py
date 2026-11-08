@@ -15,7 +15,6 @@ The ranges are the ones Cloudflare publishes at https://www.cloudflare.com/ips/.
 from __future__ import annotations
 
 import ipaddress
-from typing import Optional
 
 #: Cloudflare's published edge ranges.
 NETWORKS = tuple(
@@ -48,8 +47,8 @@ NETWORKS = tuple(
 
 
 def _address(
-    text: Optional[str],
-) -> Optional[ipaddress.IPv4Address | ipaddress.IPv6Address]:
+    text: str | None,
+) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
     if not text:
         return None
     try:
@@ -58,7 +57,7 @@ def _address(
         return None
 
 
-def visitor(client: Optional[str], connecting_ip: Optional[str]) -> Optional[str]:
+def visitor(client: str | None, connecting_ip: str | None) -> str | None:
     """The visitor a request came from when ``client``, the address the
     server resolved, is one of Cloudflare's: the address ``CF-Connecting-IP``
     names, normalized. ``None`` when ``client`` is not Cloudflare's or the

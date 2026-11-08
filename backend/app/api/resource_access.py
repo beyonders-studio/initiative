@@ -16,56 +16,55 @@ collection), its own rule.
 # annotations re-evaluate it where cfg is out of scope → FastAPI drops the path
 # param and 422s.
 
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Annotated, Any, Awaitable, Callable, Mapping, Optional, TypeVar
+from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException, status
+from sqlalchemy import inspect
 
 from app.api.deps import (
     ActorContext,
     get_current_active_user,
 )
-from app.core.plugin_scopes import PluginScopeAccess, scope_name, tool_resource
+from app.core.errors import CodedError
 from app.core.messages import (
     CommonMessages,
+    InitiativeMessages,
     KindMessages,
     PluginMessages,
-    InitiativeMessages,
 )
-from app.core.errors import CodedError
+from app.core.plugin_scopes import PluginScopeAccess, scope_name, tool_resource
 from app.core.tools import KIND_BY_TABLE, KINDS, Tool, kind_refusal
 from app.db.frozen import ancestor_is_frozen, row_is_frozen
 from app.db.guild_standing import InstallContext
 from app.db.initiative_rls import governing_path
 from app.db.session import require_actor_context
+from app.models.platform.user import User
 from app.models.tenant.calendar_event import CalendarEvent
-from app.models.tenant.counter import Counter
 from app.models.tenant.collection import Collection
+from app.models.tenant.counter import Counter
 from app.models.tenant.initiative import Initiative, PermissionKey
-from app.models.tenant.wiki import WikiPage
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.task import Task
-from app.models.platform.user import User
-from sqlalchemy import inspect
+from app.models.tenant.wiki import WikiPage
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
 from app.services import permissions as permissions_service
-from app.services.permissions import Action
-from app.services import rls as rls_service
 from app.services import reachability
-from app.services.tenant import ownership as ownership_service
+from app.services import rls as rls_service
+from app.services.permissions import Action
 from app.services.tenant import calendar_events as events_service
 from app.services.tenant import calendars as calendars_service
+from app.services.tenant import collections as collections_service
 from app.services.tenant import contacts as contacts_service
 from app.services.tenant import counters as counters_service
 from app.services.tenant import dashboards as dashboards_service
 from app.services.tenant import files as files_service
-from app.services.tenant import collections as collections_service
 from app.services.tenant import initiatives as initiatives_service
-from app.services.tenant import wikis as wikis_service
+from app.services.tenant import named_people, project_grants, task_queries
+from app.services.tenant import ownership as ownership_service
 from app.services.tenant import posts as posts_service
-from app.services.tenant import named_people
-from app.services.tenant import project_grants
-from app.services.tenant import task_queries
+from app.services.tenant import wikis as wikis_service
 from app.services.tenant.initiative_tools import tool_on
 
 CurrentUserDep = Annotated[User, Depends(get_current_active_user)]
@@ -90,9 +89,9 @@ class ResourceAccessConfig:
     #: reads more than the decision does — its tags, properties, comment
     #: count, a project's statuses, a file's body — has one, so a gate
     #: check does not cost every caller the queries none of them reads.
-    hydrated_loader: Optional[Callable[..., Awaitable[Any]]] = None
+    hydrated_loader: Callable[..., Awaitable[Any]] | None = None
     #: A path parameter that differs from ``<tool>_id``.
-    id_param: Optional[str] = None
+    id_param: str | None = None
 
     @property
     def path_param(self) -> str:
@@ -185,7 +184,7 @@ async def require_create(
     session: Any,
     kind: Tool,
     initiative: Any,
-    user: Optional[User],
+    user: User | None,
     guild_context: ActorContext,
 ) -> None:
     """Raise 403 unless this caller may create a ``kind`` in ``initiative``.
@@ -214,8 +213,8 @@ async def require_create(
 async def prepare_create(
     session: Any,
     kind: Tool,
-    initiative_id: Optional[int],
-    user: Optional[User],
+    initiative_id: int | None,
+    user: User | None,
     guild_context: ActorContext,
 ) -> Initiative:
     """The initiative a new ``kind`` goes into, once the caller may make one
@@ -277,7 +276,7 @@ def refuse_plugin_sharing(actor: ActorContext, payload: Any, *fields: str) -> No
     require_install_may_share(actor, None)
 
 
-def require_install_may_share(actor: ActorContext, kind: Optional[Tool]) -> None:
+def require_install_may_share(actor: ActorContext, kind: Tool | None) -> None:
     """Raise 403 unless an installed plug-in's standing lets it change sharing:
     ``sharing:write``, the tool's write scope when ``kind`` is named, and the
     roster reads a sharing change makes. A person passes; their rung on the
@@ -301,7 +300,7 @@ def require_install_may_share(actor: ActorContext, kind: Optional[Tool]) -> None
 
 
 def refuse_install_community_share(
-    actor: ActorContext, initiative_id: Optional[int]
+    actor: ActorContext, initiative_id: int | None
 ) -> None:
     """Raise 403 when an installed plug-in would share a resource that belongs to
     no initiative. Such a resource is shared with the community's members,
@@ -319,7 +318,7 @@ async def apply_plugin_initial_sharing(
     kind: Tool,
     *,
     resource_id: int,
-    initiative_id: Optional[int],
+    initiative_id: int | None,
     payload: Any,
     grants: list[ResourceGrantSchema],
 ) -> None:
@@ -354,9 +353,9 @@ async def grant_initial_sharing(
     actor: ActorContext,
     kind: Tool,
     *,
-    user: Optional[User],
+    user: User | None,
     resource_id: int,
-    initiative_id: Optional[int],
+    initiative_id: int | None,
     payload: Any,
     grants: list[ResourceGrantSchema],
 ) -> None:
@@ -395,11 +394,11 @@ async def grant_initial_sharing(
 def authorize(
     kind: Tool,
     row: Any,
-    user: Optional[User] = None,
+    user: User | None = None,
     *,
-    context: Optional[ActorContext],
+    context: ActorContext | None,
     access: str = "read",
-    action: Optional[Action] = None,
+    action: Action | None = None,
 ) -> None:
     """Feature gate → the action ``resource_actions`` answered for the row.
 
@@ -426,11 +425,11 @@ async def load_authorized(
     session: Any,
     kind: Tool,
     resource_id: int,
-    user: Optional[User],
+    user: User | None,
     guild_context: ActorContext,
     *,
     access: str = "read",
-    action: Optional[Action] = None,
+    action: Action | None = None,
     hydrated: bool = False,
 ) -> Any:
     """Load by id (RLS scopes to the guild) → 404 if absent, then authorize.
@@ -503,10 +502,10 @@ def parent_column(model: type) -> str:
 async def require_may_change(
     session: Any,
     row: Any,
-    user: Optional[User],
+    user: User | None,
     context: ActorContext,
     *,
-    action: Optional[Action] = None,
+    action: Action | None = None,
 ) -> None:
     """Raise unless the request may change ``row``, a kind in no one instance
     of its tool: its tool switched on in the row's initiative, a role there
@@ -534,7 +533,7 @@ async def may_change(
     row: Any,
     context: ActorContext,
     *,
-    action: Optional[Action] = None,
+    action: Action | None = None,
 ) -> bool:
     """Whether :func:`require_may_change` would let the request change ``row``,
     for a read that reports it."""
@@ -545,17 +544,14 @@ async def may_change(
     return True
 
 
-Child = TypeVar("Child")
-
-
-async def load_child(
+async def load_child[Child](
     session: Any,
     model: type[Child],
     child_id: int,
     *,
     access: str = "read",
-    action: Optional[Action] = None,
-    parent_id: Optional[int] = None,
+    action: Action | None = None,
+    parent_id: int | None = None,
 ) -> Child:
     """A row inside a tool, by its own loader, refused as its tool would be
     (:func:`authorize`) for the standing the session was routed with.
@@ -586,7 +582,7 @@ async def load_kind(
     session: Any,
     kind: str,
     entity_id: int,
-    user: Optional[User],
+    user: User | None,
     guild_context: ActorContext,
 ) -> Any:
     """A tool or a row inside one, by its kind, read as its own page reads it
@@ -615,7 +611,7 @@ def parent_of(row: Any) -> Any:
 
 
 async def require_stays_in(
-    session: Any, source_initiative_id: Optional[int], initiative_id: Optional[int]
+    session: Any, source_initiative_id: int | None, initiative_id: int | None
 ) -> None:
     """Refuse taking content of ``source_initiative_id`` into
     ``initiative_id`` when the source keeps its content in. Every copy and
@@ -638,7 +634,7 @@ async def require_may_move(session: Any, row: Any, destination: Any) -> None:
     )
 
 
-async def reload_child(session: Any, model: type[Child], child_id: int) -> Child:
+async def reload_child[Child](session: Any, model: type[Child], child_id: int) -> Child:
     """A row inside a tool again after a change, as its loader reads it."""
     row = await SUB_TOOLS[model].load(session, child_id, populate_existing=True)
     if row is None:
@@ -659,7 +655,7 @@ async def set_resource_grants(
     session: Any,
     kind: Tool,
     resource_id: int,
-    user: Optional[User],
+    user: User | None,
     guild_context: ActorContext,
     grants: list[ResourceGrantSchema],
 ) -> None:

@@ -8,8 +8,8 @@ policies on the table answer that.
 
 from __future__ import annotations
 
-from app.models.tenant.calendar_event import CalendarEvent
 from app.core.tools import Tool
+from app.models.tenant.calendar_event import CalendarEvent
 from app.services.fields.derive import derive_fields
 from app.services.fields.spec import Dataset, Hop, Relation
 

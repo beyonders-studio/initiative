@@ -6,7 +6,8 @@ Deleting a type moves its tasks to another first, the trashed and archived ones
 included, and takes its page with it.
 """
 
-from typing import Annotated, List, Sequence
+from collections.abc import Sequence
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
@@ -102,7 +103,7 @@ async def _require_free_name(
         )
 
 
-@router.get("/", response_model=List[TaskTypeRead])
+@router.get("/", response_model=list[TaskTypeRead])
 async def list_task_types(
     project_id: int,
     session: ActorSessionDep,
@@ -119,13 +120,13 @@ async def list_task_types(
     return await task_types_service.list_types(session, project_id)
 
 
-@router.get("/gallery", response_model=List[TaskTypeGalleryGroup])
+@router.get("/gallery", response_model=list[TaskTypeGalleryGroup])
 async def list_task_type_gallery(
     project_id: int,
     session: ActorSessionDep,
     current_user: ActorUserDep,
     guild_context: ProjectsRead,
-) -> List[TaskTypeGalleryGroup]:
+) -> list[TaskTypeGalleryGroup]:
     """The ready-made types the project can add, grouped by what they are for,
     in the reader's language."""
     await resource_access.load_authorized(
@@ -229,7 +230,7 @@ async def create_task_type(
     )
 
 
-@router.post("/copy", response_model=List[TaskTypeRead])
+@router.post("/copy", response_model=list[TaskTypeRead])
 async def copy_task_types(
     project_id: int,
     copy_in: TaskTypeCopyRequest,
@@ -332,7 +333,7 @@ async def update_task_type(
     return target
 
 
-@router.post("/reorder", response_model=List[TaskTypeRead])
+@router.post("/reorder", response_model=list[TaskTypeRead])
 async def reorder_task_types(
     project_id: int,
     reorder_in: TaskTypeReorderRequest,

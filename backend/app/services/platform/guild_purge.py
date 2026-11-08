@@ -32,8 +32,8 @@ on the provisioning engine.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import logging
+from datetime import UTC, datetime
 
 from sqlalchemy import text
 from sqlmodel import col, delete, select
@@ -41,18 +41,17 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.db import cohorts, post_commit
-from app.db.guild_migrations import GUILD_SCHEMA_REGEX
 from app.db.advisory_locks import LockNamespace, advisory_lock
+from app.db.guild_migrations import GUILD_SCHEMA_REGEX
 from app.db.holds import refuse_while_held
+from app.db.request_context import SystemGuild, Unattributed
 from app.db.schema_provisioning import deprovision_guild
 from app.db.session import SystemSessionLocal, set_rls_context
 from app.models.platform.guild import CommunityStatus, Guild
 from app.services import audit as audit_service
 from app.services.marketplace import community_hooks, plugin_refs
-from app.services.platform.retention import COMMUNITY_DELETION, COMMUNITY_HOLD
 from app.services.platform import rules
-from app.db.request_context import SystemGuild, Unattributed
-
+from app.services.platform.retention import COMMUNITY_DELETION, COMMUNITY_HOLD
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +158,7 @@ async def _remove(session: AsyncSession, guild_id: int, days: int | None) -> boo
         await session.commit()
         return True
     if guild.purge_started_at is None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         guild.purge_started_at = now
         if guild.status != CommunityStatus.deleted.value:
             # Closed to everybody while it waits on its plug-ins, as a deleted
@@ -330,7 +329,7 @@ async def reclaim_orphaned_guilds(session: AsyncSession) -> int:
 async def process_guild_purges() -> None:
     """One pass of the guild-purge loop. Idempotent and safe to run on a
     schedule even when nothing is due."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     async with SystemSessionLocal() as session:
         await delete_expired_holds(session, now=now)
         await purge_due_guilds(session, now=now)

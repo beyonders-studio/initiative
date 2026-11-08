@@ -12,8 +12,9 @@ out, and the width of the window.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Optional, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from app.core.intake import FeedbackTopic, IntakeStream
 from app.models.platform.user import User
@@ -37,17 +38,17 @@ async def send(
     topic: FeedbackTopic,
     body: str,
     contactable: bool,
-    context: Optional["DeviceContext"] = None,
-    evidence: Sequence["PreparedEvidence"] = (),
-    now: Optional[datetime] = None,
-    idea_task_id: Optional[int] = None,
+    context: DeviceContext | None = None,
+    evidence: Sequence[PreparedEvidence] = (),
+    now: datetime | None = None,
+    idea_task_id: int | None = None,
 ) -> None:
     """File feedback as a case on the team's board, titled by its kind and how
     what they wrote begins. Their words open the conversation with a
     contactable sender and go into the description for any other. Sent with
     the published idea they voted for while writing it, it is joined to that
     idea."""
-    moment = now or datetime.now(timezone.utc)
+    moment = now or datetime.now(UTC)
     first = body.strip().splitlines()[0].strip()
     if len(first) > TITLE_LENGTH:
         first = first[: TITLE_LENGTH - 1].rstrip() + "…"

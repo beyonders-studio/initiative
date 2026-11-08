@@ -20,9 +20,8 @@ done or trashed, when the report was settled — by the retention sweep
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import (
     CheckConstraint,
@@ -64,9 +63,9 @@ class Evidence(CreatedByMixin, table=True):
         CheckConstraint(f"kind IN ({_KIND_SQL})", name="ck_evidence_kind"),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
 
-    report_id: Optional[int] = Field(
+    report_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -77,7 +76,7 @@ class Evidence(CreatedByMixin, table=True):
     )
     #: The operations case, named by its task: a case is its task, and every
     #: community's schema has ``tasks``.
-    case_task_id: Optional[int] = Field(
+    case_task_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -88,7 +87,7 @@ class Evidence(CreatedByMixin, table=True):
     )
     #: The answer it came with, where it came with one: the opening words or
     #: a reply. Kept so the conversation shows each file beside what was said.
-    comment_id: Optional[int] = Field(
+    comment_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -123,6 +122,6 @@ class Evidence(CreatedByMixin, table=True):
     kek_version: int = Field(sa_column=Column(SmallInteger, nullable=False))
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

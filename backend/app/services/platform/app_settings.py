@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-
 import logging
+from collections.abc import AsyncIterator, Sequence
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from cryptography.fernet import InvalidToken
 from sqlalchemy import text, update
@@ -9,41 +12,35 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from collections.abc import AsyncIterator, Sequence
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
-from datetime import datetime, timezone
-
-from app.core.transitions import Transition
-from app.services import audit as audit_service
 from app.core.config import settings as app_config
 from app.core.encryption import (
-    decrypt_field,
-    encrypt_field,
-    SALT_PLUGIN_PLATFORM_SIGNING_KEY,
     SALT_CAPTCHA_SECRET_KEY,
     SALT_FCM_SERVICE_ACCOUNT,
+    SALT_PLUGIN_PLATFORM_SIGNING_KEY,
     SALT_S3_SECRET_KEY,
     SALT_SMTP_PASSWORD,
+    decrypt_field,
+    encrypt_field,
 )
-from app.core.security import use_stored_plugin_platform_signing_key
 from app.core.login_methods import (
     DEFAULT_LOGIN_METHODS,
     LOGIN_METHOD_VALUES,
     PRIMARY_LOGIN_METHODS,
     LoginMethod,
 )
+from app.core.security import use_stored_plugin_platform_signing_key
+from app.core.transitions import Transition
 from app.db import cohorts
 from app.db import session as db_session
-from app.db.session import guild_context
-from app.db.session import set_rls_context
+from app.db.request_context import SystemGuild
+from app.db.session import guild_context, set_rls_context
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.app_setting_secret import AppSettingSecret
 from app.models.tenant.guild_setting import GuildSetting
+from app.services import audit as audit_service
 from app.services.marketplace import context_jwt
 from app.services.platform import guilds as guilds_service
 from app.services.platform import rules
-from app.db.request_context import SystemGuild
 
 GLOBAL_SETTINGS_ID = 1
 
@@ -320,7 +317,7 @@ async def ensure_settings_row(session: AsyncSession) -> AppSetting:
     columns = AppSetting.__table__.columns
     await session.exec(
         pg_insert(AppSetting.__table__)
-        .values({name: getattr(defaults, name) for name in columns.keys()})
+        .values({c.key: getattr(defaults, c.key) for c in columns})
         .on_conflict_do_nothing(index_elements=["id"])
     )
     settings_row = await _stored_app_settings(session)
@@ -476,7 +473,7 @@ async def record_running_version(
     if not await _session_can_write_app_settings(session):
         return (await get_app_settings(session)).previous_version
     settings_row = await ensure_settings_row(session)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     started = {
         name: now for name in transitions if name not in settings_row.transitions
     }
@@ -507,7 +504,7 @@ async def transition_over(session: AsyncSession, transition: Transition) -> bool
     """Whether ``transition``'s grace period has run out on this deployment."""
     started = (await get_app_settings(session)).transitions.get(transition.name)
     return started is not None and (
-        datetime.fromisoformat(started) + transition.grace < datetime.now(timezone.utc)
+        datetime.fromisoformat(started) + transition.grace < datetime.now(UTC)
     )
 
 

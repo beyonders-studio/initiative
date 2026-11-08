@@ -48,13 +48,13 @@ import base64
 import hashlib
 import json
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Mapping, Optional
+from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
-from app.models.platform.guild import CommunityStatus
 from app.core.security import (
     PLUGIN_CONTEXT_TOKEN_TYPE,
     PUBLIC_KEY_JWT_ALGORITHM,
@@ -63,6 +63,7 @@ from app.core.security import (
     resolve_plugin_platform_signing_material,
     sign_eddsa,
 )
+from app.models.platform.guild import CommunityStatus
 
 __all__ = [
     "CONTEXT_SCOPES",
@@ -175,15 +176,15 @@ def mint_context_token(
     plugin_install_id: int,
     scope: str,
     community_status: str,
-    endpoint_id: Optional[str] = None,
-    hook: Optional[str] = None,
-    connection_refs: Optional[Mapping[str, str]] = None,
-    caller: Optional[str] = None,
-    actor: Optional[str] = None,
-    member: Optional[str] = None,
-    initiative_id: Optional[int] = None,
-    viewer: Optional[str] = None,
-    subject: Optional[Mapping[str, Any]] = None,
+    endpoint_id: str | None = None,
+    hook: str | None = None,
+    connection_refs: Mapping[str, str] | None = None,
+    caller: str | None = None,
+    actor: str | None = None,
+    member: str | None = None,
+    initiative_id: int | None = None,
+    viewer: str | None = None,
+    subject: Mapping[str, Any] | None = None,
     lifetime: timedelta = CONTEXT_TOKEN_LIFETIME,
 ) -> tuple[str, int]:
     """Sign one context token and return it with its lifetime in seconds.
@@ -221,7 +222,7 @@ def mint_context_token(
     if len(refs) > _MAX_CONNECTION_REFS:
         raise ContextTokenError("too many connection references for one call")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "jti": str(uuid.uuid4()),
         "iss": TOKEN_ISSUER,
@@ -264,7 +265,7 @@ def mint_context_token(
 
 #: The published document, rebuilt only when the configured key changes. Parsing
 #: a PEM per request would be pure waste on a route plug-ins poll.
-_jwks_cache: tuple[str, Optional[str], dict[str, Any]] | None = None
+_jwks_cache: tuple[str, str | None, dict[str, Any]] | None = None
 
 
 def context_jwks() -> dict[str, Any]:

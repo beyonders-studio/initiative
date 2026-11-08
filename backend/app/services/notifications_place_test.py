@@ -10,11 +10,11 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool
+from app.db.request_context import SystemGuild, Unattributed
 from app.models.platform.notification import Notification, NotificationType
 from app.services import notifications as notifications_service
 from app.services.platform import user_notifications
 from app.testing import create_guild, create_user, drain_notices
-from app.db.request_context import SystemGuild, Unattributed
 
 
 async def _only(session: AsyncSession, user_id: int) -> Notification:

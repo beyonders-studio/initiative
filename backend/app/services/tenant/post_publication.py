@@ -39,18 +39,18 @@ from sqlalchemy import ColumnElement, and_, func, update
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tools import Tool
+from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.post import Post
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.services import notifications as notifications_service
 from app.services.notifications import PluginAuthor
-from app.models.platform.notification import NotificationType
-from app.core.tools import Tool
 from app.services.platform import accounts as accounts_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import post_polls as post_polls_service
 from app.services.tenant import posts as posts_service
-from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 
 logger = logging.getLogger(__name__)

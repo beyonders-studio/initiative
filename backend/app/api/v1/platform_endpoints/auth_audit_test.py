@@ -22,7 +22,6 @@ from app.models.platform.user import UserStatus
 from app.testing import emitted
 from app.testing.factories import create_user, get_auth_headers
 
-
 PASSWORD = "testpassword123"
 
 
@@ -295,13 +294,13 @@ async def test_claiming_an_existing_account_by_verified_email_is_recorded(
     from sqlmodel import select
 
     from app.core.security import get_password_hash
+    from app.db import post_commit
     from app.models.platform.mfa_recovery_code import MfaRecoveryCode
     from app.models.platform.user import User
     from app.models.platform.user_passkey import UserPasskey
     from app.services import content_sockets
     from app.services.auth import addresses
     from app.services.auth import totp as totp_service
-    from app.db import post_commit
     from app.testing.oidc import FakeIdp
 
     rechecked: list[int] = []

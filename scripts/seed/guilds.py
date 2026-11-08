@@ -7,25 +7,23 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.image_headers import validate_image
-from app.db.schema_provisioning import provision_guild
 from app.db.request_context import SystemGuild, Unattributed
+from app.db.schema_provisioning import provision_guild
 from app.db.session import set_rls_context
 from app.db.tenancy import GUILD_SCOPED_TABLES
 from app.models.platform.guild import (
-    Guild,
     CommunityCategory,
-    GuildMembership,
     CommunityRole,
+    Guild,
+    GuildMembership,
 )
 from app.models.platform.guild_image import IMAGE_SPECS
 from app.models.platform.user import User
-from app.services.platform import guild_images
+from app.services.platform import guild_images, rules
 from app.services.platform import guilds as guilds_service
-from app.services.platform import rules
 from app.services.platform.app_settings import (
     get_or_create_guild_settings,
 )
-
 from seed.common import Community, photo
 
 #: The three communities with real content, in the order they are seeded.

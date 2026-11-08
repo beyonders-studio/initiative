@@ -14,7 +14,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Path, Query, Response, status
 from sqlalchemy import text
 
-from app.api.deps import UserSessionDep, CurrentUser
+from app.api.deps import CurrentUser, UserSessionDep
 from app.core.messages import DirectMessageMessages
 from app.models.platform.contact_grant import ContactGrantKind
 from app.schemas.platform.dm import (

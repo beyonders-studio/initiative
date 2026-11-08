@@ -18,7 +18,6 @@ from app.models.platform.guild import CommunityRole
 from app.testing import create_guild, create_guild_membership, create_user
 from app.testing.billing_managed import billing_manages_plans
 
-
 GUILDS = "/api/v1/settings/communities"
 
 

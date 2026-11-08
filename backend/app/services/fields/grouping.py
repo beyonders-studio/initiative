@@ -19,11 +19,12 @@ every group it is in.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from enum import Enum
 from types import SimpleNamespace
-from typing import Any, Callable, Iterable, Optional, TypeVar
+from typing import Any, TypeVar
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -84,7 +85,7 @@ class Group:
     #: What it is called, when that is somebody's text (a tag's name, a
     #: person's); ``None`` for a value the reader's language names (an enum's,
     #: a checkbox's, the empty group).
-    label: Optional[str]
+    label: str | None
     rank: tuple = ()
 
 
@@ -95,7 +96,7 @@ class Grouping:
     #: The field, as the dataset names it, or ``property:<id>``.
     field: str
     #: The property's own name, for a property grouping.
-    name: Optional[str]
+    name: str | None
     groups: dict[int, list[Group]]
     #: Whether a row can have no value, and so the list an empty group, last.
     empty: bool = True
@@ -146,7 +147,7 @@ class _How(Enum):
     reader = "reader"
 
 
-def _how(ds: Dataset, spec: FieldSpec) -> Optional[_How]:
+def _how(ds: Dataset, spec: FieldSpec) -> _How | None:
     """How ``spec`` groups ``ds``'s rows, or ``None`` where its values do not
     group: free text, numbers, and anything a reader is not offered."""
     if spec.buckets:
@@ -197,8 +198,8 @@ async def group_rows(
     field: str,
     ids: list[int],
     *,
-    bucket: Optional[DateBucket] = None,
-    tz: Optional[str] = None,
+    bucket: DateBucket | None = None,
+    tz: str | None = None,
 ) -> Grouping:
     """The groups each of ``ids`` is in, by ``field`` of the dataset, a date
     by ``bucket`` in the zone ``tz``.
@@ -241,10 +242,10 @@ async def group_rows(
     return Grouping(field, None, held, empty=empty)
 
 
-def bucket_start(value: date | datetime, bucket: DateBucket, tz: Optional[str]) -> date:
+def bucket_start(value: date | datetime, bucket: DateBucket, tz: str | None) -> date:
     """The first day of the bucket ``value`` falls in, in the zone ``tz``."""
     if isinstance(value, datetime):
-        aware = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        aware = value if value.tzinfo else value.replace(tzinfo=UTC)
         value = aware.astimezone(resolve_zone(tz)).date()
     if bucket is DateBucket.week:
         return value - timedelta(days=value.weekday())
@@ -257,7 +258,7 @@ def bucket_start(value: date | datetime, bucket: DateBucket, tz: Optional[str]) 
     return value
 
 
-def _date_group(value: Any, bucket: DateBucket, tz: Optional[str]) -> list[Group]:
+def _date_group(value: Any, bucket: DateBucket, tz: str | None) -> list[Group]:
     if isinstance(value, str):
         try:
             value = (
@@ -279,7 +280,7 @@ async def _by_date(
     spec: FieldSpec,
     ids: list[int],
     bucket: DateBucket,
-    tz: Optional[str],
+    tz: str | None,
 ) -> dict[int, list[Group]]:
     rows = await session.exec(
         select(ds.model.id, spec.column).where(ds.model.id.in_(ids))
@@ -287,7 +288,7 @@ async def _by_date(
     return {row_id: _date_group(value, bucket, tz) for row_id, value in rows}
 
 
-def _dataset_for_table(table: str) -> Optional[Dataset]:
+def _dataset_for_table(table: str) -> Dataset | None:
     """The dataset a reference to ``table`` names: the one over that table, or
     the one whose rows are that table's under another name (the guild's
     members are its ``users``)."""
@@ -304,7 +305,7 @@ def _dataset_for_table(table: str) -> Optional[Dataset]:
     return None
 
 
-def _referenced_dataset(spec: FieldSpec) -> Optional[Dataset]:
+def _referenced_dataset(spec: FieldSpec) -> Dataset | None:
     for fk in getattr(spec.column, "foreign_keys", ()):
         return _dataset_for_table(fk.target_fullname.split(".")[0])
     return None
@@ -419,7 +420,7 @@ async def _by_bucket(
     ds: Dataset,
     spec: FieldSpec,
     ids: list[int],
-    tz: Optional[str],
+    tz: str | None,
 ) -> dict[int, list[Group]]:
     assert spec.sort is not None  # buckets are read off the field's ordering
     rows = await session.exec(
@@ -445,8 +446,8 @@ async def _by_property(
     ds: Dataset,
     field: str,
     ids: list[int],
-    bucket: Optional[DateBucket],
-    tz: Optional[str],
+    bucket: DateBucket | None,
+    tz: str | None,
 ) -> Grouping:
     from app.services.tenant import metadata as metadata_service
 

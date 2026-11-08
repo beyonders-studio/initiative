@@ -5,30 +5,30 @@ once their case has been closed long enough."""
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import update
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 
+from app.api.v1.platform_endpoints import tickets_following_test as following
+from app.api.v1.platform_endpoints.tickets_following_test import TICKETS, _file
+from app.api.v1.platform_endpoints.tickets_test import _set_support
+from app.api.v1.tenant_endpoints import moderation_test as moderation
 from app.core import blob_crypto
+from app.core.intake import IntakeStream, meta
 from app.core.messages import EvidenceMessages
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.comment import Comment, CommentAudience
-from app.core.intake import IntakeStream, meta
 from app.models.tenant.evidence import Evidence
-from app.models.tenant.task import Task
 from app.models.tenant.intake import IntakeCase
+from app.models.tenant.task import Task
 from app.services import storage as storage_service
 from app.services.platform import evidence as evidence_service
 from app.services.platform.evidence_test import picture
-from app.api.v1.platform_endpoints import tickets_following_test as following
-from app.api.v1.platform_endpoints.tickets_following_test import TICKETS, _file
-from app.api.v1.platform_endpoints.tickets_test import _set_support
-from app.api.v1.tenant_endpoints import moderation_test as moderation
 
 # The neighbouring suites' fixtures, by name.
 desk = following.desk
@@ -435,7 +435,7 @@ async def _set_state(session, desk, task_id: int, *, done_days_ago: float | None
         task.completed_at = None
     else:
         task.task_status_id = desk["done"]
-        task.completed_at = datetime.now(timezone.utc) - timedelta(days=done_days_ago)
+        task.completed_at = datetime.now(UTC) - timedelta(days=done_days_ago)
     session.add(task)
     await session.commit()
 
@@ -495,7 +495,7 @@ async def test_a_case_a_hold_names_keeps_its_files_until_the_hold_is_released(
     released = (
         await session.exec(select(ContentHold).where(ContentHold.id == hold_id))
     ).one()
-    released.released_at = datetime.now(timezone.utc)
+    released.released_at = datetime.now(UTC)
     released.release_outcome = "restore"
     session.add(released)
     await session.commit()
@@ -547,7 +547,7 @@ async def test_a_long_trashed_cases_files_go(client, session, acting_user, desk)
     task_id = await _with_file(client, acting_user)
     await set_rls_context(session, SystemGuild(desk["guild_id"]))
     task = (await session.exec(select(Task).where(Task.id == task_id))).one()
-    task.deleted_at = datetime.now(timezone.utc) - timedelta(days=91)
+    task.deleted_at = datetime.now(UTC) - timedelta(days=91)
     session.add(task)
     await session.commit()
     assert await _sweep(session, desk) == 1
@@ -626,9 +626,8 @@ async def test_what_was_written_before_a_failed_write_is_removed(
         ],
         meta(IntakeStream.support).evidence,
     )
-    with pytest.raises(OSError):
-        with evidence_service.Sealing(gid) as sealing:
-            sealing.store(session, prepared=files, created_by=None, case_task_id=1)
+    with pytest.raises(OSError), evidence_service.Sealing(gid) as sealing:
+        sealing.store(session, prepared=files, created_by=None, case_task_id=1)
     assert len(written) == 2
     assert not storage.exists(written[0])
 
@@ -641,14 +640,11 @@ async def test_what_was_written_for_rows_that_never_landed_is_removed(session, d
         meta(IntakeStream.support).evidence,
     )
     await set_rls_context(session, SystemGuild(gid))
-    with pytest.raises(DBAPIError):
-        with evidence_service.Sealing(gid) as sealing:
-            # No such case: the commit is refused.
-            sealing.store(
-                session, prepared=files, created_by=None, case_task_id=999_999
-            )
-            await session.commit()
-            sealing.keep()
+    with pytest.raises(DBAPIError), evidence_service.Sealing(gid) as sealing:
+        # No such case: the commit is refused.
+        sealing.store(session, prepared=files, created_by=None, case_task_id=999_999)
+        await session.commit()
+        sealing.keep()
     await session.rollback()
     (key,) = sealing.written
     assert not storage.exists(key)

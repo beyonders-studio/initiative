@@ -10,24 +10,15 @@ there is anybody to scope a policy to.
 """
 
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from app.api.deps import (
-    FactorExemptUser,
-    require_first_party_session,
-    SystemSessionDep,
     CurrentUser,
-)
-from app.core.audit_events import AuditEventType
-from app.core.login_methods import LoginMethod
-from app.core.messages import AuthMessages
-from app.core.rate_limit import limiter
-from app.core.security import has_usable_password
-from app.api.v1.platform_endpoints.password_recheck import (
-    require_password_or_recent_proof,
+    FactorExemptUser,
+    SystemSessionDep,
+    require_first_party_session,
 )
 from app.api.v1.platform_endpoints.change_assessment import is_risky
 from app.api.v1.platform_endpoints.held_changes import (
@@ -35,15 +26,20 @@ from app.api.v1.platform_endpoints.held_changes import (
     held_response,
     hold_change,
 )
+from app.api.v1.platform_endpoints.password_recheck import (
+    require_password_or_recent_proof,
+)
 from app.api.v1.platform_endpoints.session_opening import (
     prove_second_factor,
     upgrade_session,
 )
-
-from app.schemas.platform.token import Token
-from app.schemas.platform.user import HeldChangeOutcome
+from app.core.audit_events import AuditEventType
+from app.core.login_methods import LoginMethod
+from app.core.messages import AuthMessages
+from app.core.rate_limit import limiter
+from app.core.security import has_usable_password
+from app.models.platform.account_change_hold import HeldChangeKind
 from app.schemas.platform.second_factor import (
-    SecondFactorStepUpAnswer,
     RecoveryCodes,
     RecoveryCodesRegenerate,
     SecondFactorConfirm,
@@ -51,12 +47,13 @@ from app.schemas.platform.second_factor import (
     SecondFactorEnrolment,
     SecondFactorEnrolStart,
     SecondFactorStatus,
+    SecondFactorStepUpAnswer,
 )
+from app.schemas.platform.token import Token
+from app.schemas.platform.user import HeldChangeOutcome
 from app.services import audit as audit_service
 from app.services import email as email_service
-from app.services.auth import addresses
-from app.models.platform.account_change_hold import HeldChangeKind
-from app.services.auth import held_changes
+from app.services.auth import addresses, held_changes
 from app.services.auth import totp as totp_service
 from app.services.platform import auth_posture
 
@@ -72,7 +69,7 @@ router = APIRouter()
 FirstPartyOnly = Depends(require_first_party_session)
 
 
-def _iso(value: Optional[datetime]) -> Optional[str]:
+def _iso(value: datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
 
 

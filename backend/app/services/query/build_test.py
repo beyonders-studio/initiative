@@ -13,7 +13,6 @@ import pytest
 from app.core.messages import QueryMessages
 from app.schemas.query import FilterOp
 from app.services.query import QueryError
-from app.services.query.resolve import PluginCall, ResolvedQuery, SheetCall, resolve
 from app.services.query.build import (
     Column,
     Condition,
@@ -22,6 +21,7 @@ from app.services.query.build import (
     Sort,
     build,
 )
+from app.services.query.resolve import PluginCall, ResolvedQuery, SheetCall, resolve
 
 
 def build_and_resolve(spec: QuerySpec) -> tuple[str, ResolvedQuery]:

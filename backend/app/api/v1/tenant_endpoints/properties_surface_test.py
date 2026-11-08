@@ -17,9 +17,10 @@ that entity's name.
 from __future__ import annotations
 
 import json
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any, Awaitable, Callable
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 from httpx import AsyncClient
@@ -27,8 +28,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.file_types import FileType
-from app.core.tools import KINDS
-from app.core.tools import Tool
+from app.core.tools import KINDS, Tool
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.metadata import MetadataType, MetadataValue
@@ -39,10 +39,10 @@ from app.testing import (
     Actor,
     create_calendar,
     create_calendar_event,
+    create_collection,
     create_counter,
     create_counter_group,
     create_file,
-    create_collection,
     create_guild,
     create_guild_membership,
     create_initiative,
@@ -122,7 +122,7 @@ def _property_filters(a, _parent, property_id, value):
 def _around_now() -> str:
     """The calendar-entries window around now, where the factory puts events,
     with no task markers."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return "&".join(
         (
             f"start_after={(now - timedelta(days=1)):%Y-%m-%dT%H:%M:%SZ}",

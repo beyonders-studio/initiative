@@ -36,11 +36,11 @@ from app.models.platform.oidc_claim_mapping import (
     OIDCMappingTargetType,
 )
 from app.schemas.platform.settings import (
-    ProviderPlacementRuleRead,
     CommunityClaimRuleCreate,
     CommunityClaimRuleRead,
     CommunityClaimRulesResponse,
     CommunityClaimRuleUpdate,
+    ProviderPlacementRuleRead,
 )
 from app.services import audit as audit_service
 from app.services.platform import provider_placement

@@ -14,7 +14,7 @@ lines (``app.core.recurrence.imported``).
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -41,8 +41,8 @@ class _EnvelopeBase(SanitizedBaseModel):
     #: to something the envelope does not carry is kept only when both are
     #: where it is being imported, because only there does its id still name
     #: the same thing.
-    source_instance_url: Optional[str] = None
-    source_guild_id: Optional[int] = None
+    source_instance_url: str | None = None
+    source_guild_id: int | None = None
 
 
 class EnvelopePropertyValue(SanitizedBaseModel):
@@ -53,14 +53,14 @@ class EnvelopePropertyValue(SanitizedBaseModel):
 
     property_name: str
     property_type: MetadataType
-    value_text: Optional[str] = None
-    value_number: Optional[float] = None
-    value_boolean: Optional[bool] = None
+    value_text: str | None = None
+    value_number: float | None = None
+    value_boolean: bool | None = None
     value_json: Any = None
-    value_handle: Optional[str] = None
-    value_name: Optional[str] = None
+    value_handle: str | None = None
+    value_name: str | None = None
     #: A money value's currency, which is its property's.
-    currency: Optional[str] = None
+    currency: str | None = None
     #: A value of its project's metadata, not of one of the initiative's
     #: properties.
     project: bool = False
@@ -91,13 +91,13 @@ class WikiPageComment(SanitizedBaseModel):
     model_config = ConfigDict(extra="ignore")
 
     content: dict[str, Any] = {}
-    author_handle: Optional[str] = None
-    author_name: Optional[str] = None
-    created_at: Optional[str] = None
+    author_handle: str | None = None
+    author_name: str | None = None
+    created_at: str | None = None
     #: What this comment was called where it came from, and the one it
     #: answers, so a thread arrives as a thread. Refs live for one job.
-    external_ref: Optional[str] = None
-    reply_to_ref: Optional[str] = None
+    external_ref: str | None = None
+    reply_to_ref: str | None = None
     mention_handles: list[str] = []
 
 
@@ -113,7 +113,7 @@ class WikiPageEnvelope(SanitizedBaseModel):
 
     title: str
     slug: str
-    parent: Optional[str] = None
+    parent: str | None = None
     position: int = 0
     is_draft: bool = False
     content: dict[str, Any] = {}
@@ -122,12 +122,12 @@ class WikiPageEnvelope(SanitizedBaseModel):
     #: When the page was written and when it was last edited. Absent in an
     #: export taken before they were carried, and absent is not "now" — the
     #: importer only uses a value it was actually given.
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: str | None = None
+    updated_at: str | None = None
     #: Who wrote it, where it came from: a handle the people step places, and
     #: the name to show when nobody answers to it.
-    author_handle: Optional[str] = None
-    author_name: Optional[str] = None
+    author_handle: str | None = None
+    author_name: str | None = None
     #: The handles the body's mention nodes name without an account yet — by
     #: ``mentionHandle`` in an exported page, by ``mentionName`` in one mapped
     #: from Confluence. Each one the people step places is linked to that
@@ -135,7 +135,7 @@ class WikiPageEnvelope(SanitizedBaseModel):
     mention_handles: list[str] = []
     #: What the page was called where it came from — ``confluence:123`` — for
     #: the job's links to point at. Never written to a column.
-    external_ref: Optional[str] = None
+    external_ref: str | None = None
     #: What was said on the page, oldest first, so a reply follows what it
     #: answers.
     comments: list[WikiPageComment] = []
@@ -149,8 +149,8 @@ class WikiFiledUpload(SanitizedBaseModel):
 
     name: str
     storage_key: str
-    original_filename: Optional[str] = None
-    content_type: Optional[str] = None
+    original_filename: str | None = None
+    content_type: str | None = None
     tags: list[str] = []
     properties: list[EnvelopePropertyValue] = []
 
@@ -165,13 +165,13 @@ class WikiFiledFile(SanitizedBaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    page: Optional[str] = None
-    position: Optional[int] = None
-    envelope: Optional[FileEnvelope] = None
-    upload: Optional[WikiFiledUpload] = None
+    page: str | None = None
+    position: int | None = None
+    envelope: FileEnvelope | None = None
+    upload: WikiFiledUpload | None = None
     #: What the file was called where it came from — ``file:7`` — so
     #: a reference to it in a page points at the file it became.
-    external_ref: Optional[str] = None
+    external_ref: str | None = None
 
 
 class WikiEnvelope(_EnvelopeBase):
@@ -188,15 +188,15 @@ class WikiEnvelope(_EnvelopeBase):
 
     type: Literal["initiative-wiki"]
     name: str
-    description: Optional[str] = None
-    home_page: Optional[str] = None
-    template_page: Optional[str] = None
-    page_order: Optional[WikiPageOrder] = None
-    contents_depth: Optional[int] = Field(default=None, ge=2, le=4)
-    show_connections: Optional[bool] = None
-    show_updated_at: Optional[bool] = None
-    reading_width: Optional[WikiReadingWidth] = None
-    accent_color: Optional[str] = Field(default=None, max_length=32)
+    description: str | None = None
+    home_page: str | None = None
+    template_page: str | None = None
+    page_order: WikiPageOrder | None = None
+    contents_depth: int | None = Field(default=None, ge=2, le=4)
+    show_connections: bool | None = None
+    show_updated_at: bool | None = None
+    reading_width: WikiReadingWidth | None = None
+    accent_color: str | None = Field(default=None, max_length=32)
     tags: list[str] = []
     properties: list[EnvelopePropertyValue] = []
     pages: list[WikiPageEnvelope] = []
@@ -208,10 +208,10 @@ class CounterEnvelopeItem(SanitizedBaseModel):
     model_config = ConfigDict(extra="ignore")
 
     name: str
-    color: Optional[str] = None
+    color: str | None = None
     count: float = 0
-    min: Optional[float] = None
-    max: Optional[float] = None
+    min: float | None = None
+    max: float | None = None
     step: float = 1
     initial_count: float = 0
     view_mode: str = "number"
@@ -219,13 +219,13 @@ class CounterEnvelopeItem(SanitizedBaseModel):
     properties: list[EnvelopePropertyValue] = []
     #: What this counter was called where it came from — a thing a reference
     #: elsewhere in the same import can name. Refs live for one job.
-    external_ref: Optional[str] = None
+    external_ref: str | None = None
 
 
 class CounterGroupEnvelope(_EnvelopeBase):
     type: Literal["initiative-counter-group"]
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     tags: list[str] = []
     properties: list[EnvelopePropertyValue] = []
     counters: list[CounterEnvelopeItem] = []
@@ -244,12 +244,12 @@ class DashboardEnvelope(_EnvelopeBase):
 
     type: Literal["initiative-dashboard"]
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     # Present only for a dashboard built on a built-in plug-in. Dropped on import
     # when the destination has no such listing, so the dashboard arrives as an
     # ordinary one rather than pointing at nothing.
-    listing_uid: Optional[str] = None
-    listing_version: Optional[str] = None
+    listing_uid: str | None = None
+    listing_version: str | None = None
     definition: dict[str, Any] = {}
     config: dict[str, Any] = {}
     tags: list[str] = []
@@ -271,14 +271,14 @@ class PostPollEnvelope(SanitizedBaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    question: Optional[str] = None
+    question: str | None = None
     options: list[str] = []
     allows_multiple: bool = False
     is_anonymous: bool = False
     hide_results: bool = False
 
     @model_validator(mode="after")
-    def _options_within_limits(self) -> "PostPollEnvelope":
+    def _options_within_limits(self) -> PostPollEnvelope:
         # The same bounds the endpoints hold a poll to. An import is a write
         # like any other, and one that skipped them would store a question the
         # app would refuse to accept or to save again.
@@ -320,12 +320,12 @@ class PostEnvelope(_EnvelopeBase):
     body: dict[str, Any] = {}
     tags: list[str] = []
     properties: list[EnvelopePropertyValue] = []
-    poll: Optional[PostPollEnvelope] = None
+    poll: PostPollEnvelope | None = None
     #: The handles the body's mention nodes name, as a file's are.
     mention_handles: list[str] = []
 
     @model_validator(mode="after")
-    def _body_within_limits(self) -> "PostEnvelope":
+    def _body_within_limits(self) -> PostEnvelope:
         # The same rule the endpoints apply, not a second copy of it: an
         # envelope that checked only the character count let a large, low-text
         # Lexical structure through, which a normal write would then refuse.
@@ -359,10 +359,10 @@ class ContactEnvelope(_EnvelopeBase):
 class EventEnvelopeAttendee(SanitizedBaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    name: Optional[str] = None
+    name: str | None = None
     #: ``foobar#1234`` — the handle names one account and is what the export
     #: writes. An address is not a person's identifier here.
-    handle: Optional[str] = None
+    handle: str | None = None
     rsvp: str = "pending"
 
 
@@ -370,13 +370,13 @@ class EventEnvelopeItem(SanitizedBaseModel):
     model_config = ConfigDict(extra="ignore")
 
     title: str
-    description: Optional[str] = None
-    location: Optional[str] = None
+    description: str | None = None
+    location: str | None = None
     start_at: str
     end_at: str
     all_day: bool = False
     # RRULE lines; an export taken before RRULE carries the older JSON shape.
-    recurrence: Optional[str | dict[str, Any]] = None
+    recurrence: str | dict[str, Any] | None = None
     recurrence_shift: int = 0
     attendees: list[EventEnvelopeAttendee] = []
     tags: list[str] = []
@@ -384,21 +384,21 @@ class EventEnvelopeItem(SanitizedBaseModel):
     #: What this event was called where it came from. An event is a thing
     #: other entries point at — a sprint with its tasks in it — so it needs a
     #: name the job's deferred link pass can resolve, exactly as a task does.
-    external_ref: Optional[str] = None
+    external_ref: str | None = None
     #: When the event was written down (not when it happens — that is
     #: ``start_at``). The export has always emitted it; it is read now.
-    created_at: Optional[str] = None
+    created_at: str | None = None
     #: An occurrence with a row of its own: its series' ``external_ref``, and
     #: its start there.
-    series_ref: Optional[str] = None
-    original_start: Optional[str] = None
+    series_ref: str | None = None
+    original_start: str | None = None
 
 
 class CalendarEnvelope(_EnvelopeBase):
     type: Literal["initiative-calendar"]
     name: str
-    description: Optional[str] = None
-    color: Optional[str] = None
+    description: str | None = None
+    color: str | None = None
     tags: list[str] = []
     properties: list[EnvelopePropertyValue] = []
     events: list[EventEnvelopeItem] = []

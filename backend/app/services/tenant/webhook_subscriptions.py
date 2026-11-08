@@ -4,22 +4,23 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
 from sqlalchemy import func
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core import webhook_events
+from app.core.audit_events import AuditEventType
+from app.core.config import settings
 from app.core.errors import CodedError
 from app.core.messages import WebhookSubscriptionMessages
-from app.core import webhook_events
-from app.core.config import settings
 from app.core.plugin_scopes import plugin_scope
 from app.db import cohorts
-from app.db.session import set_rls_context
-from app.core.audit_events import AuditEventType
 from app.db.guild_standing import InstallContext
+from app.db.request_context import SystemGuild
+from app.db.session import set_rls_context
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.webhook_delivery import WebhookDelivery
 from app.models.tenant.webhook_subscription import WebhookSubscription
@@ -34,7 +35,6 @@ from app.services.marketplace.registration_lookup import (
 )
 from app.services.marketplace.service_plugins import ENDPOINT_ID_PREFIX
 from app.services.platform.intake import configured_operations_guild_id
-from app.db.request_context import SystemGuild
 
 #: The fields a rewrite reports as moved. ``fields`` is a list of names, so
 #: it is reported as having moved and never copied.
@@ -311,7 +311,7 @@ async def create_subscription(
     )
 
     secret = _generate_hmac_secret()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     subscription = WebhookSubscription(
         initiative_id=payload.initiative_id,
@@ -426,7 +426,7 @@ async def update_subscription(
 
     for field, value in data.items():
         setattr(subscription, field, value)
-    subscription.updated_at = datetime.now(timezone.utc)
+    subscription.updated_at = datetime.now(UTC)
 
     session.add(subscription)
     if actor_user_id is not None:
@@ -479,7 +479,7 @@ async def deactivate_for_install(
     ).all()
     for row in rows:
         row.active = False
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = datetime.now(UTC)
         session.add(row)
     return len(rows)
 

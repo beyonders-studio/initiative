@@ -20,8 +20,7 @@ by ``app.services.platform.user_avatars`` for the moderation path, not here.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from pydantic import ConfigDict
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, LargeBinary, String
@@ -62,10 +61,10 @@ class UserAvatar(SQLModel, table=True):
     # Null only on a row carried over from the old base64 column, which had no
     # size recorded and could not be measured from within a migration. Anything
     # uploaded since has both.
-    width: Optional[int] = Field(default=None, sa_column=Column(Integer))
-    height: Optional[int] = Field(default=None, sa_column=Column(Integer))
+    width: int | None = Field(default=None, sa_column=Column(Integer))
+    height: int | None = Field(default=None, sa_column=Column(Integer))
     data: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

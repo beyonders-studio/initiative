@@ -3,13 +3,14 @@
 import logging
 import smtplib
 from dataclasses import replace
+from datetime import UTC
 from types import SimpleNamespace
 
 import pytest
 
 from app.core.email_i18n import email_t
-from app.services.auth import addresses
 from app.services import email as email_service
+from app.services.auth import addresses
 from app.testing import create_user
 
 EVIL_NAME = '<a href="https://phish.example">Reset your password</a>'
@@ -178,9 +179,9 @@ async def test_join_request_outcome_emails_render(
 
 
 def test_the_hold_letter_names_the_deletion_day_when_there_is_one():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    day = datetime(2026, 10, 24, tzinfo=timezone.utc)
+    day = datetime(2026, 10, 24, tzinfo=UTC)
     billed, held, undated = (
         email_service.community_on_hold_pieces(
             community="Acme",
@@ -207,13 +208,13 @@ def test_the_hold_letter_names_the_deletion_day_when_there_is_one():
 
 
 def test_the_hold_letter_is_written_in_its_readers_language():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     letter = email_service.community_on_hold_pieces(
         community="Acme",
         contact=None,
         guild_id=7,
-        delete_at=datetime(2026, 3, 4, tzinfo=timezone.utc),
+        delete_at=datetime(2026, 3, 4, tzinfo=UTC),
         plan_managed=True,
         locale="de",
     )

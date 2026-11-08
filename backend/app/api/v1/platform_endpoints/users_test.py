@@ -24,16 +24,12 @@ from app.models.platform.user_dm_settings import DmPolicy
 from app.models.platform.user_passkey import UserPasskey
 from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.schemas.platform.user import STATUS_TEXT_MAX_LENGTH
+from app.services.content_sockets import sockets as content_sockets
 from app.services.marketplace import catalog as marketplace_catalog
 from app.services.marketplace.builtin import load_builtin_manifests
-from app.services.platform import rules
 from app.services.platform import profile_decorations as profile_decorations_service
-from app.services.content_sockets import sockets as content_sockets
-from app.testing.sockets import (
-    FakeWebSocket,
-    open_account_socket,
-    watch_events_bus,
-)
+from app.services.platform import rules
+from app.testing import route_as
 from app.testing.factories import (
     create_federated_identity,
     create_guild,
@@ -46,7 +42,11 @@ from app.testing.factories import (
     create_user,
     get_auth_token,
 )
-from app.testing import route_as
+from app.testing.sockets import (
+    FakeWebSocket,
+    open_account_socket,
+    watch_events_bus,
+)
 
 #: Every test here drives the API through the real app and a real database.
 
@@ -970,8 +970,7 @@ def _parse_csv(body: bytes) -> tuple[list[str], list[list[str]]]:
     import io
 
     text = body.decode("utf-8")
-    if text.startswith("﻿"):
-        text = text[1:]
+    text = text.removeprefix("﻿")
     reader = csv.reader(io.StringIO(text))
     rows = list(reader)
     return rows[0], rows[1:]
@@ -1012,7 +1011,7 @@ async def test_export_users_csv_as_admin(client, session, csv_guild):
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/csv")
     assert "attachment; filename=" in response.headers["content-disposition"]
-    assert response.content.startswith("﻿".encode("utf-8"))
+    assert response.content.startswith("﻿".encode())
 
     header_row, data_rows = _parse_csv(response.content)
     # No platform tier and no verification state: both are the platform's

@@ -1,6 +1,5 @@
 import uuid as uuid_module
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     Column,
@@ -8,8 +7,8 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     LargeBinary,
-    String,
     SmallInteger,
+    String,
     Text,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -38,7 +37,7 @@ class AuthChallenge(SQLModel, table=True):
 
     __tablename__ = "auth_challenges"
 
-    id: Optional[uuid_module.UUID] = Field(
+    id: uuid_module.UUID | None = Field(
         default_factory=uuid_module.uuid4,
         sa_column=Column(UUID(as_uuid=True), primary_key=True),
     )
@@ -50,7 +49,7 @@ class AuthChallenge(SQLModel, table=True):
     #: The account the challenge belongs to, where one is known. A passkey
     #: sign-in begins from the credential rather than from an address, so the
     #: account is named by the assertion that answers rather than by the row.
-    user_id: Optional[int] = Field(
+    user_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -68,7 +67,7 @@ class AuthChallenge(SQLModel, table=True):
     #: ``challenge_hash``, where the lookup and the attempt count are one
     #: statement, and the code is kept here. ``NULL`` wherever presenting the
     #: issued value is itself the proof.
-    answer_hash: Optional[bytes] = Field(
+    answer_hash: bytes | None = Field(
         default=None, sa_column=Column(LargeBinary, nullable=True)
     )
 
@@ -76,7 +75,7 @@ class AuthChallenge(SQLModel, table=True):
     #: sent to somebody signing up. Fernet ciphertext under ``SALT_EMAIL``,
     #: the way ``user_emails`` keeps one, so an address waiting on a sign-up
     #: is stored no differently from one already held.
-    email_encrypted: Optional[str] = Field(
+    email_encrypted: str | None = Field(
         default=None,
         sa_column=Column(String(2000), nullable=True, info={FERNET_SALT: SALT_EMAIL}),
     )
@@ -85,7 +84,7 @@ class AuthChallenge(SQLModel, table=True):
     #: to one. Following ``user_tokens.user_email_id``: an account may hold
     #: more than one address, and what arriving at a particular one proves is
     #: about that address rather than about the account.
-    user_email_id: Optional[int] = Field(
+    user_email_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -102,11 +101,11 @@ class AuthChallenge(SQLModel, table=True):
         sa_column=Column(DateTime(timezone=True), nullable=False, index=True)
     )
 
-    consumed_at: Optional[datetime] = Field(
+    consumed_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

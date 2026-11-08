@@ -27,7 +27,7 @@ import hashlib
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import jwt
@@ -152,7 +152,5 @@ def verify(
         jti=jti,
         # The last moment it's accepted, leeway included: its jti is kept
         # until then, so it can't be presented again in the leeway.
-        expires_at=datetime.fromtimestamp(
-            int(claims["exp"]) + LEEWAY_SECONDS, tz=timezone.utc
-        ),
+        expires_at=datetime.fromtimestamp(int(claims["exp"]) + LEEWAY_SECONDS, tz=UTC),
     )

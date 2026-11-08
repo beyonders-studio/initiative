@@ -179,7 +179,7 @@
     "description": "Wähle ein Zielprojekt innerhalb der aktuellen Community aus. Du kannst Aufgaben nur in Projekte verschieben, in denen du die Berechtigung hast, neue Arbeit zu erstellen.",
     "noProjects": "Du hast noch keine anderen beschreibbaren Projekte verfügbar.",
     "searchPlaceholder": "Projekte suchen…",
-    "statusResetWarning": "Beim Verschieben dieser Aufgabe wird ihr Status auf ‘Backlog’ zurückgesetzt.",
+    "statusResetWarning": "Beim Verschieben erhält diese Aufgabe den Standardstatus des Zielprojekts.",
     "moving": "Wird verschoben…",
     "moveTask": "Aufgabe verschieben"
   },

@@ -27,21 +27,17 @@ and whoever triggers a purge cannot reach rows that are someone else's alone.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from weakref import WeakValueDictionary
 from typing import (
     TYPE_CHECKING,
     Any,
-    Iterable,
-    Mapping,
-    Optional,
-    Sequence,
     cast,
 )
+from weakref import WeakValueDictionary
 
 from sqlalchemy import Table, and_, func, or_, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -143,7 +139,7 @@ async def record_view(
 
     ``persist=False`` writes nothing: a PAM grantee's browsing is transient.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if persist:
         await _upsert(
             session,
@@ -167,7 +163,7 @@ async def set_mark(
         user_id=user_id,
         entity_type=kind,
         entity_id=entity_id,
-        **{column: datetime.now(timezone.utc)},
+        **{column: datetime.now(UTC)},
     )
     undone = {"unsubscribed_at": None} if mark is Mark.subscribe else {}
     await session.exec(
@@ -203,7 +199,7 @@ async def unsubscribe(
     can open."""
     from app.db.cohorts import as_system
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     async with as_system(session) as system:
         row = (
             await system.exec(
@@ -244,7 +240,7 @@ async def clear_mark(
 @asynccontextmanager
 async def _own_row(
     session: AsyncSession, user_id: int, kind: str, entity_id: int
-) -> AsyncIterator[Optional[PersonalItem]]:
+) -> AsyncIterator[PersonalItem | None]:
     """The reader's row on an item, locked, to let go of something on it: run
     as the platform and limited to that row, so it comes off something they can
     no longer open. Kept if it still holds anything, deleted if not."""
@@ -322,11 +318,10 @@ async def move_reminders(
     lock = _series_locks.setdefault((guild_id, series), asyncio.Lock())
 
     async def _move() -> None:
-        async with lock:
-            async with cohorts.system_session(guild_id) as system:
-                await set_rls_context(system, SystemGuild(guild_id))
-                await _move_reminders(system, from_task, to_task, due, next_due)
-                await system.commit()
+        async with lock, cohorts.system_session(guild_id) as system:
+            await set_rls_context(system, SystemGuild(guild_id))
+            await _move_reminders(system, from_task, to_task, due, next_due)
+            await system.commit()
 
     after_commit(session, _move)
 
@@ -377,7 +372,7 @@ async def _move_reminders(
 
 async def item_state(
     session: AsyncSession, *, user_id: int, kind: str, entity_id: int
-) -> Optional[PersonalItem]:
+) -> PersonalItem | None:
     """The reader's row on this item, if they keep anything about it."""
     return (
         await session.exec(select(PersonalItem).where(*_key(user_id, kind, entity_id)))
@@ -385,7 +380,7 @@ async def item_state(
 
 
 async def list_marked(
-    session: AsyncSession, *, user_id: int, mark: Mark, limit: Optional[int] = None
+    session: AsyncSession, *, user_id: int, mark: Mark, limit: int | None = None
 ) -> Sequence[PersonalItem]:
     """The tools the reader marked this way in this community, newest first:
     the tabs for views, the sidebar's bookmarks for bookmarks. Bookmarks are listed
@@ -425,7 +420,7 @@ class Subscriber:
     ties: frozenset[Tie]
     #: When they first subscribed by hand, where that is all that ties them:
     #: what happened before it is not news to them.
-    since: Optional[datetime] = None
+    since: datetime | None = None
 
     @property
     def tie(self) -> Tie:
@@ -437,7 +432,7 @@ class Subscriber:
         """Made it or follows it, beyond being named on it."""
         return bool(self.ties - {Tie.named})
 
-    def joined(self, other: "Subscriber") -> "Subscriber":
+    def joined(self, other: Subscriber) -> Subscriber:
         """Both ties at once. A date holds only while every tie has one."""
         since = (
             None
@@ -505,9 +500,9 @@ async def _declined(session: AsyncSession, event_ids: set[int]) -> set[tuple[int
 
 async def subscribers_of(
     session: AsyncSession,
-    items: Mapping[Ref, Optional[Ref]],
+    items: Mapping[Ref, Ref | None],
     *,
-    user_id: Optional[int] = None,
+    user_id: int | None = None,
 ) -> dict[Ref, dict[int, Subscriber]]:
     """Who is subscribed to each item, given the tool it is in, and why.
 
@@ -571,27 +566,31 @@ async def subscribers_of(
             else:
                 unsubscribed.setdefault(ref, set()).add(row.user_id)
 
+    def tie(
+        people: dict[int, Subscriber],
+        person: int,
+        how: Tie,
+        since: datetime | None = None,
+    ) -> None:
+        subscriber = Subscriber(frozenset({how}), since)
+        held = people.get(person)
+        people[person] = subscriber if held is None else held.joined(subscriber)
+
     found: dict[Ref, dict[int, Subscriber]] = {}
     for item, tool in items.items():
         people: dict[int, Subscriber] = {}
-
-        def tie(person: int, how: Tie, since: Optional[datetime] = None) -> None:
-            subscriber = Subscriber(frozenset({how}), since)
-            held = people.get(person)
-            people[person] = subscriber if held is None else held.joined(subscriber)
-
         if tool is not None and tool != item:
             gone = unsubscribed.get(tool, set())
             for person, hows in tied.get(tool, {}).items():
                 if hows and person not in gone:
-                    tie(person, Tie.subscribed)
+                    tie(people, person, Tie.subscribed)
             for person, at in explicit.get(tool, {}).items():
-                tie(person, Tie.subscribed, at)
+                tie(people, person, Tie.subscribed, at)
         for person, at in explicit.get(item, {}).items():
-            tie(person, Tie.subscribed, at)
+            tie(people, person, Tie.subscribed, at)
         for person, hows in tied.get(item, {}).items():
             for how in hows:
-                tie(person, how)
+                tie(people, person, how)
         for person in unsubscribed.get(item, set()):
             people.pop(person, None)
         found[item] = people
@@ -639,12 +638,12 @@ async def place_projects(
         return
     insert = pg_insert(PersonalItem).values(
         [
-            dict(
-                user_id=user_id,
-                entity_type="project",
-                entity_id=project_id,
-                sort_order=float(index),
-            )
+            {
+                "user_id": user_id,
+                "entity_type": "project",
+                "entity_id": project_id,
+                "sort_order": float(index),
+            }
             for index, project_id in enumerate(order)
         ]
     )
@@ -716,12 +715,12 @@ _OLDEST_LET_GO = "SELECT min(ranked.viewed_at) FROM " + _RANKED + " WHERE " + _L
 
 def _ranking(expiring: Expiring) -> dict:
     users = list(expiring.tab_limits)
-    return dict(
-        tabs=list(TOOL_KINDS),
-        users=users,
-        limits=[expiring.tab_limits[user] for user in users],
-        default_limit=DEFAULT_RECENT_VIEWS,
-    )
+    return {
+        "tabs": list(TOOL_KINDS),
+        "users": users,
+        "limits": [expiring.tab_limits[user] for user in users],
+        "default_limit": DEFAULT_RECENT_VIEWS,
+    }
 
 
 async def expire(session: AsyncSession, expiring: Expiring) -> None:

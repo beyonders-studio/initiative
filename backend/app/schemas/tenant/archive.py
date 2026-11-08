@@ -7,7 +7,6 @@ archivable by joining the ``Tool`` enum rather than by being listed again here.
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import ConfigDict, Field
 
@@ -29,7 +28,7 @@ class ArchiveResponse(SanitizedBaseModel):
 
     entity_type: ArchivableType
     entity_id: int
-    archived_at: Optional[datetime] = None
+    archived_at: datetime | None = None
 
 
 class ContentCan(SanitizedBaseModel):
@@ -67,5 +66,5 @@ class ToolState(SanitizedBaseModel):
     and what the caller may do to it."""
 
     #: When this was put away, or ``null`` while it is live.
-    archived_at: Optional[datetime] = None
+    archived_at: datetime | None = None
     can: ToolCan = Field(default_factory=ToolCan)

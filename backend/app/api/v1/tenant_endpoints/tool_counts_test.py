@@ -7,7 +7,7 @@ disagree with the list it sits on. These tests hold that for every tool in
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from httpx import AsyncClient
@@ -32,7 +32,7 @@ async def _one_of_each(session, acting_user, tool: Tool):
     factory = TOOL_FACTORIES[tool]
     tagged = await factory(session, home, actor.user)
     await factory(session, home, actor.user)
-    await factory(session, home, actor.user, archived_at=datetime.now(timezone.utc))
+    await factory(session, home, actor.user, archived_at=datetime.now(UTC))
     if "templates" in TOOL_LISTS[tool].views:
         await factory(session, home, actor.user, is_template=True)
         await factory(
@@ -40,7 +40,7 @@ async def _one_of_each(session, acting_user, tool: Tool):
             home,
             actor.user,
             is_template=True,
-            archived_at=datetime.now(timezone.utc),
+            archived_at=datetime.now(UTC),
         )
     tag = await create_tag(session, actor.guild)
     await tags_service.set_entity_tags(

@@ -1,7 +1,6 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Uuid, text
 from sqlmodel import Field, SQLModel
@@ -36,20 +35,20 @@ class AccountChangeHold(SQLModel, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(
         sa_column=Column(
             Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
         )
     )
     kind: HeldChangeKind = Field(sa_column=Column(String(32), nullable=False))
-    address_id: Optional[int] = Field(
+    address_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer, ForeignKey("user_emails.id", ondelete="CASCADE"), nullable=True
         ),
     )
-    passkey_id: Optional[uuid.UUID] = Field(
+    passkey_id: uuid.UUID | None = Field(
         default=None,
         sa_column=Column(
             Uuid, ForeignKey("user_passkeys.id", ondelete="CASCADE"), nullable=True
@@ -57,22 +56,22 @@ class AccountChangeHold(SQLModel, table=True):
     )
     # The sign-in that asked for it, which a change ending other sessions
     # leaves signed in.
-    session_id: Optional[uuid.UUID] = Field(
+    session_id: uuid.UUID | None = Field(
         default=None,
         sa_column=Column(
             Uuid, ForeignKey("auth_sessions.id", ondelete="SET NULL"), nullable=True
         ),
     )
     requested_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     applies_at: datetime = Field(
         sa_column=Column(DateTime(timezone=True), nullable=False)
     )
-    cancelled_at: Optional[datetime] = Field(
+    cancelled_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-    applied_at: Optional[datetime] = Field(
+    applied_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )

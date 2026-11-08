@@ -36,6 +36,7 @@ from app.db.session import require_guild_context
 from app.models.platform.user import User
 from app.schemas.tenant.project_export import ProjectExportEnvelope
 from app.schemas.tenant.tool_layout import MAX_NODES
+from app.services.export import values
 from app.services.export.adapters._common import (
     BuildContext,
     ToolExportAdapter,
@@ -43,7 +44,6 @@ from app.services.export.adapters._common import (
     export_stem,
     get_for_export,
 )
-from app.services.export import values
 from app.services.export.adapters.tasks_table import task_columns
 from app.services.export.contract import RenderItem
 from app.services.export.filters import narrow, parse_filters
@@ -186,7 +186,7 @@ class ProjectAdapter(ToolExportAdapter):
         envelopes: list[ProjectExportEnvelope],
         ctx: BuildContext,
         /,
-    ) -> "Prepared":
+    ) -> Prepared:
         """The refs of the tasks the export's task filters leave, in the order
         they list them (``None`` keeps every task), and, for a report, the
         task list's rows for them and the columns the reader's table shows."""

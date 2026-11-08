@@ -27,7 +27,7 @@ write scope, as it reaches the tool's create.
 # stringized annotations re-evaluate it where that local is out of scope.
 
 from enum import Enum
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Path, status
 
@@ -39,9 +39,9 @@ from app.api.deps import (
     ActorUserDep,
     GuildContext,
     RLSSessionDep,
-    plugin_scope,
     get_current_active_user,
     get_guild_membership,
+    plugin_scope,
 )
 from app.api.v1.tenant_endpoints.tool_lists import TOOL_LISTS, ToolListSpec
 from app.core.tools import Tool
@@ -117,8 +117,8 @@ def _mount_duplicate(
     async def copy(
         session: Any,
         entity_id: int,
-        body: Optional[ToolDuplicateRequest],
-        current_user: Optional[User],
+        body: ToolDuplicateRequest | None,
+        current_user: User | None,
         guild_context: ActorContext,
     ):
         body = body or ToolDuplicateRequest()
@@ -158,7 +158,7 @@ def _mount_duplicate(
             session: ActorSessionDep,
             current_user: ActorUserDep,
             guild_context: ToolWrite,
-            body: Optional[ToolDuplicateRequest] = None,
+            body: ToolDuplicateRequest | None = None,
         ):
             return await copy(session, entity_id, body, current_user, guild_context)
 
@@ -169,7 +169,7 @@ def _mount_duplicate(
             session: RLSSessionDep,
             current_user: CurrentUserDep,
             guild_context: GuildContextDep,
-            body: Optional[ToolDuplicateRequest] = None,
+            body: ToolDuplicateRequest | None = None,
         ):
             return await copy(session, entity_id, body, current_user, guild_context)
 

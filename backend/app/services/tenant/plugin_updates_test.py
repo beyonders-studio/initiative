@@ -19,8 +19,8 @@ from app.core.messages import MarketplaceMessages
 from app.core.rules import SURFACE_PLUGINS, SetBy
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification, NotificationType
-from app.models.tenant.plugin_schedule_run import PluginScheduleRun
 from app.models.tenant.guild_plugin import GuildPlugin
+from app.models.tenant.plugin_schedule_run import PluginScheduleRun
 from app.services.platform import rules
 from app.services.tenant import plugin_updates
 from app.services.tenant.plugin_updates import (
@@ -33,15 +33,15 @@ from app.services.tenant.plugin_updates import (
     update_offer,
 )
 from app.testing import (
-    create_plugin_service_registration,
     create_guild,
-    create_guild_plugin,
     create_guild_membership,
+    create_guild_plugin,
     create_marketplace_listing,
+    create_plugin_service_registration,
     create_user,
+    drain_notices,
     marketplace_uid,
     route_session_to_guild,
-    drain_notices,
 )
 
 
@@ -534,7 +534,7 @@ class TestVersionsThatAskForMore:
         """The pinned version requested ``comments:read`` and the seat did not
         grant it: a version requesting it again has answered nothing new."""
         uid = marketplace_uid("asksanswered")
-        _, guild, plugin = await _asking_install(
+        _, guild, _plugin = await _asking_install(
             session, uid, scopes=("projects:read", "comments:read")
         )
         await _publish(

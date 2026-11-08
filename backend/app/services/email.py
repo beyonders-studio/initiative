@@ -1,29 +1,30 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import html as _html
+import logging
 import re
 import smtplib
 import ssl
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from email.message import EmailMessage
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal, Mapping, Sequence
+from typing import Literal
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings as app_config
 from app.core.email_i18n import email_t
+from app.core.encryption import SALT_SMTP_PASSWORD, decrypt_field
 from app.core.notification_categories import CATEGORY_SPECS, NotificationCategory
-from app.core.encryption import decrypt_field, SALT_SMTP_PASSWORD
+from app.core.user_display import handle_of
 from app.models.platform.access_grant import LEVEL_LABEL_KEYS
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.user import User
 from app.services.platform import app_settings as app_settings_service
-from app.core.user_display import handle_of
 
 try:  # premailer inlines our <style> rules so they survive Gmail/Outlook stripping <style>
     from premailer import transform as _premailer_transform

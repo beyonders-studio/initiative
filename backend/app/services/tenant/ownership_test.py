@@ -1,17 +1,17 @@
 """Ownership: what it is, where it lives, and what happens when someone leaves."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel import select
 
 from app.core.tools import Tool
+from app.models.platform.guild import CommunityRole, GuildMembership
 from app.models.tenant._mixins import CreatedByMixin
 from app.models.tenant.metadata import MetadataType
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
-from app.services.tenant import ownership as ownership_service
 from app.services.tenant import initiatives as initiatives_service
+from app.services.tenant import ownership as ownership_service
 from app.testing import (
-    create_resource_grant,
     TOOL_FACTORIES,
     create_guild,
     create_guild_membership,
@@ -19,11 +19,10 @@ from app.testing import (
     create_initiative_member,
     create_property_definition,
     create_property_value,
+    create_resource_grant,
     create_user,
     route_session_to_guild,
 )
-from app.models.platform.guild import GuildMembership, CommunityRole
-
 
 # ── Invariants over the Tool enum ───────────────────────────────────────────
 
@@ -192,7 +191,7 @@ async def test_departure_does_not_touch_authorship(session):
             ),
             value_user_id=leaver.id,
             value_text="L.",
-            value_datetime=datetime.now(timezone.utc),
+            value_datetime=datetime.now(UTC),
         )
         for kind in (MetadataType.signature, MetadataType.user_reference)
     ]
@@ -406,8 +405,8 @@ async def test_general_access_does_not_displace_the_owner(session):
     user row at ``owner``. Rebuilding a resource's sharing replaces the first
     and preserves the second, so opening something up never leaves it ownerless.
     """
-    from app.services import permissions as permissions_service
     from app.schemas.tenant.resource_grant import ResourceGrantSchema
+    from app.services import permissions as permissions_service
 
     admin = await create_user(session)
     guild = await create_guild(session, creator=admin)

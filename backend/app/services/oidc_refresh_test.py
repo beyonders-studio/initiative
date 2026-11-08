@@ -15,11 +15,12 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.encryption import SALT_OIDC_CLIENT_SECRET, encrypt_field
+from app.db.request_context import Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.auth_provider_secret import AuthProviderSecret
 from app.models.platform.federated_identity import FederatedIdentity
-from app.models.platform.guild import GuildMembership, CommunityRole
+from app.models.platform.guild import CommunityRole, GuildMembership
 from app.models.platform.oidc_claim_mapping import (
     ClaimRuleAuthor,
     OIDCClaimMapping,
@@ -37,7 +38,6 @@ from app.testing.factories import (
     create_guild_provider_connection,
     create_user,
 )
-from app.db.request_context import Unattributed
 
 
 async def _configured(session: AsyncSession, slug: str):

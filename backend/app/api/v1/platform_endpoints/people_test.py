@@ -6,7 +6,7 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models.platform.guild import Guild, CommunityRole
+from app.models.platform.guild import CommunityRole, Guild
 from app.models.platform.user import User, UserStatus
 from app.models.platform.user_dm_settings import DmPolicy
 from app.testing.factories import (

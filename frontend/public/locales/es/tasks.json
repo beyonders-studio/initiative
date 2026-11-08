@@ -179,7 +179,7 @@
     "description": "Selecciona un proyecto de destino dentro de la comunidad actual. Solo puedes mover tareas a proyectos donde tengas permiso para crear nuevo trabajo.",
     "noProjects": "Aún no tienes otros proyectos con acceso de escritura disponibles.",
     "searchPlaceholder": "Buscar proyectos…",
-    "statusResetWarning": "Mover esta tarea restablecerá su estado a ‘Pendientes’.",
+    "statusResetWarning": "Al mover esta tarea, toma el estado predeterminado del proyecto de destino.",
     "moving": "Moviendo…",
     "moveTask": "Mover tarea"
   },

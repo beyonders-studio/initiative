@@ -10,7 +10,6 @@ from app.services.export.contract import RenderItem, RenderRequest
 from app.services.export.local_backend import LocalRenderBackend
 from app.services.export.stamp import stamp_export
 
-
 _TABLE = {
     "title": "Tasks",
     "columns": [{"key": "title", "label": "Task"}],

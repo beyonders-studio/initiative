@@ -20,7 +20,7 @@ answers is refused as every other route refuses it.
 from __future__ import annotations
 
 import asyncio
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import (
     APIRouter,
@@ -93,7 +93,7 @@ CurrentUser = Annotated[User, Depends(get_current_active_user)]
 async def read_ticket_availability(
     session: UserSessionDep,
     current_user: CurrentUser,
-    guild_id: Optional[int] = Query(
+    guild_id: int | None = Query(
         default=None,
         description="The community the reader is standing in.",
         alias="community_id",

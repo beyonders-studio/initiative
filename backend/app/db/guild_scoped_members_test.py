@@ -23,7 +23,6 @@ from app.db.public_rls import role_name
 from app.db.schema_provisioning import GuildRoleKind, guild_role_name
 from app.testing import create_guild, create_guild_membership, create_user
 
-
 _COUNT = "SELECT count(*) FROM public.current_guild_members"
 _IDS = "SELECT id FROM public.current_guild_members ORDER BY id"
 
@@ -93,11 +92,10 @@ class TestItAnswersForTheRoutedGuild:
         person = await create_user(session)
         guild = await create_guild(session, creator=person)
         await create_guild_membership(session, user=person, guild=guild)
-        async with engine.connect() as conn:
-            async with conn.begin():
-                await _routed(conn, None)
-                await _as_query_role(conn, guild.id)
-                assert await conn.scalar(text(_COUNT)) == 0
+        async with engine.connect() as conn, conn.begin():
+            await _routed(conn, None)
+            await _as_query_role(conn, guild.id)
+            assert await conn.scalar(text(_COUNT)) == 0
 
     async def test_a_grantee_is_routed_by_the_grant(self, session, engine):
         """A break-glass session leaves the guild unset and carries the grant
@@ -110,12 +108,11 @@ class TestItAnswersForTheRoutedGuild:
         guild = await create_guild(session, creator=person)
         await create_guild_membership(session, user=person, guild=guild)
 
-        async with engine.connect() as conn:
-            async with conn.begin():
-                await _routed(conn, None)
-                await _routed(conn, guild.id, pam=True)
-                await _as_query_role(conn, guild.id)
-                assert person.id in (await conn.execute(text(_IDS))).scalars().all()
+        async with engine.connect() as conn, conn.begin():
+            await _routed(conn, None)
+            await _routed(conn, guild.id, pam=True)
+            await _as_query_role(conn, guild.id)
+            assert person.id in (await conn.execute(text(_IDS))).scalars().all()
 
     async def test_it_never_widens_past_the_account_projection(self, session, engine):
         """It narrows the guild projection and adds nothing to it: a guild
@@ -124,18 +121,17 @@ class TestItAnswersForTheRoutedGuild:
         guild = await create_guild(session, creator=person)
         await create_guild_membership(session, user=person, guild=guild)
 
-        async with engine.connect() as conn:
-            async with conn.begin():
-                await _routed(conn, guild.id)
-                await _as_query_role(conn, guild.id)
-                here = await conn.scalar(text(_COUNT))
-                # The query role reads nothing else in ``public``, so the
-                # projection is read as the guild's read-only role.
-                read_only = guild_role_name(guild.id, GuildRoleKind.read_only)
-                await conn.execute(text(f'SET LOCAL ROLE "{read_only}"'))
-                everywhere = await conn.scalar(
-                    text("SELECT count(*) FROM public.guild_member_profiles")
-                )
+        async with engine.connect() as conn, conn.begin():
+            await _routed(conn, guild.id)
+            await _as_query_role(conn, guild.id)
+            here = await conn.scalar(text(_COUNT))
+            # The query role reads nothing else in ``public``, so the
+            # projection is read as the guild's read-only role.
+            read_only = guild_role_name(guild.id, GuildRoleKind.read_only)
+            await conn.execute(text(f'SET LOCAL ROLE "{read_only}"'))
+            everywhere = await conn.scalar(
+                text("SELECT count(*) FROM public.guild_member_profiles")
+            )
         assert here <= everywhere
 
 

@@ -9,7 +9,7 @@ tool's schema can import it without a cycle.
 
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -46,14 +46,14 @@ class ResourceGrantSchema(SanitizedBaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     level: ResourceAccessLevel
-    user_id: Optional[PersonId] = None
-    role_id: Optional[int] = None
+    user_id: PersonId | None = None
+    role_id: int | None = None
     all_initiative_members: bool = False
     #: The installed plug-in this grant is made to. Reported, never taken.
-    plugin_install_id: Optional[int] = None
+    plugin_install_id: int | None = None
 
     @model_validator(mode="after")
-    def exactly_one_grantee(self) -> "ResourceGrantSchema":
+    def exactly_one_grantee(self) -> ResourceGrantSchema:
         count = (
             (self.user_id is not None)
             + (self.role_id is not None)
@@ -101,7 +101,7 @@ class ResourceGrantBulkItemResult(SanitizedBaseModel):
     resource_type: Tool
     resource_id: int
     status: Literal["ok", "forbidden", "not_found"]
-    detail: Optional[str] = None
+    detail: str | None = None
 
 
 class ResourceGrantBulkResponse(SanitizedBaseModel):

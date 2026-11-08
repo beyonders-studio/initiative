@@ -14,8 +14,6 @@ stored address is read in full only where the reader is its owner
 
 from __future__ import annotations
 
-from typing import Optional
-
 #: What replaces the elided middle. A fixed width regardless of how much was
 #: removed, so the length of the original does not show through.
 ELISION = "***"
@@ -33,7 +31,7 @@ def _mask_part(part: str) -> str:
     return f"{part[0]}{ELISION}{part[-1]}"
 
 
-def mask_email(value: Optional[str]) -> Optional[str]:
+def mask_email(value: str | None) -> str | None:
     """``user1@example.com`` -> ``u***1@e***m``.
 
     Both halves are reduced the same way: first character, elision, last

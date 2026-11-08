@@ -1,6 +1,6 @@
 """A challenge stands until it is spent, expires, or runs out of attempts."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -9,8 +9,7 @@ from app.models.platform.auth_challenge import AuthChallenge
 from app.services.auth import challenges
 from app.testing import create_user
 
-
-FIXED_NOW = datetime(2026, 9, 16, 12, 0, 0, tzinfo=timezone.utc)
+FIXED_NOW = datetime(2026, 9, 16, 12, 0, 0, tzinfo=UTC)
 PURPOSE = challenges.ChallengePurpose.sign_in
 
 

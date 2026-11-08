@@ -19,17 +19,17 @@ import pytest
 
 from app.services.marketplace import service_plugins
 from app.services.marketplace.definitions import (
+    GUILD_INSTALLABLE_PLUGIN_KINDS,
     KIND_AUDIENCE,
     LISTING_AUDIENCES,
     LISTING_KINDS,
-    kinds_for_audience,
-    PLUGIN_KINDS,
-    GUILD_INSTALLABLE_PLUGIN_KINDS,
     LISTING_SOURCES,
+    PLUGIN_KINDS,
     ListingDefinitionError,
-    plugin_widget_type,
-    normalize_publisher,
+    kinds_for_audience,
     normalize_listing_definition,
+    normalize_publisher,
+    plugin_widget_type,
     published_by_us,
     reserved_prefix_problem,
 )
@@ -1341,10 +1341,8 @@ class TestFieldsPartsAndActions:
             ],
         }
         for tree in (widest, _nested(service_plugins.MAX_PART_DEPTH)):
-            assert (
-                _items(lambda b: b["parts"][0].update(tree=tree))["parts"][0]["tree"]
-                == tree
-            )
+            items = _items(lambda b, tree=tree: b["parts"][0].update(tree=tree))
+            assert items["parts"][0]["tree"] == tree
 
     @pytest.mark.parametrize(
         ("change", "problem"),

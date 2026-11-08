@@ -3,7 +3,6 @@ way in."""
 
 import copy
 
-
 from app.core.references import references_in_body, references_in_text
 from app.services.import_engine.references import (
     SOURCE_REF,

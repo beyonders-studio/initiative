@@ -9,6 +9,7 @@ foreign server can misbehave becomes a code rather than prose.
 
 import base64
 import io
+from datetime import UTC
 
 import httpx
 import pytest
@@ -16,7 +17,6 @@ import pytest
 from app.core.messages import ImportEngineMessages
 from app.services.import_engine import atlassian
 from app.services.import_engine.contract import ImportEngineError
-
 
 CREDENTIAL = atlassian.AtlassianCredential(
     site_url="https://acme.atlassian.net",
@@ -352,16 +352,16 @@ async def test_a_wait_longer_than_the_policy_allows_is_a_block(monkeypatch, wait
 
 async def test_retry_after_may_be_a_date(monkeypatch, waits):
     """The header's other form. A date in the past means "now"."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
     from email.utils import format_datetime
 
-    soon = format_datetime(datetime.now(timezone.utc) + timedelta(seconds=3))
+    soon = format_datetime(datetime.now(UTC) + timedelta(seconds=3))
     _stub(monkeypatch, _sequence(_throttled(soon), _response(200, {})))
     await atlassian.get_json(CREDENTIAL, "/rest/api/3/myself")
     assert 0.0 < waits[0] <= 3.0 * (1 + atlassian.JITTER_FRACTION)
 
     waits.clear()
-    past = format_datetime(datetime.now(timezone.utc) - timedelta(minutes=5))
+    past = format_datetime(datetime.now(UTC) - timedelta(minutes=5))
     _stub(monkeypatch, _sequence(_throttled(past), _response(200, {})))
     await atlassian.get_json(CREDENTIAL, "/rest/api/3/myself")
     assert waits == [0.0]

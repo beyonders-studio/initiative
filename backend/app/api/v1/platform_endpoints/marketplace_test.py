@@ -18,7 +18,6 @@ from app.core.messages import MarketplaceMessages
 from app.models.platform.guild import CommunityRole
 from app.testing.tuf_repository import service_plugin_definition
 
-
 RESCAN_URL = "/api/v1/marketplace/operator-catalog/rescan"
 
 

@@ -35,7 +35,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models.platform.guild import GuildMembership
 from app.services.platform import rules
 
-
 #: What a community held to the compliance standard asks of its members.
 #: HIPAA's automatic-logoff expectation and NIST SP 800-63B's AAL2
 #: reauthentication limit land on the same number, so one constant serves both.

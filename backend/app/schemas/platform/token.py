@@ -1,7 +1,5 @@
 from app.schemas.base import SanitizedBaseModel
 
-from typing import Optional
-
 
 class Token(SanitizedBaseModel):
     access_token: str
@@ -10,16 +8,16 @@ class Token(SanitizedBaseModel):
     #: rather than as a cookie — a native client, which keeps it in the
     #: platform's secure storage and so needs the rotated one back. A browser
     #: gets it as a cookie it never reads, and this stays absent.
-    refresh_token: Optional[str] = None
+    refresh_token: str | None = None
 
 
 class SessionAssurance(SanitizedBaseModel):
     """One provider's account of the authentication it performed, as carried
     in the access token's ``satd`` claim (see ``services.auth.assurance``)."""
 
-    auth_time: Optional[int] = None
+    auth_time: int | None = None
     amr: list[str] = []
-    acr: Optional[str] = None
+    acr: str | None = None
     #: What this provider asserted for the claims some community narrows it
     #: by. The community's rule about which values count is read live; this is
     #: only the fact of what was said.
@@ -27,16 +25,16 @@ class SessionAssurance(SanitizedBaseModel):
 
 
 class TokenPayload(SanitizedBaseModel):
-    sub: Optional[str] = None
-    exp: Optional[int] = None
-    iat: Optional[int] = None
-    ver: Optional[int] = None
+    sub: str | None = None
+    exp: int | None = None
+    iat: int | None = None
+    ver: int | None = None
     # New-model session claims (absent on legacy tokens): the server-side
     # session id, satisfied auth methods, and satisfied provider ids — the
     # guild auth-policy gate reads ``sat``.
-    sid: Optional[str] = None
-    amr: Optional[list[str]] = None
-    sat: Optional[list[int]] = None
+    sid: str | None = None
+    amr: list[str] | None = None
+    sat: list[int] | None = None
     # Per-provider detail behind ``sat``, keyed by provider id as a string.
     # Absent when no provider contributed one (a password session).
-    satd: Optional[dict[str, SessionAssurance]] = None
+    satd: dict[str, SessionAssurance] | None = None

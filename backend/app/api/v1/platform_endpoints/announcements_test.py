@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import struct
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -43,7 +43,7 @@ def _body(**overrides) -> dict:
         "title": "Board view is new",
         "category": "feature",
         "sections": [{"heading": "Look", "body": "At this"}],
-        "published_at": (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat(),
+        "published_at": (datetime.now(UTC) - timedelta(minutes=1)).isoformat(),
     }
     payload.update(overrides)
     return payload
@@ -207,7 +207,7 @@ async def test_an_account_made_since_publication_is_not_told_about_it(
     client: AsyncClient, session: AsyncSession
 ):
     _, author_headers = await _author(session)
-    published = datetime.now(timezone.utc) - timedelta(days=7)
+    published = datetime.now(UTC) - timedelta(days=7)
 
     newcomer = await create_user(session)
     newcomer.created_at = published + timedelta(days=1)
@@ -302,11 +302,7 @@ async def test_editing_publishes_and_unpublishes(
     published = await client.patch(
         f"/api/v1/announcements/operator/{announcement_id}",
         headers=author_headers,
-        json={
-            "published_at": (
-                datetime.now(timezone.utc) - timedelta(minutes=1)
-            ).isoformat()
-        },
+        json={"published_at": (datetime.now(UTC) - timedelta(minutes=1)).isoformat()},
     )
     assert published.status_code == 200
     assert (
@@ -459,7 +455,7 @@ async def test_re_uploading_the_same_picture_still_serves_it(
     # Old enough for the sweep to consider it, and referenced by nothing.
     image = await session.get(AnnouncementImage, first.json()["sha256"])
     assert image is not None
-    image.created_at = datetime.now(timezone.utc) - timedelta(days=30)
+    image.created_at = datetime.now(UTC) - timedelta(days=30)
     session.add(image)
     await session.commit()
 

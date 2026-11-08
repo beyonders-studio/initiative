@@ -28,8 +28,8 @@ guild, because the sidebar has to know a plug-in is there. What a member may do
 *inside* a plug-in is decided by that instance's grants, not here.
 """
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import ConfigDict
 from sqlalchemy import Boolean, Column, DateTime, String, Text, UniqueConstraint, text
@@ -51,7 +51,7 @@ class GuildPlugin(CreatedByMixin, table=True):
         UniqueConstraint("listing_uid", name="guild_plugins_unique_listing"),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
 
     # Provenance, exactly as an installed dashboard records it: the uid is the
     # identity that means the same listing on every deployment.
@@ -108,7 +108,7 @@ class GuildPlugin(CreatedByMixin, table=True):
         sa_column=Column(String(16), nullable=False, server_default="unverified"),
     )
     #: The plug-in's own short code for an ``invalid`` state, shown beside it.
-    config_state_detail: Optional[str] = Field(
+    config_state_detail: str | None = Field(
         default=None, sa_column=Column(String(120), nullable=True)
     )
 
@@ -162,22 +162,22 @@ class GuildPlugin(CreatedByMixin, table=True):
     # rather than applying it, and tells the seat once; the install keeps
     # running its pinned version until the seat accepts. Cleared when a
     # version is applied or the seat declines this one.
-    pending_version: Optional[str] = Field(
+    pending_version: str | None = Field(
         default=None, sa_column=Column(String(32), nullable=True)
     )
     # The version the seat declined. The sweep does not ask about it again;
     # a newer version is asked about afresh. Cleared when a version is
     # applied.
-    declined_version: Optional[str] = Field(
+    declined_version: str | None = Field(
         default=None, sa_column=Column(String(32), nullable=True)
     )
 
     created_by: int = Field(foreign_key="users.id", nullable=False)
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

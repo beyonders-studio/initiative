@@ -12,24 +12,24 @@ writes the table; authorization for those is enforced here via capabilities +
 ownership, mirroring the ``/operator/*`` endpoints.
 """
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlmodel.ext.asyncio.session import AsyncSession
 from webauthn.helpers import bytes_to_base64url
 
 from app.api.deps import (
+    SystemSessionDep,
     UserSessionDep,
     get_current_active_user,
     require_capability,
-    SystemSessionDep,
 )
 from app.api.v1.platform_endpoints.session_opening import prove_second_factor
+from app.core.audit_events import AuditEventType
 from app.core.capabilities import Capability
 from app.core.clock import utcnow
-from app.core.audit_events import AuditEventType
 from app.core.messages import AccessGrantMessages, AuthMessages
 from app.db.query import build_paginated_response
-from app.models.platform.user import User
 from app.models.platform.access_grant import (
     AccessGrant,
     AccessGrantPurpose,
@@ -38,27 +38,27 @@ from app.models.platform.access_grant import (
     CommunityNotice,
     SettingsLevel,
 )
+from app.models.platform.user import User
 from app.schemas.platform.access_grant import (
-    AccessGrantListResponse,
     AccessGrantApprove,
     AccessGrantCreate,
     AccessGrantLimits,
+    AccessGrantListResponse,
     AccessGrantRead,
     BreakGlassCreate,
-    SecondFactorAnswer,
     BreakGlassRequirements,
     GrantCaseList,
     GrantCaseRead,
+    SecondFactorAnswer,
 )
 from app.schemas.platform.passkey import PasskeyAuthenticationOptions
 from app.services import audit as audit_service
 from app.services.auth import challenges as challenge_service
 from app.services.auth import passkeys as passkey_service
 from app.services.auth import totp as totp_service
+from app.services.content_sockets import sockets as content_sockets
 from app.services.platform import access_grants as service
 from app.services.platform import case_activity, grant_cases
-from app.services.content_sockets import sockets as content_sockets
-from sqlmodel.ext.asyncio.session import AsyncSession
 
 router = APIRouter()
 
@@ -81,11 +81,11 @@ async def _one(grant, *, system_session: AsyncSession | None = None) -> AccessGr
 
 async def _check_case(
     actor: User,
-    case_task_id: Optional[int],
+    case_task_id: int | None,
     guild_id: int,
     *,
     required: bool,
-    notice: Optional[CommunityNotice],
+    notice: CommunityNotice | None,
 ) -> CommunityNotice:
     """Hold the case a grant is asked for to what it may be: one the asker
     reads, open, of a kind a grant serves, and about this community or none
@@ -111,7 +111,7 @@ async def _check_case(
 async def _commit_with_case(
     session: AsyncSession,
     grants: list[AccessGrant],
-    case_task_id: Optional[int],
+    case_task_id: int | None,
     guild_id: int,
 ) -> None:
     """Settle the case ``grants`` name as about their community, link them to
@@ -143,9 +143,9 @@ async def _tell_requested(
     session: AsyncSession,
     grants: list[AccessGrant],
     *,
-    case: Optional[int],
+    case: int | None,
     requester: User,
-    guild_name: Optional[str],
+    guild_name: str | None,
 ) -> None:
     """Tell the case a request names that access was asked for it, and write
     down that each grant serves it."""
@@ -171,9 +171,9 @@ async def _tell_decided(
     session: AsyncSession,
     grant: AccessGrant,
     *,
-    case: Optional[int],
+    case: int | None,
     decided_by: User,
-    guild_name: Optional[str],
+    guild_name: str | None,
 ) -> None:
     """Tell a grant's case how it was decided; an approval also puts a case
     still waiting to be picked up to work."""
@@ -507,7 +507,7 @@ async def break_glass_access(
 async def list_access_grants(
     session: UserSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
-    grant_status: Optional[str] = Query(None, alias="status"),
+    grant_status: str | None = Query(None, alias="status"),
     live: bool = Query(False, description="Keep only grants that haven't expired yet."),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=200),
@@ -536,7 +536,7 @@ async def list_access_grants(
 async def list_access_grant_queue(
     session: UserSessionDep,
     _approver: AccessApproveDep,
-    grant_status: Optional[str] = Query(None, alias="status"),
+    grant_status: str | None = Query(None, alias="status"),
     live: bool = Query(False, description="Keep only grants that haven't expired yet."),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=200),
@@ -576,7 +576,7 @@ async def list_grant_cases(
         User,
         Depends(require_capability(Capability.ACCESS_REQUEST, Capability.DATA_BYPASS)),
     ],
-    search: Optional[str] = Query(
+    search: str | None = Query(
         default=None,
         max_length=200,
         description="A title holding this, or the case with this number.",

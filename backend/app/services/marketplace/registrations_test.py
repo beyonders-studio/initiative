@@ -19,19 +19,18 @@ from app.models.platform.plugin_service_registration import (
     PluginServiceRegistration,
 )
 from app.models.platform.publisher import Publisher
+from app.services.marketplace import registrations as service
 from app.services.marketplace.catalog import (
     CatalogError,
     CatalogSourceConflict,
     upsert_listing,
 )
 from app.services.marketplace.plugin_keys import jwk_thumbprint
-from app.services.marketplace.vendor_values import load_vendor_values
-from app.services.marketplace import registrations as service
 from app.services.marketplace.registration_lookup import load_registrations
+from app.services.marketplace.vendor_values import load_vendor_values
 from app.testing import create_plugin_service_registration, sample_plugin_jwks
 from app.testing.fake_vendor import declarative_plugin
 from app.testing.tuf_repository import service_plugin_definition
-
 
 #: Where the deployment calls the plug-in.
 BASE_URL = "http://127.0.0.1:9100"

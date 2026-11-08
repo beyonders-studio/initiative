@@ -21,7 +21,7 @@ different questions:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any
 
 from pydantic import AwareDatetime, ConfigDict, Field, model_validator
 
@@ -51,8 +51,8 @@ class PollWrite(SanitizedBaseModel):
     whatever took third place.
     """
 
-    question: Optional[str] = Field(default=None, max_length=255)
-    options: List[PollOptionWrite] = Field(
+    question: str | None = Field(default=None, max_length=255)
+    options: list[PollOptionWrite] = Field(
         ..., min_length=MIN_POLL_OPTIONS, max_length=MAX_POLL_OPTIONS
     )
     allows_multiple: bool = False
@@ -61,17 +61,17 @@ class PollWrite(SanitizedBaseModel):
     #: When voting stops. Omitted leaves it open for as long as the notice
     #: stands; a time that has already passed is refused rather than creating a
     #: poll nobody can answer.
-    closes_at: Optional[AwareDatetime] = None
+    closes_at: AwareDatetime | None = None
 
 
 class PollVoteWrite(SanitizedBaseModel):
     """A ballot. One id on a single-choice poll, any number on a multiple one;
     an empty list is a retraction, which the DELETE route also expresses."""
 
-    option_ids: List[int] = Field(default_factory=list, max_length=MAX_POLL_OPTIONS)
+    option_ids: list[int] = Field(default_factory=list, max_length=MAX_POLL_OPTIONS)
 
     @model_validator(mode="after")
-    def distinct_choices(self) -> "PollVoteWrite":
+    def distinct_choices(self) -> PollVoteWrite:
         if len(set(self.option_ids)) != len(self.option_ids):
             raise ValueError("The same choice cannot be picked twice")
         return self
@@ -86,7 +86,7 @@ class PollOptionRead(SanitizedBaseModel):
     #: How many people chose it, or ``null`` while the results are withheld.
     #: Null rather than zero, so a client renders "not yet" instead of a
     #: confident nought.
-    vote_count: Optional[int] = None
+    vote_count: int | None = None
     #: Whether THIS reader chose it. Always answered — a voter can see their own
     #: ballot even on a poll whose numbers are hidden.
     voted_by_me: bool = False
@@ -96,15 +96,15 @@ class PollRead(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     id: int
-    question: Optional[str] = None
+    question: str | None = None
     allows_multiple: bool = False
     is_anonymous: bool = False
     hide_results: bool = False
-    closes_at: Optional[datetime] = None
+    closes_at: datetime | None = None
     #: Whether voting has stopped. Served rather than recomputed client-side so
     #: the card and the API agree on a close time that has just passed.
     is_closed: bool = False
-    options: List[PollOptionRead] = Field(default_factory=list)
+    options: list[PollOptionRead] = Field(default_factory=list)
     #: Whether this reader has answered.
     has_voted: bool = False
     #: Whether the numbers are being shown. False only on a ``hide_results``
@@ -113,7 +113,7 @@ class PollRead(SanitizedBaseModel):
     #: How many people have answered — not how many boxes were ticked, which on
     #: a multiple-choice poll is a larger and less meaningful number. ``null``
     #: while the results are withheld.
-    total_voters: Optional[int] = None
+    total_voters: int | None = None
     #: Whether anybody has answered, and so whether the choices and the two
     #: switches that can only tighten are now fixed.
     #:
@@ -133,8 +133,8 @@ class PollVoter(SanitizedBaseModel):
     id: int
     username: str
     discriminator: int
-    display_name: Optional[str] = None
-    avatar_url: Optional[str] = None
+    display_name: str | None = None
+    avatar_url: str | None = None
     profile_decorations: ProfileDecorations = Field(default_factory=ProfileDecorations)
 
 
@@ -142,7 +142,7 @@ class PollOptionVoters(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     option_id: int
-    voters: List[PollVoter] = Field(default_factory=list)
+    voters: list[PollVoter] = Field(default_factory=list)
 
 
 class PollVoters(SanitizedBaseModel):
@@ -160,8 +160,8 @@ class PollVoters(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    options: List[PollOptionVoters] = Field(default_factory=list)
-    not_voted: List[PollVoter] = Field(default_factory=list)
+    options: list[PollOptionVoters] = Field(default_factory=list)
+    not_voted: list[PollVoter] = Field(default_factory=list)
 
 
 def poll_voter(profile: Any) -> PollVoter:

@@ -14,7 +14,6 @@ from app.testing.factories import (
     get_auth_headers,
 )
 
-
 _ANSWER = billing_ping.PlanSummary.model_validate(
     {
         "tier_name": "Gold",

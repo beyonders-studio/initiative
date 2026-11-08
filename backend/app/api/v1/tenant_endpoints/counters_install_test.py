@@ -19,17 +19,17 @@ from app.core.tools import Tool
 from app.models.tenant.counter import Counter, CounterGroup
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.testing import (
-    create_resource_grant,
-    guild_url,
     create_counter,
     create_counter_group,
+    create_resource_grant,
     guild_of,
+    guild_url,
     route_session_to_guild,
 )
 from app.testing.plugin_clients import (
     assert_names_nobody,
-    install_plugin,
     install_headers,
+    install_plugin,
     lift_person_and_guild_ids,
 )
 
@@ -228,7 +228,7 @@ async def test_what_it_creates_is_its_own_and_it_steps_the_counters(
 
     await route_session_to_guild(session, guild_id)
     stored = await session.get(Counter, counter_id, populate_existing=True)
-    assert stored is not None and stored.count == Decimal("1")
+    assert stored is not None and stored.count == Decimal(1)
 
 
 async def test_it_steps_a_counter_shared_for_writing_only(

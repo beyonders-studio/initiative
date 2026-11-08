@@ -19,7 +19,7 @@ delete.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel import SQLModel, delete
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -37,7 +37,7 @@ async def purge_expired_jtis(session: AsyncSession, model: type[SQLModel]) -> in
     """
     try:
         result = await session.exec(
-            delete(model).where(model.expires_at < datetime.now(timezone.utc))
+            delete(model).where(model.expires_at < datetime.now(UTC))
         )
         await session.commit()
     except Exception:

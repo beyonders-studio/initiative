@@ -38,10 +38,11 @@ server reads it is what lets the rules below be written against what will run.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from itertools import islice
-from typing import Any, Callable, Mapping, Optional, Sequence
+from typing import Any
 
 from fastapi import status
 from pglast import ast, parse_sql
@@ -128,7 +129,7 @@ class SheetCall:
     by name, and the range, or none for the first visible sheet."""
 
     file: int | str
-    range: Optional[str] = None
+    range: str | None = None
 
 
 @dataclass(frozen=True)
@@ -223,11 +224,11 @@ class Sheet(Recordset):
     sheet_names: tuple[str, ...] = ()
 
     @classmethod
-    def unread(cls, call: SheetCall) -> "Sheet":
+    def unread(cls, call: SheetCall) -> Sheet:
         return cls(model=None, fields=(), tool=Tool.file, call=call, read=False)
 
     @classmethod
-    def from_range(cls, call: SheetCall, answer: Mapping[str, Any]) -> "Sheet":
+    def from_range(cls, call: SheetCall, answer: Mapping[str, Any]) -> Sheet:
         """The sheet a range read (``lib/spreadsheet/range.ts``)."""
         columns = answer.get("columns") or ()
         kinds = [_SHEET_TYPES[entry["type"]] for entry in columns]
@@ -272,7 +273,7 @@ class PluginRows(Recordset):
     each return it declares as a list, named by its key."""
 
     @classmethod
-    def unread(cls, call: PluginCall) -> "PluginRows":
+    def unread(cls, call: PluginCall) -> PluginRows:
         return cls(
             model=None, fields=(), name_override="plugins", call=call, read=False
         )
@@ -283,7 +284,7 @@ class PluginRows(Recordset):
         call: PluginCall,
         columns: Sequence[tuple[str, str]],
         rows: Sequence[Mapping[str, Any]],
-    ) -> "PluginRows":
+    ) -> PluginRows:
         """The rows, under *columns*: each return's key and declared type."""
         kinds = [_PLUGIN_TYPES.get(kind, _SHEET_TYPES["text"]) for _, kind in columns]
         return cls(

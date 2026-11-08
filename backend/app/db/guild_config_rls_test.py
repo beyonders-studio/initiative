@@ -14,7 +14,7 @@ from sqlalchemy import delete
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 
-from app.models.platform.guild import GuildInvite, CommunityRole
+from app.models.platform.guild import CommunityRole, GuildInvite
 from app.models.platform.rule import CommunityRule
 from app.models.platform.user import UserRole
 from app.testing import (

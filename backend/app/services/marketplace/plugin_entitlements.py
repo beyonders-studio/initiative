@@ -30,10 +30,10 @@ grant, and every caller has authenticated whoever it acts for first.
 from __future__ import annotations
 
 import logging
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any, Collection, Mapping, Optional
-
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from urllib.parse import quote
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -57,19 +57,19 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "ENTITLEMENT_HOOK",
-    "action_url",
-    "entitlement_blocks",
-    "gated_listings",
+    "REASON_TERM_FULL",
     "Statement",
     "StoredStatement",
     "UsageOutcome",
+    "action_url",
     "after_install",
     "deliver_entitlement",
+    "entitlement_blocks",
     "entitlement_satisfied",
+    "gated_listings",
     "listing_terms",
     "read_statement",
     "record_usage",
-    "REASON_TERM_FULL",
     "statement_active",
     "statement_reason",
     "statements_for",
@@ -92,7 +92,7 @@ class Statement:
     values: dict[str, Any]
 
     @classmethod
-    def of(cls, row: PluginEntitlement) -> "Statement":
+    def of(cls, row: PluginEntitlement) -> Statement:
         return cls(jws=row.statement, version=row.version, values=dict(row.values))
 
 
@@ -117,7 +117,7 @@ def statement_active(values: Mapping[str, Any]) -> bool:
 REASON_TERM_FULL = "term_full"
 
 
-def statement_reason(values: Mapping[str, Any]) -> Optional[str]:
+def statement_reason(values: Mapping[str, Any]) -> str | None:
     """Why an inactive statement isn't active, when it says: the ``reason``
     beside ``active: false``, passed through as billing sent it."""
     if statement_active(values):
@@ -136,7 +136,7 @@ def _terms_honoured() -> bool:
     return configured_root_is_builtin()
 
 
-def _terms(listing: MarketplaceListing) -> Optional[ListingTerms]:
+def _terms(listing: MarketplaceListing) -> ListingTerms | None:
     if listing.access is None or listing.source != REGISTRY_SOURCE:
         return None
     return ListingTerms(
@@ -162,8 +162,8 @@ def terms_for_listings(
 
 
 async def listing_terms(
-    listing_uid: Optional[str], session: Optional[AsyncSession] = None
-) -> Optional[ListingTerms]:
+    listing_uid: str | None, session: AsyncSession | None = None
+) -> ListingTerms | None:
     """The terms a package gives listing ``listing_uid``, or ``None``.
 
     Read on ``session`` when given (any role that reads the catalog), else on
@@ -183,7 +183,7 @@ async def listing_terms(
 # --- statements ---------------------------------------------------------------------
 
 
-async def read_statement(guild_id: int, listing_uid: str) -> Optional[Statement]:
+async def read_statement(guild_id: int, listing_uid: str) -> Statement | None:
     """The statement held for one (community, listing), or ``None``."""
     async with db_session.SystemSessionLocal() as session:
         row = await session.get(PluginEntitlement, (guild_id, listing_uid))
@@ -209,7 +209,7 @@ async def statements_for(
 
 
 def entitlement_satisfied(
-    terms: Optional[ListingTerms], statement: Optional[Statement]
+    terms: ListingTerms | None, statement: Statement | None
 ) -> bool:
     """Whether a community may install a listing with ``terms`` while holding
     ``statement``: anything but an ``entitled`` listing may, and that one only
@@ -220,7 +220,7 @@ def entitlement_satisfied(
 
 
 async def entitlement_blocks(
-    guild_id: int, listing_uid: str, session: Optional[AsyncSession] = None
+    guild_id: int, listing_uid: str, session: AsyncSession | None = None
 ) -> bool:
     """Whether ``guild_id`` may not install ``listing_uid`` for want of an
     active entitlement statement."""
@@ -232,7 +232,7 @@ async def entitlement_blocks(
 
 async def gated_listings(
     guild_id: int, listings: Collection[MarketplaceListing]
-) -> dict[str, Optional[str]]:
+) -> dict[str, str | None]:
     """The uids among ``listings`` that ``guild_id`` may not install for want
     of an active entitlement statement, each with the statement's reason when
     it gives one (:func:`statement_reason`). Two queries for any number."""
@@ -251,7 +251,7 @@ async def gated_listings(
     }
 
 
-def action_url(listing_uid: str) -> Optional[str]:
+def action_url(listing_uid: str) -> str | None:
     """Where a community acts on its entitlement for a listing: the
     deployment's billing portal, on the manage page with the listing's
     purchase open, or ``None`` with no portal. The client opens it with a
@@ -278,7 +278,7 @@ async def store_statement(
     One statement: insert, or replace a row holding a lower version. A version
     no higher than the one held changes nothing and reports what is held.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     insert = pg_insert(PluginEntitlement).values(
         guild_id=guild_id,
         listing_uid=listing_uid,
@@ -335,7 +335,7 @@ async def record_usage(
     nothing; an equal or higher one is kept and forwarded. The caller has
     checked the meter against the listing's terms.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     insert = pg_insert(PluginUsage).values(
         guild_id=guild_id,
         listing_uid=listing_uid,
@@ -377,7 +377,7 @@ async def record_usage(
 
 async def _install_owed(
     guild_id: int, listing_uid: str, version: int
-) -> Optional[tuple[GuildPlugin, registration_lookup.RegistrationSnapshot]]:
+) -> tuple[GuildPlugin, registration_lookup.RegistrationSnapshot] | None:
     """The live install of ``listing_uid`` in ``guild_id`` that has not been
     handed statement ``version``, with its registration, or ``None``."""
     from app.services.tenant.plugin_channels import owns_install
@@ -406,7 +406,7 @@ async def _install_owed(
                 select(PluginHookDelivery.delivery_id).where(
                     PluginHookDelivery.install_id == plugin.id,
                     PluginHookDelivery.delivery_id == _delivery_id(version),
-                    PluginHookDelivery.expires_at > datetime.now(timezone.utc),
+                    PluginHookDelivery.expires_at > datetime.now(UTC),
                 )
             )
         ).first()
@@ -418,7 +418,7 @@ def _delivery_id(version: int) -> str:
 
 
 async def _remember(guild_id: int, install_id: int, version: int) -> None:
-    expires_at = datetime.now(timezone.utc) + DELIVERY_TTL
+    expires_at = datetime.now(UTC) + DELIVERY_TTL
     statement = pg_insert(PluginHookDelivery).values(
         install_id=install_id, delivery_id=_delivery_id(version), expires_at=expires_at
     )

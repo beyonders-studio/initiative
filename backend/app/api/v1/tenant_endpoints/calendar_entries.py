@@ -18,18 +18,21 @@ list's conditions and serializer (``visible_project_conditions``,
 ``board_conditions``).
 """
 
-from typing import Annotated, List, Literal, Optional
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import or_
 from sqlmodel import select
 
 from app.api.deps import (
+    GuildContextDep,
     RLSSessionDep,
     UserSessionDep,
     get_current_active_user,
-    GuildContextDep,
 )
+from app.api.v1.tenant_endpoints import calendar_events as calendar_events_api
+from app.api.v1.tenant_endpoints import posts as posts_api
+from app.api.v1.tenant_endpoints import projects as projects_api
 from app.core.user_input_validators import resolve_zone
 from app.models.platform.user import User
 from app.models.tenant.post import Post
@@ -39,9 +42,6 @@ from app.schemas.tenant.calendar_entry import CalendarEntriesResponse
 from app.schemas.tenant.calendar_event import serialize_calendar_event_summary
 from app.schemas.tenant.post import PostRead
 from app.schemas.tenant.tool import serialize_tool
-from app.api.v1.tenant_endpoints import calendar_events as calendar_events_api
-from app.api.v1.tenant_endpoints import posts as posts_api
-from app.api.v1.tenant_endpoints import projects as projects_api
 from app.services.tenant import calendar_events as events_service
 from app.services.tenant import calendar_occurrences as occurrences_service
 from app.services.tenant import posts as posts_service
@@ -58,15 +58,15 @@ async def list_calendar_entries(
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
     window: calendar_events_api.CalendarWindowDep,
-    initiative_id: Optional[int] = Query(default=None),
-    scope: Optional[Literal["community"]] = Query(default=None),
-    calendar_ids: Optional[List[int]] = Query(default=None),
-    property_filters: Optional[str] = Query(default=None),
-    conditions: Optional[str] = Query(
+    initiative_id: int | None = Query(default=None),
+    scope: Literal["community"] | None = Query(default=None),
+    calendar_ids: list[int] | None = Query(default=None),
+    property_filters: str | None = Query(default=None),
+    conditions: str | None = Query(
         default=None,
         description="Task filter conditions (same JSON shape as GET /tasks).",
     ),
-    tz: Optional[str] = Query(default=None),
+    tz: str | None = Query(default=None),
     include_events: bool = Query(default=True),
     include_tasks: bool = Query(default=True),
     include_projects: bool = Query(default=False),
@@ -213,12 +213,12 @@ async def list_my_calendar_entries(
     session: UserSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     window: calendar_events_api.CalendarWindowDep,
-    guild_ids: Optional[List[int]] = Query(default=None, alias="community_ids"),
-    conditions: Optional[str] = Query(
+    guild_ids: list[int] | None = Query(default=None, alias="community_ids"),
+    conditions: str | None = Query(
         default=None,
         description="Task filter conditions (same JSON shape as GET /me/tasks).",
     ),
-    tz: Optional[str] = Query(default=None),
+    tz: str | None = Query(default=None),
     include_events: bool = Query(default=True),
     include_tasks: bool = Query(default=True),
 ) -> CalendarEntriesResponse:

@@ -25,10 +25,11 @@ import sys
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, BinaryIO, Optional, Union
+from typing import Any, BinaryIO
 
 from app.core.messages import ImportEngineMessages
 from app.services.import_engine import confluence_attachments, confluence_mapping
+from app.services.import_engine import limits as import_limits
 from app.services.import_engine.confluence_fetch import (
     _ENVELOPE_RESERVE_BYTES,
     ConfluenceFetched,
@@ -37,7 +38,6 @@ from app.services.import_engine.confluence_fetch import (
 from app.services.import_engine.confluence_storage import _Element, _parse, _text_of
 from app.services.import_engine.contract import ImportEngineError
 from app.services.import_engine.jira_attachments import AssetBudget, AssetSink
-from app.services.import_engine import limits as import_limits
 from app.services.import_engine.zip_bounds import copy_member, read_member
 
 logger = logging.getLogger(__name__)
@@ -90,12 +90,12 @@ class ExportPage:
     id: str
     title: str
     file: str
-    parent_file: Optional[str]
-    position: Optional[int]
+    parent_file: str | None
+    position: int | None
     #: The body, translated to storage format.
     body: str
-    author: Optional[str] = None
-    created_at: Optional[str] = None
+    author: str | None = None
+    created_at: str | None = None
     attachments: list[ExportAttachment] = field(default_factory=list)
 
 
@@ -122,7 +122,7 @@ def _walk(element: _Element):
         yield from _walk(child)
 
 
-def _find(element: _Element, predicate) -> Optional[_Element]:
+def _find(element: _Element, predicate) -> _Element | None:
     return next((e for e in _walk(element) if predicate(e)), None)
 
 
@@ -292,19 +292,19 @@ def _page_title(doc: _Element, space_name: str, key: str) -> str:
 
 def _index_tree(
     index: _Element, page_files: set[str]
-) -> dict[str, tuple[Optional[str], int]]:
+) -> dict[str, tuple[str | None, int]]:
     """Each page's parent and place among its siblings, from the list of
     pages the export draws in ``index.html`` — where each child is a list of
     its own, so siblings are counted across every list under one parent."""
-    tree: dict[str, tuple[Optional[str], int]] = {}
-    counts: dict[Optional[str], int] = {}
+    tree: dict[str, tuple[str | None, int]] = {}
+    counts: dict[str | None, int] = {}
 
-    def page_of(item: _Element) -> Optional[str]:
+    def page_of(item: _Element) -> str | None:
         link = next((e for e in item.elements() if e.tag == "a"), None)
         href = link.attr("href") if link is not None else ""
         return href if href in page_files else None
 
-    def walk(container: _Element, parent: Optional[str]) -> None:
+    def walk(container: _Element, parent: str | None) -> None:
         for listing in container.elements():
             if listing.tag not in ("ul", "ol"):
                 continue
@@ -334,14 +334,14 @@ def _index_tree(
     return tree
 
 
-def _parent_of(root: _Element, target: _Element) -> Optional[_Element]:
+def _parent_of(root: _Element, target: _Element) -> _Element | None:
     for element in _walk(root):
         if any(child is target for child in element.elements()):
             return element
     return None
 
 
-def _breadcrumb_parent(doc: _Element, page_files: set[str]) -> Optional[str]:
+def _breadcrumb_parent(doc: _Element, page_files: set[str]) -> str | None:
     crumbs = _find(doc, lambda e: e.attr("id") == "breadcrumbs")
     if crumbs is None:
         return None
@@ -350,7 +350,7 @@ def _breadcrumb_parent(doc: _Element, page_files: set[str]) -> Optional[str]:
     return parents[-1] if parents else None
 
 
-def _metadata(doc: _Element) -> tuple[Optional[str], Optional[str]]:
+def _metadata(doc: _Element) -> tuple[str | None, str | None]:
     """Who wrote the page and when, from the line the export prints under
     its title."""
     line = _find(doc, lambda e: "page-metadata" in _classes(e))
@@ -379,9 +379,9 @@ def _listed_attachments(
     section = _section_of(doc, heading)
     found: list[ExportAttachment] = []
     children = list(section.children) if section is not None else []
-    flat: list[Union[_Element, str]] = []
+    flat: list[_Element | str] = []
 
-    def flatten(nodes: list[Union[_Element, str]]) -> None:
+    def flatten(nodes: list[_Element | str]) -> None:
         for node in nodes:
             flat.append(node)
             if isinstance(node, _Element) and node.tag != "a":
@@ -409,7 +409,7 @@ def _listed_attachments(
     return found
 
 
-def _section_of(doc: _Element, heading: _Element) -> Optional[_Element]:
+def _section_of(doc: _Element, heading: _Element) -> _Element | None:
     """The ``pageSection`` block a heading sits in."""
     for element in _walk(doc):
         if "pageSection" in _classes(element) and any(
@@ -447,10 +447,10 @@ class _Translator:
         self.found_attachments: list[ExportAttachment] = []
         self.site_url = ""
 
-    def markup(self, nodes: list[Union[_Element, str]]) -> str:
+    def markup(self, nodes: list[_Element | str]) -> str:
         return "".join(self.node(node) for node in nodes)
 
-    def node(self, node: Union[_Element, str]) -> str:
+    def node(self, node: _Element | str) -> str:
         if isinstance(node, str):
             return html.escape(node, quote=False)
         tag = node.tag
@@ -497,7 +497,7 @@ class _Translator:
         return self.element(tag, node.attrs, node.children)
 
     def element(
-        self, tag: str, attrs: dict[str, str], children: list[Union[_Element, str]]
+        self, tag: str, attrs: dict[str, str], children: list[_Element | str]
     ) -> str:
         kept = {k: v for k, v in attrs.items() if k in _KEPT_ATTRS}
         rendered = "".join(
@@ -508,7 +508,7 @@ class _Translator:
             return f"<{tag}{rendered}/>"
         return f"<{tag}{rendered}>{self.markup(children)}</{tag}>"
 
-    def attachment_at(self, src: str, alias: str = "") -> Optional[ExportAttachment]:
+    def attachment_at(self, src: str, alias: str = "") -> ExportAttachment | None:
         href = html.unescape(src).split("?")[0]
         if not href.startswith("attachments/"):
             return None
@@ -737,8 +737,8 @@ def _macro(
     params: dict[str, str],
     *,
     inline: bool = False,
-    rich_body: Optional[str] = None,
-    plain_body: Optional[str] = None,
+    rich_body: str | None = None,
+    plain_body: str | None = None,
 ) -> str:
     parts = [f'<ac:structured-macro ac:name="{name}">']
     for key, value in params.items():
@@ -763,10 +763,10 @@ async def export_to_fetched(
     *,
     guild_id: int,
     app_version: str,
-    asset_budget: Optional[AssetBudget],
+    asset_budget: AssetBudget | None,
     files_allowed: bool,
-    store: Optional[AssetSink] = None,
-    max_rows: Optional[int] = None,
+    store: AssetSink | None = None,
+    max_rows: int | None = None,
 ) -> tuple[ConfluenceFetched, str]:
     """The export as a site fetch would have read it, and the site its pages
     point issues at, when they do.

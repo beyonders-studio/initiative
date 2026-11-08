@@ -1,6 +1,5 @@
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     ARRAY,
@@ -33,7 +32,7 @@ class UserPasskey(SQLModel, table=True):
 
     __tablename__ = "user_passkeys"
 
-    id: Optional[uuid.UUID] = Field(
+    id: uuid.UUID | None = Field(
         default_factory=uuid.uuid4,
         sa_column=Column(UUID(as_uuid=True), primary_key=True),
     )
@@ -75,7 +74,7 @@ class UserPasskey(SQLModel, table=True):
     #: The authenticator model's identifier, as it reports it. Recorded for the
     #: person's own benefit — it is what lets the list say "YubiKey" rather than
     #: "credential 3" — and never trusted as a claim.
-    aaguid: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    aaguid: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
 
     # Whether the ceremony proved the person as well as the device — a PIN, a
     # fingerprint, a face. This is what makes one credential answer for two
@@ -94,9 +93,9 @@ class UserPasskey(SQLModel, table=True):
     name: str = Field(sa_column=Column(String(64), nullable=False))
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
-    last_used_at: Optional[datetime] = Field(
+    last_used_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )

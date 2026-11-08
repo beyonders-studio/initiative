@@ -1,10 +1,11 @@
-from datetime import datetime, timezone
-from typing import Annotated, List, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
-from sqlmodel import select, delete, update
+from sqlmodel import delete, select, update
 
 from app.api import resource_access
 from app.api.actor_route import ActorRoute
@@ -12,32 +13,31 @@ from app.api.deps import (
     ActorContext,
     ActorSessionDep,
     ActorUserDep,
+    GuildContextDep,
     RLSSessionDep,
     SessionDep,
-    plugin_scope,
     get_current_active_user,
-    GuildContextDep,
+    plugin_scope,
 )
+from app.core.messages import InitiativeMessages, TaskStatusMessages
 from app.db import gucs
 from app.db.guild_standing import InstallContext
 from app.db.session import raise_flag
+from app.models.platform.user import User
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
-from app.models.platform.user import User
 from app.schemas.tenant.task_status import (
     InitiativeTaskStatusRead,
     TaskStatusCreate,
     TaskStatusDeleteRequest,
-    TaskStatusReorderRequest,
     TaskStatusRead,
+    TaskStatusReorderRequest,
     TaskStatusUpdate,
 )
-from app.core.messages import InitiativeMessages, TaskStatusMessages
 from app.services.tenant import initiatives as initiatives_service
+from app.services.tenant import task_completion, task_series
 from app.services.tenant import task_statuses as task_statuses_service
-from app.services.tenant import task_completion
-from app.services.tenant import task_series
 
 router = APIRouter(
     prefix="/projects/{project_id}/task-statuses",
@@ -58,16 +58,16 @@ initiative_router = APIRouter(
 ProjectsRead = Annotated[ActorContext, Depends(plugin_scope("projects:read"))]
 
 
-def _sorted(statuses: List[TaskStatus]) -> List[TaskStatus]:
+def _sorted(statuses: list[TaskStatus]) -> list[TaskStatus]:
     return sorted(statuses, key=lambda status: (status.position, status.id or 0))
 
 
-def _resequence(statuses: List[TaskStatus]) -> None:
+def _resequence(statuses: list[TaskStatus]) -> None:
     for index, item in enumerate(statuses):
         item.position = index
 
 
-def _ensure_default(statuses: List[TaskStatus]) -> None:
+def _ensure_default(statuses: list[TaskStatus]) -> None:
     if any(status.is_default for status in statuses):
         return
     preferred = task_statuses_service.first_by_category_preference(statuses)
@@ -146,7 +146,7 @@ async def _pick_fallback_status(
     return task_statuses_service.first_by_category_preference(statuses) or statuses[0]
 
 
-@router.get("/", response_model=List[TaskStatusRead])
+@router.get("/", response_model=list[TaskStatusRead])
 async def list_task_statuses(
     project_id: int,
     session: ActorSessionDep,
@@ -242,7 +242,7 @@ async def update_task_status(
             session,
             status_id=target.id,
             category=new_category,
-            now=datetime.now(timezone.utc),
+            now=datetime.now(UTC),
         )
     if "name" in update_data and update_data["name"] is not None:
         target.name = update_data["name"]
@@ -271,7 +271,7 @@ async def update_task_status(
     return target
 
 
-@router.post("/reorder", response_model=List[TaskStatusRead])
+@router.post("/reorder", response_model=list[TaskStatusRead])
 async def reorder_task_statuses(
     project_id: int,
     reorder_in: TaskStatusReorderRequest,
@@ -422,7 +422,7 @@ async def delete_task_status(
         )
         # The destination may sit on the other side of the done boundary from
         # the column being emptied, so realign the tasks that just landed in it.
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         await task_completion.resync_status_tasks(
             session,
             status_id=fallback_obj.id,
@@ -458,12 +458,14 @@ async def _require_initiative_reader(
     An installed plug-in is in the initiatives it is placed in; any other is not
     found, as an initiative it cannot reach reads everywhere else.
     """
-    if isinstance(guild_context, InstallContext):
-        if initiative_id not in guild_context.member_initiatives:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=InitiativeMessages.NOT_FOUND,
-            )
+    if (
+        isinstance(guild_context, InstallContext)
+        and initiative_id not in guild_context.member_initiatives
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=InitiativeMessages.NOT_FOUND,
+        )
     stmt = select(Initiative.id).where(
         Initiative.id == initiative_id,
     )
@@ -489,13 +491,13 @@ async def _require_initiative_reader(
         )
 
 
-@initiative_router.get("/", response_model=List[InitiativeTaskStatusRead])
+@initiative_router.get("/", response_model=list[InitiativeTaskStatusRead])
 async def list_initiative_task_statuses(
     initiative_id: int,
     session: ActorSessionDep,
     current_user: ActorUserDep,
     guild_context: ProjectsRead,
-) -> List[InitiativeTaskStatusRead]:
+) -> list[InitiativeTaskStatusRead]:
     """The distinct status columns across the initiative's readable projects.
 
     One entry per ``(name, category)``, carrying how many of the caller's

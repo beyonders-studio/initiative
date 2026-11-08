@@ -31,7 +31,7 @@ guild-routed session of the member installing.
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -57,11 +57,11 @@ from app.services.marketplace.publish_profile import (
 )
 
 __all__ = [
-    "ListingTooLargeError",
     "MAX_LISTING_BODY_BYTES",
+    "ListingTooLargeError",
     "example_is_generated",
-    "installable_body",
     "install_tool_listing",
+    "installable_body",
     "listing_example",
     "normalize_tool_example",
     "normalize_tool_listing",
@@ -326,7 +326,7 @@ async def install_tool_listing(
     if body is None:
         raise ImportEngineError(ImportEngineMessages.IMPORT_INVALID_PARAMS)
 
-    start = starts_on or datetime.now(timezone.utc).date()
+    start = starts_on or datetime.now(UTC).date()
     body = shift_dates(tool, body, (start - DATE_ANCHOR).days)
 
     importer = _importer(tool)

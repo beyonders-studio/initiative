@@ -17,8 +17,8 @@ changes the next request without anything else being told.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Sequence
 
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import distinct, func
@@ -27,14 +27,14 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
+from app.core.clock import utcnow
 from app.db.session import routed_guild_id
 from app.models.tenant.plugin_member_consent import (
-    PluginMemberConsent,
     ConsentAccess,
     ConsentStatus,
+    PluginMemberConsent,
 )
 from app.services import audit as audit_service
-from app.core.clock import utcnow
 
 __all__ = [
     "ConsentRequest",
@@ -55,7 +55,7 @@ __all__ = [
 ]
 
 
-def _purpose_is(purpose: Optional[str]):
+def _purpose_is(purpose: str | None):
     """``purpose IS NOT DISTINCT FROM :purpose``, which is what the unique key
     holds the column to."""
     return PluginMemberConsent.purpose.is_not_distinct_from(purpose)  # type: ignore[union-attr]
@@ -70,15 +70,15 @@ class ConsentRequest:
 
     install_id: int
     user_id: int
-    purpose: Optional[str]
+    purpose: str | None
     label: str
-    initiative_id: Optional[int]
+    initiative_id: int | None
     access: ConsentAccess
 
 
 async def find_consent(
-    session: AsyncSession, *, install_id: int, user_id: int, purpose: Optional[str]
-) -> Optional[PluginMemberConsent]:
+    session: AsyncSession, *, install_id: int, user_id: int, purpose: str | None
+) -> PluginMemberConsent | None:
     """The row for one (install, member, purpose), in whatever state it is."""
     return (
         await session.exec(
@@ -158,7 +158,7 @@ async def list_install_consents(
     session: AsyncSession,
     *,
     install_id: int,
-    user_ids: Optional[Sequence[int]] = None,
+    user_ids: Sequence[int] | None = None,
 ) -> list[PluginMemberConsent]:
     """Every member's rows for one install, for the seat's members view:
     grouped by member, whole-plug-in first within each, then by purpose.
@@ -209,7 +209,7 @@ async def consent_tallies(session: AsyncSession, *, install_id: int) -> ConsentT
 
 async def get_member_consent(
     session: AsyncSession, *, consent_id: int, install_id: int, user_id: int
-) -> Optional[PluginMemberConsent]:
+) -> PluginMemberConsent | None:
     """One of the member's own rows for one install, or ``None``."""
     return (
         await session.exec(
@@ -227,7 +227,7 @@ async def grant(
     row: PluginMemberConsent,
     *,
     access: ConsentAccess,
-    confirmed_factor: Optional[str],
+    confirmed_factor: str | None,
     actor_user_id: int,
 ) -> PluginMemberConsent:
     """The member allows the request at ``access``.
@@ -395,8 +395,8 @@ async def delete_member_consents(session: AsyncSession, *, user_id: int) -> int:
 
 
 async def live_consent(
-    session: AsyncSession, *, install_id: int, user_id: int, purpose: Optional[str]
-) -> Optional[PluginMemberConsent]:
+    session: AsyncSession, *, install_id: int, user_id: int, purpose: str | None
+) -> PluginMemberConsent | None:
     """The member's consent for this install and purpose, when it is granted
     and not revoked; ``None`` otherwise."""
     row = await find_consent(

@@ -7,6 +7,8 @@ seeder, and each one applies the operator's default rather than the column
 default.
 """
 
+from pathlib import Path
+
 from sqlalchemy import text
 from sqlmodel import select
 
@@ -92,8 +94,7 @@ async def test_the_bootstrap_owner_is_seeded(session):
 
     source = init_db_module.__file__
     assert source is not None
-    with open(source, encoding="utf-8") as handle:
-        body = handle.read()
+    body = Path(source).read_text(encoding="utf-8")
     assert "dm_settings_service.seed_for_new_account" in body
 
 
@@ -104,6 +105,5 @@ async def test_identity_provisioning_is_seeded(session):
 
     source = identity_module.__file__
     assert source is not None
-    with open(source, encoding="utf-8") as handle:
-        body = handle.read()
+    body = Path(source).read_text(encoding="utf-8")
     assert "dm_settings_service.seed_for_new_account" in body

@@ -19,10 +19,8 @@ import socket
 from contextlib import contextmanager
 from unittest.mock import patch
 
-
-from app.models.platform.guild import CommunityRole
 from app.db.request_context import SystemGuild
-
+from app.models.platform.guild import CommunityRole
 
 _WEBHOOK_HOST = "hooks.example.com"
 # A public unicast IPv4 (example.com) with a real stream socket type/proto, so

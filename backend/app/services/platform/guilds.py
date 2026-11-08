@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import logging
+import secrets
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from hashlib import sha256
-import logging
-import secrets
 from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import ColumnElement, case, exists, func, or_, text
@@ -17,32 +17,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.core.config import settings
+from app.core.encryption import SALT_EMAIL, encrypt_field, normalize_email
+from app.core.errors import CodedError
 from app.core.guild_auth_options import CommunityAuthOption
 from app.core.intake import IntakeStream
-from app.core.tools import Tool
-from app.core.encryption import encrypt_field, normalize_email, SALT_EMAIL
-from app.core.errors import CodedError
 from app.core.messages import GuildMessages
-from app.db import cohorts, post_commit
-from app.db.advisory_locks import LockNamespace, advisory_lock
-from app.db.guild_migrations import GUILD_SCHEMA_REGEX
-from app.db.query import apply_pagination, ids_in
-from app.models.platform.guild import (
-    BANNER_TEXT_COLORS,
-    GUILD_ADMIN_ROLES,
-    LIVE_STATUS_VALUES,
-    UNLISTED_STATUSES,
-    DEFAULT_BANNER,
-    DEFAULT_BANNER_TEXT_COLOR,
-    Guild,
-    CommunityCategory,
-    GuildInvite,
-    GuildMembership,
-    CommunityRole,
-    CommunityStatus,
-    restore_status_choices,
-)
-from app.models.platform.access_grant import AccessGrant, AccessGrantPurpose
 from app.core.rules import (
     OPTION_RULES,
     SURFACE_AI_CONNECTIONS,
@@ -50,24 +29,43 @@ from app.core.rules import (
     SURFACE_PLUGINS,
     SetBy,
 )
+from app.core.tools import Tool
+from app.db import cohorts, post_commit
+from app.db.advisory_locks import LockNamespace, advisory_lock
+from app.db.guild_migrations import GUILD_SCHEMA_REGEX
+from app.db.query import apply_pagination, ids_in
+from app.db.request_context import Platform, SystemGuild, Unattributed
+from app.models.platform.access_grant import AccessGrant, AccessGrantPurpose
+from app.models.platform.guild import (
+    BANNER_TEXT_COLORS,
+    DEFAULT_BANNER,
+    DEFAULT_BANNER_TEXT_COLOR,
+    GUILD_ADMIN_ROLES,
+    LIVE_STATUS_VALUES,
+    UNLISTED_STATUSES,
+    CommunityCategory,
+    CommunityRole,
+    CommunityStatus,
+    Guild,
+    GuildInvite,
+    GuildMembership,
+    restore_status_choices,
+)
 from app.models.platform.guild_administration import GuildAdministration
 from app.models.platform.notification import NotificationType
+from app.models.platform.user import User, UserStatus
 from app.models.tenant.guest_invite_grant import GuestInviteGrant
+from app.models.tenant.guild_setting import GuildSetting
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.schemas.platform.guild import CommunityInviteGrant
-from app.models.tenant.guild_setting import GuildSetting
-from app.models.platform.user import User, UserStatus
 from app.services import audit as audit_service
-from app.services.marketplace import community_hooks
 from app.services.auth import addresses
-from app.services.platform import billing as billing_service
-
-from app.services.platform import account_stream, user_stream
+from app.services.marketplace import community_hooks
+from app.services.platform import account_stream, rules, user_stream
 from app.services.platform import api_keys as api_keys_service
-from app.services.platform import rules
+from app.services.platform import billing as billing_service
 from app.services.platform import contact_grants as contact_grants_service
 from app.services.platform.retention import COMMUNITY_DELETION, COMMUNITY_HOLD
-from app.db.request_context import Platform, SystemGuild, Unattributed
 
 if TYPE_CHECKING:
     from app.services.email import EmailPieces
@@ -293,7 +291,7 @@ async def get_primary_guild(session: AsyncSession) -> Guild:
             user_count,
             schema_count,
         )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     guild = await _persist_new_guild(
         session,
         Guild(
@@ -598,7 +596,7 @@ async def _refuse_ended_guest(
     if (
         membership is not None
         and membership.guest_until is not None
-        and membership.guest_until <= datetime.now(timezone.utc)
+        and membership.guest_until <= datetime.now(UTC)
     ):
         raise GuestTimeEndedError(GuildMessages.GUEST_TIME_ENDED)
 
@@ -623,11 +621,11 @@ async def extend_guest(
         raise NotAGuestError(GuildMessages.NOT_A_GUEST)
     before = membership.guest_until
     days = await _guest_days(session, guild_id=guild_id, days=days)
-    if before <= datetime.now(timezone.utc):
+    if before <= datetime.now(UTC):
         # An ended guest no longer counts against the cap, so bringing one back
         # takes a place as a new guest does.
         await _assert_guest_capacity(session, guild_id=guild_id)
-    membership.guest_until = datetime.now(timezone.utc) + timedelta(days=days)
+    membership.guest_until = datetime.now(UTC) + timedelta(days=days)
     session.add(membership)
     await session.flush()
     await audit_service.record(
@@ -1009,7 +1007,7 @@ async def may_create_another_guild(session: AsyncSession, *, user_id: int) -> bo
     if not limit:
         return True
     await advisory_lock(session, LockNamespace.GUILD_CREATION, user_id)
-    since = datetime.now(timezone.utc) - timedelta(days=1)
+    since = datetime.now(UTC) - timedelta(days=1)
     created = await session.scalar(
         select(func.count())
         .select_from(Guild)
@@ -1043,7 +1041,7 @@ async def create_guild(
     somebody to pass the seat to only because they hold it first. Every guild
     keeps at least one from here on (:func:`must_keep_superadmin`).
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     guild = Guild(
         name=name.strip(),
         description=description.strip()
@@ -1359,7 +1357,7 @@ async def update_guild(
     if guild.is_community:
         await _assert_listable(session, guild)
     if updated:
-        guild.updated_at = datetime.now(timezone.utc)
+        guild.updated_at = datetime.now(UTC)
         session.add(guild)
         await session.flush()
 
@@ -1474,7 +1472,7 @@ async def set_guild_status(
             guild.status if status is CommunityStatus.suspended else None
         )
         guild.status = status.value
-        guild.status_changed_at = datetime.now(timezone.utc)
+        guild.status_changed_at = datetime.now(UTC)
         session.add(guild)
         await session.flush()
         community_hooks.status_changed(session, guild_id)
@@ -1582,13 +1580,9 @@ async def create_guild_invite(
         await _assert_guest_capacity(session, guild_id=guild_id, claiming_seat=False)
     code = await _generate_unique_invite_code(session)
     if expires_at is None:
-        expiry = datetime.now(timezone.utc) + timedelta(
-            days=DEFAULT_INVITE_EXPIRATION_DAYS
-        )
+        expiry = datetime.now(UTC) + timedelta(days=DEFAULT_INVITE_EXPIRATION_DAYS)
     else:
-        expiry = (
-            expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=timezone.utc)
-        )
+        expiry = expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=UTC)
     invite = GuildInvite(
         code_hash=_hash_code(code),
         guild_id=guild_id,
@@ -2197,7 +2191,7 @@ async def soft_delete_guild(
             delete(GuildMembership).where(GuildMembership.guild_id == guild_id)
         )
     guild.status = CommunityStatus.deleted.value
-    guild.status_changed_at = datetime.now(timezone.utc)
+    guild.status_changed_at = datetime.now(UTC)
     session.add(guild)
     await session.flush()
     community_hooks.status_changed(session, guild_id)
@@ -2287,7 +2281,7 @@ async def restore_guild(
         seated = seat_user_id
 
     guild.status = status.value
-    guild.status_changed_at = datetime.now(timezone.utc)
+    guild.status_changed_at = datetime.now(UTC)
     session.add(guild)
     community_hooks.status_changed(session, guild_id)
     await audit_service.record(
@@ -2317,11 +2311,9 @@ async def get_invite_by_code(
 
 
 def invite_is_active(invite: GuildInvite) -> bool:
-    if invite.expires_at and invite.expires_at < datetime.now(timezone.utc):
+    if invite.expires_at and invite.expires_at < datetime.now(UTC):
         return False
-    if invite.max_uses is not None and invite.uses >= invite.max_uses:
-        return False
-    return True
+    return not (invite.max_uses is not None and invite.uses >= invite.max_uses)
 
 
 async def _live_invite(
@@ -2396,7 +2388,7 @@ async def redeem_invite_for_user(
             AccessGrant.user_id == user.id,
             AccessGrant.guild_id == invite.guild_id,
             AccessGrant.purpose != AccessGrantPurpose.billing.value,
-            AccessGrant.live(datetime.now(timezone.utc)),
+            AccessGrant.live(datetime.now(UTC)),
         )
         .limit(1)
     )
@@ -2430,7 +2422,7 @@ async def redeem_invite_for_user(
         days = await _guest_days(
             session, guild_id=invite.guild_id, days=invite.guest_days
         )
-        guest_until = datetime.now(timezone.utc) + timedelta(days=days)
+        guest_until = datetime.now(UTC) + timedelta(days=days)
     await ensure_membership(
         session,
         guild_id=invite.guild_id,
@@ -2822,7 +2814,7 @@ async def describe_invite_code(
         return invite, guild, True, None
 
     reason = GuildMessages.INVITE_INVALID
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if invite.expires_at and invite.expires_at < now:
         reason = GuildMessages.INVITE_EXPIRED
     elif invite.max_uses is not None and invite.uses >= invite.max_uses:
@@ -2989,9 +2981,9 @@ async def remove_user_from_guild(
     The session must already be routed into the guild. Revocations are queued on
     it and delivered by the caller after the commit.
     """
+    from app.services.tenant import initiatives as initiatives_service
     from app.services.tenant import plugin_connections as plugin_connections_service
     from app.services.tenant import plugin_member_consents as consents_service
-    from app.services.tenant import initiatives as initiatives_service
 
     if via is None:
         left = actor_user_id == user_id

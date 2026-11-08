@@ -7,15 +7,15 @@ session it runs on has no account behind it.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.db.soft_delete_filter import select_including_deleted
 from app.models.tenant.initiative import Initiative
-from app.services.tenant.soft_delete import soft_delete_entity
 from app.services.guild_sweeps import Scope, each_guild
+from app.services.tenant.soft_delete import soft_delete_entity
 from app.services.tenant.trash_purge import purge_guild
 from app.testing import emitted
 from app.testing.factories import (
@@ -40,7 +40,7 @@ async def _expired_initiative(session: AsyncSession, guild, user, **overrides):
             select_including_deleted(Initiative).where(Initiative.id == initiative.id)
         )
     ).one()
-    refreshed.purge_at = datetime.now(timezone.utc) - timedelta(days=2)
+    refreshed.purge_at = datetime.now(UTC) - timedelta(days=2)
     session.add(refreshed)
     await session.commit()
     return initiative

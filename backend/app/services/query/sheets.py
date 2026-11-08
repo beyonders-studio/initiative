@@ -20,7 +20,8 @@ from __future__ import annotations
 
 import time
 from collections import OrderedDict
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession

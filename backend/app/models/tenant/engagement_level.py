@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import CheckConstraint, Column, DateTime, Index, SmallInteger, Text
 from sqlmodel import Field, SQLModel
@@ -41,6 +41,6 @@ class EngagementLevel(SQLModel, table=True):
     entity_id: int = Field(primary_key=True)
     level: int = Field(sa_column=Column(SmallInteger, nullable=False))
     computed_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

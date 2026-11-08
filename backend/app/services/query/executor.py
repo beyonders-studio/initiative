@@ -23,11 +23,12 @@ perfectly legal, and it does so without executing it.
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Any, AsyncIterator, Mapping
+from typing import Any
 
 from asyncpg.exceptions import (
     DatabaseDroppedError,
@@ -150,10 +151,10 @@ def _wire(value: Any) -> Any:
         return json.dumps(value)
     # Before date, because every datetime is one.
     if isinstance(value, datetime):
-        moment = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        moment = value if value.tzinfo else value.replace(tzinfo=UTC)
         return int(moment.timestamp() * 1000)
     if isinstance(value, date):
-        midnight = datetime(value.year, value.month, value.day, tzinfo=timezone.utc)
+        midnight = datetime(value.year, value.month, value.day, tzinfo=UTC)
         return int(midnight.timestamp() * 1000)
     return str(value)
 
@@ -343,46 +344,48 @@ async def execute(
     """
     routed = _as_query(context, initiative_id)
     guild_id = routed.guild_id
-    async with _translated_failures():
-        async with cohorts.query_sessionmaker(guild_id)() as session:
-            # Opened before anything else touches the connection. The bounds
-            # below and the context after it are transaction-local, so they
-            # need a transaction that is already open to be local *to*.
-            await session.begin()
-            sqlalchemy_connection = await session.connection()
-            raw = await sqlalchemy_connection.get_raw_connection()
-            connection = raw.driver_connection
+    async with (
+        _translated_failures(),
+        cohorts.query_sessionmaker(guild_id)() as session,
+    ):
+        # Opened before anything else touches the connection. The bounds
+        # below and the context after it are transaction-local, so they
+        # need a transaction that is already open to be local *to*.
+        await session.begin()
+        sqlalchemy_connection = await session.connection()
+        raw = await sqlalchemy_connection.get_raw_connection()
+        connection = raw.driver_connection
 
-            await _bound_transaction(sqlalchemy_connection)
-            if not await _claim_a_slot(sqlalchemy_connection, guild_id):
-                raise QueryError(QueryMessages.BUSY, str(guild_id))
-            await set_rls_context(session, routed)
-            statement = await _with_cells(session, statement, guild_id)
+        await _bound_transaction(sqlalchemy_connection)
+        if not await _claim_a_slot(sqlalchemy_connection, guild_id):
+            raise QueryError(QueryMessages.BUSY, str(guild_id))
+        await set_rls_context(session, routed)
+        statement = await _with_cells(session, statement, guild_id)
 
-            cost = await _estimated_cost(connection, statement)
-            if cost > QUERY_MAX_COST:
-                raise QueryError(QueryMessages.TOO_EXPENSIVE, f"{cost:.0f}")
+        cost = await _estimated_cost(connection, statement)
+        if cost > QUERY_MAX_COST:
+            raise QueryError(QueryMessages.TOO_EXPENSIVE, f"{cost:.0f}")
 
-            prepared = await connection.prepare(statement.sql)
-            columns = await _described(connection, prepared, statement)
+        prepared = await connection.prepare(statement.sql)
+        columns = await _described(connection, prepared, statement)
 
-            limit = QUERY_MAX_ROWS
-            rows: list[tuple[Any, ...]] = []
-            truncated = False
-            async for record in prepared.cursor(*statement.parameters):
-                if len(rows) >= limit:
-                    truncated = True
-                    break
-                rows.append(tuple(_wire(value) for value in record))
+        limit = QUERY_MAX_ROWS
+        rows: list[tuple[Any, ...]] = []
+        truncated = False
+        async for record in prepared.cursor(*statement.parameters):
+            if len(rows) >= limit:
+                truncated = True
+                break
+            rows.append(tuple(_wire(value) for value in record))
 
-            await session.rollback()
-            return QueryResult(
-                columns=columns,
-                rows=tuple(rows),
-                cost=cost,
-                truncated=truncated,
-                relations=statement.relations,
-            )
+        await session.rollback()
+        return QueryResult(
+            columns=columns,
+            rows=tuple(rows),
+            cost=cost,
+            truncated=truncated,
+            relations=statement.relations,
+        )
 
 
 async def run(
@@ -419,20 +422,22 @@ async def describe(
     routed = _as_query(context, initiative_id)
     guild_id = routed.guild_id
 
-    async with _translated_failures():
-        async with cohorts.query_sessionmaker(guild_id)() as session:
-            await session.begin()
-            sqlalchemy_connection = await session.connection()
-            raw = await sqlalchemy_connection.get_raw_connection()
-            connection = raw.driver_connection
+    async with (
+        _translated_failures(),
+        cohorts.query_sessionmaker(guild_id)() as session,
+    ):
+        await session.begin()
+        sqlalchemy_connection = await session.connection()
+        raw = await sqlalchemy_connection.get_raw_connection()
+        connection = raw.driver_connection
 
-            await _bound_transaction(sqlalchemy_connection)
-            await set_rls_context(session, routed)
-            statement = await _with_cells(session, statement, guild_id)
-            prepared = await connection.prepare(statement.sql)
-            columns = await _described(connection, prepared, statement)
-            await session.rollback()
-            return columns, statement
+        await _bound_transaction(sqlalchemy_connection)
+        await set_rls_context(session, routed)
+        statement = await _with_cells(session, statement, guild_id)
+        prepared = await connection.prepare(statement.sql)
+        columns = await _described(connection, prepared, statement)
+        await session.rollback()
+        return columns, statement
 
 
 def _from_json(value: Any, type_name: str) -> Any:

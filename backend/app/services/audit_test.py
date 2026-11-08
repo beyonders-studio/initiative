@@ -3,6 +3,7 @@
 import json
 
 import pytest
+
 from app.core import audit_context
 from app.core.audit_events import (
     SCHEMA_VERSION,

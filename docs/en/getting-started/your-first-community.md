@@ -4,71 +4,87 @@ icon: lucide/users
 
 # Your first community
 
-A **community** is a workspace — one separate space for one group of people and everything they're working on. You need to be in one before you can do anything much.
+A community is one group's space: the people, and everything they're working on. Your book club is one community and your day job is another, and nothing crosses between them. You need to be in one before you can do much.
 
-Three ways in: someone **invites** you, you **find** one that's listed itself publicly, or you **make** your own.
+There are three ways in. Somebody invites you, you find one that's listed publicly, or you start your own.
 
-## Joining by invite (the usual one)
+## Join a community from an invite link
 
-Most people arrive on an invite link from somebody already in the group.
+This is how most people arrive.
 
-1. **Open the link.**
-2. **Sign in**, or [make your account](create-account.md) if you haven't yet.
-3. You're in. The community's icon appears on the rail down the left, and you're on its home screen.
+1. Open the invite link.
+2. Sign in, or [create your account](create-account.md#sign-up-from-an-invite-link) if you don't have one.
+3. Select **Accept invite**.
+4. Select **Continue to Initiative**.
 
-That's genuinely the whole thing.
+The community's icon appears in the strip down the left, and you can see the initiatives you've been added to.
 
-!!! note "If your link says it's expired"
-    Invite links can be set to run out, or to only work a certain number of times. This is the link's fault, not yours, and definitely not a comment on you as a person. Ask whoever sent it for a new one — it takes them about four seconds.
+!!! note "If the invite won't work"
+    Invite links can run out after a date or a number of uses. That's the link's fault, and definitely not a comment on you as a person. Ask whoever sent it for a new one.
 
-## Finding one yourself
+## Find a community to join
 
-Some communities list themselves publicly so anyone can find them. **Join a community** is the dashed button on the rail — you can browse by category or search by name, then join straight from a community's card. No invite, no waiting for approval.
+Some communities list themselves so anyone on the server can find and join them, with no invite and no waiting for approval.
 
-Don't see a **Join a community** button? Then this server hasn't switched that feature on, and everything here works by invitation. Nothing's wrong. More in [Finding a community to join](../guides/communities.md#finding-a-community-to-join).
+1. Select **Join a community** in the strip down the left.
+2. Browse by category, or type into **Search communities**.
+3. Select **Join** on the community you want.
 
-## Making your own
+The first time, Initiative asks your date of birth once, because listed communities are for people 16 and older. No **Join a community** button? Your server doesn't run a directory, and everything there works by invitation. More in [Find a community to join](../guides/communities.md#finding-a-community-to-join).
 
-Starting fresh for your own group? You can create a community yourself, as long as your server allows it.
+## Start your own community
 
-1. On the **community rail** down the left edge, press the **+** (**Create Community**).
-2. Give it a **Community name** — usually just what your group is actually called. "Fairview Bakery". "PTA Committee". "The Nguyens". A **Description** is optional.
-3. Create it. Congratulations, you're its [superadmin](../guides/communities.md#why-superadmin-is-separate), the top seat.
-4. Give it an **icon** next, under **Community settings → Community**. Once you're in three communities, that rail of tiny pictures is the only thing standing between you and posting the surprise party plans in the work one.
+You can make a community whenever your server allows it. If there's no **+** in the strip, it doesn't; ask a community admin to invite you, or whoever runs the server to make one for you.
 
-![Creating a new community](../images/getting-started/create-community.png)
+1. Select **Create Community** (the **+**) in the strip down the left.
+2. Type a **Community name**, usually whatever your group is called: "Fairview Bakery", "PTA Committee", "The Nguyens".
+3. Add a **Description** if you like.
+4. Select **Create community**.
 
-!!! info "No 'Create community' button?"
-    Some servers turn that off deliberately, so everybody joins through invites instead. Ask a community admin to invite you, or whoever runs the server to make one for you.
+You're its superadmin, the top seat, and Initiative takes you straight to setting up the first initiative.
 
-## What a brand-new community comes with
+![The Create a new community dialog, with Community name and Description](../images/getting-started/create-community.png)
 
-Nothing. Genuinely — it's empty, and the home page's first and only offer is **Create initiative**.
+## Set up your first initiative
 
-That is on purpose. An initiative is a name for a body of work — "Spring Play", "Engineering", "Tuesday Night D&D" — and only you know what yours is called.
+A brand-new community is empty on purpose. An initiative is a body of work, like "Spring Play", "Engineering" or "Tuesday Night D&D", and only you know what yours is called. It holds that work's projects, files and other tools.
 
-So the first move:
+The **New initiative** box opens by itself after you create a community. Otherwise, select **Create initiative** on the community's home page.
 
-1. Click **Create initiative**. Four short questions follow: what it's called, what it's made of, who can get in, and what they can do. Any of it can change later.
-2. Open it, go to its **Projects** tab, click **Add Project**, give it a name, and there's your first board. Every tool's tab has one button like that.
+1. Under **What is it called?**, type a **Name**, add a **Description** and pick a **Color** if you like, then select **Next: Tools**.
+2. Under **What is it made of?**, keep the tools it needs and turn off the rest, then select **Next: Membership**.
+3. Under **Who can get in?**, choose **Invite only**, **By request** or **Anyone can join**, then select **Next: Permissions**.
+4. Under **What can they do?**, choose **Make things**, **See things** or **Managers only**.
+5. Select **Create initiative**.
 
-Put some tasks on it. That's a working setup — everything else in these guides is optional extra.
+You can change all of it later, and turning a tool off never deletes what's in it. [Initiatives](../guides/initiatives.md) explains each choice.
 
-## Switching between communities
+## Add your first project
 
-You can belong to as many as you want — work, the volunteer thing, your family — and they stay completely separate from each other.
+1. Open your initiative from the sidebar.
+2. Select its **Projects** tab.
+3. Select **Add Project**.
+4. Type a name, then select **Create project**.
 
-Click a community's icon on the rail and the whole app moves over with you: sidebar, projects, files, everything. Nothing leaks between them, ever, in either direction.
+There's your first board. Put some tasks on it and you have a working setup; everything else in this guide is optional. Every other tool's tab has a button like this one.
 
-??? techspec "For the technically minded — a community is a hard boundary"
-    Each community's content lives in its own database schema, created with the community, and a request is routed into exactly one of them — so reads and writes reach only communities you belong to, enforced at the database level rather than in the interface. Two browser tabs can sit in two different communities at once with no crossover. See [How your data is kept separate](../security/how-your-data-is-kept-separate.md).
+## Invite people to your community
 
-## Next
+1. Right-click your community's icon in the strip down the left, or press and hold it on a touch screen.
+2. Select **Invite members**.
 
-You're in. Now click the **Initiative logo** at the top of the rail, above the community icons.
+An invite link is copied, ready to paste into the group chat. To set how long it lasts or how many people can use it, see [Running a community](../guides/running-a-community.md).
 
-That's [your space](../guides/your-space.md): everything assigned to you, pulled out of every community you're in, on one page. It's where you'll start most days, and it's the reason belonging to four groups doesn't mean checking four groups.
+## Give your community an icon
 
-After that, either build a mental picture with [how Initiative is organized](../concepts/index.md), or skip it entirely and go straight to the [how-to guides](../guides/index.md).
+Once you're in three communities, that row of tiny pictures is the only thing standing between you and posting the surprise party plans in the work one.
 
-Both are completely valid life choices and we won't ask which you picked.
+1. Select the gear beside your community's name at the top of the sidebar.
+2. On the **Community** tab, under **Pictures**, choose an image for the **Icon**.
+
+Any image works; Initiative crops it square for you.
+
+??? techspec "A community is a hard boundary"
+    Each community's content lives in its own database schema, created with the community, and every request is routed into exactly one of them. Reads and writes reach only the communities you belong to, enforced in the database rather than in the interface. Two browser tabs can sit in two different communities at once with no crossover. See [How your data is kept separate](../security/how-your-data-is-kept-separate.md).
+
+Next, select the Initiative logo above your community icons. That's [your space](../guides/your-space.md): everything assigned to you from every community, on one page. After that, read [how Initiative is organized](../concepts/index.md), or skip straight to the [how-to guides](../guides/index.md). We won't ask which you picked.

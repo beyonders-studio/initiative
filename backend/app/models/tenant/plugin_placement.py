@@ -14,7 +14,7 @@ places a mandatory install in every initiative there is when it installs it.
 The row names no person: a placement is a fact about the install.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     Column,
@@ -51,10 +51,10 @@ class PluginPlacement(SQLModel, table=True):
         sa_column=Column(ARRAY(Integer), nullable=False, server_default=text("'{}'")),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

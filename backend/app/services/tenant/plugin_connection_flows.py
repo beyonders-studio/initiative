@@ -45,9 +45,10 @@ import hashlib
 import json
 import logging
 import time
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, Mapping, Optional
+from datetime import UTC, datetime
+from typing import Any
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 import httpx
@@ -56,12 +57,11 @@ from sqlalchemy import func, text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.rules import SURFACE_PLUGINS
-from app.services.platform import rules
 from app.core.config import settings
 from app.core.encryption import SALT_PLUGIN_CONFIG, decrypt_field, encrypt_field
 from app.core.errors import CodedError
 from app.core.messages import GuildPluginMessages, PluginChannelMessages
+from app.core.rules import SURFACE_PLUGINS
 from app.core.security import PluginPlatformSigningNotConfiguredError
 from app.db import cohorts
 from app.db.advisory_locks import LockNamespace, advisory_lock
@@ -98,6 +98,7 @@ from app.services.marketplace.plugin_refs import (
 )
 from app.services.marketplace.vendor_values import load_vendor_values
 from app.services.platform import access_grants as access_grants_service
+from app.services.platform import rules
 from app.services.safe_http import ResponseTooLargeError, request_public_target
 from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import plugin_config as plugin_config_service
@@ -135,10 +136,10 @@ __all__ = [
     "call_hook",
     "callback_url",
     "clear_token_cache",
-    "forget_minted",
     "complete_callback",
     "complete_setup",
     "flow_of",
+    "forget_minted",
     "landing_url",
     "mint_jwt_bearer",
     "refresh_tokens",
@@ -208,7 +209,7 @@ class HookError(Exception):
     ``status`` is the HTTP status the plug-in answered with, when it answered.
     """
 
-    def __init__(self, message: str, *, status: Optional[int] = None) -> None:
+    def __init__(self, message: str, *, status: int | None = None) -> None:
         super().__init__(message)
         self.status = status
 
@@ -229,16 +230,16 @@ class RevocationAnsweredError(HookError):
 @dataclass(frozen=True)
 class TokenSet:
     access_token: str
-    refresh_token: Optional[str] = None
+    refresh_token: str | None = None
     #: Epoch seconds, or ``None`` when the vendor did not say.
-    expires_at: Optional[int] = None
-    refresh_expires_at: Optional[int] = None
+    expires_at: int | None = None
+    refresh_expires_at: int | None = None
 
 
 # --- reading a connection's declaration --------------------------------------
 
 
-def flow_of(connection: Mapping[str, Any] | None) -> Optional[dict[str, Any]]:
+def flow_of(connection: Mapping[str, Any] | None) -> dict[str, Any] | None:
     """The connection's ``flow``, when it declares one."""
     flow = (connection or {}).get("flow")
     return flow if isinstance(flow, dict) else None
@@ -272,7 +273,7 @@ def return_path(public_id: str, connection_id: str) -> str:
     return f"/plugins/connected?{urlencode([('plugin', public_id), ('connection', connection_id)])}"
 
 
-def landing_url(path: Optional[str], outcome: str) -> str:
+def landing_url(path: str | None, outcome: str) -> str:
     """Where a person is sent when a flow ends, with how it ended."""
     base = path if path and path.startswith("/") else "/plugins/connected"
     joiner = "&" if "?" in base else "?"
@@ -328,7 +329,7 @@ def render(
 
 
 def _render_url(
-    template: Optional[str], *, vendor: Mapping[str, str], fields: Mapping[str, Any]
+    template: str | None, *, vendor: Mapping[str, str], fields: Mapping[str, Any]
 ) -> str:
     if not template:
         raise ConnectionFlowError(GuildPluginMessages.CONNECTION_VENDOR_NOT_CONFIGURED)
@@ -348,7 +349,7 @@ def _with_query(url: str, params: list[tuple[str, str]]) -> str:
 
 def _client(
     flow: Mapping[str, Any], *, vendor: Mapping[str, str], fields: Mapping[str, Any]
-) -> tuple[str, Optional[str]]:
+) -> tuple[str, str | None]:
     client_id = render(
         str(flow.get("client_id") or ""), vendor=vendor, fields=fields, in_url=False
     )
@@ -404,7 +405,7 @@ async def start_url(
     plugin: GuildPlugin,
     connection: Mapping[str, Any],
     guild_id: int,
-    user_id: Optional[int],
+    user_id: int | None,
     started_by: int,
     public_id: str,
     fields: Mapping[str, Any],
@@ -438,7 +439,7 @@ async def start_url(
 # --- tokens -----------------------------------------------------------------
 
 
-def _epoch(value: Any, *, now: int) -> Optional[int]:
+def _epoch(value: Any, *, now: int) -> int | None:
     """An ``expires_in`` in seconds, as an epoch time."""
     if isinstance(value, bool):
         return None
@@ -449,7 +450,7 @@ def _epoch(value: Any, *, now: int) -> Optional[int]:
     return None
 
 
-def _token_set(body: Any, *, previous_refresh: Optional[str] = None) -> TokenSet:
+def _token_set(body: Any, *, previous_refresh: str | None = None) -> TokenSet:
     """A token endpoint's answer (RFC 6749 §5.1), or :class:`VendorRefusedError`.
 
     Some vendors answer an error with a success status, so an ``error`` member
@@ -557,7 +558,7 @@ def seal_tokens(
 
 def unseal_tokens(
     config: Mapping[str, Any] | None, secrets: Mapping[str, Any] | None
-) -> Optional[TokenSet]:
+) -> TokenSet | None:
     """The token set a connection holds, or ``None`` when it holds none."""
     sealed = secrets or {}
     access = sealed.get("access_token")
@@ -566,7 +567,7 @@ def unseal_tokens(
     refresh = sealed.get("refresh_token")
     plain = config or {}
 
-    def _time(key: str) -> Optional[int]:
+    def _time(key: str) -> int | None:
         value = plain.get(key)
         return value if isinstance(value, int) and not isinstance(value, bool) else None
 
@@ -580,7 +581,7 @@ def unseal_tokens(
     )
 
 
-def needs_refresh(tokens: TokenSet, *, now: Optional[int] = None) -> bool:
+def needs_refresh(tokens: TokenSet, *, now: int | None = None) -> bool:
     if tokens.expires_at is None:
         return False
     current = int(time.time()) if now is None else now
@@ -593,7 +594,7 @@ def needs_refresh(tokens: TokenSet, *, now: Optional[int] = None) -> bool:
 @dataclass
 class _Minted:
     token: str
-    expires_at: Optional[int]
+    expires_at: int | None
     reuse_until: float
 
 
@@ -627,16 +628,16 @@ def _keep_minted(key: tuple[Any, ...], minted: _Minted) -> None:
     _minted[key] = minted
 
 
-def _parse_expiry(body: Mapping[str, Any], *, now: int) -> Optional[int]:
+def _parse_expiry(body: Mapping[str, Any], *, now: int) -> int | None:
     raw = body.get("expires_at")
     if isinstance(raw, str) and raw:
         try:
-            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(raw)
         except ValueError:
             parsed = None
         if parsed is not None:
             if parsed.tzinfo is None:
-                parsed = parsed.replace(tzinfo=timezone.utc)
+                parsed = parsed.replace(tzinfo=UTC)
             return int(parsed.timestamp())
     if isinstance(raw, int) and not isinstance(raw, bool):
         return raw
@@ -788,8 +789,8 @@ async def call_hook(
     guild_id: int,
     install_id: int,
     body: Mapping[str, Any],
-    guild_ref: Optional[str] = None,
-) -> Optional[Any]:
+    guild_ref: str | None = None,
+) -> Any | None:
     """Call one of the plug-in's hooks and return its JSON answer (``None`` for an
     empty one). Raises :class:`HookError` for anything but a 2xx answer, with
     the status the plug-in answered with when it answered.
@@ -863,9 +864,9 @@ async def call_hook(
 class AfterConnect:
     refused: bool
     values: dict[str, Any]
-    account_label: Optional[str]
+    account_label: str | None
     #: What a declarative refusal answers.
-    code: Optional[str] = None
+    code: str | None = None
 
 
 def connected(answer: Mapping[str, Any]) -> AfterConnect:
@@ -926,7 +927,7 @@ class _Loaded:
 
 async def _load_for_flow(
     session: AsyncSession, state: ConnectionFlowState
-) -> Optional[_Loaded]:
+) -> _Loaded | None:
     """The install and connection a state names, with the session — one from
     its community's cohort — routed into that community, or ``None`` when the
     flow can no longer finish."""
@@ -983,7 +984,7 @@ async def _load_for_flow(
     )
 
 
-def _clean_installation_id(value: Optional[str]) -> Optional[str]:
+def _clean_installation_id(value: str | None) -> str | None:
     """An installation id as a vendor's setup address returns it: letters,
     digits, ``-`` and ``_``, and short."""
     if not value or len(value) > MAX_INSTALLATION_ID_LENGTH:
@@ -1006,8 +1007,8 @@ async def _is_member(session: AsyncSession, state: ConnectionFlowState) -> bool:
 
 
 async def _person_outcome(
-    state: ConnectionFlowState, signed_in: Optional[int]
-) -> Optional[str]:
+    state: ConnectionFlowState, signed_in: int | None
+) -> str | None:
     """Whether the person finishing a flow may: the landing outcome when not,
     ``None`` when they may go on.
 
@@ -1043,10 +1044,10 @@ async def _person_outcome(
 
 async def complete_setup(
     *,
-    state_token: Optional[str],
-    installation_id: Optional[str],
-    setup_action: Optional[str],
-    signed_in: Optional[int],
+    state_token: str | None,
+    installation_id: str | None,
+    setup_action: str | None,
+    signed_in: int | None,
 ) -> str:
     """The return from an installation-style vendor's install page.
 
@@ -1089,10 +1090,10 @@ async def complete_setup(
 
 async def complete_callback(
     *,
-    state_token: Optional[str],
-    code: Optional[str],
-    error: Optional[str],
-    signed_in: Optional[int],
+    state_token: str | None,
+    code: str | None,
+    error: str | None,
+    signed_in: int | None,
 ) -> str:
     """The vendor's return with an authorization code. Exchanges it, asks the
     plug-in's ``after_connect`` hook when the flow says so, stores the result, and
@@ -1137,7 +1138,7 @@ async def complete_callback(
         return landing_url(state.return_path, "not_recorded")
 
     values: dict[str, Any] = {}
-    label: Optional[str] = None
+    label: str | None = None
     declared = loaded.flow.get("after_connect")
     if declared is True or isinstance(declared, dict):
         params: dict[str, str] = {}
@@ -1237,7 +1238,7 @@ async def _store_member(
     user_id: int,
     tokens: TokenSet,
     values: Mapping[str, Any],
-    label: Optional[str],
+    label: str | None,
 ) -> str:
     """The member's row: their token set, the managed values and the account
     label, ``connected``. A blocked member's row is left as it is. Answers the
@@ -1279,7 +1280,7 @@ async def _store_member(
     row.config, sealed = seal_tokens(tokens, config=config, secrets=secrets)
     row.account_label = label
     row.status = "connected"
-    row.updated_at = datetime.now(timezone.utc)
+    row.updated_at = datetime.now(UTC)
     await connections_service.store_connection_secrets(session, row, sealed)
     await session.commit()
     return "connected"
@@ -1291,7 +1292,7 @@ async def _store_community(
     guild_id: int,
     plugin_id: int,
     connection: Mapping[str, Any],
-    tokens: Optional[TokenSet],
+    tokens: TokenSet | None,
     values: Mapping[str, Any],
 ) -> str:
     """The community's own connection: the managed values, and the token set
@@ -1327,7 +1328,7 @@ async def _store_community(
         plugin_config_service.guild_connection_ref(plugin, connection_id)
         plugin.config_state = "unverified"
         plugin.config_state_detail = None
-        plugin.updated_at = datetime.now(timezone.utc)
+        plugin.updated_at = datetime.now(UTC)
         session.add(plugin)
         await guild_plugins_service.store_secrets(
             session, plugin, _replace_entry(all_secrets, connection_id, secrets)
@@ -1369,7 +1370,7 @@ async def _renewed(
     public_id: str,
     fields: Mapping[str, Any],
     tokens: TokenSet,
-) -> Optional[TokenSet]:
+) -> TokenSet | None:
     """A refreshed token set, the same one when it needs no refresh, or
     ``None`` when the grant is over."""
     now = int(time.time())
@@ -1409,8 +1410,8 @@ async def _hold_renewal(
 
 
 async def _member_row(
-    session: AsyncSession, *, plugin_id: Optional[int], connection_ref: str, lock: bool
-) -> Optional[GuildPluginUserConnection]:
+    session: AsyncSession, *, plugin_id: int | None, connection_ref: str, lock: bool
+) -> GuildPluginUserConnection | None:
     query = select(GuildPluginUserConnection).where(
         GuildPluginUserConnection.plugin_id == plugin_id,
         GuildPluginUserConnection.connection_ref == connection_ref,
@@ -1445,7 +1446,7 @@ async def member_token(
     public_id: str,
     connection_ref: str,
     guild_id: int,
-) -> Optional[TokenSet]:
+) -> TokenSet | None:
     """A member connection's access token, refreshed when it is about to
     expire.
 
@@ -1483,12 +1484,12 @@ async def member_token(
         return current
     if renewed is None:
         row.status = "expired"
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = datetime.now(UTC)
         session.add(row)
         await session.commit()
         raise ConnectionFlowError(PluginChannelMessages.CONNECTION_EXPIRED)
     row.config, sealed = seal_tokens(renewed, config=row.config, secrets=stored)
-    row.updated_at = datetime.now(timezone.utc)
+    row.updated_at = datetime.now(UTC)
     await connections_service.store_connection_secrets(session, row, sealed)
     await session.commit()
     return renewed
@@ -1635,8 +1636,8 @@ async def revocation_sender(
     guild_id: int,
     install_id: int,
     connection_id: str,
-    expires_at: Optional[int] = None,
-) -> Optional[Callable[[], Awaitable[None]]]:
+    expires_at: int | None = None,
+) -> Callable[[], Awaitable[None]] | None:
     """The request that ends one grant, ready to send, or ``None`` when there
     is nowhere to send it. Raises :class:`ConnectionFlowError` when the vendor
     values it needs are missing.
@@ -1682,7 +1683,7 @@ async def revocation_sender(
         if not tokens.get("access_token"):
             return None
         access: str = tokens["access_token"]
-        refresh_token: Optional[str] = tokens.get("refresh_token")
+        refresh_token: str | None = tokens.get("refresh_token")
         lapsed = expires_at is not None and expires_at <= int(time.time())
         if lapsed and not refresh_token:
             logger.info(

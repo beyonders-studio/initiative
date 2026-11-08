@@ -11,12 +11,11 @@ from sqlalchemy.exc import DBAPIError, ProgrammingError
 
 from app.db.schema_provisioning import (
     GuildRoleKind,
-    guild_role_name,
     drop_guild_schema,
+    guild_role_name,
     guild_schema_name,
     provision_guild_schema,
 )
-
 
 _GID = 990_140
 _GID_OTHER = 990_141

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+from datetime import UTC
 
 import pytest
 from PIL import Image
@@ -97,11 +98,11 @@ async def test_a_large_picture_gets_a_thumbnail_no_limit_counts(session, stored)
 async def test_an_archived_picture_gets_its_thumbnail_too(session, stored):
     """Archived content takes no writes, but a thumbnail of what is already
     there is not one."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     guild, file = await _picture(session, _png((1600, 1200)))
     archived = (await session.exec(select(File).where(File.id == file.id))).one()
-    archived.archived_at = datetime.now(timezone.utc)
+    archived.archived_at = datetime.now(UTC)
     session.add(archived)
     await session.commit()
 

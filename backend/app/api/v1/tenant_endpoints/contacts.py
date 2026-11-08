@@ -13,8 +13,8 @@ name. Holders of the surface edit it, and so does anyone given write on it.
 An initiative's content may link to one.
 """
 
-from datetime import datetime, timezone
-from typing import Annotated, Optional
+from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select
@@ -86,7 +86,7 @@ async def create_contact(
     """
     resource_access.refuse_plugin_sharing(guild_context, contact_in, "grants")
     initiative_id = contact_in.initiative_id
-    plugin: Optional[GuildPlugin] = None
+    plugin: GuildPlugin | None = None
     if initiative_id is None:
         plugin = await contacts_service.community_holder(
             session, current_user, guild_context
@@ -159,7 +159,7 @@ async def update_contact(
     if data:
         for field, value in data.items():
             setattr(contact, field, value)
-        contact.updated_at = datetime.now(timezone.utc)
+        contact.updated_at = datetime.now(UTC)
         session.add(contact)
         await session.commit()
     return await read_after_write(session, contact_id, current_user, guild_context)
@@ -205,7 +205,7 @@ async def move_contact(
     )
     contact.initiative = None
     contact.initiative_id = None
-    contact.updated_at = datetime.now(timezone.utc)
+    contact.updated_at = datetime.now(UTC)
     session.add(contact)
     await session.flush()
     await ownership_service.give_to_install(
@@ -228,7 +228,7 @@ async def move_contact(
 async def read_after_write(
     session: RLSSessionDep,
     contact_id: int,
-    user: Optional[User],
+    user: User | None,
     guild_context: ActorContext,
 ) -> ContactRead:
     """The contact a write answers with: re-read after the commit, serialized.

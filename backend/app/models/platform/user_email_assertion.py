@@ -12,7 +12,7 @@ no email claim is invented rather than asserted.
 **app_admin-only**, like ``user_emails`` itself.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer
 from sqlmodel import Field, Index, SQLModel
@@ -45,12 +45,12 @@ class UserEmailAssertion(SQLModel, table=True):
     )
 
     first_asserted_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     # Refreshed on every sign-in that carries the claim, so a directory that
     # has stopped asserting an address is visible as a stale one.
     last_asserted_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

@@ -17,8 +17,7 @@ right one starts the count over, and an account whose password is turned off
 is refused here too.
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,9 +44,9 @@ RECENT_PROOF_MINUTES = 10
 async def require_password(
     system_session: AsyncSession,
     user: User,
-    supplied: Optional[str],
+    supplied: str | None,
     *,
-    detail: Optional[str] = None,
+    detail: str | None = None,
 ) -> None:
     """Re-check the password, as a password change does.
 
@@ -99,9 +98,9 @@ async def require_password_or_recent_proof(
     request: Request,
     system_session: AsyncSession,
     user: User,
-    supplied: Optional[str],
+    supplied: str | None,
     *,
-    detail: Optional[str] = None,
+    detail: str | None = None,
 ) -> bool:
     """Ask for the password, or for a sign-in recent enough to speak for it.
 
@@ -133,7 +132,7 @@ async def require_password_or_recent_proof(
     ):
         raise _recent_proof_required()
     started = await chain_started_at(system_session, session_id=session_id)
-    if started is None or datetime.now(timezone.utc) - started > timedelta(
+    if started is None or datetime.now(UTC) - started > timedelta(
         minutes=RECENT_PROOF_MINUTES
     ):
         raise _recent_proof_required()

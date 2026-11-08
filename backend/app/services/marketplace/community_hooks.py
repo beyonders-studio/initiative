@@ -93,8 +93,8 @@ import logging
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import delete, func, insert, text, update
 from sqlmodel import col, select
@@ -110,19 +110,19 @@ from app.models.platform.plugin_community_hook import (
 )
 from app.models.platform.plugin_install import PluginInstall
 from app.services.marketplace import plugin_refs, registration_lookup
-from app.services.platform import identity_refs
 from app.services.marketplace.registration_lookup import RegistrationSnapshot
+from app.services.platform import identity_refs
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "ANSWERED_HOOK_NAMES",
     "BACKOFF_SECONDS",
     "COMMUNITY_HOOK_NAMES",
     "DONE_RETENTION",
     "KIND",
     "LATEST_WINS",
     "MAX_ATTEMPTS",
-    "ANSWERED_HOOK_NAMES",
     "call_now",
     "deliver_community_hook",
     "due_outside",
@@ -196,7 +196,7 @@ def _check_name(hook: str) -> None:
         raise UnknownCommunityHookError(f"not a community hook: {hook!r}")
 
 
-async def _container(public_id: str) -> Optional[RegistrationSnapshot]:
+async def _container(public_id: str) -> RegistrationSnapshot | None:
     """The plug-in's registration, when it is a container this deployment
     calls; a declarative plug-in has nothing to receive a hook."""
     registration = (await registration_lookup.load_registrations()).get(public_id)
@@ -220,7 +220,7 @@ def _row(
     public_id: str,
     hook: str,
     body: Mapping[str, Any],
-    install_id: Optional[int],
+    install_id: int | None,
     now: datetime,
 ) -> dict[str, Any]:
     return {
@@ -252,8 +252,8 @@ async def queue_community_hooks(
     guild_id: int,
     public_id: str,
     hooks: Sequence[str],
-    install_id: Optional[int] = None,
-    body: Optional[Mapping[str, Any]] = None,
+    install_id: int | None = None,
+    body: Mapping[str, Any] | None = None,
 ) -> bool:
     """Write ``hooks``, in order, on ``session``, and arm the community's
     timer, so they go once its transaction commits and not at all if it rolls
@@ -276,7 +276,7 @@ async def queue_community_hooks(
     if registration is not None and registration.declarative:
         # Initiative makes a declarative plug-in's calls itself: nobody to tell.
         return False
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await session.exec(
         insert(_TABLE).values(
             [
@@ -301,8 +301,8 @@ async def deliver_community_hook(
     guild_id: int,
     public_id: str,
     hook: str,
-    body: Optional[Mapping[str, Any]] = None,
-    install_id: Optional[int] = None,
+    body: Mapping[str, Any] | None = None,
+    install_id: int | None = None,
 ) -> bool:
     """Send ``hook`` to the plug-in ``public_id`` about community ``guild_id``,
     from outside any transaction about it: :func:`queue_community_hooks` on a
@@ -338,8 +338,8 @@ def status_changed(session: Any, guild_id: int) -> None:
 @dataclass(frozen=True)
 class _Outcome:
     #: ``delivered``, ``not_taken``, or ``None`` to try again.
-    outcome: Optional[str]
-    error: Optional[str] = None
+    outcome: str | None
+    error: str | None = None
 
 
 #: The community's enabled installs whose plug-in was last told a status other
@@ -403,7 +403,7 @@ async def _tell_status(session: AsyncSession, guild_id: int, now: datetime) -> N
 
 async def _current_body(
     hook: str, guild_id: int, public_id: str, stored: Mapping[str, Any]
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     """What a hook says when it is sent. A state hook says the state now: the
     community's status, or the newest signed entitlement statement as stored
     (``None`` when there is none, and nothing to send). Every other hook says what it was
@@ -443,7 +443,7 @@ async def _send(
     hook: str,
     guild_id: int,
     public_id: str,
-    install_id: Optional[int],
+    install_id: int | None,
     body: Mapping[str, Any],
 ) -> _Outcome:
     """Send one hook once, and say how it ended."""
@@ -457,7 +457,7 @@ async def _send(
     ):
         return _Outcome(None, "the plug-in is not reachable here")
 
-    guild_ref: Optional[str] = None
+    guild_ref: str | None = None
     if hook == "erase":
         # Nothing to tell it to forget when it calls the community nothing;
         # whatever else it holds a name for is dropped all the same.
@@ -493,7 +493,7 @@ async def _send(
     return _Outcome("delivered")
 
 
-def _opened(sealed: Any, salt: str) -> Optional[str]:
+def _opened(sealed: Any, salt: str) -> str | None:
     """A sealed token, opened to be sent."""
     from app.core.encryption import decrypt_field
 
@@ -544,7 +544,7 @@ async def _mark_status_told(
 async def _settle(
     row: PluginCommunityHook,
     outcome: _Outcome,
-    sent: Optional[Mapping[str, Any]] = None,
+    sent: Mapping[str, Any] | None = None,
 ) -> bool:
     """Record how one attempt ended and clear its claim, in a short
     transaction of its own, dropping the references an ``erase`` that is done
@@ -553,7 +553,7 @@ async def _settle(
     Only the sender still holding the claim it was given may settle: a claim
     that lapsed, or that another sender has since taken, records nothing and
     drops nothing, and answers ``False`` so this sender stops."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     lease = row.claimed_until
     if lease is None or lease <= now:
         logger.warning(
@@ -643,7 +643,7 @@ def _live(row: PluginCommunityHook, now: datetime) -> bool:
     return row.claimed_until is not None and row.claimed_until > now
 
 
-async def _claim_head(guild_id: int, public_id: str) -> Optional[PluginCommunityHook]:
+async def _claim_head(guild_id: int, public_id: str) -> PluginCommunityHook | None:
     """Claim the plug-in's next hook to send in the community, in a short
     transaction, or answer ``None``: nothing is due, or another sender holds
     the plug-in.
@@ -651,7 +651,7 @@ async def _claim_head(guild_id: int, public_id: str) -> Optional[PluginCommunity
     State hooks a newer one of their kind supersedes are settled first,
     whether or not they are due, so a send that failed never holds the current
     state back. A hook sent at once whose sender died is settled ``lapsed``."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     async with db_session.SystemSessionLocal() as session:
         await db_session.set_rls_context(session, Unattributed())
         await _claiming(session, guild_id, public_id)
@@ -708,7 +708,7 @@ async def _deliver_plugin(
     held while it is sent, so a plug-in that is down holds back only its own."""
     async with limit:
         while (row := await _claim_head(guild_id, public_id)) is not None:
-            sent: Optional[dict[str, Any]] = None
+            sent: dict[str, Any] | None = None
             try:
                 async with asyncio.timeout(SEND_DEADLINE.total_seconds()):
                     sent = await _current_body(
@@ -783,14 +783,14 @@ async def naming_closed(*, guild_id: int, public_id: str) -> bool:
 
 async def _claim_call(
     hook: str, *, guild_id: int, public_id: str, install_id: int
-) -> Optional[tuple[int, datetime]]:
+) -> tuple[int, datetime] | None:
     """Claim the plug-in for one hook sent at once, in a short transaction: a
     row of its own, claimed, and the claim it holds. ``None`` while another
     sender holds the plug-in. Raises ``HookNameRefused`` while an ``erase`` of
     it is waiting."""
     from app.services.tenant import plugin_connection_flows as flows
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     async with db_session.SystemSessionLocal() as session:
         await db_session.set_rls_context(session, Unattributed())
         await _claiming(session, guild_id, public_id)
@@ -829,7 +829,7 @@ async def _claim_call(
     return int(claimed), lease
 
 
-async def _settle_call(row_id: int, lease: datetime, error: Optional[str]) -> None:
+async def _settle_call(row_id: int, lease: datetime, error: str | None) -> None:
     """Record a hook sent at once, if its claim is still the one it was given:
     one that lapsed is left for the next claimer to settle ``lapsed``."""
     async with db_session.SystemSessionLocal() as session:
@@ -839,12 +839,12 @@ async def _settle_call(row_id: int, lease: datetime, error: Optional[str]) -> No
             .where(
                 _TABLE.c.id == row_id,
                 _TABLE.c.claimed_until == lease,
-                _TABLE.c.claimed_until > datetime.now(timezone.utc),
+                _TABLE.c.claimed_until > datetime.now(UTC),
             )
             .values(
                 attempts=1,
                 claimed_until=None,
-                done_at=datetime.now(timezone.utc),
+                done_at=datetime.now(UTC),
                 outcome="failed" if error else "answered",
                 last_error=(error or "")[:HOOK_ERROR_MAX_LENGTH] or None,
             )
@@ -860,7 +860,7 @@ async def call_now(
     guild_id: int,
     install_id: int,
     body: Mapping[str, Any],
-) -> Optional[Any]:
+) -> Any | None:
     """Send one of :data:`ANSWERED_HOOK_NAMES` now and return the plug-in's
     answer, holding the same lease the queue sends under: it waits up to
     :data:`CALL_WAIT_SECONDS` for a send in flight to finish, and raises
@@ -916,7 +916,7 @@ def _effective(
     return stale, [row for row in rows if row.id not in stale]
 
 
-async def _next_due(session: AsyncSession, guild_id: int) -> Optional[datetime]:
+async def _next_due(session: AsyncSession, guild_id: int) -> datetime | None:
     """When the community next has hook work: each plug-in's first hook still
     to send (now, if one of its state hooks is waiting to be superseded), or an
     answered row coming past its keeping. A hook queued behind one waiting
@@ -935,7 +935,7 @@ async def _next_due(session: AsyncSession, guild_id: int) -> Optional[datetime]:
     for row in rows:
         by_plugin.setdefault(row.public_id, []).append(row)
     due: list[datetime] = []
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for queue in by_plugin.values():
         stale, rest = _effective(queue)
         held = [row.claimed_until for row in queue if _live(row, now)]
@@ -959,7 +959,7 @@ async def _next_due(session: AsyncSession, guild_id: int) -> Optional[datetime]:
     return min(due) if due else None
 
 
-async def visit(_routed: AsyncSession, guild_id: int) -> Optional[datetime]:
+async def visit(_routed: AsyncSession, guild_id: int) -> datetime | None:
     """The ``plugin_hooks`` sweep's visit: tell installed plug-ins a status they
     have not been told, send the community's due hooks, delete answered ones
     past their keeping, and answer when there is next work.
@@ -971,7 +971,7 @@ async def visit(_routed: AsyncSession, guild_id: int) -> Optional[datetime]:
     (``claimed_until``), and at most :data:`SENDS_AT_ONCE` plug-ins are sent to
     at once.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     async with db_session.SystemSessionLocal() as session:
         await db_session.set_rls_context(session, Unattributed())
         await _tell_status(session, guild_id, now)
@@ -1003,7 +1003,7 @@ async def visit(_routed: AsyncSession, guild_id: int) -> Optional[datetime]:
         return await _next_due(session, guild_id)
 
 
-async def due_outside(guild_id: int, now: datetime) -> Optional[datetime]:
+async def due_outside(guild_id: int, now: datetime) -> datetime | None:
     """What the daily reconcile asks of the ``plugin_hooks`` sweep, read on the
     system engine since its rows are ``public``'s: ``now`` when an enabled
     install has not been told the community's status, else the visit's own

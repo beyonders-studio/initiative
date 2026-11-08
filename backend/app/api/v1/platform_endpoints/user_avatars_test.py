@@ -10,19 +10,19 @@ from sqlalchemy import text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.image_headers import validate_image
 from app.db.public_rls import platform_tier, role_name
 from app.models.platform.notification import Notification, NotificationType
 from app.models.platform.user import User, UserRole
-from app.core.image_headers import validate_image
 from app.models.platform.user_avatar import AVATAR_SPEC, UserAvatar
 from app.services.platform import user_avatars as service
 from app.services.platform.user_avatars_test import jpeg, png
+from app.testing import drain_notices
 from app.testing.factories import (
     create_federated_identity,
     create_user,
     get_auth_headers,
 )
-from app.testing import drain_notices
 
 
 async def _assume(session, tier: str, user_id: int) -> None:

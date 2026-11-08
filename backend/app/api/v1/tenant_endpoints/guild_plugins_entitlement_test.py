@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from typing import ClassVar
 
 import httpx
 import pytest
@@ -27,9 +28,6 @@ from app.models.platform.guild import CommunityRole
 from app.services import sweep_timers
 from app.services.marketplace import plugin_entitlements, tuf_registry
 from app.services.platform import billing_ping
-from app.testing.billing_boundary import served_changes
-from app.testing.billing_boundary import configure_outbound
-from app.testing.billing_managed import billing_manages_plans
 from app.services.tenant import plugin_connection_flows as flows
 from app.testing import (
     billing_guild_ref,
@@ -39,6 +37,8 @@ from app.testing import (
     entitlement_statement,
     marketplace_uid,
 )
+from app.testing.billing_boundary import configure_outbound, served_changes
+from app.testing.billing_managed import billing_manages_plans
 
 SERVICE_ID = "tests.paidco"
 SERVICE_UID = marketplace_uid("paidco")
@@ -102,7 +102,7 @@ def billing(monkeypatch):
     request this deployment makes to it."""
 
     class Billing:
-        sent: list[tuple[str, dict]] = []
+        sent: ClassVar[list[tuple[str, dict]]] = []
         answer: dict | None = None
         delay: float = 0.0
 

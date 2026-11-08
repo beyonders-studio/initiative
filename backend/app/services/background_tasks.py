@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from functools import partial
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from functools import partial
 
 from app.core import audit_context
 
@@ -68,75 +68,74 @@ async def hourly_pass() -> None:
     from app.services import notifications
     from app.services.platform import security_signals
 
-    await notifications.drop_spent_notifications(now=datetime.now(timezone.utc))
+    await notifications.drop_spent_notifications(now=datetime.now(UTC))
     await security_signals.sweep()
 
 
 def start_background_tasks() -> list[asyncio.Task]:
     from app.services import sweep_timers
-    from app.services.notifications import (
-        process_hold_summaries,
-        HOLD_SUMMARY_POLL_SECONDS,
-    )
-    from app.services.platform import email_outbox, notice_outbox
-    from app.services.platform import security_signals
-    from app.services.platform.presence import (
-        ACTIVITY_FLUSH_SECONDS,
-        process_activity_flush,
-    )
-    from app.services.oidc_refresh import (
-        process_oidc_refresh_sync,
-        OIDC_SYNC_POLL_SECONDS,
-    )
-    from app.services.platform.announcements import (
-        process_announcement_image_purge,
-        IMAGE_PURGE_POLL_SECONDS,
-    )
-    from app.services.platform.guild_purge import (
-        GUILD_PURGE_POLL_SECONDS,
-        process_guild_purges,
-    )
-    from app.services.platform.account_purge import (
-        ACCOUNT_PURGE_POLL_SECONDS,
-        process_account_purges,
-    )
-    from app.services.platform.identity_refs import (
-        IDENTITY_REF_SWEEP_POLL_SECONDS,
-        process_identity_ref_sweep,
-    )
-    from app.services.tenant.room_sink import ROOM_SWEEP_SECONDS, process_room_sweep
-    from app.services.platform.user_tokens import (
-        process_expired_token_purge,
-        TOKEN_PURGE_POLL_SECONDS,
+    from app.services.auth.held_changes import (
+        HOLD_SWEEP_POLL_SECONDS,
+        process_due_holds,
     )
     from app.services.auth.sessions import (
         SESSION_PURGE_POLL_SECONDS,
         process_dead_session_purge,
     )
-    from app.services.platform.jti_purge import (
-        process_jti_blocklist_purges,
-        JTI_PURGE_POLL_SECONDS,
+    from app.services.marketplace.tuf_registry import (
+        process_registry_refresh,
+        registry_available,
     )
+    from app.services.notifications import (
+        HOLD_SUMMARY_POLL_SECONDS,
+        process_hold_summaries,
+    )
+    from app.services.oidc_refresh import (
+        OIDC_SYNC_POLL_SECONDS,
+        process_oidc_refresh_sync,
+    )
+    from app.services.platform import email_outbox, notice_outbox, security_signals
     from app.services.platform.access_grants import (
         GRANT_EXPIRY_POLL_SECONDS,
         process_grant_expiry,
+    )
+    from app.services.platform.account_purge import (
+        ACCOUNT_PURGE_POLL_SECONDS,
+        process_account_purges,
+    )
+    from app.services.platform.announcements import (
+        IMAGE_PURGE_POLL_SECONDS,
+        process_announcement_image_purge,
     )
     from app.services.platform.guests import (
         GUEST_EXPIRY_POLL_SECONDS,
         end_expired_guests,
     )
-    from app.services.auth.held_changes import (
-        HOLD_SWEEP_POLL_SECONDS,
-        process_due_holds,
+    from app.services.platform.guild_purge import (
+        GUILD_PURGE_POLL_SECONDS,
+        process_guild_purges,
+    )
+    from app.services.platform.identity_refs import (
+        IDENTITY_REF_SWEEP_POLL_SECONDS,
+        process_identity_ref_sweep,
+    )
+    from app.services.platform.jti_purge import (
+        JTI_PURGE_POLL_SECONDS,
+        process_jti_blocklist_purges,
+    )
+    from app.services.platform.presence import (
+        ACTIVITY_FLUSH_SECONDS,
+        process_activity_flush,
     )
     from app.services.platform.ticket_notices import (
         TICKET_NOTICE_POLL_SECONDS,
         process_ticket_notices,
     )
-    from app.services.marketplace.tuf_registry import (
-        process_registry_refresh,
-        registry_available,
+    from app.services.platform.user_tokens import (
+        TOKEN_PURGE_POLL_SECONDS,
+        process_expired_token_purge,
     )
+    from app.services.tenant.room_sink import ROOM_SWEEP_SECONDS, process_room_sweep
 
     tasks = [
         # Every sweep that works community by community, in only the

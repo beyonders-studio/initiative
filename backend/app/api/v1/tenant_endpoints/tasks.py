@@ -1,5 +1,6 @@
-from datetime import datetime, timezone
-from typing import Annotated, List, Optional, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -8,28 +9,29 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.errors import CodedError
 from app.api import resource_access
 from app.api.actor_route import ActorRoute
 from app.api.deps import (
     ActorContext,
     ActorSessionDep,
     ActorUserDep,
+    GuildContextDep,
     IncludeDeletedDep,
     RLSSessionDep,
     SessionDep,
     UserSessionDep,
-    plugin_scope,
     get_current_active_user,
-    GuildContextDep,
+    plugin_scope,
 )
 from app.core import recurrence
+from app.core.errors import CodedError
 from app.core.messages import (
     ChecklistMessages,
     IdeaMessages,
     QueryMessages,
     TaskMessages,
 )
+from app.core.tools import KINDS, Tool
 from app.db.query import build_paginated_response, paginated_query
 from app.db.session import routed_guild_id
 from app.models.platform.user import User
@@ -40,15 +42,16 @@ from app.schemas.ai_generation import (
     GenerateChecklistResponse,
     GenerateDescriptionResponse,
 )
+from app.schemas.platform.access_grant import AccessGrantRead
+from app.schemas.platform.user import UserPublic
 from app.schemas.query import DateBucket, GroupRead, GroupsResponse
 from app.schemas.recurrence import OccurrenceScope, validate_task_recurrence
-from app.schemas.platform.access_grant import AccessGrantRead
 from app.schemas.tenant.task import (
-    ChecklistItem,
-    ChecklistItemToggle,
     CaseEvidenceRead,
     CaseIdeaRead,
     CaseMessageRead,
+    ChecklistItem,
+    ChecklistItemToggle,
     ColumnFillRead,
     IdeaJoin,
     TaskCaseRead,
@@ -59,27 +62,27 @@ from app.schemas.tenant.task import (
     TaskReorderRequest,
     TaskUpdate,
 )
-from app.schemas.platform.user import UserPublic
 from app.services import ai_generation as ai_generation_service
 from app.services import notifications as notifications_service
 from app.services.fields.grouping import GroupingError, group_rows
+from app.services.platform import ideas as ideas_service
 from app.services.tenant import archive as archive_service
 from app.services.tenant import attachments as attachments_service
-from app.services.tenant import column_limits
-from app.services.tenant import overwrites
-from app.services.tenant import required_fields
 from app.services.tenant import cases as cases_service
-from app.services.platform import ideas as ideas_service
+from app.services.tenant import (
+    column_limits,
+    named_people,
+    overwrites,
+    required_fields,
+    task_hierarchy,
+    task_queries,
+    task_series,
+)
+from app.services.tenant import descriptions as descriptions_service
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import task_checklist as checklist_service
-from app.services.tenant import task_hierarchy
 from app.services.tenant import task_creation as task_creation_service
-from app.core.tools import KINDS, Tool
-from app.services.tenant import named_people
-from app.services.tenant import descriptions as descriptions_service
-from app.services.tenant import task_queries
-from app.services.tenant import task_series
 from app.services.tenant import task_statuses as task_statuses_service
 from app.services.tenant import task_types as task_types_service
 from app.services.tenant.soft_delete import trash
@@ -181,7 +184,7 @@ _GOVERNING = resource_access.governing_tool("tasks")
 async def _writable_series(
     session: AsyncSession,
     task: Task,
-    current_user: Optional[User],
+    current_user: User | None,
     context: ActorContext,
 ) -> list[Task]:
     """Every other task of the task's series, once the caller may change each."""
@@ -205,7 +208,7 @@ async def _response(session: SessionDep, task_id: int) -> Task:
 async def list_my_tasks(
     session: UserSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
-    conditions: Optional[str] = Query(default=None),
+    conditions: str | None = Query(default=None),
     created: bool = Query(
         default=False,
         description="The tasks you created instead of the ones assigned to you",
@@ -213,8 +216,8 @@ async def list_my_tasks(
     include_archived: bool = Query(default=False, description="Include archived tasks"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=0, le=100),
-    sorting: Optional[str] = Query(default=None),
-    tz: Optional[str] = Query(default=None),
+    sorting: str | None = Query(default=None),
+    tz: str | None = Query(default=None),
 ) -> TaskListResponse:
     """Tasks assigned to the current user across every guild they belong to,
     or with ``created`` the tasks they created.
@@ -249,7 +252,7 @@ async def list_tasks(
     session: ActorSessionDep,
     current_user: ActorUserDep,
     guild_context: ProjectsRead,
-    conditions: Optional[str] = Query(
+    conditions: str | None = Query(
         default=None,
         description=(
             "JSON list of filter conditions, AND-ed together. Each object: "
@@ -263,11 +266,11 @@ async def list_tasks(
     include_archived: bool = Query(default=False, description="Include archived tasks"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=0, le=100),
-    sorting: Optional[str] = Query(
+    sorting: str | None = Query(
         default=None,
         description='JSON list of sort fields: [{"field": "due_date", "dir": "desc"}]',
     ),
-    tz: Optional[str] = Query(
+    tz: str | None = Query(
         default=None,
         description="IANA timezone name (e.g. America/Los_Angeles) for date_group calculation",
     ),
@@ -431,7 +434,7 @@ async def _insert_task(
             session, task, task_in.parent_task_id, user_id=guild_context.user_id
         )
 
-    _touch_project(project, datetime.now(timezone.utc))
+    _touch_project(project, datetime.now(UTC))
     await metadata_service.write_on_create(session, task, task_in.properties)
     return task
 
@@ -448,12 +451,12 @@ async def list_task_groups(
             "``groupings`` name it, or ``property:<id>``"
         ),
     ),
-    bucket: Optional[DateBucket] = Query(
+    bucket: DateBucket | None = Query(
         default=None, description="For a date: the bucket of the calendar it groups by"
     ),
-    conditions: Optional[str] = Query(default=None),
+    conditions: str | None = Query(default=None),
     include_archived: bool = Query(default=False),
-    tz: Optional[str] = Query(default=None),
+    tz: str | None = Query(default=None),
 ) -> GroupsResponse:
     """The groups of the task list these filters answer with, in the order the
     list shows them, and the groups each task is in."""
@@ -483,12 +486,12 @@ async def list_task_groups(
     )
 
 
-@router.get("/column-limits", response_model=List[ColumnFillRead])
+@router.get("/column-limits", response_model=list[ColumnFillRead])
 async def list_column_limits(
     session: ActorSessionDep,
     guild_context: ProjectsRead,
-    project_id: Annotated[List[int], Query(min_length=1, max_length=100)],
-) -> List[ColumnFillRead]:
+    project_id: Annotated[list[int], Query(min_length=1, max_length=100)],
+) -> list[ColumnFillRead]:
     """Each limited board column of the named projects the reader can open:
     its limit, and how many open tasks it holds. A project with no limits, or
     one the reader can't open, has none."""
@@ -598,7 +601,7 @@ async def take_task_case(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=TaskMessages.NOT_A_CASE
         )
-    _touch_project(task.project, datetime.now(timezone.utc))
+    _touch_project(task.project, datetime.now(UTC))
     await session.commit()
     return await _response(session, task.id)
 
@@ -884,10 +887,9 @@ async def _apply_update(
         task.recurrence_anchor, task.recurrence_anchor_count = (
             task_series.anchor_from_dates(task)
         )
-    if before is not None:
-        if scope == "all":
-            series = await _writable_series(session, task, current_user, guild_context)
-    now = datetime.now(timezone.utc)
+    if before is not None and scope == "all":
+        series = await _writable_series(session, task, current_user, guild_context)
+    now = datetime.now(UTC)
     task.updated_at = now
     sync_completed_at(
         task, task.task_status.category if task.task_status else None, now=now
@@ -1028,7 +1030,7 @@ async def move_task(
     default_status = await task_statuses_service.get_default_status(
         session, target_project.id
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     source_project = task.project
     # Its project's metadata goes onto the destination's of the same name and
     # type, and the rest is dropped.
@@ -1117,7 +1119,7 @@ async def duplicate_task(
     await column_limits.refuse_full_columns(
         session, guild_context, task.project_id, [copy]
     )
-    _touch_project(task.project, datetime.now(timezone.utc))
+    _touch_project(task.project, datetime.now(UTC))
     await session.commit()
     return await _response(session, copy.id)
 
@@ -1128,7 +1130,7 @@ async def delete_task(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-    scope: Optional[OccurrenceScope] = Query(default=None),
+    scope: OccurrenceScope | None = Query(default=None),
 ) -> None:
     """Trash the task. For a repeating one, ``this`` skips it so the series
     goes on (trashing it when the series has no more), ``following`` (the
@@ -1136,7 +1138,7 @@ async def delete_task(
     other task of the series too."""
     task = await resource_access.load_child(session, Task, task_id, access="write")
     project = task.project
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     skipped = (
         scope == "this"
         and bool(task.recurrence)
@@ -1170,7 +1172,7 @@ async def skip_task(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=TaskMessages.NOT_REPEATING,
         )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if not await task_series.skip(
         session,
         task,
@@ -1188,7 +1190,7 @@ async def skip_task(
     return await _response(session, task.id)
 
 
-@router.post("/reorder", response_model=List[TaskRead])
+@router.post("/reorder", response_model=list[TaskRead])
 async def reorder_tasks(
     reorder_in: TaskReorderRequest,
     session: RLSSessionDep,
@@ -1221,7 +1223,7 @@ async def reorder_tasks(
     if missing_ids:
         raise KINDS["task"].not_found()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     status_cache: dict[int, TaskStatus] = {}
     entering = [
         task_map[item.id]
@@ -1297,7 +1299,7 @@ async def archive_done_tasks(
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
     project_id: int = Query(..., description="Project to archive done tasks from"),
-    task_status_id: Optional[int] = Query(
+    task_status_id: int | None = Query(
         default=None, description="Specific done status to archive (optional)"
     ),
 ) -> ArchiveDoneResponse:
@@ -1328,7 +1330,7 @@ async def archive_done_tasks(
 
 @router.patch(
     "/{task_id}/checklist/{item_id}",
-    response_model=List[ChecklistItem],
+    response_model=list[ChecklistItem],
 )
 async def toggle_checklist_item(
     task_id: int,
@@ -1337,7 +1339,7 @@ async def toggle_checklist_item(
     session: ActorSessionDep,
     current_user: ActorUserDep,
     guild_context: ProjectsWrite,
-) -> List[ChecklistItem]:
+) -> list[ChecklistItem]:
     """Tick or untick one checklist item.
 
     Adding, renaming, reordering and deleting go through ``PATCH /tasks/{id}``
@@ -1346,7 +1348,7 @@ async def toggle_checklist_item(
     only that item, so two ticks on different items both land.
     """
     task = await resource_access.load_child(session, Task, task_id, access="write")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     result = await session.exec(
         checklist_service.toggle_statement(),
         params=checklist_service.toggle_params(
@@ -1423,7 +1425,7 @@ async def promote_checklist_item(
     )
     task = await _insert_task(task_in, session, current_user, guild_context)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     removed = await session.exec(
         checklist_service.remove_statement(),
         params=checklist_service.remove_params(task_id=parent.id, item=item, now=now),

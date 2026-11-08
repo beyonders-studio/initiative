@@ -5,7 +5,7 @@ per-guild schemas. These tests assert it routes into the guild schema rather
 than reading the empty ``public`` backup (which returned all-zero dashboards).
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.task import TaskStatusCategory
@@ -90,7 +90,7 @@ async def test_completion_stats_follow_completion_not_later_edits(
     actor = await acting_user(
         guild_role=CommunityRole.admin, initiative=True, project=True
     )
-    finished = datetime.now(timezone.utc) - timedelta(days=14)
+    finished = datetime.now(UTC) - timedelta(days=14)
     task = await create_task(
         session,
         actor.project,

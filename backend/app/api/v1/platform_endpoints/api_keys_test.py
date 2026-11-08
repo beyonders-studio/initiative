@@ -8,23 +8,23 @@ Tests the API key endpoints at /api/v1/me/api-keys including:
 - Authentication with API keys
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
 from app.models.platform.api_key import UserApiKey
 from app.models.platform.guild import CommunityRole
+from app.testing.audit import emitted
 from app.testing.factories import (
     create_guild,
     create_guild_membership,
     create_user,
     get_auth_headers,
 )
-from app.core.audit_events import AuditEventType
-from app.testing.audit import emitted
 
 
 async def test_list_api_keys_empty(client: AsyncClient, session: AsyncSession):
@@ -68,7 +68,7 @@ async def test_create_api_key_with_expiration(
     user = await create_user(session, email="test@example.com")
     headers = get_auth_headers(user)
 
-    expires = datetime.now(timezone.utc) + timedelta(days=30)
+    expires = datetime.now(UTC) + timedelta(days=30)
     payload = {
         "name": "Expiring Key",
         "expires_at": expires.isoformat(),
@@ -311,7 +311,7 @@ async def test_create_api_key_without_expiry_never_expires(
     assert forever.status_code == 201
     assert forever.json()["api_key"]["expires_at"] is None
 
-    far = (datetime.now(timezone.utc) + timedelta(days=3650)).isoformat()
+    far = (datetime.now(UTC) + timedelta(days=3650)).isoformat()
     long_lived = await client.post(
         "/api/v1/me/api-keys",
         headers=headers,

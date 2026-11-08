@@ -62,7 +62,7 @@ async def test_apple_association_waits_for_an_ios_app(client, monkeypatch):
 async def test_other_well_known_paths_are_not_the_app(client, monkeypatch, tmp_path):
     """A path the association routes do not serve is a 404, never the SPA's
     index page, even where the SPA bundle is present."""
-    import app.main as main
+    from app import main
 
     index = tmp_path / "index.html"
     index.write_text("<!doctype html><title>Initiative</title>")

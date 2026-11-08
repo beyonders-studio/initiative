@@ -4,7 +4,7 @@ envelope content (large payloads are staged behind storage and deleted on
 terminal states)."""
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import Field
 
@@ -96,9 +96,9 @@ class ContactCsvColumn(SanitizedBaseModel):
     column: int = Field(ge=0, lt=MAX_CSV_COLUMNS)
     target: ContactCsvTarget
     #: A detail's label, read from this column beside its value.
-    label_column: Optional[int] = Field(default=None, ge=0, lt=MAX_CSV_COLUMNS)
+    label_column: int | None = Field(default=None, ge=0, lt=MAX_CSV_COLUMNS)
     #: The initiative property a ``property`` column fills.
-    property_id: Optional[int] = None
+    property_id: int | None = None
 
 
 class ContactCsvPreview(SanitizedBaseModel):
@@ -117,7 +117,7 @@ class ContactCsvImportRequest(SanitizedBaseModel):
     what its columns hold, and where its contacts go — an initiative, or with
     none the community's contacts."""
 
-    initiative_id: Optional[int] = None
+    initiative_id: int | None = None
     #: The file itself, verbatim, as :class:`ForeignImportRequest` carries one.
     content: RawTextStr
     columns: list[ContactCsvColumn] = Field(max_length=MAX_CSV_COLUMNS)
@@ -131,8 +131,8 @@ class EntryResult(SanitizedBaseModel):
     type: str
     title: str
     status: str  # "created" | "failed" | "skipped"
-    error: Optional[str] = None  # short code, never content
-    detail: Optional[EnvelopeImportResult] = None
+    error: str | None = None  # short code, never content
+    detail: EnvelopeImportResult | None = None
 
 
 class BackupPlanInitiative(SanitizedBaseModel):
@@ -146,7 +146,7 @@ class BackupPlanInitiative(SanitizedBaseModel):
     # Set when the bundle files into an initiative that already exists rather
     # than creating one — every foreign-source import. ``proposed_name`` means
     # nothing then; this is where the content goes.
-    target_initiative_id: Optional[int] = None
+    target_initiative_id: int | None = None
 
 
 class BackupPlanPerson(SanitizedBaseModel):
@@ -160,9 +160,9 @@ class BackupPlanPerson(SanitizedBaseModel):
     """
 
     handle: str
-    name: Optional[str] = None
+    name: str | None = None
     comment_count: int = 0
-    suggested_user_id: Optional[int] = None
+    suggested_user_id: int | None = None
 
 
 class AtlassianPlanProperty(SanitizedBaseModel):
@@ -219,7 +219,7 @@ class AtlassianFetchSummary(SanitizedBaseModel):
     #: Why no sprint will come over, as an error code, when none will — the
     #: target initiative's calendars are off, or the importer cannot create
     #: one there.
-    sprints_skipped: Optional[str] = None
+    sprints_skipped: str | None = None
     #: Comments that will come over, and those visible only to a role or
     #: group at the source, left behind rather than shown to everybody.
     comments: int = 0
@@ -286,7 +286,7 @@ class BackupImportPlan(SanitizedBaseModel):
 
     source_community_name: str = ""
     app_version: str = ""
-    exported_at: Optional[str] = None
+    exported_at: str | None = None
     schema_version: int = 0
     initiatives: list[BackupPlanInitiative] = []
     asset_count: int = 0
@@ -298,7 +298,7 @@ class BackupImportPlan(SanitizedBaseModel):
     # inventoried, and for one that quotes nobody.
     people: list[BackupPlanPerson] = []
     # Only on a bundle this server fetched from an Atlassian site.
-    atlassian: Optional[AtlassianFetchSummary] = None
+    atlassian: AtlassianFetchSummary | None = None
 
 
 class EnvelopeImportPlan(SanitizedBaseModel):

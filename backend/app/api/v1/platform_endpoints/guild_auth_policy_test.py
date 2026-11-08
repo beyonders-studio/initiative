@@ -2,9 +2,9 @@
 session-satisfaction enforcement inside the guild RLS."""
 
 import json
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -19,11 +19,12 @@ from app.api.deps import (
     establish_guild_access,
 )
 from app.core import auth_context
-from app.db.schema_provisioning import GuildRoleKind, guild_role_name
-from app.db.session import set_rls_context
-from app.models.platform.guild import Guild, CommunityRole
 from app.core.login_methods import LoginMethod
 from app.core.rules import SetBy, SignInRequirement
+from app.db.request_context import SystemGuild
+from app.db.schema_provisioning import GuildRoleKind, guild_role_name
+from app.db.session import set_rls_context
+from app.models.platform.guild import CommunityRole, Guild
 from app.models.platform.rule import CommunityRule
 from app.models.platform.user import User, UserRole, UserStatus
 from app.models.platform.user_passkey import UserPasskey
@@ -31,10 +32,12 @@ from app.models.platform.user_totp import UserTotp
 from app.models.tenant.project import Project
 from app.services.auth.assurance import SECOND_FACTOR_AMR
 from app.services.platform import api_keys as api_keys_service
+from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.services.platform.ws_auth import authenticate_ws_token
+from app.testing import route_as
 from app.testing.actor import Actor
 from app.testing.factories import (
-    satisfied_claims_for,
     create_access_grant,
     create_auth_provider,
     create_federated_identity,
@@ -48,11 +51,8 @@ from app.testing.factories import (
     create_user,
     get_auth_token,
     guild_administration,
+    satisfied_claims_for,
 )
-from app.testing import route_as
-from app.db.request_context import SystemGuild
-from app.services.platform import app_settings as app_settings_service
-from app.services.platform import rules
 
 
 def _bearer(token: str) -> dict[str, str]:
@@ -140,7 +140,7 @@ async def test_the_seat_reads_how_many_each_rule_would_ask(
     await create_guild_provider_connection(session, guild=seat.guild, provider=provider)
     linked = await create_user(session)
     await create_guild_membership(session, user=linked, guild=seat.guild)
-    session.add(UserTotp(user_id=linked.id, confirmed_at=datetime.now(timezone.utc)))
+    session.add(UserTotp(user_id=linked.id, confirmed_at=datetime.now(UTC)))
     await create_federated_identity(session, linked, provider=provider)
     keyed = await create_user(session)
     await create_guild_membership(session, user=keyed, guild=seat.guild)
@@ -1366,7 +1366,7 @@ async def test_a_community_is_told_when_the_deployment_asks_everybody(
     """Its own box for a second factor has nothing left to add, so the page
     reads this and stops offering one. Asking only the platform rungs leaves a
     community's members untouched, so that box stays."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.core.login_methods import SecondFactorRequirement
     from app.models.platform.user_totp import UserTotp
@@ -1374,7 +1374,7 @@ async def test_a_community_is_told_when_the_deployment_asks_everybody(
     seat = await acting_user(guild_role=CommunityRole.superadmin)
     # Under ``everyone`` this admin is asked for a factor like anybody else,
     # so they hold one — which is the state the page is read in.
-    session.add(UserTotp(user_id=seat.user.id, confirmed_at=datetime.now(timezone.utc)))
+    session.add(UserTotp(user_id=seat.user.id, confirmed_at=datetime.now(UTC)))
     await session.commit()
     url = _settings(seat.guild.id)
 

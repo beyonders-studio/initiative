@@ -91,7 +91,7 @@ def test_no_guild_content_reads_a_person_from_the_users_table() -> None:
         for match in _re.finditer(
             r'^\s*(\w+):\s*(?:Optional\[|List\[)?"User"\]?\s*=\s*Relationship',
             path.read_text(),
-            _re.M,
+            _re.MULTILINE,
         ):
             offenders.append(f"{path.name}: {match.group(1)}")
     assert not offenders, (

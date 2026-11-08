@@ -11,8 +11,7 @@ governed by its project, a calendar event by its calendar — so the query filte
 on the sharing decision without re-walking those joins.
 """
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     Boolean,
@@ -60,7 +59,7 @@ class SearchEntry(SQLModel, table=True):
     )
     #: The initiative gating this row, or NULL for guild-level content (tags, a
     #: guild calendar) where the initiative gate has nothing to decide.
-    initiative_id: Optional[int] = Field(
+    initiative_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -70,8 +69,8 @@ class SearchEntry(SQLModel, table=True):
     )
     #: The ``Tool`` whose sharing governs this row, and the resource id to test
     #: against ``resource_grants``. NULL for rows carrying no sharing gate.
-    dac_tool: Optional[str] = Field(sa_column=Column(Text, nullable=True))
-    dac_id: Optional[int] = Field(sa_column=Column(Integer, nullable=True))
+    dac_tool: str | None = Field(sa_column=Column(Text, nullable=True))
+    dac_id: int | None = Field(sa_column=Column(Integer, nullable=True))
     #: Whether the source row is archived. Archived work stays indexed so it
     #: can still be found on purpose, and is left out of the answers nobody
     #: asked it for — pickers, and a search that did not opt in.
@@ -83,11 +82,11 @@ class SearchEntry(SQLModel, table=True):
         sa_column=Column(Boolean, nullable=False, server_default=text("false"))
     )
     title: str = Field(sa_column=Column(Text, nullable=False))
-    body: Optional[str] = Field(sa_column=Column(Text, nullable=True))
+    body: str | None = Field(sa_column=Column(Text, nullable=True))
     #: When this row's *searchable text* last changed — not the source row's
     #: ``updated_at``, which moves on writes the index deliberately ignores.
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
-    tsv: Optional[str] = Field(default=None, sa_column=Column(TSVECTOR, nullable=False))
+    tsv: str | None = Field(default=None, sa_column=Column(TSVECTOR, nullable=False))

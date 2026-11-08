@@ -16,9 +16,8 @@ one.
 """
 
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import (
     ARRAY,
@@ -26,9 +25,9 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
-    Index,
     Text,
     text,
 )
@@ -81,7 +80,7 @@ class CustomRole(CreatedByMixin, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     name: str = Field(
         sa_column=Column(
             String(length=CUSTOM_ROLE_NAME_MAX_LENGTH), nullable=False, unique=True
@@ -105,7 +104,7 @@ class CustomRole(CreatedByMixin, table=True):
         ),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
@@ -127,7 +126,7 @@ class CustomRoleMember(SQLModel, table=True):
     #: When the role was given, by the database. The standing applies it only
     #: from the holder's ``guild_memberships.joined_at`` on, so leaving and
     #: coming back does not bring an old role back.
-    assigned_at: Optional[datetime] = Field(
+    assigned_at: datetime | None = Field(
         default=None,
         sa_column=Column(
             DateTime(timezone=True), nullable=False, server_default=text("now()")
@@ -137,7 +136,7 @@ class CustomRoleMember(SQLModel, table=True):
     #: (:class:`CustomRoleClaimRule`), which a later sign-in through it may
     #: change or take back. ``None`` for a role somebody gave by hand, which the
     #: claims leave alone. A ``public.auth_providers`` id.
-    oidc_provider_id: Optional[int] = Field(
+    oidc_provider_id: int | None = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
 
@@ -158,7 +157,7 @@ class CustomRoleClaimRule(CreatedByMixin, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     #: A ``public.auth_providers`` id the community connects to.
     provider_id: int = Field(sa_column=Column(Integer, nullable=False))
     claim_value: str = Field(sa_column=Column(String(length=500), nullable=False))
@@ -173,6 +172,6 @@ class CustomRoleClaimRule(CreatedByMixin, table=True):
     #: Earlier first; the first matching rule wins.
     position: int = Field(default=0, sa_column=Column(Integer, nullable=False))
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

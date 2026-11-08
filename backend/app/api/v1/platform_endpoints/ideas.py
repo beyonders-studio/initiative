@@ -7,20 +7,20 @@ paced per account.
 
 from __future__ import annotations
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.deps import get_current_active_user, get_current_user_optional
-from app.db.query import build_paginated_response
 from app.core.messages import AuthMessages, IdeaMessages
+from app.db.query import build_paginated_response
 from app.models.platform.user import User
 from app.schemas.platform.idea import IdeaListRead, IdeaRead, IdeaStatusRead
 from app.services.platform import ideas as ideas_service
 
 router = APIRouter()
 
-OptionalReader = Annotated[Optional[User], Depends(get_current_user_optional)]
+OptionalReader = Annotated[User | None, Depends(get_current_user_optional)]
 Voter = Annotated[User, Depends(get_current_active_user)]
 
 
@@ -53,8 +53,8 @@ def _read(idea: ideas_service.IdeaRead) -> IdeaRead:
 @router.get("", response_model=IdeaListRead)
 async def list_ideas(
     reader: OptionalReader,
-    search: Annotated[Optional[str], Query(max_length=200)] = None,
-    status_id: Optional[int] = None,
+    search: Annotated[str | None, Query(max_length=200)] = None,
+    status_id: int | None = None,
     voted: bool = False,
     sort: ideas_service.IdeaSort = ideas_service.IdeaSort.votes,
     page: Annotated[int, Query(ge=1)] = 1,

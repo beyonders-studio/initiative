@@ -179,7 +179,7 @@
     "description": "Select a destination project within the current community. You can only move tasks to projects where you have permission to create new work.",
     "noProjects": "You don’t have any other writable projects available yet.",
     "searchPlaceholder": "Search projects…",
-    "statusResetWarning": "Moving this task will reset its status to ‘Backlog’.",
+    "statusResetWarning": "Moving this task sets its status to the destination project's default status.",
     "moving": "Moving…",
     "moveTask": "Move task"
   },
