@@ -51,6 +51,7 @@ import type { PropertyInputProps } from "@/ui/properties/PropertyInput";
 
 import type { EditableDetail } from "./LayoutEditor";
 import { editablePresets } from "./LayoutPresets";
+import { TaskSortPicker } from "./TaskSortPicker";
 import type { LayoutProject } from "./taskLists";
 
 /** A detail's words, kept under `key` in the layouts namespace. */
@@ -287,7 +288,8 @@ export const taskDetails = (project: LayoutProject): EditableDetail[] =>
       hiddenHelp: "layouts:hiddenHelp",
       parts: "layouts:",
     },
-    fields: TASK_DETAIL.fields,
+    fields: (definitions, plugins) =>
+      TASK_DETAIL.fields([...project.properties, ...definitions], plugins),
     preview: (tree) => <TaskPreview project={project} type={type} tree={tree} />,
   }));
 
@@ -395,7 +397,10 @@ export const taskPresets = (project: LayoutProject) =>
         onChange={onChange}
       />
     ),
-    sortable: (kind) => kind === "table",
+    sortControls: (list, value, onChange, fields) =>
+      list === "table" ? (
+        <TaskSortPicker value={value} onChange={onChange} fields={fields} />
+      ) : null,
   });
 
 /** The initiative calendar's presets: what its tasks are, and the properties
@@ -425,7 +430,6 @@ export const calendarPresets = (
         />
       </div>
     ),
-    sortable: () => false,
   });
 
 /** What each tool the whole initiative shares lays out: its item's detail,

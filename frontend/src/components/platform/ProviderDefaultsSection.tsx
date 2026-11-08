@@ -14,6 +14,7 @@
  * had not spoken.
  */
 
+import { Pencil, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -27,9 +28,11 @@ import {
 } from "@/hooks/useSettings";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { RowActionsMenu } from "@/ui/row-actions-menu";
 
 const ProviderDefaultRow = ({ provider }: { provider: AuthProviderOwnerRead }) => {
   const { t } = useTranslation("settings");
@@ -84,26 +87,30 @@ const ProviderDefaultRow = ({ provider }: { provider: AuthProviderOwnerRead }) =
               : t("providerDefaults.noAnswer")}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={open}>
-            {current ? t("providerDefaults.change") : t("providerDefaults.answer")}
-          </Button>
-          {current && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
+        {current ? (
+          <RowActionsMenu subject={provider.display_name}>
+            <DropdownMenuItem onSelect={open}>
+              <Pencil className="h-4 w-4" />
+              {t("providerDefaults.change")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
               className="text-destructive"
-              onClick={() =>
+              onSelect={() =>
                 clearDefault.mutate(undefined, {
                   onSuccess: () => toast.success(t("providerDefaults.withdrawn")),
                 })
               }
             >
+              <Undo2 className="h-4 w-4" />
               {t("providerDefaults.withdraw")}
-            </Button>
-          )}
-        </div>
+            </DropdownMenuItem>
+          </RowActionsMenu>
+        ) : (
+          <Button type="button" variant="outline" size="sm" onClick={open}>
+            {t("providerDefaults.answer")}
+          </Button>
+        )}
       </div>
 
       {editing && (

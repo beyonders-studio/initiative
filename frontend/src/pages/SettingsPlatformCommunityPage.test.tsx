@@ -45,6 +45,7 @@ vi.mock("@/hooks/useSettings", () => ({
       direct_messages_enabled: config.directMessages,
       deleted_community_retention_days: config.retentionDays,
       on_hold_community_deletion_days: config.holdDays,
+      deleted_account_retention_days: null,
       engagement_ranking_enabled: true,
       guests_enabled: config.guests,
       max_guest_days: 365,
@@ -217,6 +218,12 @@ describe("SettingsPlatformCommunityPage", () => {
   });
 });
 
+/** Open a figure's dialog from its row. */
+const change = (rule: string) =>
+  userEvent.click(screen.getByRole("button", { name: `Change ${rule}` }));
+
+const save = () => screen.getByRole("button", { name: "Save" });
+
 describe("the policy new accounts start on", () => {
   it("shows what this deployment ships with", async () => {
     renderPage();
@@ -239,21 +246,30 @@ describe("the policy new accounts start on", () => {
       default_dm_policy: "community",
     });
   });
+
+  it("states the policy while messaging is off, rather than offering it", () => {
+    config.directMessages = false;
+    renderPage();
+
+    expect(screen.queryByLabelText("Direct messages for new accounts")).not.toBeInTheDocument();
+    expect(screen.getByText("Private")).toBeInTheDocument();
+    expect(screen.getByText(/used once direct messages are on/)).toBeInTheDocument();
+  });
 });
 
 describe("how long deleted communities are kept", () => {
   it("shows the deployment's window and saves a new one", async () => {
     config.communityDirectory = true;
     renderPage();
+    expect(screen.getByText("90 days")).toBeInTheDocument();
 
-    const box = (await screen.findByLabelText("Keep communities for (days)")) as HTMLInputElement;
+    await change("Keeping deleted communities");
+    const box = screen.getByLabelText("Keep communities for (days)") as HTMLInputElement;
     expect(box.value).toBe("90");
 
     await userEvent.clear(box);
     await userEvent.type(box, "30");
-    await userEvent.click(
-      screen.getByRole("button", { name: "Save how long communities are kept" })
-    );
+    await userEvent.click(save());
 
     expect(updateMutate).toHaveBeenCalledWith({
       community_directory_enabled: true,
@@ -264,11 +280,9 @@ describe("how long deleted communities are kept", () => {
   it("takes a blank box as never destroy", async () => {
     renderPage();
 
-    const box = (await screen.findByLabelText("Keep communities for (days)")) as HTMLInputElement;
-    await userEvent.clear(box);
-    await userEvent.click(
-      screen.getByRole("button", { name: "Save how long communities are kept" })
-    );
+    await change("Keeping deleted communities");
+    await userEvent.clear(screen.getByLabelText("Keep communities for (days)"));
+    await userEvent.click(save());
 
     expect(updateMutate).toHaveBeenCalledWith({
       community_directory_enabled: false,
@@ -279,13 +293,13 @@ describe("how long deleted communities are kept", () => {
   it("shows a blank box where the deployment keeps them", async () => {
     config.retentionDays = null;
     renderPage();
+    expect(screen.getByText("Never destroy")).toBeInTheDocument();
 
-    const box = (await screen.findByLabelText("Keep communities for (days)")) as HTMLInputElement;
+    await change("Keeping deleted communities");
+    const box = screen.getByLabelText("Keep communities for (days)") as HTMLInputElement;
     expect(box.value).toBe("");
     // Nothing to save until it is changed.
-    expect(
-      screen.getByRole("button", { name: "Save how long communities are kept" })
-    ).toBeDisabled();
+    expect(save()).toBeDisabled();
   });
 });
 
@@ -293,14 +307,13 @@ describe("how long communities stay on hold", () => {
   it("shows the deployment's window and saves a new one", async () => {
     renderPage();
 
-    const box = (await screen.findByLabelText("Delete after (days on hold)")) as HTMLInputElement;
+    await change("Deleting communities on hold");
+    const box = screen.getByLabelText("Delete after (days on hold)") as HTMLInputElement;
     expect(box.value).toBe("30");
 
     await userEvent.clear(box);
     await userEvent.type(box, "60");
-    await userEvent.click(
-      screen.getByRole("button", { name: "Save how long communities stay on hold" })
-    );
+    await userEvent.click(save());
 
     expect(updateMutate).toHaveBeenCalledWith({
       community_directory_enabled: false,
@@ -311,11 +324,9 @@ describe("how long communities stay on hold", () => {
   it("takes a blank box as never delete", async () => {
     renderPage();
 
-    const box = (await screen.findByLabelText("Delete after (days on hold)")) as HTMLInputElement;
-    await userEvent.clear(box);
-    await userEvent.click(
-      screen.getByRole("button", { name: "Save how long communities stay on hold" })
-    );
+    await change("Deleting communities on hold");
+    await userEvent.clear(screen.getByLabelText("Delete after (days on hold)"));
+    await userEvent.click(save());
 
     expect(updateMutate).toHaveBeenCalledWith({
       community_directory_enabled: false,
@@ -335,18 +346,25 @@ describe("guests", () => {
     });
   });
 
+  it("states the longest stay while guests are off, rather than offering it", () => {
+    renderPage();
+
+    expect(screen.getByText("365 days")).toBeInTheDocument();
+    expect(screen.getByText(/used once guests are allowed/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Change Longest guest stay" })).toBeNull();
+  });
+
   it("saves the longest a guest may stay", async () => {
     config.guests = true;
     renderPage();
 
-    const box = (await screen.findByLabelText(
-      "Longest a guest may stay (days)"
-    )) as HTMLInputElement;
+    await change("Longest guest stay");
+    const box = screen.getByLabelText("Longest a guest may stay (days)") as HTMLInputElement;
     expect(box.value).toBe("365");
 
     await userEvent.clear(box);
     await userEvent.type(box, "30");
-    await userEvent.click(screen.getByRole("button", { name: "Save the longest guest stay" }));
+    await userEvent.click(save());
 
     expect(updateMutate).toHaveBeenCalledWith({
       community_directory_enabled: false,
@@ -381,15 +399,17 @@ describe("who may join and create", () => {
 
   it("saves 0 as no daily limit", async () => {
     renderPage();
+    expect(screen.getByText("5 communities a day")).toBeInTheDocument();
 
-    const box = (await screen.findByLabelText(
+    await change("Daily limit per account");
+    const box = screen.getByLabelText(
       "Communities one account may create per day"
-    )) as HTMLInputElement;
+    ) as HTMLInputElement;
     expect(box.value).toBe("5");
 
     await userEvent.clear(box);
     await userEvent.type(box, "0");
-    await userEvent.click(screen.getByRole("button", { name: "Save the daily community limit" }));
+    await userEvent.click(save());
 
     expect(updateMutate).toHaveBeenCalledWith({
       community_directory_enabled: false,
@@ -397,31 +417,28 @@ describe("who may join and create", () => {
     });
   });
 
-  it("leaves the daily limit alone while creation is off", async () => {
+  it("states the daily limit while creation is off, rather than offering it", () => {
     config.creation = false;
     renderPage();
 
-    expect(
-      await screen.findByLabelText("Communities one account may create per day")
-    ).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Save the daily community limit" })).toBeDisabled();
+    expect(screen.getByText("5 communities a day")).toBeInTheDocument();
+    expect(screen.getByText(/used once anyone can create a community/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Change Daily limit per account" })).toBeNull();
   });
 });
 
 describe("the time between community exports", () => {
   it("saves a new wait", async () => {
     renderPage();
+    expect(screen.getByText("48 hours")).toBeInTheDocument();
 
-    const box = (await screen.findByLabelText(
-      "Hours between community exports"
-    )) as HTMLInputElement;
+    await change("Time between exports");
+    const box = screen.getByLabelText("Hours between community exports") as HTMLInputElement;
     expect(box.value).toBe("48");
 
     await userEvent.clear(box);
     await userEvent.type(box, "24");
-    await userEvent.click(
-      screen.getByRole("button", { name: "Save the time between community exports" })
-    );
+    await userEvent.click(save());
 
     expect(updateMutate).toHaveBeenCalledWith({
       community_directory_enabled: false,
@@ -432,10 +449,9 @@ describe("the time between community exports", () => {
   it("will not save a blank box", async () => {
     renderPage();
 
-    await userEvent.clear(await screen.findByLabelText("Hours between community exports"));
+    await change("Time between exports");
+    await userEvent.clear(screen.getByLabelText("Hours between community exports"));
 
-    expect(
-      screen.getByRole("button", { name: "Save the time between community exports" })
-    ).toBeDisabled();
+    expect(save()).toBeDisabled();
   });
 });

@@ -16,9 +16,11 @@ import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
 import { taskDetails, taskPresets } from "@/components/layouts/details";
 import { LayoutEditor } from "@/components/layouts/LayoutEditor";
+import { taskLists } from "@/components/layouts/taskLists";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { useProject, useProjectTaskStatuses, useProjectTaskTypes } from "@/hooks/useProjects";
+import { useProperties } from "@/hooks/useProperties";
 import { useRouteId } from "@/hooks/useRouteId";
 import { instanceTarget, useInstanceLayouts, useSaveLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -36,20 +38,25 @@ export const ProjectLayoutEditorPage = () => {
   const project = useProject(id).data;
   const statuses = useProjectTaskStatuses(id).data;
   const types = useProjectTaskTypes(id).data;
+  const properties = useProperties({
+    owner: id === null ? undefined : { kind: "project", id },
+    enabled: id !== null,
+  }).data;
   const set = useInstanceLayouts(Tool.project, id).data;
   const save = useSaveLayouts(instanceTarget(Tool.project, id ?? 0));
   const plugins = useLayoutPlugins(project?.initiative_id, "task");
   const editing = useMemo(
     () =>
-      project && statuses && types
-        ? { id: project.id, initiativeId: project.initiative_id, statuses, types }
+      project && statuses && types && properties
+        ? { id: project.id, initiativeId: project.initiative_id, properties, statuses, types }
         : null,
-    [project, statuses, types]
+    [project, statuses, types, properties]
   );
+  const lists = useMemo(() => (editing ? taskLists(editing) : null), [editing]);
   const details = useMemo(() => (editing ? taskDetails(editing) : []), [editing]);
   const presets = useMemo(() => (editing ? taskPresets(editing) : null), [editing]);
 
-  if (!project || !editing || !set || !presets) return null;
+  if (!project || !set || !lists || !presets) return null;
   if (!set.can_configure) return <SettingsPermissionRequired scope="tool" />;
   return (
     <LayoutEditor
@@ -58,7 +65,7 @@ export const ProjectLayoutEditorPage = () => {
       key={project.id}
       t={t as TranslateFn}
       initiativeId={project.initiative_id}
-      project={editing}
+      lists={lists}
       presets={presets}
       details={details}
       plugins={plugins}

@@ -14,7 +14,6 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { NO_DEFINITIONS, useCreateProperty, useOwnedDefinitions } from "@/hooks/useProperties";
-import { TASK_LIST_SHAPE, taskFields } from "@/lib/layouts/tasks";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { host } from "@/ui/host";
@@ -50,7 +49,7 @@ import {
   startHistory,
   withCard,
 } from "@/ui/layouts/draft";
-import { type FieldDef, type LayoutEnv, propertyFieldId, withDisplays } from "@/ui/layouts/fields";
+import { type FieldDef, type LayoutEnv, propertyFieldId } from "@/ui/layouts/fields";
 import { detailLayoutOf, type LayoutChange, listLayouts } from "@/ui/layouts/layoutSet";
 import type { LayoutNode } from "@/ui/layouts/tree";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
@@ -65,7 +64,7 @@ import {
 } from "@/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
-import { CanvasFrame, type CanvasTools, LayoutCanvas, type PreviewWidth } from "./LayoutCanvas";
+import { CanvasFrame, type CanvasTools, type PreviewWidth } from "./CanvasFrame";
 import {
   type Adders,
   AddPicker,
@@ -78,16 +77,20 @@ import {
 } from "./LayoutOutline";
 import type { EditablePresets } from "./LayoutPresets";
 import { DetailLayoutSettings, LayoutProperties, ListLayoutSettings } from "./LayoutSettingsPanel";
-import { type LayoutProject, TaskListSettings } from "./taskLists";
 
 const noop = () => {};
 
-/** No fields: where a list shows a property is its own card or columns, or
- *  its shape's, whatever plug-ins add. */
+/** No fields: those of a list with nothing of its own to draw here. Where a
+ *  list shows a property is its own card or columns, or its shape's, whatever
+ *  plug-ins add, so that is read with none. */
 const NO_FIELDS: ReadonlyMap<string, FieldDef> = new Map();
 
 /** What the part edits change while nothing is open. */
 const EMPTY_TREE: LayoutNode = { type: "layout", children: [] };
+
+/** The shape of a list with nothing of its own to draw here: a calendar's,
+ *  which offers its presets alone. */
+const NO_SHAPE: ListShape = { card: { type: "card" }, columns: [], columnFields: new Set() };
 
 const WIDTHS: { width: PreviewWidth; icon: typeof Laptop }[] = [
   { width: "desktop", icon: Laptop },
@@ -127,15 +130,32 @@ export type LayoutEdits = {
   resetLayout: () => void;
 };
 
-/** What a target lists where that is not a project's tasks (a collection's
- *  files): the fields its lists can show, what they draw as shipped, and the
- *  open list drawn with the target's own items, its parts marked. */
-export type EditableLists = {
+/** What a target's lists draw the open one on the canvas with: it, its
+ *  fields, the frame that marks its parts, and the edits that change it. */
+export type ListPreview = {
+  layout: ListLayout;
   fields: ReadonlyMap<string, FieldDef>;
+  /** `list` drawn on the canvas, with `bar` above it: controls of the list's
+   *  own, which, unlike it, are used. */
+  frame: (list: ReactNode, bar?: ReactNode) => ReactNode;
+  edits: LayoutEdits;
+  /** A save is under way, and nothing changes until it answers. */
+  locked: boolean;
+};
+
+/** What a target lists (a project's tasks, a collection's files): the
+ *  fields its lists can show, what they draw as shipped, the open list drawn
+ *  with the target's own items, and its settings. */
+export type EditableLists = {
+  /** Its fields, by id: the built-ins, the properties of `definitions`, and
+   *  the plug-ins'. */
+  fields: (definitions: PropertyDefinitionRead[], plugins: FieldDef[]) => Map<string, FieldDef>;
   shape: ListShape;
-  /** `fields` as the open list draws them: its scales as it says. */
-  preview: (layout: ListLayout, fields: ReadonlyMap<string, FieldDef>) => ReactNode;
-  /** Whose metadata a field made in the editor may be: this collection's. */
+  /** The open list, its parts marked, drawn in `frame`; its scales as its
+   *  `displays` say. */
+  preview: (preview: ListPreview) => ReactNode;
+  /** Whose metadata a field made in the editor may be: the project's or the
+   *  collection's. */
   owner?: MetadataOwner;
   /** What a list is, as a key: what its settings say of it. */
   help: (kind: ListLayoutReadKind) => string;
@@ -290,7 +310,6 @@ const stillThere = (selection: Selection, tree: LayoutNode, columns: string[]): 
 export const LayoutEditor = ({
   t,
   initiativeId,
-  project,
   lists,
   details,
   presets,
@@ -306,9 +325,8 @@ export const LayoutEditor = ({
    *  and what the editor says of them. */
   t: LayoutEnv["t"];
   initiativeId: number;
-  /** The project whose lists these are, drawn with its tasks. A target with
-   *  no project offers its lists' presets alone, or draws its `lists`. */
-  project?: LayoutProject;
+  /** Its lists, drawn with its items. A target without offers its lists'
+   *  presets alone. */
   lists?: EditableLists;
   details: EditableDetail[];
   /** The presets its lists offer; a target with no lists has none. */
@@ -340,7 +358,7 @@ export const LayoutEditor = ({
   const [active, setActive] = useState<string>(
     initialKind && offered.includes(initialKind as ListLayoutReadKind)
       ? initialKind
-      : project || lists
+      : lists
         ? draft.opensOn
         : details[0]
           ? detailKey(details[0])
@@ -349,7 +367,7 @@ export const LayoutEditor = ({
   const [selected, setSelected] = useState<Selection>(LAYOUT_SELECTED);
   const openDetail = details.find((detail) => detailKey(detail) === active);
   const onDetail = openDetail !== undefined;
-  const shape = lists?.shape ?? TASK_LIST_SHAPE;
+  const shape = lists?.shape ?? NO_SHAPE;
   const current: ListLayout | null = onDetail
     ? null
     : {
@@ -384,18 +402,12 @@ export const LayoutEditor = ({
 
   // The owner whose metadata its fields may be: a project's tasks', or a
   // collection's files'.
-  const owner: MetadataOwner | undefined =
-    lists?.owner ?? (project ? { kind: "project", id: project.id } : undefined);
-  const { data: definitions = NO_DEFINITIONS } = useOwnedDefinitions({
-    initiativeId,
-    owner: project ? owner : undefined,
-  });
+  const owner = lists?.owner;
+  const { data: definitions = NO_DEFINITIONS } = useOwnedDefinitions({ initiativeId });
   const createProperty = useCreateProperty();
   // A detail's fields are its own; a list's are its target's.
   const fields = useMemo(
-    () =>
-      (!openDetail && lists?.fields) ||
-      (openDetail?.fields ?? taskFields)(definitions, plugins.fields),
+    () => (openDetail ?? lists)?.fields(definitions, plugins.fields) ?? NO_FIELDS,
     [lists, openDetail, definitions, plugins]
   );
   // The tree the part edits change.
@@ -799,7 +811,7 @@ export const LayoutEditor = ({
       {/* A screen too narrow to edit on keeps the draft, and says so. */}
       {!wide ? (
         <p className="p-6 text-muted-foreground text-sm">{t("layouts:compact")}</p>
-      ) : current && ((project && presets) || lists) ? (
+      ) : current && lists ? (
         <div className="grid min-h-0 flex-1 grid-cols-[16rem_minmax(0,1fr)_18rem]">
           <aside className="min-h-0 border-r">
             <ListLayoutOutline
@@ -815,26 +827,23 @@ export const LayoutEditor = ({
             />
           </aside>
           <main className="min-h-0">
-            {project ? (
-              <LayoutCanvas
-                projectId={project.id}
-                initiativeId={project.initiativeId}
-                statuses={project.statuses}
-                layout={current}
-                fields={fields}
-                width={width}
-                selection={selection}
-                onSelect={setSelected}
-                tools={tools}
-                onGroupingsChange={(groupings) =>
-                  edits.changeGroupings(groupings, current.definition.group_by ?? null)
-                }
-              />
-            ) : lists ? (
-              <CanvasFrame width={width} selection={selection} onSelect={setSelected} tools={tools}>
-                {lists.preview(current, withDisplays(fields, current.definition.displays))}
-              </CanvasFrame>
-            ) : null}
+            {lists.preview({
+              layout: current,
+              fields,
+              frame: (list, bar) => (
+                <CanvasFrame
+                  width={width}
+                  selection={selection}
+                  onSelect={setSelected}
+                  tools={tools}
+                  bar={bar}
+                >
+                  {list}
+                </CanvasFrame>
+              ),
+              edits,
+              locked: saving,
+            })}
           </main>
           <aside className="min-h-0 overflow-y-auto border-l">
             <ListLayoutSettings
@@ -842,7 +851,7 @@ export const LayoutEditor = ({
               name={listName(current.kind)}
               layout={current}
               presets={presets}
-              help={lists ? lists.help(current.kind) : `layouts:listHelp.${current.kind}`}
+              help={lists.help(current.kind)}
               opensFirst={draft.opensOn === current.kind}
               shown={{
                 value: !hiddenOf(current.kind),
@@ -850,18 +859,7 @@ export const LayoutEditor = ({
               }}
               stored={draft.lists[current.kind] != null}
               fields={fields}
-              settings={
-                project ? (
-                  <TaskListSettings
-                    layout={current}
-                    fields={fields}
-                    statuses={project.statuses}
-                    edits={edits}
-                  />
-                ) : (
-                  lists?.settings?.(current, fields, edits)
-                )
-              }
+              settings={lists.settings?.(current, fields, edits)}
               selection={selection}
               edits={edits}
               locked={saving}

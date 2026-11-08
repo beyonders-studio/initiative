@@ -1,5 +1,8 @@
 import { type ReactNode, useId } from "react";
+import { useTranslation } from "react-i18next";
 
+import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
 import { FieldContext } from "@/ui/field";
 import { Label } from "@/ui/label";
@@ -99,6 +102,9 @@ export const SettingsSection = ({
 
 export interface SettingsRowProps {
   label: ReactNode;
+  /** The setting's current value, for a row that states it rather than
+   *  holding a control. Shown in the foreground, ahead of the description. */
+  value?: ReactNode;
   description?: ReactNode;
   /** The control's id, for something else that names it; one is made otherwise. */
   htmlFor?: string;
@@ -109,6 +115,9 @@ export interface SettingsRowProps {
   /** A button or badge at the end of the row in place of a control. It names
    *  itself, so the label stays text. */
   action?: ReactNode;
+  /** Opens the dialog that changes the value: draws a Change button, named
+   *  for the row, at its end. */
+  onChange?: () => void;
   /** Shown under the row, for what the control opens up when it is on. */
   below?: ReactNode;
 }
@@ -122,15 +131,19 @@ export interface SettingsRowProps {
  */
 export const SettingsRow = ({
   label,
+  value,
   description,
   htmlFor,
   children,
   action,
+  onChange,
   below,
 }: SettingsRowProps) => {
+  const { t } = useTranslation("settings");
   const madeId = useId();
   const id = htmlFor ?? madeId;
-  const descriptionId = description ? `${id}-description` : undefined;
+  const said = value != null || Boolean(description);
+  const descriptionId = said ? `${id}-description` : undefined;
   return (
     <div className="space-y-3 border-b pb-4 last:border-b-0 last:pb-0">
       <div className="flex flex-wrap items-center justify-between gap-2 gap-x-6">
@@ -142,8 +155,10 @@ export const SettingsRow = ({
           ) : (
             <p className="font-medium text-sm">{label}</p>
           )}
-          {description ? (
+          {said ? (
             <p id={descriptionId} className="text-muted-foreground text-sm">
+              {value != null ? <span className="text-foreground">{value}</span> : null}
+              {value != null && description ? " · " : null}
               {description}
             </p>
           ) : null}
@@ -155,9 +170,51 @@ export const SettingsRow = ({
             </FieldContext>
           </div>
         ) : null}
-        {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
+        {action || onChange ? (
+          <div className="flex shrink-0 items-center gap-2">
+            {action}
+            {onChange ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-label={
+                  typeof label === "string"
+                    ? t("settingsSection.changeRule", { rule: label })
+                    : undefined
+                }
+                onClick={onChange}
+              >
+                {t("settingsSection.change")}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       {below}
     </div>
+  );
+};
+
+/**
+ * What a change reaches once it saves, a line each, shown in a dialog above
+ * its Save button. A line with nothing to say is left out, and with none left
+ * nothing is shown.
+ */
+export const WhenYouSave = ({ lines }: { lines: (string | false | null | undefined)[] }) => {
+  const { t } = useTranslation("settings");
+  const said = lines.filter((line): line is string => Boolean(line));
+  if (said.length === 0) return null;
+  return (
+    <Alert role="note" className="border-transparent bg-muted">
+      <AlertTitle>{t("settingsSection.whenYouSave")}</AlertTitle>
+      <AlertDescription>
+        <ul className="list-disc space-y-1 pl-4">
+          {said.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </AlertDescription>
+    </Alert>
   );
 };
