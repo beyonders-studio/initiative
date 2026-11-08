@@ -661,10 +661,11 @@ def retire(cut: str, replaced: list[Path]) -> dict[str, list[Path]]:
     return done
 
 
-def restore(written: list[Path]) -> None:
+def restore(written: list[Path], done: dict[str, list[Path]]) -> None:
+    """Put back what the collapse wrote, deleted and edited."""
     for path in written:
         path.unlink(missing_ok=True)
-    _git("checkout", "HEAD", "--", "backend")
+    _git("checkout", "HEAD", "--", *(str(p) for p in done["deleted"] + done["edited"]))
 
 
 def tidy(paths: list[Path]) -> None:
@@ -728,15 +729,15 @@ def main() -> int:
         build(found, "head")
         want = asyncio.run(_shape(found))
 
-    written = write_baseline(args.release, cut, shot)
     done = retire(cut, replaced)
+    written = write_baseline(args.release, cut, shot)
     try:
         with server("after") as found:
             print("Building the collapsed chain to head ...", flush=True)
             build(found, "head")
             got = asyncio.run(_shape(found))
     except BaseException:
-        restore(written)
+        restore(written, done)
         raise
     differences = [
         line
@@ -746,7 +747,7 @@ def main() -> int:
         )
     ]
     if differences:
-        restore(written)
+        restore(written, done)
         print("\n".join(differences))
         print(f"\n{len(differences)} differences; the tree is back as it was.")
         return 1
