@@ -20,7 +20,6 @@ import { queryScope } from "@/lib/widgets/provenance";
 import { sourceDescriptor } from "@/lib/widgets/sources";
 import { localized, type WidgetMeta } from "@/lib/widgets/widgetMeta";
 import { Button } from "@/ui/button";
-import { dateTimeFormat } from "@/ui/lib/intl";
 import { cn } from "@/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
@@ -48,11 +47,6 @@ export function WidgetProvenance({
   className,
 }: WidgetProvenanceProps) {
   const { t, i18n } = useTranslation(["dashboards", "tasks", "common"]);
-
-  const _formatDate = useMemo(() => {
-    const format = dateTimeFormat(i18n.language, { dateStyle: "medium" });
-    return (epoch: number) => format.format(new Date(epoch));
-  }, [i18n.language]);
 
   // What a statement read, answered by the server rather than parsed here: what
   // a statement resolves to is the validator's answer, and a second reading of

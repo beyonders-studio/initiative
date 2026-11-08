@@ -15,7 +15,6 @@
   },
   "include": [
     "vite.config.ts",
-    "vite.config.d.ts",
     "vitest.config.ts",
     "capacitor.config.ts",
     "electron/content-policy.ts",

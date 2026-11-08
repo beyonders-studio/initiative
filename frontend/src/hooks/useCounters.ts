@@ -80,11 +80,8 @@ const useCounterWrite = <TData extends CounterRead | CounterGroupRead, TVariable
 
 const counterGroups = TOOL_HOOKS[Tool.counter_group];
 
-export const useCounterGroupsList = counterGroups.useList;
 export const useCounterGroup = counterGroups.useDetail;
 export const useUpdateCounterGroup = counterGroups.useUpdate;
-export const useDeleteCounterGroup = counterGroups.useDelete;
-export const useSetCounterGroupGrants = counterGroups.useSetGrants;
 
 // ── Counter mutations ───────────────────────────────────────────────────────
 

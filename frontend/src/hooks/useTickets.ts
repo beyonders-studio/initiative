@@ -35,13 +35,9 @@ import {
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useApiMutation, useCommunityMutation } from "@/hooks/useApiMutation";
-import { docsUrl } from "@/lib/links";
 import { queryClient } from "@/lib/queryClient";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
-
-/** Where somebody is sent when there is neither a form nor an address. */
-export const FAQ_URL = docsUrl("faq/");
 
 /** A ticket's one line at most this long, as the column behind it. */
 export const SUBJECT_MAX = 200;

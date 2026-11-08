@@ -1,4 +1,4 @@
-import { keepPreviousData, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQueryClient } from "@tanstack/react-query";
 
 import {
   extendCommunityGuest,
@@ -25,10 +25,8 @@ import {
   exportUsersCsv,
   getListDecorationPacksQueryKey,
   getListMyDecorationsQueryKey,
-  getListRosterQueryKey,
   getListUsersQueryKey,
   installDecorationPack,
-  listRoster,
   removeDecorationPack,
   updateMe,
   useListDecorationPacks,
@@ -62,33 +60,6 @@ export const useUsers = (
   return useListUsers(communityId, params, {
     // Keep the page on screen while the next one (or the next search) loads.
     query: { placeholderData: keepPreviousData, ...options },
-  });
-};
-
-/** People per page of the sidebar roster. */
-const ROSTER_PAGE_SIZE = 50;
-
-/**
- * The active community's people roster, grown a page at a time.
- *
- * Presence is read when the page is served and not pushed, so it refetches
- * every minute while it is open. A guest has no roster to read.
- */
-export const useCommunityRoster = () => {
-  const communityId = useActiveCommunityId();
-  const communityWide = Boolean(useCommunities().activeCommunity?.can.community_wide);
-  return useInfiniteQuery({
-    queryKey: getListRosterQueryKey(communityId),
-    queryFn: ({ pageParam }) =>
-      listRoster(communityId, {
-        page: pageParam,
-        page_size: ROSTER_PAGE_SIZE,
-      }),
-    initialPageParam: 1,
-    getNextPageParam: (last) => (last.has_next ? last.page + 1 : undefined),
-    enabled: communityId > 0 && communityWide,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
   });
 };
 

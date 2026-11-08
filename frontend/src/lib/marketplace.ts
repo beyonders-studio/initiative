@@ -52,7 +52,6 @@ export const DEFAULT_COMMUNITY_SHELF: CommunityShelf = ListingKind.dashboard;
 
 const LISTING_KINDS: ReadonlySet<string> = new Set(Object.values(ListingKind));
 const COMMUNITY_SHELF_KINDS: ReadonlySet<string> = new Set(COMMUNITY_SHELVES);
-const USER_SHELF_KINDS: ReadonlySet<string> = new Set(USER_SHELVES);
 
 const isListingKind = (value: unknown): value is ListingKind =>
   typeof value === "string" && LISTING_KINDS.has(value);
@@ -76,9 +75,6 @@ export const parseListingKind = (value: unknown): ListingKind | undefined =>
  *  a person's shelf, a typo, nothing at all — opens the default shelf. */
 export const parseCommunityShelf = (value: unknown): CommunityShelf =>
   isCommunityShelf(value) ? value : DEFAULT_COMMUNITY_SHELF;
-
-/** Whether this kind is bought by a person rather than by a community. */
-export const isUserShelf = (kind: ListingKind): boolean => USER_SHELF_KINDS.has(kind);
 
 /** The region of a BCP 47 tag (`en-US` → `US`), or null when it names none. */
 const regionOf = (tag: string | undefined): string | null => {

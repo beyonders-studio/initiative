@@ -132,13 +132,6 @@ const parseSheet = (
   };
 };
 
-/** A brand-new, empty workbook: one sheet, default canvas. */
-export const emptySpreadsheetContent = (): SpreadsheetContent => ({
-  schema_version: SPREADSHEET_SCHEMA_VERSION,
-  kind: "spreadsheet",
-  sheets: [parseSheet(undefined, DEFAULT_SHEET_ID, "Sheet1")],
-});
-
 /**
  * Coerce an arbitrary ``file.content`` blob into the canonical v3
  * workbook. Never throws — the backend is the authority on hard rejects,

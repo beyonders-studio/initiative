@@ -2,7 +2,6 @@ export { buildActivityEntry } from "./activity.factory";
 export {
   buildCalendarEvent,
   buildCalendarEventSummary,
-  buildEventAttendee,
   resetCounter as resetCalendarEventCounter,
 } from "./calendarEvent.factory";
 export { ownerCan, readerCan, writerCan } from "./can";
@@ -130,6 +129,7 @@ import { resetCounter as resetShareRequestCounter } from "./shareRequest.factory
 import { resetCounter as resetTagCounter } from "./tag.factory";
 import { resetCounter as resetTaskCounter } from "./task.factory";
 import { resetCounter as resetTaskTypeCounter } from "./taskType.factory";
+import { resetCounter as resetTrashCounter } from "./trash.factory";
 import { resetCounter as resetUserCounter } from "./user.factory";
 import { resetCounter as resetWikiCounter } from "./wiki.factory";
 
@@ -160,4 +160,5 @@ export function resetFactories(): void {
   resetContactCounter();
   resetCalendarEventCounter();
   resetShareRequestCounter();
+  resetTrashCounter();
 }

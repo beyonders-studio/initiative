@@ -11,5 +11,3 @@ export const SettingsCommunityTrashPage = () => (
     <TrashTable variant="community" showPurgeAction />
   </SettingsSection>
 );
-
-export default SettingsCommunityTrashPage;

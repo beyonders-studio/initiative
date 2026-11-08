@@ -5,7 +5,6 @@ import { ListingKind } from "@/api/generated/initiativeAPI.schemas";
 import {
   COMMUNITY_SHELVES,
   DEFAULT_COMMUNITY_SHELF,
-  isUserShelf,
   minimumAgeFor,
   parseCommunityShelf,
   parseListingKind,
@@ -22,11 +21,6 @@ describe("who a listing is offered to", () => {
     const placed = [...USER_SHELVES, ...COMMUNITY_SHELVES, ...UNSHELVED_KINDS];
     expect(new Set(placed).size).toBe(placed.length);
     expect(new Set(placed)).toEqual(new Set(Object.values(ListingKind)));
-  });
-
-  it("sells a profile pack to a person", () => {
-    expect(isUserShelf(ListingKind.profile_pack)).toBe(true);
-    expect(isUserShelf(ListingKind.dashboard)).toBe(false);
   });
 });
 

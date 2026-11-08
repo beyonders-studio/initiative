@@ -377,11 +377,6 @@ export const wikiFileRoute = (
  */
 export const entityRefRoute = (refType: string, id: number): string => `/go/${refType}/${id}`;
 
-/** The router path param carrying a tool entity's id, e.g. "counterGroupId".
- *  Every tool's detail/settings route names its param this way, so the shared
- *  settings page reads the id without a per-tool lookup. */
-export const toolParamName = (tool: Tool): string => `${toolCamelSingular(tool)}Id`;
-
 /** "counter_group" → "counter-group". The KEBAB SINGULAR: envelope
  * discriminator and entity-ref segment. */
 export const toolKebabSingular = (tool: Tool): string => tool.replaceAll("_", "-");
@@ -389,16 +384,6 @@ export const toolKebabSingular = (tool: Tool): string => tool.replaceAll("_", "-
 /** Export endpoint (relative to /c/{communityId}), e.g. "/exports/counter_group".
  * It takes the selection as `ids`. */
 export const toolExportEndpoint = (tool: Tool): string => `/exports/${tool}`;
-
-/**
- * The `{tool}_id` field that names one tool entity in a payload, e.g.
- * "counter_group_id".
- *
- * One spelling, two uses: the comment column a thread hangs off (backend
- * `_COMMENT_PARENTS`) and the id the realtime bus puts in a comment envelope.
- * They agree because they are this rule.
- */
-export const toolIdParam = (tool: Tool): string => `${tool}_id`;
 
 /** The envelope ``type`` discriminator a tool's single-entity export emits —
  * the same value its importer registers under: the kebab-singular. */
@@ -499,9 +484,6 @@ export const NO_RELATIONS_PANEL: ReadonlySet<Tool> = new Set<Tool>([
   // the one that writes itself is the better answer for a wiki.
   Tool.wiki,
 ]);
-
-/** Whether this tool's own detail page shows a relations panel. */
-export const showsRelations = (tool: Tool): boolean => !NO_RELATIONS_PANEL.has(tool);
 
 /**
  * Tools whose pages do NOT carry the activity drawer, and why. Stated as an

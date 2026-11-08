@@ -20,7 +20,7 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "tailwind.config.ts", "vite.config.d.ts"],
+  "include": ["src"],
   "exclude": ["src/__tests__", "src/**/*.test.ts", "src/**/*.test.tsx"],
   "references": [
     {

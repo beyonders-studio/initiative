@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildInitiative } from "@/__tests__/factories";
 import { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { isCreatableFromName, linkableToolTypes } from "@/lib/references";
+import { linkableToolTypes } from "@/lib/references";
 import { TOOLS, toolViewPermission } from "@/lib/tools";
 
 // Every master switch on, derived from the registry rather than listed: a new
@@ -39,21 +39,5 @@ describe("what [[ ]] can reach", () => {
     expect(types).not.toContain(SearchEntityType.task);
     expect(types).not.toContain(SearchEntityType.calendar_event);
     expect(types).not.toContain(SearchEntityType.tag);
-  });
-});
-
-describe("what [[ ]] can create", () => {
-  it("will not put back a tool the initiative turned off", () => {
-    const initiative = enabled({ counter_groups_enabled: false });
-    expect(isCreatableFromName(SearchEntityType.counter_group, initiative)).toBe(false);
-    expect(isCreatableFromName(SearchEntityType.file, initiative)).toBe(true);
-  });
-
-  it("creates nothing until the initiative is known", () => {
-    expect(isCreatableFromName(SearchEntityType.file, null)).toBe(false);
-  });
-
-  it("creates no task, however it is spelled", () => {
-    expect(isCreatableFromName(SearchEntityType.task, enabled())).toBe(false);
   });
 });

@@ -29,7 +29,6 @@ import {
   NON_EXPORTABLE_TOOLS,
   PARENT_TOOL,
   SIDEBAR_TOOLS,
-  showsRelations,
   singularOf,
   TOOL_ICONS,
   TOOL_SETTINGS_SECTIONS,
@@ -43,7 +42,6 @@ import {
   toolInPath,
   toolListRoute,
   toolNavLabelKey,
-  toolParamName,
   toolPascalPlural,
   toolPlural,
   toolRouteSegment,
@@ -235,7 +233,7 @@ describe("tool routes", () => {
   // Without this a tool could ship with a clickable card and nowhere to land.
   it("every tool has its per-entity detail route", () => {
     for (const tool of TOOLS) {
-      const file = `${INITIATIVE_ROUTES}/${toolRouteSegment(tool)}/$${toolParamName(tool)}/index.tsx`;
+      const file = `${INITIATIVE_ROUTES}/${toolRouteSegment(tool)}/$${toolCamelSingular(tool)}Id/index.tsx`;
       expect(communityRouteFiles, `missing detail route file ${file}`).toContain(file);
     }
   });
@@ -244,7 +242,7 @@ describe("tool routes", () => {
   // absence of this check is how a tool shipped with no way to do either.
   it("every tool has its per-entity settings route", () => {
     for (const tool of TOOLS) {
-      const file = `${INITIATIVE_ROUTES}/${toolRouteSegment(tool)}/$${toolParamName(tool)}/settings.tsx`;
+      const file = `${INITIATIVE_ROUTES}/${toolRouteSegment(tool)}/$${toolCamelSingular(tool)}Id/settings.tsx`;
       expect(communityRouteFiles, `missing settings route file ${file}`).toContain(file);
     }
   });
@@ -253,7 +251,7 @@ describe("tool routes", () => {
   // A missing file is a tab that navigates to a blank page.
   it("every tool has a route per settings section", () => {
     for (const tool of TOOLS) {
-      const settings = `${INITIATIVE_ROUTES}/${toolRouteSegment(tool)}/$${toolParamName(tool)}/settings`;
+      const settings = `${INITIATIVE_ROUTES}/${toolRouteSegment(tool)}/$${toolCamelSingular(tool)}Id/settings`;
       for (const section of TOOL_SETTINGS_SECTIONS) {
         const file = section === "details" ? `${settings}/index.tsx` : `${settings}/${section}.tsx`;
         expect(communityRouteFiles, `missing settings section route file ${file}`).toContain(file);
@@ -286,8 +284,6 @@ describe("tool routes", () => {
 
   it("derives the route param name from the enum", () => {
     expect(toolCamelSingular(Tool.counter_group)).toBe("counterGroup");
-    expect(toolParamName(Tool.counter_group)).toBe("counterGroupId");
-    expect(toolParamName(Tool.project)).toBe("projectId");
   });
 });
 
@@ -364,7 +360,7 @@ describe("tool relations", () => {
     // not offer them has to be named in NO_RELATIONS_PANEL with its reason,
     // rather than simply never having been wired up.
     const wired = toolsWithRelationsPanel();
-    const missing = TOOLS.filter((tool) => showsRelations(tool) && !wired.has(tool));
+    const missing = TOOLS.filter((tool) => !NO_RELATIONS_PANEL.has(tool) && !wired.has(tool));
     expect(missing, `no ToolRelationsPanel wired for ${missing.join(", ")}`).toEqual([]);
   });
 

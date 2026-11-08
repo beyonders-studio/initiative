@@ -50,4 +50,4 @@ export const HOME_WIDGETS: Record<HomeWidgetType, HomeWidgetDefinition> = {
   clock: { icon: Clock, Component: ClockWidget, Settings: ClockSettings },
 };
 
-export type { HomeWidgetDefinition, HomeWidgetProps, HomeWidgetSettingsProps } from "./types";
+export type { HomeWidgetDefinition } from "./types";

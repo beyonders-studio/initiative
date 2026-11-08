@@ -34,15 +34,6 @@ export interface EventTiming {
  * saved with — or null while the end falls before the start. An all-day event
  * runs from the start day's midnight to the end of its last day.
  */
-export function useEventTiming(timing: EventTiming): { start_at: string; end_at: string } | null {
-  const { allDay, startDate, startTime, endDate, endTime, startInstant, endInstant } = timing;
-  return useMemo(
-    () => eventRange({ allDay, startDate, startTime, endDate, endTime, startInstant, endInstant }),
-    [allDay, startDate, startTime, endDate, endTime, startInstant, endInstant]
-  );
-}
-
-/** {@link useEventTiming}'s range, worked out where a hook cannot be used. */
 export function eventRange(timing: EventTiming): { start_at: string; end_at: string } | null {
   const { allDay, startDate, startTime, endDate, endTime, startInstant, endInstant } = timing;
   if (!datesAreValid(allDay, startDate, startTime, endDate, endTime, startInstant, endInstant))

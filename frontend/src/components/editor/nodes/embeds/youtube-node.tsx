@@ -10,7 +10,6 @@ import type {
   EditorConfig,
   ElementFormatType,
   LexicalEditor,
-  LexicalNode,
   NodeKey,
   Spread,
 } from "lexical";
@@ -158,10 +157,4 @@ export class YouTubeNode extends DecoratorBlockNode {
 
 export function $createYouTubeNode(videoID: string): YouTubeNode {
   return new YouTubeNode(videoID);
-}
-
-export function $isYouTubeNode(
-  node: YouTubeNode | LexicalNode | null | undefined
-): node is YouTubeNode {
-  return node instanceof YouTubeNode;
 }

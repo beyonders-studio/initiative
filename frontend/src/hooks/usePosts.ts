@@ -49,8 +49,6 @@ const posts = TOOL_HOOKS[Tool.post];
 export const usePost = posts.useDetail;
 export const useCreatePost = posts.useCreate;
 export const useUpdatePost = posts.useUpdate;
-export const useDeletePost = posts.useDelete;
-export const useSetPostGrants = posts.useSetGrants;
 
 // ── Queries ─────────────────────────────────────────────────────────────────
 

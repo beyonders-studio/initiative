@@ -34,7 +34,6 @@ import type { QueryOpts } from "@/types/query";
 // each one reads and the invalidation each one fires.
 
 const wikis = TOOL_HOOKS[Tool.wiki];
-export const useWikisList = wikis.useList;
 export const useWiki = wikis.useDetail;
 export const useUpdateWiki = wikis.useUpdate;
 export const useDeleteWiki = wikis.useDelete;
