@@ -30,7 +30,7 @@ const editedBody = { root: { children: [{ type: "edited" }] } };
 
 // Stands in for Lexical, exposing the one thing these tests drive: a body edit,
 // reported back the way the real editor reports one.
-vi.mock("@/components/editor/initiative/editor", () => ({
+vi.mock("@/components/editor/editor", () => ({
   Editor: ({ onSerializedChange }: { onSerializedChange: (state: unknown) => void }) => (
     <button type="button" onClick={() => onSerializedChange(editedBody)}>
       edit the body

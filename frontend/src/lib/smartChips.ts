@@ -16,7 +16,7 @@ import {
   type SmartChipState,
   SmartChipTone,
 } from "@/api/generated/initiativeAPI.schemas";
-import { CHIP_TONE_CLASSES } from "@/components/editor/editor-ui/chip-tones";
+import { CHIP_TONE_CLASSES } from "@/ui/editor/editor-ui/chip-tones";
 
 /** How the parts of a reference are joined — mirrors `REF_SEPARATOR`. */
 const SEPARATOR = ":";

@@ -52,7 +52,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 // draws one loads it on demand, and a static import here would pull it back
 // into the shared chunk for all of them.
 const Editor = lazy(() =>
-  import("@/components/editor/initiative/editor").then((m) => ({ default: m.Editor }))
+  import("@/components/editor/editor").then((m) => ({ default: m.Editor }))
 );
 
 const PageBodySkeleton = () => (

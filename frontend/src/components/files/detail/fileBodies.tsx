@@ -31,7 +31,7 @@ import { sanitizeUrl } from "@/ui/lib/safeUrl";
 import { cn } from "@/ui/lib/utils";
 
 const Editor = lazy(() =>
-  import("@/components/editor/initiative/editor").then((m) => ({ default: m.Editor }))
+  import("@/components/editor/editor").then((m) => ({ default: m.Editor }))
 );
 const UploadedFileViewer = lazy(() =>
   import("@/components/files/UploadedFileViewer").then((m) => ({

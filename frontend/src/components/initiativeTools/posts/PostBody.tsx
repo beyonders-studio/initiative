@@ -8,7 +8,7 @@ import { Skeleton } from "@/ui/skeleton";
 // The editor is the largest thing in the bundle and a board is often the first
 // page someone lands on, so it arrives on demand rather than in the route chunk.
 const Editor = lazy(() =>
-  import("@/components/editor/initiative/editor").then((m) => ({ default: m.Editor }))
+  import("@/components/editor/editor").then((m) => ({ default: m.Editor }))
 );
 
 interface PostBodyProps {
