@@ -5,7 +5,7 @@ is the connection.** A community's own row replaces the deployment's outright â€
 nothing merges â€” and a community that has said nothing inherits.
 """
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import auth_context

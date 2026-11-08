@@ -9,7 +9,7 @@ under each operator config, not about access control.
 from __future__ import annotations
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from app.core.config import CAPACITOR_NATIVE_ORIGINS, settings
 from app.core.version import get_min_desktop_version, get_min_native_version

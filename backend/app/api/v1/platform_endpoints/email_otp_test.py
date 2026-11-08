@@ -2,7 +2,7 @@
 
 from datetime import UTC
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.security import decode_session_token

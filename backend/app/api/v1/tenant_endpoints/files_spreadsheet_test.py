@@ -8,7 +8,7 @@ frontend; these tests are about the durable storage shape.
 from typing import Any
 
 import pytest
-from httpx import AsyncClient, Response
+from httpx2 import AsyncClient, Response
 
 from app.models.platform.guild import CommunityRole
 from app.testing import Actor

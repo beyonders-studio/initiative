@@ -43,7 +43,7 @@ import json
 from collections.abc import Mapping
 from typing import Any
 
-import httpx
+import httpx2
 from sqlalchemy import exists
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -200,7 +200,7 @@ async def _act(
     element: str | None,
     guild_id: int,
     user_id: int,
-    transport: httpx.AsyncBaseTransport | None,
+    transport: httpx2.AsyncBaseTransport | None,
 ) -> None:
     """Do what a declarative action declares, as the SDK's ``runAction``
     does: the call its endpoint makes, when it names one, with ``params``,
@@ -227,7 +227,7 @@ async def _act(
     if endpoint is not None:
 
         async def read(
-            request: httpx.Request | plugin_data.Answered,
+            request: httpx2.Request | plugin_data.Answered,
         ) -> dict[str, Any]:
             return await plugin_data._read_body(request, transport=transport)
 
@@ -291,7 +291,7 @@ async def run_action(
     age_allows: bool,
     params: Mapping[str, Any] | None = None,
     element: str | None = None,
-    transport: httpx.AsyncBaseTransport | None = None,
+    transport: httpx2.AsyncBaseTransport | None = None,
 ) -> dict[str, Any]:
     """Run one of the install's actions on one item for the reader, and return
     the values the install shows on it afterwards, by key.
@@ -405,7 +405,7 @@ async def run_action(
         session.expunge_all()
         await session.rollback()
 
-        async def read(request: httpx.Request | plugin_data.Answered) -> None:
+        async def read(request: httpx2.Request | plugin_data.Answered) -> None:
             await plugin_data._read_body(request, transport=transport)
 
         await plugin_data._call_plugin(

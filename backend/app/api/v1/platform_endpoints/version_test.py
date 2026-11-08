@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import httpx
+import httpx2
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from app.api.v1.platform_endpoints import version as version_endpoint
 from app.schemas.base import MAX_PLAIN_TEXT_LENGTH
@@ -69,7 +69,7 @@ async def test_latest_version_keeps_the_last_answer_while_offline(
     client: AsyncClient, latest, caplog
 ):
     await client.get("/api/v1/version/latest")
-    latest["answer"] = httpx.ConnectError("no route to host")
+    latest["answer"] = httpx2.ConnectError("no route to host")
 
     for _ in range(2):
         _expire()
@@ -82,7 +82,7 @@ async def test_latest_version_keeps_the_last_answer_while_offline(
 
 
 async def test_latest_version_is_none_when_never_reached(client: AsyncClient, latest):
-    latest["answer"] = httpx.ConnectError("no route to host")
+    latest["answer"] = httpx2.ConnectError("no route to host")
     response = await client.get("/api/v1/version/latest")
     assert response.json() == {"version": None}
 
@@ -99,14 +99,14 @@ async def test_latest_version_is_the_highest_published_release(monkeypatch):
         {"tag_name": "v0.9.0", "draft": False, "prerelease": False},
     ]
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         assert str(request.url).startswith(version_endpoint._RELEASES_URL)
-        return httpx.Response(200, json=releases)
+        return httpx2.Response(200, json=releases)
 
-    real_client = httpx.AsyncClient
+    real_client = httpx2.AsyncClient
 
     def client_with(**kwargs):
-        return real_client(transport=httpx.MockTransport(handler), **kwargs)
+        return real_client(transport=httpx2.MockTransport(handler), **kwargs)
 
-    monkeypatch.setattr(version_endpoint.httpx, "AsyncClient", client_with)
+    monkeypatch.setattr(version_endpoint.httpx2, "AsyncClient", client_with)
     assert await version_endpoint._fetch_latest_version() == "0.74.0"

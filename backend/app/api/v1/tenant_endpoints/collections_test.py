@@ -3,7 +3,7 @@ file makers, gone to the trash once their last file leaves."""
 
 from datetime import UTC, date, datetime
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select, update
 
 from app.core.messages import CollectionMessages

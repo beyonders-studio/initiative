@@ -16,7 +16,7 @@ tool's own event names.
 """
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.resource_access import SUB_TOOLS, governing_tool, parent_column

@@ -36,7 +36,7 @@ import json
 from datetime import UTC, datetime
 from urllib.parse import quote
 
-import httpx
+import httpx2
 import jwt
 import pytest
 from sqlmodel import delete, select
@@ -312,14 +312,14 @@ def _clean_cache():
 def upstream(monkeypatch):
     """Stand in for the plug-in service, recording every call it receives.
 
-    Returns a recorder whose ``calls`` holds the outgoing `httpx.Request`s — so a
+    Returns a recorder whose ``calls`` holds the outgoing `httpx2.Request`s — so a
     test can assert on the minted token and the URL — and whose ``rows`` and
     ``values`` are what the plug-in answers with next.
     """
 
     class Recorder:
         def __init__(self) -> None:
-            self.calls: list[httpx.Request] = []
+            self.calls: list[httpx2.Request] = []
             self.rows: list = [{"id": 1}]
             self.values: dict = {}
             self.error: Exception | None = None
@@ -1957,7 +1957,7 @@ def plugin_write(monkeypatch):
 
     class Recorder:
         def __init__(self) -> None:
-            self.calls: list[httpx.Request] = []
+            self.calls: list[httpx2.Request] = []
             self.then = None
 
     recorder = Recorder()
@@ -2297,7 +2297,7 @@ class TestActions:
             session, acting_user, _declarative_action_definition()
         )
 
-        async def answer(request: httpx.Request) -> httpx.Response:
+        async def answer(request: httpx2.Request) -> httpx2.Response:
             await route_session_to_guild(session, member.guild.id)
             if unplace:
                 await session.exec(
@@ -2323,7 +2323,7 @@ class TestActions:
             return vendor.handle(request)
 
         monkeypatch.setattr(
-            plugin_connection_flows, "http_transport", httpx.MockTransport(answer)
+            plugin_connection_flows, "http_transport", httpx2.MockTransport(answer)
         )
         response = await client.post(
             _run(member, plugin, "tally"),

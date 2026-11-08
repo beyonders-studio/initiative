@@ -25,7 +25,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import parse_qsl
 
-import httpx
+import httpx2
 
 from app.services import safe_http
 from app.services.webhook_target_url import ValidatedTarget
@@ -323,14 +323,14 @@ class FakeVendor:
         from app.services.tenant import plugin_connection_flows
 
         async def resolve(url: str, *, allow_private: bool = False) -> ValidatedTarget:
-            host = httpx.URL(url).host
+            host = httpx2.URL(url).host
             return ValidatedTarget(
                 hostname=host, addresses=(ipaddress.ip_address("93.184.216.34"),)
             )
 
         monkeypatch.setattr(safe_http, "resolve_validated_target_async", resolve)
         monkeypatch.setattr(
-            plugin_connection_flows, "http_transport", httpx.MockTransport(self.handle)
+            plugin_connection_flows, "http_transport", httpx2.MockTransport(self.handle)
         )
 
     def authorize(self, challenge: str | None) -> str:
@@ -358,7 +358,7 @@ class FakeVendor:
 
     # --- the vendor's and the plug-in's side --------------------------------
 
-    def handle(self, request: httpx.Request) -> httpx.Response:
+    def handle(self, request: httpx2.Request) -> httpx2.Response:
         host = request.headers.get("host", "")
         path = request.url.path
         if host == self.api_host:
@@ -368,7 +368,7 @@ class FakeVendor:
                 return self._token(request)
             if path == "/revoke":
                 self.revocations.append(dict(parse_qsl(request.content.decode())))
-                return httpx.Response(self.revoke_status)
+                return httpx2.Response(self.revoke_status)
             if path.startswith("/applications/") and path.endswith("/grant"):
                 body = json.loads(request.content or b"null")
                 self.grant_deletions.append(
@@ -380,11 +380,11 @@ class FakeVendor:
                     )
                 )
                 if (body or {}).get("access_token") in self.lapsed_tokens:
-                    return httpx.Response(404)
-                return httpx.Response(self.grant_status)
+                    return httpx2.Response(404)
+                return httpx2.Response(self.grant_status)
             if path.startswith("/app/installations/"):
                 return self._exchange(request)
-            return httpx.Response(404)
+            return httpx2.Response(404)
         if path.startswith("/v1/hooks/"):
             name = path[len("/v1/hooks/") :]
             self.hooks.append(
@@ -395,13 +395,13 @@ class FakeVendor:
                 )
             )
             if self.hook_status >= 300:
-                return httpx.Response(self.hook_status)
+                return httpx2.Response(self.hook_status)
             if name == "revoke":
-                return httpx.Response(204)
-            return httpx.Response(200, json=self.after_connect_answer)
-        return httpx.Response(404)
+                return httpx2.Response(204)
+            return httpx2.Response(200, json=self.after_connect_answer)
+        return httpx2.Response(404)
 
-    def _api(self, request: httpx.Request, host: str) -> httpx.Response:
+    def _api(self, request: httpx2.Request, host: str) -> httpx2.Response:
         self.api_requests.append(
             {
                 "method": request.method,
@@ -412,10 +412,10 @@ class FakeVendor:
         )
         answer = self.api_answers.pop(0)
         if "body" not in answer:
-            return httpx.Response(
+            return httpx2.Response(
                 answer.get("status", 200), headers=answer.get("headers")
             )
-        return httpx.Response(
+        return httpx2.Response(
             answer.get("status", 200),
             headers=answer.get("headers"),
             json=answer["body"],
@@ -430,30 +430,30 @@ class FakeVendor:
             "token_type": "bearer",
         }
 
-    def _token(self, request: httpx.Request) -> httpx.Response:
+    def _token(self, request: httpx2.Request) -> httpx2.Response:
         form = dict(parse_qsl(request.content.decode()))
         self.token_requests.append(form)
         if (
             form.get("client_id") != self.client_id
             or form.get("client_secret") != self.client_secret
         ):
-            return httpx.Response(401, json={"error": "invalid_client"})
+            return httpx2.Response(401, json={"error": "invalid_client"})
         if form.get("grant_type") == "refresh_token":
             self.refreshes += 1
             if self.refuse_refresh:
-                return httpx.Response(400, json={"error": "invalid_grant"})
-            return httpx.Response(200, json=self._issue())
+                return httpx2.Response(400, json={"error": "invalid_grant"})
+            return httpx2.Response(200, json=self._issue())
         code = form.get("code", "")
         if code not in self.codes:
             # A success status carrying an error, as some vendors answer.
-            return httpx.Response(200, json={"error": "bad_verification_code"})
+            return httpx2.Response(200, json={"error": "bad_verification_code"})
         challenge = self.codes.pop(code)
         verifier = form.get("code_verifier", "")
         if challenge and _challenge(verifier) != challenge:
-            return httpx.Response(400, json={"error": "invalid_grant"})
-        return httpx.Response(200, json=self._issue())
+            return httpx2.Response(400, json={"error": "invalid_grant"})
+        return httpx2.Response(200, json=self._issue())
 
-    def _exchange(self, request: httpx.Request) -> httpx.Response:
+    def _exchange(self, request: httpx2.Request) -> httpx2.Response:
         self.exchanges.append(
             (
                 request.headers.get("authorization", ""),
@@ -461,9 +461,9 @@ class FakeVendor:
             )
         )
         if self.exchange_status >= 300:
-            return httpx.Response(self.exchange_status)
+            return httpx2.Response(self.exchange_status)
         expires = datetime.now(UTC) + timedelta(hours=1)
-        return httpx.Response(
+        return httpx2.Response(
             self.exchange_status,
             json={
                 "token": f"ghs_installation_{next(self._serial)}",

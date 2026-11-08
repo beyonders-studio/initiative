@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 
 from app.core.config import settings
@@ -19,13 +19,13 @@ from app.services.upload_scanning import ScannerUnavailableError, ScanRefusedErr
 class FakeScanner:
     """The scanner's ``POST /v1/scan``, answering what it is told to."""
 
-    def __init__(self, answer: httpx.Response | Exception) -> None:
+    def __init__(self, answer: httpx2.Response | Exception) -> None:
         self.answer = answer
         self.calls: list[dict[str, Any]] = []
 
     def post(
         self, url: str, *, content: Any, headers: dict[str, str], timeout: Any
-    ) -> httpx.Response:
+    ) -> httpx2.Response:
         body = content if isinstance(content, bytes) else b"".join(content)
         self.calls.append({"url": url, "body": body, "headers": headers})
         if isinstance(self.answer, Exception):
@@ -35,17 +35,19 @@ class FakeScanner:
 
 @pytest.fixture
 def scanner(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeScanner]:
-    fake = FakeScanner(httpx.Response(200, json={"verdict": "clean"}))
+    fake = FakeScanner(httpx2.Response(200, json={"verdict": "clean"}))
     monkeypatch.setattr(settings, "UPLOAD_SCANNER_URL", "http://scanner:8080")
     monkeypatch.setattr(settings, "UPLOAD_SCANNER_TOKEN", "token")
-    monkeypatch.setattr(upload_scanning.httpx, "post", fake.post)
+    monkeypatch.setattr(upload_scanning.httpx2, "post", fake.post)
     yield fake
 
 
 def test_unset_nothing_is_sent(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "UPLOAD_SCANNER_URL", "")
     sent: list[bytes] = []
-    monkeypatch.setattr(upload_scanning.httpx, "post", lambda *a, **k: sent.append(b""))
+    monkeypatch.setattr(
+        upload_scanning.httpx2, "post", lambda *a, **k: sent.append(b"")
+    )
     upload_scanning.scan_bytes(b"anything")
     assert sent == []
 
@@ -62,7 +64,7 @@ def test_a_clean_file_passes_with_the_token_and_its_length(
 
 
 def test_a_refused_file_is_refused(scanner: FakeScanner) -> None:
-    scanner.answer = httpx.Response(
+    scanner.answer = httpx2.Response(
         200, json={"verdict": "refused", "engine": "clamav", "reason": "Eicar"}
     )
     with pytest.raises(ScanRefusedError) as refused:
@@ -71,7 +73,7 @@ def test_a_refused_file_is_refused(scanner: FakeScanner) -> None:
 
 
 def test_too_large_to_scan_is_refused(scanner: FakeScanner) -> None:
-    scanner.answer = httpx.Response(413)
+    scanner.answer = httpx2.Response(413)
     with pytest.raises(ScanRefusedError):
         upload_scanning.scan_bytes(b"x")
 
@@ -79,11 +81,11 @@ def test_too_large_to_scan_is_refused(scanner: FakeScanner) -> None:
 @pytest.mark.parametrize(
     "answer",
     [
-        httpx.Response(503),
-        httpx.Response(500),
-        httpx.Response(200, json={"verdict": "something new"}),
-        httpx.ConnectError("refused"),
-        httpx.ReadTimeout("slow"),
+        httpx2.Response(503),
+        httpx2.Response(500),
+        httpx2.Response(200, json={"verdict": "something new"}),
+        httpx2.ConnectError("refused"),
+        httpx2.ReadTimeout("slow"),
     ],
 )
 def test_no_answer_holds_every_upload_back(scanner: FakeScanner, answer: Any) -> None:
@@ -125,7 +127,7 @@ def test_a_finished_upload_is_scanned_whole_before_it_is_taken(
 def test_a_finished_upload_the_scanner_refuses_is_not_taken(
     scanner: FakeScanner, staged: LocalFilesystemStorage
 ) -> None:
-    scanner.answer = httpx.Response(200, json={"verdict": "refused", "engine": "yara"})
+    scanner.answer = httpx2.Response(200, json={"verdict": "refused", "engine": "yara"})
     with pytest.raises(ScanRefusedError):
         attachments.validate_stored(7, "resumable-done", 209, "a.pdf")
 
@@ -136,7 +138,7 @@ def test_evidence_is_scanned_before_it_is_kept(scanner: FakeScanner) -> None:
     policy = EvidencePolicy(
         max_files=1, max_bytes=10_000, types=frozenset({"application/pdf"})
     )
-    scanner.answer = httpx.Response(
+    scanner.answer = httpx2.Response(
         200, json={"verdict": "refused", "engine": "clamav"}
     )
     with pytest.raises(ScanRefusedError):

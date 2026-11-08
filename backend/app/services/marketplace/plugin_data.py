@@ -61,7 +61,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any
 
-import httpx
+import httpx2
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -824,9 +824,9 @@ def _endpoints_url(registration: RegistrationSnapshot) -> str:
 
 
 async def _read_body(
-    request: httpx.Request | Answered,
+    request: httpx2.Request | Answered,
     *,
-    transport: httpx.AsyncBaseTransport | None,
+    transport: httpx2.AsyncBaseTransport | None,
 ) -> dict[str, Any]:
     """Send one bounded request and read what it answered with.
 
@@ -862,12 +862,12 @@ async def _read_body(
 
 
 async def _send(
-    request: httpx.Request, *, transport: httpx.AsyncBaseTransport | None
+    request: httpx2.Request, *, transport: httpx2.AsyncBaseTransport | None
 ) -> Any:
     """Send one bounded request, and its body as JSON."""
-    timeout = httpx.Timeout(REQUEST_TIMEOUT_SECONDS, connect=REQUEST_TIMEOUT_SECONDS)
+    timeout = httpx2.Timeout(REQUEST_TIMEOUT_SECONDS, connect=REQUEST_TIMEOUT_SECONDS)
     try:
-        async with httpx.AsyncClient(
+        async with httpx2.AsyncClient(
             timeout=timeout, follow_redirects=False, transport=transport
         ) as client:
             response = await client.send(request, stream=True)
@@ -891,7 +891,7 @@ async def _send(
                     chunks.append(chunk)
             finally:
                 await response.aclose()
-    except httpx.HTTPError as exc:
+    except httpx2.HTTPError as exc:
         raise PluginDataError(
             PluginDataMessages.SERVICE_UNAVAILABLE,
             502,
@@ -909,10 +909,10 @@ async def _send(
 
 
 async def _read_answer(
-    request: httpx.Request | Answered,
+    request: httpx2.Request | Answered,
     *,
     endpoint: Mapping[str, Any],
-    transport: httpx.AsyncBaseTransport | None,
+    transport: httpx2.AsyncBaseTransport | None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """What a widget reads of one answer: its result, through the returns the
     endpoint declares (:func:`project_returns`)."""
@@ -955,8 +955,8 @@ async def _call_plugin[T](
     params: Mapping[str, Any],
     refs: Mapping[str, str],
     fields: Mapping[str, Mapping[str, Any]],
-    transport: httpx.AsyncBaseTransport | None,
-    read: Callable[[httpx.Request | Answered], Awaitable[T]],
+    transport: httpx2.AsyncBaseTransport | None,
+    read: Callable[[httpx2.Request | Answered], Awaitable[T]],
     caller: CallingPlugin | None = None,
     viewer: str | None = None,
     subject: Mapping[str, Any] | None = None,
@@ -1092,7 +1092,7 @@ async def fetch_plugin_source(
     user_id: int | None,
     is_guild_admin: bool,
     as_installation: bool = False,
-    transport: httpx.AsyncBaseTransport | None = None,
+    transport: httpx2.AsyncBaseTransport | None = None,
 ) -> PluginDataResult:
     """Resolve one endpoint for one caller (:func:`prepare_plugin_source`),
     and make the call."""
@@ -1118,7 +1118,7 @@ async def prepare_plugin_source(
     user_id: int | None,
     is_guild_admin: bool,
     as_installation: bool = False,
-    transport: httpx.AsyncBaseTransport | None = None,
+    transport: httpx2.AsyncBaseTransport | None = None,
 ) -> Callable[[], Awaitable[PluginDataResult]]:
     """Resolve one endpoint for one caller, and hand back the call to make.
 
@@ -1183,7 +1183,7 @@ async def prepare_plugin_source(
     )
 
     async def read(
-        request: httpx.Request | Answered,
+        request: httpx2.Request | Answered,
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         return await _read_answer(request, endpoint=endpoint, transport=transport)
 
@@ -1469,7 +1469,7 @@ async def resolve_param_options(
     raw_params: str | None,
     user_id: int,
     is_guild_admin: bool,
-    transport: httpx.AsyncBaseTransport | None = None,
+    transport: httpx2.AsyncBaseTransport | None = None,
 ) -> tuple[list[dict[str, str]], str | None]:
     """The values one parameter permits, from the read its plug-in named.
 

@@ -7,7 +7,7 @@ from contextlib import AbstractAsyncContextManager, nullcontext
 from dataclasses import dataclass
 from typing import Any
 
-import httpx
+import httpx2
 from google.auth.transport.requests import Request
 from google.oauth2 import service_account
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -158,7 +158,7 @@ async def _get_fcm_access_token(cfg: ResolvedPushConfig) -> str | None:
 
 
 async def send_push_notification(
-    client: httpx.AsyncClient,
+    client: httpx2.AsyncClient,
     *,
     push_token: str,
     title: str,
@@ -310,7 +310,7 @@ async def send_push_notification(
             )
             return (False, False)
 
-    except httpx.TimeoutException:
+    except httpx2.TimeoutException:
         logger.warning("%s request timed out", service)
         return (False, False)
     except Exception:
@@ -330,7 +330,7 @@ class _Outcome:
 
 
 async def _send_to_devices(
-    client: httpx.AsyncClient,
+    client: httpx2.AsyncClient,
     tokens: Sequence[PushToken],
     *,
     title: str,
@@ -427,7 +427,7 @@ async def send_pushes(session: AsyncSession, pushes: Sequence[Push]) -> list[boo
         logger.exception("Could not read the unread counts for a batch of pushes")
         unread = None
     gate = asyncio.Semaphore(CONCURRENT_SENDS)
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx2.AsyncClient(timeout=10.0) as client:
         outcomes = await asyncio.gather(
             *(
                 _send_to_devices(

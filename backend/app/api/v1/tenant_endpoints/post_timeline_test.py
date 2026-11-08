@@ -9,7 +9,7 @@ offering a month the feed then shows as empty is worse than no rail.
 import json
 from datetime import UTC, datetime, timedelta
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole

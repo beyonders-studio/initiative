@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.user_view_preference import MAX_VALUE_JSON_BYTES

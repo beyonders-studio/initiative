@@ -15,7 +15,7 @@ from typing import Annotated, Any
 
 import pytest
 from fastapi import APIRouter, Depends
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import delete
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession

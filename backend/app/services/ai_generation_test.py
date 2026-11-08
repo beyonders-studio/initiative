@@ -8,7 +8,7 @@ of the answer.
 import json
 from unittest.mock import patch
 
-import httpx
+import httpx2
 import pytest
 
 from app.core.messages import AIMessages
@@ -60,9 +60,9 @@ async def test_a_checklist_is_asked_for_as_json_and_tidied(monkeypatch):
     sent: list[dict] = []
     answer = {"items": [" Book the hall ", "", "x" * 300]}
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         sent.append(json.loads(request.content))
-        return httpx.Response(
+        return httpx2.Response(
             200,
             json={
                 "id": "c1",
@@ -85,7 +85,7 @@ async def test_a_checklist_is_asked_for_as_json_and_tidied(monkeypatch):
         lambda *, allow_private, max_bytes: safe_http.PinnedTransport(
             allow_private=allow_private,
             max_bytes=max_bytes,
-            inner=httpx.MockTransport(handler),
+            inner=httpx2.MockTransport(handler),
         ),
     )
     health = _resolving_to(monkeypatch)

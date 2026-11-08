@@ -5,7 +5,7 @@ a provider the community already counts as its own, and it says where the
 people carrying one group land.
 """
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import AuthProviderMessages, SettingsMessages

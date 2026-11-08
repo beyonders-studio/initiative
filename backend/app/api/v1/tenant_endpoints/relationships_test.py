@@ -7,7 +7,7 @@ so a caller never has to know that a symmetric edge is stored in node-id order.
 
 from datetime import UTC, datetime
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import text
 
 from app.core.messages import RelationshipMessages

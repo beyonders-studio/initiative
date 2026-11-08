@@ -11,7 +11,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
-import httpx
+import httpx2
 import pytest
 from sqlmodel import select
 
@@ -358,23 +358,23 @@ class _Wire:
 
     def __init__(self, status: int = 200) -> None:
         self.status = status
-        self.sends: list[httpx.Request] = []
+        self.sends: list[httpx2.Request] = []
         self.registrations = 0
 
-    def handler(self, request: httpx.Request) -> httpx.Response:
+    def handler(self, request: httpx2.Request) -> httpx2.Response:
         if request.url.path == "/v1/servers":
             self.registrations += 1
             n = self.registrations
-            return httpx.Response(
+            return httpx2.Response(
                 201, json={"server_id": f"srv_new{n}", "server_key": f"new-{n}"}
             )
         self.sends.append(request)
         if self.status == 200:
-            return httpx.Response(200, json={"name": "projects/p/messages/1"})
-        return httpx.Response(self.status, json={"error": {"code": self.status}})
+            return httpx2.Response(200, json={"name": "projects/p/messages/1"})
+        return httpx2.Response(self.status, json={"error": {"code": self.status}})
 
-    def client(self) -> httpx.AsyncClient:
-        return httpx.AsyncClient(transport=httpx.MockTransport(self.handler))
+    def client(self) -> httpx2.AsyncClient:
+        return httpx2.AsyncClient(transport=httpx2.MockTransport(self.handler))
 
 
 @pytest.fixture
@@ -585,7 +585,7 @@ async def test_each_device_is_sent_on_its_own_platform(monkeypatch):
         PushToken(id=1, user_id=1, push_token="phone", platform="ios"),
         PushToken(id=2, user_id=1, push_token="tablet", platform="android"),
     ]
-    async with httpx.AsyncClient() as client:
+    async with httpx2.AsyncClient() as client:
         outcome = await push_notifications._send_to_devices(
             client, tokens, title="t", body="b", data=None, channel_id="default"
         )

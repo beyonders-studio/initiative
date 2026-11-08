@@ -7,7 +7,7 @@ cleaned up, and a stale row alone would not grant access anyway
 (the initiative gate, now the table's own policy).
 """
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from app.models.platform.guild import CommunityRole
 

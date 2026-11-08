@@ -8,7 +8,7 @@ let the holder seat somebody from inside the community, or delete it from its
 own settings — either of which clears the account's deletion blocker.
 """
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
