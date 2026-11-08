@@ -105,10 +105,12 @@
   },
   "featuredImage": {
     "label": "Featured image",
-    "upload": "Upload image",
-    "fromFiles": "From Files",
-    "replace": "Replace",
-    "remove": "Remove",
+    "add": "Add featured image",
+    "upload": "Upload an image",
+    "fromFiles": "Choose from Files",
+    "replace": "Upload a different image",
+    "replaceFromFiles": "Choose a different one from Files",
+    "remove": "Remove the featured image",
     "uploading": "Uploading…"
   },
   "imageChooser": {

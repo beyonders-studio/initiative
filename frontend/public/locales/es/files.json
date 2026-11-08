@@ -105,10 +105,12 @@
   },
   "featuredImage": {
     "label": "Imagen destacada",
-    "upload": "Subir imagen",
-    "fromFiles": "Desde Archivos",
-    "replace": "Reemplazar",
-    "remove": "Quitar",
+    "add": "Añadir imagen destacada",
+    "upload": "Subir una imagen",
+    "fromFiles": "Elegir de Archivos",
+    "replace": "Subir otra imagen",
+    "replaceFromFiles": "Elegir otra de Archivos",
+    "remove": "Quitar la imagen destacada",
     "uploading": "Subiendo…"
   },
   "imageChooser": {
