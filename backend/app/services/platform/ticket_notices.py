@@ -12,6 +12,9 @@ moved becomes one notice; the case then records what it told them.
 A closed case its filer has already been told about drops out of the scan
 unless something new is said to them, so a pass reads the open work, not the
 history.
+
+The same pass tells each voter whose idea moved to another status
+(:func:`app.services.platform.ideas.voter_notices`).
 """
 
 from __future__ import annotations
@@ -30,6 +33,7 @@ from app.db.session import set_rls_context
 from app.models.platform.notification import NotificationType
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
+from app.services.platform import ideas as ideas_service
 from app.services.platform import notice_outbox, ticket_stream
 from app.services.platform.intake import configured_operations_guild_id
 from app.services.platform.tickets import (
@@ -105,7 +109,8 @@ def _notice(case: IntakeCase, state: FilerState, *, replied: bool) -> dict[str, 
 
 
 async def notify_filers() -> int:
-    """One pass: tell each filer whose case moved. Returns how many were told."""
+    """One pass: tell each filer whose case moved, and each voter whose idea
+    did. Returns how many were told."""
     guild_id = await configured_operations_guild_id()
     if guild_id is None:
         return 0
@@ -141,6 +146,7 @@ async def notify_filers() -> int:
             if latest is not None:
                 case.filer_notified_comment_id = latest
             session.add(case)
+        notices += await ideas_service.voter_notices(session)
         await notice_outbox.enqueue(session, notices)
         await session.commit()
     return len(notices)

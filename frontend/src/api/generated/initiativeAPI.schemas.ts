@@ -6563,7 +6563,6 @@ export interface EnvelopeImportResult {
   matched?: EnvelopeImportResultMatched;
   failed?: EnvelopeImportResultFailed;
   failed_rows?: ImportRowFailure[];
-  renamed_properties?: string[];
   renamed_property_count?: number;
   links_created?: number;
   links_unresolved?: number;
@@ -6822,6 +6821,7 @@ export const IntakeStream = {
   moderation: "moderation",
   support: "support",
   feedback: "feedback",
+  ideas: "ideas",
 } as const;
 
 /**
@@ -7186,6 +7186,58 @@ export interface ICalParseResult {
   events: ICalEventPreview[];
   has_recurring: boolean;
 }
+
+/**
+ * A status of the Ideas board, under the name the team gave it.
+ */
+export interface IdeaStatusRead {
+  id: number;
+  name: string;
+  color?: string | null;
+  category: string;
+}
+
+/**
+ * One published idea.
+ */
+export interface IdeaRead {
+  task_id: number;
+  title: string;
+  status: IdeaStatusRead;
+  votes: number;
+  voted: boolean;
+  closed: boolean;
+  published_at: string;
+  updated_at?: string | null;
+  description?: string | null;
+}
+
+/**
+ * A page of the published ideas, and every status of the board.
+ */
+export interface IdeaListRead {
+  items: IdeaRead[];
+  total: number;
+  statuses: IdeaStatusRead[];
+}
+
+/**
+ * What the team sees of an Ideas-board task.
+ */
+export interface IdeaPanelRead {
+  published_at?: string | null;
+  votes: number;
+}
+
+/**
+ * How the list is ordered.
+ */
+export type IdeaSort = (typeof IdeaSort)[keyof typeof IdeaSort];
+
+export const IdeaSort = {
+  votes: "votes",
+  newest: "newest",
+} as const;
 
 /**
  * Ignoring by handle, the same address a connection request takes.
@@ -7773,6 +7825,7 @@ export interface IntakeBindingRead {
   awaiting_filer_status_id?: number | null;
   active_status_id?: number | null;
   conversation?: Conversation;
+  filed?: boolean;
   isolated?: boolean;
   shares_initiative?: boolean;
   enabled?: boolean;
@@ -8608,6 +8661,7 @@ export const NotificationType = {
   plugin_consent_requested: "plugin_consent_requested",
   plugin_update_pending: "plugin_update_pending",
   ticket_updated: "ticket_updated",
+  idea_updated: "idea_updated",
   moderation_removal: "moderation_removal",
   moderation_warning: "moderation_warning",
   case_opened: "case_opened",
@@ -8845,14 +8899,11 @@ export const OperatorUserDeleteRequestAction = {
   hard_delete: "hard_delete",
 } as const;
 
-export type OperatorUserDeleteRequestProjectTransfers = { [key: string]: number } | null;
-
 /**
  * Request to deactivate, anonymize (soft delete), or hard delete another account.
  */
 export interface OperatorUserDeleteRequest {
   action: OperatorUserDeleteRequestAction;
-  project_transfers?: OperatorUserDeleteRequestProjectTransfers;
 }
 
 export interface UserInitiativeRole {
@@ -12880,6 +12931,22 @@ export type GetChangelogParams = {
 };
 
 export type GetBundleManifest200 = { [key: string]: unknown };
+
+export type ListIdeasParams = {
+  q?: string | null;
+  status_id?: number | null;
+  voted?: boolean;
+  sort?: IdeaSort;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  page_size?: number;
+};
 
 export type RegisterUserParams = {
   invite_code?: string | null;

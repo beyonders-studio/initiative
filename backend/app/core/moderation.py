@@ -158,12 +158,6 @@ class ModerationAct(str, Enum):
     warn = "warn"
 
 
-#: The acts a moderator starts directly; a restore names the removal it undoes.
-DIRECT_ACTS: frozenset[ModerationAct] = frozenset(ModerationAct) - {
-    ModerationAct.restore
-}
-
-
 class HoldReason(str, Enum):
     """Why content is held."""
 

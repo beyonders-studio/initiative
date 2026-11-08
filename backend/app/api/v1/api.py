@@ -99,6 +99,7 @@ from app.api.v1.platform_endpoints import (
     guilds,
     health,
     help_center,
+    ideas,
     legal,
     marketplace,
     native,
@@ -137,6 +138,7 @@ api_router.include_router(config.router, tags=["config"])
 # This deployment's terms and privacy policy, if it has any.
 # Unauthenticated: the signup form links to them.
 api_router.include_router(legal.router, tags=["legal"])
+api_router.include_router(ideas.router, prefix="/ideas", tags=["ideas"])
 # The help center's search index. Unauthenticated, like the help center.
 api_router.include_router(help_center.router, prefix="/help", tags=["help"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])

@@ -39,6 +39,7 @@ __all__ = [
     "ContentGrantee",
     "ContextShapeError",
     "Filer",
+    "IdeaReader",
     "SignIn",
     "Install",
     "Member",
@@ -510,6 +511,47 @@ class Filer:
         )
 
 
+# --- Somebody reading the published ideas ----------------------------------------
+
+
+@dataclass(frozen=True)
+class IdeaReader:
+    """Anybody reading the published ideas, signed in or not, in the
+    operations community.
+
+    Not a member and not a grantee: routed into the one role that exists for
+    this, ``guild_<id>_ideas``, whose grants and row policies admit the
+    published ideas and their votes and nothing else (see
+    ``app.db.operations_schema``). The account, where there is one, is what
+    the reader's own vote is told apart by.
+    """
+
+    guild_id: int
+    user_id: Optional[int] = None
+    #: The tasks of the published ideas, as the seam read them through the
+    #: ideas role. Empty on the first routing, which is what reads them.
+    tasks: tuple[int, ...] = ()
+
+    @property
+    def attributed(self) -> bool:
+        return self.user_id is not None
+
+    def __post_init__(self) -> None:
+        if self.guild_id is None:
+            raise ContextShapeError("an ideas routing names the community")
+        object.__setattr__(self, "tasks", tuple(sorted(int(t) for t in self.tasks)))
+
+    def route(self) -> Route:
+        from app.db.operations_schema import ideas_role_name
+
+        values: dict[gucs.Guc, Any] = {gucs.IDEA_TASKS: self.tasks}
+        if self.user_id is not None:
+            values[gucs.USER_ID] = self.user_id
+        return Route(
+            values, ideas_role_name(self.guild_id), _guild_schemas(self.guild_id)
+        )
+
+
 # --- Nobody behind it ---------------------------------------------------------
 
 
@@ -568,6 +610,7 @@ RequestContext = Union[
     SettingsGrantee,
     Install,
     Filer,
+    IdeaReader,
     SystemGuild,
     SystemMaintenance,
 ]

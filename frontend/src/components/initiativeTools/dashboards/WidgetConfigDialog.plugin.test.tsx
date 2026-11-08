@@ -25,8 +25,22 @@ import { renderWithProviders } from "@/__tests__/helpers/render";
 import type { DefinitionWidget } from "@/lib/widgets/definition";
 
 const apiGet = vi.hoisted(() => vi.fn());
+// The generated client calls it as a function, which answers only the widget
+// catalog, from `apiGet`; the hand-written reads (a parameter's options) go
+// through `get`. Any other generated read fails, as an unserved request would.
 vi.mock("@/api/client", () => ({
-  apiClient: { get: apiGet, post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  apiClient: Object.assign(
+    (config: { url: string }) =>
+      config.url.endsWith("/plugins/widget-catalog")
+        ? apiGet(config.url)
+        : Promise.reject(new Error(`not served: ${config.url}`)),
+    {
+      get: apiGet,
+      post: vi.fn(),
+      put: vi.fn(),
+      delete: vi.fn(),
+    }
+  ),
   API_BASE_URL: "http://test/api/v1",
 }));
 

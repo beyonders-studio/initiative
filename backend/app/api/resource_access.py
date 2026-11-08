@@ -145,12 +145,6 @@ RESOURCE_ACCESS: dict[Tool, ResourceAccessConfig] = {
 }
 
 
-# The tools whose sharing can be set through the unified *local* grant flow
-# (``set_resource_grants`` / the bulk endpoint) — exactly the tools registered
-# above, derived so the two never drift.
-GRANTABLE_KINDS: tuple[Tool, ...] = tuple(RESOURCE_ACCESS)
-
-
 def governing_tool(table: str) -> Tool:
     """The tool whose sharing governs one content table's rows.
 

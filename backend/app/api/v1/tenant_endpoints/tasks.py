@@ -38,6 +38,7 @@ from app.schemas.ai_generation import (
 from app.schemas.query import DateBucket, GroupRead, GroupsResponse
 from app.schemas.recurrence import OccurrenceScope, validate_task_recurrence
 from app.schemas.platform.access_grant import AccessGrantRead
+from app.schemas.platform.idea import IdeaPanelRead
 from app.schemas.tenant.task import (
     ChecklistItem,
     ChecklistItemToggle,
@@ -61,6 +62,7 @@ from app.services.tenant import attachments as attachments_service
 from app.services.tenant import column_limits
 from app.services.tenant import overwrites
 from app.services.tenant import required_fields
+from app.services.platform import ideas as ideas_service
 from app.services.tenant import cases as cases_service
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
@@ -586,6 +588,68 @@ async def take_task_case(
     _touch_project(task.project, datetime.now(timezone.utc))
     await session.commit()
     return await _response(session, task.id)
+
+
+async def _idea_task(session, guild_id: int, task_id: int, *, access: str) -> Task:
+    """``task_id``, where it is on the Ideas board; 404 for any other task.
+    Asked first whether this server and community have the board at all, so
+    every other task page pays nothing for asking."""
+    from app.services.platform.intake import configured_operations_guild_id
+
+    missing = HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND, detail=TaskMessages.NOT_AN_IDEA
+    )
+    if (
+        not ideas_service.board_open()
+        or await configured_operations_guild_id() != guild_id
+    ):
+        raise missing
+    task = await resource_access.load_child(session, Task, task_id, access=access)
+    if not await ideas_service.on_the_board(session, task):
+        raise missing
+    return task
+
+
+async def _idea_panel(session, task: Task) -> IdeaPanelRead:
+    found = await ideas_service.panel(session, task)
+    return IdeaPanelRead(published_at=found.published_at, votes=found.votes)
+
+
+@router.get("/{task_id}/idea", response_model=IdeaPanelRead)
+async def read_task_idea(
+    task_id: int,
+    session: RLSSessionDep,
+    guild_context: GuildContextDep,
+) -> IdeaPanelRead:
+    """An Ideas-board task's panel: whether it is published, and how many
+    voted. 404 for any other task."""
+    task = await _idea_task(session, guild_context.guild_id, task_id, access="read")
+    return await _idea_panel(session, task)
+
+
+@router.put("/{task_id}/idea/published", response_model=IdeaPanelRead)
+async def publish_task_idea(
+    task_id: int,
+    session: RLSSessionDep,
+    guild_context: GuildContextDep,
+) -> IdeaPanelRead:
+    """Publish an Ideas-board task: everybody sees its title, description and
+    status, and may vote for it."""
+    task = await _idea_task(session, guild_context.guild_id, task_id, access="write")
+    await ideas_service.publish(session, task, on=True)
+    return await _idea_panel(session, task)
+
+
+@router.delete("/{task_id}/idea/published", response_model=IdeaPanelRead)
+async def unpublish_task_idea(
+    task_id: int,
+    session: RLSSessionDep,
+    guild_context: GuildContextDep,
+) -> IdeaPanelRead:
+    """Take an idea off the Ideas page. Its votes stay with the task."""
+    task = await _idea_task(session, guild_context.guild_id, task_id, access="write")
+    await ideas_service.publish(session, task, on=False)
+    return await _idea_panel(session, task)
 
 
 async def _case_grants(guild_id: int, task_id: int) -> list[AccessGrantRead]:

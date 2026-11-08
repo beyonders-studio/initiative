@@ -401,6 +401,8 @@
     "moderationRemovedLegal": "Algo que escribiste se retiró por motivos legales",
     "moderationWarned": "Un aviso de los moderadores: {{message}}",
     "feedbackRead": "Tu comentario fue leído",
+    "ideaMoved": "«{{title}}» ahora está en {{status}}",
+    "ideaUnnamed": "Una idea que votaste",
     "caseOpened": "Caso nuevo de {{stream}}: {{taskTitle}}",
     "caseReplied": "{{name}} respondió en {{taskTitle}} y nadie ha tomado el caso",
     "caseRepliedMany": "{{name}} dejó {{count}} respuestas en {{taskTitle}} y nadie ha tomado el caso",

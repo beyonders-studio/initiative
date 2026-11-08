@@ -284,12 +284,6 @@ def hold_models() -> list[type[HoldMixin]]:
     return [found[name] for name in sorted(found)]
 
 
-def comment_lock_models() -> list[type[CommentLockMixin]]:
-    """Every mapped model carrying :class:`CommentLockMixin`, by table name."""
-    found = _mapped_subclasses(CommentLockMixin)
-    return [found[name] for name in sorted(found)]
-
-
 def created_by_models() -> list[type[CreatedByMixin]]:
     """Every mapped model carrying :class:`CreatedByMixin`, by table name.
 

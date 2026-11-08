@@ -1742,6 +1742,8 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     # A case is read exactly as hard as the task it describes, so it hangs off
     # the task rather than off the project column it is keyed by.
     "intake_cases": via_task_project("task_id"),
+    # The votes for an idea are read as hard as the task that is the idea.
+    "idea_votes": via_task_project("task_id"),
     # What a person attached: reached as its report or its case is.
     "evidence": evidence_path(),
     # Two hops -> post_polls -> posts
@@ -2242,6 +2244,7 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
     "moderation_report_reporters": Silent("the reporters behind one report"),
     "moderation_actions": Silent("the moderation log, read on its own surface"),
     "intake_cases": Silent("the key -> task map; the task is what a subscriber hears"),
+    "idea_votes": Silent("who voted; the vote sweep tells voters what moved"),
     "uploads": Silent("a stored file; the content showing it is what changed"),
     "evidence": Silent("an attached file; its case or report is what changed"),
     # -- Guild-level tables that emit ---------------------------------------

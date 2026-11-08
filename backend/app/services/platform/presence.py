@@ -165,13 +165,6 @@ class OnlineRoll:
                 appearing[user_id] = presence
         return appearing
 
-    def is_online(self, user_id: int) -> bool:
-        """Whether this account appears at all — any of the shown states.
-
-        Idle counts: they are here, they are just not typing.
-        """
-        return self.presence_of(user_id) is not Presence.offline
-
 
 #: The one roll every channel feeds and every reader asks.
 online = OnlineRoll()

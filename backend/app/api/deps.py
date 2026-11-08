@@ -59,6 +59,7 @@ from app.db.public_rls import PLATFORM_SUSPENDED
 from app.db.request_context import (
     ContentGrantee,
     Filer,
+    IdeaReader,
     Install,
     Member,
     Platform,
@@ -127,7 +128,6 @@ _SAFE_HTTP_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 #: something authority the credential itself carries, because there the
 #: credential is a party to the decision rather than a way of transporting it.
 CREDENTIAL_SESSION = CredentialKind.session.value
-CREDENTIAL_API_KEY = CredentialKind.api_key.value
 #: An installed plug-in's access token. Only a route that names a plug-in scope
 #: admits one (:func:`plugin_scope`).
 CREDENTIAL_INSTALL = "install"
@@ -1258,16 +1258,6 @@ async def get_guild_settings_session(
     return session
 
 
-async def get_guild_settings_write_session(
-    session: SessionDep,
-    guild_context: Annotated[GuildContext, Depends(get_guild_settings_context)],
-) -> AsyncSession:
-    """The same session, for a configuration route that changes something: a
-    grantee is asked for the ``read_write`` grant beside the rung."""
-    require_grant_writes(guild_context)
-    return session
-
-
 async def establish_guild_access(
     session: AsyncSession,
     current_user: User,
@@ -1434,6 +1424,50 @@ async def establish_filer_access(session: AsyncSession, user: User) -> int:
                 guild_id=guild_id,
                 user_id=int(user.id),
                 cases=tuple(row[0] for row in cases),
+            ),
+        )
+    except DBAPIError as exc:
+        clear_rls_context(session)
+        await session.rollback()
+        raise FilerAccessError("operations community cannot be routed") from exc
+    return guild_id
+
+
+async def establish_ideas_access(session: AsyncSession, user: Optional[User]) -> int:
+    """Route ``session`` as whoever reads the published ideas, ``user`` or
+    nobody signed in — the establishment seam for the ideas, beside
+    :func:`establish_filer_access`.
+
+    Into the operations community's ``guild_<id>_ideas`` role, which is what
+    decides what they read. ``session`` comes from that community's cohort on
+    the request engine. Returns the community's id.
+
+    Raises :class:`FilerAccessError` where no operations community is set, or
+    it has no ideas role to assume.
+    """
+    from app.services.platform.intake import configured_operations_guild_id
+
+    guild_id = await configured_operations_guild_id()
+    if guild_id is None:
+        raise FilerAccessError("no operations community")
+    user_id = int(user.id) if user is not None else None
+    try:
+        await set_rls_context(session, IdeaReader(guild_id=guild_id, user_id=user_id))
+        # The published ideas, read through the role's own row on
+        # intake_cases: the one read the other ideas rows are then keyed on.
+        tasks = (
+            await session.exec(
+                sa_text("SELECT task_id FROM intake_cases ORDER BY task_id")
+            )
+        ).all()
+        # End the transaction, which leaves the role, before routing again.
+        await session.rollback()
+        await set_rls_context(
+            session,
+            IdeaReader(
+                guild_id=guild_id,
+                user_id=user_id,
+                tasks=tuple(row[0] for row in tasks),
             ),
         )
     except DBAPIError as exc:
@@ -1995,9 +2029,6 @@ SettingsSeatWriteContextDep = Annotated[
     Depends(require_guild_roles(CommunityRole.superadmin, settings=True, write=True)),
 ]
 SettingsRLSSessionDep = Annotated[AsyncSession, Depends(get_guild_settings_session)]
-SettingsWriteSessionDep = Annotated[
-    AsyncSession, Depends(get_guild_settings_write_session)
-]
 SeatContextDep = Annotated[GuildContext, Depends(get_guild_seat_context)]
 SeatWriteContextDep = Annotated[GuildContext, Depends(get_guild_seat_write_context)]
 SeatSessionDep = Annotated[AsyncSession, Depends(get_guild_seat_session)]
@@ -2054,21 +2085,6 @@ async def _apply_user_session_context(
     )
     await set_rls_context(session, Platform(user_id=current_user.id, tier=tier))
     return session
-
-
-async def get_factor_exempt_user_session(
-    session: SessionDep,
-    current_user: FactorExemptUser,
-) -> AsyncSession:
-    """The platform-path session for a route that stays reachable while the
-    deployment's second-factor rule is unmet — routed exactly as the ordinary
-    one, and holding no more."""
-    return await _apply_user_session_context(session, current_user)
-
-
-FactorExemptSessionDep = Annotated[
-    AsyncSession, Depends(get_factor_exempt_user_session)
-]
 
 
 async def get_account_holder_session(

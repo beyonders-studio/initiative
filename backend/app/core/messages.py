@@ -420,6 +420,7 @@ class TaskMessages:
     INVALID_RECURRENCE_LIMIT = "INVALID_RECURRENCE_LIMIT"
     #: The task was not opened by an intake stream.
     NOT_A_CASE = "TASK_NOT_A_CASE"
+    NOT_AN_IDEA = "TASK_NOT_AN_IDEA"
     #: The board column it would go into holds as many tasks as it takes.
     STATUS_AT_LIMIT = "TASK_STATUS_AT_LIMIT"
     ALREADY_IN_PROJECT = "TASK_ALREADY_IN_PROJECT"
@@ -823,6 +824,14 @@ class TicketMessages:
     REPLY_NOT_TAKEN = "TICKET_REPLY_NOT_TAKEN"
 
 
+class IdeaMessages:
+    """Reading the published ideas, and voting."""
+
+    NOT_FOUND = "IDEA_NOT_FOUND"
+    #: A closed idea keeps its votes and takes no change to them.
+    CLOSED = "IDEA_CLOSED"
+
+
 class IntakeMessages:
     """Binding a stream of operations work to a project."""
 
@@ -1117,9 +1126,6 @@ class QueryMessages:
     #: A field that exists but is computed rather than stored, so there is no
     #: column for a query to name yet.
     FIELD_NOT_SELECTABLE = "QUERY_FIELD_NOT_SELECTABLE"
-    #: A column read beside an aggregate without being grouped, so there is no
-    #: one value of it per row of the answer.
-    UNGROUPED_FIELD = "QUERY_UNGROUPED_FIELD"
     #: An unqualified column that more than one relation in scope could mean.
     AMBIGUOUS_FIELD = "QUERY_AMBIGUOUS_FIELD"
     #: The same alias used for two relations.

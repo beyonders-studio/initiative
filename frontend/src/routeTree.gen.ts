@@ -36,6 +36,8 @@ import { Route as ServerRequiredAuthenticatedProfileRouteImport } from './routes
 import { Route as ServerRequiredAuthenticatedShareRouteImport } from './routes/_serverRequired/_authenticated/share'
 import { Route as ServerRequiredAuthenticatedUserStatsRouteImport } from './routes/_serverRequired/_authenticated/user-stats'
 import { Route as ServerRequiredAccountNotMeRouteImport } from './routes/_serverRequired/account.not-me'
+import { Route as ServerRequiredIdeasIndexRouteImport } from './routes/_serverRequired/ideas.index'
+import { Route as ServerRequiredIdeasTaskIdRouteImport } from './routes/_serverRequired/ideas.$taskId'
 import { Route as ServerRequiredInviteCodeRouteImport } from './routes/_serverRequired/invite.$code'
 import { Route as ServerRequiredLegalSlugRouteImport } from './routes/_serverRequired/legal.$slug'
 import { Route as ServerRequiredOidcCallbackRouteImport } from './routes/_serverRequired/oidc.callback'
@@ -337,6 +339,18 @@ const ServerRequiredAccountNotMeRoute =
   ServerRequiredAccountNotMeRouteImport.update({
     id: '/account/not-me',
     path: '/account/not-me',
+    getParentRoute: () => ServerRequiredRoute,
+  } as any)
+const ServerRequiredIdeasIndexRoute =
+  ServerRequiredIdeasIndexRouteImport.update({
+    id: '/ideas/',
+    path: '/ideas/',
+    getParentRoute: () => ServerRequiredRoute,
+  } as any)
+const ServerRequiredIdeasTaskIdRoute =
+  ServerRequiredIdeasTaskIdRouteImport.update({
+    id: '/ideas/$taskId',
+    path: '/ideas/$taskId',
     getParentRoute: () => ServerRequiredRoute,
   } as any)
 const ServerRequiredInviteCodeRoute =
@@ -1541,10 +1555,12 @@ export interface FileRoutesByFullPath {
   '/share': typeof ServerRequiredAuthenticatedShareRoute
   '/user-stats': typeof ServerRequiredAuthenticatedUserStatsRoute
   '/account/not-me': typeof ServerRequiredAccountNotMeRoute
+  '/ideas/$taskId': typeof ServerRequiredIdeasTaskIdRoute
   '/invite/$code': typeof ServerRequiredInviteCodeRoute
   '/legal/$slug': typeof ServerRequiredLegalSlugRoute
   '/oidc/callback': typeof ServerRequiredOidcCallbackRoute
   '/whats-new/$version': typeof ServerRequiredWhatsNewVersionRoute
+  '/ideas/': typeof ServerRequiredIdeasIndexRoute
   '/whats-new/': typeof ServerRequiredWhatsNewIndexRoute
   '/c/$communityId': typeof ServerRequiredAuthenticatedCCommunityIdRouteWithChildren
   '/my-tickets/$taskId': typeof ServerRequiredAuthenticatedMyTicketsTaskIdRoute
@@ -1719,10 +1735,12 @@ export interface FileRoutesByTo {
   '/share': typeof ServerRequiredAuthenticatedShareRoute
   '/user-stats': typeof ServerRequiredAuthenticatedUserStatsRoute
   '/account/not-me': typeof ServerRequiredAccountNotMeRoute
+  '/ideas/$taskId': typeof ServerRequiredIdeasTaskIdRoute
   '/invite/$code': typeof ServerRequiredInviteCodeRoute
   '/legal/$slug': typeof ServerRequiredLegalSlugRoute
   '/oidc/callback': typeof ServerRequiredOidcCallbackRoute
   '/whats-new/$version': typeof ServerRequiredWhatsNewVersionRoute
+  '/ideas': typeof ServerRequiredIdeasIndexRoute
   '/whats-new': typeof ServerRequiredWhatsNewIndexRoute
   '/my-tickets/$taskId': typeof ServerRequiredAuthenticatedMyTicketsTaskIdRoute
   '/profile/account': typeof ServerRequiredAuthenticatedProfileAccountRoute
@@ -1884,11 +1902,13 @@ export interface FileRoutesById {
   '/_serverRequired/_authenticated/share': typeof ServerRequiredAuthenticatedShareRoute
   '/_serverRequired/_authenticated/user-stats': typeof ServerRequiredAuthenticatedUserStatsRoute
   '/_serverRequired/account/not-me': typeof ServerRequiredAccountNotMeRoute
+  '/_serverRequired/ideas/$taskId': typeof ServerRequiredIdeasTaskIdRoute
   '/_serverRequired/invite/$code': typeof ServerRequiredInviteCodeRoute
   '/_serverRequired/legal/$slug': typeof ServerRequiredLegalSlugRoute
   '/_serverRequired/oidc/callback': typeof ServerRequiredOidcCallbackRoute
   '/_serverRequired/whats-new/$version': typeof ServerRequiredWhatsNewVersionRoute
   '/_serverRequired/_authenticated/': typeof ServerRequiredAuthenticatedIndexRoute
+  '/_serverRequired/ideas/': typeof ServerRequiredIdeasIndexRoute
   '/_serverRequired/whats-new/': typeof ServerRequiredWhatsNewIndexRoute
   '/_serverRequired/_authenticated/c/$communityId': typeof ServerRequiredAuthenticatedCCommunityIdRouteWithChildren
   '/_serverRequired/_authenticated/my-tickets/$taskId': typeof ServerRequiredAuthenticatedMyTicketsTaskIdRoute
@@ -2066,10 +2086,12 @@ export interface FileRouteTypes {
     | '/share'
     | '/user-stats'
     | '/account/not-me'
+    | '/ideas/$taskId'
     | '/invite/$code'
     | '/legal/$slug'
     | '/oidc/callback'
     | '/whats-new/$version'
+    | '/ideas/'
     | '/whats-new/'
     | '/c/$communityId'
     | '/my-tickets/$taskId'
@@ -2244,10 +2266,12 @@ export interface FileRouteTypes {
     | '/share'
     | '/user-stats'
     | '/account/not-me'
+    | '/ideas/$taskId'
     | '/invite/$code'
     | '/legal/$slug'
     | '/oidc/callback'
     | '/whats-new/$version'
+    | '/ideas'
     | '/whats-new'
     | '/my-tickets/$taskId'
     | '/profile/account'
@@ -2408,11 +2432,13 @@ export interface FileRouteTypes {
     | '/_serverRequired/_authenticated/share'
     | '/_serverRequired/_authenticated/user-stats'
     | '/_serverRequired/account/not-me'
+    | '/_serverRequired/ideas/$taskId'
     | '/_serverRequired/invite/$code'
     | '/_serverRequired/legal/$slug'
     | '/_serverRequired/oidc/callback'
     | '/_serverRequired/whats-new/$version'
     | '/_serverRequired/_authenticated/'
+    | '/_serverRequired/ideas/'
     | '/_serverRequired/whats-new/'
     | '/_serverRequired/_authenticated/c/$communityId'
     | '/_serverRequired/_authenticated/my-tickets/$taskId'
@@ -2757,6 +2783,20 @@ declare module '@tanstack/react-router' {
       path: '/account/not-me'
       fullPath: '/account/not-me'
       preLoaderRoute: typeof ServerRequiredAccountNotMeRouteImport
+      parentRoute: typeof ServerRequiredRoute
+    }
+    '/_serverRequired/ideas/': {
+      id: '/_serverRequired/ideas/'
+      path: '/ideas'
+      fullPath: '/ideas/'
+      preLoaderRoute: typeof ServerRequiredIdeasIndexRouteImport
+      parentRoute: typeof ServerRequiredRoute
+    }
+    '/_serverRequired/ideas/$taskId': {
+      id: '/_serverRequired/ideas/$taskId'
+      path: '/ideas/$taskId'
+      fullPath: '/ideas/$taskId'
+      preLoaderRoute: typeof ServerRequiredIdeasTaskIdRouteImport
       parentRoute: typeof ServerRequiredRoute
     }
     '/_serverRequired/invite/$code': {
@@ -4530,10 +4570,12 @@ interface ServerRequiredRouteChildren {
   ServerRequiredVerifyEmailRoute: typeof ServerRequiredVerifyEmailRoute
   ServerRequiredWelcomeRoute: typeof ServerRequiredWelcomeRoute
   ServerRequiredAccountNotMeRoute: typeof ServerRequiredAccountNotMeRoute
+  ServerRequiredIdeasTaskIdRoute: typeof ServerRequiredIdeasTaskIdRoute
   ServerRequiredInviteCodeRoute: typeof ServerRequiredInviteCodeRoute
   ServerRequiredLegalSlugRoute: typeof ServerRequiredLegalSlugRoute
   ServerRequiredOidcCallbackRoute: typeof ServerRequiredOidcCallbackRoute
   ServerRequiredWhatsNewVersionRoute: typeof ServerRequiredWhatsNewVersionRoute
+  ServerRequiredIdeasIndexRoute: typeof ServerRequiredIdeasIndexRoute
   ServerRequiredWhatsNewIndexRoute: typeof ServerRequiredWhatsNewIndexRoute
   ServerRequiredCommunityCommunityIdLoginRoute: typeof ServerRequiredCommunityCommunityIdLoginRoute
 }
@@ -4553,10 +4595,12 @@ const ServerRequiredRouteChildren: ServerRequiredRouteChildren = {
   ServerRequiredVerifyEmailRoute: ServerRequiredVerifyEmailRoute,
   ServerRequiredWelcomeRoute: ServerRequiredWelcomeRoute,
   ServerRequiredAccountNotMeRoute: ServerRequiredAccountNotMeRoute,
+  ServerRequiredIdeasTaskIdRoute: ServerRequiredIdeasTaskIdRoute,
   ServerRequiredInviteCodeRoute: ServerRequiredInviteCodeRoute,
   ServerRequiredLegalSlugRoute: ServerRequiredLegalSlugRoute,
   ServerRequiredOidcCallbackRoute: ServerRequiredOidcCallbackRoute,
   ServerRequiredWhatsNewVersionRoute: ServerRequiredWhatsNewVersionRoute,
+  ServerRequiredIdeasIndexRoute: ServerRequiredIdeasIndexRoute,
   ServerRequiredWhatsNewIndexRoute: ServerRequiredWhatsNewIndexRoute,
   ServerRequiredCommunityCommunityIdLoginRoute:
     ServerRequiredCommunityCommunityIdLoginRoute,

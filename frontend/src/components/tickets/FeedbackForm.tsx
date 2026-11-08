@@ -6,6 +6,7 @@
  * it was sent from, theirs to leave out. Once sent, the thanks.
  */
 
+import { Link } from "@tanstack/react-router";
 import { CircleAlert, Heart, Lightbulb, type LucideIcon } from "lucide-react";
 import type { ComponentProps, ElementType, Ref } from "react";
 import { useTranslation } from "react-i18next";
@@ -180,6 +181,15 @@ export const FeedbackForm = ({
             {t("feedback.contactable")}
           </Label>
         </div>
+        {/* An idea may already be on the Ideas page, waiting for a vote. */}
+        {draft.kind === FeedbackTopic.idea ? (
+          <Link
+            to="/ideas"
+            className="inline-block text-muted-foreground text-sm underline underline-offset-2 hover:text-foreground"
+          >
+            {t("feedback.seeIdeas")}
+          </Link>
+        ) : null}
         {/* Somebody who needs it sorted needs an answer, which feedback is not. */}
         {help && draft.kind === FeedbackTopic.problem ? (
           <HelpLink

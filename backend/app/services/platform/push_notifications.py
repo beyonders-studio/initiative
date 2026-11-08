@@ -95,6 +95,7 @@ PUSH_CHANNELS: dict[NotificationType, str] = {
     # channel the installed app already registers rather than asking for a
     # new one — a new channel id would mean a native release.
     NotificationType.ticket_updated: "comments",
+    NotificationType.idea_updated: "comments",
     NotificationType.moderation_removal: "comments",
     NotificationType.moderation_warning: "comments",
     # Work landing on a person, so the channel task assignments use.

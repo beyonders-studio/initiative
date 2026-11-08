@@ -32,6 +32,8 @@ class IntakeStream(str, Enum):
     moderation = "moderation"
     support = "support"
     feedback = "feedback"
+    #: The ideas the team publishes for everybody to see and vote for.
+    ideas = "ideas"
 
 
 class Source(str, Enum):
@@ -278,6 +280,19 @@ STREAMS: dict[IntakeStream, IntakeStreamMeta] = {
         # Feedback is about the product, so it goes to the team that makes it.
         cloud_only=True,
     ),
+    IntakeStream.ideas: IntakeStreamMeta(
+        # The team writes each idea; nobody files into the board.
+        sources=frozenset({Source.manual}),
+        submitter=Submitter.member,
+        blueprint="ideas.json",
+        conversation=Conversation.none,
+        # How often one account may vote for an idea or take a vote back.
+        filing_rate="60/hour",
+        max_open_per_filer=None,
+        evidence=NO_EVIDENCE,
+        retention_days=30,
+        cloud_only=True,
+    ),
 }
 
 
@@ -383,4 +398,5 @@ STREAM_FIELDS: dict[IntakeStream, tuple[CaseField, ...]] = {
         CaseField.subject_guild,
         CaseField.reported_at,
     ),
+    IntakeStream.ideas: (),
 }

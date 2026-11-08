@@ -17,7 +17,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.v1.platform_endpoints.operator import ConfigManageDep
-from app.core.intake import IntakeStream, meta, offered_streams
+from app.core.intake import IntakeStream, Source, meta, offered_streams
 from app.core.messages import IntakeMessages
 from app.models.platform.guild import Guild
 from app.models.platform.user import User
@@ -55,6 +55,7 @@ def _read(view: BindingView) -> IntakeBindingRead:
         awaiting_filer_status_id=view.awaiting_filer_status_id,
         active_status_id=view.active_status_id,
         conversation=meta(view.stream).conversation,
+        filed=Source.submitted in meta(view.stream).sources,
         isolated=view.isolated,
         shares_initiative=view.shares_initiative,
         enabled=view.enabled,

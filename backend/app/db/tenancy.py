@@ -383,6 +383,9 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         # A ballot: ``user_id`` is the voter, which is both the author of the
         # row and its whole content.
         "post_poll_votes",
+        # A vote for an idea, likewise; the voter is not a member, and the
+        # writer that records it has nobody of its own to name.
+        "idea_votes",
         "personal_items",
         # A value belongs to its definition's owner, not to whoever set it.
         "metadata_values",
@@ -432,7 +435,7 @@ GUILD_SCOPED_TABLES: frozenset[str] = INITIATIVE_SCOPED_TABLES | GUILD_LEVEL_TAB
 # (``app.db.operations_schema``). Each is still classified above, which is how
 # it is secured there.
 OPERATIONS_TABLES: frozenset[str] = frozenset(
-    {"intake_bindings", "intake_cases", "case_grants"}
+    {"intake_bindings", "intake_cases", "case_grants", "idea_votes"}
 )
 
 # Union of every table that has an explicit placement decision.

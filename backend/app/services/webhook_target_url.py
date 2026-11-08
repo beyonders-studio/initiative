@@ -204,14 +204,9 @@ async def resolve_validated_target_async(
     return ValidatedTarget(hostname=host, addresses=tuple(addresses))
 
 
-def assert_target_url_is_public(url: str, *, allow_private: bool = False) -> None:
-    """Policy check only, discarding the resolution. For create/update
-    validation where no connection is made yet."""
-    resolve_validated_target(url, allow_private=allow_private)
-
-
 async def assert_target_url_is_public_async(
     url: str, *, allow_private: bool = False
 ) -> None:
-    """Async policy check only. See :func:`assert_target_url_is_public`."""
+    """Policy check only, discarding the resolution. For create/update
+    validation where no connection is made yet."""
     await resolve_validated_target_async(url, allow_private=allow_private)

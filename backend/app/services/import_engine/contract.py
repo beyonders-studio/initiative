@@ -58,9 +58,7 @@ class EnvelopeImportResult(SanitizedBaseModel):
     failed: dict[str, int] = {}
     # The rows behind ``failed`` where the import reads rows (a spreadsheet).
     failed_rows: list[ImportRowFailure] = []
-    # Property definitions that collided by name and were created renamed
-    # (names when known, count always).
-    renamed_properties: list[str] = []
+    # Property definitions that collided by name and were created renamed.
     renamed_property_count: int = 0
     # Edges the deferred pass wrote for this envelope, and the ones whose far
     # end was never imported. Zero on every importer that reads no links.

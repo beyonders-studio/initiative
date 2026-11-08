@@ -31,6 +31,7 @@ from app.core.intake import (
     FeedbackTopic,
     IntakeStream,
     SecurityTopic,
+    Source,
     conversation_for,
     meta,
     offered_streams,
@@ -129,6 +130,9 @@ async def availability(
     contacts = await _contacts(session)
     offered: dict[IntakeStream, StreamAvailability] = {}
     for stream in IntakeStream:
+        # A stream nobody files into offers nothing to file.
+        if Source.submitted not in meta(stream).sources:
+            continue
         contact = contacts[stream]
         if stream is IntakeStream.moderation:
             # A report about a community's own content goes to that
