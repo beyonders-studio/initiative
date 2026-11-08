@@ -4,61 +4,102 @@ icon: lucide/hash
 
 # Counters
 
-A **counter** tracks a number that moves. Tickets sold, seats left, money raised, points scored, laps run, cups of tea consumed by the committee since March.
+A **counter** tracks a number that moves: tickets sold, seats left, money raised, points scored, laps run, cups of coffee the PTA board has had since September.
 
-The reason this is a feature and not just a note in a document is that a number in a document is *one person's* number, and it is wrong. A counter is everybody's. Tap it on your phone and the screen at the front of the room changes.
+A number typed into a document is one person's number, and by Thursday it's wrong. A counter is everybody's. Tap it on your phone and the screen at the front of the room changes with it.
 
-## Counter groups
+Counters live in **counter groups**, because they almost always come in sets: one per table at the fundraiser, one per team, one per donation jar. A group is the [tool](tools.md); the counters are what's inside it.
 
-Counters live in **groups**, because they almost always come in sets. One counter per table at a fundraiser. One per team. One per collection tin.
+## Make a counter group
 
-Make one from the initiative's **Counters** tab with **Create Counter Group**, name it, then add counters to it with **Add Counter**. In the list, each group's card shows its first few counters, so you can check the score without opening anything.
+You need a role in the initiative that can create counters. If there's no button, ask one of the initiative's managers.
 
-## What a counter can do
+1. Open the initiative and select its **Counters** tab.
+2. Select **Create Counter Group**. (On a phone, it's the **+** at the bottom of the screen.)
+3. Type a **Name**, and a description if you like.
+4. To change who can see it, open **Advanced options**.
+5. Select **Create Counter Group**.
 
-| Setting | What it does |
-|---|---|
-| **Count** | The current number. It's the whole point. |
-| **Minimum / maximum** | Bounds, if the number shouldn't go past something. Seats can't go below zero; a venue has a capacity. |
-| **Step** | How much one tap moves it. Set it to 5 and each tap is five. |
-| **Initial value** | What **Reset** goes back to — not necessarily zero. |
-| **Color** | For telling them apart at speed. |
-| **Display style** | A plain **number**, a **progress bar**, or a **segmented clock**. |
+The group opens, ready for its first counter. In the list, each group's card shows its first few counters, so you can check the score without opening anything.
 
-Counters take decimals, so a fundraising total in pounds and pence works as well as a headcount.
+## Add a counter
 
-### Choosing a display style
+You need edit access to the group.
 
-- **Number** — when the value is the message. A total, a tally, a score.
-- **Progress bar** — when the value only means something against a target. £2,400 raised is a fact; £2,400 of £3,000 is a story.
-- **Segmented clock** — when you're counting down a fixed number of discrete things. Rounds, doses, lives, attempts.
+1. Open the group.
+2. Select **Add Counter**.
+3. Type a **Name** and pick a **Color**, or keep the one it suggests.
+4. Set a **Min** and **Max** if the number has bounds. Seats can't go below zero, and the gym only holds 300.
+5. Set the **Step**: how much one tap moves it. Set it to 5 and each tap is five.
+6. Set the **Initial value**, where the counter starts and where a reset sends it back to.
+7. Pick a **View mode**: **Number**, **Progress bar** or **Segmented clock**.
+8. Select **Add Counter**.
 
-![A group of counters](../images/tools/counters.png)
+The new counter starts at its initial value. Counters take decimals, so a fundraising total in dollars and cents works as well as a headcount.
 
-## Using them in the room
+### Pick a view mode
 
-- **Increment**, **decrement** and **reset** are one tap each.
-- **Reset All** does the whole group at once — the right button between sessions. It sits in the strip at the top of the group, with **Add Counter**, **Sort**, and the switch between rows and a grid.
-- **Duplicate**, in a counter's menu, makes another one with the same bounds and the same count, at the end of the group. For when the second team turns up.
-- **Focus mode** — **Open full screen** on a counter — blows it up to fill the screen, which is what you want when it's on a projector or a tablet propped up on the door.
+- **Number**, when the value is the message: a total, a tally, a score.
+- **Progress bar**, when the value only means something against a target. $2,400 raised is a fact; $2,400 of $3,000 is a story.
+- **Segmented clock**, when you're counting down a handful of things: rounds, doses, lives, attempts.
 
-!!! tip "Focus mode is the one to remember"
-    Counters are usually being read by people who aren't holding the device — which is to say, from the other end of a draughty hall, at an angle, by somebody who left their glasses in the car. Focus mode is for them.
+A progress bar and a segmented clock both need a **Min** and a **Max**, so they stay grayed out until both are set.
 
-## Things people use them for
+!!! screenshot "A counter group"
+    **Show:** a counter group with three or four counters in rows, one of each view mode, and the strip at the top with **Add Counter**, **Sort** and **Reset All**.
 
-- **Door counts** — capacity, attendance, ticket stubs.
-- **Fundraising totals** — one counter per tin, plus a group total on a [dashboard](dashboards.md).
-- **Inventory on the day** — stock left on a stall.
-- **Scores and rounds** — matches, tournaments, games.
+    Save as `en/images/counters/counter-group.png`, then replace this box with:
+    `![A counter group with a number, a progress bar and a segmented clock](../images/counters/counter-group.png)`
 
-## Sharing and comments
+## Change the count
 
-Counter groups share like every other tool — **Viewer**, **Editor**, **Owner**, or everyone in the initiative — and take tags, comments, connections and copies the same way too. See [Tools](tools.md).
+Tap **+** (**Increment**) or **−** (**Decrement**) beside a counter. Each tap moves it by its step, and the buttons gray out at the min and max.
 
-## Related
+To set an exact number, tap the number itself and type. It saves when you press ++enter++, tap away, or stop typing for a moment.
 
-- [Dashboards](dashboards.md) — putting counter values on a screen with everything else.
-- [Tools](tools.md) — what every tool shares.
-- [Sharing projects & files](../sharing/sharing-projects-and-files.md) — access levels in full.
-- [Your space](your-space.md#my-tools) — every counter group that's reached you, from every community.
+The count never goes past the counter's min or max, however it's changed. Viewers see the count change but can't change it themselves; that takes edit access.
+
+## Show a counter full screen
+
+Counters usually get read from the back of a school gym by somebody who left their glasses in the car. Full screen is for them.
+
+1. Open the counter's **More actions** menu (the **⋮** on its row).
+2. Select **Open full screen**.
+
+The counter fills the screen in its own color, with big **+** and **−** buttons. When the group has more than one counter, **Previous counter** and **Next counter** move between them (so does swiping sideways), and the position ("2 / 5") shows which one you're on. **Exit full screen**, the **X** at the top, takes you back. Anyone who can see the group can open it, which makes it handy on a projector or a tablet propped up by the door.
+
+## Edit or remove a counter
+
+1. Open the counter's **More actions** menu.
+2. Select **Edit Counter**.
+3. Change what you need. Each field saves as you change it.
+
+To remove one, select **Remove Counter** in the same menu, then confirm. Changing a min or max pulls the count (and the initial value) back inside the new bounds if it was outside them.
+
+How the counter's dialog is laid out is the group's **Counter detail** [layout](layouts.md), which you can change under **Settings** › **Layouts**.
+
+## Reset counters
+
+- **One counter:** open its **More actions** menu and select **Reset**. It goes back to its initial value.
+- **The whole group:** select **Reset All** in the strip at the top of the group, then confirm. It's the button for between sessions.
+
+## Duplicate a counter
+
+1. Open the counter's **More actions** menu.
+2. Select **Duplicate**.
+
+The copy lands at the end of the group with "(Copy)" after its name, keeping the count, the bounds, the step, the color and the view mode. It's for when the second team turns up.
+
+## Arrange the group
+
+- **Reorder** counters by dragging each by its handle (**Drag to reorder**).
+- **Sort** them by **Name (A→Z)**, **Name (Z→A)**, **Count (low→high)** or **Count (high→low)**. Sorting rearranges the saved order for everyone, so it's a one-time tidy rather than a view.
+- **Switch to grid view** or **Switch to row view** with the button in the strip. That choice is yours alone and only changes your screen.
+
+**Add Counter**, **Sort** and **Reset All** are only there for people with edit access.
+
+## Settings, sharing and the rest
+
+A counter group's **Settings** has **Details**, **Access**, **Layouts** and **Advanced**, and the group shares, tags, archives, exports, duplicates and goes to the trash like every other tool. See [Tools](tools.md). A group can be tagged; the counters inside it can't.
+
+A [dashboard](dashboards.md) can show counters too, beside everything else.

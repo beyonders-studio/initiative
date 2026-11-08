@@ -4,73 +4,125 @@ icon: lucide/log-in
 
 # Signing in
 
-Four seconds, give or take.
+Signing in takes about four seconds. Your server decides which ways in it offers, so your sign-in card shows some or all of the ones below. Initiative keeps you signed in on each device, so you aren't doing this every morning like it's your bank.
 
-## Email and password
+## Sign in with your email and password
 
 1. Open your group's Initiative address.
-2. Type your **email** and **password**.
-3. Click **Sign in**.
+2. Type your **Email** and **Password**.
+3. Select **Sign in**.
 
-You land on your home screen. Initiative keeps you signed in on that device, so you aren't logging in again every single morning like it's your bank.
+If you've set up [two-factor authentication](../account/two-factor-authentication.md), the card asks for **One more step**:
 
-The card says which server you're signing in to — **Sign in to** and its address — with a small **Self-hosted** badge beside it. That's the kind of server you're on: one somebody runs for your group, at the address you just opened.
+1. Type the **Authentication code** from your authenticator app.
+2. Select **Continue**.
 
-![Signing in with email and password](../images/getting-started/login-form.png)
+Phone in another room? Select **Use a recovery code** and type one of the codes you saved. **Start over** goes back to the email and password.
 
-## A code by email
+## Sign in with a passkey
 
-If your group's Initiative offers it, there's an **Email me a code** button. Type your address, and a six-digit code turns up in your inbox. Type that in. You're in.
+If you've [added a passkey](../account/passkeys.md):
 
-No password anywhere in that. Nothing to remember, nothing to reset, nothing on a sticky note under the keyboard.
+1. Select **Sign in with a passkey**.
+2. Unlock it the way you unlock your phone or computer.
 
-The code lasts ten minutes and works once. Get it wrong five times and it gives up rather than letting you keep going — ask for a fresh one and carry on.
+Many browsers also offer your passkey the moment you click into the **Email** box, above the addresses they remember. Pick it there and you skip the button.
 
-Haven't got an account yet? Same button. The code confirms your address, it asks you to pick a username, and that's the whole thing.
+In the Android app, the prompt comes from your phone. In the Windows app it's Windows' own passkey window, and **Use a passkey saved in your browser** under the button reaches passkeys kept in a browser's password manager. In the Mac and Linux apps, your browser opens for a moment and hands you back.
 
-## Single sign-on
+## Sign in with a code by email
 
-If your work or school set this up, there's a button saying something like **Continue with Single Sign-On**. Click it, log in the way you already do everywhere else, done. No extra Initiative password to forget.
+No password to remember, and nothing to reset.
 
-## Passkeys
+1. Select **Email me a code**.
+2. Type your **Email** and select **Email me a code**.
+3. Type the code from your inbox and select **Sign in**.
 
-If you've [added a passkey](../account/passkeys.md), press **Sign in with a passkey** — or click into the email box, where most browsers offer it above the addresses they remember. Unlock it the way you unlock the device, and you're in. Nothing typed.
+The code works for 10 minutes. Five wrong tries and it gives up, so ask for a fresh one. If your account has two-factor authentication, the code from your app comes next.
 
-## Forgotten your password?
+Don't have an account yet? The same button makes one. After the code, Initiative asks you to **Choose a username**, and **Create account** finishes it.
 
-Happens to everybody. Roughly monthly. There is no shame here.
+## Sign in with your work or school account
 
-1. Click **Forgot password?** on the sign-in screen.
-2. Type the email address your account uses.
-3. Follow the reset link we send you.
-4. Pick a new password (12+ characters) and sign in.
+1. Select **Continue with** and your organization's name.
+2. Sign in the way you do everywhere else at work or school.
 
-Nothing arriving? Check spam first — it's usually spam. Reset links also go stale after a while, so if yours has been sitting in your inbox since Tuesday, just ask for another.
+You come back to Initiative signed in; in the phone or desktop app, your browser opens for this and hands you back. The first time, Initiative may ask you to choose a username and agree to your server's terms; see [Sign up with your work or school account](create-account.md#sign-up-with-your-work-or-school-account).
 
-No password to forget, because you sign in with a [passkey](../account/passkeys.md) and the passkey has gone with the phone? **Use a recovery code** on the same screen sets you a new password with one of the ten you were given.
+## Sign in from your community's own sign-in link
 
-## The mobile app
+Some communities give their members a sign-in link of their own, with a button for each of the community's sign-in providers.
 
-Haven't got it yet? [Installing the app](install-the-app.md) covers the iPhone, Android and desktop apps, and the home-screen version for everything else. The desktop app signs in the same way.
+1. Open the link your community admin shared.
+2. Select **Continue with** and the provider's name.
 
-The app needs one extra step the first time, because it has to be told *which* Initiative it's talking to. There are a lot of them out there and it has no way of guessing which one is yours.
+**Use another sign-in method** goes to the ordinary sign-in card. This link works in a browser; in the app, sign in from the app's own card.
 
-1. Open the app. Under the title it says **Sign in to**, followed by a server. Tap that, choose **Your own server**, type in your group's Initiative address — the same one you use in a browser — and tap **Connect**.
-2. Sign in with your email and password, single sign-on, or a passkey. On Android and Windows a passkey works right inside the app; on iPhone, Mac and Linux the browser opens for a moment and hands you back.
+## Reset a forgotten password
 
-After that it remembers, and stays signed in. Moving to a different server works the same way, from the sign-in or sign-up card: tap the server's name, then a new address and another **Connect**. The app keeps the last address you used, in case you want to go back.
+It happens to everybody, roughly monthly. There is no shame here.
 
-!!! tip "One account, as many devices as you like"
-    Laptop and phone at the same time is completely fine, and so is the tablet you'd forgotten about.
+1. On the sign-in card, select **Forgot password?**
+2. Type the **Email** your account uses and select **Send reset link**.
+3. Open the email and select its link.
+4. Type a **New password** of at least 12 characters, and again in **Confirm password**.
+5. Select **Reset password**.
+6. Select **Go to sign in** and sign in with the new password.
 
-    To see everywhere you're currently signed in — and boot off anything you don't recognise — open **My Settings → Security → Where you're signed in**. Worth a glance every so often, in roughly the same spirit as testing the smoke alarm.
+The link works for an hour, so one that's been sitting in your inbox since Tuesday won't. Nothing arrived? Check spam, then ask for another. Resetting your password signs you out on every other device and turns off your [API keys](../account/api-keys-and-integrations.md).
 
-## Signing out
+## Set a password with a recovery code
 
-Click your **name or picture** at the bottom of the sidebar, then **Sign out**.
+This is for an account that has no password, because it signs in with a passkey, and the passkey has gone off with the phone. You'll need one of the recovery codes you saved when the password went away.
 
-On a shared or public computer, do this. Every time. The library computer does not need standing access to your PTA.
+1. On the sign-in card, select **Forgot password?**
+2. Select **No password to reset? Use a recovery code**.
+3. Type your **Email** and one **Recovery code**.
+4. Type a **New password**, and again in **Confirm password**.
+5. Select **Set password**.
+6. Sign in with your new password.
 
-## Next
+Each recovery code works once. Once you're back in, you can [add a passkey](../account/passkeys.md#add-a-passkey) and give the password up again.
 
-Now let's find where everything lives — [take the quick tour](a-quick-tour.md).
+## When a community asks you to sign in again
+
+A community can ask for more than your server does. When you open one of those, a box appears where you are, and nobody signs you out.
+
+| The box says | Do this |
+|---|---|
+| **Additional sign-in required** | Select **Sign in with** and the provider's name, and sign in there. |
+| **One more step for this community**, asking for a code | Type the code from your authenticator app and select **Continue**. |
+| **One more step for this community**, asking for a passkey | Select **Use your passkey** and unlock it. |
+
+Don't have the code or passkey it wants? Select **Set one up** or **Add a passkey**, add one in your settings, then come back. **Not now** closes the box, and the community stays closed until you answer it.
+
+## When your server asks for a second factor
+
+Whoever runs your server can require two-factor authentication for everybody, or for people with server-wide roles. If that's you and you haven't set one up, Initiative asks the next time you open it. Set up an [authenticator app](../account/two-factor-authentication.md) or a [passkey](../account/passkeys.md), and you're back where you were in about a minute.
+
+Until you do, your API keys and the phone app stop working for you, because neither can type a code. Both start working again the moment you have a factor.
+
+## Sign in on the phone or desktop app
+
+The app asks which server it's talking to the first time, because there are a lot of Initiatives out there and it can't guess yours. [Connect the app to your server](install-the-app.md#connect-the-app-to-your-server) covers that step, then you sign in the same ways as above.
+
+## Sign out
+
+1. Select your name or picture at the bottom of the sidebar.
+2. Select **Sign out**.
+
+On a shared or public computer, do this every time. The library computer does not need standing access to your PTA. To sign out somewhere you aren't sitting, use [Where you're signed in](../account/sign-in-and-security.md#where-youre-signed-in).
+
+## If your account is suspended
+
+A platform moderator can suspend an account. You can still sign in, but you see **Your account is suspended** in place of your communities, with the reason if one was given. Nothing has been removed, and it all comes back when the suspension is lifted.
+
+To ask for it to be lifted:
+
+1. Select **Appeal**.
+2. Explain under **Why should it be lifted?**
+3. Select **Send appeal**.
+
+The moderators can write back on that same page.
+
+Next, find your way around with [the quick tour](a-quick-tour.md).

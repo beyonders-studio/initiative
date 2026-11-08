@@ -4,247 +4,202 @@ icon: lucide/store
 
 # Plug-ins & the marketplace
 
-Whatever your group needs, some other group has needed exactly the same thing, built it, got fed up rebuilding it every year, and shared it.
+Whatever your group needs, some other group has needed exactly the same thing, built it, got tired of rebuilding it every spring, and shared it. The **marketplace** is where those live: ready-made dashboards, projects and plug-ins you add in a couple of clicks, without anybody writing code.
 
-The **marketplace** is where those live: ready-made dashboards, projects and plug-ins you add in a couple of clicks. No developer. No custom build. No waiting for us to get round to shipping it.
+Everything on your marketplace either ships with Initiative or was put there on purpose (see [where listings come from](#where-listings-come-from)). Nothing you add can reach past what you allow it, and you can take any of it back out.
 
-Your marketplace holds the listings that ship with Initiative plus whatever the person running your server has added and approved. Nothing turns up on it by accident — everything there is there because a human put it there.
+There are two marketplaces, and the difference is who gets what you take:
 
-## Two marketplaces
-
-There are two, and the difference is who gets what you take.
-
-| | **Your community's** | **Yours** |
+| | **Your community's marketplace** | **Your own marketplace** |
 |---|---|---|
 | What's on it | Dashboards, projects and plug-ins | Home layouts and decoration packs |
-| Who it's for | Everyone in that community | You, in every community you're in |
-| Where to open it | **Browse the marketplace** in a dashboards or projects list's **More actions** menu (beside the create button, while the list is empty), or at the foot of the **Plug-ins** section of the sidebar | **Browse the marketplace** when making a new home view, or on **My Settings → Profile** |
+| Who gets it | Everyone in that community | You, in every community you're in |
+| Where to find it | **Browse the marketplace** in a Dashboards or Projects list, or at the bottom of the **Plug-ins** section of the sidebar | **Browse the marketplace** when making a new home view, or under **Your packs** in **My Settings → Profile** |
 
-![Browsing the marketplace](../images/marketplace/browse.png)
+Every listing says who published it ("by Initiative", or the publisher's name) on its card, on its page and in the dialog where you add it, so you know before you decide.
 
-## Your community's marketplace
+## Add a ready-made dashboard { #adding-a-dashboard }
 
-| | **Dashboards** | **Projects** | **Plug-ins** |
-|---|---|---|---|
-| What it adds | A screen of charts, numbers and timelines | A board that's already set up: columns, fields and a first round of tasks | Something the whole community shares |
-| Where it goes | Into one initiative | Into one initiative | Into the community |
-| Who can add it | Anyone who can create dashboards there | Anyone who can create projects there | Your community's [superadmin](communities.md#why-superadmin-is-separate) |
+A marketplace dashboard is a screen of charts, numbers and timelines somebody already laid out. You can add one wherever you can create dashboards. If you can't, ask an initiative manager to give your role the dashboard permission (see [Initiative roles](../sharing/initiative-roles.md)).
 
-All three browse the same way: search, open a listing to read what it does, add it.
+1. Open an initiative's **Dashboards**.
+2. Select **Browse the marketplace**. On a list that already has dashboards, it's under **More actions**.
+3. Open a listing. **Preview** shows it drawn with sample data.
+4. Select **Add to an initiative**.
+5. Pick the **Initiative**.
+6. Change the **Name**, if you like.
+7. Select **Add**.
 
-### Adding a dashboard
+It shows up under that initiative's **Dashboards**, and from then on it's a dashboard like one you built: rename it, tag it, share it, delete it. It shows each person only the numbers they could already reach, so two people looking at the same dashboard can correctly see different totals.
 
-1. Open the listing and choose **Add to an initiative**.
-2. Pick the **initiative** it should live in.
-3. Give it a **name** — the listing's name is filled in, changeable now or later.
+When the publisher puts out a newer version, the dashboard shows something like **Version 1.3.0 available**. Anyone who can edit the dashboard can select it to update, and nothing changes until somebody does. A listing that needs a newer version of Initiative than your server runs says so rather than half-working.
 
-It appears under that initiative's **Dashboards**, exactly like one you built. Rename it, tag it, share it, delete it like any other tool.
+## Copy a ready-made project { #adding-a-project }
 
-!!! info "No initiative to choose from?"
-    You can only add a dashboard where you're allowed to create one. If the list is empty, ask an initiative manager to give your role the dashboard permission — see [Initiative roles](../sharing/initiative-roles.md).
+Somebody has already worked out which columns a hiring pipeline needs. Initiative ships with a sales pipeline, a hiring pipeline, a bug tracker, a content calendar, a grant tracker, a product launch, facility maintenance and plant care. Each comes with [task types](project-setup.md#task-types) of its own, so the bug tracker has bugs, feature requests and chores, and plant care has watering, fertilizing and repotting.
 
-A listing's page can show a **preview** drawn with sample data, so you can see the shape of it before committing. Yours will show your group's real numbers.
+You can add one wherever you can create projects.
 
-When the publisher ships a newer version, the dashboard shows **Version X available**. Updating is your choice; nothing changes underneath you. If a listing needs a newer Initiative than your server runs, it says so rather than half-working.
+1. Open an initiative's **Projects**.
+2. Select **Browse the marketplace**. On a list that already has projects, it's under **More actions**.
+3. Open a listing. **Blank** and **Example** show the empty board you'd get and the same board with made-up work moving through it.
+4. Select **Add to an initiative**.
+5. Pick the **Initiative**, and change the **Name** if you like.
+6. Under **What to start from**, pick **Start blank** or **Start from the example**.
+7. If it asks for a **Start date**, pick one. The project's dates move so the earliest lands on that day, and the rest keep their distance, so a launch six weeks out is still six weeks out.
+8. Select **Add**.
 
-### Adding a project
+What you get is an ordinary project of your own. Rename the columns, delete the example tasks, take it apart completely; nothing you do reaches the listing or anybody else's copy.
 
-Somebody has already worked out what a hiring pipeline needs as columns. A few listings ship with Initiative: a sales pipeline, a hiring pipeline, a bug tracker, a content calendar, a grant tracker, a product launch, facility maintenance and plant care.
+## Add a plug-in to your community { #adding-a-plug-in }
 
-Each comes with [task types](projects-and-tasks.md#task-types) of its own in place of the usual four, each with its own page: the bug tracker has bugs, feature requests and chores, and plant care has watering, fertilizing and repotting.
+A **plug-in** adds something to the whole community: a page of its own, widgets for dashboards, [fields and buttons on your items](#what-a-plug-in-puts-on-items), or a link to a service your group already uses. Because it affects everyone, only your community's [superadmin](running-a-community.md#why-superadmin-is-separate) can add or remove one. Everybody else can browse, read the listing, and go ask them nicely.
 
-1. Open the listing. **Blank** and **Example** show it both ways: the empty board you'd get, and the same board with some made-up work moving through it.
-2. Choose **Add to an initiative**, and pick the initiative and a name.
-3. Choose **What to start from**: **Start blank**, or **Start from the example**.
-4. Pick a **Start date**. The project's dates move so the earliest lands on that day, and the rest keep their distance from it. A launch with a deadline six weeks in is still six weeks in.
+1. In the community's sidebar, select **Add a plug-in** at the bottom of the **Plug-ins** section.
+2. Open a listing.
+3. Select **Add to community**.
+4. Change the **Name**, if you like.
+5. Answer the questions it asks (below).
+6. Select **Add to community**.
 
-What lands is an ordinary project of your own. Rename the columns, delete the example tasks, take it apart entirely; nothing you do reaches the listing or anybody else's copy.
+It appears in the **Plug-ins** section of the sidebar, above your initiatives, and under the initiatives it works in if it has a page there. If it needs a credential or a setting before it can do anything, it's marked **Needs setup**; see [Managing plug-ins](managing-plugins.md).
 
-### Adding a plug-in
+The marketplace only offers plug-ins your server can run. Some need a program running alongside Initiative, so if you expected one and can't find it, ask whoever runs your server. Some listings also have a minimum age, shown as **Ages 16+** (or whatever it is where you are). The community can add it anyway; somebody under that age just can't open or use it.
 
-A **plug-in** adds something to the community as a whole rather than one effort: a page of its own, extra dashboard widgets, [fields and buttons on your items](#what-a-plug-in-puts-on-items), or a link to a service your group already uses. Because it affects everyone, **only your community's [superadmin](communities.md#why-superadmin-is-separate) can add or remove one**. Everybody else can browse, read the listing, and go and ask them nicely.
+### What you're agreeing to { #what-youre-agreeing-to }
 
-1. Switch the marketplace to the **Plug-ins** shelf and open a listing.
-2. **Add to community**, and name it.
-3. Answer the questions it asks (below), and add it.
-4. If it needs setting up, it's marked **Needs setup**. Open its settings to finish.
+Adding a plug-in asks up to four things, and every answer can be changed later from its settings, so you can't get any of it wrong in a way that sticks. A plug-in that asks for nothing just gets a name.
 
-The Plug-ins shelf lists the plug-ins your server actually runs. Some need a program running alongside Initiative, and one your server hasn't set up, or has switched off, isn't offered here. Expected something and can't find it? Whoever runs your server is who to ask. On the hosted service they're already running — see [Self-host or let us host it](../self-host-or-hosted.md#plug-ins-that-need-something-running-behind-them).
+!!! screenshot "Adding a plug-in"
+    **Show:** the **Add** dialog for a plug-in, with **What it can reach**, **Where it works** and **Who can open it there** filled in.
 
-Installed plug-ins appear in the **Plug-ins** section at the top of the sidebar, above your initiatives, and are managed under **Community settings → Integrations**.
+    Save as `en/images/marketplace/add-plugin.png`, then replace this box with:
+    `![Adding a plug-in](../images/marketplace/add-plugin.png)`
 
-### What you're agreeing to
-
-Adding a plug-in asks up to three things, and every answer can be changed later from the plug-in's settings. So none of this is a trap, and you can't get it wrong in a way that sticks.
-
-| | What it means |
+| Question | What it decides |
 |---|---|
-| **What it can reach** | The kinds of thing it may read, or read and change: projects, files, comments, tags, metadata, and so on. Everything it asks for starts ticked; untick what you'd rather it didn't have. A line marked *This server doesn't allow it* is off-limits whatever you tick. Two lines start unticked: acting as a moderator, and acting as an admin (see below). |
-| **Where it works** | Every current initiative, or only the ones you pick. A plug-in reads and changes things only in the initiatives it works in, so the committee's private budget initiative stays out of reach unless you put it there. |
-| **Who can open it there** | Only for a plug-in with a page inside initiatives: which roles see that page. Community admins always can. |
-| **Plug-ins that can use it** | Only when plug-ins already here have asked to use this one. Each starts ticked. |
+| **What it can reach** | What it may read, or read and change: projects, files, comments, tags, metadata, and so on. Everything it asks for starts ticked; untick what you'd rather it didn't have. A line marked **This server doesn't allow it** stays off whatever you tick. |
+| **Where it works** | **Every current initiative**, or **Only the initiatives I choose**. It reads and changes things only in the initiatives it works in, so the committee's private budget initiative stays out of reach unless you put it there. |
+| **Who can open it there** | For a plug-in with a page or fields inside initiatives: which roles see them. Moderators start ticked, and community admins can always open it. |
+| **Plug-ins that can use it** | Only when plug-ins you already have ask to use this one. Each starts ticked. |
 
-A plug-in asking for nothing gets asked nothing. It just gets a name.
+Some plug-ins work through another one, the way a plug-in that files bug reports might open them through a code-hosting plug-in. You're asked about that when the second plug-in arrives, so a community without the code-hosting plug-in is never asked whether anything may use it. Remove that plug-in and the permission goes with it; add it back and you're asked again.
 
-Some plug-ins work through another one: automations that open GitHub issues, say. You're asked about that when the other one arrives, not before, so a community without GitHub is never asked whether automations may use it. Remove GitHub and that permission goes with it. Add it back and you're asked again.
+A plug-in allowed to change something, a task say, can fill in that thing's [metadata](initiatives.md#metadata) too. Ticking **Metadata** itself lets it read the initiative's list of metadata fields, and with change allowed, add to that list and edit it.
 
-A plug-in allowed to change something, such as a task, can fill in that thing's [metadata](initiatives.md#metadata) as well. **Metadata** on its own is for making new ones: it lets the plug-in read the initiative's metadata, and with write, add to it.
+However you answer, a plug-in never reaches past what you allowed. One that may read projects in the Garden initiative reads projects in the Garden initiative, and not files, and not the Kitchen.
 
-!!! info "Some plug-ins have a minimum age"
-    A listing that has one says so: **Ages 16+**, for the country your browser is set to. It can differ by country. The community can still add it; somebody under the age where they are just can't open or use it.
+### Letting a plug-in act as a moderator or an admin
 
-However you answer, **it never reaches past what you allowed.** A plug-in that may read projects in the Garden initiative reads projects in the Garden initiative. Not files, not the Kitchen.
+On its own, a plug-in sees what any member of an initiative it works in would see: what's shared with everyone there, and what it made itself. Something shared with three people stays with those three.
 
-### Acting as a moderator or an admin
-
-On its own, a plug-in sees what any member of an initiative would without being given anything more: what's shared with everyone there, and what it made itself. Something shared with three people stays with those three.
-
-Some plug-ins can do more if you let them, and ask for it in two lines that start unticked:
+Some plug-ins can do more, and ask in two lines that start unticked:
 
 - **Act as a moderator in the initiatives it's placed in.** Inside an initiative it works in, it reaches everything a moderator would, whoever it's shared with.
 - **Act as an admin across your whole community.** Everything a community admin reaches, including initiatives it isn't placed in.
 
-Ticking either lets the plug-in ask for that standing; it doesn't use it everywhere at once. An automations plug-in, for example, uses it only for an automation somebody holding that role set up to run that way. Either way, it still reaches only the kinds of thing ticked above. An admin-standing plug-in that may read projects reads every project, and still no files.
+Ticking one lets the plug-in use that standing when it needs to, not all the time. Either way it reaches only the kinds of thing ticked above, so an admin-standing plug-in that may read projects reads every project, and no files.
 
-### What a plug-in puts on items
+## Use a plug-in
 
-Some plug-ins add to the things you already work with: an invoice number on a task, a **Paid** tick on an event, a progress bar on a counter that is very nearly at its fundraising target. They can appear on tasks, calendar events, counters and posts.
+Plug-ins are in the **Plug-ins** section of the community's sidebar. Select one to open its page. One with a page inside initiatives also shows up under each initiative it works in, for the roles that may open it. A plug-in that adds things elsewhere, like widgets or fields, has nothing to open, so it waits under the **2 more** (or however many) line at the bottom of the section.
+
+Point at a plug-in in the sidebar and a gear appears beside its name. That opens its settings, showing the parts that are yours to decide.
+
+### Connect your own account to a plug-in
+
+Some plug-ins work with another service on your behalf, so each member signs in with their own account there. Nobody else sees yours, admins included.
+
+1. Point at the plug-in in the sidebar and select its gear (or select its name, if it has no page).
+2. Under **Your account**, select **Connect**.
+3. Sign in to the other service in the tab that opens.
+4. Close that tab when it says **Connected**.
+
+The settings then say **Connected as** and your account there. **Disconnect** takes it back, and **Reconnect** fixes a connection that's **Expired**. Your community's superadmin can see who has connected and disconnect anybody, and if it says **A community admin has stopped you connecting this**, that's what happened.
+
+### Let a plug-in act as you
+
+A plug-in sometimes asks to do something in your name, like commenting on a linked issue as the person who closed it. It asks for each purpose on its own, in its own words, and you get a notification under **Waiting on you**.
+
+1. Open the plug-in's settings from the gear beside its name.
+2. Under **What it has asked to do as you**, read each request.
+3. Select **Let it read as me**, **Let it read and change things as me**, or **Decline**.
+
+You can change your mind any time: **Stop this** ends one you allowed. Nobody else can answer these for you, admins included.
+
+### What a plug-in puts on items { #what-a-plug-in-puts-on-items }
+
+Some plug-ins add to things you already work with: an invoice number on a task, a **Paid** tick on an event, a progress bar on a counter very nearly at its fundraising goal. They can appear on tasks, calendar events, counters and posts.
 
 | | What you see |
 |---|---|
-| **Fields** | A labelled value, drawn like Initiative's own: text, a number, a date, a date and time, a link, a colored badge, a progress bar or a tick box. A field can also hold a list, such as every pull request linked to a task, each with badges for what state it's in. Task fields can be filtered on, like any other. |
+| **Fields** | A labeled value drawn like Initiative's own: text, a number, a date, a link, a colored badge, a progress bar or a checkbox. A field can hold a list too, like every pull request linked to a task, each with its state. Task fields can be filtered on like any other. |
 | **Sections** | A small panel on the item's page, made of the plug-in's fields and buttons. |
-| **Actions** | A button in a section, an entry in the item's menu, or a button beside one entry of a list, that asks the plug-in to do something with this one item. Some check with you first, or ask you a question or two, like which repository. |
+| **Actions** | A button in a section, an entry in the item's menu, or a button beside one entry in a list, that asks the plug-in to do something with this item. Some check with you first, or ask a question or two, like which repository. |
 
-The plug-in keeps those values in Initiative, so they show and filter without waiting on it.
+The plug-in keeps those values in Initiative, so they show and filter without waiting on it. They follow what the superadmin agreed to: a plug-in only marks items it may read, and only in the initiatives it works in, for the roles that may open it there. A few actions belong to community admins alone.
 
-What the superadmin agreed to applies here too. A plug-in only puts values on items it may read, so one allowed to read projects can mark tasks, but not calendar events. They show in the initiatives under **Where it works**, to the roles under **Who can open it there**, and to community admins. A few actions belong to community admins alone.
+Whoever looks after the initiative's layouts can move a plug-in's fields and sections, or take them off, in [Edit layouts](layouts.md). One taken off stays off, updates included.
 
-Placing a plug-in in an initiative adds its fields and sections to that initiative's item pages, and its task fields to boards and tables. Whoever looks after the layouts can move them or take them off in [Edit layouts](layouts.md). One taken off stays off, updates included.
+## Report a listing or a plug-in
 
-### Updates
+Something in a plug-in or listing that shouldn't be there? Tell whoever runs your server.
 
-Plug-ins update themselves. Most new versions arrive quietly and nobody notices, which is the idea.
+1. Open the listing's page, or the plug-in's own page.
+2. Select **Report** (the flag) beside its name.
+3. Pick what's wrong under **What is wrong?**, and add anything else they should know.
+4. Select **Send report**.
 
-The exception is a version that wants **more** than you agreed to: something new to reach, or a new page. That one waits. The superadmin gets a notification, and the plug-in's settings show what the new version wants, with **Accept and update** and **Decline** beside it. Declining keeps the plug-in exactly as it is, on the version it's already running.
+It goes to whoever runs your server, not to the publisher, and not to your community's admins. Initiative's own listings carry no flag. If one of those misbehaves, that's a bug, so tell whoever runs your server the way you would about anything else that's broken.
 
-Prefer to read every update first? Turn off **Update automatically** in the plug-in's settings, and each new version waits for you to click **Update to** it.
+## Your own marketplace { #your-own-marketplace }
 
-Some plug-ins come with your server and are added to every community for you. Those can't be removed or turned off from here, and they update without asking. Whoever runs the server decides whether they exist at all; once one is added, your community decides where it appears and what it may do, like any other.
+Your own marketplace holds things for you rather than your community: **home layouts** and **decoration packs**. Whatever you take from it comes with you into every community.
 
-### A plug-in can own things
+### Add a home layout { #home-layouts }
 
-Content usually belongs to a person. It can also belong to a **plug-in**, so a project a plug-in looks after doesn't end up orphaned when the person who set it up moves on.
+A home layout is a ready-made page of widgets for a particular kind of day. It's only an arrangement: every widget reads your own tasks and calendar when it draws.
 
-In **Settings → Users**, **Transfer ownership** offers plug-ins beside admins. A plug-in can be given something only while it's switched on, works in that initiative, and is allowed to change that kind of thing. A plug-in that owns something may decide who else gets access to it, if you allowed it to change sharing.
+1. On **Home**, select **Customize**.
+2. Select **+** beside your view tabs.
+3. Select **Browse the marketplace** at the bottom of the picker.
+4. Find a layout under **Home layouts**.
+5. Select **Add to my home**.
 
-### Setting a plug-in up
+It opens as a new view beside the ones you have, and nothing you arranged is touched. See [Your space](your-space.md#home) for arranging it from there.
 
-Some plug-ins need a credential — an API key, or a sign-in to another service. Two kinds, and the difference matters:
-
-- **Community credential** — set once by the superadmin, used for everyone. Good for a shared account the whole group works through.
-- **Your account** — each member supplies their own, used only for them. Yours is yours: other members, admins included, can't see or use it. The superadmin can see who has connected, and disconnect them.
-
-Some plug-ins also have **settings** of their own, such as the prefix a task's reference starts with. The superadmin changes them in the plug-in's settings.
-
-Each connection shows which service it uses and what it's allowed to do there, so you can decide before you hand anything over.
-
-### Turning a plug-in off, and removing it
-
-- **Turn off** hides it from everyone while keeping its setup. Turn it back on and it picks up where it left off. Disabled plug-ins stay listed in **Community settings → Integrations**.
-- **Remove** takes it out entirely:
-    - Anything it set up when it was added moves to the **Trash**, restorable during the retention window.
-    - Anything it owned stays where it is, with no owner. An admin picks it up with **Claim unowned content** in **Settings → Users**.
-    - Every value it kept on items goes with it.
-    - Every credential it held, the community's and each member's, is deleted, and the plug-in is told to stop using them.
-    - The plug-in is told it was removed, and what it keeps about your community stays with it. It never learns your members' names or accounts, only a name of its own for each of them, and those names stay the same: add it back later and it recognises your community and its members, and picks up where it left off.
-- **Remove and erase its data** does all of that and also asks the plug-in to delete everything it holds about your community. Once it has, its names for your community and its members are forgotten, and adding it back starts afresh. Until then it can't be added back. A plug-in that never answers is given a few days, and then its names are forgotten anyway. Only the community's admins can erase, and a plug-in that comes with your server can't be removed or erased.
-
-A plug-in is also told when your community's standing changes, for instance when it is put on hold, and pauses its own work until the community is back. When a community is deleted for good, every plug-in that knew it is asked to erase what it holds first, and the community is destroyed once each has answered or been given up on.
-
-## Your own marketplace
-
-Yours holds **home layouts** and **decoration packs**.
-
-### Home layouts
-
-Ready-made pages for your [home](your-space.md#home), each arranged for a particular kind of day. Five ship with Initiative:
-
-| | |
+| Layout | What's on it |
 |---|---|
-| **Week ahead** | Your calendar front and centre, the next fortnight beside it, what's urgent underneath. |
-| **Study session** | A twenty-five minute timer, the next few things, your streak, then the whole list. |
-| **Stand-up** | What happened to your things, what changed lately, your list. Read it top to bottom and you know what to say. |
-| **Club secretary** | Every community you're in, the calendar across them, and the posts, events and files that changed. |
-| **Around the world** | Clocks for wherever your people are, plus what everybody changed while you slept. |
+| **Week ahead** | The whole week on one page. |
+| **Study session** | A timer, the next thing, and your streak. |
+| **Stand-up** | What happened to your things, and what moved. |
+| **Club secretary** | Your groups, their calendars, and what's been posted. |
+| **Around the world** | Clocks for a team that's never all awake at once, and what changed while you slept. |
 
-**Add to my home** opens the layout as a new view, beside the ones you already have — nothing you arranged is touched. **Browse the marketplace** at the foot of the new-view picker brings you here.
+### Get a decoration pack { #decoration-packs }
 
-A layout is only an arrangement. It carries no tasks, no communities and nobody else's anything: every widget reads your own things when it draws.
+Decoration packs are artwork for your profile, and by far the least serious part of Initiative. Each is built around something a group of people has in common (Sports, Drama, Pets, Tea, Spooky and plenty more) and carries banners, frames and trophies to wear in any combination you like. Plenty of the banners move: skeletons dance, a lake changes color as the sun goes down into it, and the view from a train window keeps going past.
 
-### Decoration packs
+1. In **My Settings → Profile**, select **Browse the marketplace** under **Your packs**.
+2. Under **Decoration packs**, open a pack to see everything in it.
+3. Select **Get this pack**.
 
-Artwork for your profile, and by far the least serious part of Initiative.
+Its pieces land in your collection, and nothing goes on you until you choose it. Pick what to wear back in **My Settings → Profile**, mixing pieces from different packs however you like; see [Profile & preferences](../account/profile-and-preferences.md#decorations). A pack's banners can also go on your [home views](your-space.md#put-a-banner-on-a-view).
 
-Each pack is built around one thing a group of people has in common, and carries banners, frames and trophies you wear in whatever combination pleases you.
-
-Sixteen packs ship with Initiative:
-
-| | |
-|---|---|
-| **What you do** | Sports, Gaming, Drama, Cinema, Soundcheck, Observatory, Education |
-| **What you love** | Pets, Plants, Books, Tea, Travel, Nature, Winter, Zen, Spooky |
-
-The banners move: a playhead lights the notes it passes, a curtain runs in and out, skeletons dance until sunrise, a typewriter types a line at a time, a lake changes color the whole way down as the sun sets into it, and the view from a train window keeps going past.
-
-What you take here is yours, not your community's. Download a pack in one community and you're wearing it in all of them, because your profile belongs to you.
-
-1. Open **Browse the marketplace** on **My Settings → Profile**.
-2. Open a pack to see everything in it, and the profile it would make — banner running, frame around your own picture, trophies underneath.
-3. **Get this pack**, and its pieces land in your collection.
-
-Downloading a pack puts nothing on you. It just hands you the pieces — you choose what to actually wear back on **My Settings → Profile**, mixing pieces from different packs however you like. Nobody is going to stop you. See [Profile & preferences](../account/profile-and-preferences.md#decorations).
-
-Giving one back is the same click in reverse — open the pack's card and remove it. Its pieces leave your collection, and anything from it you were wearing comes off with them.
-
-!!! screenshot "Decoration packs"
-    **Show:** the decoration packs shelf, a row of pack cards with their banners running.
-
-    Save as `en/images/marketplace/decoration-packs.png`, then replace this box with:
-    `![Decoration packs](../images/marketplace/decoration-packs.png)`
+To give a pack back, select **Remove pack** on it, here or under **Your packs**, and confirm. Its pieces leave your collection, and anything from it you were wearing comes off.
 
 ## Where listings come from
 
-Every listing in your marketplace arrived one of three ways:
+Every listing on your marketplace arrived one of three ways:
 
-- It **ships with Initiative** — part of the built-in catalog, credited to Initiative. That credit can't be claimed by anything else.
-- It came from **the Initiative registry** — a signed online catalog your server follows unless its platform owner has switched it off. Anyone can propose a listing for it; it's published once it's been reviewed. Every file from it is checked against a signing key built into Initiative before anything is used, so a listing arrives exactly as it was published or not at all.
-- Your **platform owner added it** — they chose that listing and published it to your deployment. If you run Initiative yourself, that's you.
+- **It ships with Initiative.** It's credited "by Initiative", and nothing else can claim that credit.
+- **It came from the Initiative registry,** a signed online catalog your server follows unless whoever runs it has switched it off. Anyone can propose a listing for it, and it's published once it's been reviewed. Every file from it is checked against a signing key built into Initiative before anything is used, so a listing arrives exactly as it was published or not at all.
+- **Whoever runs your server added it.** If you run Initiative yourself, that's you; see [Publishing your own listings](../running-a-server/publishing-listings.md).
 
-That's the lot. Anyone can write a listing; reaching *your* marketplace takes that signed registry or a decision by your platform owner. See [Publishing your own listings](../running-a-server/publishing-listings.md).
-
-Every listing shows **who published it** — on the card, on its page, and in the dialog where you add it — so the question is answered while you're deciding.
-
-Two things hold whatever you install:
-
-- **Your access rules still apply.** A dashboard shows *you* only the data you could already reach — same community, initiative, role and sharing checks as everywhere else. Two people on the same dashboard can correctly see different numbers.
-- **Widgets run in a sandbox.** Marketplace widgets run in an isolated runtime that can only hand back something to draw. If one misbehaves, that tile shows an error and the rest of the page carries on.
-
-### Reporting a listing or a plug-in
-
-Something in a plug-in that shouldn't be there? Press the **flag** beside the listing's name, or at the top of an installed plug-in's page, pick a reason, and send it. It goes to whoever runs your server, not to the plug-in's publisher and not to your community's admins, who are free to carry on not knowing.
-
-Plug-ins from BeyondersStudio, who make Initiative, carry no flag. If one misbehaves, that's a bug: tell whoever runs your server, the way you would about anything else that's broken.
+Marketplace widgets on dashboards run in a sandbox that can only hand back something to draw. If one misbehaves, that tile shows an error and the rest of the page carries on.
 
 ### On the iPhone app
 
-The iPhone app shows the **curated catalogue**: the listings that ship with Initiative and the ones from the Initiative registry. Anything your platform owner added themselves is browsed from the website or the other apps.
+The iPhone app's marketplace shows the listings that ship with Initiative and the ones from the Initiative registry. Anything whoever runs your server added themselves is browsed from the website or the other apps.
 
-Plug-ins your community has already added open as usual. The first time you open one BeyondersStudio doesn't publish, you're told who made it, that your community and its publisher provide it rather than Initiative, and where to report it. **Continue**, and it doesn't ask again for that plug-in.
-
-## Related
-
-- [Profile & preferences](../account/profile-and-preferences.md) — wearing what a decoration pack gave you.
-- [Tools](tools.md) — the calendar, counters, dashboards and boards built into every initiative.
-- [Sharing & access](../sharing/index.md) — who can see what you add.
-- [Publishing your own listings](../running-a-server/publishing-listings.md) — for whoever runs the server, adding to its marketplace.
+Plug-ins your community already has open as usual. The first time you open one that doesn't come from Initiative, you're told who made it, that your community and its publisher provide it, and where to report it. Select **Continue**, and it won't ask again for that plug-in.

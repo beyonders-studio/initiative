@@ -4,80 +4,91 @@ icon: lucide/map
 
 # A quick tour
 
-Nobody reads the tour. You're going to skim this, click something, and work it out by touch like everyone else does, and that's genuinely fine — the app is built on the assumption that you will.
+Nobody reads the tour. You're going to skim this, click something, and work it out by touch like everyone else, which is fine, because the app is built for exactly that. If you'd like the map first, here it is. You'll spend most of your time in two places: the sidebar and the big area in the middle.
 
-But if you'd like the map first: four regions on screen, plus one corner of it that belongs to you rather than to any group. You'll spend about 95% of your life in two of them. Here's what the rest are up to.
+!!! screenshot "The whole screen in a community: the rail of community icons on the far left, the sidebar with its Initiatives tab open, an initiative's page in the middle, and the tab bar along the top. Save as docs/en/images/getting-started/tour-overview.png"
 
-![The Initiative screen: the community rail, the sidebar, and an initiative's page](../images/getting-started/tour-overview.png)
+## Switch between your communities
 
-## The far-left strip
+The narrow strip down the far left edge holds one icon per community you belong to. Select one and the whole app moves over: sidebar, projects, files, all of it. A dot on an icon means something in there is unread.
 
-A narrow column of icons welded to the edge of the screen. One per community you belong to. Click one and the entire app swaps over — sidebar, projects, files, the lot.
+Below the icons are **Create Community** (the **+**) and **Join a community**, when your server offers them. Can't tell your communities apart from a row of tiny pictures? **Expand community list** opens the strip into cards with each community's banner, description, member count and how many people are online.
 
-Can't tell your communities apart from a row of tiny pictures? **Expand community list** opens the rail out into cards: each community's banner, description and categories, with how many people are in it and how many are online right now.
+Right-click an icon, or press and hold it on a touch screen, for that community's menu: **View initiatives**, **View members**, **Invite members**, **Leave community** and a few more. [Communities](../guides/communities.md) covers them.
 
-## The logo above them
+## Go to your own space
 
-The **Initiative logo** sits above the community icons, and it isn't one. It's your corner — and you have already been in it, because the page you land on when you sign in is **Home**: everything assigned to you, from every community at once, laid out however you like.
+The Initiative logo above the community icons is your corner rather than a group's. You've already been there: **Home**, the page you land on when you sign in, shows what's assigned to you from every community at once.
 
-Click the logo from anywhere and the sidebar swaps to your own short list — Home, My Calendar, My Tools, My Messages, My Stats. Click a community icon to go back out.
+Select the logo and the sidebar swaps to your own short list:
 
-So: **the icons are where the group's work lives, the logo is where yours does.** Belong to four groups and you still only have one list of what you've agreed to. See [Your space](../guides/your-space.md).
+- **Home**
+- **My Calendar**
+- **My Tools**
+- **My Messages**, where your server has messages switched on
+- **My Tickets**, once you've sent a help request or a report
+- **My Stats**
 
-## The sidebar
+Belong to four groups and you still have one list of what you agreed to do. See [Your space](../guides/your-space.md). Select a community icon to go back.
 
-A map of whichever community you're currently standing in.
+## Find your way around a community
 
-It has two tabs. **Initiatives** is the one that matters. Each initiative expands into a row per tool, with a count beside each and its projects listed underneath. Whatever you're looking for is almost certainly under here, nested a level or two down, being quietly organised.
+The sidebar is a map of the community you're in. Its name sits at the top, with a gear for **Community Settings** if you run the place, and a search box under it.
 
-Click an initiative's *name* for its own page: the name with the initiative's colour running down the side, your role there, the faces of whoever's online, and a tab for each of its tools.
+The **Initiatives** tab is the one that matters. An initiative is a body of work inside the community, like "Spring Play" or "Tuesday Night D&D". Each one expands into a row per tool (projects, files, calendars and so on) with a count beside each, and its projects listed underneath. Whatever you're looking for is almost certainly a level or two down in here. Select an initiative's name for its own page, with a tab for each of its tools.
 
-**Bookmarks** sits at the top of that tab, for anything you've bookmarked. **Tags** is the other tab, for things you've labelled. **Search** is near the top, though within a week you'll be doing that from the keyboard and this button will become purely decorative.
+Above the initiatives you'll find **Bookmarks**, for anything you've bookmarked, and **Plug-ins**, for what your community has added. The **Tags** tab lists everything by the labels people have put on it.
 
-In a busy community the sidebar gets long. Initiatives collapse, and there's a **Collapse all** for when it has got away from you completely and you'd like to begin again. Too narrow, or too wide? Drag its edge.
+In a busy community the sidebar gets long. **Collapse all** folds every initiative back up so you can begin again. Too narrow or too wide? Drag its edge.
 
-## The bottom of the sidebar
+## Use your account menu
 
-Your bits, tucked underneath.
+Select your name or picture at the bottom of the sidebar. The menu opens on your picture and handle, then:
 
-**Your name and picture** opens your account menu — your profile, **My Settings**, **Help**, **Theme**, and signing out.
+| Item | What it's for |
+|---|---|
+| **Set status** | An emoji and a line about what you're up to |
+| Your presence, such as **Online** | How you appear to everyone else: **Online**, **Idle**, **Busy** or **Offline** |
+| **My Profile** | Your public profile page |
+| **Home** | Your own space |
+| **My Settings** | Everything about your account ([Profile & preferences](../account/profile-and-preferences.md)) |
+| **Help** | Searches this guide without leaving the app |
+| **Theme** | **System**, **Light** or **Dark**, plus the rainbow **Pride** wordmark |
+| **Sign out** | What it says |
 
-The small **dot** on your picture is your presence: online, idle, busy, or offline. Offline means offline. You can sit in Initiative at two in the morning with six files open and that dot will say offline the entire time, because you asked it to and it is nobody's business. See [Saying how you're around](../account/profile-and-preferences.md#saying-how-youre-around).
+**Offline** means offline. You can sit in Initiative at two in the morning with six files open and the dot will say offline the whole time, because you asked it to and it's nobody's business. **System**, under **Theme**, follows your device, for those of us who lost the argument with our laptop some time ago.
 
-**Theme**, in that menu, does Light, Dark, or System. "System" is for those of us who lost the argument with our laptop some time ago and have made peace with it.
+Beside your name is the bell, which holds your [notifications](../guides/notifications.md). An **Update** button joins it when a newer version of Initiative is waiting, and stays until you take it.
 
-**The bell**, beside your name, is your notifications. Announcements you've closed land there too, already read, so you can open one again.
+## Get help without leaving the app
 
-**Update** appears beside the bell only when there's a newer version waiting, and stays until you take it. On the web and phones it reloads. The desktop app keeps it in the window's title bar instead, where it restarts into the new app, or tells you where to get it.
+1. Open your account menu and select **Help**.
+2. Type into **Search the user guide**.
 
-**Help**, in your account menu and in [search](#the-one-thing-genuinely-worth-learning-today), searches these pages without leaving the app, starting with answers for the page you're on. The desktop app also has it as the question mark in its title bar. Where there's somebody to ask (a server that takes help requests, or one that has given an address to write to), the way to ask sits under the results.
+Before you type anything, Help shows the pages **For this page**, the one you're on. Where your server takes help requests, **Ask the team** sits under the results, and your search goes into the request. Some servers give an address to write to instead. The desktop app keeps Help in the window's title bar too.
 
-Which version you're on, and what changed lately, is at the foot of **My Settings**, for anyone who likes to know what changed and when.
+## Get back to something you had open
 
-## The middle
+The tabs along the top are the things you opened lately, across every community. Select one to go back to the document you were three paragraphs into when somebody messaged you about something else entirely.
 
-Where the work is. Whatever you clicked opens here — a board, a spreadsheet, a task list, a settings page.
+Right-click a tab for **Close**, **Close others** and **Close all**. Or let them pile up, as is traditional. To cap how many it keeps, set **Recent items in tab bar** in **My Settings › Preferences**.
 
-It gets the most room because it *is* the thing. Everything else described on this page is scaffolding holding up this one rectangle.
+## Find anything with search
 
-## The tabs along the top
+This is the one thing worth learning today.
 
-Browser tabs, but for your work. Things you open stack up along the top, so you can get back to the document you were three paragraphs into when somebody messaged you about something else entirely.
+1. Press ++ctrl+k++ on Windows or Linux, or ++cmd+k++ on a Mac. On a touch screen, tap with three fingers.
+2. Type part of a name.
+3. Select what you were after, or press ++enter++ for the top result.
 
-Close them when you're done. Or let them pile up, as is traditional. You can cap how many it keeps in **My Settings → Preferences**, if you'd like that limit actually enforced rather than merely intended.
+It finds projects, tasks, files, documents, people, comments and tags in the community you're in, and the tabs across the top of the results switch between them (++tab++ does it from the keyboard). It also opens pages like **My Settings**, and runs actions like **Add Task** and **Help**. **See all results for** your search opens the full [search page](../guides/search-and-shortcuts.md).
 
-## The one thing genuinely worth learning today
+It's faster than clicking down the sidebar muttering "it's in here somewhere", and it takes about four days to become muscle memory. Learn it and you have our full written blessing to forget the rest of this page.
 
-++cmd+k++ on a Mac. ++ctrl+k++ on Windows or Linux. Three fingers on a phone screen.
+![The search box, opened with Ctrl+K, with results for "barovia"](../images/getting-started/search.png)
 
-Type the name of any project, task or file — or any page of this help site — and go straight there. No remembering which initiative you filed it under. No clicking down the sidebar muttering "it's in here somewhere."
+## Find your way around on a phone
 
-This is faster than navigating. Not usually — every time. It is the entire difference between the people who find Initiative quick and the people who find it fiddly, and it takes roughly four days to become muscle memory.
+On a phone the sidebar tucks away, and a bar along the bottom holds the essentials: the menu button (which opens the sidebar and the community strip), **Home**, **Search**, **My Messages** (where your server has messages on), and **Create** for adding a task or a file wherever you are.
 
-Learn this one thing and you have our full written blessing to forget the rest of this page.
-
-![The search box, opened with Cmd or Ctrl + K](../images/getting-started/search.png)
-
-## Next
-
-That's the furniture. Go [join or create your first community](your-first-community.md) and put something in it.
+Next, [join or start your first community](your-first-community.md) and put something in it.
