@@ -6,7 +6,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http, type PathParams } from "msw";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildUser } from "@/__tests__/factories";
 import { server } from "@/__tests__/helpers/msw-server";
@@ -19,6 +19,8 @@ import type {
 vi.mock("@/lib/mascotToast", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
+
+import { queryClient } from "@/lib/queryClient";
 
 import { OperatorDashboardPlacementPage } from "./OperatorDashboardPlacementPage";
 
@@ -53,10 +55,14 @@ const servePlacement = () => {
   );
 };
 
+// The placement hooks refresh through the app's own client, as the app does.
 const renderPage = (role: "owner" | "operator" = "owner") =>
   renderWithProviders(<OperatorDashboardPlacementPage />, {
     auth: { user: buildUser({ role }) },
+    queryClient,
   });
+
+afterEach(() => queryClient.clear());
 
 const everywhereSwitch = () =>
   screen.getByRole("switch", { name: /apply placement rules to every community/i });

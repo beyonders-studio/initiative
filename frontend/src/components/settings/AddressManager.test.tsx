@@ -143,7 +143,7 @@ describe("AddressManager", () => {
     renderWithProviders(<AddressManager />);
 
     // An account with addresses must not read as an account with none.
-    expect(screen.getByText(/could not be loaded/i)).toBeInTheDocument();
+    expect(screen.getByText(/couldn't load this/i)).toBeInTheDocument();
     expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
   });
 

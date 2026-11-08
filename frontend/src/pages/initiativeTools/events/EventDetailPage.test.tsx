@@ -40,6 +40,7 @@ const serve = (
 ) =>
   server.use(
     communityHttp.get("/calendar-events/:eventId", () => HttpResponse.json(event)),
+    communityHttp.get("/relationships/", () => HttpResponse.json([])),
     communityHttp.patch("/calendar-events/:eventId", async ({ request }) => {
       const { tz: _tz, ...body } = (await request.json()) as Record<string, unknown>;
       sent.push(body);
