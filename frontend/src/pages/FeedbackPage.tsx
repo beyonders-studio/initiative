@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 
 import { type DeviceContext, TicketMode } from "@/api/generated/initiativeAPI.schemas";
 import { SignInFrame } from "@/components/auth/SignInFrame";
+import { ContactDialog } from "@/components/tickets/ContactDialog";
 import { CONTEXT_FIELDS } from "@/components/tickets/DeviceContext";
 import { EMPTY_DRAFT, type FeedbackDraft, FeedbackForm } from "@/components/tickets/FeedbackForm";
 import { useAuth } from "@/hooks/useAuth";
@@ -90,7 +91,20 @@ export const FeedbackPage = () => {
 
   if (!isCloudOrigin(getServerOrigin())) return <Navigate to="/" replace />;
 
+  // Signed in, the server says whether it takes feedback now; where it
+  // doesn't, the page is its address or nothing, as the sheet is.
   const feedback = data?.feedback;
+  if (user && feedback && feedback.mode !== TicketMode.form) {
+    return feedback.mode === TicketMode.email && feedback.contact ? (
+      <ContactDialog
+        open
+        onOpenChange={() => void navigate({ to: "/" })}
+        contact={feedback.contact}
+      />
+    ) : (
+      <Navigate to="/" replace />
+    );
+  }
   const send = () => {
     if (!user) {
       const { files: _, ...words } = form;
@@ -119,7 +133,7 @@ export const FeedbackPage = () => {
           onChange={(next) => setForm((current) => ({ ...current, ...next }))}
           onDiscard={() => setForm(EMPTY_DRAFT)}
           context={context}
-          evidence={feedback?.mode === TicketMode.form ? feedback.evidence : null}
+          evidence={feedback?.evidence}
           pending={file.isPending}
           sent={sent}
           submitLabel={user ? t("feedback.submit") : t("feedback.signInToSend")}
