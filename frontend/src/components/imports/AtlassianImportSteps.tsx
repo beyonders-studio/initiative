@@ -529,10 +529,14 @@ export function AtlassianChooseStep({
         />
       )}
 
-      <div className="space-y-2">
-        <Label htmlFor="export-initiative">{t("wizard.choose.initiativeLabel")}</Label>
+      <Field
+        label={t("wizard.choose.initiativeLabel")}
+        hint={
+          wantsProjects && wantsSpaces ? t("wizard.atlassian.choose.initiativeHint") : undefined
+        }
+      >
         <Select value={chosen} onValueChange={setInitiativeId}>
-          <SelectTrigger id="export-initiative">
+          <SelectTrigger>
             <SelectValue placeholder={t("wizard.choose.initiativePlaceholder")} />
           </SelectTrigger>
           <SelectContent>
@@ -543,7 +547,7 @@ export function AtlassianChooseStep({
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </Field>
 
       <div className="space-y-3 rounded-lg border p-3">
         <div className="flex items-center justify-between gap-3">

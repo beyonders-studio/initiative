@@ -80,8 +80,9 @@ export type ComboboxProps = {
    *  is taken; a promise that rejects keeps it, to try again. */
   onCreate?: (typed: string) => unknown;
   /** Opens the popover in place of the field: a button of the caller's own,
-   *  which names itself. `id`, `aria-label`, `placeholder` and `className`
-   *  are the field's, and go unused beside it. */
+   *  which names itself. It takes the id and description of a `Field` around
+   *  it; `aria-label`, `placeholder` and `className` are the field's, and go
+   *  unused beside it. */
   trigger?: ReactElement;
   /** The trigger's edge the popover lines up with: "end" for one at the end
    *  of a row. */
@@ -248,14 +249,14 @@ export const Combobox = (props: ComboboxProps) => {
 
   const popover = (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
+      {/* The field's id and description reach a trigger of the caller's own too. */}
+      <PopoverTrigger asChild {...field}>
         {trigger ?? (
           <button
             type="button"
             role="combobox"
             aria-expanded={open}
             aria-label={ariaLabel}
-            {...field}
             className={cn(
               fieldClass,
               "items-center justify-between gap-2",
