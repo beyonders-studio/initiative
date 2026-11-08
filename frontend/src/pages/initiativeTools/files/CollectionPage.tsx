@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import type { SortingState } from "@tanstack/react-table";
 import { ExternalLink, LayoutList as LayoutsIcon, Plus, Tags, Trash2, Upload } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -67,6 +67,7 @@ import { type ListViewSpec, NO_PART_VIEW, useListView, viewKey } from "@/hooks/u
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
 import { propertySaves, useProperties } from "@/hooks/useProperties";
+import { useRouteId } from "@/hooks/useRouteId";
 import { useKnownTagIds } from "@/hooks/useTags";
 import {
   detailLayoutOf,
@@ -145,14 +146,12 @@ const collectionViewSpec = (
  */
 export function CollectionPage() {
   const { t } = useTranslation(["files", "common", "layouts"]);
-  const { collectionId } = useParams({ strict: false }) as { collectionId: string };
-  const parsedId = Number(collectionId);
-  const validId = Number.isFinite(parsedId) ? parsedId : null;
+  const collectionId = useRouteId("collectionId");
   const gp = useCommunityPath();
   const navigate = useNavigate();
   const communityId = useActiveCommunityId();
 
-  const collectionQuery = useCollection(validId);
+  const collectionQuery = useCollection(collectionId);
   const collection = collectionQuery.data;
   const initiativeId = useCanonicalInitiativeId(collection?.initiative_id);
   const canEdit = Boolean(collection?.can.edit);
@@ -174,7 +173,7 @@ export function CollectionPage() {
   useRecordOpen(SearchEntityType.collection, collection?.id);
 
   // The lists the collection shows, and the one it opens on.
-  const layoutsQuery = useInstanceLayouts("collection", validId);
+  const layoutsQuery = useInstanceLayouts("collection", collectionId);
   const shown = useMemo(
     () => listLayouts(layoutsQuery.data).filter((layout) => !layout.hidden),
     [layoutsQuery.data]
@@ -183,8 +182,8 @@ export function CollectionPage() {
   // This person's view: the list they were last in, its grouping, their
   // filters and their order, kept for them on this collection.
   const viewSpec = useMemo(
-    () => collectionViewSpec(communityId, parsedId),
-    [communityId, parsedId]
+    () => collectionViewSpec(communityId, collectionId ?? 0),
+    [communityId, collectionId]
   );
   const view = useListView(viewSpec);
   const listLayout =
@@ -250,14 +249,14 @@ export function CollectionPage() {
     ...(tagIds.length > 0 ? { tag_ids: tagIds } : {}),
     ...sort,
   };
-  const feed = useCollectionFilesFeed(validId, {
+  const feed = useCollectionFilesFeed(collectionId, {
     ...params,
     ...(anchored ? { until: anchored.at } : {}),
   });
   // The rail is drawn without the anchor: it is the map.
   const { sort_by: _sortBy, sort_dir: _sortDir, ...narrowed } = params;
   const timelineQuery = useCollectionFilesTimeline(
-    validId,
+    collectionId,
     { ...narrowed, tz: browserTimezone() },
     { enabled: list === "timeline" }
   );
@@ -286,7 +285,7 @@ export function CollectionPage() {
   const dropzoneRef = useRef<CollectionDropzoneHandle | null>(null);
   const [choosing, setChoosing] = useState(false);
   const inCollection = useMemo(() => new Set(rows.map((row) => row.id)), [rows]);
-  const addFile = useAddCollectionFiles(parsedId, {
+  const addFile = useAddCollectionFiles(collectionId ?? 0, {
     onSuccess: () => {
       toast.success(t("collections.fileAdded"));
       setChoosing(false);
@@ -296,7 +295,7 @@ export function CollectionPage() {
     canEdit ? { run: () => setChoosing(true), label: t("collections.addFiles") } : null
   );
 
-  const update = useUpdateCollection(parsedId);
+  const update = useUpdateCollection(collectionId ?? 0);
   const [trashing, setTrashing] = useState(false);
   const [layoutsOpen, setLayoutsOpen] = useState(false);
   const trash = useDeleteCollection({
@@ -313,7 +312,7 @@ export function CollectionPage() {
   const { selectedIds } = selection;
   const isSelected = useCallback((file: FileSummary) => selectedIds.has(file.id), [selectedIds]);
 
-  const remove = useRemoveCollectionFiles(parsedId, {
+  const remove = useRemoveCollectionFiles(collectionId ?? 0, {
     onSuccess: (_data, fileIds) => {
       selection.exit();
       // With its last file gone the collection goes to the trash, and with the
@@ -420,7 +419,7 @@ export function CollectionPage() {
     (propertyFilters ? 1 : 0) +
     (oldestFirst ? 1 : 0);
 
-  if (validId === null || collectionQuery.isError) {
+  if (collectionId === null || collectionQuery.isError) {
     return (
       <ToolAccessStatus
         error={collectionQuery.error}
@@ -697,7 +696,7 @@ export function CollectionPage() {
       <ToolRelationsPanel
         tool={Tool.file}
         entity={collection}
-        target={{ type: SearchEntityType.collection, id: parsedId }}
+        target={{ type: SearchEntityType.collection, id: collectionId }}
         canEdit={canEdit}
         entityTitle={collection?.name}
       />
@@ -801,7 +800,7 @@ export function CollectionPage() {
         confirmLabel={t("collections.trash")}
         isLoading={trash.isPending}
         destructive
-        onConfirm={() => trash.mutate(parsedId)}
+        onConfirm={() => trash.mutate(collectionId)}
       />
 
       {collection && layoutsQuery.data?.can_configure ? (

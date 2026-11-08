@@ -11,7 +11,7 @@
  * screen is too narrow to edit on, and keeps its draft while it is.
  */
 
-import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useMemo } from "react";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
@@ -26,6 +26,7 @@ import type { ToolIndexRow } from "@/components/tools/ToolIndexPage";
 import { ToolIndexTable } from "@/components/tools/ToolIndexTable";
 import { useCollection, useCollectionFilesFeed } from "@/hooks/useCollections";
 import { useProperties } from "@/hooks/useProperties";
+import { useRouteId } from "@/hooks/useRouteId";
 import { instanceTarget, useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { collectionFileFields, FILE_LIST_SHAPE } from "@/lib/layouts/files";
@@ -44,10 +45,8 @@ const NO_SELECTION = {
 const NEWEST_ADDED = { sort_by: "added_at", sort_dir: "desc" };
 
 export const CollectionLayoutEditorPage = () => {
-  const { collectionId } = useParams({ strict: false }) as { collectionId?: string };
   const { layout } = useSearch({ strict: false }) as { layout?: string };
-  const parsedId = collectionId ? Number(collectionId) : Number.NaN;
-  const id = Number.isFinite(parsedId) ? parsedId : null;
+  const id = useRouteId("collectionId");
   const navigate = useNavigate();
   const gp = useCommunityPath();
 

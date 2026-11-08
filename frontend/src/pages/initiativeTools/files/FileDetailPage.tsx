@@ -33,6 +33,7 @@ import { useFile, useSetFileCache, useUpdateFile } from "@/hooks/useFiles";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
+import { useRouteId } from "@/hooks/useRouteId";
 import { useServerForm } from "@/hooks/useServerForm";
 import { uploadAttachment } from "@/lib/attachmentUtils";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -50,11 +51,10 @@ import { FileDetailSkeleton } from "@/ui/page-skeletons";
 
 export const FileDetailPage = () => {
   const { t } = useTranslation(["files", "properties", "common", "editor"]);
-  const { communityId: communityIdParam, fileId } = useParams({ strict: false }) as {
+  const { communityId: communityIdParam } = useParams({ strict: false }) as {
     communityId: string;
-    fileId: string;
   };
-  const parsedId = Number(fileId);
+  const fileId = useRouteId("fileId");
   const setFileCache = useSetFileCache();
   const { user, token } = useAuth();
   const { activeCommunityId } = useCommunities();
@@ -79,7 +79,7 @@ export const FileDetailPage = () => {
   // Network status for offline detection
   const { isOnline } = useNetworkStatus();
 
-  const fileQuery = useFile(Number.isFinite(parsedId) ? parsedId : null);
+  const fileQuery = useFile(fileId);
   const file = fileQuery.data;
   const bodyKind = file ? fileBody(file.file_type) : null;
   // Whether this file's room is in play: a body that joins none has no
@@ -95,10 +95,8 @@ export const FileDetailPage = () => {
   // where `<Editor>` appears, which regresses the collab bootstrap and leaves
   // Lexical stuck on "Syncing document…".
   const collaboration = useCollaboration({
-    socketPath: Number.isFinite(parsedId)
-      ? `${toolRouteSegment(Tool.file)}/${parsedId}/collaborate`
-      : null,
-    enabled: joinsRoom && Number.isFinite(parsedId),
+    socketPath: fileId !== null ? `${toolRouteSegment(Tool.file)}/${fileId}/collaborate` : null,
+    enabled: joinsRoom && fileId !== null,
     onError: (error) => {
       toast.error(t("detail.collaborationFailed"), {
         description: error.message || t("detail.collaborationFailedDescription"),
@@ -142,7 +140,7 @@ export const FileDetailPage = () => {
 
   useEffect(() => {
     seededFileRef.current = null;
-  }, [parsedId]);
+  }, [fileId]);
 
   // Lock body scroll while the editor is in fullscreen so wheel events
   // over the overlay don't bleed through to the page beneath.
@@ -177,7 +175,7 @@ export const FileDetailPage = () => {
   }, [file, fileQuery.isFetchedAfterMount]);
 
   const saved = useMemo(() => (file ? fileBody(file.file_type).saved(file) : undefined), [file]);
-  const editedBody = edited?.fileId === parsedId ? edited.content : undefined;
+  const editedBody = edited?.fileId === fileId ? edited.content : undefined;
   const savedJson = useMemo(() => JSON.stringify(saved), [saved]);
   const editedJson = useMemo(() => JSON.stringify(editedBody), [editedBody]);
   // What a save carries for the body: the edit, or the saved body echoed back.
@@ -197,7 +195,7 @@ export const FileDetailPage = () => {
   const titleIsDirty = canEditFile && nameIsDirty;
 
   const updateFileCommentCount = (delta: number) => {
-    setFileCache(parsedId, (previous) => {
+    setFileCache(fileId ?? 0, (previous) => {
       if (!previous) return previous;
       const nextCount = Math.max(0, (previous.comment_count ?? 0) + delta);
       return { ...previous, comment_count: nextCount };
@@ -206,8 +204,8 @@ export const FileDetailPage = () => {
 
   // Only the template flag, from the tool chest's status: kept apart from the
   // save above, which settles the editor's draft when it lands.
-  const setTemplate = useUpdateFile(parsedId);
-  const saveFile = useUpdateFile(parsedId, {
+  const setTemplate = useUpdateFile(fileId ?? 0);
+  const saveFile = useUpdateFile(fileId ?? 0, {
     onSuccess: (_updated, sent) => {
       // Only if the field still holds the name this save carried: an autosave
       // that started before the last keystroke must not mark it saved. A save
@@ -220,14 +218,14 @@ export const FileDetailPage = () => {
         toast.success(t("detail.saved"));
       }
       // Clear the write-ahead cache — the DB is now up-to-date.
-      clearWhiteboardSceneCache(parsedId);
+      clearWhiteboardSceneCache(fileId ?? 0);
       // Fire-and-forget: notify users who were newly mentioned
       const newMentionIds = findNewMentions(
         saved as SerializedEditorState | undefined,
         editedBody as SerializedEditorState | undefined
       );
       if (newMentionIds.length > 0) {
-        notifyMentions(communityId, parsedId, {
+        notifyMentions(communityId, fileId ?? 0, {
           mentioned_user_ids: newMentionIds,
         }).catch((err) => console.error("Failed to notify mentions:", err));
       }
@@ -241,9 +239,9 @@ export const FileDetailPage = () => {
   // older edit than the one on screen.
   const handleBodyChange = useCallback(
     (content: unknown) => {
-      setEdited({ fileId: parsedId, content });
+      setEdited({ fileId: fileId ?? 0, content });
     },
-    [parsedId]
+    [fileId]
   );
 
   // Autosave with debounce
@@ -296,7 +294,7 @@ export const FileDetailPage = () => {
     bodyIsDirty,
     canEditFile,
     saveFile,
-    parsedId,
+    fileId,
     title,
     contentForSave,
     featuredImageUrl,
@@ -339,7 +337,7 @@ export const FileDetailPage = () => {
     canEditFile,
     isDirty,
     saveFile,
-    parsedId,
+    fileId,
     joinsRoom,
     collaboration,
     title,
@@ -368,14 +366,14 @@ export const FileDetailPage = () => {
       return;
     }
     pendingSavePayloadRef.current = {
-      fileId: parsedId,
+      fileId: fileId ?? 0,
       data: {
         name: title?.trim(),
         content: contentForSave,
         featured_image_url: featuredImageUrl,
       },
     };
-  }, [canEditFile, isDirty, parsedId, title, contentForSave, featuredImageUrl]);
+  }, [canEditFile, isDirty, fileId, title, contentForSave, featuredImageUrl]);
 
   // Hold token and activeCommunityId in refs so the flush closure always sees
   // the latest values without the effect needing to re-run on JWT rotation.
@@ -512,14 +510,14 @@ export const FileDetailPage = () => {
     return <FileDetailSkeleton label={t("detail.loading")} />;
   }
 
-  if (fileQuery.isError || !file) {
+  if (fileId === null || fileQuery.isError || !file) {
     return (
       <ToolAccessStatus
         error={fileQuery.error}
         keys="files:detail."
         backTo={gp(toolListRoute(Tool.file, initiativeId))}
         backLabel={t("detail.backToFiles")}
-        entity={{ kind: "file", id: parsedId }}
+        entity={fileId === null ? undefined : { kind: "file", id: fileId }}
       />
     );
   }
@@ -794,7 +792,7 @@ export const FileDetailPage = () => {
         <SummarySheet
           open={sidePanel.isOpen}
           onOpenChange={sidePanel.setIsOpen}
-          request={(options, signal) => generateSummary(communityId, parsedId, options, signal)}
+          request={(options, signal) => generateSummary(communityId, fileId, options, signal)}
           summary={aiSummary}
           onSummaryChange={setAiSummary}
         />

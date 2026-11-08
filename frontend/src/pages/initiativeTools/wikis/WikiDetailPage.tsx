@@ -1,4 +1,4 @@
-import { Navigate, useParams } from "@tanstack/react-router";
+import { Navigate } from "@tanstack/react-router";
 import { BookText, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -7,6 +7,7 @@ import { WikiPageTree } from "@/components/initiativeTools/wikis/WikiPageTree";
 import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { useReadOnOpen } from "@/hooks/useNotifications";
+import { useRouteId } from "@/hooks/useRouteId";
 import { useAddWikiPage, useWiki, useWikiPages } from "@/hooks/useWikis";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolListRoute, wikiPageRoute } from "@/lib/tools";
@@ -25,18 +26,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/
 export const WikiDetailPage = () => {
   const { t } = useTranslation(["wikis", "common"]);
   const gp = useCommunityPath();
-  const { wikiId: wikiIdParam, initiativeId: initiativeIdParam } = useParams({
-    strict: false,
-  }) as { wikiId?: string; initiativeId?: string };
+  const wikiId = useRouteId("wikiId");
+  const initiativeId = useRouteId("initiativeId");
 
-  const wikiId = Number(wikiIdParam);
-  const initiativeId = Number(initiativeIdParam);
-  const validIds = Number.isFinite(wikiId) && Number.isFinite(initiativeId);
-
-  const wikiQuery = useWiki(validIds ? wikiId : null);
-  const pagesQuery = useWikiPages(validIds ? wikiId : null);
+  const wikiQuery = useWiki(wikiId);
+  const pagesQuery = useWikiPages(wikiId);
   useReadOnOpen(Tool.wiki, wikiQuery.data?.id);
-  const createPage = useAddWikiPage(wikiId, initiativeId);
+  const createPage = useAddWikiPage(wikiId ?? 0, initiativeId ?? 0);
 
   const pages = pagesQuery.data?.items ?? [];
   const addPage = () => createPage.mutate({});
@@ -47,14 +43,14 @@ export const WikiDetailPage = () => {
   // the corner keeps whatever the list before it registered — a second wiki.
   useRegisterPrimaryCreateAction(canWrite ? { run: addPage, label: t("pages.newPage") } : null);
 
-  if (!validIds || wikiQuery.isError) {
+  if (wikiId === null || initiativeId === null || wikiQuery.isError) {
     return (
       <ToolAccessStatus
         error={wikiQuery.error}
         keys="wikis:"
         backTo={gp(toolListRoute(Tool.wiki, initiativeId))}
         backLabel={t("backToWikis")}
-        entity={validIds ? { kind: "wiki", id: wikiId } : undefined}
+        entity={wikiId === null ? undefined : { kind: "wiki", id: wikiId }}
       />
     );
   }

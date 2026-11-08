@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { MoreHorizontal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -14,6 +14,7 @@ import { useInitiative } from "@/hooks/useInitiatives";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
 import { usePost, useUpdatePost } from "@/hooks/usePosts";
+import { useRouteId } from "@/hooks/useRouteId";
 import { detailLayoutOf, sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
@@ -38,10 +39,9 @@ import { Skeleton } from "@/ui/skeleton";
  */
 export function PostDetailPage() {
   const { t } = useTranslation(["posts", "common"]);
-  const { postId } = useParams({ strict: false }) as { postId: string };
-  const parsedId = Number(postId);
+  const postId = useRouteId("postId");
   const gp = useCommunityPath();
-  const postQuery = usePost(Number.isFinite(parsedId) ? parsedId : null);
+  const postQuery = usePost(postId);
   const post = postQuery.data;
   const initiativeId = useCanonicalInitiativeId(post?.initiative_id);
   useReadOnOpen(Tool.post, post?.id);
@@ -51,21 +51,21 @@ export function PostDetailPage() {
   const canPin = Boolean(initiativeQuery.data?.can.manage);
   const canModerate = Boolean(initiativeQuery.data?.can.moderate);
   const navigate = useNavigate();
-  const rename = useUpdatePost(parsedId, {
+  const rename = useUpdatePost(postId ?? 0, {
     onSuccess: () => toast.success(t("detailsUpdated")),
   });
   // Every notice in the initiative shares one layout.
   const layouts = useToolLayouts(post ? sharedTarget(Tool.post, post.initiative_id) : null);
-  const pluginActions = usePluginMenuActions("post", parsedId, post?.initiative_id);
+  const pluginActions = usePluginMenuActions("post", postId ?? 0, post?.initiative_id);
 
-  if (!Number.isFinite(parsedId) || postQuery.isError) {
+  if (postId === null || postQuery.isError) {
     return (
       <ToolAccessStatus
         error={postQuery.error}
         keys="posts:"
         backTo={gp(toolListRoute(Tool.post, initiativeId))}
         backLabel={t("backToPosts")}
-        entity={{ kind: "post", id: parsedId }}
+        entity={postId === null ? undefined : { kind: "post", id: postId }}
       />
     );
   }

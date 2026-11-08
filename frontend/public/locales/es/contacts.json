@@ -5,6 +5,8 @@
   "createDescription": "Una persona o una organización, y cómo contactar con ella.",
   "addPersonDescription": "Alguien de {{name}}, y cómo contactar con esa persona.",
   "creating": "Creando...",
+  "initiative": "Iniciativa",
+  "selectInitiative": "Seleccionar iniciativa",
   "name": "Nombre",
   "namePlaceholder": "Hotel del Lago, Priya Shah...",
   "kind": "Persona u organización",

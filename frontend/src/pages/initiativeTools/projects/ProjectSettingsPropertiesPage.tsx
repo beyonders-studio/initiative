@@ -4,18 +4,12 @@
  * and deleted by whoever may change the project's tasks.
  */
 
-import { useParams } from "@tanstack/react-router";
-
 import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
 import { useProject } from "@/hooks/useProjects";
+import { useRouteId } from "@/hooks/useRouteId";
 
 export const ProjectSettingsPropertiesPage = () => {
-  const { projectId } = useParams({ strict: false }) as { projectId?: string };
-  const parsedId = projectId ? Number(projectId) : Number.NaN;
-  const isValidId = Number.isFinite(parsedId);
-
-  const projectQuery = useProject(isValidId ? parsedId : null);
-  const project = projectQuery.data;
+  const project = useProject(useRouteId("projectId")).data;
 
   if (!project) return null;
 

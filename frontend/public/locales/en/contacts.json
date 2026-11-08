@@ -5,6 +5,8 @@
   "createDescription": "A person or an organization, and how to reach them.",
   "addPersonDescription": "Someone at {{name}}, and how to reach them.",
   "creating": "Creating...",
+  "initiative": "Initiative",
+  "selectInitiative": "Select initiative",
   "name": "Name",
   "namePlaceholder": "Lakeside Lodge, Priya Shah...",
   "kind": "Person or organization",

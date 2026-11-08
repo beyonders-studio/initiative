@@ -10,7 +10,6 @@
   "filters": {
     "searchLabel": "Name oder Beschreibung",
     "searchProjects": "Projekte suchen",
-    "selectedInitiative": "Ausgewählte Initiative",
     "filterByTag": "Nach Tag filtern",
     "allTags": "Alle Tags",
     "filterByAssignee": "Nach zuständiger Person filtern",
@@ -44,14 +43,15 @@
     "label": "Layout",
     "loadError": "Die Layouts dieses Projekts konnten nicht geladen werden."
   },
+  "namePlaceholder": "Grundlagen-Überarbeitung",
+  "description": "Beschreibung (Markdown wird unterstützt)",
+  "descriptionPlaceholder": "Teile Kontext, um der Initiative bei der Priorisierung zu helfen.",
+  "initiative": "Initiative",
+  "selectInitiative": "Initiative auswählen",
+  "creating": "Wird erstellt…",
   "createDialog": {
-    "title": "Projekt erstellen",
     "description": "Gib dem Projekt einen Namen, eine optionale Beschreibung und eine zugehörige Initiative.",
     "iconLabel": "Symbol (optional)",
-    "namePlaceholder": "Grundlagen-Überarbeitung",
-    "descriptionLabel": "Beschreibung (Markdown wird unterstützt)",
-    "descriptionPlaceholder": "Teile Kontext, um der Initiative bei der Priorisierung zu helfen.",
-    "initiativeLabel": "Initiative",
     "templateLabel": "Vorlage (optional)",
     "loadingTemplates": "Vorlagen werden geladen…",
     "templateLoadError": "Vorlagen konnten nicht geladen werden.",
@@ -59,8 +59,6 @@
     "disableTemplateHint": "Deaktiviere „Als Vorlage speichern“, um eine Vorlage auszuwählen.",
     "saveAsTemplate": "Als Vorlage speichern",
     "saveAsTemplateHint": "Vorlagenprojekte befinden sich im Tab „Vorlagen“ und können wiederverwendet werden, um neue Arbeit zu starten.",
-    "createError": "Projekt konnte nicht erstellt werden.",
-    "creating": "Wird erstellt…",
     "createProject": "Projekt erstellen"
   },
   "detail": {

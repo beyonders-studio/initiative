@@ -7,21 +7,20 @@
  * edit on, and keeps its draft while it is.
  */
 
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useMemo } from "react";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { SHARED_LAYOUTS } from "@/components/layouts/details";
 import { LayoutEditor } from "@/components/layouts/LayoutEditor";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
+import { useRouteId } from "@/hooks/useRouteId";
 import { sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { initiativeRoute } from "@/lib/tools";
 
 export const SharedLayoutEditorPage = ({ tool }: { tool: Tool }) => {
-  const { initiativeId } = useParams({ strict: false }) as { initiativeId?: string };
-  const parsedId = initiativeId ? Number(initiativeId) : Number.NaN;
-  const id = Number.isFinite(parsedId) ? parsedId : null;
+  const id = useRouteId("initiativeId");
   const navigate = useNavigate();
   const gp = useCommunityPath();
 
