@@ -30,6 +30,7 @@ import { toDateKey, toTimeSlot } from "@/components/initiativeTools/events/event
 import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import type { OccurrenceScope } from "@/components/recurrence/OccurrenceScopeDialog";
 import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
+import { TagsField } from "@/components/tags/TagsField";
 import { useAuth } from "@/hooks/useAuth";
 import {
   type EventPatch,
@@ -64,11 +65,12 @@ import { hour12Option } from "@/ui/lib/timeFormat";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 
+import { DescriptionField } from "./DescriptionField";
 import { type DetailKind, useItemContext } from "./DetailLayoutView";
 import { filledBy, hasAny, hasText, sentOr } from "./detailLayout";
 import { FieldFrame, sameIds, sameJson, useFieldDraft } from "./editing";
 import { type EVENT_FIELDS, EVENT_LAYOUT, eventFields } from "./events";
-import { DescriptionField, TagsField, TitleField } from "./fieldEditors";
+import { TitleField } from "./fieldEditors";
 
 /** What an event's detail shares with its parts, beside the event itself. */
 export interface EventLayoutContext {

@@ -243,7 +243,14 @@ def visiting(guild_id: int) -> Generator[None, None, None]:
 def route_of(scope: MutableMapping[str, Any]) -> str | None:
     """The route as it is written, rather than as it was typed; ``None``
     when no route answered."""
-    path = getattr(scope.get("route"), "path", None)
+    # A route in an included router knows its path only without the router's
+    # prefix; FastAPI keeps the whole path on the context it ran it with.
+    context = scope.get("fastapi", {}).get("effective_route_context")
+    path = (
+        getattr(getattr(context, "starlette_route", None), "path_format", None)
+        or getattr(context, "path_format", None)
+        or getattr(scope.get("route"), "path", None)
+    )
     return path if isinstance(path, str) else None
 
 

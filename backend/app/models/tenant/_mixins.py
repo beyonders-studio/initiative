@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from sqlalchemy import (
     ARRAY,
     DateTime,
+    FetchedValue,
     Integer,
     String,
     func,
@@ -144,8 +145,8 @@ class CreatedByMixin(SQLModel):
     The database fills both (``public.fn_set_created_by``, a BEFORE INSERT
     trigger per table) from the request: its user, else its plug-in, else
     Initiative. A write on someone else's behalf names both columns; one that
-    names only ``created_by`` is refused. A freshly flushed object holds
-    ``None`` until refreshed.
+    names only ``created_by`` is refused. Both are read back from the insert,
+    so a flushed object holds what the trigger wrote.
 
     Authorship is historical and never transfers; ownership lives in
     ``resource_grants``. ``created_by`` is a weak reference: it outlives the
@@ -154,11 +155,18 @@ class CreatedByMixin(SQLModel):
     There is no ``updated_by``; ``event_outbox`` records who changed what.
     """
 
-    created_by: int | None = Field(default=None, foreign_key="users.id", nullable=True)
-    #: What ``created_by`` names. NULL on an object until the insert trigger has
-    #: stamped it and the object is refreshed.
+    created_by: int | None = Field(
+        default=None,
+        foreign_key="users.id",
+        nullable=True,
+        sa_column_kwargs={"server_default": FetchedValue()},
+    )
+    #: What ``created_by`` names. ``None`` only on an object not yet inserted.
     created_by_kind: ActorKind | None = Field(
-        default=None, sa_type=String(length=16), nullable=False
+        default=None,
+        sa_type=String(length=16),
+        nullable=False,
+        sa_column_kwargs={"server_default": FetchedValue()},
     )
 
 

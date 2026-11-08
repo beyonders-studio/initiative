@@ -7,6 +7,7 @@ import pkgutil
 from enum import Enum
 
 import pytest
+from fastapi.routing import iter_route_contexts
 from pydantic import BaseModel, ValidationError
 
 import app.schemas as schemas_pkg
@@ -283,8 +284,8 @@ def _request_body_models() -> set[type[BaseModel]]:
             for info in model.model_fields.values():
                 walk(info.annotation)
 
-    for route in fastapi_app.routes:
-        if isinstance(route, APIRoute) and route.body_field is not None:
+    for route in iter_route_contexts(fastapi_app.routes):
+        if isinstance(route.original_route, APIRoute) and route.body_field is not None:
             walk(route.body_field.field_info.annotation)
     return found
 

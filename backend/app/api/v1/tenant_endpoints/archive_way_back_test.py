@@ -6,6 +6,7 @@ somewhere to see what has been put away, and an answer to "may I take this
 back", which the capped permission level cannot give.
 """
 
+from fastapi.routing import iter_route_contexts
 from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -38,9 +39,9 @@ def test_every_archivable_tool_has_somewhere_to_be_found():
 
     offered = {
         route.path.rsplit("/", 2)[-2]: {p.name for p in route.dependant.query_params}
-        for route in app.routes
+        for route in iter_route_contexts(app.routes)
         if getattr(route, "path", "").startswith("/api/v1/c/{community_id}/")
-        and "GET" in getattr(route, "methods", set())
+        and "GET" in (getattr(route, "methods", None) or set())
         and getattr(route, "path", "").endswith("/")
     }
     missing = [
