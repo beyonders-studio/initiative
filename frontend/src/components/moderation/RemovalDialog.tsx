@@ -21,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
-import { Label } from "@/ui/label";
+import { Field } from "@/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Textarea } from "@/ui/textarea";
 
@@ -93,10 +93,9 @@ const RemovalForm = ({
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="removal-reason">{t("remove.reasonLabel")}</Label>
+        <Field label={t("remove.reasonLabel")} hint={t("remove.reasonHelp")}>
           <Select value={reason} onValueChange={(v) => setReason(v as RemovalReasonValue)}>
-            <SelectTrigger id="removal-reason">
+            <SelectTrigger>
               <SelectValue placeholder={t("remove.reasonPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
@@ -107,19 +106,16 @@ const RemovalForm = ({
               ))}
             </SelectContent>
           </Select>
-          <p className="text-muted-foreground text-xs">{t("remove.reasonHelp")}</p>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="removal-note">{t("remove.noteLabel")}</Label>
+        </Field>
+        <Field label={t("remove.noteLabel")}>
           <Textarea
-            id="removal-note"
             value={note}
             maxLength={NOTE_MAX}
             rows={2}
             placeholder={t("remove.notePlaceholder")}
             onChange={(e) => setNote(e.target.value)}
           />
-        </div>
+        </Field>
       </div>
       <DialogFooter
         submitLabel={t("remove.submit")}

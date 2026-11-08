@@ -10,7 +10,7 @@ import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import type { HomeWidgetOptions } from "@/lib/home/layout";
 import { TOOLS, toolNavLabelKey } from "@/lib/tools";
 import { Combobox } from "@/ui/combobox";
-import { Label } from "@/ui/label";
+import { Field } from "@/ui/field";
 
 /** The kinds picked, in registry order; none picked is every kind. */
 export const toolsOf = (options: HomeWidgetOptions): Tool[] => {
@@ -42,11 +42,9 @@ export const ToolsSetting = ({
   const { t: tNav } = useTranslation("nav");
   const picked = narrowed(options) ? toolsOf(options) : [];
   return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{t("widgets.tools.label")}</Label>
+    <Field label={t("widgets.tools.label")} hint={hint} id={id}>
       <Combobox
         multiple
-        id={id}
         value={picked}
         items={TOOLS.map((tool) => ({ value: tool, label: tNav(toolNavLabelKey(tool)) }))}
         onValueChange={(values) => {
@@ -56,7 +54,6 @@ export const ToolsSetting = ({
         }}
         placeholder={t("widgets.tools.all")}
       />
-      <p className="text-muted-foreground text-xs">{hint}</p>
-    </div>
+    </Field>
   );
 };

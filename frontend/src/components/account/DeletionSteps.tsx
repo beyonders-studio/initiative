@@ -1,10 +1,9 @@
 import { AlertCircle, Loader2 } from "lucide-react";
-import { useId } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Alert, AlertDescription } from "@/ui/alert";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 
 interface EligibilityStepProps {
   checking: boolean;
@@ -69,20 +68,17 @@ interface ConfirmPhraseFieldProps {
 /** The phrase a deletion dialog asks to be typed back before it acts. */
 export function ConfirmPhraseField({ phrase, value, onChange }: ConfirmPhraseFieldProps) {
   const { t } = useTranslation("settings");
-  const id = useId();
   return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>
-        {t("accountDeletion.typeToConfirmPrefix")}{" "}
-        <span className="font-bold font-mono">{phrase}</span>{" "}
-        {t("accountDeletion.typeToConfirmSuffix")}
-      </Label>
-      <Input
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={phrase}
-      />
-    </div>
+    <Field
+      label={
+        <>
+          {t("accountDeletion.typeToConfirmPrefix")}{" "}
+          <span className="font-bold font-mono">{phrase}</span>{" "}
+          {t("accountDeletion.typeToConfirmSuffix")}
+        </>
+      }
+    >
+      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={phrase} />
+    </Field>
   );
 }

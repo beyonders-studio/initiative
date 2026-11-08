@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Confirmations look like every other dialog.** They have the same lighter, blurred backdrop (side panels too), rounded corners at every width and a margin on phones. Deleting several tasks or tools at once asks in the app instead of in the browser's prompt.
 - **Every dialog's buttons behave the same.** Save, Create and Delete show a spinner while they work and can't be pressed twice, and Cancel is the same outlined button everywhere, waiting while the work is under way.
 - **Rows that scroll sideways work the same everywhere.** The collections above a list of files, a marketplace listing's pictures, the pictures under a release note and an item's links drag with the mouse, swipe, scroll with a trackpad, settle on an item and have arrow buttons, which hide when everything fits.
+- **Fields look and read the same everywhere.** Text boxes, selects, searchable lists and the date, colour and emoji pickers share one box and focus ring, and an invalid field is outlined in red wherever it is. A screen reader reads a field's hint and error with it and announces an error as it appears, and clicking a label focuses or opens its field.
 - **One colour picker everywhere.** A spreadsheet's text, fill and border colours and a profile decoration's colours open the same picker as the rest of the app, rather than the system's. The picker opens with its cursor on the current colour, and a single click in its field picks.
 
 ### Fixed

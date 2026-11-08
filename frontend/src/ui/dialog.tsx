@@ -4,6 +4,7 @@ import * as React from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/ui/button";
+import { FieldContext } from "@/ui/field";
 import { cn } from "@/ui/lib/utils";
 
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -75,7 +76,8 @@ const DialogContent = React.forwardRef<
           className={cn(dialogContentClassName, className)}
           {...props}
         >
-          {children}
+          {/* A dialog's fields are its own, not those of a field it opened from. */}
+          <FieldContext value={null}>{children}</FieldContext>
           {showCloseButton && (
             <DialogPrimitive.Close
               data-slot="dialog-close"

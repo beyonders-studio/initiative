@@ -13,6 +13,7 @@ import type { DialogWithSuccessProps } from "@/types/dialog";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { Button } from "@/ui/button";
 import { DialogFooter } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
@@ -271,16 +272,14 @@ export function DeleteAccountDialog({
             </Alert>
 
             {!passwordless && (
-              <div className="space-y-2">
-                <Label htmlFor="password">{t("deleteAccount.confirmPasswordLabel")}</Label>
+              <Field label={t("deleteAccount.confirmPasswordLabel")} id="password">
                 <Input
-                  id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={t("deleteAccount.enterPassword")}
                 />
-              </div>
+              </Field>
             )}
 
             <ConfirmPhraseField

@@ -33,6 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { FileDropArea } from "@/ui/file-drop";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
@@ -216,10 +217,8 @@ export const CreateFileDialog = ({
 
           {/* Shared fields: Title and Initiative */}
           <div className="mt-4 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="create-doc-title">{t("create.titleLabel")}</Label>
+            <Field label={t("create.titleLabel")}>
               <Input
-                id="create-doc-title"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 placeholder={
@@ -228,7 +227,7 @@ export const CreateFileDialog = ({
                     : t("create.titlePlaceholderAttach")
                 }
               />
-            </div>
+            </Field>
             <div className="space-y-2">
               <Label>{t("create.initiativeLabel")}</Label>
               <div className="rounded-md border px-3 py-2 text-sm">
@@ -239,13 +238,12 @@ export const CreateFileDialog = ({
 
           {/* New file tab content */}
           <TabsContent value="new" className="mt-4 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="create-doc-type">{t("create.fileTypeLabel")}</Label>
+            <Field label={t("create.fileTypeLabel")}>
               <Select
                 value={newFileType}
                 onValueChange={(value) => setNewFileType(value as NewFileType)}
               >
-                <SelectTrigger id="create-doc-type">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -256,7 +254,7 @@ export const CreateFileDialog = ({
                   <SelectItem value={FileType.sheet}>{t("create.fileTypeSpreadsheet")}</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>{t("create.templateLabel")}</Label>

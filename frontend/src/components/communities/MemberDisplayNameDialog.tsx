@@ -13,8 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 
 /** The longest name the server takes (`MEMBER_DISPLAY_NAME_MAX_LENGTH`). */
 const MAX_LENGTH = 64;
@@ -77,16 +77,14 @@ export const MemberDisplayNameDialog = ({
           </DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="member-display-name">{t("displayName.label")}</Label>
+          <Field label={t("displayName.label")}>
             <Input
-              id="member-display-name"
               value={value}
               maxLength={MAX_LENGTH}
               onChange={(event) => setValue(event.target.value)}
               autoFocus
             />
-          </div>
+          </Field>
           <DialogFooter submitLabel={t("common:save")} pending={setDisplayName.isPending} />
         </form>
       </DialogContent>

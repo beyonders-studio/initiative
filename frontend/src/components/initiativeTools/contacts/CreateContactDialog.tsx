@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -26,8 +26,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 
 /** An organization a person can be part of. */
 type Organization = { id: number; name: string };
@@ -108,7 +108,6 @@ export const CreateContactDialog = ({
   onSuccess,
 }: CreateContactDialogProps) => {
   const { t } = useTranslation(["contacts", "common"]);
-  const id = useId();
   const [name, setName] = useState("");
   const [isOrganization, setIsOrganization] = useState(false);
   const [details, setDetails] = useState<ContactDetails>(NO_DETAILS);
@@ -172,17 +171,15 @@ export const CreateContactDialog = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor={`${id}-name`}>{t("name")}</Label>
+          <Field label={t("name")}>
             <Input
-              id={`${id}-name`}
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder={t("namePlaceholder")}
               maxLength={255}
               autoFocus
             />
-          </div>
+          </Field>
 
           {fixedOrganization ? null : (
             <ContactKindToggle isOrganization={isOrganization} onChange={setIsOrganization} />
@@ -191,14 +188,13 @@ export const CreateContactDialog = ({
           <ContactDetailsFields value={details} onChange={setDetails} />
 
           {fixedOrganization || isOrganization ? null : (
-            <div className="space-y-2">
-              <Label>{t("partOf")}</Label>
+            <Field label={t("partOf")}>
               <OrganizationPicker
                 initiativeId={initiativeId}
                 value={organization}
                 onChange={setOrganization}
               />
-            </div>
+            </Field>
           )}
 
           <CreateAccessSection

@@ -1,5 +1,5 @@
 import { ListTodo } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ProjectRead, TaskRead } from "@/api/generated/initiativeAPI.schemas";
@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 
@@ -37,7 +38,6 @@ export const ContactNewTaskDialog = ({
   onCreated,
 }: ContactNewTaskDialogProps) => {
   const { t } = useTranslation(["contacts", "common"]);
-  const id = useId();
   const communityId = useActiveCommunityId();
   const [title, setTitle] = useState("");
   const [project, setProject] = useState<ProjectRead | null>(null);
@@ -97,11 +97,9 @@ export const ContactNewTaskDialog = ({
               />
             )}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor={`${id}-title`}>{t("task.title")}</Label>
+          <Field label={t("task.title")}>
             <Input
               ref={titleRef}
-              id={`${id}-title`}
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               onKeyDown={(event) => {
@@ -112,7 +110,7 @@ export const ContactNewTaskDialog = ({
               }}
               placeholder={t("task.titlePlaceholder")}
             />
-          </div>
+          </Field>
         </div>
         <DialogFooter>
           <Button type="button" onClick={submit} pending={create.isPending} disabled={!canSubmit}>

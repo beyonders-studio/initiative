@@ -48,8 +48,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { cn } from "@/ui/lib/utils";
 import { Textarea } from "@/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
@@ -162,27 +162,23 @@ const CreateCommunityButton = ({ expanded = false }: { expanded?: boolean }) => 
           <DialogDescription>{t("createCommunityDescription")}</DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="community-name">{t("communityNameLabel")}</Label>
+          <Field label={t("communityNameLabel")}>
             <Input
-              id="community-name"
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder={t("communityNamePlaceholder")}
               maxLength={255}
               required
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="community-description">{t("descriptionLabel")}</Label>
+          </Field>
+          <Field label={t("descriptionLabel")}>
             <Textarea
-              id="community-description"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder={t("descriptionPlaceholder")}
               rows={3}
             />
-          </div>
+          </Field>
           {error ? <p className="text-destructive text-sm">{error}</p> : null}
           <DialogFooter>
             <Button type="submit" disabled={submitting}>

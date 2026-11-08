@@ -69,8 +69,8 @@ import { getUserHandle } from "@/lib/userDisplay";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui/sheet";
 import { Switch } from "@/ui/switch";
@@ -418,8 +418,11 @@ export const UserOperatorSettingsSheet = ({
           </SheetHeader>
 
           {mayNameCase && (grantCases.data?.items.length ?? 0) > 0 ? (
-            <div className="space-y-1 pt-4">
-              <Label htmlFor="operator-user-case">{t("platformUsers.sheet.forCase")}</Label>
+            <Field
+              label={t("platformUsers.sheet.forCase")}
+              hint={t("platformUsers.sheet.forCaseHelp")}
+              className="space-y-1 pt-4"
+            >
               <CasePicker
                 cases={grantCases.data?.items ?? []}
                 value={caseTaskId}
@@ -428,10 +431,7 @@ export const UserOperatorSettingsSheet = ({
                 loading={grantCases.isLoading}
                 aria-label={t("platformUsers.sheet.forCase")}
               />
-              <p className="text-muted-foreground text-xs">
-                {t("platformUsers.sheet.forCaseHelp")}
-              </p>
-            </div>
+            </Field>
           ) : null}
 
           <div className="space-y-6 py-6">
@@ -796,15 +796,13 @@ export const UserOperatorSettingsSheet = ({
           })
         }
       >
-        <div className="space-y-2">
-          <Label htmlFor="operator-suspend-reason">{t("platformUsers.suspendReasonLabel")}</Label>
+        <Field label={t("platformUsers.suspendReasonLabel")}>
           <Textarea
-            id="operator-suspend-reason"
             value={suspendReason}
             onChange={(event) => setSuspendReason(event.target.value)}
             rows={3}
           />
-        </div>
+        </Field>
       </ConfirmDialog>
 
       <ConfirmDialog

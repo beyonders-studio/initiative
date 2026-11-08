@@ -136,7 +136,7 @@ export const TagDetailPage = () => {
                   className="h-9 w-64"
                   autoFocus
                 />
-                <ColorPickerPopover value={editColor} onChange={setEditColor} className="h-9" />
+                <ColorPickerPopover value={editColor} onChange={setEditColor} />
                 <Button
                   size="sm"
                   onClick={() => void handleSaveEdit()}

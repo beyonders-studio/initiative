@@ -6,6 +6,7 @@ import { fromLocalDateTimeInput, toLocalDateTimeInput } from "@/lib/formatDate";
 import { MAX_POLL_OPTION_CHARS, MAX_POLL_OPTIONS, MIN_POLL_OPTIONS } from "@/lib/posts";
 import { Button } from "@/ui/button";
 import { DateTimePicker } from "@/ui/date-time-picker";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Switch } from "@/ui/switch";
@@ -165,17 +166,14 @@ export const PollEditor = ({
 
   return (
     <div className="space-y-4 rounded-md border bg-card p-3">
-      <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-question`}>{t("poll.question")}</Label>
+      <Field label={t("poll.question")} hint={t("poll.questionHint")}>
         <Input
-          id={`${idPrefix}-question`}
           value={value.question}
           maxLength={255}
           placeholder={t("poll.questionPlaceholder")}
           onChange={(event) => onChange({ ...value, question: event.target.value })}
         />
-        <p className="text-muted-foreground text-xs">{t("poll.questionHint")}</p>
-      </div>
+      </Field>
 
       <fieldset className="space-y-2" disabled={choicesLocked}>
         <legend className="pb-2 font-medium text-sm">{t("poll.choices")}</legend>
@@ -257,17 +255,14 @@ export const PollEditor = ({
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-closes`}>{t("poll.closesAt")}</Label>
+      <Field label={t("poll.closesAt")} hint={t("poll.closesAtHint")}>
         <DateTimePicker
-          id={`${idPrefix}-closes`}
           includeTime
           value={value.closesAt}
           placeholder={t("poll.closesAtPlaceholder")}
           onChange={(next) => onChange({ ...value, closesAt: next })}
         />
-        <p className="text-muted-foreground text-xs">{t("poll.closesAtHint")}</p>
-      </div>
+      </Field>
 
       {onRemove && (
         <Button type="button" variant="ghost" size="sm" onClick={onRemove}>

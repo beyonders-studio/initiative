@@ -167,12 +167,7 @@ export function TagPicker({
             }}
             autoFocus
           />
-          <ColorPickerPopover
-            value={newTagColor}
-            onChange={setNewTagColor}
-            triggerLabel="Color"
-            className="h-9"
-          />
+          <ColorPickerPopover value={newTagColor} onChange={setNewTagColor} triggerLabel="Color" />
           <div className="flex gap-2">
             <Button
               size="sm"

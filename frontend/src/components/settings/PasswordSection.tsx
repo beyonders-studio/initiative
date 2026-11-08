@@ -28,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 
@@ -292,19 +293,15 @@ export const PasswordSection = ({ user, refreshUser }: PasswordSectionProps) => 
                   instead, and the dialog that asks for one is raised on
                   refusal. */}
               {user.password_required ? (
-                <div className="space-y-2">
-                  <Label htmlFor="remove-current-password">
-                    {t("profile.currentPasswordLabel")}
-                  </Label>
+                <Field label={t("profile.currentPasswordLabel")} id="remove-current-password">
                   <Input
-                    id="remove-current-password"
                     type="password"
                     autoComplete="current-password"
                     value={removeCurrentPassword}
                     onChange={(event) => setRemoveCurrentPassword(event.target.value)}
                     required
                   />
-                </div>
+                </Field>
               ) : null}
               {removeError ? <p className="text-destructive text-sm">{removeError}</p> : null}
               <DialogFooter

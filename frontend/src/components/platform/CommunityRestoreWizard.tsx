@@ -33,6 +33,7 @@ import { toast } from "@/lib/mascotToast";
 import { getUserHandle } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
+import { Field } from "@/ui/field";
 import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { WizardDialog } from "@/ui/wizard-dialog";
@@ -100,8 +101,7 @@ export const CommunityRestoreWizard = ({
         description={t("communities.restore.seatDescription")}
         progress={{ current: 1, total: 2 }}
       >
-        <div className="space-y-2">
-          <Label htmlFor="community-restore-seat">{t("communities.restore.seatLabel")}</Label>
+        <Field label={t("communities.restore.seatLabel")} hint={t("communities.restore.seatHelp")}>
           <Combobox
             className="w-full"
             value={seatUserId || null}
@@ -118,8 +118,7 @@ export const CommunityRestoreWizard = ({
             emptyMessage={t("communities.restore.seatEmpty")}
             aria-label={t("communities.restore.seatLabel")}
           />
-          <p className="text-muted-foreground text-xs">{t("communities.restore.seatHelp")}</p>
-        </div>
+        </Field>
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t("common:cancel")}

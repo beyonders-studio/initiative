@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
-import { Label } from "@/ui/label";
+import { Field } from "@/ui/field";
 import { Textarea } from "@/ui/textarea";
 
 /** Matches the column behind it, so the field stops where the server would. */
@@ -68,16 +68,14 @@ const AppealDialog = ({
           <DialogTitle>{t("timeOut.appealTitle")}</DialogTitle>
           <DialogDescription>{t("timeOut.appealDescription")}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="appeal-body">{t("timeOut.appealLabel")}</Label>
+        <Field label={t("timeOut.appealLabel")}>
           <Textarea
-            id="appeal-body"
             value={body}
             onChange={(event) => setBody(event.target.value)}
             rows={6}
             maxLength={BODY_MAX}
           />
-        </div>
+        </Field>
         <DialogFooter
           submitLabel={t("timeOut.appealSubmit")}
           pending={file.isPending}

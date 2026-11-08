@@ -40,6 +40,7 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
@@ -401,12 +402,9 @@ export const ConnectSignInWizard = ({
                 placeholder={t("settings:communityAuth.rules.groupPlaceholder")}
                 onChange={(event) => setRuleGroup(event.target.value)}
               />
-              <div className="space-y-2">
-                <Label htmlFor="wizard-rule-role">
-                  {t("settings:communityAuth.rules.standingLabel")}
-                </Label>
+              <Field label={t("settings:communityAuth.rules.standingLabel")}>
                 <Select value={ruleRole} onValueChange={setRuleRole}>
-                  <SelectTrigger id="wizard-rule-role">
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -418,7 +416,7 @@ export const ConnectSignInWizard = ({
                     </SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
             </div>
           )}
 

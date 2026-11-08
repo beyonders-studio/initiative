@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Switch } from "@/ui/switch";
@@ -327,20 +328,16 @@ const ProviderEditForm = ({
             />
           </div>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="provider-slug">{t("authProviders.slugLabel")}</Label>
-          <Input id="provider-slug" value={form.slug} maxLength={64} disabled required />
-          <p className="text-muted-foreground text-xs">{t("authProviders.slugHelp")}</p>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="provider-display-name">{t("authProviders.displayNameLabel")}</Label>
+        <Field label={t("authProviders.slugLabel")} hint={t("authProviders.slugHelp")}>
+          <Input value={form.slug} maxLength={64} disabled required />
+        </Field>
+        <Field label={t("authProviders.displayNameLabel")}>
           <Input
-            id="provider-display-name"
             value={form.display_name}
             onChange={(event) => setForm((prev) => ({ ...prev, display_name: event.target.value }))}
             required
           />
-        </div>
+        </Field>
         <div className="space-y-2">
           <Label htmlFor="provider-issuer">{t("authProviders.issuerLabel")}</Label>
           <div className="flex items-center gap-2">
@@ -369,15 +366,13 @@ const ProviderEditForm = ({
           </div>
           {probe ? <ProbeReport probe={probe} /> : null}
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="provider-client-id">{t("authProviders.clientIdLabel")}</Label>
+        <Field label={t("authProviders.clientIdLabel")}>
           <Input
-            id="provider-client-id"
             value={form.client_id}
             onChange={(event) => setForm((prev) => ({ ...prev, client_id: event.target.value }))}
             required
           />
-        </div>
+        </Field>
         <div className="space-y-2">
           <Label htmlFor="provider-client-secret">{t("authProviders.clientSecretLabel")}</Label>
           <Input
@@ -405,29 +400,28 @@ const ProviderEditForm = ({
             </label>
           )}
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="provider-scopes">{t("authProviders.scopesLabel")}</Label>
+        <Field label={t("authProviders.scopesLabel")}>
           <Input
-            id="provider-scopes"
             value={form.scopes}
             onChange={(event) => setForm((prev) => ({ ...prev, scopes: event.target.value }))}
           />
-        </div>
-        <div className="space-y-1">
-          {/* Whose groups these are and how this provider spells them.
-                  Rules below read it, and each provider spells it its own
-                  way — Keycloak nests roles, Entra flattens them. */}
-          <Label htmlFor="provider-claim-path">{t("authProviders.claimPathLabel")}</Label>
+        </Field>
+        {/* Whose groups these are and how this provider spells them.
+            Rules below read it, and each provider spells it its own
+            way — Keycloak nests roles, Entra flattens them. */}
+        <Field
+          label={t("authProviders.claimPathLabel")}
+          hint={t("authProviders.claimPathHelp")}
+          className="space-y-1"
+        >
           <Input
-            id="provider-claim-path"
             value={form.role_claim_path}
             placeholder={t("authProviders.claimPathPlaceholder")}
             onChange={(event) =>
               setForm((prev) => ({ ...prev, role_claim_path: event.target.value }))
             }
           />
-          <p className="text-muted-foreground text-xs">{t("authProviders.claimPathHelp")}</p>
-        </div>
+        </Field>
         <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2">
           <div>
             <Label htmlFor="provider-allow-jit" className="font-medium">

@@ -55,8 +55,8 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
@@ -278,16 +278,20 @@ export const CommunityClaimRulesSection = ({ communityId }: { communityId: numbe
             <DialogDescription>{t("communityAuth.rules.dialogDescription")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor={adding ? "rule-provider" : undefined}>
-                {t("communityAuth.rules.providerLabel")}
-              </Label>
+            <Field
+              label={t("communityAuth.rules.providerLabel")}
+              hint={
+                draft.providerId !== "" &&
+                !reporting.has(Number(draft.providerId)) &&
+                t("communityAuth.rules.noGroupsHint")
+              }
+            >
               {adding ? (
                 <Select
                   value={draft.providerId}
                   onValueChange={(providerId) => edit({ providerId })}
                 >
-                  <SelectTrigger id="rule-provider">
+                  <SelectTrigger>
                     <SelectValue placeholder={t("communityAuth.rules.providerPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -303,31 +307,25 @@ export const CommunityClaimRulesSection = ({ communityId }: { communityId: numbe
                   {rules.find((rule) => rule.id === draft.ruleId)?.provider_display_name}
                 </p>
               )}
-              {draft.providerId !== "" && !reporting.has(Number(draft.providerId)) && (
-                <p className="text-muted-foreground text-xs">
-                  {t("communityAuth.rules.noGroupsHint")}
-                </p>
-              )}
-            </div>
+            </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="rule-group">{t("communityAuth.rules.groupLabel")}</Label>
+            <Field
+              label={t("communityAuth.rules.groupLabel")}
+              hint={t("communityAuth.rules.groupHint")}
+            >
               <Input
-                id="rule-group"
                 value={draft.claimValue}
                 onChange={(event) => edit({ claimValue: event.target.value })}
                 placeholder={t("communityAuth.rules.groupPlaceholder")}
               />
-              <p className="text-muted-foreground text-xs">{t("communityAuth.rules.groupHint")}</p>
-            </div>
+            </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="rule-role">{t("communityAuth.rules.standingLabel")}</Label>
+            <Field label={t("communityAuth.rules.standingLabel")}>
               <Select
                 value={draft.communityRole}
                 onValueChange={(communityRole) => edit({ communityRole })}
               >
-                <SelectTrigger id="rule-role">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -335,15 +333,14 @@ export const CommunityClaimRulesSection = ({ communityId }: { communityId: numbe
                   <SelectItem value="admin">{t("communityAuth.rules.role.admin")}</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
 
-            <div className="space-y-2">
-              <Label htmlFor="rule-initiative">{t("communityAuth.rules.initiativeLabel")}</Label>
+            <Field label={t("communityAuth.rules.initiativeLabel")}>
               <Select
                 value={draft.initiativeId}
                 onValueChange={(initiativeId) => edit({ initiativeId, initiativeRoleId: "" })}
               >
-                <SelectTrigger id="rule-initiative">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -357,18 +354,15 @@ export const CommunityClaimRulesSection = ({ communityId }: { communityId: numbe
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
 
             {chosenInitiative !== null && (
-              <div className="space-y-2">
-                <Label htmlFor="rule-initiative-role">
-                  {t("communityAuth.rules.initiativeRoleLabel")}
-                </Label>
+              <Field label={t("communityAuth.rules.initiativeRoleLabel")}>
                 <Select
                   value={draft.initiativeRoleId}
                   onValueChange={(initiativeRoleId) => edit({ initiativeRoleId })}
                 >
-                  <SelectTrigger id="rule-initiative-role">
+                  <SelectTrigger>
                     <SelectValue placeholder={t("communityAuth.rules.initiativeRolePlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -379,7 +373,7 @@ export const CommunityClaimRulesSection = ({ communityId }: { communityId: numbe
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
             )}
           </div>
           <DialogFooter

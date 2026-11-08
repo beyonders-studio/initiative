@@ -1,7 +1,8 @@
 import { lazy, type ReactNode, Suspense, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/ui/button";
+import { useFieldControl } from "@/ui/field";
+import { fieldClass } from "@/ui/input";
 import { cn } from "@/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
@@ -69,6 +70,7 @@ export const ColorPickerPopover = ({
   opaque,
 }: ColorPickerPopoverProps) => {
   const { t } = useTranslation("ui");
+  const field = useFieldControl({ id });
   const [open, setOpen] = useState(false);
   const [draftColor, setDraftColor] = useState(value);
   // What the picker opened on: the colour a commit is measured against. Not
@@ -101,25 +103,19 @@ export const ColorPickerPopover = ({
     <Popover open={open} onOpenChange={handleOpenChange} modal={modal}>
       <PopoverTrigger asChild aria-label={triggerLabel ?? t("colorPicker.pick")}>
         {children ?? (
-          <Button
-            id={id}
+          <button
             type="button"
-            variant="outline"
-            className={cn(
-              "h-11 w-full justify-between gap-3 font-mono text-xs uppercase tracking-wide",
-              className
-            )}
+            {...field}
+            className={cn(fieldClass, "items-center gap-2 font-mono uppercase", className)}
             disabled={disabled}
           >
-            <span className="flex items-center gap-2">
-              <span
-                aria-hidden="true"
-                className="h-6 w-6 rounded-md border"
-                style={{ backgroundColor: shown }}
-              />
-              {shown}
-            </span>
-          </Button>
+            <span
+              aria-hidden="true"
+              className="h-6 w-6 shrink-0 rounded-md border"
+              style={{ backgroundColor: shown }}
+            />
+            {shown}
+          </button>
         )}
       </PopoverTrigger>
       <PopoverContent className="w-80 space-y-3" align="start">

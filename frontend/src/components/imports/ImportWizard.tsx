@@ -52,8 +52,8 @@ import { toast } from "@/lib/mascotToast";
 import { uploadInPieces } from "@/lib/resumableUpload";
 import { getItem, removeItem, setItem } from "@/lib/storage";
 import { Button } from "@/ui/button";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { formatBytes } from "@/ui/lib/fileUtils";
 import { numberFormat } from "@/ui/lib/intl";
 import { Progress } from "@/ui/progress";
@@ -746,10 +746,9 @@ export function ImportWizard({ open, onOpenChange, contactsInto }: ImportWizardP
       {step === "choose" && preview && (
         <div className="space-y-4">
           {preview.picks_one ? (
-            <div className="space-y-2">
-              <Label htmlFor="import-selection">{t("wizard.choose.whichLabel")}</Label>
+            <Field label={t("wizard.choose.whichLabel")}>
               <Select value={selection} onValueChange={setSelection}>
-                <SelectTrigger id="import-selection">
+                <SelectTrigger>
                   <SelectValue placeholder={t("wizard.choose.whichPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -763,26 +762,23 @@ export function ImportWizard({ open, onOpenChange, contactsInto }: ImportWizardP
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           ) : (
-            <div className="space-y-2">
-              <Label htmlFor="import-name">{t("wizard.choose.nameLabel")}</Label>
+            <Field
+              label={t("wizard.choose.nameLabel")}
+              hint={t("wizard.choose.taskCount", { count: preview.options[0]?.task_count ?? 0 })}
+            >
               <Input
-                id="import-name"
                 value={selection}
                 placeholder={t("wizard.choose.namePlaceholder")}
                 onChange={(e) => setSelection(e.target.value)}
               />
-              <p className="text-muted-foreground text-xs">
-                {t("wizard.choose.taskCount", { count: preview.options[0]?.task_count ?? 0 })}
-              </p>
-            </div>
+            </Field>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="import-initiative">{t("wizard.choose.initiativeLabel")}</Label>
+          <Field label={t("wizard.choose.initiativeLabel")}>
             <Select value={initiativeId} onValueChange={setInitiativeId}>
-              <SelectTrigger id="import-initiative">
+              <SelectTrigger>
                 <SelectValue placeholder={t("wizard.choose.initiativePlaceholder")} />
               </SelectTrigger>
               <SelectContent>
@@ -793,7 +789,7 @@ export function ImportWizard({ open, onOpenChange, contactsInto }: ImportWizardP
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
 
           <p className="text-muted-foreground text-xs">{t("wizard.choose.note")}</p>
           <Button

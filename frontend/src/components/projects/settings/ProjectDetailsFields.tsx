@@ -6,7 +6,7 @@ import { useUpdateProject } from "@/hooks/useProjects";
 import { useServerForm } from "@/hooks/useServerForm";
 import { dateRangeBounds } from "@/lib/dateRange";
 import { EmojiField } from "@/ui/emoji-picker";
-import { Label } from "@/ui/label";
+import { Field } from "@/ui/field";
 
 interface ProjectDates {
   startDate: string;
@@ -47,15 +47,13 @@ export const ProjectDetailsFields = ({ project }: { project: ProjectRead }) => {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="project-icon">{t("createDialog.iconLabel")}</Label>
+      <Field label={t("createDialog.iconLabel")}>
         <EmojiField
-          id="project-icon"
           value={project.icon ?? undefined}
           onChange={(emoji) => update.mutate({ icon: emoji ?? null })}
           disabled={!canEdit}
         />
-      </div>
+      </Field>
       <ProjectDateFields
         idPrefix="project-settings"
         startDate={dates.values.startDate}

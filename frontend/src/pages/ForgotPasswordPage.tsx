@@ -11,8 +11,8 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { checkNewPassword } from "@/lib/passwordPolicy";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 
 /**
  * Two ways back in, on one card.
@@ -108,10 +108,8 @@ export const ForgotPasswordPage = () => {
           <CardContent>
             {mode === "reset" ? (
               <form className="space-y-4" onSubmit={handleSubmit}>
-                <div className="space-y-2">
-                  <Label htmlFor="forgot-email">{t("forgotPassword.emailLabel")}</Label>
+                <Field label={t("forgotPassword.emailLabel")}>
                   <Input
-                    id="forgot-email"
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
@@ -119,7 +117,7 @@ export const ForgotPasswordPage = () => {
                     autoComplete="email"
                     autoCapitalize="none"
                   />
-                </div>
+                </Field>
                 <Button className="w-full" type="submit" disabled={status === "sending"}>
                   {status === "sending"
                     ? t("forgotPassword.submitting")
@@ -146,10 +144,8 @@ export const ForgotPasswordPage = () => {
               </div>
             ) : (
               <form className="space-y-4" onSubmit={handleRecover}>
-                <div className="space-y-2">
-                  <Label htmlFor="recover-email">{t("forgotPassword.emailLabel")}</Label>
+                <Field label={t("forgotPassword.emailLabel")}>
                   <Input
-                    id="recover-email"
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
@@ -157,11 +153,9 @@ export const ForgotPasswordPage = () => {
                     autoComplete="email"
                     autoCapitalize="none"
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="recovery-code">{t("forgotPassword.recoveryCodeLabel")}</Label>
+                </Field>
+                <Field label={t("forgotPassword.recoveryCodeLabel")}>
                   <Input
-                    id="recovery-code"
                     value={recoveryCode}
                     onChange={(event) => setRecoveryCode(event.target.value)}
                     placeholder={t("forgotPassword.recoveryCodePlaceholder")}
@@ -169,7 +163,7 @@ export const ForgotPasswordPage = () => {
                     autoCapitalize="none"
                     required
                   />
-                </div>
+                </Field>
                 <NewPasswordFields
                   id="recover-password"
                   label={t("resetPassword.newPasswordLabel")}

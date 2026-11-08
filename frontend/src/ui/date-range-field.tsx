@@ -15,7 +15,10 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "@/ui/button";
 import { Calendar } from "@/ui/calendar";
+import { useFieldControl } from "@/ui/field";
+import { fieldClass } from "@/ui/input";
 import { dateTimeFormat } from "@/ui/lib/intl";
+import { cn } from "@/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 /** A span of calendar days in the viewer's zone. Either end may be open. */
@@ -83,6 +86,7 @@ interface DateRangeFieldProps {
  *  where either end may be left open. */
 export function DateRangeField({ id, value, onChange }: DateRangeFieldProps) {
   const { t } = useTranslation("ui");
+  const field = useFieldControl({ id });
   const formatRange = useFormatDateRange();
   const [open, setOpen] = useState(false);
   const set = isDateRangeSet(value);
@@ -91,16 +95,18 @@ export function DateRangeField({ id, value, onChange }: DateRangeFieldProps) {
     <div className="flex items-center gap-1">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button
-            id={id}
+          <button
             type="button"
-            variant="outline"
+            {...field}
             data-empty={!set}
-            className="min-w-0 flex-1 justify-start gap-2 font-normal data-[empty=true]:text-muted-foreground"
+            className={cn(
+              fieldClass,
+              "min-w-0 flex-1 items-center gap-2 data-[empty=true]:text-muted-foreground"
+            )}
           >
             <CalendarIcon className="h-4 w-4 shrink-0" />
             <span className="truncate">{set ? formatRange(value) : t("dateRange.any")}</span>
-          </Button>
+          </button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <div className="flex flex-wrap gap-1 border-b p-2">

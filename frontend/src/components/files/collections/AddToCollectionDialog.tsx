@@ -37,8 +37,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { listFormat } from "@/ui/lib/intl";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
@@ -157,15 +157,13 @@ export const AddToCollectionDialog = ({
         {making ? (
           <form onSubmit={submitNew} className="flex min-h-0 flex-1 flex-col">
             <div className="relative min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="new-collection-name">{t("collections.shapes.name")}</Label>
+              <Field label={t("collections.shapes.name")}>
                 <Input
-                  id="new-collection-name"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   maxLength={255}
                 />
-              </div>
+              </Field>
               <ReadyMadeGallery
                 blank={{
                   name: t("collections.shapes.blank"),
@@ -194,15 +192,15 @@ export const AddToCollectionDialog = ({
                 }
               />
               {all.length > 0 ? (
-                <div className="space-y-2">
-                  <Label htmlFor="new-collection-shape-from">
-                    {t("collections.shapes.copyLabel")}
-                  </Label>
+                <Field
+                  label={t("collections.shapes.copyLabel")}
+                  hint={t("collections.shapes.copyHint")}
+                >
                   <Select
                     value={start.kind === "copy" ? String(start.id) : ""}
                     onValueChange={(value) => setStart({ kind: "copy", id: Number(value) })}
                   >
-                    <SelectTrigger id="new-collection-shape-from">
+                    <SelectTrigger>
                       <SelectValue placeholder={t("collections.shapes.copyPlaceholder")} />
                     </SelectTrigger>
                     <SelectContent>
@@ -213,10 +211,7 @@ export const AddToCollectionDialog = ({
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-muted-foreground text-xs">
-                    {t("collections.shapes.copyHint")}
-                  </p>
-                </div>
+                </Field>
               ) : null}
             </div>
             <DialogFooter className="border-t px-5 py-3">

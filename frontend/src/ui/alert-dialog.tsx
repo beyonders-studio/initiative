@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { buttonVariants } from "@/ui/button";
 import { dialogContentClassName, dialogOverlayClassName } from "@/ui/dialog";
+import { FieldContext } from "@/ui/field";
 import { cn } from "@/ui/lib/utils";
 
 const AlertDialog = AlertDialogPrimitive.Root;
@@ -27,7 +28,7 @@ AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName;
 const AlertDialogContent = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content>
->(({ className, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => (
   <AlertDialogPortal>
     {/* Inside its overlay, so it always paints above it (see DialogContent). */}
     <AlertDialogOverlay>
@@ -35,7 +36,10 @@ const AlertDialogContent = React.forwardRef<
         ref={ref}
         className={cn(dialogContentClassName, className)}
         {...props}
-      />
+      >
+        {/* A confirmation's fields are its own, not those of a field it opened from. */}
+        <FieldContext value={null}>{children}</FieldContext>
+      </AlertDialogPrimitive.Content>
     </AlertDialogOverlay>
   </AlertDialogPortal>
 ));

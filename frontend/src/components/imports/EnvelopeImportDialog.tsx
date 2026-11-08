@@ -25,6 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
@@ -385,15 +386,12 @@ export function EnvelopeImportDialog({
           ) : null}
 
           {fixedInitiativeId == null && (
-            <div className="space-y-2">
-              <Label htmlFor="envelope-import-initiative">
-                {t("imports:envelope.targetInitiative")}
-              </Label>
+            <Field label={t("imports:envelope.targetInitiative")}>
               <Select
                 value={initiativeId ?? undefined}
                 onValueChange={(value) => setInitiativeId(value)}
               >
-                <SelectTrigger id="envelope-import-initiative">
+                <SelectTrigger>
                   <SelectValue placeholder={t("imports:envelope.selectInitiative")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -404,7 +402,7 @@ export function EnvelopeImportDialog({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           )}
 
           <DialogFooter

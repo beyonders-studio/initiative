@@ -40,6 +40,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/dialog";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
@@ -146,19 +147,16 @@ const NewApiKeyDialog = ({
             <DialogHeader>
               <DialogTitle>{t("security.generateTitle")}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-2">
-              <Label htmlFor="api-key-name">{t("security.keyNameLabel")}</Label>
+            <Field label={t("security.keyNameLabel")}>
               <Input
-                id="api-key-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder={t("security.keyNamePlaceholder")}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="api-key-community">{t("security.communityLabel")}</Label>
+            </Field>
+            <Field label={t("security.communityLabel")} hint={t("security.communityHelp")}>
               <Select value={communityId} onValueChange={setCommunityId}>
-                <SelectTrigger id="api-key-community">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -172,12 +170,9 @@ const NewApiKeyDialog = ({
                     ))}
                 </SelectContent>
               </Select>
-              <p className="text-muted-foreground text-xs">{t("security.communityHelp")}</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="api-key-expiration">{t("security.expirationLabel")}</Label>
+            </Field>
+            <Field label={t("security.expirationLabel")}>
               <DateTimePicker
-                id="api-key-expiration"
                 value={expiresAtInput}
                 onChange={setExpiresAtInput}
                 placeholder={t("security.neverExpires")}
@@ -187,7 +182,7 @@ const NewApiKeyDialog = ({
                   },
                 }}
               />
-            </div>
+            </Field>
             <div className="flex items-start gap-2">
               <Checkbox
                 id="api-key-read-only"
