@@ -1,4 +1,5 @@
 import type { UserStatus } from "@/api/generated/initiativeAPI.schemas";
+import type { Member } from "@/components/properties/PropertyInput";
 import i18n from "@/i18n";
 import { ANONYMIZED_INITIALS, getInitials } from "@/lib/initials";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
@@ -123,3 +124,11 @@ export const getAvatarSrc = (user: AvatarSourceUser | null | undefined): string 
   if (!user) return undefined;
   return resolveUploadUrl(user.avatar_url ?? undefined) || undefined;
 };
+
+/** A person as a picker draws them. */
+export const toMember = (user: DisplayableUser & AvatarSourceUser & { id: number }): Member => ({
+  id: user.id,
+  name: getUserDisplayName(user),
+  picture: getAvatarSrc(user),
+  initials: getInitialsForUser(user),
+});

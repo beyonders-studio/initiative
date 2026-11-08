@@ -19,10 +19,14 @@ import { useTranslation } from "react-i18next";
 
 import type { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
-import { NewPropertyForm, PROPERTY_TYPES } from "@/components/properties/NewPropertyForm";
+import {
+  type CreateProperty,
+  NewPropertyForm,
+  PROPERTY_TYPES,
+} from "@/components/properties/NewPropertyForm";
+import type { MetadataOwner } from "@/components/properties/propertyHelpers";
 import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
 import { useDragSensors } from "@/hooks/useDragSensors";
-import type { MetadataOwner } from "@/hooks/useProperties";
 import { isRequired, LAYOUT_REGIONS, withRequired } from "@/lib/layouts/detailLayout";
 import {
   addableFields,
@@ -124,7 +128,7 @@ export type AddChoices = {
   parts: PickerPart[];
   /** Where a new field is made, where one can be placed: among the
    *  initiative's metadata, or the project's or collection's properties. */
-  newField?: { initiativeId: number; owner?: MetadataOwner };
+  newField?: { initiativeId: number; owner?: MetadataOwner; create: CreateProperty };
 };
 
 /** What a pick in the Add picker does. */
@@ -878,6 +882,7 @@ export const AddPicker = ({
           <NewPropertyForm
             initiativeId={newField.initiativeId}
             owner={newField.owner}
+            create={newField.create}
             type={making}
             name={search.trim()}
             onCreated={(created) => pick(() => onField(propertyFieldId(created.id)))}

@@ -9,6 +9,20 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import type { MemberLike } from "@/components/members/MemberSearchSelect";
 
+/** Who a definition belongs to where it is not the initiative's: a project
+ *  (its metadata, on its tasks) or a collection (its metadata, on its files). */
+export type MetadataOwner = { kind: "project" | "collection"; id: number };
+
+/** The owner columns a definition is created and listed with. */
+export const ownerColumns = (
+  owner: MetadataOwner | undefined
+): { project_id?: number; collection_id?: number } =>
+  owner === undefined
+    ? {}
+    : owner.kind === "project"
+      ? { project_id: owner.id }
+      : { collection_id: owner.id };
+
 /**
  * Slugify a user-entered label into a stable option value slug. Output is
  * lowercase, alphanumeric plus `_` and `-`, trimmed of leading/trailing
@@ -143,7 +157,7 @@ export const normalizeOptionList = (options: PropertyOption[]): PropertyOption[]
 };
 
 export const findOptionByLabel = (
-  definition: PropertyDefinitionRead,
+  definition: { options?: PropertyOption[] | null },
   label: string
 ): PropertyOption | undefined => {
   const needle = label.trim().toLowerCase();

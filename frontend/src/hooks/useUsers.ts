@@ -1,4 +1,5 @@
 import { keepPreviousData, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 
 import {
   extendCommunityGuest,
@@ -19,13 +20,18 @@ import type {
   UserRead,
   UserSummary,
 } from "@/api/generated/initiativeAPI.schemas";
-import { useSearchInitiativeMembers } from "@/api/generated/initiatives/initiatives";
+import {
+  getGetInitiativeQueryOptions,
+  getSearchInitiativeMembersQueryOptions,
+  useSearchInitiativeMembers,
+} from "@/api/generated/initiatives/initiatives";
 import {
   deleteOwnAccount,
   exportUsersCsv,
   getListDecorationPacksQueryKey,
   getListMyDecorationsQueryKey,
   getListUsersQueryKey,
+  getSearchUsersQueryOptions,
   installDecorationPack,
   removeDecorationPack,
   updateMe,
@@ -37,11 +43,13 @@ import {
   useSearchUsers,
 } from "@/api/generated/users/users";
 import { invalidate, q } from "@/api/query-keys";
+import type { SearchMembers } from "@/components/properties/PropertyInput";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useApiMutation, useCommunityMutation } from "@/hooks/useApiMutation";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { downloadBlob } from "@/lib/csv";
+import { toMember } from "@/lib/userDisplay";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
@@ -308,6 +316,49 @@ export const useMemberSearch = (
   );
 
   return scope.type === "initiative" ? initiativeQuery : communityQuery;
+};
+
+/**
+ * {@link useMemberSearch} as a function a picker calls when it searches, for
+ * the active community: the same requests, through the same cache.
+ */
+export const useSearchMembers = (): SearchMembers => {
+  const queryClient = useQueryClient();
+  const communityId = useActiveCommunityId();
+  return useCallback<SearchMembers>(
+    async (scope, query) => {
+      const ids = "ids" in query ? query.ids : undefined;
+      const params = {
+        ...memberSearchParams("search" in query ? query.search : undefined, ids),
+        page_size: ids ? USER_ID_LOOKUP_MAX : USER_SEARCH_PAGE_SIZE,
+      };
+      const options = { query: { staleTime: 30_000 } };
+      if (scope.type === "initiative") {
+        const { initiativeId } = scope;
+        if (initiativeId == null) return [];
+        // Asked only where the reader may read the roster, which a guest
+        // given items there may not.
+        const initiative = await queryClient.ensureQueryData(
+          getGetInitiativeQueryOptions(communityId, initiativeId)
+        );
+        if (!initiative.can.roster) return [];
+        const page = await queryClient.fetchQuery(
+          getSearchInitiativeMembersQueryOptions(communityId, initiativeId, params, options)
+        );
+        return page.items.map(toMember);
+      }
+      if (scope.id == null) return [];
+      const page = await queryClient.fetchQuery(
+        getSearchUsersQueryOptions(
+          communityId,
+          { ...params, tool: scope.tool, resource_id: scope.id },
+          options
+        )
+      );
+      return page.items.map(toMember);
+    },
+    [queryClient, communityId]
+  );
 };
 
 export type { UserSummary };

@@ -4,13 +4,18 @@
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
+import { HttpResponse } from "msw";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { buildUserCommunityMember } from "@/__tests__/factories";
+import { buildPage, buildUserCommunityMember, buildUserSummary } from "@/__tests__/factories";
+import { communityHttp } from "@/__tests__/helpers/communityHttp";
+import { server } from "@/__tests__/helpers/msw-server";
 import type { UserCommunityMemberListResponse } from "@/api/generated/initiativeAPI.schemas";
 import { getListUsersQueryKey } from "@/api/generated/users/users";
-import { useSetMemberApiAccess } from "@/hooks/useUsers";
+import { useSearchMembers, useSetMemberApiAccess } from "@/hooks/useUsers";
+
+vi.mock("@/hooks/useActiveCommunityId", () => ({ useActiveCommunityId: () => 1 }));
 
 vi.mock("@/api/generated/communities/communities", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -52,5 +57,29 @@ describe("useSetMemberApiAccess", () => {
         client.getQueryData<UserCommunityMemberListResponse>(key)?.items[0].api_keys_allowed
       ).toBe(false);
     }
+  });
+});
+
+describe("useSearchMembers", () => {
+  it("searches an initiative's members and draws each as a picker does", async () => {
+    let asked: URLSearchParams | undefined;
+    server.use(
+      communityHttp.get("/initiatives/:initiativeId/members/search", ({ request }) => {
+        asked = new URL(request.url).searchParams;
+        return HttpResponse.json(
+          buildPage([buildUserSummary({ id: 7, display_name: "Ada Lovelace" })])
+        );
+      })
+    );
+    const { result } = renderHook(() => useSearchMembers(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
+      ),
+    });
+
+    const found = await result.current({ type: "initiative", initiativeId: 1 }, { search: "ada" });
+
+    expect(found).toEqual([{ id: 7, name: "Ada Lovelace", picture: undefined, initials: "AL" }]);
+    expect(asked?.get("search")).toBe("ada");
   });
 });

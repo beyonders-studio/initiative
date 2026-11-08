@@ -1,6 +1,5 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -8,15 +7,28 @@ import {
   buildPropertyOption,
   buildPropertySummary,
 } from "@/__tests__/factories/properties";
-import { communityHttp } from "@/__tests__/helpers/communityHttp";
-import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { MetadataType, type PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
 
-import { PropertyInput } from "./PropertyInput";
+import {
+  PropertyInput as KitInput,
+  type MemberScope,
+  type PropertyInputProps,
+  type SearchMembers,
+} from "./PropertyInput";
 
 const def = (overrides: Partial<PropertyDefinitionRead>) =>
   buildPropertyDefinition({ ...overrides });
+
+/** The input, adding no options and finding nobody unless a test says. */
+const PropertyInput = ({
+  appendOption = () => Promise.reject(new Error("No option added")),
+  searchMembers = async () => [],
+  ...props
+}: Omit<PropertyInputProps, "appendOption" | "searchMembers"> &
+  Partial<Pick<PropertyInputProps, "appendOption" | "searchMembers">>) => (
+  <KitInput appendOption={appendOption} searchMembers={searchMembers} {...props} />
+);
 
 describe("PropertyInput", () => {
   describe("text type", () => {
@@ -277,48 +289,30 @@ describe("PropertyInput", () => {
   });
 
   describe("user_reference type", () => {
-    it("renders a user picker backed by the initiative-members search API", async () => {
-      // The picker is scoped to the property's initiative (default id 1) and
-      // fetches a slim, paginated UserSummary page when opened.
-      server.use(
-        communityHttp.get("/initiatives/:initiativeId/members/search", () =>
-          HttpResponse.json({
-            items: [
-              {
-                id: 7,
-                display_name: "Ada Lovelace",
-                avatar_url: null,
-                status: "active",
-              },
-              {
-                id: 8,
-                display_name: "Grace Hopper",
-                avatar_url: null,
-                status: "active",
-              },
-            ],
-            total_count: 2,
-            page: 1,
-            page_size: 25,
-            has_next: false,
-            has_prev: false,
-          })
-        )
+    it("names a bare id by looking it up, and searches the property's initiative once opened", async () => {
+      const ada = { id: 7, name: "Ada Lovelace", initials: "AL" };
+      const grace = { id: 8, name: "Grace Hopper", initials: "GH" };
+      const searchMembers = vi.fn<SearchMembers>(async (_scope, query) =>
+        "ids" in query ? [grace] : [ada, grace]
       );
+      const onChange = vi.fn();
       renderWithProviders(
         <PropertyInput
           definition={def({ type: MetadataType.user_reference, name: "Owner" })}
-          value={null}
-          onChange={vi.fn()}
+          value={8}
+          onChange={onChange}
+          searchMembers={searchMembers}
         />
       );
-      const trigger = screen.getByRole("combobox");
-      expect(trigger).toBeInTheDocument();
-      // Members load and render in the popover only after it opens (enabled gate).
-      await userEvent.click(trigger);
-      await waitFor(() =>
-        expect(screen.getByRole("option", { name: /Ada Lovelace/i })).toBeInTheDocument()
-      );
+      const scope: MemberScope = { type: "initiative", initiativeId: 1 };
+      expect(await screen.findByText("Grace Hopper")).toBeInTheDocument();
+      expect(searchMembers).toHaveBeenCalledWith(scope, { ids: [8] });
+      expect(searchMembers).not.toHaveBeenCalledWith(scope, { search: "" });
+
+      await userEvent.click(screen.getByRole("combobox"));
+      await userEvent.click(await screen.findByRole("option", { name: /Ada Lovelace/i }));
+      expect(searchMembers).toHaveBeenCalledWith(scope, { search: "" });
+      expect(onChange).toHaveBeenCalledWith(7);
     });
   });
 
@@ -409,38 +403,35 @@ describe("PropertyInput", () => {
 
   describe("inline option creation on select", () => {
     it("offers a 'Create' command when typing a new label, and appends + selects it on click", async () => {
+      const draft = buildPropertyOption({ value: "draft", label: "Draft" });
       const definition = def({
         id: 33,
         type: MetadataType.select,
         name: "Status",
-        options: [buildPropertyOption({ value: "draft", label: "Draft" })],
+        options: [draft],
       });
-      const bodies: unknown[] = [];
-      server.use(
-        communityHttp.patch("/property-definitions/:id", async ({ request }) => {
-          const body = await request.json();
-          bodies.push(body);
-          return HttpResponse.json({
-            definition: { ...definition, options: (body as { options: unknown }).options },
-            orphaned_value_count: 0,
-          });
-        })
-      );
+      const appendOption = vi.fn<PropertyInputProps["appendOption"]>(async () => ({
+        value: "in_review",
+        label: "In Review",
+        color: null,
+      }));
       const onChange = vi.fn();
-      renderWithProviders(<PropertyInput definition={definition} value="" onChange={onChange} />);
+      renderWithProviders(
+        <PropertyInput
+          definition={definition}
+          value=""
+          onChange={onChange}
+          appendOption={appendOption}
+        />
+      );
       const trigger = screen.getByRole("button", { name: /Select/i });
       await userEvent.click(trigger);
       const searchBox = await screen.findByPlaceholderText(/Search or create/i);
       await userEvent.type(searchBox, "In Review");
       const createItem = await screen.findByRole("option", { name: /Create "In Review"/i });
       await userEvent.click(createItem);
-      await waitFor(() => expect(bodies).toHaveLength(1));
-      const patched = bodies[0] as { options: Array<{ value: string; label: string }> };
-      expect(patched.options).toEqual([
-        expect.objectContaining({ value: "draft", label: "Draft" }),
-        expect.objectContaining({ value: "in_review", label: "In Review" }),
-      ]);
       await waitFor(() => expect(onChange).toHaveBeenCalledWith("in_review"));
+      expect(appendOption).toHaveBeenCalledWith({ id: 33, options: [draft] }, "In Review");
     });
 
     it("does NOT offer Create when the typed label matches an existing option (case-insensitive)", async () => {
