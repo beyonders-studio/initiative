@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { getAuthToken } from "@/api/client";
 import { invalidate, q } from "@/api/query-keys";
 import { useAuth } from "@/hooks/useAuth";
+import { useCommunities } from "@/hooks/useCommunities";
 import { refreshNotifications } from "@/hooks/useNotifications";
 import { refreshFiledTickets } from "@/hooks/useTickets";
 import { type AlertFrame, receiveAlert } from "@/lib/desktopAlerts";
@@ -103,6 +104,9 @@ export const useNotificationStream = () => {
   // existed when we connected.
   const refreshUserRef = useRef(refreshUser);
   refreshUserRef.current = refreshUser;
+  const { refreshCommunities } = useCommunities();
+  const refreshCommunitiesRef = useRef(refreshCommunities);
+  refreshCommunitiesRef.current = refreshCommunities;
   const accountRetryTimerRef = useRef<number | null>(null);
 
   // Re-read the account, and keep trying for a short while if it does not
@@ -134,16 +138,22 @@ export const useNotificationStream = () => {
     void invalidate(q.contactGrants(), q.ignoredAccounts(), q.dmSettings());
   }, []);
 
+  // The communities this account is in, and what each one's plan gives it.
+  const refreshCommunityList = useCallback(() => {
+    void refreshCommunitiesRef.current();
+  }, []);
+
   // Everything this socket follows, re-read at once. Used where the gap is
   // real but its contents are not knowable: our own reconnect, and the
   // server's.
   const resync = useCallback(() => {
     void invalidate(q.notifications());
     refreshAccount();
+    refreshCommunityList();
     refreshConnections();
     void invalidate(q.directMessages());
     void refreshFiledTickets();
-  }, [refreshAccount, refreshConnections]);
+  }, [refreshAccount, refreshCommunityList, refreshConnections]);
 
   useEffect(
     () => () => {
@@ -194,6 +204,11 @@ export const useNotificationStream = () => {
           receiveAlert(frame);
         } else if (frame.resource === "account") {
           refreshAccount();
+          // Which communities the account is in changed, or what one of them
+          // gives it did (its plan, its listing): the list reads them again.
+          if (frame.action === "membership" || frame.action === "community") {
+            refreshCommunityList();
+          }
         } else if (frame.resource === "connections") {
           refreshConnections();
         } else if (frame.resource === "tickets") {
@@ -239,5 +254,5 @@ export const useNotificationStream = () => {
       setConnected(false);
       connection.close();
     };
-  }, [userId, resync, refreshAccount, refreshConnections]);
+  }, [userId, resync, refreshAccount, refreshCommunityList, refreshConnections]);
 };
