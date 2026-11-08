@@ -17,7 +17,6 @@ import { useInitiatives } from "@/hooks/useInitiatives";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { toolEnvelopeType, toolForEnvelopeType } from "@/lib/tools";
-import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -321,7 +320,7 @@ export function EnvelopeImportDialog({
   };
 
   const isSubmitting = importMutation.isPending || archiveMutation.isPending;
-  const canSubmit = (!!envelope || !!archive) && !!initiativeId && !isSubmitting;
+  const canSubmit = (!!envelope || !!archive) && !!initiativeId;
   // Every tool's envelope names its entity `name`; file exports taken
   // before the rename spelled it `title`, which the server still accepts.
   const envelopeTitle = envelope?.name ?? envelope?.title ?? "";
@@ -338,25 +337,12 @@ export function EnvelopeImportDialog({
             <DialogDescription>{t("imports:wizard.people.prompt")}</DialogDescription>
           </DialogHeader>
           <ImportPeopleStep people={people} value={peopleMap} onChange={setPeopleMap} />
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void handleDiscard()}
-              disabled={confirmMutation.isPending}
-            >
-              {t("common:cancel")}
-            </Button>
-            <Button
-              type="button"
-              onClick={() => void handleConfirm()}
-              disabled={confirmMutation.isPending}
-            >
-              {confirmMutation.isPending
-                ? t("imports:envelope.importing")
-                : t("imports:envelope.importButton")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("imports:envelope.importButton")}
+            pendingLabel={t("imports:envelope.importing")}
+            pending={confirmMutation.isPending}
+            onSubmit={() => void handleConfirm()}
+          />
         </DialogContent>
       </Dialog>
     );
@@ -421,19 +407,12 @@ export function EnvelopeImportDialog({
             </div>
           )}
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
-            >
-              {t("common:cancel")}
-            </Button>
-            <Button type="submit" disabled={!canSubmit}>
-              {isSubmitting ? t("imports:envelope.importing") : t("imports:envelope.importButton")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("imports:envelope.importButton")}
+            pendingLabel={t("imports:envelope.importing")}
+            pending={isSubmitting}
+            disabled={!canSubmit}
+          />
         </form>
       </DialogContent>
     </Dialog>

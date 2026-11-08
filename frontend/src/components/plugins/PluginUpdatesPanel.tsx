@@ -27,7 +27,6 @@
  */
 
 import { isAxiosError } from "axios";
-import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -85,7 +84,7 @@ export function PluginUpdatesPanel({ plugin }: { plugin: CommunityPluginDetail }
           <Button
             size="sm"
             variant="outline"
-            disabled={upgrade.isPending}
+            pending={upgrade.isPending}
             onClick={() =>
               upgrade.mutate(undefined, {
                 onSuccess: (updated) =>
@@ -94,7 +93,6 @@ export function PluginUpdatesPanel({ plugin }: { plugin: CommunityPluginDetail }
               })
             }
           >
-            {upgrade.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {t("plugins:manage.upgradeTo", { version: pending })}
           </Button>
         ) : refused ? (
@@ -168,13 +166,17 @@ export function PluginPendingUpdate({
         </p>
       )}
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" disabled={busy} onClick={accept}>
-          {upgrade.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+        <Button size="sm" disabled={busy} pending={upgrade.isPending} onClick={accept}>
           {t("plugins:updates.accept")}
         </Button>
         {!asks.declined && (
-          <Button size="sm" variant="outline" disabled={busy} onClick={refuse}>
-            {decline.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            pending={decline.isPending}
+            onClick={refuse}
+          >
             {t("plugins:updates.decline")}
           </Button>
         )}

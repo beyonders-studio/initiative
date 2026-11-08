@@ -59,7 +59,6 @@ const open = (tasks: TaskListRead[], types = [TASK_TYPE, IDEA], { unreadable = f
         initiativeId={1}
         isSubmitting={false}
         onApply={onApply}
-        onCancel={() => {}}
       />
     </Dialog>
   );

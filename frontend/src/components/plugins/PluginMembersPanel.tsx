@@ -21,7 +21,7 @@
  * a token you could then use as them.
  */
 
-import { Loader2, ShieldOff, UserX } from "lucide-react";
+import { ShieldOff, UserX } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -136,9 +136,8 @@ export function PluginMembersPanel({ pluginId, enabled }: PluginMembersPanelProp
             size="sm"
             variant="destructive"
             onClick={() => setConfirmingRevokeAll(true)}
-            disabled={revokeAll.isPending}
+            pending={revokeAll.isPending}
           >
-            {revokeAll.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {t("plugins:members.revokeAll")}
           </Button>
         </div>
@@ -284,10 +283,9 @@ function MemberConsents({
         <Button
           size="sm"
           variant="destructive"
-          disabled={revokeAll.isPending}
+          pending={revokeAll.isPending}
           onClick={() => setConfirming(true)}
         >
-          {revokeAll.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           {t("plugins:consent.revokeAll")}
         </Button>
       )}

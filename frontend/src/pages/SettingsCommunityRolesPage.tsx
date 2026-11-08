@@ -170,14 +170,11 @@ const CustomRoleDialog = ({ role, open, onOpenChange }: CustomRoleDialogProps) =
               );
             })}
           </fieldset>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={close}>
-              {t("common:cancel")}
-            </Button>
-            <Button type="submit" disabled={pending || !name.trim()}>
-              {role ? t("common:save") : t("customRoles.add")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={role ? t("common:save") : t("customRoles.add")}
+            pending={pending}
+            disabled={!name.trim()}
+          />
         </form>
       </DialogContent>
     </Dialog>

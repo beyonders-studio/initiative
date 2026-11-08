@@ -198,8 +198,7 @@ export function AtlassianConnectStep({ onConnected, onUseExport }: AtlassianConn
       </div>
       <p className="text-muted-foreground text-xs">{t("wizard.atlassian.connect.note")}</p>
       {error && <p className="text-destructive text-sm">{error}</p>}
-      <Button type="submit" className="w-full" disabled={!ready || connect.isPending}>
-        {connect.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+      <Button type="submit" className="w-full" pending={connect.isPending} disabled={!ready}>
         {t("wizard.atlassian.connect.submit")}
       </Button>
       {onUseExport && (
@@ -349,10 +348,10 @@ export function AtlassianExportStep({ initiatives, onStarted }: AtlassianExportS
       )}
       <Button
         className="w-full"
-        disabled={!file || !chosen || busy}
+        pending={busy}
+        disabled={!file || !chosen}
         onClick={() => void handleStart()}
       >
-        {busy && <Loader2 className="h-4 w-4 animate-spin" />}
         {t("wizard.atlassian.choose.submit")}
       </Button>
     </div>

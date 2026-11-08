@@ -1,4 +1,3 @@
-import { Loader2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -257,15 +256,11 @@ export const ProviderRegistrySection = ({
                     size="sm"
                     onClick={() => test(provider)}
                     disabled={testProvider.isPending}
+                    pending={testProvider.isPending && testProvider.variables === provider.id}
                   >
-                    {testProvider.isPending && testProvider.variables === provider.id ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        {t("authProviders.testing")}
-                      </>
-                    ) : (
-                      t("authProviders.test")
-                    )}
+                    {testProvider.isPending && testProvider.variables === provider.id
+                      ? t("authProviders.testing")
+                      : t("authProviders.test")}
                   </Button>
                   <Button
                     type="button"
@@ -365,16 +360,12 @@ export const ProviderRegistrySection = ({
                   type="button"
                   variant="outline"
                   onClick={verify}
-                  disabled={!form.issuer.trim() || discoverIssuer.isPending}
+                  disabled={!form.issuer.trim()}
+                  pending={discoverIssuer.isPending}
                 >
-                  {discoverIssuer.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {t("authProviders.verifying")}
-                    </>
-                  ) : (
-                    t("authProviders.verify")
-                  )}
+                  {discoverIssuer.isPending
+                    ? t("authProviders.verifying")
+                    : t("authProviders.verify")}
                 </Button>
               </div>
               {probe ? <ProbeReport probe={probe} /> : null}
@@ -484,14 +475,11 @@ export const ProviderRegistrySection = ({
                 }
               />
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={closeDialog} disabled={saving}>
-                {t("authProviders.cancel")}
-              </Button>
-              <Button type="submit" disabled={saving}>
-                {saving ? t("authProviders.saving") : t("authProviders.save")}
-              </Button>
-            </DialogFooter>
+            <DialogFooter
+              submitLabel={t("authProviders.save")}
+              pendingLabel={t("authProviders.saving")}
+              pending={saving}
+            />
           </form>
         </DialogContent>
       </Dialog>

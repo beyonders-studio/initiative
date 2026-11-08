@@ -96,14 +96,7 @@ export const SignatureFieldInput = ({
                 autoFocus
               />
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                {t("common:cancel")}
-              </Button>
-              <Button type="submit" disabled={!signed}>
-                {t("input.sign")}
-              </Button>
-            </DialogFooter>
+            <DialogFooter submitLabel={t("input.sign")} disabled={!signed} />
           </form>
         </DialogContent>
       </Dialog>

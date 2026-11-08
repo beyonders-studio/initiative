@@ -685,19 +685,11 @@ export const PluginServiceFormDialog = ({
             </div>
           </div>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={saving}
-            >
-              {t("pluginServices.cancel")}
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? t("pluginServices.saving") : t("pluginServices.save")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("pluginServices.save")}
+            pendingLabel={t("pluginServices.saving")}
+            pending={saving}
+          />
         </form>
       </DialogContent>
     </Dialog>

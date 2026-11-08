@@ -27,7 +27,6 @@ import {
 } from "@/hooks/useProviderPlacement";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 import {
   Dialog,
@@ -345,14 +344,12 @@ export const ProviderPlacementRuleDialog = ({
           )}
         </div>
 
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
-            {t("authProviders.cancel")}
-          </Button>
-          <Button type="button" onClick={submit} disabled={!canSubmit}>
-            {editing ? t("providerPlacement.save") : t("providerPlacement.add")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={editing ? t("providerPlacement.save") : t("providerPlacement.add")}
+          onSubmit={submit}
+          pending={saving}
+          disabled={!canSubmit}
+        />
       </DialogContent>
     </Dialog>
   );

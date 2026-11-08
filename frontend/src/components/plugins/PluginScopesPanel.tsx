@@ -12,7 +12,6 @@
  * Saved as one set: the server replaces the whole grant.
  */
 
-import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -160,8 +159,12 @@ export function PluginScopesPanel({ plugin }: PluginScopesPanelProps) {
       </ul>
 
       <div className="flex justify-end">
-        <Button size="sm" onClick={save} disabled={setScopes.isPending || sameSet(chosen, granted)}>
-          {setScopes.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+        <Button
+          size="sm"
+          onClick={save}
+          disabled={sameSet(chosen, granted)}
+          pending={setScopes.isPending}
+        >
           {t("common:save")}
         </Button>
       </div>

@@ -1,4 +1,4 @@
-import { AlertCircle, ChevronLeft, Loader2 } from "lucide-react";
+import { AlertCircle, ChevronLeft } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -313,35 +313,24 @@ export function DeleteAccountDialog({
                 onClick={handleNext}
                 disabled={
                   (step === "choose-type" && !canProceedFromChooseType) ||
-                  (step === "check-blockers" && !canProceedFromBlockers) ||
-                  isCheckingEligibility
+                  (step === "check-blockers" && !canProceedFromBlockers)
                 }
+                pending={isCheckingEligibility}
               >
-                {isCheckingEligibility ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t("deleteAccount.checking")}
-                  </>
-                ) : (
-                  t("deleteAccount.next")
-                )}
+                {isCheckingEligibility ? t("deleteAccount.checking") : t("deleteAccount.next")}
               </Button>
             ) : (
               <Button
                 variant="destructive"
                 onClick={handleSubmit}
-                disabled={!canConfirm || deleteAccount.isPending}
+                disabled={!canConfirm}
+                pending={deleteAccount.isPending}
               >
-                {deleteAccount.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t("deleteAccount.deleting")}
-                  </>
-                ) : action === "deactivate" ? (
-                  t("deleteAccount.deactivateAccount")
-                ) : (
-                  t("deleteAccount.deleteAccountButton")
-                )}
+                {deleteAccount.isPending
+                  ? t("deleteAccount.deleting")
+                  : action === "deactivate"
+                    ? t("deleteAccount.deactivateAccount")
+                    : t("deleteAccount.deleteAccountButton")}
               </Button>
             )}
           </div>

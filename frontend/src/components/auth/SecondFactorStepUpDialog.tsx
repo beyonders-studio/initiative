@@ -252,14 +252,13 @@ export const SecondFactorStepUpDialog = () => {
               >
                 {t("factorStepUp.emailCodeResend")}
               </button>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={dismiss}>
-                  {t("factorStepUp.dismiss")}
-                </Button>
-                <Button type="submit" disabled={submitting || !code.trim()}>
-                  {submitting ? t("login.submitting") : t("factorStepUp.submit")}
-                </Button>
-              </DialogFooter>
+              <DialogFooter
+                cancel={t("factorStepUp.dismiss")}
+                submitLabel={t("factorStepUp.submit")}
+                pendingLabel={t("login.submitting")}
+                pending={submitting}
+                disabled={!code.trim()}
+              />
             </form>
           </>
         ) : presentsPasskey ? (

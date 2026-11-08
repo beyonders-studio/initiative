@@ -242,14 +242,12 @@ export const CustomRoleClaimRulesSection = ({ communityId }: { communityId: numb
               </Select>
             </div>
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={closeDialog}>
-              {t("authProviders.cancel")}
-            </Button>
-            <Button type="button" onClick={submit} disabled={!canSubmit || createRule.isPending}>
-              {t("customRoleRules.add")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("customRoleRules.add")}
+            pending={createRule.isPending}
+            disabled={!canSubmit}
+            onSubmit={submit}
+          />
         </DialogContent>
       </Dialog>
 

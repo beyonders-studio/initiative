@@ -26,7 +26,7 @@
  * definition declares — a new plug-in needs no code here.
  */
 
-import { KeyRound, Loader2, Plug, ShieldCheck, TriangleAlert } from "lucide-react";
+import { KeyRound, Plug, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Fragment, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -256,16 +256,19 @@ function CommunityConnection({
           )}
           <div className="flex flex-wrap items-center gap-2">
             {vendorFlow && (
-              <Button size="sm" onClick={start} disabled={connect.isPending}>
-                {connect.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              <Button size="sm" onClick={start} pending={connect.isPending}>
                 {connection.satisfied
                   ? t("plugins:connections.reconnect")
                   : t("plugins:connections.connect")}
               </Button>
             )}
             {typed.length > 0 && (
-              <Button size="sm" onClick={submit} disabled={!touched.length || save.isPending}>
-                {save.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              <Button
+                size="sm"
+                onClick={submit}
+                disabled={!touched.length}
+                pending={save.isPending}
+              >
                 {t("common:save")}
               </Button>
             )}
@@ -449,8 +452,7 @@ function PersonalConnection({
             </span>
           ) : null}
 
-          <Button size="sm" onClick={start} disabled={connect.isPending}>
-            {connect.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          <Button size="sm" onClick={start} pending={connect.isPending}>
             {connection.status
               ? t("plugins:connections.reconnect")
               : t("plugins:connections.connect")}

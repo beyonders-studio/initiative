@@ -19,9 +19,10 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 
-import { Dialog, DialogContent, DialogTitle } from "./dialog";
+import { Dialog, DialogContent, DialogFooter, DialogTitle } from "./dialog";
 
 const SRC = path.resolve(__dirname, "../..");
 
@@ -116,5 +117,80 @@ describe("DialogContent", () => {
     walk(SRC);
 
     expect(offenders, `put these behind sm: — ${offenders.join(", ")}`).toEqual([]);
+  });
+});
+
+describe("DialogFooter", () => {
+  it("draws Cancel, which closes the dialog, and a button that submits its form", async () => {
+    const onOpenChange = vi.fn();
+    const onSubmit = vi.fn((event: { preventDefault: () => void }) => event.preventDefault());
+    render(
+      <Dialog open onOpenChange={onOpenChange}>
+        <DialogContent showCloseButton={false}>
+          <DialogTitle>Rename</DialogTitle>
+          <form onSubmit={onSubmit}>
+            <DialogFooter submitLabel="Save" />
+          </form>
+        </DialogContent>
+      </Dialog>
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("clicks its own handler rather than submitting when given one", async () => {
+    const onSubmit = vi.fn();
+    const onFormSubmit = vi.fn();
+    render(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>Delete</DialogTitle>
+          <form onSubmit={onFormSubmit}>
+            <DialogFooter submitLabel="Delete" cancel="Keep" destructive onSubmit={onSubmit} />
+          </form>
+        </DialogContent>
+      </Dialog>
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onFormSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Keep" })).toBeInTheDocument();
+  });
+
+  it("spins the submit button under its pending label and disables both while pending", () => {
+    render(
+      <Dialog open>
+        <DialogContent showCloseButton={false}>
+          <DialogTitle>Rename</DialogTitle>
+          <DialogFooter submitLabel="Save" pendingLabel="Saving…" pending />
+        </DialogContent>
+      </Dialog>
+    );
+
+    const submit = screen.getByRole("button", { name: "Saving…" });
+    expect(submit).toBeDisabled();
+    expect(submit).toHaveAttribute("aria-busy", "true");
+    expect(submit.querySelector("[data-slot='spinner']")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+  });
+
+  it("only lays out its children without a submit label", () => {
+    render(
+      <Dialog open>
+        <DialogContent showCloseButton={false}>
+          <DialogTitle>Done</DialogTitle>
+          <DialogFooter>
+            <button type="button">Done</button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+
+    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["Done"]);
   });
 });

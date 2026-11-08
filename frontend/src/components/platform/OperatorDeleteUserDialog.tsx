@@ -1,4 +1,4 @@
-import { AlertCircle, ChevronLeft, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, ChevronLeft, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -413,39 +413,30 @@ export function OperatorDeleteUserDialog({
                   disabled={
                     (step === "choose-type" && !canProceedFromChooseType) ||
                     (step === "check-blockers" && !canProceedFromBlockers) ||
-                    (step === "resolve-blockers" && !canProceedFromBlockers) ||
-                    isCheckingEligibility
+                    (step === "resolve-blockers" && !canProceedFromBlockers)
                   }
+                  pending={isCheckingEligibility}
                 >
-                  {isCheckingEligibility ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {t("operatorDeleteUser.loading")}
-                    </>
-                  ) : (
-                    t("operatorDeleteUser.next")
-                  )}
+                  {isCheckingEligibility
+                    ? t("operatorDeleteUser.loading")
+                    : t("operatorDeleteUser.next")}
                 </Button>
               ) : (
                 <Button
                   variant="destructive"
                   onClick={handleDelete}
-                  disabled={!canConfirm || deleteUser.isPending}
+                  disabled={!canConfirm}
+                  pending={deleteUser.isPending}
                 >
-                  {deleteUser.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {action === "deactivate"
-                        ? t("operatorDeleteUser.deactivating")
-                        : t("operatorDeleteUser.deleting")}
-                    </>
-                  ) : action === "deactivate" ? (
-                    t("operatorDeleteUser.deactivateButton")
-                  ) : action === "soft_delete" ? (
-                    t("operatorDeleteUser.anonymizeButton")
-                  ) : (
-                    t("operatorDeleteUser.deleteButton")
-                  )}
+                  {deleteUser.isPending
+                    ? action === "deactivate"
+                      ? t("operatorDeleteUser.deactivating")
+                      : t("operatorDeleteUser.deleting")
+                    : action === "deactivate"
+                      ? t("operatorDeleteUser.deactivateButton")
+                      : action === "soft_delete"
+                        ? t("operatorDeleteUser.anonymizeButton")
+                        : t("operatorDeleteUser.deleteButton")}
                 </Button>
               )}
             </div>

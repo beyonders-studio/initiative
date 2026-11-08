@@ -307,20 +307,12 @@ export const PasswordSection = ({ user, refreshUser }: PasswordSectionProps) => 
                 </div>
               ) : null}
               {removeError ? <p className="text-destructive text-sm">{removeError}</p> : null}
-              <DialogFooter className="gap-2">
-                <Button type="button" variant="outline" onClick={closeRemove}>
-                  {t("common:cancel")}
-                </Button>
-                <Button
-                  type="submit"
-                  variant="destructive"
-                  disabled={
-                    removePassword.isPending || (user.password_required && !removeCurrentPassword)
-                  }
-                >
-                  {t("account.removePassword")}
-                </Button>
-              </DialogFooter>
+              <DialogFooter
+                submitLabel={t("account.removePassword")}
+                pending={removePassword.isPending}
+                disabled={user.password_required && !removeCurrentPassword}
+                destructive
+              />
             </form>
           )}
         </DialogContent>

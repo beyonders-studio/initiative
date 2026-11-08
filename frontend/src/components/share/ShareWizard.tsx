@@ -1,4 +1,4 @@
-import { FileUp, Loader2, type LucideIcon, ScrollText, X } from "lucide-react";
+import { FileUp, type LucideIcon, ScrollText, X } from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -263,8 +263,7 @@ export function ShareWizard({ share, onDone }: ShareWizardProps) {
                 </li>
               ))}
             </ul>
-            <Button type="submit" className="w-full" disabled={!canSubmit || land.isPending}>
-              {land.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            <Button type="submit" className="w-full" disabled={!canSubmit} pending={land.isPending}>
               {land.isPending
                 ? t("compose.creating")
                 : t("compose.upload", { count: files.length })}
@@ -321,8 +320,7 @@ export function ShareWizard({ share, onDone }: ShareWizardProps) {
                 {t("compose.filesLeftOut", { count: leftOut })}
               </p>
             )}
-            <Button type="submit" className="w-full" disabled={!canSubmit || land.isPending}>
-              {land.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            <Button type="submit" className="w-full" disabled={!canSubmit} pending={land.isPending}>
               {land.isPending ? t("compose.creating") : t(`compose.create.${writes}`)}
             </Button>
           </form>

@@ -1,4 +1,3 @@
-import { Loader2 } from "lucide-react";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -211,15 +210,8 @@ export const CreateContactDialog = ({
         </div>
 
         <DialogFooter>
-          <Button type="button" onClick={submit} disabled={!canSubmit}>
-            {pending ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("creating")}
-              </>
-            ) : (
-              t("newContact")
-            )}
+          <Button type="button" onClick={submit} pending={pending} disabled={!canSubmit}>
+            {pending ? t("creating") : t("newContact")}
           </Button>
         </DialogFooter>
       </DialogContent>

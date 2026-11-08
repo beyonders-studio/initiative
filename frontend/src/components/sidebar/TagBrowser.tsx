@@ -262,17 +262,13 @@ export const TagBrowser = ({
               className="h-9 w-auto shrink-0"
             />
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={closeRename}>
-              {t("common:cancel")}
-            </Button>
-            <Button
-              onClick={() => void handleSaveRename()}
-              disabled={!editName.trim() || updateTag.isPending}
-            >
-              {updateTag.isPending ? t("detail.saving") : t("detail.save")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("detail.save")}
+            onSubmit={() => void handleSaveRename()}
+            pending={updateTag.isPending}
+            pendingLabel={t("detail.saving")}
+            disabled={!editName.trim()}
+          />
         </DialogContent>
       </Dialog>
 
