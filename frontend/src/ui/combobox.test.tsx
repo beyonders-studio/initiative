@@ -208,6 +208,27 @@ describe("Combobox", () => {
       expect(screen.queryByRole("button", { name: 'Make "Gamma"' })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Add" })).toHaveAttribute("aria-expanded", "false");
     });
+
+    it("keeps what was typed when making the item fails, to try again", async () => {
+      const user = userEvent.setup();
+      const onCreate = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValue(null);
+      render(
+        <Combobox
+          items={ITEMS}
+          typedLabel={(typed) => typed && `Create "${typed}"`}
+          onCreate={onCreate}
+        />
+      );
+
+      await user.click(screen.getByRole("combobox"));
+      await user.type(screen.getByPlaceholderText("Search"), "Gamma");
+      await user.click(screen.getByRole("option", { name: 'Create "Gamma"' }));
+      expect(screen.getByPlaceholderText("Search")).toHaveValue("Gamma");
+
+      await user.click(screen.getByRole("option", { name: 'Create "Gamma"' }));
+      await waitFor(() => expect(screen.getByPlaceholderText("Search")).toHaveValue(""));
+      expect(onCreate).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("multiple", () => {
@@ -262,14 +283,14 @@ describe("Combobox", () => {
       expect(trigger).toHaveTextContent("All statuses");
     });
 
-    it("leaves a disabled item out of select all", async () => {
+    it("adds every item that can be chosen to what is chosen, listed or not", async () => {
       const user = userEvent.setup();
       const onValueChange = vi.fn();
       render(
         <Combobox
           multiple
           aria-label="Statuses"
-          value={[]}
+          value={["removed"]}
           onValueChange={onValueChange}
           items={[
             { value: "1", label: "Doing" },
@@ -280,7 +301,7 @@ describe("Combobox", () => {
 
       await user.click(screen.getByRole("combobox", { name: "Statuses" }));
       await user.click(screen.getByRole("option", { name: "Select all" }));
-      expect(onValueChange).toHaveBeenCalledWith(["1"]);
+      expect(onValueChange).toHaveBeenCalledWith(["removed", "1"]);
     });
 
     it("says there is nothing to choose in place of the field", () => {

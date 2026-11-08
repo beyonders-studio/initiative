@@ -75,8 +75,9 @@ export type ComboboxProps = {
    */
   typedLabel?: (typed: string) => string;
   /** Makes a new item of what was typed when its offer is chosen, in place of
-   *  choosing it. The search is cleared, since what was typed is taken. */
-  onCreate?: (typed: string) => void;
+   *  choosing it. The search is cleared once it is done, since what was typed
+   *  is taken; a promise that rejects keeps it, to try again. */
+  onCreate?: (typed: string) => unknown;
   /** Opens the popover in place of the field: a button of the caller's own,
    *  which names itself. `id`, `aria-label`, `placeholder` and `className`
    *  are the field's, and go unused beside it. */
@@ -229,8 +230,10 @@ export const Combobox = (props: ComboboxProps) => {
 
   const takeTyped = () => {
     if (!onCreate) return choose(typed);
-    onCreate(typed);
-    setQuery("");
+    Promise.resolve(onCreate(typed)).then(
+      () => setQuery(""),
+      () => {}
+    );
   };
 
   // Searched here, with nothing loading and nothing to type, an empty list of
@@ -308,18 +311,19 @@ export const Combobox = (props: ComboboxProps) => {
                   {props.multiple && !searchedOnServer && !query && items.length > 0 ? (
                     <>
                       <CommandGroup>
-                        {/* Every item that can be chosen, keeping any chosen
-                            item that can't. */}
+                        {/* Every item that can be chosen, added to what is
+                            chosen already, listed or not. */}
                         <CommandItem
                           disabled={items.every(
                             (item) => item.disabled || chosen.includes(item.value)
                           )}
                           onSelect={() =>
-                            props.onValueChange(
-                              items
-                                .filter((item) => !item.disabled || chosen.includes(item.value))
-                                .map((item) => item.value)
-                            )
+                            props.onValueChange([
+                              ...chosen,
+                              ...items
+                                .filter((item) => !item.disabled && !chosen.includes(item.value))
+                                .map((item) => item.value),
+                            ])
                           }
                         >
                           {t("selectAll")}

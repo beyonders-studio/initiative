@@ -600,18 +600,16 @@ const PropertyOptionPicker = ({
 
   const knownValues = useMemo(() => new Set(options.map((option) => option.value)), [options]);
 
+  // A failure is toasted by the hook, and rejects so the picker keeps the
+  // typed name to try again.
   const handleCreate = async (label: string) => {
     if (isPending) return;
-    try {
-      const slug = (await appendOption(toDefinitionForPatch(definition), label)).option.value;
-      if (isMulti) {
-        if (!selectedArr.includes(slug)) onChangeMulti([...selectedArr, slug]);
-      } else {
-        onChangeSingle(slug);
-        setOpen(false);
-      }
-    } catch {
-      // Toast surfaced by the hook.
+    const slug = (await appendOption(toDefinitionForPatch(definition), label)).option.value;
+    if (isMulti) {
+      if (!selectedArr.includes(slug)) onChangeMulti([...selectedArr, slug]);
+    } else {
+      onChangeSingle(slug);
+      setOpen(false);
     }
   };
 
