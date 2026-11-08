@@ -64,6 +64,7 @@ from app.core.errors import CodedError
 from app.core.messages import WebhookSubscriptionMessages
 from app.db.guild_standing import InstallContext
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.webhook_subscription import WebhookSubscription
 from app.schemas.tenant.webhook_subscription import (
@@ -155,7 +156,9 @@ async def _named(
         own = {
             row.id
             for row in rows
-            if row.plugin_install_id == actor.install_id and row.created_by is None
+            if row.plugin_install_id == actor.install_id
+            and row.created_by_kind == ActorKind.plugin
+            and row.created_by == actor.install_id
         }
     # An install's own subscriptions are its token's plug-in; any other is read
     # from its install row.
@@ -181,7 +184,9 @@ async def _named(
                     if row.plugin_install_id is not None
                     else None,
                     row.id,
-                    () if row.created_by is None else (row.created_by,),
+                    (row.created_by,)
+                    if row.created_by_kind == ActorKind.member
+                    else (),
                 )
                 for row in rows
                 if row.id not in own
@@ -204,7 +209,9 @@ async def _named(
                 community_ref=guild_ref,
                 initiative_id=row.initiative_id,
                 created_by_ref=(
-                    None if row.created_by is None else actor_refs[row.created_by]
+                    actor_refs[row.created_by]
+                    if row.created_by_kind == ActorKind.member
+                    else None
                 ),
                 target_url=row.target_url,
                 event_types=row.event_types,
@@ -259,7 +266,7 @@ async def create_subscription(
         subscription, secret = await subscriptions_service.create_subscription(
             session,
             payload=payload,
-            created_by=guild_context.user_id,
+            actor_user_id=guild_context.user_id,
             guild_id=guild_context.guild_id,
         )
 

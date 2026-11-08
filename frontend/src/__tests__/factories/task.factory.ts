@@ -1,10 +1,11 @@
-import type {
-  GroupingDescription,
-  TaskAssigneeSummary,
-  TaskListRead,
-  TaskListResponse,
-  TaskStatusRead,
-  TaskTypeRead,
+import {
+  ActorKind,
+  type GroupingDescription,
+  type TaskAssigneeSummary,
+  type TaskListRead,
+  type TaskListResponse,
+  type TaskStatusRead,
+  type TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
 
 let counter = 0;
@@ -82,6 +83,8 @@ export function buildTask(overrides: Partial<TaskListRead> = {}): TaskListRead {
     position: counter,
     archived_at: null,
     created_by: 1,
+    created_by_kind: ActorKind.member,
+    created_by_install: null,
     comment_count: 0,
     blocked_by_open_count: 0,
     community_id: null,

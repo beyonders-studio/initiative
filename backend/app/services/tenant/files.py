@@ -202,13 +202,13 @@ async def copy_contents(
     copy.content = attachments_service.replace_upload_urls(content, copies)
     copy.featured_image_url = copied(copy.featured_image_url)
     if current is not None:
-        # A plug-in is never an author: its copy names the file's uploader.
+        # The copy is its copier's: a member, or the plug-in or Initiative the
+        # insert trigger names when no member is acting.
         file_versions.copy_version(
             session,
             current,
             copy,
             file_url=copied(file_url),
-            created_by=actor.user_id or current.created_by,
         )
     return []
 

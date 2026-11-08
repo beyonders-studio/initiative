@@ -29,6 +29,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.search import SearchEntityType
 from app.core.tools import Tool, tool_envelope_type
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.initiative import Initiative, PermissionKey
 from app.models.tenant.wiki import Wiki, WikiPage
 from app.schemas.tenant.import_envelopes import WikiEnvelope, WikiPageEnvelope
@@ -182,6 +183,7 @@ class WikiImporter:
             description=env.description,
             initiative_id=target_initiative.id,
             created_by=importer.id,
+            created_by_kind=ActorKind.member,
             **settings,
         )
         session.add(wiki)
@@ -229,6 +231,7 @@ class WikiImporter:
                 is_draft=page_env.is_draft,
                 content=page_env.content or {},
                 created_by=author if author is not None else importer.id,
+                created_by_kind=ActorKind.member,
                 # When it was written, where the envelope says so. Absent
                 # leaves the model's own default — the moment of the import,
                 # which is the only time this row can honestly claim.
@@ -520,6 +523,7 @@ async def _upload_file(
         content={},
         initiative_id=target_initiative.id,
         created_by=importer.id,
+        created_by_kind=ActorKind.member,
     )
     session.add(file)
     await session.flush()
@@ -534,6 +538,7 @@ async def _upload_file(
         session,
         file,
         created_by=importer.id,
+        created_by_kind=ActorKind.member,
         file_url=f"/uploads/{routed_guild_id(session)}/{key}",
         original_filename=filename,
         file_content_type=content_type,
@@ -590,6 +595,7 @@ async def _write_comments(
             wiki_page_id=row.id,
             content=body,
             created_by=author if author is not None else importer.id,
+            created_by_kind=ActorKind.member,
             imported_author_name=None
             if author is not None
             else (source_name[:200] or None),

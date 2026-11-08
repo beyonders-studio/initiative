@@ -1,4 +1,9 @@
-import type { PollOptionRead, PollRead, PostRead } from "@/api/generated/initiativeAPI.schemas";
+import {
+  ActorKind,
+  type PollOptionRead,
+  type PollRead,
+  type PostRead,
+} from "@/api/generated/initiativeAPI.schemas";
 
 import { ownerCan } from "./can";
 
@@ -56,6 +61,8 @@ export function buildPost(overrides: Partial<PostRead> = {}): PostRead {
     initiative_id: 1,
     community_id: 1,
     created_by: 1,
+    created_by_kind: ActorKind.member,
+    created_by_install: null,
     // Every real row is signed, so a test post is too.
     author: {
       id: 1,

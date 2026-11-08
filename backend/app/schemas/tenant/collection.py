@@ -8,11 +8,12 @@ from pydantic import AliasChoices, ConfigDict, Field, model_validator
 
 from app.core.collection_shapes import SHAPES, FieldDisplay
 from app.core.file_types import FileType
-from app.core.identity_boundary import UPLOAD_PATH, GuildId, PersonId
+from app.core.identity_boundary import UPLOAD_PATH, GuildId
 from app.models.tenant.metadata import MetadataType
 from app.schemas.base import MentionStr, SanitizedBaseModel, TitleStr
 from app.schemas.query import PageMeta
 from app.schemas.tenant.archive import ContentCan
+from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.file import FileSummary
 from app.schemas.tenant.property import (
     CurrencyCode,
@@ -147,7 +148,7 @@ class CollectionCan(ContentCan):
     unarchive: bool = False
 
 
-class CollectionRead(SanitizedBaseModel):
+class CollectionRead(CreatedByRead):
     """A collection as its reader sees it: only the files they can open are
     counted, and the cover is one of those."""
 
@@ -166,7 +167,6 @@ class CollectionRead(SanitizedBaseModel):
     #: Its files the reader knows are there and can't open, which they may
     #: ask for.
     hidden_files: HiddenFiles = Field(default_factory=HiddenFiles)
-    created_by: PersonId | None = None
     created_at: datetime
     updated_at: datetime
     archived_at: datetime | None = None

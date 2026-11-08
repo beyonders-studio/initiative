@@ -56,7 +56,7 @@ from app.core.plugin_scopes import (
 from app.core.tools import Tool
 from app.db.session import install_context
 from app.models.platform.guild import GuildMembership
-from app.models.tenant._mixins import tool_models
+from app.models.tenant._mixins import ActorKind, tool_models
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
@@ -582,10 +582,11 @@ async def restore_ownership_to_author(
         return False
 
     # Every tool carries CreatedByMixin, so once tool_for_row has answered there
-    # is a created_by to read (ownership_test pins that).
-    author_id = row.created_by
-    if author_id is None:
+    # is a created_by to read (ownership_test pins that). Only a member author
+    # is given anything back.
+    if row.created_by_kind != ActorKind.member or row.created_by is None:
         return False
+    author_id = row.created_by
 
     if await current_owner(session, tool=tool, resource_id=row.id) is not None:
         return False

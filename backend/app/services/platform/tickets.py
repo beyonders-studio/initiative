@@ -42,6 +42,7 @@ from app.db import cohorts
 from app.db.session import routed_guild_id
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.evidence import Evidence
 from app.models.tenant.intake import IntakeBinding, IntakeCase
@@ -368,7 +369,12 @@ def latest_reply():
         .where(Comment.task_id == IntakeCase.task_id)
         .where(Comment.audience == CommentAudience.filer)
         .where(Comment.deleted_at.is_(None))  # type: ignore[union-attr]
-        .where(Comment.created_by.is_distinct_from(IntakeCase.filer_user_id))  # type: ignore[union-attr]
+        .where(
+            or_(
+                Comment.created_by_kind != ActorKind.member,
+                Comment.created_by.is_distinct_from(IntakeCase.filer_user_id),  # type: ignore[union-attr]
+            )
+        )
         .correlate(IntakeCase)
         .scalar_subquery()
     )

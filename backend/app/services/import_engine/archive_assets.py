@@ -28,6 +28,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import ImportEngineMessages
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.services.data_jobs import while_beating
 from app.services.import_engine.atlassian import HEARTBEAT_SECONDS
 from app.services.import_engine.contract import ImportEngineError
@@ -223,6 +224,7 @@ async def restore_assets(
                         data=Path(spool.name),
                         content_type=content_type,
                         created_by=user.id,
+                        created_by_kind=ActorKind.member,
                         initiative_id=initiative_id,
                     ),
                     heartbeat,

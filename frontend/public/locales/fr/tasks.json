@@ -53,7 +53,6 @@
     "backToProjects": "← Retour aux projets",
     "loadProjectError": "Impossible de charger le contexte du projet de cette tâche.",
     "createdBy": "Créée par {{name}} · {{time}}",
-    "createdAt": "Créée {{time}}",
     "readOnlyNoAccess": "Vous n'avez qu'un accès en lecture à ce projet ; les champs de la tâche sont donc désactivés.",
     "readOnlyArchived": "Ce projet est archivé. Désarchivez-le depuis les paramètres du projet pour modifier les tâches.",
     "aiGenerate": "Générer avec l'IA",

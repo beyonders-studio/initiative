@@ -316,7 +316,10 @@ class Task(
     # out because the target is a view, which carries no foreign key.
     creator: Optional["MemberProfile"] = Relationship(
         sa_relationship_kwargs={
-            "primaryjoin": "foreign(Task.created_by) == MemberProfile.id",
+            "primaryjoin": (
+                "and_(foreign(Task.created_by) == MemberProfile.id,"
+                " Task.created_by_kind == 'member')"
+            ),
             "viewonly": True,
         }
     )

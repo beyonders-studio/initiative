@@ -35,6 +35,7 @@ from app.core.image_headers import read_image_header
 from app.core.messages import AttachmentMessages
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.query import ids_in
+from app.models.tenant._mixins import ActorKind
 from app.services.platform import billing_changes
 from app.services.storage import (
     ReadableBlob,
@@ -397,7 +398,11 @@ async def discard_pasted_image(session, filename: str, *, user_id: int) -> str |
         return None
     upload = (
         await session.exec(
-            select(Upload).where(Upload.filename == name, Upload.created_by == user_id)
+            select(Upload).where(
+                Upload.filename == name,
+                Upload.created_by_kind == ActorKind.member,
+                Upload.created_by == user_id,
+            )
         )
     ).first()
     if upload is None or await _still_shown(session, name, leaving={}):
@@ -527,7 +532,10 @@ async def copy_uploads(
         session.add(
             Upload(
                 filename=name,
-                created_by=created_by if created_by is not None else source.created_by,
+                created_by=source.created_by if created_by is None else created_by,
+                created_by_kind=source.created_by_kind
+                if created_by is None
+                else ActorKind.member,
                 size_bytes=source.size_bytes,
                 content_type=source.content_type,
                 content_hash=source.content_hash,
@@ -660,7 +668,10 @@ async def claim_uploads(
             if upload is None:
                 continue
             if upload.claimed_at is None:
-                if uploaded_by is None or upload.created_by in uploaded_by:
+                if uploaded_by is None or (
+                    upload.created_by_kind == ActorKind.member
+                    and upload.created_by in uploaded_by
+                ):
                     upload.initiative_id = initiative_id
                     upload.claimed_at = now
             elif upload.initiative_id != initiative_id:
@@ -952,12 +963,15 @@ async def store_upload(
     filename: str,
     data: bytes | Path,
     content_type: str | None,
-    created_by: int | None,
+    created_by: int | None = None,
+    created_by_kind: ActorKind | None = None,
     initiative_id: int | None = None,
 ) -> str:
     """Write ``data``, or the file at that path without reading it into
     memory, to the guild's storage as ``filename`` and record it in
     ``uploads``. Returns the served URL, ``/uploads/{community_id}/{filename}``.
+    ``created_by`` and ``created_by_kind`` name its author, both or neither:
+    neither is the request's (``CreatedByMixin``).
 
     Every upload a person or an import brings into a guild is stored here.
     The ``uploads`` row is what the serve route requires and what the storage
@@ -998,6 +1012,7 @@ async def store_upload(
         content_type=content_type,
         content_hash=await asyncio.to_thread(compute_content_hash, data),
         created_by=created_by,
+        created_by_kind=created_by_kind,
         initiative_id=initiative_id,
     )
 
@@ -1010,8 +1025,9 @@ def record_upload(
     size: int,
     content_type: str | None,
     content_hash: str | None,
-    created_by: int | None,
     initiative_id: int | None,
+    created_by: int | None = None,
+    created_by_kind: ActorKind | None = None,
 ) -> str:
     """Record what is already in the guild's storage as ``filename`` in
     ``uploads``, as :func:`store_upload` records what it writes, and return
@@ -1023,6 +1039,7 @@ def record_upload(
         Upload(
             filename=filename,
             created_by=created_by,
+            created_by_kind=created_by_kind,
             size_bytes=size,
             content_type=content_type,
             content_hash=content_hash,

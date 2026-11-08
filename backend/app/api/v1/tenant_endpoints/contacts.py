@@ -98,7 +98,6 @@ async def create_contact(
 
     contact = Contact(
         initiative_id=initiative_id,
-        created_by=guild_context.user_id,
         **contact_in.model_dump(include={"name", "is_organization", *DETAILS}),
     )
     session.add(contact)

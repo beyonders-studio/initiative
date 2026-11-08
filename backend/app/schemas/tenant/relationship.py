@@ -16,6 +16,7 @@ from app.core.references import REF_SEPARATOR
 from app.core.relationships import EndpointKind, RelationshipType
 from app.core.tools import Tool
 from app.schemas.base import SanitizedBaseModel
+from app.schemas.tenant.created_by import CreatedByRead
 
 
 class EndpointRef(SanitizedBaseModel):
@@ -98,7 +99,7 @@ class RelatedEnd(SanitizedBaseModel):
     starts_at: datetime | None = None
 
 
-class RelationshipRead(SanitizedBaseModel):
+class RelationshipRead(CreatedByRead):
     """One edge, rendered from the asking entity's side.
 
     ``direction`` is which way it runs relative to the entity asked about, so a
@@ -115,7 +116,6 @@ class RelationshipRead(SanitizedBaseModel):
     other: RelatedEnd
     provenance: str
     confidence: float | None = None
-    created_by: int | None = None
     created_at: datetime
 
 

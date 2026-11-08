@@ -37,7 +37,7 @@ def test_fractional_offset_repeat_survives_ical_export_and_import(zone_name):
     assert parsed.decoded("dtstart").astimezone(UTC) == start.astimezone(UTC)
     assert calendar.walk("VTIMEZONE")
     imported, errors, skipped = ical_service.build_calendar_events(
-        exported.decode(), 1, 1, 1
+        exported.decode(), 1, 1
     )
     assert (errors, skipped) == ([], 0)
     event = imported[0]
@@ -72,7 +72,7 @@ def test_picked_date_exceptions_survive_ical_round_trip(start, shift):
         ]
     )
     imported, errors, skipped = ical_service.build_calendar_events(
-        exported.decode(), 1, 1, 1
+        exported.decode(), 1, 1
     )
     assert (errors, skipped) == ([], 0)
     event = imported[0]
@@ -114,7 +114,7 @@ def test_ical_duration_sets_the_imported_event_end(
         "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:duration\r\n"
         f"SUMMARY:Duration\r\n{properties}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
     )
-    imported, errors, skipped = ical_service.build_calendar_events(content, 1, 1, 1)
+    imported, errors, skipped = ical_service.build_calendar_events(content, 1, 1)
     assert (errors, skipped) == ([], 0)
     assert imported[0].start_at.astimezone(UTC).isoformat() == expected_start
     assert imported[0].end_at.astimezone(UTC).isoformat() == expected_end
@@ -128,7 +128,7 @@ def test_duration_preserves_case_insensitive_components_and_ignores_alarm_durati
         "duration:PT1M\r\nrepeat:1\r\nend:valarm\r\n"
         "end:vevent\r\nend:vcalendar\r\n"
     )
-    imported, errors, skipped = ical_service.build_calendar_events(content, 1, 1, 1)
+    imported, errors, skipped = ical_service.build_calendar_events(content, 1, 1)
     assert (errors, skipped) == ([], 0)
     assert imported[0].end_at == datetime(2026, 10, 20, 11, tzinfo=UTC)
 

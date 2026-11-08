@@ -6,10 +6,11 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import AliasChoices, ConfigDict, Field
 
-from app.core.identity_boundary import GuildId, PersonId
+from app.core.identity_boundary import GuildId
 from app.models.tenant.wiki import WikiPageOrder, WikiReadingWidth
 from app.schemas.base import LexicalState, MentionStr, SanitizedBaseModel, TitleStr
 from app.schemas.query import PageMeta
+from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.file import smart_link_url
 from app.schemas.tenant.property import (
     PropertiesOnCreate,
@@ -181,7 +182,7 @@ class WikiPageHeading(SanitizedBaseModel):
     anchor: str
 
 
-class WikiPageSummary(SanitizedBaseModel):
+class WikiPageSummary(CreatedByRead):
     """One page as the navigation draws it — no body.
 
     The navigation renders every page of a wiki at once, so this carries what a
@@ -210,7 +211,6 @@ class WikiPageSummary(SanitizedBaseModel):
     is_draft: bool = False
     title: str
     slug: str
-    created_by: PersonId | None = None
     created_at: datetime
     updated_at: datetime
     #: What is written on the page, so the navigation can nest it without
@@ -300,6 +300,7 @@ def serialize_file_as_page(
         title=file.name,
         slug=slugify(file.name, fallback=f"file-{file.id}"),
         created_by=file.created_by,
+        created_by_kind=file.created_by_kind,
         created_at=file.created_at,
         updated_at=file.updated_at,
         headings=[WikiPageHeading(**h) for h in page_headings(heading_nodes)],

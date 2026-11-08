@@ -1209,12 +1209,14 @@ $function$
 def _author_arms() -> str:
     return "\n".join(
         f"      WHEN '{tool.value}' THEN\n"
-        f"        SELECT created_by INTO v_author FROM {tool.plural} WHERE id = p_resource_id;"
+        f"        SELECT created_by INTO v_author FROM {tool.plural}"
+        f" WHERE id = p_resource_id AND created_by_kind = 'member';"
         for tool in Tool
     )
 
 
-#: Whether ``p_user_id`` wrote this resource and nobody owns it now. Lets an
+#: Whether ``p_user_id`` wrote this resource (a ``member`` author) and nobody
+#: owns it now. Lets an
 #: owner row be written that gives unowned content back to its author (trash
 #: restore does this), by someone who is not its owner.
 RESOURCE_RECLAIMABLE = f"""\

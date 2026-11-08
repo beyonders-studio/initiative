@@ -21,6 +21,7 @@ from app.schemas.platform.access_grant import AccessGrantRead
 from app.schemas.platform.user import PersonShape, UserPublic
 from app.schemas.query import PageMeta
 from app.schemas.recurrence import OccurrenceScope, TaskRule, validate_task_recurrence
+from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.evidence import EvidenceRead
 from app.schemas.tenant.initiative import InitiativeSummary
 from app.schemas.tenant.property import (
@@ -243,7 +244,7 @@ class TaskProjectSummary(SanitizedBaseModel):
     is_template: bool | None = None
 
 
-class TaskRead(TaskBase):
+class TaskRead(TaskBase, CreatedByRead):
     model_config = ConfigDict(
         from_attributes=True, json_schema_serialization_defaults_required=True
     )
@@ -261,7 +262,6 @@ class TaskRead(TaskBase):
     completed_at: datetime | None = None
     position: float
     archived_at: datetime | None = None
-    created_by: PersonId | None = None
     # Author summary — lets the detail view render "Created by …" without
     # fetching the whole guild roster to resolve ``created_by``.
     creator: UserPublic | None = None
@@ -294,7 +294,7 @@ class TaskRead(TaskBase):
     properties: list[PropertySummary] = []
 
 
-class TaskListRead(TaskBase):
+class TaskListRead(TaskBase, CreatedByRead):
     """Lightweight schema for task list endpoints - excludes heavy nested data"""
 
     model_config = ConfigDict(
@@ -318,7 +318,6 @@ class TaskListRead(TaskBase):
     completed_at: datetime | None = None
     position: float
     archived_at: datetime | None = None
-    created_by: PersonId | None = None
     assignees: list[TaskAssigneeSummary] = []
     recurrence_occurrence_count: int = 0
     recurrence_shift: int = 0

@@ -46,6 +46,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import KINDS
 from app.db.initiative_rls import CONTENT_KIND_TABLES, NAMED_PEOPLE
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.calendar_event import RSVPStatus
 from app.models.tenant.personal_item import TOOL_KINDS, PersonalItem, ViewSource
 from app.services.tenant.change_log import RETENTION
@@ -533,6 +534,11 @@ async def subscribers_of(
                 )
                 if user_id is not None:
                     statement = statement.where(table.c[person_column] == user_id)
+                if person_column == "created_by":
+                    # An author is a person only where its kind says so.
+                    statement = statement.where(
+                        table.c.created_by_kind == ActorKind.member
+                    )
                 for entity_id, person in (await system.exec(statement)).all():  # type: ignore[call-overload]
                     tied.setdefault((kind, entity_id), {}).setdefault(
                         person, set()

@@ -1,4 +1,4 @@
-import type { ContactRead } from "@/api/generated/initiativeAPI.schemas";
+import { ActorKind, type ContactRead } from "@/api/generated/initiativeAPI.schemas";
 
 import { ownerCan } from "./can";
 
@@ -22,6 +22,8 @@ export function buildContact(overrides: Partial<ContactRead> = {}): ContactRead 
     initiative_id: 1,
     community_id: 1,
     created_by: 1,
+    created_by_kind: ActorKind.member,
+    created_by_install: null,
     created_at: "2026-01-15T00:00:00.000Z",
     updated_at: "2026-01-15T00:00:00.000Z",
     archived_at: null,

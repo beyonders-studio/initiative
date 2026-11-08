@@ -333,6 +333,7 @@ async def occurrence(
         series_id=series.id,
         original_start=at,
         created_by=series.created_by,
+        created_by_kind=series.created_by_kind,
     )
     session.add(override)
     await session.flush()
@@ -620,6 +621,7 @@ async def split(
         recurrence=tail,
         recurrence_shift=series.recurrence_shift,
         created_by=series.created_by,
+        created_by_kind=series.created_by_kind,
     )
     session.add(rest)
     await session.flush()

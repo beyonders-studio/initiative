@@ -282,7 +282,8 @@ class FieldSpec:
 
 #: Columns no dataset offers as a filter, by convention rather than per model.
 #:
-#: Soft-delete, hold, moderation and purge bookkeeping, the surrogate key, the
+#: Soft-delete, hold, moderation and purge bookkeeping, the actor kinds (the
+#: author filter asks for members itself), the surrogate key, the
 #: tenant key (a request is already scoped to one guild, so filtering by it
 #: narrows nothing), and the drag-ordering float. None of these means anything
 #: to somebody building a filter, and every table has them.
@@ -293,6 +294,8 @@ HIDDEN_EVERYWHERE: frozenset[str] = frozenset(
         "position",
         "deleted_at",
         "deleted_by",
+        "deleted_by_kind",
+        "created_by_kind",
         "purge_at",
         "held_at",
         "hold_id",

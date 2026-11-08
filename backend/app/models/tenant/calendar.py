@@ -79,7 +79,10 @@ class Calendar(
     initiative: Optional["Initiative"] = Relationship(back_populates="calendars")
     creator: Optional["MemberProfile"] = Relationship(
         sa_relationship_kwargs={
-            "primaryjoin": "foreign(Calendar.created_by) == MemberProfile.id",
+            "primaryjoin": (
+                "and_(foreign(Calendar.created_by) == MemberProfile.id,"
+                " Calendar.created_by_kind == 'member')"
+            ),
             "viewonly": True,
         },
     )

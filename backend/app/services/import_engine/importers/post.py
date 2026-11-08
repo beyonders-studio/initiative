@@ -19,6 +19,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.search import SearchEntityType
 from app.core.tools import Tool, tool_envelope_type
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.initiative import Initiative, PermissionKey
 from app.models.tenant.post import Post
 from app.models.tenant.post_poll import PostPoll, PostPollOption
@@ -96,6 +97,7 @@ class PostImporter(NamesPeopleInPassing):
             body=body,
             initiative_id=target_initiative.id,
             created_by=importer.id,
+            created_by_kind=ActorKind.member,
             # A restored notice is live on arrival. The schedule is not carried
             # for the same reason the pin is not: it said when this notice
             # mattered on the board it came from, and re-running it here would

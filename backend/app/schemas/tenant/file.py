@@ -15,6 +15,7 @@ from app.core.identity_boundary import UPLOAD_PATH
 from app.schemas.base import LexicalState, SanitizedBaseModel
 from app.schemas.platform.user import UserPublic
 from app.schemas.query import PageMeta
+from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.initiative import InitiativeSummary
 from app.schemas.tenant.ownership import OwnerPluginSummary, owner_profile
 from app.schemas.tenant.property import PropertiesOnCreate
@@ -152,7 +153,7 @@ class FileRead(FileSummary):
         return spec_of(self.file_type).converts_to
 
 
-class FileVersionRead(SanitizedBaseModel):
+class FileVersionRead(CreatedByRead):
     """A single stored version of an uploaded file. The binary is fetched
     via the version download endpoint by id — ``file_url`` is intentionally
     not exposed."""
@@ -167,7 +168,6 @@ class FileVersionRead(SanitizedBaseModel):
     file_size: int | None = None
     original_filename: str | None = None
     #: ``null`` for a version a plug-in acting as its community uploaded.
-    created_by: int | None = None
     created_at: datetime
     is_current: bool = False
 

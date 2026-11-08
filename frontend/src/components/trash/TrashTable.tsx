@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { EntityType, TrashItem } from "@/api/generated/initiativeAPI.schemas";
+import { ActorKind, type EntityType, type TrashItem } from "@/api/generated/initiativeAPI.schemas";
 import {
   useCommunityTrashList,
   useMyTrashList,
@@ -36,6 +36,7 @@ interface TrashTableProps {
 
 export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
   const { t } = useTranslation("trash");
+  const { t: tCommon } = useTranslation("common");
   // Hooks must run unconditionally; pick the active query by variant. The
   // unused one is disabled so it never fires a request.
   const [page, setPage] = useState(1);
@@ -127,7 +128,11 @@ export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
                   <Badge variant="secondary">{t(`entityType.${item.entity_type}` as const)}</Badge>
                 </TableCell>
                 <TableCell className="font-medium">{item.name || `#${item.entity_id}`}</TableCell>
-                <TableCell className="text-muted-foreground">{item.deleted_by_display}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {item.deleted_by_kind === ActorKind.system
+                    ? tCommon("appName")
+                    : item.deleted_by_display || tCommon("aPlugin")}
+                </TableCell>
                 <TableCell className="text-muted-foreground">
                   <RelativeTime date={item.deleted_at} fallback={item.deleted_at} />
                 </TableCell>

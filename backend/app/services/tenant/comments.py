@@ -46,7 +46,7 @@ from app.db.session import guild_context, install_context, routed_guild_id
 from app.db.soft_delete_filter import select_including_deleted
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
-from app.models.tenant._mixins import tool_models
+from app.models.tenant._mixins import ActorKind, tool_models
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.collection import Collection
 from app.models.tenant.comment import Comment, CommentAudience, in_thread
@@ -507,7 +507,11 @@ def serialize_comment(comment: Comment, *, viewer_id: int | None = None):
         read.updated_at = None
         return read
     # Deleting is its author's: a moderator takes a comment down instead.
-    read.can_remove = viewer_id is not None and comment.created_by == viewer_id
+    read.can_remove = (
+        viewer_id is not None
+        and comment.created_by_kind == ActorKind.member
+        and comment.created_by == viewer_id
+    )
     rows = getattr(comment, "_reactions", None)
     if rows:
         read.reactions = reactions_service.summarize(rows, viewer_id=viewer_id)
@@ -813,14 +817,16 @@ async def create_comment(
 
     comment = Comment(
         content=content,
-        created_by=author.id,
         parent_comment_id=parent_comment_id,
         audience=audience,
         **{column: ctx.entity_id},
     )
     session.add(comment)
     await session.flush()
-    await session.refresh(comment, attribute_names=["author"])
+    # The database stamps its author from the request, so it is read back.
+    await session.refresh(
+        comment, attribute_names=["created_by", "created_by_kind", "author"]
+    )
     _stamp_parent(session, ctx, comment)
     await content_references.sync_for_comment(session, comment, author_id=author.id)
     await attachments_service.claim_uploads(session, comment)
@@ -1214,7 +1220,7 @@ async def delete_comment(
 
     # Deleting is the author's alone; a moderator takes a comment down
     # instead (``moderation_acts``), which leaves a tombstone and a record.
-    if comment.created_by != user.id:
+    if comment.created_by_kind != ActorKind.member or comment.created_by != user.id:
         raise CommentPermissionError(CommentMessages.AUTHOR_ONLY_DELETE)
     if comment.removed_at is not None:
         raise CommentValidationError(CommentMessages.REMOVED)
@@ -1257,7 +1263,7 @@ async def update_comment(
         raise CommentNotFoundError(CommentMessages.NOT_FOUND)
 
     # Only the author can edit their own comment
-    if comment.created_by != user.id:
+    if comment.created_by_kind != ActorKind.member or comment.created_by != user.id:
         raise CommentPermissionError(CommentMessages.AUTHOR_ONLY_EDIT)
     if comment.removed_at is not None:
         raise CommentValidationError(CommentMessages.REMOVED)

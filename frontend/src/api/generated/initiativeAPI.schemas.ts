@@ -552,6 +552,18 @@ export interface ActivityFeedPage {
 }
 
 /**
+ * Who did something to a row: what its ``created_by`` (made it) or
+ * ``deleted_by`` (put it in the trash) names.
+ */
+export type ActorKind = (typeof ActorKind)[keyof typeof ActorKind];
+
+export const ActorKind = {
+  member: "member",
+  plugin: "plugin",
+  system: "system",
+} as const;
+
+/**
  * A part of administering a community, held as a whole.
  *
  * The admin rung holds every one. What the rung holds beyond them, the reach
@@ -1676,6 +1688,9 @@ export interface CalendarEventAttendeePreview {
 }
 
 export interface CalendarEventSummary {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   /**
    * @minLength 1
    * @maxLength 255
@@ -1695,7 +1710,6 @@ export interface CalendarEventSummary {
   calendar_id: number;
   initiative_id: number | null;
   community_id: number;
-  created_by: number | null;
   properties: PropertySummary[];
   tags: TagSummary[];
   can: ContentCan;
@@ -1825,6 +1839,9 @@ export interface TaskParentSummary {
  * Lightweight schema for task list endpoints - excludes heavy nested data
  */
 export interface TaskListRead {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   title: string;
   priority: TaskPriority;
   start_date: string | null;
@@ -1845,7 +1862,6 @@ export interface TaskListRead {
   completed_at: string | null;
   position: number;
   archived_at: string | null;
-  created_by: number | null;
   assignees: TaskAssigneeSummary[];
   recurrence_occurrence_count: number;
   recurrence_shift: number;
@@ -1906,12 +1922,14 @@ export interface ProjectTaskSummary {
 }
 
 export interface ProjectRead {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   archived_at: string | null;
   can: ProjectCan;
   id: number;
   initiative_id: number;
   community_id: number;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   comments_enabled: boolean;
@@ -2073,12 +2091,14 @@ export interface PollRead {
 export type PostReadBody = { [key: string]: unknown };
 
 export interface PostRead {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   archived_at: string | null;
   can: ToolCan;
   id: number;
   initiative_id: number;
   community_id: number;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   comments_enabled: boolean;
@@ -2159,6 +2179,9 @@ export interface CalendarEventRSVPUpdate {
 }
 
 export interface CalendarEventRead {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   /**
    * @minLength 1
    * @maxLength 255
@@ -2178,7 +2201,6 @@ export interface CalendarEventRead {
   calendar_id: number;
   initiative_id: number | null;
   community_id: number;
-  created_by: number | null;
   properties: PropertySummary[];
   tags: TagSummary[];
   can: ContentCan;
@@ -2255,12 +2277,14 @@ export interface CalendarFilterSpec {
 }
 
 export interface CalendarSummary {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   archived_at: string | null;
   can: ToolCan;
   id: number;
   initiative_id: number | null;
   community_id: number;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   comments_enabled: boolean;
@@ -2287,12 +2311,14 @@ export interface CalendarListResponse {
 }
 
 export interface CalendarRead {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   archived_at: string | null;
   can: ToolCan;
   id: number;
   initiative_id: number | null;
   community_id: number;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   comments_enabled: boolean;
@@ -2814,12 +2840,14 @@ export const FileKind = {
  * its values of the collection's metadata.
  */
 export interface CollectionFileSummary {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   archived_at: string | null;
   can: ToolCan;
   id: number;
   initiative_id: number;
   community_id: number;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   comments_enabled: boolean;
@@ -2904,6 +2932,9 @@ export interface PropertyDefinitionRead {
  * counted, and the cover is one of those.
  */
 export interface CollectionRead {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   id: number;
   initiative_id: number;
   community_id: number;
@@ -2913,7 +2944,6 @@ export interface CollectionRead {
   cover: CollectionCover | null;
   file_count: number;
   hidden_files: HiddenFiles;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   archived_at: string | null;
@@ -3088,6 +3118,9 @@ export interface CommentRemoval {
  * the task's for a task comment (filled by the service's serializer).
  */
 export interface CommentRead {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   content: string;
   task_id: number | null;
   wiki_page_id: number | null;
@@ -3101,7 +3134,6 @@ export interface CommentRead {
   wiki_id: number | null;
   contact_id: number | null;
   id: number;
-  created_by: number | null;
   parent_comment_id: number | null;
   created_at: string;
   updated_at: string | null;
@@ -4779,12 +4811,14 @@ export interface ContactOrganization {
 }
 
 export interface ContactSummary {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   archived_at: string | null;
   can: ToolCan;
   id: number;
   initiative_id: number | null;
   community_id: number;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   comments_enabled: boolean;
@@ -4810,12 +4844,14 @@ export interface ContactListResponse {
 }
 
 export interface ContactRead {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   archived_at: string | null;
   can: ToolCan;
   id: number;
   initiative_id: number | null;
   community_id: number;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   comments_enabled: boolean;
@@ -5068,12 +5104,14 @@ export interface CounterPreview {
  * unless the list was asked for previews, when its first few come along.
  */
 export interface CounterGroupSummary {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   archived_at: string | null;
   can: ToolCan;
   id: number;
   initiative_id: number;
   community_id: number;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   comments_enabled: boolean;
@@ -5121,12 +5159,14 @@ export interface CounterRead {
 }
 
 export interface CounterGroupRead {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   archived_at: string | null;
   can: ToolCan;
   id: number;
   initiative_id: number;
   community_id: number;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   comments_enabled: boolean;
@@ -5436,12 +5476,14 @@ export interface DashboardPreview {
 }
 
 export interface DashboardSummary {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   archived_at: string | null;
   can: ToolCan;
   id: number;
   initiative_id: number;
   community_id: number;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   comments_enabled: boolean;
@@ -5474,12 +5516,14 @@ export type DashboardReadDefinition = { [key: string]: unknown };
 export type DashboardReadConfig = { [key: string]: unknown };
 
 export interface DashboardRead {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   archived_at: string | null;
   can: ToolCan;
   id: number;
   initiative_id: number;
   community_id: number;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   comments_enabled: boolean;
@@ -6709,12 +6753,14 @@ export interface FileCreate {
 }
 
 export interface FileSummary {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   archived_at: string | null;
   can: ToolCan;
   id: number;
   initiative_id: number;
   community_id: number;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   comments_enabled: boolean;
@@ -6753,12 +6799,14 @@ export interface FileListResponse {
 export type FileReadContent = { [key: string]: unknown };
 
 export interface FileRead {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   archived_at: string | null;
   can: ToolCan;
   id: number;
   initiative_id: number;
   community_id: number;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   comments_enabled: boolean;
@@ -6809,12 +6857,14 @@ export interface FileUpdate {
  * not exposed.
  */
 export interface FileVersionRead {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   id: number;
   version_number: number;
   file_content_type: string | null;
   file_size: number | null;
   original_filename: string | null;
-  created_by: number | null;
   created_at: string;
   is_current: boolean;
 }
@@ -10888,13 +10938,15 @@ export interface RelationshipCreate {
  * caller never has to know that a symmetric edge is stored in node-id order.
  */
 export interface RelationshipRead {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   id: number;
   relationship_type: RelationshipType;
   direction: string;
   other: RelatedEnd;
   provenance: string;
   confidence: number | null;
-  created_by: number | null;
   created_at: string;
 }
 
@@ -11655,6 +11707,9 @@ export interface TaskProjectSummary {
 }
 
 export interface TaskRead {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   title: string;
   priority: TaskPriority;
   start_date: string | null;
@@ -11674,7 +11729,6 @@ export interface TaskRead {
   completed_at: string | null;
   position: number;
   archived_at: string | null;
-  created_by: number | null;
   creator: UserPublic | null;
   assignees: UserPublic[];
   recurrence_occurrence_count: number;
@@ -11957,6 +12011,7 @@ export interface TrashItem {
   name: string;
   deleted_at: string;
   deleted_by_id: number | null;
+  deleted_by_kind: ActorKind;
   deleted_by_display: string;
   purge_at: string | null;
 }
@@ -12479,12 +12534,14 @@ export const WikiReadingWidth = {
 } as const;
 
 export interface WikiSummary {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   archived_at: string | null;
   can: ToolCan;
   id: number;
   initiative_id: number;
   community_id: number;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   comments_enabled: boolean;
@@ -12574,6 +12631,9 @@ export type WikiPageReadContent = { [key: string]: unknown };
  * One page, opened.
  */
 export interface WikiPageRead {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   id: number;
   wiki_id: number;
   community_id: number;
@@ -12583,7 +12643,6 @@ export interface WikiPageRead {
   is_draft: boolean;
   title: string;
   slug: string;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   headings: WikiPageHeading[];
@@ -12606,6 +12665,9 @@ export interface WikiPageRead {
  * have written.
  */
 export interface WikiPageSummary {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   id: number;
   wiki_id: number;
   community_id: number;
@@ -12615,7 +12677,6 @@ export interface WikiPageSummary {
   is_draft: boolean;
   title: string;
   slug: string;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   headings: WikiPageHeading[];
@@ -12661,12 +12722,14 @@ export interface WikiPageUpdate {
  * their own, because a wiki is navigated rather than read end to end.
  */
 export interface WikiRead {
+  created_by: number | null;
+  created_by_kind: ActorKind;
+  created_by_install: number | null;
   archived_at: string | null;
   can: ToolCan;
   id: number;
   initiative_id: number;
   community_id: number;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
   comments_enabled: boolean;
@@ -12934,9 +12997,7 @@ export type ListIdeasParams = {
   status_id?: number | null;
   voted?: boolean;
   sort?: IdeaSort;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -12992,15 +13053,11 @@ export type ProviderCallbackParams = {
 };
 
 export type ListAllUsersParams = {
-  /**
-   * Matches the handle's name part; a whole handle (`foobar#1234`) pins one account.
-   */
+  /** Matches the handle's name part; a whole handle (`foobar#1234`) pins one account. */
   search?: string | null;
   sort_by?: ListAllUsersSortBy;
   sort_dir?: ListAllUsersSortDir;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -13031,116 +13088,84 @@ export type ExportPlatformUsersCsvParams = {
 };
 
 export type ClearSecondFactorParams = {
-  /**
-   * The operations case this act is for: one the caller can read, still open. The case is told of the act.
-   */
+  /** The operations case this act is for: one the caller can read, still open. The case is told of the act. */
   case_task_id?: number | null;
 };
 
 export type SignUserOutEverywhereParams = {
-  /**
-   * The operations case this act is for: one the caller can read, still open. The case is told of the act.
-   */
+  /** The operations case this act is for: one the caller can read, still open. The case is told of the act. */
   case_task_id?: number | null;
 };
 
 export type ClearProfileFieldParams = {
-  /**
-   * The operations case this act is for: one the caller can read, still open. The case is told of the act.
-   */
+  /** The operations case this act is for: one the caller can read, still open. The case is told of the act. */
   case_task_id?: number | null;
 };
 
 export type TriggerPasswordResetParams = {
-  /**
-   * The operations case this act is for: one the caller can read, still open. The case is told of the act.
-   */
+  /** The operations case this act is for: one the caller can read, still open. The case is told of the act. */
   case_task_id?: number | null;
 };
 
 export type ReactivateUserParams = {
-  /**
-   * The operations case this act is for: one the caller can read, still open. The case is told of the act.
-   */
+  /** The operations case this act is for: one the caller can read, still open. The case is told of the act. */
   case_task_id?: number | null;
 };
 
 export type RestoreDeletedUserParams = {
-  /**
-   * The operations case this act is for: one the caller can read, still open. The case is told of the act.
-   */
+  /** The operations case this act is for: one the caller can read, still open. The case is told of the act. */
   case_task_id?: number | null;
 };
 
 export type RemoveUserAvatarParams = {
-  /**
-   * The operations case this act is for: one the caller can read, still open. The case is told of the act.
-   */
+  /** The operations case this act is for: one the caller can read, still open. The case is told of the act. */
   case_task_id?: number | null;
 };
 
 export type SetUserUsernameParams = {
-  /**
-   * The operations case this act is for: one the caller can read, still open. The case is told of the act.
-   */
+  /** The operations case this act is for: one the caller can read, still open. The case is told of the act. */
   case_task_id?: number | null;
 };
 
 export type SetUserSuspensionParams = {
-  /**
-   * The operations case this act is for: one the caller can read, still open. The case is told of the act.
-   */
+  /** The operations case this act is for: one the caller can read, still open. The case is told of the act. */
   case_task_id?: number | null;
 };
 
 export type LiftSignInLockParams = {
-  /**
-   * The operations case this act is for: one the caller can read, still open. The case is told of the act.
-   */
+  /** The operations case this act is for: one the caller can read, still open. The case is told of the act. */
   case_task_id?: number | null;
 };
 
 export type RevokeUserApiKeysParams = {
-  /**
-   * The operations case this act is for: one the caller can read, still open. The case is told of the act.
-   */
+  /** The operations case this act is for: one the caller can read, still open. The case is told of the act. */
   case_task_id?: number | null;
 };
 
 export type ClearAgeBlockParams = {
-  /**
-   * The operations case this act is for: one the caller can read, still open. The case is told of the act.
-   */
+  /** The operations case this act is for: one the caller can read, still open. The case is told of the act. */
   case_task_id?: number | null;
 };
 
 export type UpdatePlatformRoleParams = {
-  /**
-   * The operations case this act is for: one the caller can read, still open. The case is told of the act.
-   */
+  /** The operations case this act is for: one the caller can read, still open. The case is told of the act. */
   case_task_id?: number | null;
 };
 
 export type DeleteUserParams = {
-  /**
-   * The operations case this act is for: one the caller can read, still open. The case is told of the act.
-   */
+  /** The operations case this act is for: one the caller can read, still open. The case is told of the act. */
   case_task_id?: number | null;
 };
 
 export type ListDirectoryCommunitiesParams = {
   search?: string | null;
-  /**
-   * @maxItems 50
-   */
+  /** @maxItems 50 */
   search_country?: string[];
   category?: CommunityCategory[];
   near_country?: string | null;
   near_lat?: number | null;
   near_lon?: number | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -13155,13 +13180,9 @@ export type ListAnnouncementsParams = {
 
 export type ListAccessGrantsParams = {
   status?: string | null;
-  /**
-   * Keep only grants that haven't expired yet.
-   */
+  /** Keep only grants that haven't expired yet. */
   live?: boolean;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -13172,13 +13193,9 @@ export type ListAccessGrantsParams = {
 
 export type ListAccessGrantQueueParams = {
   status?: string | null;
-  /**
-   * Keep only grants that haven't expired yet.
-   */
+  /** Keep only grants that haven't expired yet. */
   live?: boolean;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -13188,16 +13205,12 @@ export type ListAccessGrantQueueParams = {
 };
 
 export type ListGrantCasesParams = {
-  /**
-   * A title holding this, or the case with this number.
-   */
+  /** A title holding this, or the case with this number. */
   search?: string | null;
 };
 
 export type GetFcmConfigParams = {
-  /**
-   * The phone asking. Its relay id is served only to a phone whose pushes go through the relay.
-   */
+  /** The phone asking. Its relay id is served only to a phone whose pushes go through the relay. */
   platform?: GetFcmConfigPlatform;
 };
 
@@ -13211,15 +13224,11 @@ export const GetFcmConfigPlatform = {
 } as const;
 
 export type ListPlatformCommunityStorageParams = {
-  /**
-   * Matches the name.
-   */
+  /** Matches the name. */
   search?: string | null;
   sort_by?: ListPlatformCommunityStorageSortBy;
   sort_dir?: ListPlatformCommunityStorageSortDir;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -13326,64 +13335,36 @@ export type MarkAllNotificationsReadParams = {
 
 export type GetToolCountsParams = {
   initiative_id?: number | null;
-  /**
-   * The view the tag counts are for: active, archived, or templates for a tool that has them
-   */
+  /** The view the tag counts are for: active, archived, or templates for a tool that has them */
   view?: string;
-  /**
-   * JSON object of the tool's own list filters, as its list route takes them (``{"search": "notes", "kind": "document"}``), that the tag counts are for
-   */
+  /** JSON object of the tool's own list filters, as its list route takes them (``{"search": "notes", "kind": "document"}``), that the tag counts are for */
   filters?: string | null;
-  /**
-   * Also count the tag tree beside ``view``
-   */
+  /** Also count the tag tree beside ``view`` */
   include_tags?: boolean;
 };
 
 export type ListProjectsParams = {
-  /**
-   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
-   */
+  /** true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows. */
   archived?: boolean | null;
-  /**
-   * Only templates (true) or only projects that are not templates (false). Omit for both.
-   */
+  /** Only templates (true) or only projects that are not templates (false). Omit for both. */
   is_template?: boolean | null;
-  /**
-   * Full-text match over the row — its name and its description. Reads the same index the search page does, so a list's filter box and a search agree about what matches.
-   */
+  /** Full-text match over the row — its name and its description. Reads the same index the search page does, so a list's filter box and a search agree about what matches. */
   search?: string | null;
-  /**
-   * Only projects in this initiative. Omit for every initiative the caller can see.
-   */
+  /** Only projects in this initiative. Omit for every initiative the caller can see. */
   initiative_id?: number | null;
-  /**
-   * Return a lightweight projection (id, name, icon, initiative_id, can) without files, grants, tags, or the nested initiative. For project pickers and other list-only callers.
-   */
+  /** Return a lightweight projection (id, name, icon, initiative_id, can) without files, grants, tags, or the nested initiative. For project pickers and other list-only callers. */
   slim?: boolean;
-  /**
-   * Only projects the caller may edit — the pickers that move work into a project.
-   */
+  /** Only projects the caller may edit — the pickers that move work into a project. */
   writable?: boolean;
-  /**
-   * Order by one of: name, initiative, updated_at. Omit to keep the reader's own manual order.
-   */
+  /** Order by one of: name, initiative, updated_at. Omit to keep the reader's own manual order. */
   sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
+  /** asc (default) or desc. */
   sort_dir?: string | null;
-  /**
-   * Only projects carrying any of these tags.
-   */
+  /** Only projects carrying any of these tags. */
   tag_ids?: number[] | null;
-  /**
-   * JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request.
-   */
+  /** JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request. */
   property_filters?: string | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 0
@@ -13395,90 +13376,52 @@ export type ListProjectsParams = {
 export type ListFilesParams = {
   initiative_id?: number | null;
   search?: string | null;
-  /**
-   * Filter by tag IDs
-   */
+  /** Filter by tag IDs */
   tag_ids?: number[] | null;
-  /**
-   * JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request.
-   */
+  /** JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request. */
   property_filters?: string | null;
-  /**
-   * Filter to files with no tags
-   */
+  /** Filter to files with no tags */
   untagged?: boolean | null;
-  /**
-   * Only templates (true) or only files that are not templates (false). Omit for both.
-   */
+  /** Only templates (true) or only files that are not templates (false). Omit for both. */
   is_template?: boolean | null;
-  /**
-   * Filter by file type
-   */
+  /** Filter by file type */
   file_type?: FileType | null;
-  /**
-   * Filter by kind of file
-   */
+  /** Filter by kind of file */
   kind?: FileKind | null;
-  /**
-   * Filter to the files in one collection
-   */
+  /** Filter to the files in one collection */
   collection_id?: number | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 0
    * @maximum 100
    */
   page_size?: number;
-  /**
-   * Order by one of: name, initiative, updated_at, created_at.
-   */
+  /** Order by one of: name, initiative, updated_at, created_at. */
   sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
+  /** asc (default) or desc. */
   sort_dir?: string | null;
-  /**
-   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
-   */
+  /** true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows. */
   archived?: boolean | null;
 };
 
 export type ListCounterGroupsParams = {
   initiative_id?: number | null;
-  /**
-   * Full-text match over the row — its name and its description. Reads the same index the search page does, so a list's filter box and a search agree about what matches.
-   */
+  /** Full-text match over the row — its name and its description. Reads the same index the search page does, so a list's filter box and a search agree about what matches. */
   search?: string | null;
-  /**
-   * Order by one of: name, initiative, updated_at. Omit for this tool's own default order.
-   */
+  /** Order by one of: name, initiative, updated_at. Omit for this tool's own default order. */
   sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
+  /** asc (default) or desc. */
   sort_dir?: string | null;
-  /**
-   * Only counter groups carrying any of these tags.
-   */
+  /** Only counter groups carrying any of these tags. */
   tag_ids?: number[] | null;
-  /**
-   * JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request.
-   */
+  /** JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request. */
   property_filters?: string | null;
-  /**
-   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
-   */
+  /** true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows. */
   archived?: boolean | null;
-  /**
-   * Also send what each row's card shows of what is inside it, read for the whole page at once.
-   */
+  /** Also send what each row's card shows of what is inside it, read for the whole page at once. */
   include_preview?: boolean;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -13490,33 +13433,19 @@ export type ListCounterGroupsParams = {
 export type ListCalendarsParams = {
   initiative_id?: number | null;
   scope?: "community" | null;
-  /**
-   * Full-text match over the row — its name and its description. Reads the same index the search page does, so a list's filter box and a search agree about what matches.
-   */
+  /** Full-text match over the row — its name and its description. Reads the same index the search page does, so a list's filter box and a search agree about what matches. */
   search?: string | null;
-  /**
-   * Order by one of: name, initiative, updated_at. Omit for this tool's own default order.
-   */
+  /** Order by one of: name, initiative, updated_at. Omit for this tool's own default order. */
   sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
+  /** asc (default) or desc. */
   sort_dir?: string | null;
-  /**
-   * Only calendars carrying any of these tags.
-   */
+  /** Only calendars carrying any of these tags. */
   tag_ids?: number[] | null;
-  /**
-   * JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request.
-   */
+  /** JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request. */
   property_filters?: string | null;
-  /**
-   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
-   */
+  /** true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows. */
   archived?: boolean | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -13527,37 +13456,21 @@ export type ListCalendarsParams = {
 
 export type ListDashboardsParams = {
   initiative_id?: number | null;
-  /**
-   * Full-text match over the row — its name and its description. Reads the same index the search page does, so a list's filter box and a search agree about what matches.
-   */
+  /** Full-text match over the row — its name and its description. Reads the same index the search page does, so a list's filter box and a search agree about what matches. */
   search?: string | null;
-  /**
-   * Order by one of: name, initiative, updated_at. Omit for this tool's own default order.
-   */
+  /** Order by one of: name, initiative, updated_at. Omit for this tool's own default order. */
   sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
+  /** asc (default) or desc. */
   sort_dir?: string | null;
-  /**
-   * Only dashboards carrying any of these tags.
-   */
+  /** Only dashboards carrying any of these tags. */
   tag_ids?: number[] | null;
-  /**
-   * JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request.
-   */
+  /** JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request. */
   property_filters?: string | null;
-  /**
-   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
-   */
+  /** true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows. */
   archived?: boolean | null;
-  /**
-   * Also send what each row's card shows of what is inside it, read for the whole page at once.
-   */
+  /** Also send what each row's card shows of what is inside it, read for the whole page at once. */
   include_preview?: boolean;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -13568,41 +13481,23 @@ export type ListDashboardsParams = {
 
 export type ListPostsParams = {
   initiative_id?: number | null;
-  /**
-   * Full-text match over the notice — its headline and its body. Reads the same index the search page does, so the board's filter and a search agree about what matches.
-   */
+  /** Full-text match over the notice — its headline and its body. Reads the same index the search page does, so the board's filter and a search agree about what matches. */
   search?: string | null;
-  /**
-   * Order by one of: name, initiative, updated_at. Omit for the board order — live pins first, then newest first.
-   */
+  /** Order by one of: name, initiative, updated_at. Omit for the board order — live pins first, then newest first. */
   sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
+  /** asc (default) or desc. */
   sort_dir?: string | null;
-  /**
-   * Only posts carrying any of these tags.
-   */
+  /** Only posts carrying any of these tags. */
   tag_ids?: number[] | null;
-  /**
-   * JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request.
-   */
+  /** JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request. */
   property_filters?: string | null;
-  /**
-   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
-   */
+  /** true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows. */
   archived?: boolean | null;
-  /**
-   * Only notices this reader has not read yet.
-   */
+  /** Only notices this reader has not read yet. */
   unread?: boolean;
-  /**
-   * Start the board at this instant and go back — inclusive, and measured by the same date the feed is ordered by. This is how a timeline jumps to a month without paging through everything since. An anchored board is strictly chronological: the pinned band steps aside, because a pin says what matters now rather than what mattered then.
-   */
+  /** Start the board at this instant and go back — inclusive, and measured by the same date the feed is ordered by. This is how a timeline jumps to a month without paging through everything since. An anchored board is strictly chronological: the pinned band steps aside, because a pin says what matters now rather than what mattered then. */
   until?: string | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * Posts per page. Small by default: a board renders each post's body, so a page is that many editors to mount.
@@ -13614,33 +13509,19 @@ export type ListPostsParams = {
 
 export type ListWikisParams = {
   initiative_id?: number | null;
-  /**
-   * Full-text match over the wiki's name and description, through the same index the search page reads.
-   */
+  /** Full-text match over the wiki's name and description, through the same index the search page reads. */
   search?: string | null;
-  /**
-   * Order by one of: name, initiative, updated_at. Omit for newest first.
-   */
+  /** Order by one of: name, initiative, updated_at. Omit for newest first. */
   sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
+  /** asc (default) or desc. */
   sort_dir?: string | null;
-  /**
-   * Only wikis carrying any of these tags.
-   */
+  /** Only wikis carrying any of these tags. */
   tag_ids?: number[] | null;
-  /**
-   * JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request.
-   */
+  /** JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request. */
   property_filters?: string | null;
-  /**
-   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
-   */
+  /** true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows. */
   archived?: boolean | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 0
@@ -13652,37 +13533,21 @@ export type ListWikisParams = {
 export type ListContactsParams = {
   initiative_id?: number | null;
   scope?: "community" | null;
-  /**
-   * Full-text match over the contact's name, through the same index the search page reads.
-   */
+  /** Full-text match over the contact's name, through the same index the search page reads. */
   search?: string | null;
-  /**
-   * Order by one of: name, initiative, updated_at. Omit for by name.
-   */
+  /** Order by one of: name, initiative, updated_at. Omit for by name. */
   sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
+  /** asc (default) or desc. */
   sort_dir?: string | null;
-  /**
-   * Only contacts carrying any of these tags.
-   */
+  /** Only contacts carrying any of these tags. */
   tag_ids?: number[] | null;
-  /**
-   * JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request.
-   */
+  /** JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request. */
   property_filters?: string | null;
-  /**
-   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
-   */
+  /** true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows. */
   archived?: boolean | null;
-  /**
-   * Only organizations (true) or only people (false).
-   */
+  /** Only organizations (true) or only people (false). */
   is_organization?: boolean | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 0
@@ -13694,54 +13559,32 @@ export type ListContactsParams = {
 export type ListCollectionFilesParams = {
   initiative_id?: number | null;
   search?: string | null;
-  /**
-   * Filter by tag IDs
-   */
+  /** Filter by tag IDs */
   tag_ids?: number[] | null;
-  /**
-   * JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request.
-   */
+  /** JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request. */
   property_filters?: string | null;
-  /**
-   * Filter to files with no tags
-   */
+  /** Filter to files with no tags */
   untagged?: boolean | null;
-  /**
-   * Only templates (true) or only files that are not templates (false). Omit for both.
-   */
+  /** Only templates (true) or only files that are not templates (false). Omit for both. */
   is_template?: boolean | null;
-  /**
-   * Filter by file type
-   */
+  /** Filter by file type */
   file_type?: FileType | null;
-  /**
-   * Filter by kind of file
-   */
+  /** Filter by kind of file */
   kind?: FileKind | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 0
    * @maximum 100
    */
   page_size?: number;
-  /**
-   * Order by one of: name, initiative, updated_at, created_at, added_at (when each was added to the collection). Omit for added_at, newest first.
-   */
+  /** Order by one of: name, initiative, updated_at, created_at, added_at (when each was added to the collection). Omit for added_at, newest first. */
   sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
+  /** asc (default) or desc. */
   sort_dir?: string | null;
-  /**
-   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
-   */
+  /** true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows. */
   archived?: boolean | null;
-  /**
-   * Start the list at this instant, measured by when each file was added to the collection. Newest first it is a ceiling and the page walks back from it; oldest first (sort_by=added_at, sort_dir=asc) a floor and the page walks forward. This is how a timeline jumps to a month: pair it with the matching end of the month's bucket.
-   */
+  /** Start the list at this instant, measured by when each file was added to the collection. Newest first it is a ceiling and the page walks back from it; oldest first (sort_by=added_at, sort_dir=asc) a floor and the page walks forward. This is how a timeline jumps to a month: pair it with the matching end of the month's bucket. */
   until?: string | null;
 };
 
@@ -13755,44 +13598,26 @@ export type RemoveCollectionFilesParams = {
 
 export type GetCollectionFilesTimelineParams = {
   search?: string | null;
-  /**
-   * Filter by tag IDs
-   */
+  /** Filter by tag IDs */
   tag_ids?: number[] | null;
-  /**
-   * JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request.
-   */
+  /** JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request. */
   property_filters?: string | null;
-  /**
-   * Filter to files with no tags
-   */
+  /** Filter to files with no tags */
   untagged?: boolean | null;
-  /**
-   * Only templates (true) or only files that are not templates (false). Omit for both.
-   */
+  /** Only templates (true) or only files that are not templates (false). Omit for both. */
   is_template?: boolean | null;
-  /**
-   * Filter by file type
-   */
+  /** Filter by file type */
   file_type?: FileType | null;
-  /**
-   * Filter by kind of file
-   */
+  /** Filter by kind of file */
   kind?: FileKind | null;
-  /**
-   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
-   */
+  /** true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows. */
   archived?: boolean | null;
-  /**
-   * IANA zone the month boundaries are cut in, e.g. Pacific/Auckland. Defaults to UTC.
-   */
+  /** IANA zone the month boundaries are cut in, e.g. Pacific/Auckland. Defaults to UTC. */
   tz?: string | null;
 };
 
 export type ReadProjectParams = {
-  /**
-   * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
-   */
+  /** Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one. */
   include_deleted?: boolean;
 };
 
@@ -13826,30 +13651,20 @@ export type ResetLayoutParams = {
 };
 
 export type ListTasksParams = {
-  /**
-   * JSON list of filter conditions, AND-ed together. Each object: {"field": "<column>", "op": "<operator>", "value": <val>}. Any Task column is valid plus virtual fields: status_category, assignee_ids, tag_ids, initiative_ids. An object with a "conditions" key is an AND/OR group: {"logic": "or", "conditions": [...]}.
-   */
+  /** JSON list of filter conditions, AND-ed together. Each object: {"field": "<column>", "op": "<operator>", "value": <val>}. Any Task column is valid plus virtual fields: status_category, assignee_ids, tag_ids, initiative_ids. An object with a "conditions" key is an AND/OR group: {"logic": "or", "conditions": [...]}. */
   conditions?: (FilterCondition | FilterGroup)[];
-  /**
-   * Include archived tasks
-   */
+  /** Include archived tasks */
   include_archived?: boolean;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 0
    * @maximum 100
    */
   page_size?: number;
-  /**
-   * JSON list of sort fields: [{"field": "due_date", "dir": "desc"}]
-   */
+  /** JSON list of sort fields: [{"field": "due_date", "dir": "desc"}] */
   sorting?: SortField[];
-  /**
-   * IANA timezone name (e.g. America/Los_Angeles) for date_group calculation
-   */
+  /** IANA timezone name (e.g. America/Los_Angeles) for date_group calculation */
   tz?: string | null;
 };
 
@@ -13859,9 +13674,7 @@ export type ListTaskGroupsParams = {
    * @maxLength 64
    */
   group_by: string;
-  /**
-   * For a date: the bucket of the calendar it groups by
-   */
+  /** For a date: the bucket of the calendar it groups by */
   bucket?: DateBucket | null;
   conditions?: (FilterCondition | FilterGroup)[];
   include_archived?: boolean;
@@ -13877,9 +13690,7 @@ export type ListColumnLimitsParams = {
 };
 
 export type ReadTaskParams = {
-  /**
-   * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
-   */
+  /** Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one. */
   include_deleted?: boolean;
 };
 
@@ -13896,21 +13707,15 @@ export const DeleteTaskScope = {
 } as const;
 
 export type ArchiveDoneTasksParams = {
-  /**
-   * Project to archive done tasks from
-   */
+  /** Project to archive done tasks from */
   project_id: number;
-  /**
-   * Specific done status to archive (optional)
-   */
+  /** Specific done status to archive (optional) */
   task_status_id?: number | null;
 };
 
 export type ListReportsParams = {
   settled?: boolean;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -13920,9 +13725,7 @@ export type ListReportsParams = {
 };
 
 export type ReadModerationLogParams = {
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -13965,9 +13768,7 @@ export type RecentCommentsParams = {
 };
 
 export type ReadCommentParams = {
-  /**
-   * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
-   */
+  /** Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one. */
   include_deleted?: boolean;
 };
 
@@ -13976,9 +13777,7 @@ export type ReadActivityParams = {
   initiative_id?: number | null;
   tool?: Tool | null;
   tool_id?: number | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -13992,35 +13791,23 @@ export type ListInitiativesParams = {
 };
 
 export type ListJoinRequestsParams = {
-  /**
-   * Narrow the queue to one status. Omit for the pending queue — the rows that are still open to an answer.
-   */
+  /** Narrow the queue to one status. Omit for the pending queue — the rows that are still open to an answer. */
   status?: JoinRequestStatus | null;
 };
 
 export type GetInitiativeParams = {
-  /**
-   * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
-   */
+  /** Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one. */
   include_deleted?: boolean;
 };
 
 export type GetInitiativeMembersParams = {
-  /**
-   * Case-insensitive substring match on the member's name.
-   */
+  /** Case-insensitive substring match on the member's name. */
   search?: string | null;
-  /**
-   * Only the members whose role is (or is not) a manager role.
-   */
+  /** Only the members whose role is (or is not) a manager role. */
   is_manager?: boolean | null;
-  /**
-   * Only the members who appear online, idle or busy right now.
-   */
+  /** Only the members who appear online, idle or busy right now. */
   online?: boolean;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -14030,14 +13817,10 @@ export type GetInitiativeMembersParams = {
 };
 
 export type SearchInitiativeMembersParams = {
-  /**
-   * Case-insensitive substring match on the member's name.
-   */
+  /** Case-insensitive substring match on the member's name. */
   search?: string | null;
   user_id?: number[] | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 0
@@ -14047,21 +13830,15 @@ export type SearchInitiativeMembersParams = {
 };
 
 export type ReadFileParams = {
-  /**
-   * Include the file body. Pass false for the metadata alone — a file's body is the largest thing this API returns, and a caller reacting to a change (a name, a tag, a property) does not need it. Everything else is unchanged.
-   */
+  /** Include the file body. Pass false for the metadata alone — a file's body is the largest thing this API returns, and a caller reacting to a change (a name, a tag, a property) does not need it. Everything else is unchanged. */
   include_content?: boolean;
-  /**
-   * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
-   */
+  /** Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one. */
   include_deleted?: boolean;
 };
 
 export type ListCollectionsParams = {
   initiative_id: number;
-  /**
-   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
-   */
+  /** true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows. */
   archived?: boolean | null;
 };
 
@@ -14078,42 +13855,24 @@ export type ListShareRequestsParams = {
 
 export type ExportTasksParams = {
   format?: ExportTasksFormat;
-  /**
-   * Same JSON filter conditions as the task list
-   */
+  /** Same JSON filter conditions as the task list */
   conditions?: (FilterCondition | FilterGroup)[];
-  /**
-   * Same JSON sort fields as the task list
-   */
+  /** Same JSON sort fields as the task list */
   sorting?: SortField[];
-  /**
-   * IANA timezone name
-   */
+  /** IANA timezone name */
   tz?: string | null;
   include_archived?: boolean;
-  /**
-   * Report layout. Markdown: a table (default) or a GitHub-style task list (checklist). PDF: the default table, or 'detailed' for a one-task-per-page report with description, checklist and comments. Ignored by csv/xlsx.
-   */
+  /** Report layout. Markdown: a table (default) or a GitHub-style task list (checklist). PDF: the default table, or 'detailed' for a one-task-per-page report with description, checklist and comments. Ignored by csv/xlsx. */
   layout?: ExportTasksLayout;
-  /**
-   * The field the list is grouped by, as GET /tasks/groups takes it: each task is listed under every group it is in, the groups in the list's order
-   */
+  /** The field the list is grouped by, as GET /tasks/groups takes it: each task is listed under every group it is in, the groups in the list's order */
   group_by?: string | null;
-  /**
-   * For a date: the bucket of the calendar it groups by
-   */
+  /** For a date: the bucket of the calendar it groups by */
   bucket?: DateBucket | null;
-  /**
-   * The keys of the groups the list leaves out
-   */
+  /** The keys of the groups the list leaves out */
   hidden_groups?: string[] | null;
-  /**
-   * The layout fields the list's table shows, in order (``title``, ``dueDate``, ``property:<id>``, ``plugin:<install>:<key>``). The status follows them, as the table draws it.
-   */
+  /** The layout fields the list's table shows, in order (``title``, ``dueDate``, ``property:<id>``, ``plugin:<install>:<key>``). The status follows them, as the table draws it. */
   columns?: string[] | null;
-  /**
-   * For the detailed PDF: the task page's parts in its order, its fields and ``status``, ``dates``, ``properties``, ``description``, ``checklist`` and ``comments``
-   */
+  /** For the detailed PDF: the task page's parts in its order, its fields and ``status``, ``dates``, ``properties``, ``description``, ``checklist`` and ``comments`` */
   detail?: string[] | null;
 };
 
@@ -14139,35 +13898,23 @@ export type ExportEventsParams = {
   initiative_id?: number | null;
   scope?: "community" | null;
   calendar_ids?: number[] | null;
-  /**
-   * Calendars to leave out, such as hidden ones
-   */
+  /** Calendars to leave out, such as hidden ones */
   exclude_calendar_ids?: number[] | null;
-  /**
-   * Same JSON property filters as the event list
-   */
+  /** Same JSON property filters as the event list */
   property_filters?: string | null;
-  /**
-   * Same date range as the event list
-   */
+  /** Same date range as the event list */
   start_after?: string | null;
   start_before?: string | null;
-  /**
-   * IANA timezone for the file name's date
-   */
+  /** IANA timezone for the file name's date */
   tz?: string | null;
 };
 
 export type EstimateAggregateExportParams = {
   scope: EstimateAggregateExportScope;
-  /**
-   * Required when scope=initiative
-   */
+  /** Required when scope=initiative */
   initiative_id?: number | null;
   include_uploads?: boolean;
-  /**
-   * JSON object of tool→filters narrowing what each tool exports: the tool's own list filters (as its list route takes them, such as ``{"project": {"tag_ids": [3]}}``), and for calendars an ``events`` date range. ``archived`` omitted exports live and archived rows alike.
-   */
+  /** JSON object of tool→filters narrowing what each tool exports: the tool's own list filters (as its list route takes them, such as ``{"project": {"tag_ids": [3]}}``), and for calendars an ``events`` date range. ``archived`` omitted exports live and archived rows alike. */
   filters?: string | null;
 };
 
@@ -14182,25 +13929,15 @@ export const EstimateAggregateExportScope = {
 export type ExportInitiativeParams = {
   initiative_id: number;
   mode?: ExportInitiativeMode;
-  /**
-   * JSON object of tool→bool, e.g. {"project": true, "calendar": false}. Omitted = every tool.
-   */
+  /** JSON object of tool→bool, e.g. {"project": true, "calendar": false}. Omitted = every tool. */
   include?: string | null;
-  /**
-   * Report mode: JSON object of tool→format; the file entry is a nested map, e.g. {"project": "pdf", "file": {"lexical": "md", "sheet": "xlsx"}}. Unlisted tools use their backup format.
-   */
+  /** Report mode: JSON object of tool→format; the file entry is a nested map, e.g. {"project": "pdf", "file": {"lexical": "md", "sheet": "xlsx"}}. Unlisted tools use their backup format. */
   formats?: string | null;
-  /**
-   * Backup mode: bundle referenced upload blobs
-   */
+  /** Backup mode: bundle referenced upload blobs */
   include_uploads?: boolean;
-  /**
-   * JSON object of tool→filters narrowing what each tool exports: the tool's own list filters (as its list route takes them, such as ``{"project": {"tag_ids": [3]}}``), and for calendars an ``events`` date range. ``archived`` omitted exports live and archived rows alike.
-   */
+  /** JSON object of tool→filters narrowing what each tool exports: the tool's own list filters (as its list route takes them, such as ``{"project": {"tag_ids": [3]}}``), and for calendars an ``events`` date range. ``archived`` omitted exports live and archived rows alike. */
   filters?: string | null;
-  /**
-   * IANA timezone for report timestamps
-   */
+  /** IANA timezone for report timestamps */
   tz?: string | null;
 };
 
@@ -14213,25 +13950,15 @@ export const ExportInitiativeMode = {
 
 export type ExportCommunityParams = {
   mode?: ExportCommunityMode;
-  /**
-   * JSON object of tool→bool; omitted = every tool
-   */
+  /** JSON object of tool→bool; omitted = every tool */
   include?: string | null;
-  /**
-   * Report mode: JSON object of tool→format (see /exports/initiative)
-   */
+  /** Report mode: JSON object of tool→format (see /exports/initiative) */
   formats?: string | null;
-  /**
-   * Backup mode: bundle referenced upload blobs
-   */
+  /** Backup mode: bundle referenced upload blobs */
   include_uploads?: boolean;
-  /**
-   * JSON object of tool→filters narrowing what each tool exports: the tool's own list filters (as its list route takes them, such as ``{"project": {"tag_ids": [3]}}``), and for calendars an ``events`` date range. ``archived`` omitted exports live and archived rows alike.
-   */
+  /** JSON object of tool→filters narrowing what each tool exports: the tool's own list filters (as its list route takes them, such as ``{"project": {"tag_ids": [3]}}``), and for calendars an ``events`` date range. ``archived`` omitted exports live and archived rows alike. */
   filters?: string | null;
-  /**
-   * IANA timezone for report timestamps
-   */
+  /** IANA timezone for report timestamps */
   tz?: string | null;
 };
 
@@ -14243,25 +13970,15 @@ export const ExportCommunityMode = {
 } as const;
 
 export type ExportToolParams = {
-  /**
-   * What to export: one artifact per id, zipped when there is more than one
-   */
+  /** What to export: one artifact per id, zipped when there is more than one */
   ids?: number[] | null;
-  /**
-   * One of the tool's export formats (project: json, pdf, csv, xlsx; file: json, md, pdf, docx, csv, xlsx, file; counter_group: json, pdf, csv, xlsx, md; calendar: ics, json; dashboard: json; post: json; wiki: json, pdf, md, docx; contact: json, csv). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json``
-   */
+  /** One of the tool's export formats (project: json, pdf, csv, xlsx; file: json, md, pdf, docx, csv, xlsx, file; counter_group: json, pdf, csv, xlsx, md; calendar: ics, json; dashboard: json; post: json; wiki: json, pdf, md, docx; contact: json, csv). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json`` */
   format?: ExportToolFormat;
-  /**
-   * Calendars only: with no ids, every calendar the caller may export in this initiative
-   */
+  /** Calendars only: with no ids, every calendar the caller may export in this initiative */
   initiative_id?: number | null;
-  /**
-   * JSON object narrowing the export: the tool's own list filters, and for calendars an ``events`` date range (``{"events": {"start_after": …, "start_before": …}}``)
-   */
+  /** JSON object narrowing the export: the tool's own list filters, and for calendars an ``events`` date range (``{"events": {"start_after": …, "start_before": …}}``) */
   filters?: string | null;
-  /**
-   * IANA timezone for report timestamps
-   */
+  /** IANA timezone for report timestamps */
   tz?: string | null;
 };
 
@@ -14279,39 +13996,29 @@ export const ExportToolFormat = {
 } as const;
 
 export type PreviewContactsImportParams = {
-  /**
-   * The initiative the contacts go into, whose properties a column headed with one's name fills; none for the community's contacts
-   */
+  /** The initiative the contacts go into, whose properties a column headed with one's name fills; none for the community's contacts */
   initiative_id?: number | null;
 };
 
 export type ConfirmImportBody = { [key: string]: unknown } | null;
 
 export type ReadCounterGroupParams = {
-  /**
-   * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
-   */
+  /** Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one. */
   include_deleted?: boolean;
 };
 
 export type ReadCounterParams = {
-  /**
-   * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
-   */
+  /** Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one. */
   include_deleted?: boolean;
 };
 
 export type ReadCalendarParams = {
-  /**
-   * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
-   */
+  /** Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one. */
   include_deleted?: boolean;
 };
 
 export type ReadDashboardParams = {
-  /**
-   * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
-   */
+  /** Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one. */
   include_deleted?: boolean;
 };
 
@@ -14319,47 +14026,31 @@ export type GetPostTimelineParams = {
   initiative_id?: number | null;
   search?: string | null;
   tag_ids?: number[] | null;
-  /**
-   * The feed's property-value filters, JSON-encoded as it takes them.
-   */
+  /** The feed's property-value filters, JSON-encoded as it takes them. */
   property_filters?: string | null;
   unread?: boolean;
-  /**
-   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
-   */
+  /** true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows. */
   archived?: boolean | null;
-  /**
-   * IANA zone the month boundaries are cut in, e.g. Pacific/Auckland. A month is a boundary in somebody's day, so a reader gets their own. Defaults to UTC.
-   */
+  /** IANA zone the month boundaries are cut in, e.g. Pacific/Auckland. A month is a boundary in somebody's day, so a reader gets their own. Defaults to UTC. */
   tz?: string | null;
 };
 
 export type ReadPostParams = {
-  /**
-   * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
-   */
+  /** Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one. */
   include_deleted?: boolean;
 };
 
 export type ReadPluginDataParams = {
-  /**
-   * The dashboard the widget sits on. Previewing a widget takes write access to it.
-   */
+  /** The dashboard the widget sits on. Previewing a widget takes write access to it. */
   dashboard_id: number;
-  /**
-   * The parameters on the form, as a JSON object.
-   */
+  /** The parameters on the form, as a JSON object. */
   params?: string | null;
 };
 
 export type ReadPluginParamOptionsParams = {
-  /**
-   * Which of the endpoint's parameters to fill a menu for.
-   */
+  /** Which of the endpoint's parameters to fill a menu for. */
   param: string;
-  /**
-   * What the form has answered so far, as a JSON object. Only the answers a source's `needs` names are ever forwarded.
-   */
+  /** What the form has answered so far, as a JSON object. Only the answers a source's `needs` names are ever forwarded. */
   params?: string | null;
 };
 
@@ -14376,9 +14067,7 @@ export type ReadUninstallNoticeParams = {
 };
 
 export type ListCommunityPluginMembersParams = {
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -14388,13 +14077,9 @@ export type ListCommunityPluginMembersParams = {
 };
 
 export type ReadCalendarEventParams = {
-  /**
-   * One occurrence of a repeating event, whose answers to show.
-   */
+  /** One occurrence of a repeating event, whose answers to show. */
   occurrence?: string | null;
-  /**
-   * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
-   */
+  /** Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one. */
   include_deleted?: boolean;
 };
 
@@ -14414,9 +14099,7 @@ export const DeleteCalendarEventScope = {
 } as const;
 
 export type DuplicateCalendarEventParams = {
-  /**
-   * One date of a repeating event, copied as an event of its own.
-   */
+  /** One date of a repeating event, copied as an event of its own. */
   occurrence?: string | null;
 };
 
@@ -14438,9 +14121,7 @@ export type ListCalendarEntriesParams = {
   scope?: "community" | null;
   calendar_ids?: number[] | null;
   property_filters?: string | null;
-  /**
-   * Task filter conditions (same JSON shape as GET /tasks).
-   */
+  /** Task filter conditions (same JSON shape as GET /tasks). */
   conditions?: (FilterCondition | FilterGroup)[];
   tz?: string | null;
   include_events?: boolean;
@@ -14455,9 +14136,7 @@ export type ListMarketplaceListingsParams = {
   kind?: ListingKind | null;
   search?: string | null;
   source?: ListingSource[] | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -14467,9 +14146,7 @@ export type ListMarketplaceListingsParams = {
 };
 
 export type ListRelationshipsParams = {
-  /**
-   * The thing to list edges for, as `kind:id`
-   */
+  /** The thing to list edges for, as `kind:id` */
   entity: string;
   relationship_type?: RelationshipType | null;
   other_type?: EndpointKind | null;
@@ -14486,25 +14163,19 @@ export const ListRelationshipsDirection = {
 } as const;
 
 export type ReplaceRelationshipSliceParams = {
-  /**
-   * The thing whose edges are being set
-   */
+  /** The thing whose edges are being set */
   entity: string;
   relationship_type: RelationshipType;
   other_type: EndpointKind;
 };
 
 export type ListTaskEdgesParams = {
-  /**
-   * The project whose tasks' edges to list
-   */
+  /** The project whose tasks' edges to list */
   project_id: number;
 };
 
 export type GetRelationsNeighbourhoodParams = {
-  /**
-   * The thing at the centre, as `kind:id`
-   */
+  /** The thing at the centre, as `kind:id` */
   entity: string;
   /**
    * How many links out to walk
@@ -14512,27 +14183,19 @@ export type GetRelationsNeighbourhoodParams = {
    * @maximum 3
    */
   hops?: number;
-  /**
-   * Walk through labels as well
-   */
+  /** Walk through labels as well */
   include_tags?: boolean;
 };
 
 export type GetTagParams = {
-  /**
-   * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
-   */
+  /** Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one. */
   include_deleted?: boolean;
 };
 
 export type GetTagEntitiesParams = {
-  /**
-   * The taggable kind to list
-   */
+  /** The taggable kind to list */
   kind: TagTarget;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -14547,25 +14210,15 @@ export type SearchCommunityParams = {
    * @maxLength 1000
    */
   search: string;
-  /**
-   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
-   */
+  /** Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly. */
   types?: SearchEntityType[] | null;
-  /**
-   * Restrict to one initiative.
-   */
+  /** Restrict to one initiative. */
   initiative_id?: number | null;
-  /**
-   * Include archived work. Left out by default, so a search answers with what is in play.
-   */
+  /** Include archived work. Left out by default, so a search answers with what is in play. */
   include_archived?: boolean;
-  /**
-   * Omit for both. ``true`` returns only templates (a template picker), ``false`` only real content (a picker choosing where content goes).
-   */
+  /** Omit for both. ``true`` returns only templates (a template picker), ``false`` only real content (a picker choosing where content goes). */
   is_template?: boolean | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -14575,25 +14228,15 @@ export type SearchCommunityParams = {
 };
 
 export type RecentCommunityParams = {
-  /**
-   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
-   */
+  /** Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly. */
   types?: SearchEntityType[] | null;
-  /**
-   * Restrict to one initiative.
-   */
+  /** Restrict to one initiative. */
   initiative_id?: number | null;
-  /**
-   * Omit for both. ``true`` returns only templates (a template picker), ``false`` only real content (a picker choosing where content goes).
-   */
+  /** Omit for both. ``true`` returns only templates (a template picker), ``false`` only real content (a picker choosing where content goes). */
   is_template?: boolean | null;
-  /**
-   * The thing being written in, as a reference (``file:12``). It is left out of the answer: a thing does not point at itself. A reference that names nothing narrows nothing.
-   */
+  /** The thing being written in, as a reference (``file:12``). It is left out of the answer: a thing does not point at itself. A reference that names nothing narrows nothing. */
   subject?: string | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   limit?: number;
 };
 
@@ -14603,37 +14246,23 @@ export type SuggestCommunityParams = {
    * @maxLength 200
    */
   search: string;
-  /**
-   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
-   */
+  /** Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly. */
   types?: SearchEntityType[] | null;
-  /**
-   * Restrict to one initiative.
-   */
+  /** Restrict to one initiative. */
   initiative_id?: number | null;
-  /**
-   * Omit for both. ``true`` returns only templates (a template picker), ``false`` only real content (a picker choosing where content goes).
-   */
+  /** Omit for both. ``true`` returns only templates (a template picker), ``false`` only real content (a picker choosing where content goes). */
   is_template?: boolean | null;
-  /**
-   * The thing being written in, as a reference (``file:12``). It is left out of the answer: a thing does not point at itself. A reference that names nothing narrows nothing.
-   */
+  /** The thing being written in, as a reference (``file:12``). It is left out of the answer: a thing does not point at itself. A reference that names nothing narrows nothing. */
   subject?: string | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   limit?: number;
 };
 
 export type ListPropertyDefinitionsParams = {
   initiative_id?: number | null;
-  /**
-   * List this project's metadata instead of properties.
-   */
+  /** List this project's metadata instead of properties. */
   project_id?: number | null;
-  /**
-   * List this collection's metadata instead of properties.
-   */
+  /** List this collection's metadata instead of properties. */
   collection_id?: number | null;
 };
 
@@ -14642,9 +14271,7 @@ export type ListPropertyDefinitionsByOwnerParams = {
 };
 
 export type ListCommunityTrashParams = {
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -14654,47 +14281,31 @@ export type ListCommunityTrashParams = {
 };
 
 export type ListUsersParams = {
-  /**
-   * Matches members the way ``/search`` does: the handle, a whole handle pinning one member, and the display names members set here.
-   */
+  /** Matches members the way ``/search`` does: the handle, a whole handle pinning one member, and the display names members set here. */
   search?: string | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
    * @maximum 100
    */
   page_size?: number;
-  /**
-   * The community's guests instead of its members. For its administrators.
-   */
+  /** The community's guests instead of its members. For its administrators. */
   guests?: boolean;
 };
 
 export type SearchUsersParams = {
-  /**
-   * Matches the handle's name part. Type the whole handle (`foobar#1234`) to pin one member; a partial number after `#` is a prefix of the four digits as rendered. Display names members set here are matched too.
-   */
+  /** Matches the handle's name part. Type the whole handle (`foobar#1234`) to pin one member; a partial number after `#` is a prefix of the four digits as rendered. Display names members set here are matched too. */
   search?: string | null;
   user_id?: number[] | null;
-  /**
-   * Only members of this initiative. The caller must reach it: be in it, administer the community, or (a plug-in) be placed there.
-   */
+  /** Only members of this initiative. The caller must reach it: be in it, administer the community, or (a plug-in) be placed there. */
   initiative_id?: number | null;
-  /**
-   * With ``resource_id``: only the people who can open that row, which is who may be named on content inside it (assignees, attendees, person properties). The caller must be able to open it too. For a person's picker; an installed plug-in's search does not take it.
-   */
+  /** With ``resource_id``: only the people who can open that row, which is who may be named on content inside it (assignees, attendees, person properties). The caller must be able to open it too. For a person's picker; an installed plug-in's search does not take it. */
   tool?: Tool | null;
   resource_id?: number | null;
-  /**
-   * List the caller first, wherever the rest of the order would put them. For the community's members page, where your own row is where you set your name.
-   */
+  /** List the caller first, wherever the rest of the order would put them. For the community's members page, where your own row is where you set your name. */
   self_first?: boolean;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 0
@@ -14704,9 +14315,7 @@ export type SearchUsersParams = {
 };
 
 export type ListRosterParams = {
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -14729,17 +14338,11 @@ export type RecordViewParams = {
 
 export type ListMyTasksParams = {
   conditions?: (FilterCondition | FilterGroup)[];
-  /**
-   * The tasks you created instead of the ones assigned to you
-   */
+  /** The tasks you created instead of the ones assigned to you */
   created?: boolean;
-  /**
-   * Include archived tasks
-   */
+  /** Include archived tasks */
   include_archived?: boolean;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 0
@@ -14751,38 +14354,26 @@ export type ListMyTasksParams = {
 };
 
 export type ReadTicketAvailabilityParams = {
-  /**
-   * The community the reader is standing in.
-   */
+  /** The community the reader is standing in. */
   community_id?: number | null;
 };
 
 export type GetMyToolCountsParams = {
   community_ids?: number[] | null;
-  /**
-   * Count only what the caller wrote, matching the list views.
-   */
+  /** Count only what the caller wrote, matching the list views. */
   created_by_me?: boolean;
 };
 
 export type ListMyProjectsParams = {
   community_ids?: number[] | null;
   search?: string | null;
-  /**
-   * Narrow to projects the caller created.
-   */
+  /** Narrow to projects the caller created. */
   created_by_me?: boolean;
-  /**
-   * Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them.
-   */
+  /** Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them. */
   sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
+  /** asc (default) or desc. */
   sort_dir?: string | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -14794,21 +14385,13 @@ export type ListMyProjectsParams = {
 export type ListMyFilesParams = {
   community_ids?: number[] | null;
   search?: string | null;
-  /**
-   * Narrow to files the caller created.
-   */
+  /** Narrow to files the caller created. */
   created_by_me?: boolean;
-  /**
-   * Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them.
-   */
+  /** Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them. */
   sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
+  /** asc (default) or desc. */
   sort_dir?: string | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 0
@@ -14820,21 +14403,13 @@ export type ListMyFilesParams = {
 export type ListMyCounterGroupsParams = {
   community_ids?: number[] | null;
   search?: string | null;
-  /**
-   * Narrow to counter groups the caller created.
-   */
+  /** Narrow to counter groups the caller created. */
   created_by_me?: boolean;
-  /**
-   * Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them.
-   */
+  /** Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them. */
   sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
+  /** asc (default) or desc. */
   sort_dir?: string | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 0
@@ -14846,21 +14421,13 @@ export type ListMyCounterGroupsParams = {
 export type ListMyCalendarsParams = {
   community_ids?: number[] | null;
   search?: string | null;
-  /**
-   * Narrow to calendars the caller created.
-   */
+  /** Narrow to calendars the caller created. */
   created_by_me?: boolean;
-  /**
-   * Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them.
-   */
+  /** Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them. */
   sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
+  /** asc (default) or desc. */
   sort_dir?: string | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -14872,21 +14439,13 @@ export type ListMyCalendarsParams = {
 export type ListMyDashboardsParams = {
   community_ids?: number[] | null;
   search?: string | null;
-  /**
-   * Narrow to dashboards the caller created.
-   */
+  /** Narrow to dashboards the caller created. */
   created_by_me?: boolean;
-  /**
-   * Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them.
-   */
+  /** Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them. */
   sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
+  /** asc (default) or desc. */
   sort_dir?: string | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 0
@@ -14898,21 +14457,13 @@ export type ListMyDashboardsParams = {
 export type ListMyPostsParams = {
   community_ids?: number[] | null;
   search?: string | null;
-  /**
-   * Narrow to posts the caller created.
-   */
+  /** Narrow to posts the caller created. */
   created_by_me?: boolean;
-  /**
-   * Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them.
-   */
+  /** Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them. */
   sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
+  /** asc (default) or desc. */
   sort_dir?: string | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 0
@@ -14924,21 +14475,13 @@ export type ListMyPostsParams = {
 export type ListMyWikisParams = {
   community_ids?: number[] | null;
   search?: string | null;
-  /**
-   * Narrow to wikis the caller created.
-   */
+  /** Narrow to wikis the caller created. */
   created_by_me?: boolean;
-  /**
-   * Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them.
-   */
+  /** Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them. */
   sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
+  /** asc (default) or desc. */
   sort_dir?: string | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 0
@@ -14950,21 +14493,13 @@ export type ListMyWikisParams = {
 export type ListMyContactsParams = {
   community_ids?: number[] | null;
   search?: string | null;
-  /**
-   * Narrow to contacts the caller created.
-   */
+  /** Narrow to contacts the caller created. */
   created_by_me?: boolean;
-  /**
-   * Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them.
-   */
+  /** Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them. */
   sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
+  /** asc (default) or desc. */
   sort_dir?: string | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 0
@@ -14979,9 +14514,7 @@ export type ListMyPersonalItemsParams = {
 
 export type ListMyCalendarEntriesParams = {
   community_ids?: number[] | null;
-  /**
-   * Task filter conditions (same JSON shape as GET /me/tasks).
-   */
+  /** Task filter conditions (same JSON shape as GET /me/tasks). */
   conditions?: (FilterCondition | FilterGroup)[];
   tz?: string | null;
   include_events?: boolean;
@@ -14991,9 +14524,7 @@ export type ListMyCalendarEntriesParams = {
 };
 
 export type ListMyTrashParams = {
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -15003,14 +14534,10 @@ export type ListMyTrashParams = {
 };
 
 export type ListPeopleSectionsParams = {
-  /**
-   * Narrows every section. Matches the handle, plus the real name in a guild that shows names; type a whole handle (`foobar#1234`) to pin one person.
-   */
+  /** Narrows every section. Matches the handle, plus the real name in a guild that shows names; type a whole handle (`foobar#1234`) to pin one person. */
   search?: string | null;
   community_ids?: number[] | null;
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -15020,9 +14547,7 @@ export type ListPeopleSectionsParams = {
 };
 
 export type ListIgnoredAccountsParams = {
-  /**
-   * @minimum 1
-   */
+  /** @minimum 1 */
   page?: number;
   /**
    * @minimum 1
@@ -15041,9 +14566,7 @@ export type CollectVerificationParams = {
 };
 
 export type GetUserStatsParams = {
-  /**
-   * Optional guild ID to filter stats
-   */
+  /** Optional guild ID to filter stats */
   community_id?: number | null;
   /**
    * Number of days to analyze

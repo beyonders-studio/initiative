@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import { FileType, type FileVersionRead } from "@/api/generated/initiativeAPI.schemas";
+import { ActorKind, FileType, type FileVersionRead } from "@/api/generated/initiativeAPI.schemas";
 
 // Avoid pulling in the real react-pdf (pdf.js worker) during tests.
 vi.mock("react-pdf", () => ({
@@ -53,6 +53,8 @@ const buildVersion = (overrides: Partial<FileVersionRead>): FileVersionRead => (
   file_size: 100,
   original_filename: "doc.pdf",
   created_by: 1,
+  created_by_kind: ActorKind.member,
+  created_by_install: null,
   created_at: "2026-05-28T00:00:00Z",
   is_current: false,
   ...overrides,

@@ -15,6 +15,7 @@ from app.core.search import SearchEntityType
 from app.core.tools import Tool, tool_envelope_type
 from app.db.session import routed_guild_id
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative, PermissionKey
 from app.schemas.tenant.import_envelopes import FileEnvelope
@@ -98,6 +99,7 @@ class FileImporter(NamesPeopleInPassing):
             content=content,
             initiative_id=target_initiative.id,
             created_by=importer.id,
+            created_by_kind=ActorKind.member,
         )
         session.add(file)
         await session.flush()
