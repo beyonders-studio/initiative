@@ -33,7 +33,6 @@
     "empty": "Nobody in your communities has messaging turned on yet.",
     "noCommunities": "Nobody to show. You share no communities with anyone yet.",
     "unreachable": "Not reachable",
-    "showMore": "Show more",
     "addToGroup": "Add {{name}} to a group",
     "removeFromGroup": "Remove {{name}}",
     "groupHint": "Everyone here will be asked before they join.",

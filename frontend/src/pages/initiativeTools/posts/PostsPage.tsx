@@ -1,7 +1,7 @@
 import { useRouter } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Loader2, Plus } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Plus } from "lucide-react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
@@ -32,6 +32,7 @@ import { type ToolView, toolDetailRoute, toolViewParams } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { LoadMore } from "@/ui/load-more";
 import { CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 /**
@@ -259,22 +260,6 @@ export const PostsView = ({ fixedInitiativeId, canCreate }: PostsViewProps) => {
       ? virtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end
       : 0;
 
-  // The bottom of the list asks for the next page as it comes into view.
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const element = sentinelRef.current;
-    if (!element || !hasNextPage || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !isFetchingNextPage) void fetchNextPage();
-      },
-      // A screen of lead time, so the next five are there before the reader is.
-      { rootMargin: "600px" }
-    );
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
-
   // The month at the top of the view, so the rail marks where the reader
   // actually is rather than where they last jumped from.
   //
@@ -434,13 +419,16 @@ export const PostsView = ({ fixedInitiativeId, canCreate }: PostsViewProps) => {
                 formatGroup={(stop) => formatPeriodYear(stop.period)}
               />
             </div>
-            <div ref={sentinelRef} className="h-px" aria-hidden />
-            {isFetchingNextPage && (
-              <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("loading")}
-              </div>
-            )}
+            {/* The bottom of the list asks for the next page as it comes into
+                view, a screen ahead, so the next five are there before the
+                reader is. */}
+            <LoadMore
+              auto
+              rootMargin="600px"
+              hasMore={hasNextPage}
+              loading={isFetchingNextPage}
+              onLoadMore={fetchNextPage}
+            />
           </>
         ) : totalCount > 0 || activeFilterCount > 0 ? (
           <p className="text-muted-foreground text-sm">{t("filters.noMatchingPosts")}</p>

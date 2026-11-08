@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Each AI connection has its own on/off switch** on its row under **Integrations**, in place of the Enabled field in its dialog. A community's **Allow AI features** switch moved to the **Security** tab, beside its other restrictions. When AI goes off, whether the community or the server turns it off, the community's connections go off with it, and none can be turned on again until AI is back on.
 - **The desktop app on Windows and Linux hides its menu bar.** The File, Edit, View and Window row no longer takes space under the title bar; press Alt to show it. Zoom, reload and full screen keep their shortcuts.
 - **Search forgives typos.** The command palette and the icon picker find what you meant through a swapped, wrong or extra letter (one in a word of four to seven letters, two from eight), and the words of a name in any order, with an exact name first. A table's filter is exact: it keeps the rows that hold what you typed, in any case.
+- **Every list pages the same way.** Tables, search results, moderation, plug-in members, the trash and task embeds show the rows on screen ("21–40 of 135") beside Previous and Next. Every **Show more** button is the same small button under its list, with a spinner while the next page comes, and lists that load as you scroll show the same spinner.
 - **One colour picker everywhere.** A spreadsheet's text, fill and border colours and a profile decoration's colours open the same picker as the rest of the app, rather than the system's. The picker opens with its cursor on the current colour, and a single click in its field picks.
 
 ### Fixed
@@ -27,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tabs past the edge of a narrow window can be reached with a mouse.** A row of tabs wider than the page, such as **Platform settings** on a narrow screen, shows a thin scrollbar under it to drag.
 - **The arrow keys move through what `[[` offers.** They stayed on the first match; now they step through the list, as they do for `@` and `#`.
 - **Progress bars tell a screen reader how far along they are,** as a percent in your language, where they read as busy with no value.
+- **The members table no longer offers page sizes that change nothing.** It always shows 25 members a page, and its menu offered 10 to 100.
 - **Confirmations, pickers and tables speak your language.** Cancel, Continue, Please wait, a picker's placeholder, a table's filter and the labels a screen reader hears were English in every language.
 
 ## [0.78.0] - 2026-11-06

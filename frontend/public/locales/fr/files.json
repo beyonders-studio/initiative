@@ -114,8 +114,7 @@
   "imageChooser": {
     "title": "Choisir une image dans Fichiers",
     "description": "Elle est insérée telle qu’elle est maintenant : une version plus récente du fichier ne la change pas.",
-    "none": "Aucune image ici.",
-    "more": "Afficher plus"
+    "none": "Aucune image ici."
   },
   "outline": {
     "show": "Afficher le sommaire",

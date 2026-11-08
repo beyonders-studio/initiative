@@ -6,7 +6,6 @@
   "people": "People",
   "peopleEmpty": "Nobody is listed here yet. People this community can't message are left off this list.",
   "peopleGroup": "{{label}} — {{count}}",
-  "peopleMore": "Show more",
   "peopleError": "The people list couldn't be loaded.",
   "peopleReaderHidden": "You're not on this list because people here can't message you.",
   "peopleReaderHiddenLink": "Change it",

@@ -1062,7 +1062,6 @@
     "actionError": "Action failed",
     "expiresIn": "expires in {{minutes}}m",
     "minutes": "{{minutes}}m",
-    "loadMore": "Load more",
     "status": {
       "pending": "Pending",
       "approved": "Approved",

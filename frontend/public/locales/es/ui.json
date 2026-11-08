@@ -1,5 +1,6 @@
 {
   "loading": "Cargando…",
+  "loadMore": "Mostrar más",
   "clear": "Limpiar",
   "next": "Siguiente",
   "previous": "Anterior",
@@ -99,8 +100,6 @@
     "rowsSelected": "{{selected}} de {{total}} fila(s) seleccionada(s)",
     "rowsSelectedFiltered": "{{selected}} seleccionada(s) ({{total}} coinciden con el filtro)",
     "noResults": "Sin resultados.",
-    "rowsPerPage": "Filas por página:",
-    "pageOf": "Página {{current}} de {{total}}",
     "filter": "Filtrar…"
   },
   "wizard": {

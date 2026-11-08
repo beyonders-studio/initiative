@@ -26,6 +26,7 @@ import { getUserDisplayName } from "@/lib/userDisplay";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { cn } from "@/ui/lib/utils";
+import { LoadMore } from "@/ui/load-more";
 import { Skeleton } from "@/ui/skeleton";
 
 const RosterRow = ({ member }: { member: CommunityRosterMember }) => {
@@ -156,17 +157,11 @@ export const PeopleSection = () => {
             </section>
           ))
         )}
-        {roster.hasNextPage && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full text-xs"
-            disabled={roster.isFetchingNextPage}
-            onClick={() => void roster.fetchNextPage()}
-          >
-            {t("peopleMore")}
-          </Button>
-        )}
+        <LoadMore
+          hasMore={roster.hasNextPage}
+          loading={roster.isFetchingNextPage}
+          onLoadMore={roster.fetchNextPage}
+        />
         {readerHidden && (
           <p className="px-2 text-muted-foreground text-xs">
             {t("peopleReaderHidden")}{" "}

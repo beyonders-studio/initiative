@@ -18,6 +18,7 @@ import { formatDayHeading, localDayKey } from "@/lib/formatDate";
 import { useStoreSellingAnswer } from "@/lib/storeSelling";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
+import { LoadMore } from "@/ui/load-more";
 import { RelativeTime } from "@/ui/relative-time";
 
 type Filter = "all" | "unread" | "personal";
@@ -213,20 +214,11 @@ export const NotificationsInboxPage = () => {
             </section>
           ))}
 
-          {history.hasNextPage && (
-            <div className="flex justify-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void history.fetchNextPage()}
-                disabled={history.isFetchingNextPage}
-              >
-                {history.isFetchingNextPage
-                  ? t("common:loading")
-                  : t("notifications.inbox.loadMore")}
-              </Button>
-            </div>
-          )}
+          <LoadMore
+            hasMore={history.hasNextPage}
+            loading={history.isFetchingNextPage}
+            onLoadMore={history.fetchNextPage}
+          />
         </div>
       )}
     </div>

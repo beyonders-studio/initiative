@@ -429,6 +429,10 @@ export const CommunityMembersPage = () => {
           pageCount={Math.max(1, Math.ceil(total / pageSize))}
           rowCount={total}
           pageIndex={page - 1}
+          // The roster is paged at the server's size, so the table counts its
+          // range in that size and offers no other.
+          initialState={{ pagination: { pageIndex: page - 1, pageSize: USER_SEARCH_PAGE_SIZE } }}
+          pageSizeOptions={[USER_SEARCH_PAGE_SIZE]}
           onPaginationChange={(next: PaginationState) =>
             setSearch({ page: next.pageIndex + 1 === 1 ? undefined : next.pageIndex + 1 })
           }

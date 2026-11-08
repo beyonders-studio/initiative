@@ -53,11 +53,6 @@
     "contact": "Un contacto",
     "collection": "Una colección"
   },
-  "paging": {
-    "newer": "Más recientes",
-    "older": "Más antiguas",
-    "page": "Página {{page}}"
-  },
   "report": {
     "action": "Denunciar",
     "title": "Denunciar esto",

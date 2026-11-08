@@ -373,7 +373,6 @@
     "inbox": {
       "title": "Benachrichtigungen",
       "empty": "Hier ist noch nichts.",
-      "loadMore": "Mehr laden",
       "markRead": "Als gelesen markieren",
       "markUnread": "Als ungelesen markieren",
       "dismiss": "Entfernen",
@@ -573,7 +572,6 @@
     "noDescription": "Noch keine Beschreibung.",
     "resultCount_one": "{{count}} Community",
     "resultCount_other": "{{count}} Communitys",
-    "showMore": "Mehr anzeigen",
     "emptyTitle": "Noch keine Communitys",
     "emptyDescription": "Keine Community ist hier im Verzeichnis eingetragen. Community-Admins können ihre Community in den Community-Einstellungen eintragen.",
     "noResultsTitle": "Keine Treffer",

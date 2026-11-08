@@ -1062,7 +1062,6 @@
     "actionError": "La acción falló",
     "expiresIn": "caduca en {{minutes}} min",
     "minutes": "{{minutes}} min",
-    "loadMore": "Cargar más",
     "status": {
       "pending": "Pendiente",
       "approved": "Aprobado",

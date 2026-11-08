@@ -373,7 +373,6 @@
     "inbox": {
       "title": "Notifications",
       "empty": "Rien pour l'instant.",
-      "loadMore": "Charger plus",
       "markRead": "Marquer comme lu",
       "markUnread": "Marquer comme non lu",
       "dismiss": "Ignorer",
@@ -573,7 +572,6 @@
     "noDescription": "Pas encore de description.",
     "resultCount_one": "{{count}} communauté",
     "resultCount_other": "{{count}} communautés",
-    "showMore": "Afficher plus",
     "emptyTitle": "Aucune communauté pour l’instant",
     "emptyDescription": "Aucune communauté n’est inscrite à l’annuaire ici. Un administrateur de communauté peut inscrire la sienne depuis les paramètres de la communauté.",
     "noResultsTitle": "Aucun résultat",

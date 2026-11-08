@@ -47,6 +47,7 @@ import { getUserDisplayName } from "@/lib/userDisplay";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { PaginationBar } from "@/ui/pagination-bar";
 import { Tabs, TabsList, TabsTrigger } from "@/ui/tabs";
 import { Textarea } from "@/ui/textarea";
 
@@ -70,9 +71,6 @@ export const ModerationPage = () => {
   );
 
   const reports = data?.items ?? [];
-  // The server may answer with an earlier page than the one asked for, when
-  // reports settled in between left fewer pages than there were.
-  const shownPage = data?.page ?? page;
 
   const showTab = (next: "open" | "settled") => {
     setTab(next);
@@ -133,28 +131,17 @@ export const ModerationPage = () => {
               ))
             )}
 
-            {(data?.has_prev || data?.has_next) && (
-              <div className="flex items-center justify-between gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!data.has_prev}
-                  onClick={() => setPage(shownPage - 1)}
-                >
-                  {t("paging.newer")}
-                </Button>
-                <span className="text-muted-foreground text-sm">
-                  {t("paging.page", { page: shownPage })}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!data.has_next}
-                  onClick={() => setPage(shownPage + 1)}
-                >
-                  {t("paging.older")}
-                </Button>
-              </div>
+            {/* The server's page, which may be earlier than the one asked
+                for when reports settled in between left fewer pages. */}
+            {data && (
+              <PaginationBar
+                className="pt-2"
+                page={data.page}
+                pageSize={data.page_size}
+                totalCount={data.total_count}
+                hasNext={data.has_next}
+                onPageChange={setPage}
+              />
             )}
           </div>
         ))}
@@ -450,28 +437,15 @@ const MembersArea = ({ initiativeId }: { initiativeId: number }) => {
             </div>
           </div>
         ))}
-        {data && (data.has_prev || data.has_next) && (
-          <div className="flex items-center justify-between gap-2 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!data.has_prev}
-              onClick={() => setPage(data.page - 1)}
-            >
-              {t("common:previous")}
-            </Button>
-            <span className="text-muted-foreground text-sm">
-              {t("paging.page", { page: data.page })}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!data.has_next}
-              onClick={() => setPage(data.page + 1)}
-            >
-              {t("common:next")}
-            </Button>
-          </div>
+        {data && (
+          <PaginationBar
+            className="pt-2"
+            page={data.page}
+            pageSize={data.page_size}
+            totalCount={data.total_count}
+            hasNext={data.has_next}
+            onPageChange={setPage}
+          />
         )}
       </CardContent>
     </Card>
@@ -601,28 +575,15 @@ const LogArea = ({ communityId, initiativeId }: { communityId: number; initiativ
             />
           ))
         )}
-        {data && (data.has_prev || data.has_next) && (
-          <div className="flex items-center justify-between gap-2 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!data.has_prev}
-              onClick={() => setPage(data.page - 1)}
-            >
-              {t("paging.newer")}
-            </Button>
-            <span className="text-muted-foreground text-sm">
-              {t("paging.page", { page: data.page })}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!data.has_next}
-              onClick={() => setPage(data.page + 1)}
-            >
-              {t("paging.older")}
-            </Button>
-          </div>
+        {data && (
+          <PaginationBar
+            className="pt-2"
+            page={data.page}
+            pageSize={data.page_size}
+            totalCount={data.total_count}
+            hasNext={data.has_next}
+            onPageChange={setPage}
+          />
         )}
       </CardContent>
     </Card>

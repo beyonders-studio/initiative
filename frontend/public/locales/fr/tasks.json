@@ -199,8 +199,7 @@
     "noInitiatives": "Aucune initiative trouvée dans cette communauté.",
     "noProjects": "Aucun projet trouvé dans cette initiative.",
     "back": "Retour",
-    "searchProjects": "Rechercher des projets…",
-    "loadMore": "Charger plus"
+    "searchProjects": "Rechercher des projets…"
   },
   "bulkEdit": {
     "title": "Modifier les tâches",

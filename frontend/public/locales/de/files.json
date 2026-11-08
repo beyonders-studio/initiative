@@ -114,8 +114,7 @@
   "imageChooser": {
     "title": "Bild aus Dateien wählen",
     "description": "Es wird so eingefügt, wie es jetzt ist: Eine neuere Version der Datei ändert es nicht.",
-    "none": "Hier gibt es keine Bilder.",
-    "more": "Mehr anzeigen"
+    "none": "Hier gibt es keine Bilder."
   },
   "outline": {
     "show": "Inhalt anzeigen",

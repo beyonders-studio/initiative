@@ -50,7 +50,7 @@ const MASONRY = read("../../../components/files/collections/MasonryWall.tsx");
 describe("a collection's wall", () => {
   it("fetches files as the reader scrolls rather than paging", () => {
     expect(PAGE).toContain("useCollectionFilesFeed");
-    expect(PAGE).toContain("IntersectionObserver");
+    expect(PAGE).toMatch(/<LoadMore\s+auto/);
     expect(PAGE).toContain("fetchNextPage");
     expect(PAGE).not.toMatch(/PaginationBar/);
   });

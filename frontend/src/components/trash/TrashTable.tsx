@@ -180,16 +180,14 @@ export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
           </TableBody>
         </Table>
       </div>
-      {data.has_prev || data.has_next ? (
-        <PaginationBar
-          className="mt-4"
-          page={data.page}
-          pageSize={data.page_size}
-          totalCount={data.total_count}
-          hasNext={data.has_next}
-          onPageChange={setPage}
-        />
-      ) : null}
+      <PaginationBar
+        className="mt-4"
+        page={data.page}
+        pageSize={data.page_size}
+        totalCount={data.total_count}
+        hasNext={data.has_next}
+        onPageChange={setPage}
+      />
 
       {purgeConfirm.open && (
         <ConfirmDialog

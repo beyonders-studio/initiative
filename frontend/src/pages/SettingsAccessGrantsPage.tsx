@@ -40,6 +40,7 @@ import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { LoadMore } from "@/ui/load-more";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Textarea } from "@/ui/textarea";
 
@@ -266,32 +267,6 @@ export const SettingsAccessGrantsPage = () => {
       {canApprove && <ApprovalQueue />}
       {canBreakGlass && <BreakGlassSection />}
       {canRequest && <RequestSection />}
-    </div>
-  );
-};
-
-const LoadMore = ({
-  hasNextPage,
-  isFetchingNextPage,
-  onLoadMore,
-}: {
-  hasNextPage: boolean;
-  isFetchingNextPage: boolean;
-  onLoadMore: () => void;
-}) => {
-  const { t } = useTranslation(["settings", "common"]);
-  if (!hasNextPage) return null;
-  return (
-    <div className="flex justify-center pt-1">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={onLoadMore}
-        disabled={isFetchingNextPage}
-      >
-        {isFetchingNextPage ? t("common:loading") : t("accessGrants.loadMore")}
-      </Button>
     </div>
   );
 };
@@ -741,9 +716,10 @@ const RequestSection = () => {
             </ul>
           )}
           <LoadMore
-            hasNextPage={myGrants.hasNextPage}
-            isFetchingNextPage={myGrants.isFetchingNextPage}
-            onLoadMore={() => myGrants.fetchNextPage()}
+            className="pt-1"
+            hasMore={myGrants.hasNextPage}
+            loading={myGrants.isFetchingNextPage}
+            onLoadMore={myGrants.fetchNextPage}
           />
         </div>
       </CardContent>
@@ -822,9 +798,10 @@ const ApprovalQueue = () => {
             </ul>
           )}
           <LoadMore
-            hasNextPage={pending.hasNextPage}
-            isFetchingNextPage={pending.isFetchingNextPage}
-            onLoadMore={() => pending.fetchNextPage()}
+            className="pt-1"
+            hasMore={pending.hasNextPage}
+            loading={pending.isFetchingNextPage}
+            onLoadMore={pending.fetchNextPage}
           />
         </div>
 
@@ -868,9 +845,10 @@ const ApprovalQueue = () => {
             </ul>
           )}
           <LoadMore
-            hasNextPage={active.hasNextPage}
-            isFetchingNextPage={active.isFetchingNextPage}
-            onLoadMore={() => active.fetchNextPage()}
+            className="pt-1"
+            hasMore={active.hasNextPage}
+            loading={active.isFetchingNextPage}
+            onLoadMore={active.fetchNextPage}
           />
         </div>
       </CardContent>

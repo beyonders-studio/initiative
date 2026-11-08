@@ -373,7 +373,6 @@
     "inbox": {
       "title": "Notifications",
       "empty": "Nothing here yet.",
-      "loadMore": "Load more",
       "markRead": "Mark read",
       "markUnread": "Mark unread",
       "dismiss": "Dismiss",
@@ -573,7 +572,6 @@
     "noDescription": "No description yet.",
     "resultCount_one": "{{count}} community",
     "resultCount_other": "{{count}} communities",
-    "showMore": "Show more",
     "emptyTitle": "No communities yet",
     "emptyDescription": "No community here has listed itself in the directory. A community admin can list theirs from community settings.",
     "noResultsTitle": "Nothing matched",

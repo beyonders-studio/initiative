@@ -114,8 +114,7 @@
   "imageChooser": {
     "title": "Choose a picture from Files",
     "description": "It goes in as it is now: a newer version of the file won't change it.",
-    "none": "No pictures here.",
-    "more": "Show more"
+    "none": "No pictures here."
   },
   "outline": {
     "show": "Show contents",

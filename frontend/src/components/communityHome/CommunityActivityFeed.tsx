@@ -22,10 +22,10 @@ import type { ActivityScope } from "@/lib/recentRoute";
 import { FROM_FEED, hitIcon, searchHitPath } from "@/lib/searchResults";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import { Badge } from "@/ui/badge";
-import { Button } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { listFormat } from "@/ui/lib/intl";
 import { cn } from "@/ui/lib/utils";
+import { LoadMore } from "@/ui/load-more";
 import { RelativeTime } from "@/ui/relative-time";
 import { Skeleton } from "@/ui/skeleton";
 
@@ -202,17 +202,11 @@ export const CommunityActivityFeed = ({
       {feed.isFetchNextPageError ? (
         <p className="px-2 text-destructive text-sm">{t("feed.loadError")}</p>
       ) : null}
-      {feed.hasNextPage ? (
-        <Button
-          type="button"
-          variant="secondary"
-          className="w-full"
-          onClick={() => void feed.fetchNextPage()}
-          disabled={feed.isFetchingNextPage}
-        >
-          {feed.isFetchingNextPage ? t("loading") : t("feed.loadMore")}
-        </Button>
-      ) : null}
+      <LoadMore
+        hasMore={feed.hasNextPage}
+        loading={feed.isFetchingNextPage}
+        onLoadMore={feed.fetchNextPage}
+      />
     </div>
   );
 };

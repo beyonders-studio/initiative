@@ -14,7 +14,6 @@
       "comments": "Personne n'a commenté cette semaine."
     },
     "loadError": "Impossible de charger ce qui s'est passé. Veuillez réessayer plus tard.",
-    "loadMore": "Afficher plus",
     "new": "Nouveau",
     "others_one": "{{count}} autre personne",
     "others_other": "{{count}} autres personnes",

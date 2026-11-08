@@ -6,7 +6,6 @@
   "people": "Personen",
   "peopleEmpty": "Hier ist noch niemand aufgeführt. Personen, denen diese Community keine Direktnachrichten schicken kann, stehen nicht auf dieser Liste.",
   "peopleGroup": "{{label}} — {{count}}",
-  "peopleMore": "Mehr anzeigen",
   "peopleError": "Die Personenliste konnte nicht geladen werden.",
   "peopleReaderHidden": "Du stehst nicht auf dieser Liste, weil dir die Leute hier keine Direktnachrichten schicken können.",
   "peopleReaderHiddenLink": "Ändern",

@@ -31,6 +31,7 @@ import {
 import { Input } from "@/ui/input";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { cn } from "@/ui/lib/utils";
+import { LoadMore } from "@/ui/load-more";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 /** How long typing settles before the roster follows it. */
@@ -363,7 +364,6 @@ const CommunityRoster = ({
   onGather: (person: PersonRead) => void;
   gathered: Set<number>;
 }) => {
-  const { t } = useTranslation(["messages", "connections"]);
   const [wantsMore, setWantsMore] = useState(false);
   const more = useMoreCommunityPeople(section.community_id, search, wantsMore);
 
@@ -409,17 +409,11 @@ const CommunityRoster = ({
           );
         })}
       </ul>
-      {hasMore ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full"
-          disabled={more.isFetching}
-          onClick={() => (wantsMore ? void more.fetchNextPage() : setWantsMore(true))}
-        >
-          {t("messages:newConversation.showMore")}
-        </Button>
-      ) : null}
+      <LoadMore
+        hasMore={hasMore}
+        loading={more.isFetching}
+        onLoadMore={() => (wantsMore ? void more.fetchNextPage() : setWantsMore(true))}
+      />
     </section>
   );
 };

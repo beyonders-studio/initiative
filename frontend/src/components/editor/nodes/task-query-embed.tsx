@@ -27,6 +27,7 @@ import { DataTable } from "@/ui/data-table";
 import { numberFormat } from "@/ui/lib/intl";
 import type { AppColumnDef } from "@/ui/lib/table";
 import { useLiveClockValue } from "@/ui/lib/useRelativeTime";
+import { PaginationBar } from "@/ui/pagination-bar";
 import { Skeleton } from "@/ui/skeleton";
 
 interface TaskQueryEmbedProps {
@@ -144,8 +145,6 @@ function TaskList({
   total,
   onPage,
 }: PagedProps & { tasks: TaskListRead[]; taskHref: (taskId: number) => string }) {
-  const { t } = useTranslation("editor");
-  const pages = Math.max(1, Math.ceil(total / EMBED_PAGE_SIZE));
   return (
     <div className="space-y-2">
       <ul className="space-y-1">
@@ -162,29 +161,13 @@ function TaskList({
           </li>
         ))}
       </ul>
-      {pages > 1 ? (
-        <div className="flex items-center gap-2 text-muted-foreground text-xs">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => onPage(page - 1)}
-          >
-            {t("embeds.tasks.previous")}
-          </Button>
-          <span>{t("embeds.tasks.page", { page, pages })}</span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={page >= pages}
-            onClick={() => onPage(page + 1)}
-          >
-            {t("embeds.tasks.next")}
-          </Button>
-        </div>
-      ) : null}
+      <PaginationBar
+        page={page}
+        pageSize={EMBED_PAGE_SIZE}
+        totalCount={total}
+        hasNext={page * EMBED_PAGE_SIZE < total}
+        onPageChange={onPage}
+      />
     </div>
   );
 }
