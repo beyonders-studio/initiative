@@ -233,12 +233,14 @@ export const usePluginsOnItems = (
   const { data } = useCommunityPlugins({
     enabled: enabled && initiativeId != null && kind !== null,
   });
+  // Off means none, even where another reader has the community's plug-ins
+  // cached: a board drawn from no community shows none of its plug-ins.
   return useMemo(
     () =>
-      data && initiativeId != null && kind !== null
+      enabled && data && initiativeId != null && kind !== null
         ? pluginsOnItems(data.items, initiativeId, kind)
         : NO_PLUGINS,
-    [data, initiativeId, kind]
+    [enabled, data, initiativeId, kind]
   );
 };
 
