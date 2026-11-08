@@ -263,10 +263,7 @@ function HomeTile({
 
       <div
         inert={editing}
-        className={cn(
-          !stacked && "h-full",
-          editing && "pointer-events-none select-none opacity-60"
-        )}
+        className={cn(!stacked && "h-full", editing && "pointer-events-none select-none")}
       >
         <WidgetBoundary title={title}>
           <Widget
@@ -285,14 +282,14 @@ function HomeTile({
           data-home-tile-handle=""
           className="absolute inset-0 flex cursor-move items-start justify-between gap-2 rounded-xl border-2 border-primary/50 border-dashed p-2"
         >
-          <span className="flex min-w-0 items-center gap-1.5 rounded-md bg-background/90 px-2 py-1 font-medium text-sm shadow-sm">
+          <span className="flex min-w-0 items-center gap-1.5 rounded-md bg-background px-2 py-1 font-medium text-sm shadow-sm">
             <GripVertical className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span className="truncate">{title}</span>
           </span>
           {/* Buttons are not drag handles: a press on one is a click. */}
           <div
             data-home-tile-actions=""
-            className="flex shrink-0 items-center gap-1 rounded-md bg-background/90 p-0.5 shadow-sm"
+            className="flex shrink-0 items-center gap-1 rounded-md bg-background p-0.5 shadow-sm"
           >
             {actions}
           </div>

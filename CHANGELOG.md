@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A plug-in update that asks for more access can be answered.** Its row in **Settings › Integrations** shows **Update waiting**, the notice opens that row, and what the version asks for comes first. A newer version this server can't run says why instead of **Up to date**, and nobody is asked while whoever runs the server manages your plug-ins.
 - **Posts from X and Reddit show where you put them.** A post in a document or on a whiteboard draws in a frame from its own site, on the web and in the apps, and a link file to one shows the post.
 - **Tabs past the edge of a narrow window can be reached with a mouse.** A row of tabs wider than the page, such as **Platform settings** on a narrow screen, shows a thin scrollbar under it to drag.
+- **Widgets stay clear while you customize Home.** Each widget is drawn at full strength, and its name and buttons sit on a solid background rather than over a faded copy of the widget.
 - **The arrow keys move through what `[[` offers.** They stayed on the first match; now they step through the list, as they do for `@` and `#`.
 - **Progress bars tell a screen reader how far along they are,** as a percent in your language, where they read as busy with no value.
 - **The members table no longer offers page sizes that change nothing.** It always shows 25 members a page, and its menu offered 10 to 100.

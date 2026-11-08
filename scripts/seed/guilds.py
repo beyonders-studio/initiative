@@ -3,7 +3,7 @@ community's own schema before its content is written."""
 
 from __future__ import annotations
 
-from sqlmodel import select
+from sqlmodel import col, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.image_headers import validate_image
@@ -221,8 +221,7 @@ async def list_in_directory(
     """Opt a community into the directory.
 
     A listing is the shelves plus the 18+ declaration together — the database
-    refuses a listed guild missing either — and a listed guild shows handles
-    rather than real names (ck_guilds_community_member_names). Writes
+    refuses a listed guild missing either. Writes
     ``public.guilds``, so the session must not be routed into a guild schema.
     """
     guild.is_community = True
@@ -267,3 +266,21 @@ async def seat_superadmin(session: AsyncSession, user: User) -> int:
         seated += 1
     await session.flush()
     return seated
+
+
+async def name_members(session: AsyncSession, users: dict[str, User]) -> None:
+    """Call every seeded account by its seed name in each community it is in,
+    as a member names themselves there. One pass over the memberships, so
+    creators, the seat and communities added later are covered; a name already
+    set is left alone."""
+    await set_rls_context(session, Unattributed())
+    for name, user in users.items():
+        await session.exec(
+            update(GuildMembership)
+            .where(
+                col(GuildMembership.user_id) == user.id,
+                col(GuildMembership.display_name).is_(None),
+            )
+            .values(display_name=name)
+        )
+    await session.flush()
