@@ -1,5 +1,4 @@
 import { $findMatchingParent, $insertNodeToNearestRoot, mergeRegister } from "@lexical/utils";
-import type { ElementNode, LexicalNode } from "lexical";
 import {
   $createParagraphNode,
   $getNodeByKey,
@@ -39,13 +38,11 @@ const $onEscape = (before: boolean) => {
     const container = $findMatchingParent(selection.anchor.getNode(), $isLayoutContainerNode);
 
     if ($isLayoutContainerNode(container)) {
-      const parent = container.getParent<ElementNode>();
-      const child =
-        parent &&
-        (before ? parent.getFirstChild<LexicalNode>() : parent?.getLastChild<LexicalNode>());
+      const parent = container.getParent();
+      const child = parent && (before ? parent.getFirstChild() : parent?.getLastChild());
       const descendant = before
-        ? container.getFirstDescendant<LexicalNode>()?.getKey()
-        : container.getLastDescendant<LexicalNode>()?.getKey();
+        ? container.getFirstDescendant()?.getKey()
+        : container.getLastDescendant()?.getKey();
 
       if (parent !== null && child === container && selection.anchor.key === descendant) {
         if (before) {
@@ -91,7 +88,7 @@ export const LayoutExtension = defineExtension({
         UPDATE_LAYOUT_COMMAND,
         ({ template, nodeKey }) => {
           editor.update(() => {
-            const container = $getNodeByKey<LexicalNode>(nodeKey);
+            const container = $getNodeByKey(nodeKey);
 
             if (!$isLayoutContainerNode(container)) {
               return;
@@ -106,7 +103,7 @@ export const LayoutExtension = defineExtension({
               }
             } else if (itemsCount < prevItemsCount) {
               for (let i = prevItemsCount - 1; i >= itemsCount; i--) {
-                const layoutItem = container.getChildAtIndex<LexicalNode>(i);
+                const layoutItem = container.getChildAtIndex(i);
 
                 if ($isLayoutItemNode(layoutItem)) {
                   layoutItem.remove();
@@ -121,9 +118,9 @@ export const LayoutExtension = defineExtension({
         COMMAND_PRIORITY_EDITOR
       ),
       editor.registerNodeTransform(LayoutItemNode, (node) => {
-        const parent = node.getParent<ElementNode>();
+        const parent = node.getParent();
         if (!$isLayoutContainerNode(parent)) {
-          const children = node.getChildren<LexicalNode>();
+          const children = node.getChildren();
           for (const child of children) {
             node.insertBefore(child);
           }
@@ -131,7 +128,7 @@ export const LayoutExtension = defineExtension({
         }
       }),
       editor.registerNodeTransform(LayoutContainerNode, (node) => {
-        const children = node.getChildren<LexicalNode>();
+        const children = node.getChildren();
         if (!children.every($isLayoutItemNode)) {
           for (const child of children) {
             node.insertBefore(child);

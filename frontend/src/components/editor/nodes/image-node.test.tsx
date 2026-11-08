@@ -4,9 +4,9 @@ import {
   $createParagraphNode,
   $createTextNode,
   $getRoot,
+  $isElementNode,
   $setSelection,
   type LexicalEditor,
-  type ParagraphNode,
   type SerializedEditorState,
 } from "lexical";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -160,7 +160,8 @@ describe("an image caption", () => {
 
     // What a collaborator's edit does here: the image node's caption changes.
     document.__lexicalEditor.update(() => {
-      const image = $getRoot().getFirstChildOrThrow<ParagraphNode>().getFirstChild();
+      const paragraph = $getRoot().getFirstChildOrThrow();
+      const image = $isElementNode(paragraph) ? paragraph.getFirstChild() : null;
       if ($isImageNode(image)) {
         image.setCaptionState(JSON.stringify(captionText("From elsewhere")));
       }
@@ -259,7 +260,8 @@ describe("an image", () => {
     });
 
     document.__lexicalEditor.update(() => {
-      const image = $getRoot().getFirstChildOrThrow<ParagraphNode>().getFirstChild();
+      const paragraph = $getRoot().getFirstChildOrThrow();
+      const image = $isElementNode(paragraph) ? paragraph.getFirstChild() : null;
       const selection = $createNodeSelection();
       if (image) selection.add(image.getKey());
       $setSelection(selection);
