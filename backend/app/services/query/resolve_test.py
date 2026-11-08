@@ -143,6 +143,17 @@ class TestNamesResolveThroughTheRegistry:
     def test_one_relation_needs_no_qualifier(self):
         assert "title" in resolve("SELECT title FROM tasks").sql
 
+    def test_the_author_is_a_person_only_where_a_member_made_the_row(self):
+        """``created_by`` reads as the member who made the row and as nothing
+        for a plug-in or Initiative, under its own name, through an alias as
+        well; the kind it is compared with is not one of the reader's values."""
+        resolved = resolve("SELECT t.created_by FROM tasks t WHERE t.title = 'x'")
+        assert (
+            "CASE WHEN t.created_by_kind = 'member' THEN t.created_by END AS created_by"
+            in resolved.sql
+        )
+        assert resolved.parameters == ("x",)
+
     def test_a_table_joined_to_itself_is_two_relations(self):
         """Two aliases of one dataset are two relations in scope, so a bare
         column of it names both and has to say which."""
@@ -660,7 +671,10 @@ class TestTheReaderIsANameAStatementMayUse:
     def test_it_becomes_the_requesting_user(self):
         resolved = resolve("SELECT count(*) AS n FROM tasks WHERE created_by = me")
         assert "app.current_user_id" in resolved.sql
-        assert "me" not in resolved.sql.split("WHERE")[1].split("current_setting")[0]
+        assert (
+            "me"
+            not in resolved.sql.split("WHERE")[1].split("current_setting")[0].split()
+        )
 
     def test_it_is_not_a_value_the_reader_wrote(self):
         """Bound parameters are the reader's literals. The reader is not one of
