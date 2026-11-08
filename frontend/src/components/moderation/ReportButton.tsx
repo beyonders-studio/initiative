@@ -1,7 +1,7 @@
 /**
  * "Report this" wherever something can be reported.
  *
- * The flag, the sheet it opens, and the one rule that holds everywhere: you
+ * The flag, the dialog it opens, and the one rule that holds everywhere: you
  * cannot report your own work. Deleting or editing it is already there, and a
  * report about yourself is somebody else's time.
  *
@@ -14,7 +14,7 @@ import { Flag } from "lucide-react";
 import { Suspense, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
-import { FileTicketSheet } from "@/components/tickets/FileTicketSheet";
+import { FileTicketDialog } from "@/components/tickets/FileTicketDialog";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/ui/button";
@@ -39,7 +39,7 @@ interface Report {
   communityId: number | null;
 }
 
-// The report being written, kept outside React so one sheet, drawn by the app
+// The report being written, kept outside React so one dialog, drawn by the app
 // shell, serves every button: reporting another thing replaces it.
 let current: Report | null = null;
 const listeners = new Set<() => void>();
@@ -52,14 +52,14 @@ const subscribe = (listener: () => void) => {
   return () => listeners.delete(listener);
 };
 
-/** The report sheet, drawn once by the app shell. */
+/** The report dialog, drawn once by the app shell. */
 export const ReportHost = () => {
   const report = useSyncExternalStore(subscribe, () => current);
   if (!report) return null;
   return (
-    // Its own boundary: the first opening loads the sheet's translations.
+    // Its own boundary: the first opening loads the dialog's translations.
     <Suspense fallback={null}>
-      <FileTicketSheet
+      <FileTicketDialog
         // Another thing reported starts a report of its own.
         key={`${report.targetType}:${report.targetId}`}
         open
