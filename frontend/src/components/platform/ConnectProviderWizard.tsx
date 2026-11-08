@@ -52,7 +52,7 @@ import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Switch } from "@/ui/switch";
-import { WizardDialog } from "@/ui/wizard-dialog";
+import { WizardDialog, WizardOption } from "@/ui/wizard-dialog";
 
 type Step = "choose" | "address" | "credentials" | "options";
 
@@ -220,16 +220,13 @@ export const ConnectProviderWizard = ({
       {step === "choose" && (
         <div className="grid grid-cols-2 gap-2">
           {PROVIDER_PRESETS.map((option) => (
-            <button
+            <WizardOption
               key={option.key}
-              type="button"
-              className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+              // `custom` has a mark of its own — the standard's.
+              icon={<ProviderMark icon={option.key} />}
+              title={option.name}
               onClick={() => choosePreset(option)}
-            >
-              {/* `custom` has a mark of its own — the standard's. */}
-              <ProviderMark icon={option.key} />
-              <span className="min-w-0 truncate font-medium text-sm">{option.name}</span>
-            </button>
+            />
           ))}
         </div>
       )}

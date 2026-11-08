@@ -7,8 +7,8 @@ import { useState } from "react";
 
 import type { InitiativeRoleRead } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeRoleDialogs } from "@/components/initiatives/settings/InitiativeRoleDialogs";
-import { InitiativeSettingsPermissionRequired } from "@/components/initiatives/settings/InitiativeSettingsGuard";
 import { InitiativeSettingsRolesTab } from "@/components/initiatives/settings/InitiativeSettingsRolesTab";
+import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
 
 export const InitiativeSettingsRolesPage = () => {
@@ -19,7 +19,7 @@ export const InitiativeSettingsRolesPage = () => {
   const [roleToRename, setRoleToRename] = useState<InitiativeRoleRead | null>(null);
 
   if (!canManageMembers) {
-    return <InitiativeSettingsPermissionRequired />;
+    return <SettingsPermissionRequired scope="initiative" />;
   }
 
   return (

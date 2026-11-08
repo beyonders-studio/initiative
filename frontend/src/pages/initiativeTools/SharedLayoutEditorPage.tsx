@@ -11,9 +11,9 @@ import { useNavigate, useParams } from "@tanstack/react-router";
 import { useMemo } from "react";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { InitiativeSettingsPermissionRequired } from "@/components/initiatives/settings/InitiativeSettingsGuard";
 import { SHARED_LAYOUTS } from "@/components/layouts/details";
 import { LayoutEditor } from "@/components/layouts/LayoutEditor";
+import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { initiativeRoute } from "@/lib/tools";
@@ -32,7 +32,7 @@ export const SharedLayoutEditorPage = ({ tool }: { tool: Tool }) => {
   const presets = useMemo(() => (id === null ? undefined : shared?.presets?.(id)), [id, shared]);
 
   if (!set || !target || id === null) return null;
-  if (!set.can_configure) return <InitiativeSettingsPermissionRequired />;
+  if (!set.can_configure) return <SettingsPermissionRequired scope="initiative" />;
   return (
     <LayoutEditor
       // Another initiative's editor starts afresh: a draft, and the question

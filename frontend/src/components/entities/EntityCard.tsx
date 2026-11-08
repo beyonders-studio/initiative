@@ -17,6 +17,7 @@ import { CHIP_TONE_CLASSES } from "@/lib/smartChips";
 import { entityRefRoute } from "@/lib/tools";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
 import { Button } from "@/ui/button";
+import { cardVariants } from "@/ui/card";
 import { LazyImage } from "@/ui/lazy-image";
 import { useRelativeTime } from "@/ui/lib/useRelativeTime";
 import { cn } from "@/ui/lib/utils";
@@ -258,7 +259,7 @@ export const EntityCard = ({
 
   const shell = compact
     ? "group block w-full rounded-md transition"
-    : "group block w-full overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-sm transition";
+    : cardVariants({ variant: "tile" });
   const rowHint = [badge, title, caption].filter(Boolean).join(" · ");
 
   return (
@@ -269,9 +270,7 @@ export const EntityCard = ({
           className={cn(
             shell,
             settled && "opacity-70",
-            compact
-              ? "hover:bg-accent/50"
-              : "hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg",
+            compact && "hover:bg-accent/50",
             onRemove && compact && "pr-8",
             className
           )}
@@ -287,6 +286,8 @@ export const EntityCard = ({
           className={cn(
             shell,
             "cursor-default opacity-60",
+            // Nowhere to go, so it does not lift under the pointer.
+            !compact && "hover:translate-none hover:border-border hover:shadow-sm",
             onRemove && compact && "pr-8",
             className
           )}

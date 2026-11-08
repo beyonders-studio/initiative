@@ -10,9 +10,9 @@ import { Pencil } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { type InitiativeToolLayoutsRead, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { InitiativeSettingsPermissionRequired } from "@/components/initiatives/settings/InitiativeSettingsGuard";
 import { SHARED_LAYOUTS } from "@/components/layouts/details";
 import { LayoutList } from "@/components/layouts/LayoutList";
+import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
 import {
   INSTANCE_LAYOUT_TOOLS,
@@ -35,7 +35,7 @@ import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 
 export const InitiativeSettingsLayoutsPage = () => {
   const { initiativeId, initiative, canManageMembers } = useInitiativeSettings();
-  if (!canManageMembers) return <InitiativeSettingsPermissionRequired />;
+  if (!canManageMembers) return <SettingsPermissionRequired scope="initiative" />;
   return (
     <InitiativeLayouts
       initiativeId={initiativeId}

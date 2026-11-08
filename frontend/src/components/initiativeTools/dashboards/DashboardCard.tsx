@@ -12,13 +12,8 @@ import { useWidgetCatalog } from "@/hooks/useDashboards";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolDetailRoute } from "@/lib/tools";
 import { readConfig, readDefinition } from "@/lib/widgets/definition";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { Card } from "@/ui/card";
 import { cn } from "@/ui/lib/utils";
-
-interface DashboardCardProps {
-  dashboard: DashboardSummary;
-  className?: string;
-}
 
 /** The width the dashboard is drawn at before it is shrunk into the card: a
  *  desktop's, so its widgets sit where their author put them. */
@@ -78,40 +73,35 @@ const DashboardPreview = ({
   );
 };
 
-export const DashboardCard = ({ dashboard, className }: DashboardCardProps) => {
+export const DashboardCard = ({ dashboard }: { dashboard: DashboardSummary }) => {
   const gp = useCommunityPath();
 
   return (
     // The link is the title, stretched over the card, rather than the card:
     // the preview holds the dashboard's own links, and a link cannot sit
-    // inside another.
-    <div
-      className={cn(
-        "group relative w-full overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-lg",
-        className
-      )}
-    >
+    // inside another. Otherwise drawn as every tool's card is (`ToolCard`).
+    <Card variant="tile" className="relative">
       {dashboard.preview ? (
         <DashboardPreview dashboard={dashboard} preview={dashboard.preview} />
       ) : null}
-      <Card className="border-0 shadow-none">
-        <CardHeader className="pb-2">
-          <CardTitle className="line-clamp-1 text-lg leading-tight">
-            <Link
-              to={gp(toolDetailRoute(Tool.dashboard, dashboard.initiative_id, dashboard.id))}
-              className="after:absolute after:inset-0"
-            >
-              {dashboard.name}
-            </Link>
-          </CardTitle>
-          {dashboard.description && (
-            <p className="line-clamp-2 text-muted-foreground text-sm">{dashboard.description}</p>
-          )}
-        </CardHeader>
-        <CardContent className="relative z-10 space-y-2 pt-0">
-          <TagBadgeList tags={dashboard.tags} tagHref={(tag) => gp(`/tags/${tag.id}`)} />
-        </CardContent>
-      </Card>
-    </div>
+      <div className={cn("space-y-1 p-4", !dashboard.preview && "pr-14")}>
+        <h3 className="line-clamp-1 font-semibold text-lg leading-tight">
+          <Link
+            to={gp(toolDetailRoute(Tool.dashboard, dashboard.initiative_id, dashboard.id))}
+            className="after:absolute after:inset-0"
+          >
+            {dashboard.name}
+          </Link>
+        </h3>
+        {dashboard.description ? (
+          <p className="line-clamp-2 text-muted-foreground text-sm">{dashboard.description}</p>
+        ) : null}
+        <TagBadgeList
+          tags={dashboard.tags}
+          tagHref={(tag) => gp(`/tags/${tag.id}`)}
+          className="relative z-10 pt-1"
+        />
+      </div>
+    </Card>
   );
 };

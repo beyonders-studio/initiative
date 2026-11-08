@@ -1,7 +1,7 @@
 /**
- * Help, in the app's corner (`AppLinks`): the sidebar's bottom row, or the
- * desktop app's title bar. It opens and closes the Help panel, which searches
- * the user guide and, where the server takes requests, asks the team.
+ * Help, in the desktop app's title bar. It opens and closes the Help panel,
+ * which searches the user guide and, where the server takes requests, asks the
+ * team. Everywhere else Help is in the account menu and the command center.
  */
 
 import { CircleQuestionMark } from "lucide-react";
