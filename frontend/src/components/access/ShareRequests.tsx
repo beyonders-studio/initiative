@@ -197,8 +197,8 @@ const AnswerButtons = ({
         <X />
         {many ? t("answer.declineAll") : t("answer.decline")}
       </Button>
-      <Button size="sm" disabled={pending} onClick={() => onAnswer(true)}>
-        {pending ? <Loader2 className="animate-spin" /> : <Check />}
+      <Button size="sm" pending={pending} onClick={() => onAnswer(true)}>
+        <Check />
         {many ? t("answer.shareAll") : t("answer.share")}
       </Button>
     </div>
@@ -346,9 +346,10 @@ export const ShareRequestBatchView = ({ batchId }: { batchId: string }) => {
                       size="icon-sm"
                       disabled={answer.isPending}
                       aria-label={t("answer.shareOne", { name: request.resource_name })}
+                      pending={busy}
                       onClick={() => answer.mutate(reply([request], true, current))}
                     >
-                      {busy ? <Loader2 className="animate-spin" /> : <Check />}
+                      <Check />
                     </Button>
                   </div>
                 ) : null}

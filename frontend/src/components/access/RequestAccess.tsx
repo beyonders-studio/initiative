@@ -8,7 +8,7 @@
  * ask again.
  */
 
-import { Check, Eye, Loader2, Lock, Pencil } from "lucide-react";
+import { Check, Eye, Lock, Pencil } from "lucide-react";
 import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -115,8 +115,7 @@ const RequestAccessForm = ({ target, level, onSent, className }: RequestAccessFo
         />
       </div>
       <div className="flex justify-end">
-        <Button type="submit" disabled={create.isPending}>
-          {create.isPending ? <Loader2 className="animate-spin" /> : null}
+        <Button type="submit" pending={create.isPending}>
           {t("request.submit")}
         </Button>
       </div>

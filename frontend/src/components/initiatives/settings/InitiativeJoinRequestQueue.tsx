@@ -11,7 +11,7 @@
  * roster is managed, so the two agree.
  */
 
-import { Check, Clock, Loader2, X } from "lucide-react";
+import { Check, Clock, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { InitiativeJoinRequestRead } from "@/api/generated/initiativeAPI.schemas";
@@ -117,15 +117,12 @@ export const InitiativeJoinRequestQueue = ({ initiativeId }: InitiativeJoinReque
           <Button
             size="sm"
             disabled={resolveRequest.isPending}
+            pending={isResolving}
             onClick={() =>
               resolveRequest.mutate({ initiativeId, requestId: request.id, approved: true })
             }
           >
-            {isResolving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Check className="h-4 w-4" />
-            )}
+            <Check className="h-4 w-4" />
             {t("joinRequests.approve")}
           </Button>
         </div>

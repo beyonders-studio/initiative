@@ -45,7 +45,6 @@ import {
 } from "@/hooks/useTickets";
 import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -343,17 +342,12 @@ export const FileTicketDialog = ({
           </p>
         )}
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            disabled={!ready || file.isPending}
-            onClick={() => ready && file.mutate({ ticket: ready, files })}
-          >
-            {isReport ? t("moderation:report.submit") : t("security.submit")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={isReport ? t("moderation:report.submit") : t("security.submit")}
+          onSubmit={() => ready && file.mutate({ ticket: ready, files })}
+          pending={file.isPending}
+          disabled={!ready}
+        />
       </DialogContent>
     </Dialog>
   );

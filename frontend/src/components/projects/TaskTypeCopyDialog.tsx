@@ -12,7 +12,6 @@ import { type TaskTypeRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { useProjects, useProjectTaskTypes } from "@/hooks/useProjects";
 import { toolViewParams } from "@/lib/tools";
-import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import {
   Dialog,
@@ -162,15 +161,11 @@ export const TaskTypeCopyDialog = ({
             </fieldset>
           ) : null}
 
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              {t("common:cancel")}
-            </Button>
-            <Button type="submit" disabled={sourceId === null || chosen.size === 0 || saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {t("taskTypes.copy.submit", { count: chosen.size })}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("taskTypes.copy.submit", { count: chosen.size })}
+            pending={saving}
+            disabled={sourceId === null || chosen.size === 0}
+          />
         </form>
       </DialogContent>
     </Dialog>

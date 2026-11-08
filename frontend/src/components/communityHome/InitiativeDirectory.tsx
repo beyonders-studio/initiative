@@ -29,7 +29,7 @@
  */
 
 import { Link } from "@tanstack/react-router";
-import { Check, ChevronRight, Clock, Loader2, Plus, Users } from "lucide-react";
+import { Check, ChevronRight, Clock, Plus, Users } from "lucide-react";
 import { type CSSProperties, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -279,16 +279,10 @@ export const InitiativeDirectory = ({ entries, onCreate }: InitiativeDirectoryPr
           <Button
             size="sm"
             disabled={joinInitiative.isPending}
+            pending={joiningId === entry.id}
             onClick={() => joinInitiative.mutate({ initiativeId: entry.id })}
           >
-            {joiningId === entry.id ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("directory.joining")}
-              </>
-            ) : (
-              t("directory.join")
-            )}
+            {joiningId === entry.id ? t("directory.joining") : t("directory.join")}
           </Button>
         ) : entry.join_policy === InitiativeJoinPolicy.request ? (
           entry.has_pending_request ? (

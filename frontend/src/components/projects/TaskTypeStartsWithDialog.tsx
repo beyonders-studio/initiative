@@ -4,7 +4,7 @@
  * server fills them in; this is where a project says what they are.
  */
 
-import { ArrowDown, ArrowUp, Loader2, Plus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -239,15 +239,7 @@ export const TaskTypeStartsWithDialog = ({
             <p className="text-muted-foreground text-xs">{t("taskTypes.startsWith.repeatHint")}</p>
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              {t("common:cancel")}
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {t("common:save")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter submitLabel={t("common:save")} pending={saving} />
         </form>
       </DialogContent>
     </Dialog>

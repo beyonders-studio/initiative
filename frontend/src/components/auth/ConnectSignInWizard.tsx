@@ -18,7 +18,6 @@
  * field should not walk three screens, so the list on the page edits in place.
  */
 
-import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -194,13 +193,6 @@ export const ConnectSignInWizard = ({
       setSaving(false);
     }
   };
-
-  const savingLabel = (
-    <>
-      <Loader2 className="h-4 w-4 animate-spin" />
-      {t("settings:authProviders.saving")}
-    </>
-  );
 
   const stepTitle: Record<Step, string> = {
     provider: t("settings:communityAuth.wizard.steps.provider.title"),
@@ -383,11 +375,11 @@ export const ConnectSignInWizard = ({
           <Button
             className="w-full"
             type="button"
-            disabled={saving}
+            pending={saving}
             onClick={() => (landingIsLast ? void finish() : go("insist"))}
           >
             {saving
-              ? savingLabel
+              ? t("settings:authProviders.saving")
               : landingIsLast
                 ? t("settings:authProviders.wizard.connect")
                 : t("common:next")}
@@ -413,8 +405,10 @@ export const ConnectSignInWizard = ({
             />
           </div>
 
-          <Button className="w-full" type="button" disabled={saving} onClick={() => void finish()}>
-            {saving ? savingLabel : t("settings:authProviders.wizard.connect")}
+          <Button className="w-full" type="button" pending={saving} onClick={() => void finish()}>
+            {saving
+              ? t("settings:authProviders.saving")
+              : t("settings:authProviders.wizard.connect")}
           </Button>
         </div>
       )}

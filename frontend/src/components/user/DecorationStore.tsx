@@ -52,8 +52,7 @@ const PackCard = ({
   const count = packPieces(entry.contents).length;
 
   const get = (
-    <Button size="sm" className="w-full" disabled={busy} onClick={onInstall}>
-      {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
+    <Button size="sm" className="w-full" pending={busy} onClick={onInstall}>
       {t("store.get")}
     </Button>
   );
@@ -67,13 +66,12 @@ const PackCard = ({
         variant="outline"
         size="sm"
         className="shrink-0"
-        disabled={busy}
+        pending={busy}
         onClick={onRemove}
         // Every card's button says the same word; the name is what tells them
         // apart when the grid is read out.
         aria-label={t("myPacks.removeNamed", { name: entry.name })}
       >
-        {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
         {t("myPacks.remove")}
       </Button>
     </div>

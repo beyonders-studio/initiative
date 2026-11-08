@@ -1,4 +1,3 @@
-import { Loader2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -95,15 +94,8 @@ export const InitiativeSettingsDetailsTab = ({
               />
             </div>
             {canManageMembers ? (
-              <Button type="submit" disabled={isSaving}>
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t("settings.saving")}
-                  </>
-                ) : (
-                  t("settings.saveChanges")
-                )}
+              <Button type="submit" pending={isSaving}>
+                {isSaving ? t("settings.saving") : t("settings.saveChanges")}
               </Button>
             ) : (
               <p className="text-muted-foreground text-sm">{t("settings.editPermissionNote")}</p>

@@ -409,13 +409,9 @@ export const UploadedFileViewer = ({
                       size="sm"
                       className="h-7"
                       onClick={() => versionInputRef.current?.click()}
-                      disabled={uploadVersion.isPending}
+                      pending={uploadVersion.isPending}
                     >
-                      {uploadVersion.isPending ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Upload className="h-3.5 w-3.5" />
-                      )}
+                      <Upload className="h-3.5 w-3.5" />
                       {uploadVersion.isPending
                         ? t("create.uploadingProgress", { percent: percent.format(versionSent) })
                         : t("versions.uploadNew")}

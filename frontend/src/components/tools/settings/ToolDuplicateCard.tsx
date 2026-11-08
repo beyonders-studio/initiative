@@ -162,21 +162,13 @@ export const ToolDuplicateCard = () => {
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={duplicate.isPending}
-            >
-              {t("cancel")}
-            </Button>
-            <Button type="button" onClick={submit} disabled={duplicate.isPending || !name.trim()}>
-              {duplicate.isPending
-                ? t("toolSettings.duplicate.duplicating")
-                : t("toolSettings.duplicate.action")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("toolSettings.duplicate.action")}
+            onSubmit={submit}
+            pending={duplicate.isPending}
+            pendingLabel={t("toolSettings.duplicate.duplicating")}
+            disabled={!name.trim()}
+          />
         </DialogContent>
       </Dialog>
     </>

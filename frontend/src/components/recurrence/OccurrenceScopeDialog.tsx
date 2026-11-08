@@ -2,7 +2,6 @@ import { type ReactNode, useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CalendarEventUpdateScope } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -69,17 +68,11 @@ export const OccurrenceScopeDialog = ({
             </div>
           ))}
         </RadioGroup>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onChoose(null)}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            variant={action === "delete" ? "destructive" : "default"}
-            onClick={() => onChoose(scope)}
-          >
-            {t(`scope.confirm.${action}`)}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t(`scope.confirm.${action}`)}
+          onSubmit={() => onChoose(scope)}
+          destructive={action === "delete"}
+        />
       </DialogContent>
     </Dialog>
   );

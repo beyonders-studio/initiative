@@ -7,7 +7,6 @@
  * flips to "requested" when the directory re-reads.
  */
 
-import { Loader2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -96,15 +95,8 @@ export const RequestToJoinDialog = ({
             <p className="text-muted-foreground text-xs">{t("joinRequests.messageHint")}</p>
           </div>
           <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button type="submit" disabled={requestToJoin.isPending || !initiative}>
-              {requestToJoin.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("joinRequests.sending")}
-                </>
-              ) : (
-                t("joinRequests.send")
-              )}
+            <Button type="submit" disabled={!initiative} pending={requestToJoin.isPending}>
+              {requestToJoin.isPending ? t("joinRequests.sending") : t("joinRequests.send")}
             </Button>
           </DialogFooter>
         </form>

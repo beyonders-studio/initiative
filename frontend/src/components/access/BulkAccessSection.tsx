@@ -1,4 +1,4 @@
-import { Copy, Loader2, Tags, Trash2 } from "lucide-react";
+import { Copy, Tags, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -109,28 +109,22 @@ export function BulkAccessSection<T extends BulkItem>({
             variant="outline"
             size="sm"
             onClick={() => duplicate.mutate(items.map((item) => item.id))}
-            disabled={!canDuplicate || duplicate.isPending}
+            pending={duplicate.isPending}
+            disabled={!canDuplicate}
             title={count > 0 && !canDuplicate ? t("common:bulkActions.needEdit") : undefined}
           >
-            {duplicate.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Copy className="h-4 w-4" />
-            )}
+            <Copy className="h-4 w-4" />
             {t("common:bulkActions.duplicate")}
           </Button>
           <Button
             variant="destructive"
             size="sm"
-            disabled={count === 0 || !canDelete || remove.isPending}
+            pending={remove.isPending}
+            disabled={count === 0 || !canDelete}
             title={count > 0 && !canDelete ? t("common:bulkActions.needDelete") : undefined}
             onClick={() => setDeleteOpen(true)}
           >
-            {remove.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Trash2 className="h-4 w-4" />
-            )}
+            <Trash2 className="h-4 w-4" />
             {t("common:delete")}
           </Button>
           <ConfirmDialog

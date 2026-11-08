@@ -1,4 +1,4 @@
-import { ListTodo, Loader2 } from "lucide-react";
+import { ListTodo } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -115,8 +115,7 @@ export const ContactNewTaskDialog = ({
           </div>
         </div>
         <DialogFooter>
-          <Button type="button" onClick={submit} disabled={!canSubmit}>
-            {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          <Button type="button" onClick={submit} pending={create.isPending} disabled={!canSubmit}>
             {t("task.create")}
           </Button>
         </DialogFooter>

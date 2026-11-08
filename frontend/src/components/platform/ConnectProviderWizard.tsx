@@ -21,7 +21,7 @@
  * and the same callback to copy.
  */
 
-import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -288,16 +288,10 @@ export const ConnectProviderWizard = ({
               type="button"
               variant="outline"
               onClick={verify}
-              disabled={!addressReady || discoverIssuer.isPending}
+              disabled={!addressReady}
+              pending={discoverIssuer.isPending}
             >
-              {discoverIssuer.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("authProviders.verifying")}
-                </>
-              ) : (
-                t("authProviders.verify")
-              )}
+              {discoverIssuer.isPending ? t("authProviders.verifying") : t("authProviders.verify")}
             </Button>
           </div>
 

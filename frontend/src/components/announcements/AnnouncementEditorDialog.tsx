@@ -497,23 +497,18 @@ export const AnnouncementEditorDialog = ({
             </div>
           </div>
 
-          <DialogFooter className="shrink-0 border-t pt-4">
+          <DialogFooter
+            className="shrink-0 border-t pt-4"
+            submitLabel={t("common:save")}
+            pending={saving}
+            disabled={triggerProblem !== null}
+            onSubmit={() => void handleSave()}
+          >
             <Button type="button" variant="ghost" onClick={() => setPreviewOpen(true)}>
               <Eye className="h-4 w-4" />
               {t("operator.preview")}
             </Button>
             <div className="flex-1" />
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              {t("common:cancel")}
-            </Button>
-            <Button
-              type="button"
-              onClick={() => void handleSave()}
-              disabled={saving || triggerProblem !== null}
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {t("common:save")}
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

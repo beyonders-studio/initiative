@@ -249,14 +249,7 @@ const PresetDialog = ({
           </div>
           {of.controls(filters, setFilters)}
           {sortable ? <TaskSortPicker value={sort} onChange={setSort} fields={fields} /> : null}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              {translate("common:cancel")}
-            </Button>
-            <Button type="submit" disabled={!trimmed}>
-              {translate("common:done")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter submitLabel={translate("common:done")} disabled={!trimmed} />
         </form>
       </DialogContent>
     </Dialog>

@@ -262,15 +262,8 @@ export const TransferContentOwnershipDialog = ({
             {t("common:cancel")}
           </Button>
           {!nothingToMove && !loading && (
-            <Button onClick={handleSubmit} disabled={submitting || !recipientId}>
-              {submitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("transferOwnership.transferring")}
-                </>
-              ) : (
-                t("transferOwnership.confirm")
-              )}
+            <Button onClick={handleSubmit} pending={submitting} disabled={!recipientId}>
+              {submitting ? t("transferOwnership.transferring") : t("transferOwnership.confirm")}
             </Button>
           )}
         </DialogFooter>

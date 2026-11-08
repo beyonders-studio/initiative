@@ -559,8 +559,7 @@ function CommunitiesUnavailable({
           <EmptyDescription>{t("noCommunity.unavailableDescription")}</EmptyDescription>
         </EmptyHeader>
         <EmptyContent className="flex-row flex-wrap justify-center">
-          <Button onClick={() => void retry()} disabled={retrying}>
-            {retrying && <Loader2 className="h-4 w-4 animate-spin" />}
+          <Button onClick={() => void retry()} pending={retrying}>
             {t("common:tryAgain")}
           </Button>
           <Button variant="ghost" onClick={logout}>

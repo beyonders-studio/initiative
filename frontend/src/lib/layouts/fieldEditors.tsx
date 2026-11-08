@@ -5,7 +5,7 @@
  */
 
 import { useBlocker } from "@tanstack/react-router";
-import { Loader2, Sparkles, X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import {
   type ReactNode,
   type RefObject,
@@ -835,13 +835,9 @@ export const DescriptionField = <I, P>({
                   size="sm"
                   className="h-8 px-2 text-xs"
                   onClick={() => void startFrom()}
-                  disabled={suggesting}
+                  pending={suggesting}
                 >
-                  {suggesting ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-3 w-3" />
-                  )}
+                  <Sparkles className="h-3 w-3" />
                   {suggest.label}
                 </Button>
               ) : null

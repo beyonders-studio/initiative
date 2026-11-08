@@ -1,6 +1,6 @@
 import { useBlocker } from "@tanstack/react-router";
 import type { SerializedEditorState } from "lexical";
-import { CalendarClock, Loader2, Vote } from "lucide-react";
+import { CalendarClock, Vote } from "lucide-react";
 import {
   createContext,
   lazy,
@@ -209,10 +209,9 @@ const Body = ({ post }: { post: PostRead }) => {
         <div className="flex justify-end">
           <Button
             size="sm"
-            disabled={update.isPending}
+            pending={update.isPending}
             onClick={() => update.mutate({ body: { ...draft } })}
           >
-            {update.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             {update.isPending ? t("saving") : t("common:save")}
           </Button>
         </div>
@@ -280,10 +279,10 @@ const Poll = ({ post }: { post: PostRead }) => {
               </Button>
               <Button
                 size="sm"
-                disabled={savePoll.isPending || !isPollDraftValid(pollDraft)}
+                disabled={!isPollDraftValid(pollDraft)}
+                pending={savePoll.isPending}
                 onClick={() => savePoll.mutate(pollDraftToWrite(pollDraft))}
               >
-                {savePoll.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {savePoll.isPending ? t("saving") : t("common:save")}
               </Button>
             </div>

@@ -4,7 +4,6 @@
  * says so instead.
  */
 
-import { Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -13,7 +12,6 @@ import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { useDeleteTaskType, useProjectTaskTypes } from "@/hooks/useProjects";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -98,25 +96,19 @@ export const TaskTypeDeleteDialog = ({
             </Select>
           </div>
         )}
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() =>
-              target &&
-              deleteType.mutate({
-                typeId: target.id,
-                data: { fallback_type_id: Number(fallbackId) },
-              })
-            }
-            disabled={!target || deleteType.isPending || isOnlyType || !fallbackId}
-          >
-            {deleteType.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {t("common:delete")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("common:delete")}
+          onSubmit={() =>
+            target &&
+            deleteType.mutate({
+              typeId: target.id,
+              data: { fallback_type_id: Number(fallbackId) },
+            })
+          }
+          pending={deleteType.isPending}
+          disabled={!target || isOnlyType || !fallbackId}
+          destructive
+        />
       </DialogContent>
     </Dialog>
   );
