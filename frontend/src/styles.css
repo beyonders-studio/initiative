@@ -83,22 +83,11 @@
     radial-gradient(ellipse 60% 40% at 10% 60%, oklch(0.4 0.18 300 / 0.25), transparent);
 }
 
-/* Pride mode — animated rainbow logo, wordmark, and primary-button accents
-   (gated on the `pride` root class set by usePride.tsx). */
-html.pride {
-  --pride-rainbow: linear-gradient(
-    90deg,
-    #e40303,
-    #ff8c00,
-    #ffed00,
-    #008026,
-    #004dff,
-    #750787,
-    #e40303
-  );
-}
-
-@keyframes pride-hue {
+/* Event themes — while an event with colours runs, a flowing gradient on the
+   logo, wordmark and primary-button borders. useEventTheme.tsx sets
+   `data-event-theme` (the event) and `data-event-gradient` with
+   `--event-gradient` (its colours) on the root. */
+@keyframes event-hue {
   from {
     filter: hue-rotate(0deg) drop-shadow(0 0 5px oklch(0.7 0.2 30 / 0.45));
   }
@@ -107,15 +96,15 @@ html.pride {
   }
 }
 
-/* Flows a 200%-wide rainbow across the element for a single-layer background. */
-@keyframes pride-flow {
+/* Flows a 200%-wide gradient across the element for a single-layer background. */
+@keyframes event-flow {
   to {
     background-position: -200% 0;
   }
 }
 
-/* Two-layer variant: the solid inner fill stays put, the border rainbow flows. */
-@keyframes pride-flow-border {
+/* Two-layer variant: the solid inner fill stays put, the border gradient flows. */
+@keyframes event-flow-border {
   to {
     background-position:
       0 0,
@@ -123,51 +112,73 @@ html.pride {
   }
 }
 
-/* The mark is painted with a static rainbow gradient; cycling the hue makes it
-   shimmer, and the synced drop-shadow gives it a soft multicolour glow. */
-.pride-logo {
-  animation: pride-hue 8s linear infinite;
+/* The mark is painted with the event's static gradient and a soft glow. */
+.event-logo {
+  filter: drop-shadow(0 0 4px oklch(0.7 0.18 320 / 0.3));
 }
 
-/* Brand wordmark rendered as flowing rainbow text. The class is harmless when
-   Pride is off — only the `html.pride` rule activates it. */
-html.pride .pride-wordmark {
-  background-image: var(--pride-rainbow);
+/* Pride's rainbow also cycles its hue, so the mark shimmers through every colour. */
+html[data-event-theme="pride"] .event-logo {
+  animation: event-hue 8s linear infinite;
+}
+
+/* Brand wordmark rendered as flowing gradient text. The class is harmless when
+   no event runs — only the `data-event-gradient` rule activates it. */
+html[data-event-gradient] .event-wordmark {
+  background-image: var(--event-gradient);
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
-  animation: pride-flow 8s linear infinite;
+  animation: event-flow 8s linear infinite;
 }
 
 /* Primary (default-variant) buttons keep their solid, legible fill but gain an
-   animated rainbow border: a solid padding-box layer over a rainbow border-box
-   layer, so the gradient shows only in the 2px transparent border. */
-html.pride [data-slot="button"].bg-primary {
+   animated gradient border: a solid padding-box layer over a gradient
+   border-box layer, so the gradient shows only in the 2px transparent border. */
+html[data-event-gradient] [data-slot="button"].bg-primary {
   border: 2px solid transparent;
   background:
     linear-gradient(var(--primary), var(--primary)) padding-box,
-    var(--pride-rainbow) border-box;
+    var(--event-gradient) border-box;
   background-size:
     auto,
     200% auto;
-  animation: pride-flow-border 8s linear infinite;
+  animation: event-flow-border 8s linear infinite;
 }
 
 /* Preserve a hover affordance (the gradient fill hides the usual bg darken). */
-html.pride [data-slot="button"].bg-primary:hover {
+html[data-event-gradient] [data-slot="button"].bg-primary:hover {
   filter: brightness(1.08);
 }
 
+/* Snow falling over the logo (LogoIcon draws the flakes at the top). */
+@keyframes event-snowfall {
+  from {
+    transform: translate(0, -30px);
+  }
+  50% {
+    transform: translate(12px, 235px);
+  }
+  to {
+    transform: translate(0, 500px);
+  }
+}
+
+.event-snowflake {
+  animation: event-snowfall linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .pride-logo {
+  .event-snowflake {
     animation: none;
-    filter: drop-shadow(0 0 4px oklch(0.7 0.18 320 / 0.3));
+    transform: translateY(var(--rest));
   }
 
-  html.pride .pride-wordmark,
-  html.pride [data-slot="button"].bg-primary {
+  html[data-event-theme="pride"] .event-logo,
+  html[data-event-gradient] .event-wordmark,
+  html[data-event-gradient] [data-slot="button"].bg-primary {
     animation: none;
   }
 }

@@ -1,7 +1,6 @@
 import { Moon, Sun } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { type PridePreference, usePride } from "@/hooks/usePride";
 import { useTheme } from "@/hooks/useTheme";
 import { Button } from "@/ui/button";
 import {
@@ -10,7 +9,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 import { cn } from "@/ui/lib/utils";
@@ -39,7 +37,6 @@ export const ThemeIcon = ({ className }: { className?: string }) => (
  */
 export const AppearanceMenuItems = () => {
   const { theme, setTheme } = useTheme();
-  const { preference: pride, setPreference: setPride } = usePride();
   const { t } = useTranslation("nav");
 
   return (
@@ -52,16 +49,6 @@ export const AppearanceMenuItems = () => {
         <DropdownMenuRadioItem value="system">{t("themeSystem")}</DropdownMenuRadioItem>
         <DropdownMenuRadioItem value="light">{t("themeLight")}</DropdownMenuRadioItem>
         <DropdownMenuRadioItem value="dark">{t("themeDark")}</DropdownMenuRadioItem>
-      </DropdownMenuRadioGroup>
-      <DropdownMenuSeparator />
-      <DropdownMenuLabel>{t("pride")}</DropdownMenuLabel>
-      <DropdownMenuRadioGroup
-        value={pride}
-        onValueChange={(value) => setPride(value as PridePreference)}
-      >
-        <DropdownMenuRadioItem value="auto">{t("prideAuto")}</DropdownMenuRadioItem>
-        <DropdownMenuRadioItem value="on">{t("prideOn")}</DropdownMenuRadioItem>
-        <DropdownMenuRadioItem value="off">{t("prideOff")}</DropdownMenuRadioItem>
       </DropdownMenuRadioGroup>
     </>
   );

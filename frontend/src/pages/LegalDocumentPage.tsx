@@ -33,7 +33,7 @@ export const LegalDocumentPage = () => {
         className="mb-6 flex items-center gap-3 font-semibold text-2xl text-primary tracking-tight"
       >
         <LogoIcon className="h-8 w-8" aria-hidden="true" focusable="false" />
-        <span className="pride-wordmark">{t("common:appName")}</span>
+        <span className="event-wordmark">{t("common:appName")}</span>
       </Link>
       <Card className="w-full max-w-3xl shadow-lg">
         <CardHeader>

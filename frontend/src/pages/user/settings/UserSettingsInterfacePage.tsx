@@ -1,11 +1,14 @@
 import { Capacitor } from "@capacitor/core";
+import { Monitor, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
+import { useEventTheme } from "@/hooks/useEventTheme";
 import { useKeepScreenAwake } from "@/hooks/useKeepScreenAwake";
+import { type Theme, useTheme } from "@/hooks/useTheme";
 import { useUpdateCurrentUser } from "@/hooks/useUsers";
 import { autoUpdateConsented, desktopCanUpdate, setAutoUpdateConsent } from "@/lib/desktopUpdates";
 import { toast } from "@/lib/mascotToast";
@@ -28,6 +31,8 @@ import { Input } from "@/ui/input";
 import { cn } from "@/ui/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 const WEEK_START_OPTIONS = [
   { labelKey: "dates:weekdays.sunday", value: 0 },
@@ -38,6 +43,12 @@ const WEEK_START_OPTIONS = [
   { labelKey: "dates:weekdays.friday", value: 5 },
   { labelKey: "dates:weekdays.saturday", value: 6 },
 ];
+
+const THEME_CHOICES = [
+  { value: "system", icon: Monitor, labelKey: "nav:themeSystem" },
+  { value: "light", icon: Sun, labelKey: "nav:themeLight" },
+  { value: "dark", icon: Moon, labelKey: "nav:themeDark" },
+] as const;
 
 const RECENT_TABS_LIMIT_MIN = 1;
 const RECENT_TABS_LIMIT_MAX = 100;
@@ -214,7 +225,7 @@ interface UserSettingsInterfacePageProps {
 }
 
 export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInterfacePageProps) => {
-  const { t, i18n } = useTranslation(["settings", "dates"]);
+  const { t, i18n } = useTranslation(["settings", "dates", "nav"]);
   // What the server says, with each choice shown from the moment it is made
   // until its save settles.
   const [pendingPrefs, setPendingPrefs] = useState<Partial<InterfacePrefs>>({});
@@ -238,6 +249,8 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
     setEnabled: setKeepAwake,
     supported: keepAwakeSupported,
   } = useKeepScreenAwake();
+  const { theme, setTheme } = useTheme();
+  const { allowed: eventThemes, setAllowed: setEventThemes } = useEventTheme();
   const [canAutoUpdate, setCanAutoUpdate] = useState(false);
   const [autoUpdate, setAutoUpdate] = useState(autoUpdateConsented);
 
@@ -316,6 +329,37 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
           disabled={pending}
           onChange={(next) => savePrefs({ color_theme: next })}
         />
+        <SettingsRow
+          label={t("interface.mode")}
+          action={
+            <TooltipProvider delayDuration={300}>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                value={theme}
+                onValueChange={(next) => next && setTheme(next as Theme)}
+                aria-label={t("interface.mode")}
+              >
+                {THEME_CHOICES.map(({ value, icon: Icon, labelKey }) => (
+                  <Tooltip key={value}>
+                    <TooltipTrigger asChild>
+                      <ToggleGroupItem value={value} aria-label={t(labelKey)}>
+                        <Icon />
+                      </ToggleGroupItem>
+                    </TooltipTrigger>
+                    <TooltipContent>{t(labelKey)}</TooltipContent>
+                  </Tooltip>
+                ))}
+              </ToggleGroup>
+            </TooltipProvider>
+          }
+        />
+        <SettingsRow
+          label={t("interface.eventThemes.label")}
+          description={t("interface.eventThemes.description")}
+        >
+          <Switch checked={eventThemes} onCheckedChange={setEventThemes} />
+        </SettingsRow>
         <SettingsRow
           label={t("interface.recentTabsLimit")}
           description={t("interface.recentTabsLimitDescription")}

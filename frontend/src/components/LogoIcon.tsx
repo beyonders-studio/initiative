@@ -1,25 +1,16 @@
 import { type SVGProps, useId } from "react";
 
-import { usePride } from "@/hooks/usePride";
+import { useEventTheme } from "@/hooks/useEventTheme";
 import { cn } from "@/ui/lib/utils";
 
 type LogoIconProps = SVGProps<SVGSVGElement>;
 
-// Pride flag colours, in order, used to paint the mark when Pride mode is on.
-const PRIDE_COLORS = [
-  "#e40303", // red
-  "#ff8c00", // orange
-  "#ffed00", // yellow
-  "#008026", // green
-  "#004dff", // blue
-  "#750787", // violet
-];
-
 export const LogoIcon = ({ className, ...props }: LogoIconProps) => {
-  const { enabled: pride } = usePride();
+  const { active: event } = useEventTheme();
+  const colors = event?.colors;
   // useId() embeds colons that break `url(#…)` references in some engines.
-  const gradientId = `pride-logo-${useId().replace(/:/g, "")}`;
-  const fill = pride ? `url(#${gradientId})` : "currentColor";
+  const gradientId = `event-logo-${useId().replace(/:/g, "")}`;
+  const fill = colors ? `url(#${gradientId})` : "currentColor";
 
   return (
     <svg
@@ -32,16 +23,16 @@ export const LogoIcon = ({ className, ...props }: LogoIconProps) => {
         strokeMiterlimit: 2,
       }}
       viewBox="0 0 438 471"
-      className={cn("text-primary", pride && "pride-logo", className)}
+      className={cn("text-primary", colors && "event-logo", className)}
       {...props}
     >
-      {pride ? (
+      {colors ? (
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-            {PRIDE_COLORS.map((color, index) => (
+            {colors.map((color, index) => (
               <stop
                 key={color}
-                offset={`${(index / (PRIDE_COLORS.length - 1)) * 100}%`}
+                offset={`${(index / (colors.length - 1)) * 100}%`}
                 stopColor={color}
               />
             ))}
@@ -65,6 +56,7 @@ export const LogoIcon = ({ className, ...props }: LogoIconProps) => {
         opacity=".25"
         fill={fill}
       />
+      {event?.logoDecoration?.({ date: new Date(), fill })}
     </svg>
   );
 };

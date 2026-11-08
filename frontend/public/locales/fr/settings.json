@@ -257,6 +257,11 @@
   },
   "interface": {
     "colorTheme": "Thème de couleurs",
+    "mode": "Clair ou sombre",
+    "eventThemes": {
+      "label": "Thèmes d'événements",
+      "description": "Habille l'application pour les fêtes et les événements."
+    },
     "colorThemeDescription": "Choisissez un thème de couleurs pour l'application.",
     "weekStartsOn": "Début de la semaine",
     "weekStartsOnDescription": "Choisissez le jour affiché en premier dans les calendriers et les sélecteurs de date.",
