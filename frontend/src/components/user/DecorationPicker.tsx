@@ -11,6 +11,7 @@ import {
   resolveDecoration,
 } from "@/lib/profileDecorations";
 import { Button } from "@/ui/button";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { cn } from "@/ui/lib/utils";
 
 /**
@@ -157,19 +158,26 @@ const TintPicker = ({
   return (
     <div className="flex items-center gap-3">
       {wells.map((well) => (
-        <label
-          key={well.slot}
-          className="flex cursor-pointer items-center gap-2 text-muted-foreground text-xs"
-        >
-          <input
-            type="color"
+        <div key={well.slot} className="flex items-center gap-2 text-muted-foreground text-xs">
+          <ColorPickerPopover
             value={well.colour}
-            onChange={(event) => well.replace(event.target.value)}
-            aria-label={well.label}
-            className="size-7 cursor-pointer rounded-md border border-input bg-transparent p-0.5"
-          />
+            onChange={well.replace}
+            triggerLabel={well.label}
+            opaque
+          >
+            <button
+              type="button"
+              className="size-7 cursor-pointer rounded-md border border-input bg-transparent p-0.5"
+            >
+              <span
+                aria-hidden
+                className="block size-full rounded-sm"
+                style={{ backgroundColor: well.colour }}
+              />
+            </button>
+          </ColorPickerPopover>
           {well.label}
-        </label>
+        </div>
       ))}
       <Button
         type="button"

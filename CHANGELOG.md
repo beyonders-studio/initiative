@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Each AI connection has its own on/off switch** on its row under **Integrations**, in place of the Enabled field in its dialog. A community's **Allow AI features** switch moved to the **Security** tab, beside its other restrictions. When AI goes off, whether the community or the server turns it off, the community's connections go off with it, and none can be turned on again until AI is back on.
 - **The desktop app on Windows and Linux hides its menu bar.** The File, Edit, View and Window row no longer takes space under the title bar; press Alt to show it. Zoom, reload and full screen keep their shortcuts.
 - **Search forgives typos.** The command palette and the icon picker find what you meant through a swapped, wrong or extra letter (one in a word of four to seven letters, two from eight), and the words of a name in any order, with an exact name first. A table's filter is exact: it keeps the rows that hold what you typed, in any case.
+- **One colour picker everywhere.** A spreadsheet's text, fill and border colours and a profile decoration's colours open the same picker as the rest of the app, rather than the system's. The picker opens with its cursor on the current colour, and a single click in its field picks.
 
 ### Fixed
 

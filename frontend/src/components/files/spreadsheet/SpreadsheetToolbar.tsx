@@ -28,7 +28,7 @@ import {
   Underline,
   Undo2,
 } from "lucide-react";
-import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
+import { Fragment, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { SpreadsheetFormattingStore } from "@/components/files/spreadsheet/useSpreadsheetFormatting";
@@ -43,6 +43,7 @@ import type {
   NumberFormat,
 } from "@/lib/spreadsheet/styles";
 import { Button } from "@/ui/button";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -939,19 +940,9 @@ interface ColorTriggerProps {
   clearLabel?: string;
 }
 
-// A native ``<input type="color">`` rather than the app's HSL
-// ColorPickerPopover: that picker drives its value through an
-// effect-based RGB⇄HSL round-trip that can fail to converge and
-// exceed React's update depth, and a 320px popover is the wrong
-// affordance for a dense toolbar anyway.
-//
-// Perf note: React's ``onChange`` on a color input maps to the DOM
-// ``input`` event, which fires on *every* drag tick in the OS picker.
-// Routing each tick through ``onPick`` would re-apply formatting to the
-// whole selection (Yjs writes + a full grid re-render) dozens of times
-// a second. So live ticks only update a cheap local swatch; the actual
-// commit goes through the native ``change`` event, which fires once
-// when the picker closes.
+// Live ticks only move the swatch here; the colour is applied once, when the
+// picker closes, because applying it re-formats the whole selection (a Yjs
+// write and a grid re-render).
 const ColorTrigger = ({
   icon,
   label,
@@ -962,13 +953,7 @@ const ColorTrigger = ({
   onPick,
   onClear,
 }: ColorTriggerProps) => {
-  const inputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(value);
-
-  const onPickRef = useRef(onPick);
-  useEffect(() => {
-    onPickRef.current = onPick;
-  });
 
   // The committed value only changes externally (other clients, clear),
   // never mid-pick — so syncing the swatch here can't fight the drag.
@@ -978,43 +963,35 @@ const ColorTrigger = ({
     setDraft(value);
   }
 
-  useEffect(() => {
-    const el = inputRef.current;
-    if (!el) return;
-    const commit = () => onPickRef.current(el.value);
-    el.addEventListener("change", commit);
-    return () => el.removeEventListener("change", commit);
-  }, []);
-
   return (
     <div className="flex items-center" title={label}>
-      <label
-        className={cn(
-          "relative flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-2 hover:bg-accent",
-          disabled && "pointer-events-none opacity-50",
-          active && "ring-2 ring-primary"
-        )}
+      <ColorPickerPopover
+        value={value}
+        onChange={setDraft}
+        onChangeComplete={onPick}
+        disabled={disabled}
+        triggerLabel={label}
+        opaque
       >
-        <span className="text-muted-foreground" aria-hidden>
-          {icon}
-        </span>
-        <span
-          aria-hidden
-          className="h-4 w-4 rounded-sm border border-border"
-          style={{ backgroundColor: active ? draft : "transparent" }}
-        />
-        <input
-          ref={inputRef}
-          type="color"
-          value={draft}
+        <button
+          type="button"
           disabled={disabled}
-          aria-label={label}
-          // Cheap: local swatch preview only. Real apply is the native
-          // ``change`` listener above.
-          onChange={(e) => setDraft(e.target.value)}
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-        />
-      </label>
+          className={cn(
+            "relative flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-2 hover:bg-accent",
+            disabled && "pointer-events-none opacity-50",
+            active && "ring-2 ring-primary"
+          )}
+        >
+          <span className="text-muted-foreground" aria-hidden>
+            {icon}
+          </span>
+          <span
+            aria-hidden
+            className="h-4 w-4 rounded-sm border border-border"
+            style={{ backgroundColor: active ? draft : "transparent" }}
+          />
+        </button>
+      </ColorPickerPopover>
       {onClear && active && !disabled && (
         <Button
           type="button"
