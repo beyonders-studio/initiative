@@ -8,11 +8,10 @@
 
 import { useTranslation } from "react-i18next";
 
-import { SettingsSection } from "@/components/settings/SettingsSection";
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { usePlatformAuthSettings, useUpdatePlatformAuthSettings } from "@/hooks/useSettings";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import { Label } from "@/ui/label";
 import { Switch } from "@/ui/switch";
 
 export const BreachedPasswordCheckSection = () => {
@@ -37,26 +36,22 @@ export const BreachedPasswordCheckSection = () => {
       title={t("auth.breachedPasswordCheck.title")}
       description={t("auth.breachedPasswordCheck.description")}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="breached-password-check" className="font-medium">
-            {t("auth.breachedPasswordCheck.label")}
-          </Label>
-          <p className="text-muted-foreground text-sm">
-            {saved.breached_password_check_enabled
-              ? t("auth.breachedPasswordCheck.onHelp")
-              : t("auth.breachedPasswordCheck.offHelp")}
-          </p>
-        </div>
+      <SettingsRow
+        label={t("auth.breachedPasswordCheck.label")}
+        description={
+          saved.breached_password_check_enabled
+            ? t("auth.breachedPasswordCheck.onHelp")
+            : t("auth.breachedPasswordCheck.offHelp")
+        }
+      >
         <Switch
-          id="breached-password-check"
           checked={saved.breached_password_check_enabled}
           disabled={update.isPending}
           onCheckedChange={(checked) =>
             update.mutate({ breached_password_check_enabled: Boolean(checked) })
           }
         />
-      </div>
+      </SettingsRow>
     </SettingsSection>
   );
 };

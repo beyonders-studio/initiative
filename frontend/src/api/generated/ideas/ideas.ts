@@ -48,7 +48,7 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
- * The published ideas: those whose title holds ``q``, in ``status_id``,
+ * The published ideas: those whose title holds ``search``, in ``status_id``,
  * or that the reader voted for, as asked; most voted or newest first.
  * @summary List Ideas
  */

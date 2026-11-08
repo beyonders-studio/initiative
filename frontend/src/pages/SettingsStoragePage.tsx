@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { StorageSettingsUpdate } from "@/api/generated/initiativeAPI.schemas";
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { useAuth } from "@/hooks/useAuth";
 import { useServerForm } from "@/hooks/useServerForm";
 import {
@@ -16,7 +17,6 @@ import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
@@ -137,163 +137,153 @@ export const SettingsStoragePage = () => {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("storage.title")}</CardTitle>
-        <CardDescription>{t("storage.description")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form className="space-y-6" onSubmit={handleSubmit}>
-          <Field label={t("storage.backendLabel")} hint={t("storage.backendHelp")}>
-            <Select
-              value={form.values.backend}
-              onValueChange={(value) => {
-                // Guard against a stray empty value (Radix can emit one during
-                // mount in jsdom); only accept the two real backends.
-                if (value === "local" || value === "s3") {
-                  form.set({ backend: value });
-                }
-              }}
-            >
-              <SelectTrigger className="w-full sm:w-72">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="local">{t("storage.backendLocal")}</SelectItem>
-                <SelectItem value="s3">{t("storage.backendS3")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
+    <SettingsSection title={t("storage.title")} description={t("storage.description")}>
+      <form className="space-y-6" onSubmit={handleSubmit}>
+        <Field label={t("storage.backendLabel")} hint={t("storage.backendHelp")}>
+          <Select
+            value={form.values.backend}
+            onValueChange={(value) => {
+              // Guard against a stray empty value (Radix can emit one during
+              // mount in jsdom); only accept the two real backends.
+              if (value === "local" || value === "s3") {
+                form.set({ backend: value });
+              }
+            }}
+          >
+            <SelectTrigger className="w-full sm:w-72">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="local">{t("storage.backendLocal")}</SelectItem>
+              <SelectItem value="s3">{t("storage.backendS3")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
 
-          {isS3 && (
-            <>
-              <Alert>
-                <AlertTitle>{t("storage.cutoverTitle")}</AlertTitle>
-                <AlertDescription>{t("storage.cutoverHelp")}</AlertDescription>
-              </Alert>
+        {isS3 && (
+          <>
+            <Alert>
+              <AlertTitle>{t("storage.cutoverTitle")}</AlertTitle>
+              <AlertDescription>{t("storage.cutoverHelp")}</AlertDescription>
+            </Alert>
 
-              <div className="grid grid-cols-pair gap-4">
-                <Field label={t("storage.bucketLabel")}>
-                  <Input
-                    value={form.values.s3_bucket}
-                    onChange={(event) => form.set({ s3_bucket: event.target.value })}
-                    placeholder={t("storage.bucketPlaceholder")}
-                  />
-                </Field>
-                <Field label={t("storage.regionLabel")}>
-                  <Input
-                    value={form.values.s3_region}
-                    onChange={(event) => form.set({ s3_region: event.target.value })}
-                    placeholder="us-east-1"
-                  />
-                </Field>
-              </div>
-
-              <Field label={t("storage.endpointLabel")} hint={t("storage.endpointHelp")}>
+            <div className="grid grid-cols-pair gap-4">
+              <Field label={t("storage.bucketLabel")}>
                 <Input
-                  value={form.values.s3_endpoint_url}
-                  onChange={(event) => form.set({ s3_endpoint_url: event.target.value })}
-                  placeholder={t("storage.endpointPlaceholder")}
+                  value={form.values.s3_bucket}
+                  onChange={(event) => form.set({ s3_bucket: event.target.value })}
+                  placeholder={t("storage.bucketPlaceholder")}
                 />
               </Field>
+              <Field label={t("storage.regionLabel")}>
+                <Input
+                  value={form.values.s3_region}
+                  onChange={(event) => form.set({ s3_region: event.target.value })}
+                  placeholder="us-east-1"
+                />
+              </Field>
+            </div>
 
-              <div className="grid grid-cols-pair gap-4">
-                <Field label={t("storage.accessKeyLabel")}>
-                  <Input
-                    value={form.values.s3_access_key_id}
-                    onChange={(event) => form.set({ s3_access_key_id: event.target.value })}
-                    placeholder={t("storage.accessKeyPlaceholder")}
-                  />
-                </Field>
-                <Field label={t("storage.secretKeyLabel")} hint={t("storage.secretKeyHelp")}>
-                  <Input
-                    type="password"
-                    value={secret}
-                    onChange={(event) => setSecret(event.target.value)}
-                    placeholder={hasSecret ? t("storage.secretKeySet") : ""}
-                  />
-                </Field>
-              </div>
+            <Field label={t("storage.endpointLabel")} hint={t("storage.endpointHelp")}>
+              <Input
+                value={form.values.s3_endpoint_url}
+                onChange={(event) => form.set({ s3_endpoint_url: event.target.value })}
+                placeholder={t("storage.endpointPlaceholder")}
+              />
+            </Field>
 
-              <div className="grid grid-cols-pair gap-4">
-                <div className="flex items-center justify-between rounded-md border px-4 py-3">
-                  <div>
-                    <p className="font-medium">{t("storage.pathStyleLabel")}</p>
-                    <p className="text-muted-foreground text-sm">{t("storage.pathStyleHelp")}</p>
-                  </div>
-                  <Switch
-                    checked={form.values.s3_use_path_style}
-                    onCheckedChange={(checked) => form.set({ s3_use_path_style: Boolean(checked) })}
-                  />
-                </div>
-                <div className="flex items-center justify-between rounded-md border px-4 py-3">
-                  <div>
-                    <p className="font-medium">{t("storage.localFallbackLabel")}</p>
-                    <p className="text-muted-foreground text-sm">
-                      {t("storage.localFallbackHelp")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={form.values.s3_local_fallback}
-                    onCheckedChange={(checked) => form.set({ s3_local_fallback: Boolean(checked) })}
-                  />
-                </div>
-              </div>
-            </>
-          )}
+            <div className="grid grid-cols-pair gap-4">
+              <Field label={t("storage.accessKeyLabel")}>
+                <Input
+                  value={form.values.s3_access_key_id}
+                  onChange={(event) => form.set({ s3_access_key_id: event.target.value })}
+                  placeholder={t("storage.accessKeyPlaceholder")}
+                />
+              </Field>
+              <Field label={t("storage.secretKeyLabel")} hint={t("storage.secretKeyHelp")}>
+                <Input
+                  type="password"
+                  value={secret}
+                  onChange={(event) => setSecret(event.target.value)}
+                  placeholder={hasSecret ? t("storage.secretKeySet") : ""}
+                />
+              </Field>
+            </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Button type="submit" disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? t("storage.saving") : t("storage.save")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => testMutation.mutate(buildPayload())}
-              disabled={testMutation.isPending || !isS3}
-            >
-              {testMutation.isPending ? t("storage.testing") : t("storage.testConnection")}
-            </Button>
-          </div>
-        </form>
+            <div className="space-y-4">
+              <SettingsRow
+                label={t("storage.pathStyleLabel")}
+                description={t("storage.pathStyleHelp")}
+              >
+                <Switch
+                  checked={form.values.s3_use_path_style}
+                  onCheckedChange={(checked) => form.set({ s3_use_path_style: Boolean(checked) })}
+                />
+              </SettingsRow>
+              <SettingsRow
+                label={t("storage.localFallbackLabel")}
+                description={t("storage.localFallbackHelp")}
+              >
+                <Switch
+                  checked={form.values.s3_local_fallback}
+                  onCheckedChange={(checked) => form.set({ s3_local_fallback: Boolean(checked) })}
+                />
+              </SettingsRow>
+            </div>
+          </>
+        )}
 
-        <div className="mt-8 space-y-3 border-t pt-6">
-          <div>
-            <h3 className="font-medium">{t("storage.backfillTitle")}</h3>
-            <p className="text-muted-foreground text-sm">{t("storage.backfillHelp")}</p>
-          </div>
+        <div className="flex flex-wrap gap-3">
+          <Button type="submit" disabled={updateMutation.isPending}>
+            {updateMutation.isPending ? t("storage.saving") : t("storage.save")}
+          </Button>
           <Button
             type="button"
             variant="outline"
-            onClick={() => backfillMutation.mutate()}
-            disabled={backfillMutation.isPending || isBackfilling}
+            onClick={() => testMutation.mutate(buildPayload())}
+            disabled={testMutation.isPending || !isS3}
           >
-            {isBackfilling ? t("storage.backfillRunning") : t("storage.startBackfill")}
+            {testMutation.isPending ? t("storage.testing") : t("storage.testConnection")}
           </Button>
-          {backfillStatus.data && backfillStatus.data.status !== "idle" && (
-            <div className="rounded-md border px-4 py-3 text-sm">
-              <p className="font-medium">
-                {t(`storage.backfillStatus.${backfillStatus.data.status}`)}
-              </p>
-              <p className="text-muted-foreground">
-                {t("storage.backfillCounts", {
-                  copied: backfillStatus.data.copied,
-                  skipped: backfillStatus.data.skipped,
-                  failed: backfillStatus.data.failed,
-                })}
-              </p>
-              {backfillStatus.data.error && (
-                <p className="text-destructive">
-                  {messageForCode(
-                    backfillStatus.data.error,
-                    "errors:SETTINGS_STORAGE_BACKFILL_FAILED"
-                  )}
-                </p>
-              )}
-            </div>
-          )}
         </div>
-      </CardContent>
-    </Card>
+      </form>
+
+      <div className="mt-8 space-y-3 border-t pt-6">
+        <div>
+          <h3 className="font-medium">{t("storage.backfillTitle")}</h3>
+          <p className="text-muted-foreground text-sm">{t("storage.backfillHelp")}</p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => backfillMutation.mutate()}
+          disabled={backfillMutation.isPending || isBackfilling}
+        >
+          {isBackfilling ? t("storage.backfillRunning") : t("storage.startBackfill")}
+        </Button>
+        {backfillStatus.data && backfillStatus.data.status !== "idle" && (
+          <div className="rounded-md border px-4 py-3 text-sm">
+            <p className="font-medium">
+              {t(`storage.backfillStatus.${backfillStatus.data.status}`)}
+            </p>
+            <p className="text-muted-foreground">
+              {t("storage.backfillCounts", {
+                copied: backfillStatus.data.copied,
+                skipped: backfillStatus.data.skipped,
+                failed: backfillStatus.data.failed,
+              })}
+            </p>
+            {backfillStatus.data.error && (
+              <p className="text-destructive">
+                {messageForCode(
+                  backfillStatus.data.error,
+                  "errors:SETTINGS_STORAGE_BACKFILL_FAILED"
+                )}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </SettingsSection>
   );
 };

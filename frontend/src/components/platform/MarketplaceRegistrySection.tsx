@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next";
 
 import type { RegistryRefreshRead } from "@/api/generated/initiativeAPI.schemas";
 import { useReadRegistryStatus } from "@/api/generated/marketplace/marketplace";
-import { SettingsSection } from "@/components/settings/SettingsSection";
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import {
   useRefreshRegistry,
   useUpdateRegistrySettings,
@@ -23,7 +23,6 @@ import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { FileDropArea } from "@/ui/file-drop";
-import { Label } from "@/ui/label";
 import { Switch } from "@/ui/switch";
 
 /** What the status row records for an uploaded bundle. */
@@ -78,20 +77,18 @@ export const MarketplaceRegistrySection = () => {
         <p className="text-muted-foreground text-sm">{t("marketplaceRegistry.notConfigured")}</p>
       ) : (
         <>
-          <div className="flex items-center gap-3">
+          <SettingsRow
+            label={t("marketplaceRegistry.toggleLabel")}
+            description={t("marketplaceRegistry.toggleHelp")}
+          >
             <Switch
-              id="marketplace-registry-enabled"
               checked={state.enabled}
               disabled={busy}
               onCheckedChange={(checked) => update.mutate({ enabled: Boolean(checked) })}
             />
-            <Label htmlFor="marketplace-registry-enabled">
-              {t("marketplaceRegistry.toggleLabel")}
-            </Label>
-          </div>
-          <p className="text-muted-foreground text-sm">{t("marketplaceRegistry.toggleHelp")}</p>
+          </SettingsRow>
 
-          <div className="space-y-1 border-t pt-4 text-sm">
+          <div className="space-y-1 text-sm">
             <p className="break-all text-muted-foreground">
               {t("marketplaceRegistry.registryUrl", { url: state.registry_url })}
             </p>

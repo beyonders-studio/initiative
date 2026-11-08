@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import type { InitiativeRoleRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { ToolIconTile, ToolSketch } from "@/components/initiatives/ToolSkeletons";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import {
   DEFAULT_ENABLED_TOOLS,
   SIDEBAR_TOOLS,
@@ -12,7 +13,6 @@ import {
   toolViewPermission,
 } from "@/lib/tools";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { cn } from "@/ui/lib/utils";
 
 /**
@@ -40,7 +40,7 @@ export interface ToolsSectionProps {
   onToggle: (tool: Tool, value: boolean) => void;
   canManage: boolean;
   isSaving: boolean;
-  /** "card" wraps the rows in a Card with title+description (settings page). "plain" returns just the rows (for use inside an Accordion). */
+  /** "card" wraps the rows in a settings section with title+description (settings page). "plain" returns just the rows (for use inside an Accordion). */
   layout?: "card" | "plain";
   /** Optional prefix for input IDs so multiple instances don't collide. */
   idPrefix?: string;
@@ -269,12 +269,12 @@ export const ToolsSection = ({
   if (layout === "plain") return rows;
 
   return (
-    <Card className="mt-4">
-      <CardHeader>
-        <CardTitle>{t("advancedTools")}</CardTitle>
-        <CardDescription>{t("advancedToolsDescription")}</CardDescription>
-      </CardHeader>
-      <CardContent>{rows}</CardContent>
-    </Card>
+    <SettingsSection
+      className="mt-4"
+      title={t("advancedTools")}
+      description={t("advancedToolsDescription")}
+    >
+      {rows}
+    </SettingsSection>
   );
 };

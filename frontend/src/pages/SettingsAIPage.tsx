@@ -9,6 +9,7 @@ import {
   AIConnectionManager,
   type ConnectionMutations,
 } from "@/components/settings/AIConnectionManager";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import {
   useCreatePlatformConnection,
   useDeletePlatformConnection,
@@ -23,7 +24,6 @@ import { getProvidersForScope } from "@/lib/ai-providers";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { Label } from "@/ui/label";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
@@ -92,52 +92,48 @@ export const SettingsAIPage = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("platformAI.title")}</CardTitle>
-          <CardDescription>{t("platformAI.description")}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <fieldset className="space-y-3">
-            <legend className="font-medium text-sm">{t("platformAI.modeLabel")}</legend>
-            <RadioGroup value={mode} onValueChange={(value) => setMode(value as AIConfigMode)}>
-              {MODES.map((value) => (
-                <Label
-                  key={value}
-                  htmlFor={`ai-mode-${value}`}
-                  className="flex cursor-pointer items-start gap-3 rounded-md border px-4 py-3 font-normal has-[:checked]:border-primary"
-                >
-                  <RadioGroupItem id={`ai-mode-${value}`} value={value} className="mt-0.5" />
-                  <span className="space-y-1">
-                    <span className="block font-medium">{t(`platformAI.mode_${value}`)}</span>
-                    <span className="block text-muted-foreground text-sm">
-                      {t(`platformAI.mode_${value}_description`)}
-                    </span>
+      <SettingsSection
+        title={t("platformAI.title")}
+        description={t("platformAI.description")}
+        contentClassName="space-y-6"
+      >
+        <fieldset className="space-y-3">
+          <legend className="font-medium text-sm">{t("platformAI.modeLabel")}</legend>
+          <RadioGroup value={mode} onValueChange={(value) => setMode(value as AIConfigMode)}>
+            {MODES.map((value) => (
+              <Label
+                key={value}
+                htmlFor={`ai-mode-${value}`}
+                className="flex cursor-pointer items-start gap-3 rounded-md border px-4 py-3 font-normal has-[:checked]:border-primary"
+              >
+                <RadioGroupItem id={`ai-mode-${value}`} value={value} className="mt-0.5" />
+                <span className="space-y-1">
+                  <span className="block font-medium">{t(`platformAI.mode_${value}`)}</span>
+                  <span className="block text-muted-foreground text-sm">
+                    {t(`platformAI.mode_${value}_description`)}
                   </span>
-                </Label>
-              ))}
-            </RadioGroup>
-          </fieldset>
+                </span>
+              </Label>
+            ))}
+          </RadioGroup>
+        </fieldset>
 
-          <Button type="button" onClick={handleSave} disabled={updateMode.isPending || !isDirty}>
-            {updateMode.isPending ? t("platformAI.savingMode") : t("platformAI.saveMode")}
-          </Button>
-        </CardContent>
-      </Card>
+        <Button type="button" onClick={handleSave} disabled={updateMode.isPending || !isDirty}>
+          {updateMode.isPending ? t("platformAI.savingMode") : t("platformAI.saveMode")}
+        </Button>
+      </SettingsSection>
 
       {savedMode === "platform" && (
-        <Card>
-          <CardContent className="pt-6">
-            <AIConnectionManager
-              scope="platform"
-              connections={connectionsQuery.data ?? []}
-              isLoading={connectionsQuery.isLoading}
-              isError={connectionsQuery.isError}
-              providers={getProvidersForScope("platform")}
-              mutations={mutations}
-            />
-          </CardContent>
-        </Card>
+        <SettingsSection>
+          <AIConnectionManager
+            scope="platform"
+            connections={connectionsQuery.data ?? []}
+            isLoading={connectionsQuery.isLoading}
+            isError={connectionsQuery.isError}
+            providers={getProvidersForScope("platform")}
+            mutations={mutations}
+          />
+        </SettingsSection>
       )}
     </div>
   );

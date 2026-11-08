@@ -37,8 +37,7 @@ export const useIdeas = (params: Omit<ListIdeasParams, "page" | "page_size">) =>
     queryKey: getListIdeasQueryKey(params),
     queryFn: ({ pageParam }) => listIdeas({ ...params, page: pageParam, page_size: PAGE_SIZE }),
     initialPageParam: 1,
-    getNextPageParam: (last: IdeaListRead, pages) =>
-      pages.length * PAGE_SIZE < last.total ? pages.length + 1 : undefined,
+    getNextPageParam: (last: IdeaListRead) => (last.has_next ? last.page + 1 : undefined),
     placeholderData: keepPreviousData,
     retry: false,
   });

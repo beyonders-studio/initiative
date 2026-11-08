@@ -18,6 +18,7 @@ import type {
   PermissionKey,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import {
   EXTRA_PERMISSION_KEYS,
   useInitiativeDefaults,
@@ -32,7 +33,6 @@ import {
   toolViewPermission,
 } from "@/lib/tools";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -331,25 +331,25 @@ export const CommunityInitiativeDefaultsCard = ({
   })();
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
-        <div className="min-w-0 flex-1 basis-80 space-y-1.5">
-          <CardTitle>{t("communityDefaults.title")}</CardTitle>
-          <CardDescription>{t("communityDefaults.description")}</CardDescription>
-        </div>
-        {free.length > 0 && (
-          <Button
-            variant="outline"
-            onClick={() =>
-              setOpen({ tool: free[0], adding: true, draft: ruleOf(defaults, free[0]) })
-            }
-          >
-            <Plus className="h-4 w-4" />
-            {t("communityDefaults.add")}
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <>
+      <SettingsSection
+        title={t("communityDefaults.title")}
+        description={t("communityDefaults.description")}
+        action={
+          free.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() =>
+                setOpen({ tool: free[0], adding: true, draft: ruleOf(defaults, free[0]) })
+              }
+            >
+              <Plus className="h-4 w-4" />
+              {t("communityDefaults.add")}
+            </Button>
+          )
+        }
+        contentClassName="space-y-6"
+      >
         {ruled.length > 0 ? (
           <ul className="divide-y rounded-md border">
             {ruled.map((tool) => {
@@ -389,27 +389,23 @@ export const CommunityInitiativeDefaultsCard = ({
           </Empty>
         )}
 
-        <div className="flex items-start justify-between gap-4 border-t pt-4">
-          <div className="space-y-1">
-            <Label htmlFor="community-custom-roles" className="font-medium">
-              {t("communityDefaults.customRolesLabel")}
-            </Label>
-            <p className="text-muted-foreground text-sm">
-              {t("communityDefaults.customRolesHelp")}
-            </p>
-          </div>
-          <Switch
-            id="community-custom-roles"
-            checked={defaults.custom_roles}
-            disabled={update.isPending}
-            onCheckedChange={(on) => update.mutate({ custom_roles: on })}
-          />
+        <div className="border-t pt-4">
+          <SettingsRow
+            label={t("communityDefaults.customRolesLabel")}
+            description={t("communityDefaults.customRolesHelp")}
+          >
+            <Switch
+              checked={defaults.custom_roles}
+              disabled={update.isPending}
+              onCheckedChange={(on) => update.mutate({ custom_roles: on })}
+            />
+          </SettingsRow>
         </div>
-      </CardContent>
+      </SettingsSection>
 
       <Dialog open={open !== null} onOpenChange={(next) => !next && setOpen(null)}>
         {dialog}
       </Dialog>
-    </Card>
+    </>
   );
 };

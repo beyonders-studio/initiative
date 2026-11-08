@@ -39,7 +39,7 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { CasePicker } from "@/components/platform/CasePicker";
 import { OperatorDeleteUserDialog } from "@/components/platform/OperatorDeleteUserDialog";
-import { Section, SettingRow } from "@/components/platform/SettingRow";
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { useGrantCases } from "@/hooks/useAccessGrants";
 import { useAuth } from "@/hooks/useAuth";
@@ -125,8 +125,8 @@ const AccountCases = ({ user, open }: { user: OperatorUserRead; open: boolean })
   });
 
   return (
-    <Section title={t("platformUsers.sheet.cases.title")}>
-      <div className="space-y-3 py-3">
+    <SettingsSection plain title={t("platformUsers.sheet.cases.title")}>
+      <div className="space-y-3">
         <p className="text-sm">
           {t("platformUsers.sheet.cases.count", { count: user.open_case_count })}
         </p>
@@ -166,7 +166,7 @@ const AccountCases = ({ user, open }: { user: OperatorUserRead; open: boolean })
         )}
         <p className="text-muted-foreground text-xs">{t("platformUsers.sheet.cases.help")}</p>
       </div>
-    </Section>
+    </SettingsSection>
   );
 };
 
@@ -440,12 +440,12 @@ export const UserOperatorSettingsSheet = ({
 
           <div className="space-y-6 py-6">
             {showStanding && (
-              <Section title={t("platformUsers.sheet.standing")}>
+              <SettingsSection plain title={t("platformUsers.sheet.standing")}>
                 {showReactivate && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.reactivateLabel")}
-                    help={t("platformUsers.sheet.reactivateHelp")}
-                    control={
+                    description={t("platformUsers.sheet.reactivateHelp")}
+                    action={
                       <Button
                         type="button"
                         variant="outline"
@@ -462,10 +462,10 @@ export const UserOperatorSettingsSheet = ({
                 {/* Distinct from reactivating: nothing was dropped, so this
                     puts the account back exactly where it was. */}
                 {showRestore && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.restoreLabel")}
-                    help={t("platformUsers.sheet.restoreHelp")}
-                    control={
+                    description={t("platformUsers.sheet.restoreHelp")}
+                    action={
                       <Button
                         type="button"
                         variant="outline"
@@ -480,10 +480,10 @@ export const UserOperatorSettingsSheet = ({
                   />
                 )}
                 {showAgeBlock && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.ageBlockLabel")}
-                    help={t("platformUsers.sheet.ageBlockHelp")}
-                    control={
+                    description={t("platformUsers.sheet.ageBlockHelp")}
+                    action={
                       <Button
                         type="button"
                         variant="outline"
@@ -497,39 +497,34 @@ export const UserOperatorSettingsSheet = ({
                     }
                   />
                 )}
-              </Section>
+              </SettingsSection>
             )}
 
             {(showIdentity || showAvatar || clearable.length > 0) && (
-              <Section title={t("platformUsers.sheet.identity")}>
+              <SettingsSection plain title={t("platformUsers.sheet.identity")}>
                 {showIdentity && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.usernameLabel")}
-                    help={t("platformUsers.sheet.usernameHelp")}
-                    htmlFor="operator-user-username"
-                    control={
-                      <Input
-                        id="operator-user-username"
-                        className="w-48"
-                        value={form.values.username}
-                        autoCapitalize="none"
-                        onChange={(event) =>
-                          form.set({ username: event.target.value.toLowerCase() })
-                        }
-                        onBlur={commitUsername}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") event.currentTarget.blur();
-                        }}
-                        disabled={setUsername.isPending}
-                      />
-                    }
-                  />
+                    description={t("platformUsers.sheet.usernameHelp")}
+                  >
+                    <Input
+                      className="w-48"
+                      value={form.values.username}
+                      autoCapitalize="none"
+                      onChange={(event) => form.set({ username: event.target.value.toLowerCase() })}
+                      onBlur={commitUsername}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") event.currentTarget.blur();
+                      }}
+                      disabled={setUsername.isPending}
+                    />
+                  </SettingsRow>
                 )}
                 {showAvatar && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.avatarLabel")}
-                    help={t("platformUsers.sheet.avatarHelp")}
-                    control={
+                    description={t("platformUsers.sheet.avatarHelp")}
+                    action={
                       <div className="flex items-center gap-3">
                         {/* The picture itself, because deciding whether it
                             should go is looking at it. */}
@@ -551,11 +546,11 @@ export const UserOperatorSettingsSheet = ({
                 {/* Like the picture: taken down for what breaches the terms
                     of use, and theirs to set again. */}
                 {clearable.map((item) => (
-                  <SettingRow
+                  <SettingsRow
                     key={item.field}
                     label={t(`platformUsers.sheet.clear.${item.key}.label`)}
-                    help={t(`platformUsers.sheet.clear.${item.key}.help`)}
-                    control={
+                    description={t(`platformUsers.sheet.clear.${item.key}.help`)}
+                    action={
                       <Button
                         type="button"
                         variant="outline"
@@ -570,35 +565,34 @@ export const UserOperatorSettingsSheet = ({
                     }
                   />
                 ))}
-              </Section>
+              </SettingsSection>
             )}
 
             {(showSuspension || showApiKeys || showSignOut) && (
-              <Section title={t("platformUsers.sheet.access")}>
+              <SettingsSection plain title={t("platformUsers.sheet.access")}>
                 {showSuspension && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.suspendLabel")}
-                    help={t("platformUsers.sheet.suspendHelp")}
-                    htmlFor="operator-user-suspended"
-                    control={
-                      <Switch
-                        id="operator-user-suspended"
-                        checked={isSuspended}
-                        onCheckedChange={(checked) => {
-                          // Lifting takes no explanation; imposing does.
-                          if (checked) setSuspendOpen(true);
-                          else setSuspension.mutate({ userId: user.id, suspended: false });
-                        }}
-                        disabled={setSuspension.isPending}
-                      />
-                    }
-                  />
+                    description={t("platformUsers.sheet.suspendHelp")}
+                  >
+                    <Switch
+                      checked={isSuspended}
+                      onCheckedChange={(checked) => {
+                        // Lifting takes no explanation; imposing does.
+                        if (checked) setSuspendOpen(true);
+                        else setSuspension.mutate({ userId: user.id, suspended: false });
+                      }}
+                      disabled={setSuspension.isPending}
+                    />
+                  </SettingsRow>
                 )}
                 {showApiKeys && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.apiKeysLabel")}
-                    help={t("platformUsers.sheet.apiKeysHelp", { count: user.api_key_count })}
-                    control={
+                    description={t("platformUsers.sheet.apiKeysHelp", {
+                      count: user.api_key_count,
+                    })}
+                    action={
                       <Button
                         type="button"
                         variant="outline"
@@ -613,10 +607,10 @@ export const UserOperatorSettingsSheet = ({
                   />
                 )}
                 {showSignOut && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.signOutLabel")}
-                    help={t("platformUsers.sheet.signOutHelp")}
-                    control={
+                    description={t("platformUsers.sheet.signOutHelp")}
+                    action={
                       <Button
                         type="button"
                         variant="outline"
@@ -630,16 +624,16 @@ export const UserOperatorSettingsSheet = ({
                     }
                   />
                 )}
-              </Section>
+              </SettingsSection>
             )}
 
             {showSignIn && (
-              <Section title={t("platformUsers.sheet.signIn")}>
+              <SettingsSection plain title={t("platformUsers.sheet.signIn")}>
                 {showReset && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.resetLabel")}
-                    help={t("platformUsers.sheet.resetHelp")}
-                    control={
+                    description={t("platformUsers.sheet.resetHelp")}
+                    action={
                       <Button
                         type="button"
                         variant="outline"
@@ -654,10 +648,10 @@ export const UserOperatorSettingsSheet = ({
                   />
                 )}
                 {showResend && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.resendLabel")}
-                    help={t("platformUsers.sheet.resendHelp")}
-                    control={
+                    description={t("platformUsers.sheet.resendHelp")}
+                    action={
                       <Button
                         type="button"
                         variant="outline"
@@ -672,10 +666,10 @@ export const UserOperatorSettingsSheet = ({
                   />
                 )}
                 {showSignInLock && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.signInLockLabel")}
-                    help={t("platformUsers.sheet.signInLockHelp")}
-                    control={
+                    description={t("platformUsers.sheet.signInLockHelp")}
+                    action={
                       <Button
                         type="button"
                         variant="outline"
@@ -690,10 +684,10 @@ export const UserOperatorSettingsSheet = ({
                   />
                 )}
                 {showSecondFactor && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.secondFactorLabel")}
-                    help={t("platformUsers.sheet.secondFactorHelp")}
-                    control={
+                    description={t("platformUsers.sheet.secondFactorHelp")}
+                    action={
                       <Button
                         type="button"
                         variant="outline"
@@ -707,60 +701,58 @@ export const UserOperatorSettingsSheet = ({
                     }
                   />
                 )}
-              </Section>
+              </SettingsSection>
             )}
 
             {showRole && (
-              <Section title={t("platformUsers.sheet.role")}>
-                <SettingRow
+              <SettingsSection plain title={t("platformUsers.sheet.role")}>
+                <SettingsRow
                   label={t("platformUsers.sheet.roleLabel")}
-                  help={t("platformUsers.sheet.roleHelp")}
-                  htmlFor="operator-user-role"
-                  control={
-                    <Select
-                      value={user.role}
-                      onValueChange={(value) => setRoleConfirm(value as UserRole)}
-                      disabled={updateRole.isPending}
-                    >
-                      <SelectTrigger id="operator-user-role" className="h-8 w-[160px]">
-                        {platformRoleLabel(user.role, t as TranslateFn)}
-                      </SelectTrigger>
-                      <SelectContent className="max-w-xs">
-                        {PLATFORM_ROLE_ORDER.map((role) => (
-                          <SelectItem
-                            key={role}
-                            value={role}
-                            // You cannot mint a role above your own rung.
-                            // Demoting the platform's last owner is refused
-                            // by the server, which says so.
-                            disabled={platformRoleRank(role) > platformRoleRank(actorRole)}
-                          >
-                            <div className="flex flex-col gap-0.5">
-                              <span className="font-medium">
-                                {platformRoleLabel(role, t as TranslateFn)}
-                              </span>
-                              <span className="text-muted-foreground text-xs leading-snug">
-                                {platformRoleDescription(role, t as TranslateFn)}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  }
-                />
-              </Section>
+                  description={t("platformUsers.sheet.roleHelp")}
+                >
+                  <Select
+                    value={user.role}
+                    onValueChange={(value) => setRoleConfirm(value as UserRole)}
+                    disabled={updateRole.isPending}
+                  >
+                    <SelectTrigger className="h-8 w-[160px]">
+                      {platformRoleLabel(user.role, t as TranslateFn)}
+                    </SelectTrigger>
+                    <SelectContent className="max-w-xs">
+                      {PLATFORM_ROLE_ORDER.map((role) => (
+                        <SelectItem
+                          key={role}
+                          value={role}
+                          // You cannot mint a role above your own rung.
+                          // Demoting the platform's last owner is refused
+                          // by the server, which says so.
+                          disabled={platformRoleRank(role) > platformRoleRank(actorRole)}
+                        >
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-medium">
+                              {platformRoleLabel(role, t as TranslateFn)}
+                            </span>
+                            <span className="text-muted-foreground text-xs leading-snug">
+                              {platformRoleDescription(role, t as TranslateFn)}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </SettingsRow>
+              </SettingsSection>
             )}
 
             {user.open_case_count > 0 && <AccountCases user={user} open={open} />}
 
             {/* The one thing here that may not be undone, so it comes last. */}
             {showDelete && (
-              <Section title={t("platformUsers.sheet.deleteSection")}>
-                <SettingRow
+              <SettingsSection plain title={t("platformUsers.sheet.deleteSection")}>
+                <SettingsRow
                   label={t("platformUsers.deleteUser")}
-                  help={t("platformUsers.sheet.deleteHelp")}
-                  control={
+                  description={t("platformUsers.sheet.deleteHelp")}
+                  action={
                     <Button
                       type="button"
                       variant="destructive"
@@ -772,7 +764,7 @@ export const UserOperatorSettingsSheet = ({
                     </Button>
                   }
                 />
-              </Section>
+              </SettingsSection>
             )}
           </div>
         </SheetContent>
