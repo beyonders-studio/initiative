@@ -269,7 +269,7 @@ Whoever keeps the member list can set or clear a member's from that person's men
 
 ## Reporting something
 
-Something here that shouldn't be? Comments, notices, pictures, wiki pages, events, profiles and directory listings all carry a small flag: **Report**. Pick what's wrong, add a line if you like, and **Send report**. The report opens beside the page, so what you're reporting stays in view. It isn't offered on your own things, because you can already edit or delete those. **Illegal** and **Other** need a line saying what's wrong.
+Something here that shouldn't be? Comments, notices, pictures, wiki pages, events, profiles and directory listings all carry a small flag: **Report**. Pick what's wrong, add a line if you like, and **Send report**. The report opens beside the page, so what you're reporting stays in view. Its camera takes a picture of the page with the people on it left showing, since a report is usually about someone. It isn't offered on your own things, because you can already edit or delete those. **Illegal** and **Other** need a line saying what's wrong.
 
 | What you report | Who looks at it |
 |---|---|
@@ -282,7 +282,7 @@ Reporting something **illegal** asks which law it breaks, and goes to the commun
 
 ## Asking for help
 
-The question mark at the foot of the sidebar, and in the desktop app's title bar, is **Help**. It searches these pages first, from inside the app, and before you type it shows answers for the page you're on. Where your server takes help requests, **Ask the team** sits under the results and starts a request with whatever you searched. Say what happened, pick what it's about, and add a screenshot if it helps: the paperclip in the box attaches one, or paste or drop it on the box. The request goes to the people who run the server, not to the community's own admins.
+The question mark at the foot of the sidebar, and in the desktop app's title bar, is **Help**. It searches these pages first, from inside the app, and before you type it shows answers for the page you're on. Where your server takes help requests, **Ask the team** sits under the results and starts a request with whatever you searched. Say what happened, pick what it's about, and add a picture if it helps: the camera in the box takes one of the page you're on, the paperclip attaches a file, or paste or drop one on the box. A picture opens in an editor first. The people on it are already swapped out (names become Person 1, Person 2, you show as You, and avatars, emails and phone numbers are hidden), and you can point at any part of the page to hide it, or mark it with a number your message can mention. The request goes to the people who run the server, not to the community's own admins.
 
 Each request carries this device's details: the app's version, the platform, your language and theme, the page you were on (without anything that names what was on it) and the window's size. The line above **Send** shows them, and its switch leaves them out. Close Help halfway through and your draft waits for you as a **Help request draft** button in the corner.
 

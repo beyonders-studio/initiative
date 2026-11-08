@@ -352,6 +352,8 @@ export const FileTicketSheet = ({
                       policy={childSafety ? null : evidence}
                       files={files}
                       onFilesChange={setFiles}
+                      // A report is usually about a person: who it was stays in view.
+                      pagePicture={{ hidePeople: false }}
                       disabled={pending}
                     />
                   </div>
@@ -390,6 +392,7 @@ export const FileTicketSheet = ({
                       policy={evidence}
                       files={files}
                       onFilesChange={setFiles}
+                      pagePicture={{ hidePeople: true }}
                       disabled={pending}
                     />
                   </div>

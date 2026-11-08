@@ -244,6 +244,7 @@ const FeedbackSheet = () => {
                   policy={feedback.evidence}
                   files={form.files}
                   onFilesChange={(files) => change({ files })}
+                  pagePicture={{ hidePeople: true }}
                   disabled={pending}
                 />
               </div>

@@ -1,13 +1,15 @@
 /**
  * The box a ticket, a report or a reply is written in, with the files that go
  * with it inside the box: a paperclip to choose them, and the box itself to
- * paste or drop them on.
+ * paste or drop them on. Where the box is in a panel over the page, a camera
+ * takes a picture of the page behind it, and any picture attached opens in
+ * the picture editor (`PictureEditor`) to hide parts of it or mark them.
  *
  * Choosing is held to what the stream takes — how many, how large, of which
  * kinds — so a refusal is said before anything is sent; the server still reads
  * every file for itself. A stream that takes no files gets the box alone.
  */
-import { FileText, Paperclip, X } from "lucide-react";
+import { Camera, FileText, Loader2, Paperclip, X } from "lucide-react";
 import {
   type ClipboardEvent,
   type ComponentProps,
@@ -20,6 +22,9 @@ import { useTranslation } from "react-i18next";
 
 import type { EvidencePolicyRead } from "@/api/generated/initiativeAPI.schemas";
 import { isPicture } from "@/components/tickets/Evidence";
+import { newSession, PictureEditor, type PictureSession } from "@/components/tickets/PictureEditor";
+import { useAuth } from "@/hooks/useAuth";
+import { findPeople, loadedPeople, pictureThePage } from "@/lib/pagePicture";
 import { Button } from "@/ui/button";
 import { DropOverlay } from "@/ui/file-drop";
 import { formatBytes } from "@/ui/lib/fileUtils";
@@ -45,12 +50,19 @@ const acceptFor = (types: string[]) =>
 /** One chosen file, told apart from the rest without its place in the list. */
 const fileKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
 
+/** The editor's work on each picture it made, so the picture opens again
+ *  where it was left. */
+const sessions = new WeakMap<File, PictureSession>();
+
 type TicketComposerProps = Omit<ComponentProps<typeof Textarea>, "className"> & {
   /** What the stream takes. No files are offered while it is not known, or
    *  where it takes none. */
   policy: EvidencePolicyRead | null | undefined;
   files: File[];
   onFilesChange: (files: File[]) => void;
+  /** Offer a picture of the page behind the panel the box is in, with the
+   *  people on it hidden to start with or not. */
+  pagePicture?: { hidePeople: boolean };
 };
 
 /** Write, and attach files, in one box. */
@@ -58,37 +70,86 @@ export const TicketComposer = ({
   policy,
   files,
   onFilesChange,
+  pagePicture,
   disabled,
   ...textarea
 }: TicketComposerProps) => {
   const { t } = useTranslation("intake");
+  const { user } = useAuth();
+  const box = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const limitsId = useId();
   const [refusal, setRefusal] = useState<string | null>(null);
+  const [picturing, setPicturing] = useState(false);
+  const [editing, setEditing] = useState<{ session: PictureSession; target: File | null } | null>(
+    null
+  );
   const takes = Boolean(policy && policy.max_files > 0);
   const taking = takes && !disabled;
+
+  /** Why the stream would not take ``file`` beside ``held`` others, if it would not. */
+  const refusalFor = (file: File, held: number) => {
+    if (!policy) return null;
+    if (!mayTake(file, policy.types)) return t("evidence.notAllowed", { name: file.name });
+    if (file.size > policy.max_bytes) {
+      return t("evidence.tooLarge", { name: file.name, size: formatBytes(policy.max_bytes, 0) });
+    }
+    if (held >= policy.max_files) return t("evidence.tooMany", { count: policy.max_files });
+    return null;
+  };
 
   const add = (chosen: File[]) => {
     if (!policy) return;
     const next = [...files];
     let said: string | null = null;
     for (const file of chosen) {
-      if (next.some((held) => fileKey(held) === fileKey(file))) {
-        // Chosen twice: it is sent once.
-      } else if (!mayTake(file, policy.types)) {
-        said = t("evidence.notAllowed", { name: file.name });
-      } else if (file.size > policy.max_bytes) {
-        said = t("evidence.tooLarge", { name: file.name, size: formatBytes(policy.max_bytes, 0) });
-      } else if (next.length >= policy.max_files) {
-        said = t("evidence.tooMany", { count: policy.max_files });
-      } else {
-        next.push(file);
-      }
+      // Chosen twice: it is sent once.
+      if (next.some((held) => fileKey(held) === fileKey(file))) continue;
+      const refused = refusalFor(file, next.length);
+      if (refused) said = refused;
+      else next.push(file);
     }
     setRefusal(said);
     onFilesChange(next);
     // The same file can be chosen again after it is taken back out.
     if (input.current) input.current.value = "";
+  };
+
+  const takePicture = async () => {
+    setPicturing(true);
+    setRefusal(null);
+    try {
+      // The panel the box is in is left out: the picture is of the page.
+      const picture = await pictureThePage(box.current?.closest('[role="dialog"]') ?? null);
+      const people = findPeople(picture.svg, loadedPeople(user ? [user] : []), user?.id ?? null, {
+        you: t("picture.you"),
+        person: (number) => t("picture.person", { number }),
+        email: t("picture.emailHidden"),
+        phone: t("picture.phoneHidden"),
+      });
+      setEditing({
+        session: newSession({ kind: "page", picture, people }, pagePicture?.hidePeople),
+        target: null,
+      });
+    } catch {
+      setRefusal(t("picture.failed"));
+    } finally {
+      setPicturing(false);
+    }
+  };
+
+  const edited = (made: File) => {
+    if (!editing) return;
+    sessions.set(made, editing.session);
+    const { target } = editing;
+    setEditing(null);
+    if (!target) {
+      add([made]);
+      return;
+    }
+    const refused = refusalFor(made, files.length - 1);
+    setRefusal(refused);
+    if (!refused) onFilesChange(files.map((file) => (file === target ? made : file)));
   };
 
   const drop = useFileDrop(taking, add);
@@ -106,6 +167,7 @@ export const TicketComposer = ({
   return (
     <div className="space-y-1.5">
       <div
+        ref={box}
         {...drop.handlers}
         onPaste={onPaste}
         className={cn(
@@ -125,6 +187,12 @@ export const TicketComposer = ({
                 key={fileKey(file)}
                 file={file}
                 disabled={disabled}
+                onEdit={() =>
+                  setEditing({
+                    session: sessions.get(file) ?? newSession({ kind: "file", file }),
+                    target: file,
+                  })
+                }
                 onRemove={() => {
                   setRefusal(null);
                   onFilesChange(files.filter((_, i) => i !== index));
@@ -148,6 +216,29 @@ export const TicketComposer = ({
             />
             {/* Its own provider: there is none at the app root. */}
             <TooltipProvider delayDuration={300}>
+              {pagePicture && policy.types.includes("image/png") ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-muted-foreground"
+                      disabled={disabled || picturing || files.length >= policy.max_files}
+                      onClick={takePicture}
+                      aria-label={t("picture.take")}
+                      aria-busy={picturing}
+                    >
+                      {picturing ? (
+                        <Loader2 className="animate-spin" aria-hidden="true" />
+                      ) : (
+                        <Camera aria-hidden="true" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t("picture.take")}</TooltipContent>
+                </Tooltip>
+              ) : null}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -180,18 +271,29 @@ export const TicketComposer = ({
           {refusal}
         </p>
       ) : null}
+      {editing ? (
+        <PictureEditor
+          session={editing.session}
+          attached={editing.target !== null}
+          onDone={edited}
+          onCancel={() => setEditing(null)}
+        />
+      ) : null}
     </div>
   );
 };
 
-/** One attached file: a picture as itself, anything else by its name. */
+/** One attached file: a picture as itself, which opens in the editor, and
+ *  anything else by its name. */
 const FileTile = ({
   file,
   disabled,
+  onEdit,
   onRemove,
 }: {
   file: File;
   disabled?: boolean;
+  onEdit: () => void;
   onRemove: () => void;
 }) => {
   const { t } = useTranslation("intake");
@@ -207,11 +309,19 @@ const FileTile = ({
   return (
     <li className="relative" title={file.name}>
       {picture ? (
-        <img
-          src={url ?? undefined}
-          alt={file.name}
-          className="h-12 w-auto max-w-24 rounded border bg-muted object-cover"
-        />
+        <button
+          type="button"
+          className="block rounded border bg-muted"
+          disabled={disabled}
+          onClick={onEdit}
+          aria-label={t("picture.edit", { name: file.name })}
+        >
+          <img
+            src={url ?? undefined}
+            alt={file.name}
+            className="h-12 w-auto max-w-24 rounded object-cover"
+          />
+        </button>
       ) : (
         <span className="flex h-12 max-w-40 items-center gap-1.5 rounded border bg-muted/40 px-2 text-xs">
           <FileText className="size-4 shrink-0" aria-hidden="true" />
