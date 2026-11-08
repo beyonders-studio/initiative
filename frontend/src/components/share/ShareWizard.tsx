@@ -28,7 +28,7 @@ import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { cn } from "@/ui/lib/utils";
 import { Textarea } from "@/ui/textarea";
-import { WizardFrame } from "@/ui/wizard-dialog";
+import { WizardFrame, WizardOption } from "@/ui/wizard-dialog";
 
 const STORAGE_KEY = "initiative-last-share-destination";
 
@@ -216,20 +216,13 @@ export function ShareWizard({ share, onDone }: ShareWizardProps) {
             <div className="space-y-2">
               {KINDS.filter(({ kind: option }) => kinds.includes(option)).map(
                 ({ kind: option, icon: Icon }) => (
-                  <button
+                  <WizardOption
                     key={option}
-                    type="button"
-                    className="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+                    icon={<Icon className="h-5 w-5 shrink-0 text-muted-foreground" />}
+                    title={t(`kinds.${option}.label`)}
+                    description={t(`kinds.${option}.description`)}
                     onClick={() => setKind(option)}
-                  >
-                    <Icon className="h-5 w-5 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm">{t(`kinds.${option}.label`)}</p>
-                      <p className="text-muted-foreground text-xs">
-                        {t(`kinds.${option}.description`)}
-                      </p>
-                    </div>
-                  </button>
+                  />
                 )
               )}
             </div>

@@ -14,6 +14,7 @@ import {
 import { useWizard } from "@/hooks/useWizard";
 import { InitiativeColorDot } from "@/lib/initiativeColors";
 import type { TranslateFn } from "@/types/i18n";
+import { WizardOption } from "@/ui/wizard-dialog";
 
 type Step = "select-community" | "select-initiative";
 
@@ -157,29 +158,25 @@ export function useCommunityInitiativeSteps<Next extends string = never>({
     step === "select-community" ? (
       <div className="space-y-2">
         {shortcut && (
-          <button
-            type="button"
-            className="flex w-full items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3 text-left transition-colors hover:bg-primary/10"
+          <WizardOption
+            className="border-primary/30 bg-primary/5 hover:bg-primary/10"
+            icon={<Zap className="h-5 w-5 shrink-0 text-primary" />}
+            title={shortcut.title}
+            description={shortcut.subtitle}
             onClick={shortcut.onClick}
           >
-            <Zap className="h-5 w-5 shrink-0 text-primary" />
-            <div className="min-w-0 flex-1">
-              <p className="font-medium text-sm">{shortcut.title}</p>
-              <p className="truncate text-muted-foreground text-xs">{shortcut.subtitle}</p>
-            </div>
             <span className="text-muted-foreground text-xs">{t("createWizard.lastUsed")}</span>
-          </button>
+          </WizardOption>
         )}
         {communities.map((entry) => (
-          <button
+          <WizardOption
             key={entry.id}
-            type="button"
-            className="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+            icon={
+              <CommunityAvatar name={entry.name} icon={entry.icon_url} active={false} size="sm" />
+            }
+            title={entry.name}
             onClick={() => chooseCommunity(entry)}
-          >
-            <CommunityAvatar name={entry.name} icon={entry.icon_url} active={false} size="sm" />
-            <span className="font-medium text-sm">{entry.name}</span>
-          </button>
+          />
         ))}
       </div>
     ) : step === "select-initiative" ? (
@@ -194,16 +191,14 @@ export function useCommunityInitiativeSteps<Next extends string = never>({
           </p>
         ) : (
           initiatives.map((entry) => (
-            <button
+            <WizardOption
               key={entry.id}
-              type="button"
-              className="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent"
+              icon={<InitiativeColorDot color={entry.color} />}
+              title={entry.name}
               onClick={() => chooseInitiative(entry)}
             >
-              <InitiativeColorDot color={entry.color} />
-              <span className="font-medium text-sm">{entry.name}</span>
               {initiativeIcon}
-            </button>
+            </WizardOption>
           ))
         )}
       </div>

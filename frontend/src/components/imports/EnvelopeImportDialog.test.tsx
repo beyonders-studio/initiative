@@ -36,7 +36,8 @@ vi.mock("@/hooks/useInitiatives", () => ({
 import { toast } from "@/lib/mascotToast";
 
 function selectFile(contents: object) {
-  const input = screen.getByLabelText(/export file/i) as HTMLInputElement;
+  const input = document.querySelector<HTMLInputElement>('input[type="file"]');
+  if (!input) throw new Error("no file input");
   const file = new File([JSON.stringify(contents)], "export.json", {
     type: "application/json",
   });
@@ -121,7 +122,8 @@ describe("EnvelopeImportDialog", () => {
 
     renderWithProviders(<EnvelopeImportDialog tool={Tool.wiki} open onOpenChange={() => {}} />);
 
-    const input = screen.getByLabelText(/export file/i) as HTMLInputElement;
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!input) throw new Error("no file input");
     const file = new File(["PK"], "barovia.zip", { type: "application/zip" });
     Object.defineProperty(input, "files", { value: [file], configurable: true });
     input.dispatchEvent(new Event("change", { bubbles: true }));
@@ -216,7 +218,8 @@ describe("EnvelopeImportDialog", () => {
     renderWithProviders(
       <EnvelopeImportDialog tool={Tool.counter_group} open onOpenChange={() => {}} />
     );
-    const input = screen.getByLabelText(/export file/i) as HTMLInputElement;
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!input) throw new Error("no file input");
 
     // First pick: a file whose read resolves LATER.
     const slow = new File(["{}"], "slow.json", { type: "application/json" });

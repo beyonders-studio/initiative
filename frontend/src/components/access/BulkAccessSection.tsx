@@ -1,9 +1,8 @@
-import { Copy, Tags, Trash2 } from "lucide-react";
+import { Copy, Shield, Tags, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { FileType, TagSummary, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { BulkAccessBar } from "@/components/access/BulkAccessBar";
 import {
   type BulkAccessItem,
   BulkEditAccessDialog,
@@ -16,6 +15,7 @@ import { toast } from "@/lib/mascotToast";
 import { everyCan } from "@/lib/permissions";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { SelectionBar } from "@/ui/selection-bar";
 
 /** The slice of {@link useGridSelection} this section drives. */
 interface GridSelectionLike<T> {
@@ -67,6 +67,7 @@ export function BulkAccessSection<T extends BulkItem>({
   // Duplicating and tagging both ask for edit on every selected item.
   const canEdit = everyCan(items, "edit");
   const canDelete = everyCan(items, "delete");
+  const canShare = everyCan(items, "share");
   // Read is enough to copy a template; anything else needs edit.
   const canDuplicate = count > 0 && items.every((item) => item.is_template || item.can.edit);
 
@@ -86,13 +87,7 @@ export function BulkAccessSection<T extends BulkItem>({
   return (
     <>
       {selection.active ? (
-        <BulkAccessBar
-          count={count}
-          canManage={everyCan(items, "share")}
-          manageHint={archived ? t("bulkBar.archived") : undefined}
-          onEditAccess={() => setAccessOpen(true)}
-          onExit={selection.exit}
-        >
+        <SelectionBar label={t("bulkBar.selected", { count })}>
           {actions}
           <BulkExportButton tool={tool} items={items} />
           <Button
@@ -135,7 +130,24 @@ export function BulkAccessSection<T extends BulkItem>({
             destructive
             onConfirm={() => remove.mutate(items.map((item) => item.id))}
           />
-        </BulkAccessBar>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAccessOpen(true)}
+            disabled={count === 0 || !canShare}
+            title={
+              count > 0 && !canShare
+                ? t(archived ? "bulkBar.archived" : "bulkBar.needManage")
+                : undefined
+            }
+          >
+            <Shield className="h-4 w-4" />
+            {t("bulkBar.editAccess")}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={selection.exit}>
+            {t("common:cancel")}
+          </Button>
+        </SelectionBar>
       ) : null}
       <BulkEditTagsDialog
         open={tagsOpen}

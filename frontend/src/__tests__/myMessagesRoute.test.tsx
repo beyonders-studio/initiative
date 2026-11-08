@@ -471,7 +471,7 @@ describe("My Messages", () => {
     ) {
       // `hidden`, plain or behind variants (`max-sm:hidden`); a class that
       // hides something inside it (`[&>svg]:hidden`) leaves it reachable.
-      expect(node.className).not.toMatch(/(^|\s)([\w-]+:)*hidden(\s|$)/);
+      expect(node.className).not.toMatch(/(^|\s)([\w/-]+:)*hidden(\s|$)/);
     }
     reply.focus();
     expect(reply).toHaveFocus();

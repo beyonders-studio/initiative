@@ -6,13 +6,15 @@
  * the dot on the picture — and that the menu it opens leads with who you are
  * and carries everything the row stopped carrying.
  */
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildUser } from "@/__tests__/factories";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
+import { currentHelp, updateHelp } from "@/components/help/helpStore";
+import { setPendingUpdate } from "@/lib/pendingUpdate";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { SidebarUserFooter } from "./SidebarUserFooter";
@@ -44,9 +46,34 @@ const openMenu = async (user: ReturnType<typeof userEvent.setup>) => {
 };
 
 describe("SidebarUserFooter", () => {
-  it("keeps Help under the person", async () => {
+  afterEach(() => {
+    updateHelp({ open: false });
+    setPendingUpdate(null);
+  });
+
+  it("opens Help from the account menu rather than from a row of its own", async () => {
+    const user = userEvent.setup();
     renderFooter();
-    expect(await screen.findByRole("button", { name: "Help" })).toBeInTheDocument();
+
+    expect(screen.queryByRole("button", { name: "Help" })).not.toBeInTheDocument();
+
+    await openMenu(user);
+    await user.click(await screen.findByRole("menuitem", { name: "Help" }));
+
+    expect(currentHelp().open).toBe(true);
+  });
+
+  it("offers an update beside the bell while one waits", async () => {
+    const user = userEvent.setup();
+    const run = vi.fn();
+    renderFooter();
+    await screen.findByRole("button", { name: /admin#1234/ });
+    expect(screen.queryByRole("button", { name: "Update" })).not.toBeInTheDocument();
+
+    act(() => setPendingUpdate({ action: "reload", run }));
+    await user.click(await screen.findByRole("button", { name: "Update" }));
+
+    expect(run).toHaveBeenCalled();
   });
 
   it("puts the status under the name, in the same row", async () => {

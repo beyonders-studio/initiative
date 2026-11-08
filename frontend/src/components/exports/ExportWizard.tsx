@@ -38,7 +38,7 @@ import { cn } from "@/ui/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 import { Switch } from "@/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
-import { WizardDialog } from "@/ui/wizard-dialog";
+import { WizardDialog, WizardOption } from "@/ui/wizard-dialog";
 
 /** What the wizard exports: a whole initiative or community, or named
  *  entities of one tool (a tool's export card, a bulk selection). */
@@ -663,10 +663,16 @@ function AggregateExportWizard({
       {step === "mode" && (
         <div className="space-y-2">
           {(["backup", "report"] as const).map((option) => (
-            <button
+            <WizardOption
               key={option}
-              type="button"
-              className="w-full rounded-lg border p-4 text-left transition-colors hover:bg-accent"
+              title={
+                option === "backup" ? t("wizard.mode.backupTitle") : t("wizard.mode.reportTitle")
+              }
+              description={
+                option === "backup"
+                  ? t("wizard.mode.backupDescription")
+                  : t("wizard.mode.reportDescription")
+              }
               onClick={() => {
                 if (option !== mode) {
                   setContent((prev) => forOutput(prev, option === "backup"));
@@ -674,16 +680,7 @@ function AggregateExportWizard({
                 setMode(option);
                 go(option);
               }}
-            >
-              <p className="font-medium text-sm">
-                {option === "backup" ? t("wizard.mode.backupTitle") : t("wizard.mode.reportTitle")}
-              </p>
-              <p className="mt-1 text-muted-foreground text-xs">
-                {option === "backup"
-                  ? t("wizard.mode.backupDescription")
-                  : t("wizard.mode.reportDescription")}
-              </p>
-            </button>
+            />
           ))}
         </div>
       )}

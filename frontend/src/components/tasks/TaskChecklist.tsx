@@ -1,11 +1,4 @@
-import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
+import { closestCenter, DndContext, type DragEndEvent } from "@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
@@ -38,6 +31,7 @@ import { useTranslation } from "react-i18next";
 import type { ChecklistItem, ChecklistProgress } from "@/api/generated/initiativeAPI.schemas";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
+import { useDragSensors } from "@/hooks/useDragSensors";
 import {
   useGenerateChecklist,
   usePromoteChecklistItem,
@@ -305,7 +299,7 @@ export const TaskChecklist = ({
     }
   };
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const sensors = useDragSensors();
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
