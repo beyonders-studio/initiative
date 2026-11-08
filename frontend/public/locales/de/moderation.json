@@ -92,7 +92,6 @@
     "roles_one": "{{count}} Rolle",
     "roles_other": "{{count}} Rollen"
   },
-  "loadFailed": "Das konnte nicht geladen werden. Versuche es erneut.",
   "hold": {
     "title": "Für die Plattform zurückhalten",
     "description": "Die Plattform bewahrt dies genau so auf, wie es ist. Niemand in dieser Community kann es sehen, ändern oder löschen, bis die Plattform es freigibt.",

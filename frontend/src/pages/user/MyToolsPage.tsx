@@ -33,6 +33,7 @@ import { Combobox } from "@/ui/combobox";
 import { Label } from "@/ui/label";
 import { cn } from "@/ui/lib/utils";
 import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 const ROUTE = "/my-tools";
@@ -206,7 +207,7 @@ export function MyToolsPage() {
                 <TableSkeleton rows={5} columns={5} pagination />
               </SkeletonRegion>
             ) : isError ? (
-              <p className="p-2 text-destructive text-sm">{t("loadError")}</p>
+              <StatusMessage />
             ) : totalCount === 0 && !query ? (
               <Card>
                 <CardHeader>

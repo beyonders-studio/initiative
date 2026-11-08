@@ -1,6 +1,6 @@
 /**
- * The published ideas on Initiative Cloud, readable signed in or not, the
- * votes for them, and the team's Idea panel on an Ideas-board task.
+ * The published ideas on Initiative Cloud, readable signed in or not, and the
+ * votes for them.
  */
 
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
@@ -15,17 +15,9 @@ import {
 } from "@/api/generated/ideas/ideas";
 import type {
   IdeaListRead,
-  IdeaPanelRead,
   IdeaRead,
   ListIdeasParams,
 } from "@/api/generated/initiativeAPI.schemas";
-import {
-  getReadTaskIdeaQueryKey,
-  publishTaskIdea,
-  readTaskIdea,
-  unpublishTaskIdea,
-} from "@/api/generated/tasks/tasks";
-import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { queryClient } from "@/lib/queryClient";
 import type { MutationOpts } from "@/types/mutation";
@@ -69,36 +61,3 @@ export const useVoteForIdea = (options?: MutationOpts<IdeaRead, { taskId: number
     },
     options
   );
-
-/** An Ideas-board task's panel; a 404, the usual answer, for any other task. */
-export const useTaskIdea = (taskId: number) => {
-  const communityId = useActiveCommunityId();
-  return useQuery<IdeaPanelRead>({
-    queryKey: getReadTaskIdeaQueryKey(communityId, taskId),
-    queryFn: () => readTaskIdea(communityId, taskId),
-    enabled: Number.isFinite(taskId),
-    retry: false,
-  });
-};
-
-/** Publish an Ideas-board task, or take it off the Ideas page. */
-export const usePublishTaskIdea = (
-  taskId: number,
-  options?: MutationOpts<IdeaPanelRead, boolean>
-) => {
-  const communityId = useActiveCommunityId();
-  return useApiMutation<IdeaPanelRead, boolean>(
-    {
-      mutationFn: (on) =>
-        on ? publishTaskIdea(communityId, taskId) : unpublishTaskIdea(communityId, taskId),
-      invalidate: () =>
-        Promise.all([
-          queryClient.invalidateQueries({
-            queryKey: getReadTaskIdeaQueryKey(communityId, taskId),
-          }),
-          refreshIdeas(),
-        ]),
-    },
-    options
-  );
-};

@@ -3,8 +3,6 @@
   "subtitle": "Abre una iniciativa para gestionar archivos, proyectos y membresía.",
   "newInitiative": "Nueva iniciativa",
   "selectCommunity": "Selecciona una comunidad",
-  "loading": "Cargando iniciativas…",
-  "loadError": "No se pudieron cargar las iniciativas en este momento.",
   "noDescription": "Sin descripción aún.",
   "members": "Miembros:",
   "createInitiative": "Crear iniciativa",
@@ -24,7 +22,6 @@
     "requestError": "No se puede enviar esta solicitud en este momento.",
     "queueTitle": "Solicitudes para unirse",
     "queueDescription": "Personas que pidieron unirse a esta iniciativa. Aprobar las añade como miembros.",
-    "queueLoadError": "No se pueden cargar las solicitudes en este momento.",
     "noMessage": "Sin mensaje",
     "unknownRequester": "Alguien",
     "priorDenials_one": "Rechazada {{count}} vez antes",
@@ -38,8 +35,6 @@
   "manage": {
     "description": "Todas las iniciativas de esta comunidad y quién las dirige. Haz a alguien gestor de proyecto para ponerlo al frente de una; hazte gestor tú para trabajar en ella desde tu propia barra lateral.",
     "adminRequired": "Debes ser administrador de la comunidad para gestionar iniciativas.",
-    "loading": "Cargando iniciativas…",
-    "loadError": "No se pueden cargar las iniciativas en este momento.",
     "filterByName": "Filtrar por nombre",
     "nameColumn": "Iniciativa",
     "managersColumn": "Gestores de proyecto",
@@ -166,7 +161,6 @@
     "roleUpdateError": "No se pudo actualizar el rol en este momento.",
     "rolesTitle": "Permisos de roles",
     "rolesDescription": "Lo que cada rol puede ver y lo que puede crear. Los gestores lo tienen todo.",
-    "loadingRoles": "Cargando roles...",
     "addCustomRole": "Agregar rol personalizado",
     "setByCommunity": "Tu comunidad define esto para todas las iniciativas.",
     "customRolesOff": "Tu comunidad limita las iniciativas a sus roles integrados.",
@@ -270,8 +264,7 @@
     "layouts": {
       "heading": "Diseños",
       "description": "Cómo muestra cada herramienta de esta iniciativa lo que contiene: cada diseño, cuándo cambió por última vez y en qué lista se abre un proyecto. Se cambian en el editor de cada una.",
-      "noProjects": "Esta iniciativa aún no tiene proyectos.",
-      "loadError": "No se pudieron cargar los diseños."
+      "noProjects": "Esta iniciativa aún no tiene proyectos."
     },
     "fixedOn": "Activado",
     "fixedOff": "Desactivado"

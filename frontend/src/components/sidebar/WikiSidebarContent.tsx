@@ -42,6 +42,7 @@ import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { TOOL_ICONS, toolSettingsRoute, wikiFileRoute, wikiPageRoute } from "@/lib/tools";
 import { Button } from "@/ui/button";
+import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 
 // Adding a file to a wiki is named by the files tool itself, so the row
@@ -175,7 +176,9 @@ export const WikiSidebarContent = ({
       <SidebarContent className="h-full overflow-y-auto overflow-x-hidden">
         <SidebarGroup>
           {pagesQuery.isLoading ? (
-            <p className="px-2 py-1.5 text-muted-foreground text-sm">{t("pages.loading")}</p>
+            <SkeletonRegion className="px-2 py-1.5">
+              <SkeletonLines lines={5} />
+            </SkeletonRegion>
           ) : needle ? (
             matches.length === 0 ? (
               <p className="px-2 py-1.5 text-muted-foreground text-sm">

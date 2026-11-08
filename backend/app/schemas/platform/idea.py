@@ -1,4 +1,4 @@
-"""The published ideas, as anybody reads them, and the team's Idea panel."""
+"""The published ideas, as anybody reads them."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ class IdeaRead(SanitizedBaseModel):
     voted: bool
     #: A closed idea keeps its votes and takes no change to them.
     closed: bool
-    published_at: datetime
+    created_at: datetime
     updated_at: Optional[datetime] = None
     #: Only on one idea's own page.
     description: Optional[str] = None
@@ -41,10 +41,3 @@ class IdeaListRead(SanitizedBaseModel):
     items: List[IdeaRead]
     total: int
     statuses: List[IdeaStatusRead]
-
-
-class IdeaPanelRead(SanitizedBaseModel):
-    """What the team sees of an Ideas-board task."""
-
-    published_at: Optional[datetime] = None
-    votes: int

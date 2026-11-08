@@ -27,6 +27,7 @@ import {
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 
 /** A change to the list waiting on its confirmation. */
 type Change =
@@ -144,12 +145,7 @@ export const AddressManager = () => {
         // Said, not drawn as an empty list. A request that did not arrive and
         // an account holding nothing render the same way otherwise, and the
         // second is alarming on the page that says how you get in.
-        <div className="space-y-2 rounded-md border border-dashed p-4 text-center">
-          <p className="text-muted-foreground text-sm">{t("settings:addresses.loadFailed")}</p>
-          <Button variant="outline" size="sm" onClick={() => void refetch()}>
-            {t("settings:addresses.retry")}
-          </Button>
-        </div>
+        <StatusMessage onRetry={refetch} />
       ) : (
         <ul className="space-y-2">
           {addresses.map((address) => {

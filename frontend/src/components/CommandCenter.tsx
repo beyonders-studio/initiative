@@ -3,6 +3,7 @@ import {
   BarChart3,
   CalendarDays,
   CheckSquare,
+  CircleQuestionMark,
   FilePlus,
   House,
   LayoutGrid,
@@ -21,6 +22,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type SearchSuggestion, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { openHelp } from "@/components/help/helpStore";
 import { InitiativeMark } from "@/components/icons/InitiativeMark";
 import { SearchCategoryTabs } from "@/components/search/SearchCategoryTabs";
 import { getOpenCreateTaskWizard } from "@/components/tasks/CreateTaskWizard";
@@ -419,8 +421,8 @@ export function CommandCenter() {
           </CommandGroup>
         )}
 
-        {/* Actions — each shown only when the user can land its wizard
-            somewhere (cmdk hides the group if it ends up empty). */}
+        {/* Actions — Help always, the rest only when the user can land its
+            wizard or form somewhere. */}
         <CommandGroup heading={t("groups.actions")}>
           {globalCreate.task && (
             <CommandItem
@@ -458,6 +460,16 @@ export function CommandCenter() {
               <span>{t("actions.reportSecurityProblem")}</span>
             </CommandItem>
           )}
+          <CommandItem
+            value="action-help"
+            onSelect={() => {
+              setOpen(false);
+              openHelp();
+            }}
+          >
+            <CircleQuestionMark className="text-muted-foreground" />
+            <span>{t("common:help")}</span>
+          </CommandItem>
           {feedback.offered && (
             <CommandItem
               value="action-send-feedback"

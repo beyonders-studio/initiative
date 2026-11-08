@@ -112,22 +112,17 @@
       "days_other": "{{count}} Tage",
       "any": "Beliebiges Datum"
     },
-    "loadError": "Fokusliste derzeit nicht verfügbar.",
     "truncated": "Die ersten {{shown}} werden angezeigt. Verkleinere den Zeitraum für eine kürzere Liste.",
     "settingsHint": "Angeheftete Aufgaben erscheinen immer, unabhängig von diesen Einstellungen."
   },
   "myTasks": {
     "title": "Meine Aufgaben",
     "noCommunity": "Keine Community",
-    "loadError": "Deine Aufgaben konnten nicht geladen werden.",
     "groupByDate": "Datum",
     "groupByCommunity": "Community"
   },
   "myCalendar": {
     "title": "Mein Kalender"
-  },
-  "tagTasks": {
-    "loadError": "Aufgaben konnten nicht geladen werden."
   },
   "ai": {
     "fromComments_one": "Ohne den Kommentar der Aufgabe geschrieben, er passte nicht hinein.",
@@ -182,8 +177,6 @@
   "move": {
     "title": "Aufgabe in ein anderes Projekt verschieben",
     "description": "Wähle ein Zielprojekt innerhalb der aktuellen Community aus. Du kannst Aufgaben nur in Projekte verschieben, in denen du die Berechtigung hast, neue Arbeit zu erstellen.",
-    "loadError": "Beschreibbare Projekte konnten nicht geladen werden.",
-    "loading": "Verfügbare Projekte werden geladen…",
     "noProjects": "Du hast noch keine anderen beschreibbaren Projekte verfügbar.",
     "searchPlaceholder": "Projekte suchen…",
     "statusResetWarning": "Beim Verschieben dieser Aufgabe wird ihr Status auf ‘Backlog’ zurückgesetzt.",

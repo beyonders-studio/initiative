@@ -150,7 +150,6 @@
       "daysOption_other": "Los próximos {{count}} días",
       "empty_one": "No hay nada para hoy.",
       "empty_other": "No hay nada en los próximos {{count}} días.",
-      "loadError": "No se pudo cargar lo que viene.",
       "openCalendar": "Abrir Mi calendario"
     },
     "calendar": {
@@ -168,7 +167,6 @@
       "toolsHint": "Limita las dos listas a estos tipos de herramienta. Déjalo vacío para todas.",
       "emptyViewed": "Aún no has abierto nada. Proyectos, archivos y lo demás aparecen aquí cuando los miras.",
       "emptyChanged": "No ha cambiado nada últimamente.",
-      "loadError": "No se pudo cargar lo reciente.",
       "openTools": "Abrir Mis herramientas"
     },
     "bookmarks": {
@@ -176,8 +174,7 @@
       "titleIn": "{{tool}} en marcadores",
       "description": "Todo lo que guardaste en marcadores, de cada comunidad, a un clic.",
       "toolsHint": "Muestra solo estos tipos de herramienta. Déjalo vacío para verlos todos.",
-      "empty": "Aún no tienes marcadores. Guarda en marcadores un proyecto, un archivo o lo que sea desde su página y te esperará aquí.",
-      "loadError": "No se pudieron cargar tus marcadores."
+      "empty": "Aún no tienes marcadores. Guarda en marcadores un proyecto, un archivo o lo que sea desde su página y te esperará aquí."
     },
     "activity": {
       "title": "Actividad",
@@ -196,7 +193,6 @@
     "progress": {
       "title": "Mi progreso",
       "description": "Tu racha, tu semana y cuánto terminas a tiempo.",
-      "loadError": "No se pudo cargar tu progreso.",
       "streak_one": "{{count}} día",
       "streak_other": "{{count}} días",
       "firstTask": "Termina tu primera tarea para empezar una racha."
@@ -258,7 +254,6 @@
   "marketplace": {
     "browse": "Explorar el marketplace",
     "by": "de {{publisher}}",
-    "loadError": "No se pudieron cargar los diseños del marketplace.",
     "empty": "Aún no hay diseños en el marketplace."
   },
   "store": {
@@ -273,7 +268,6 @@
     "description": "Cualquier banner que tengas puede ir arriba de esta vista, y cada vista puede llevar uno distinto.",
     "useProfile": "Usar el banner de mi perfil",
     "none": "Sin banner",
-    "more": "Conseguir más banners",
-    "loadError": "No se pudieron cargar tus banners."
+    "more": "Conseguir más banners"
   }
 }

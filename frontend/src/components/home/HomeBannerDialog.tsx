@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 
 export interface HomeBannerDialogProps {
   open: boolean;
@@ -74,17 +75,7 @@ export function HomeBannerDialog({ open, onOpenChange, value, onChange }: HomeBa
             if it could not be read, the picker would say there is nothing in
             it, which is not true. */}
         {library.isError ? (
-          <div className="flex flex-wrap items-center gap-3 text-muted-foreground text-sm">
-            <span>{t("banner.loadError")}</span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void library.refetch()}
-            >
-              {t("common:tryAgain")}
-            </Button>
-          </div>
+          <StatusMessage onRetry={library.refetch} />
         ) : owned ? (
           <SlotPicker kind="banner" value={value} onChange={onChange} owned={owned} />
         ) : (

@@ -1,12 +1,4 @@
-import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
+import { closestCenter, DndContext, type DragEndEvent } from "@dnd-kit/core";
 import {
   rectSortingStrategy,
   SortableContext,
@@ -44,6 +36,7 @@ import {
   useUpdateCounter,
   useUpdateCounterGroup,
 } from "@/hooks/useCounters";
+import { useDragSensors } from "@/hooks/useDragSensors";
 import { layoutViewSpec, useListView, viewKey } from "@/hooks/useListView";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
@@ -78,10 +71,7 @@ export function CounterGroupDetailPage() {
   const groupQuery = useCounterGroup(groupId);
   useToolRealtime(Tool.counter_group, groupId);
 
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { distance: 8 } })
-  );
+  const sensors = useDragSensors();
 
   const updateCounter = useUpdateCounter(groupId ?? 0);
   const setCount = useSetCount(groupId ?? 0);

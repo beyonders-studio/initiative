@@ -6,6 +6,7 @@ import { LogoIcon } from "@/components/LogoIcon";
 import { Markdown } from "@/components/Markdown";
 import { useLegalDocument, useLegalIndex } from "@/hooks/useLegalDocuments";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
 
 /**
  * One of the deployment's legal documents, read in the app.
@@ -46,7 +47,9 @@ export const LegalDocumentPage = () => {
         </CardHeader>
         <CardContent>
           {document.isLoading ? (
-            <p className="text-muted-foreground text-sm">{t("common:loading")}</p>
+            <SkeletonRegion>
+              <SkeletonLines lines={8} />
+            </SkeletonRegion>
           ) : null}
           {elsewhere ? (
             <a

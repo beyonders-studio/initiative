@@ -62,6 +62,8 @@
     "landingStatusDefault": "El estado por defecto del proyecto",
     "caseTypeLabel": "Los casos nuevos son de tipo",
     "caseTypeDefault": "El tipo por defecto del proyecto",
+    "ideaTypeLabel": "El tipo que lleva una tarea a la página de Ideas",
+    "ideaTypeNone": "Ninguno: no se publica nada",
     "enabledLabel": "Recibiendo casos nuevos",
     "lastCase": "Último caso abierto el {{when}}.",
     "noCasesYet": "Aún no hay casos.",
@@ -82,11 +84,6 @@
     "noAwaitingHelp": "Sin un estado elegido, quien envía ve Recibido, En curso y Cerrado, nunca «Esperando tu respuesta».",
     "sharesIsolated": "Otro canal también llega a esta iniciativa. Los casos de seguridad y moderación deberían tener su propia iniciativa, para que solo quienes los atienden puedan leerlos.",
     "sharesWithIsolated": "Esta iniciativa también recibe casos de seguridad o moderación, que deberían tener su propia iniciativa. Dirige uno de los canales a otro lugar."
-  },
-  "loadFailed": {
-    "title": "No se pudieron cargar estos ajustes",
-    "description": "No se ha cambiado nada. Inténtalo de nuevo; si sigue fallando, el registro del servidor dirá por qué.",
-    "retry": "Reintentar"
   },
   "help": {
     "action": "Pedir ayuda",
@@ -157,12 +154,13 @@
     "replyError": "No se pudo enviar tu respuesta. Inténtalo de nuevo en un momento.",
     "closedNote": "Este ticket está cerrado. Si surge otra cosa, vuelve a pedir ayuda.",
     "noConversation": "Gracias por el reporte. El equipo revisa cada uno, pero no responde a los reportes aquí.",
-    "empty": "Aún no has enviado ningún ticket. Cuando pidas ayuda, aparecerá aquí para que puedas seguirla.",
-    "loadError": "No se pudieron cargar tus tickets."
+    "empty": "Aún no has enviado ningún ticket. Cuando pidas ayuda, aparecerá aquí para que puedas seguirla."
   },
   "case": {
     "filedBy": "Enviado por",
     "noFiler": "Abierto automáticamente",
+    "votes_one": "{{count}} voto",
+    "votes_other": "{{count}} votos",
     "noContact": "Prefiere que no le contacten",
     "theyCalledIt": "Su asunto:",
     "noConversation": "Este tipo de caso no abre una conversación con quien lo envió.",
@@ -323,15 +321,6 @@
   },
   "moderationTopics": {
     "appeal": "Apelación contra tu suspensión"
-  },
-  "idea": {
-    "title": "Idea",
-    "publish": "Publicada en la página de ideas",
-    "publishedHelp": "Todos ven su título, su descripción y su estado, y pueden votarla.",
-    "draftHelp": "Sin publicar: solo la ve el equipo. Sus votos se quedan con ella.",
-    "votes_one": "{{count}} voto",
-    "votes_other": "{{count}} votos",
-    "error": "No se pudo cambiar. Inténtalo de nuevo en un momento."
   },
   "ideas": {
     "title": "Ideas",

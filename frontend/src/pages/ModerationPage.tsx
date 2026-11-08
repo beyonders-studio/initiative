@@ -47,7 +47,9 @@ import { getUserDisplayName } from "@/lib/userDisplay";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { CardGridSkeleton, ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { PaginationBar } from "@/ui/pagination-bar";
+import { StatusMessage } from "@/ui/status-message";
 import { Tabs, TabsList, TabsTrigger } from "@/ui/tabs";
 import { Textarea } from "@/ui/textarea";
 
@@ -112,7 +114,9 @@ export const ModerationPage = () => {
 
       {area === "reports" &&
         (isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("common:loading")}</p>
+          <SkeletonRegion>
+            <CardGridSkeleton count={3} className="space-y-4" />
+          </SkeletonRegion>
         ) : (
           <div className="space-y-4">
             {reports.length === 0 ? (
@@ -402,17 +406,21 @@ const ReportCard = ({ report, communityId, initiativeId }: ReportCardProps) => {
 const MembersArea = ({ initiativeId }: { initiativeId: number }) => {
   const { t } = useTranslation(["moderation", "common"]);
   const [page, setPage] = useState(1);
-  const { data, isLoading, isError } = useInitiativeRoster(initiativeId, {
+  const { data, isLoading, isError, refetch } = useInitiativeRoster(initiativeId, {
     page,
     page_size: MEMBERS_PAGE_SIZE,
   });
   const members = data?.items ?? [];
 
   if (isLoading) {
-    return <p className="text-muted-foreground text-sm">{t("common:loading")}</p>;
+    return (
+      <SkeletonRegion>
+        <ListSkeleton rows={5} avatar={false} />
+      </SkeletonRegion>
+    );
   }
   if (isError) {
-    return <p className="text-destructive text-sm">{t("loadFailed")}</p>;
+    return <StatusMessage onRetry={refetch} />;
   }
 
   return (
@@ -468,16 +476,20 @@ const SharingArea = ({
   initiativeId: number;
 }) => {
   const { t } = useTranslation(["moderation", "common"]);
-  const { data, isLoading, isError } = useInitiativeSharing(communityId, initiativeId);
+  const { data, isLoading, isError, refetch } = useInitiativeSharing(communityId, initiativeId);
   const items = data?.items ?? [];
 
   if (isLoading) {
-    return <p className="text-muted-foreground text-sm">{t("common:loading")}</p>;
+    return (
+      <SkeletonRegion>
+        <ListSkeleton rows={5} avatar={false} />
+      </SkeletonRegion>
+    );
   }
   // A read that failed and a community that has shared nothing are different
   // answers; this says which one it is.
   if (isError) {
-    return <p className="text-destructive text-sm">{t("loadFailed")}</p>;
+    return <StatusMessage onRetry={refetch} />;
   }
 
   return (
@@ -541,7 +553,7 @@ const SharingArea = ({
 const LogArea = ({ communityId, initiativeId }: { communityId: number; initiativeId: number }) => {
   const { t } = useTranslation(["moderation", "common"]);
   const [page, setPage] = useState(1);
-  const { data, isLoading, isError } = useModerationLog(
+  const { data, isLoading, isError, refetch } = useModerationLog(
     { communityId, initiativeId, page },
     { enabled: Boolean(communityId) && Number.isFinite(initiativeId) }
   );
@@ -551,10 +563,14 @@ const LogArea = ({ communityId, initiativeId }: { communityId: number; initiativ
   const items = data?.items ?? [];
 
   if (isLoading) {
-    return <p className="text-muted-foreground text-sm">{t("common:loading")}</p>;
+    return (
+      <SkeletonRegion>
+        <ListSkeleton rows={5} avatar={false} />
+      </SkeletonRegion>
+    );
   }
   if (isError) {
-    return <p className="text-destructive text-sm">{t("loadFailed")}</p>;
+    return <StatusMessage onRetry={refetch} />;
   }
 
   return (

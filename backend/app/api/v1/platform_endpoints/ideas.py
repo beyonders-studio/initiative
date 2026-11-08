@@ -43,7 +43,7 @@ def _read(idea: ideas_service.IdeaRead) -> IdeaRead:
         votes=idea.votes,
         voted=idea.voted,
         closed=idea.closed,
-        published_at=idea.published_at,
+        created_at=idea.created_at,
         updated_at=idea.updated_at,
         description=idea.description,
     )

@@ -28,6 +28,7 @@ import { cn } from "@/ui/lib/utils";
 import { LoadMore } from "@/ui/load-more";
 import { RelativeTime } from "@/ui/relative-time";
 import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 
 /** "Ada and 2 others commented and edited", in the reader's language. */
 const useSentence = () => {
@@ -177,7 +178,7 @@ export const CommunityActivityFeed = ({
     );
   }
   if (feed.isError && entries.length === 0) {
-    return <p className="p-2 text-destructive text-sm">{t("feed.loadError")}</p>;
+    return <StatusMessage onRetry={feed.refetch} />;
   }
   if (entries.length === 0) {
     return (

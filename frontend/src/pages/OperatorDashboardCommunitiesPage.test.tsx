@@ -597,14 +597,14 @@ describe("OperatorDashboardCommunitiesPage", () => {
       expect(screen.getByText("Automations")).toBeInTheDocument();
       expect(screen.getByText("Runs this month")).toBeInTheDocument();
       expect(screen.getByText("250 of 500")).toBeInTheDocument();
-      expect(screen.queryByText("Plug-in usage could not be loaded.")).not.toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
 
     it("says the list could not be loaded rather than showing none", async () => {
       pluginSummariesFail = true;
       await openSheet("Capped Community");
 
-      expect(screen.getByText("Plug-in usage could not be loaded.")).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toBeInTheDocument();
     });
   });
 

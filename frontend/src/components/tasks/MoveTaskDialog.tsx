@@ -13,6 +13,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/ui/dialog";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 type MoveTaskDialogProps = {
   trigger?: ReactNode;
@@ -87,9 +89,11 @@ export const MoveTaskDialog = ({
         </DialogHeader>
 
         {hasError ? (
-          <p className="text-destructive text-sm">{t("move.loadError")}</p>
+          <StatusMessage />
         ) : isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("move.loading")}</p>
+          <SkeletonRegion>
+            <ListSkeleton rows={3} avatar={false} />
+          </SkeletonRegion>
         ) : availableProjects.length === 0 ? (
           <p className="text-muted-foreground text-sm">{t("move.noProjects")}</p>
         ) : (

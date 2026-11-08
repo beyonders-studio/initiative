@@ -23,6 +23,7 @@ import { getUserDisplayName } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hover-card";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 import { CommentInput } from "./CommentInput";
 import { CommentReferences } from "./CommentReferences";
@@ -391,7 +392,9 @@ export const CommentSection = ({
             comments naming the same task ask about it once. */}
           <div ref={threadRef} className="mt-4 space-y-3">
             {isLoading ? (
-              <p className="text-muted-foreground text-sm">{t("loading")}</p>
+              <SkeletonRegion>
+                <ListSkeleton rows={3} />
+              </SkeletonRegion>
             ) : hasComments ? (
               commentTree.map((entry) => {
                 const thread = (comment: CommentWithReplies, depth: number) => (

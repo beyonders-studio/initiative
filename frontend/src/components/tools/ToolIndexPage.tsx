@@ -123,6 +123,7 @@ import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { useFileDrop } from "@/ui/lib/useFileDrop";
 import { CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { PaginationBar } from "@/ui/pagination-bar";
+import { StatusMessage } from "@/ui/status-message";
 
 // ---------------------------------------------------------------------------
 // What a tool contributes
@@ -174,6 +175,7 @@ export type ToolIndexList = {
   rows: ToolIndexRow[];
   isLoading: boolean;
   isError: boolean;
+  refetch: () => void;
   /** The rows are the previous request's, shown while this one loads. */
   isPlaceholderData: boolean;
   /** Rows the server holds for this archive state — what the pager counts. */
@@ -340,6 +342,7 @@ const makeRows =
       rows,
       isLoading: query.isLoading,
       isError: query.isError,
+      refetch: query.refetch,
       isPlaceholderData: query.isPlaceholderData,
       totalCount: query.data?.total_count ?? 0,
       hasNext: query.data?.has_next ?? false,
@@ -958,7 +961,7 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
           <CardGridSkeleton />
         </SkeletonRegion>
       ) : list.isError ? (
-        <p className="text-destructive text-sm">{t("loadError")}</p>
+        <StatusMessage onRetry={list.refetch} />
       ) : list.rows.length > 0 ||
         (layout === "tags" && (tagTree.selectedPaths.size > 0 || activeFilterCount > 0)) ? (
         // In the tags view a narrowed list that matches nothing keeps the tree

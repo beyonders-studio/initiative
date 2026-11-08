@@ -52,7 +52,6 @@
     "unreadOnly": "Solo sin leer"
   },
   "loading": "Cargando publicaciones...",
-  "loadError": "No se pudieron cargar las publicaciones.",
   "creating": "Publicando...",
   "saving": "Guardando...",
   "notFound": "Publicación no encontrada",

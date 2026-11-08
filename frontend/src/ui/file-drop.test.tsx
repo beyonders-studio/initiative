@@ -44,6 +44,16 @@ describe("FileDropArea", () => {
     expect(screen.getByText("Drop a file here, or")).toBeInTheDocument();
   });
 
+  it("knows an extension with two dots", () => {
+    const onFile = vi.fn();
+    render(<FileDropArea accept=".tar.gz,.tgz" onFile={onFile} prompt="Drop a bundle here" />);
+    const area = screen.getByText("Drop a bundle here").parentElement as HTMLElement;
+
+    fireEvent.drop(area, drag([new File(["x"], "registry.tar.gz")]));
+
+    expect(onFile).toHaveBeenCalledWith(expect.objectContaining({ name: "registry.tar.gz" }));
+  });
+
   it("says so when nothing dropped is a kind it takes", () => {
     const { onFile, area } = mount();
 

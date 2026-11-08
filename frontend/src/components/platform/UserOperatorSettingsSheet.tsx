@@ -71,8 +71,10 @@ import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui/sheet";
+import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
 import { Textarea } from "@/ui/textarea";
 
@@ -129,9 +131,11 @@ const AccountCases = ({ user, open }: { user: OperatorUserRead; open: boolean })
           {t("platformUsers.sheet.cases.count", { count: user.open_case_count })}
         </p>
         {cases.isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("platformUsers.sheet.cases.loading")}</p>
+          <SkeletonRegion>
+            <ListSkeleton rows={2} avatar={false} />
+          </SkeletonRegion>
         ) : cases.isError ? (
-          <p className="text-destructive text-sm">{t("platformUsers.sheet.cases.loadError")}</p>
+          <StatusMessage onRetry={cases.refetch} />
         ) : (
           <ul className="divide-y rounded-md border">
             {(cases.data ?? []).map((item) => (

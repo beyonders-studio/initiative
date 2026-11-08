@@ -1,8 +1,9 @@
 import { Suspense, useEffect, useLayoutEffect, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
-import { AppLinks } from "@/components/AppLinks";
 import { LogoIcon } from "@/components/LogoIcon";
+import { HelpButton } from "@/components/support/HelpButton";
+import { UpdateButton } from "@/components/UpdateButton";
 import { themeColor } from "@/lib/cssColor";
 import Desktop from "@/plugins/desktop";
 
@@ -31,7 +32,7 @@ const titleBarHeight = () => {
  * where the window draws its own: a browser, a phone, a desktop app from
  * before it drew one, or a window gone full screen.
  */
-const useTitleBarHeight = () => useSyncExternalStore(subscribe, titleBarHeight, () => 0);
+export const useTitleBarHeight = () => useSyncExternalStore(subscribe, titleBarHeight, () => 0);
 
 /** Colour the window's own buttons to the bar, and again whenever the theme or accent changes. */
 const useWindowButtonColors = (shown: boolean) => {
@@ -65,13 +66,13 @@ const useWindowButtonColors = (shown: boolean) => {
 
 /**
  * The desktop app's title bar, which the window leaves to the page: the app's
- * name, then the app's corner (the update it is waiting on, and Help), with
- * the computer's own window buttons drawn at its end. The bar drags the window
- * and a double click maximizes it. Everything under it is sized by
- * `--title-bar-height` (`h-app`, `min-h-app`, `max-h-app`).
+ * name, then the update it is waiting on and Help, with the computer's own
+ * window buttons drawn at its end. The bar drags the window and a double click
+ * maximizes it. Everything under it is sized by `--title-bar-height` (`h-app`,
+ * `min-h-app`, `max-h-app`).
  *
  * It renders on every page, the web included, so it reads only the preloaded
- * `common` namespace; the corner's own translations load inside a boundary.
+ * `common` namespace; its buttons' translations load inside a boundary.
  */
 export const DesktopTitleBar = () => {
   const { t } = useTranslation("common");
@@ -102,7 +103,10 @@ export const DesktopTitleBar = () => {
         <LogoIcon className="size-4 shrink-0" aria-hidden="true" focusable="false" />
         <span className="truncate font-medium text-sidebar-foreground text-xs">{t("appName")}</span>
         <Suspense fallback={null}>
-          <AppLinks className="ml-auto [app-region:no-drag]" />
+          <div className="ml-auto flex items-center gap-3 [app-region:no-drag]">
+            <UpdateButton />
+            <HelpButton />
+          </div>
         </Suspense>
       </div>
     </header>

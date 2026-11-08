@@ -36,6 +36,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 import { RegisterPage } from "./RegisterPage";
 
@@ -334,7 +335,11 @@ const SignInCard = () => {
   if (bootstrap.isPending) {
     return (
       <div className="flex min-h-app items-center justify-center bg-muted/60 px-4 py-12">
-        <p className="text-muted-foreground text-sm">{t("common:loading")}</p>
+        <div className="w-full max-w-md">
+          <SkeletonRegion>
+            <FormSkeleton fields={2} />
+          </SkeletonRegion>
+        </div>
       </div>
     );
   }

@@ -528,9 +528,6 @@ class IdeaReader:
 
     guild_id: int
     user_id: Optional[int] = None
-    #: The tasks of the published ideas, as the seam read them through the
-    #: ideas role. Empty on the first routing, which is what reads them.
-    tasks: tuple[int, ...] = ()
 
     @property
     def attributed(self) -> bool:
@@ -539,12 +536,11 @@ class IdeaReader:
     def __post_init__(self) -> None:
         if self.guild_id is None:
             raise ContextShapeError("an ideas routing names the community")
-        object.__setattr__(self, "tasks", tuple(sorted(int(t) for t in self.tasks)))
 
     def route(self) -> Route:
         from app.db.operations_schema import ideas_role_name
 
-        values: dict[gucs.Guc, Any] = {gucs.IDEA_TASKS: self.tasks}
+        values: dict[gucs.Guc, Any] = {}
         if self.user_id is not None:
             values[gucs.USER_ID] = self.user_id
         return Route(

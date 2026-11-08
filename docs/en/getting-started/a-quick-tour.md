@@ -40,7 +40,7 @@ In a busy community the sidebar gets long. Initiatives collapse, and there's a *
 
 Your bits, tucked underneath.
 
-**Your name and picture** opens your account menu — your profile, **My Settings**, **Theme**, and signing out.
+**Your name and picture** opens your account menu — your profile, **My Settings**, **Help**, **Theme**, and signing out.
 
 The small **dot** on your picture is your presence: online, idle, busy, or offline. Offline means offline. You can sit in Initiative at two in the morning with six files open and that dot will say offline the entire time, because you asked it to and it is nobody's business. See [Saying how you're around](../account/profile-and-preferences.md#saying-how-youre-around).
 
@@ -48,10 +48,9 @@ The small **dot** on your picture is your presence: online, idle, busy, or offli
 
 **The bell**, beside your name, is your notifications. Announcements you've closed land there too, already read, so you can open one again.
 
-Under all of it, one small row. The desktop app has it in the window's title bar as well:
+**Update** appears beside the bell only when there's a newer version waiting, and stays until you take it. On the web and phones it reloads. The desktop app keeps it in the window's title bar instead, where it restarts into the new app, or tells you where to get it.
 
-- **Update** appears only when there's a newer version waiting, and stays until you take it. On the web and phones it reloads; in the desktop app it restarts into the new app, or tells you where to get it.
-- **Help** (the question mark) searches these pages without leaving the app, starting with answers for the page you're on. Where there's somebody to ask (a server that takes help requests, or one that has given an address to write to), the way to ask sits under the results.
+**Help**, in your account menu and in [search](#the-one-thing-genuinely-worth-learning-today), searches these pages without leaving the app, starting with answers for the page you're on. The desktop app also has it as the question mark in its title bar. Where there's somebody to ask (a server that takes help requests, or one that has given an address to write to), the way to ask sits under the results.
 
 Which version you're on, and what changed lately, is at the foot of **My Settings**, for anyone who likes to know what changed and when.
 
