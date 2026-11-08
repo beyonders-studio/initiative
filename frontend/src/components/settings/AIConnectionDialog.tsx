@@ -17,7 +17,6 @@ import {
 } from "@/ui/dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 
@@ -133,10 +132,8 @@ export const AIConnectionDialog = ({
           )}
 
           {showBaseUrlField && (
-            <div className="space-y-2">
-              <Label htmlFor="ai-connection-base-url">{t("ai.baseUrlLabel")}</Label>
+            <Field label={t("ai.baseUrlLabel")}>
               <Input
-                id="ai-connection-base-url"
                 value={form.baseUrl}
                 onChange={(event) => setField("baseUrl", event.target.value)}
                 placeholder={providerConfig?.defaultBaseUrl ?? "https://api.example.com/v1"}
@@ -147,7 +144,7 @@ export const AIConnectionDialog = ({
                     {t("ai.httpWarning")}
                   </p>
                 )}
-            </div>
+            </Field>
           )}
 
           {form.provider && (

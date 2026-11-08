@@ -355,10 +355,8 @@ export const CreateFileDialog = ({
 
           {/* Smart link tab content */}
           <TabsContent value="smartLink" className="mt-4 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="create-doc-smart-link-url">{t("create.smartLinkUrlLabel")}</Label>
+            <Field label={t("create.smartLinkUrlLabel")} hint={t("create.smartLinkDisclaimer")}>
               <Input
-                id="create-doc-smart-link-url"
                 type="url"
                 value={smartLinkUrl}
                 onChange={(e) => setSmartLinkUrl(e.target.value)}
@@ -406,8 +404,7 @@ export const CreateFileDialog = ({
                   )}
                 </div>
               ) : null}
-              <p className="text-muted-foreground text-xs">{t("create.smartLinkDisclaimer")}</p>
-            </div>
+            </Field>
           </TabsContent>
         </Tabs>
 

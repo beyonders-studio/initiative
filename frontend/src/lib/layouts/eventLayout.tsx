@@ -57,6 +57,7 @@ import type { TranslateFn } from "@/types/i18n";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { DateTimePicker } from "@/ui/date-time-picker";
+import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { useItemContext } from "@/ui/layouts/DetailLayoutView";
@@ -575,8 +576,10 @@ const MyAnswer = ({ event }: { event: CalendarEventRead }) => {
   const mine = event.attendees.find((attendee) => attendee.user_id === user?.id);
   if (!mine) return null;
   return (
-    <section className="space-y-2 rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-      <Label htmlFor="event-rsvp">{t("rsvp")}</Label>
+    <Field
+      label={t("rsvp")}
+      className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm"
+    >
       <Select
         // Pending is no answer yet, so it shows as the placeholder rather
         // than as a choice.
@@ -589,7 +592,7 @@ const MyAnswer = ({ event }: { event: CalendarEventRead }) => {
         }
         disabled={answer.isPending}
       >
-        <SelectTrigger id="event-rsvp" className="w-[140px]">
+        <SelectTrigger className="w-[140px]">
           <SelectValue placeholder={t("rsvpPending")} />
         </SelectTrigger>
         <SelectContent>
@@ -598,7 +601,7 @@ const MyAnswer = ({ event }: { event: CalendarEventRead }) => {
           <SelectItem value="declined">{t("rsvpDeclined")}</SelectItem>
         </SelectContent>
       </Select>
-    </section>
+    </Field>
   );
 };
 

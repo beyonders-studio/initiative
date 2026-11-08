@@ -40,7 +40,6 @@ import {
 import { Field } from "@/ui/field";
 import { FileDropArea } from "@/ui/file-drop";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { fileIcon } from "@/ui/lib/fileIcon";
 import { formatBytes, getFileTypeLabel, nameWithoutExtension } from "@/ui/lib/fileUtils";
 import { cn } from "@/ui/lib/utils";
@@ -324,8 +323,10 @@ export const AddLinkDialog = ({
           </Tabs>
 
           {farType && farTitle ? (
-            <div className="space-y-2">
-              <Label htmlFor="relation-kind">{t("dialog.sentenceLabel")}</Label>
+            <Field
+              label={t("dialog.sentenceLabel")}
+              hint={offered.length < assertable.length && t("dialog.readOnlyTarget")}
+            >
               {/* Read as one sentence, with both ends named: "This task is
                   blocked by Ship the API". Seeing the claim written out is
                   what tells somebody it is the wrong one — and the verb in
@@ -336,7 +337,7 @@ export const AddLinkDialog = ({
                   value={chosenGroup ?? undefined}
                   onValueChange={(value) => setGroupKey(value as RelationGroupKey)}
                 >
-                  <SelectTrigger id="relation-kind" className="w-auto min-w-44 bg-background">
+                  <SelectTrigger className="w-auto min-w-44 bg-background">
                     <SelectValue placeholder={t("dialog.relationship")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -349,10 +350,7 @@ export const AddLinkDialog = ({
                 </Select>
                 <span className="min-w-0 truncate font-medium text-sm">{farTitle}</span>
               </div>
-              {offered.length < assertable.length ? (
-                <p className="text-muted-foreground text-xs">{t("dialog.readOnlyTarget")}</p>
-              ) : null}
-            </div>
+            </Field>
           ) : null}
         </div>
         <DialogFooter>

@@ -55,7 +55,6 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/ui/empty";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** Match the columns behind them, so a field stops where the server would. */
@@ -329,14 +328,15 @@ export const FileTicketDialog = ({
                       </p>
                     </div>
                   ) : null}
-                  <div className="space-y-1.5">
-                    <Label htmlFor="ticket-detail">
-                      {detailRequired
+                  <Field
+                    label={
+                      detailRequired
                         ? t("moderation:report.detailRequiredLabel")
-                        : t("moderation:report.detailLabel")}
-                    </Label>
+                        : t("moderation:report.detailLabel")
+                    }
+                    className="space-y-1.5"
+                  >
                     <TicketComposer
-                      id="ticket-detail"
                       value={body}
                       onChange={(event) => setBody(event.target.value)}
                       placeholder={
@@ -353,7 +353,7 @@ export const FileTicketDialog = ({
                       pagePicture={{ hidePeople: false, takenOf: ticket.thing ?? null }}
                       disabled={pending}
                     />
-                  </div>
+                  </Field>
                 </>
               ) : (
                 <>

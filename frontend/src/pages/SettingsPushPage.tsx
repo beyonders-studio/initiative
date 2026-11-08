@@ -21,7 +21,6 @@ import { Capability, hasCapability } from "@/lib/permissions";
 import { Button } from "@/ui/button";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { Label } from "@/ui/label";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
@@ -115,15 +114,16 @@ export const SettingsPushPage = () => {
 
         <div className="grid grid-cols-pair gap-4">
           {TEXT_FIELDS.map((field) => (
-            <div key={field} className="space-y-2">
-              <Label htmlFor={`push-${field}`}>{t(`push.fields.${field}.label`)}</Label>
+            <Field
+              key={field}
+              label={t(`push.fields.${field}.label`)}
+              hint={t(`push.fields.${field}.help`)}
+            >
               <Input
-                id={`push-${field}`}
                 value={form.values[field]}
                 onChange={(event) => form.set({ [field]: event.target.value })}
               />
-              <p className="text-muted-foreground text-xs">{t(`push.fields.${field}.help`)}</p>
-            </div>
+            </Field>
           ))}
         </div>
 
