@@ -38,6 +38,7 @@ import re
 import secrets
 import subprocess
 import sys
+import textwrap
 import time
 from collections.abc import Generator
 from dataclasses import dataclass
@@ -427,8 +428,19 @@ def write_baseline(tag: str, cut: str, shot: Snapshot) -> list[Path]:
         f"-- never edited. {PREFIX_MARK} is the platform-role prefix.\n\n" + shot.sql
     )
     py_path = VERSIONS / f"{cut}_baseline.py"
+    about = textwrap.fill(
+        f"Every revision up to {cut} was collapsed into this one by "
+        "``scripts/collapse_migrations.py``. A database stamped at it or later "
+        "never runs it. A fresh one gets the group roles and memberships those "
+        "revisions made (the logins are ``app.db.bootstrap``'s), their "
+        f"extensions, and ``alembic/baseline/{sql_path.name}``. A database "
+        f"stamped before it is refused at boot and told to start {tag} first "
+        "(``app.db.init_db.check_pre_baseline_db``).",
+        width=79,
+    )
     py_path.write_text(
         _BASELINE.format(
+            about=about,
             tag=tag,
             cut=cut,
             sql=sql_path.name,
@@ -449,12 +461,7 @@ def _literal(rows: list[tuple]) -> str:
 
 _BASELINE = '''"""Baseline: the schema the chain built at {tag}.
 
-Every revision up to {cut} was collapsed into this one by
-``scripts/collapse_migrations.py``. A database stamped at {cut} or later never
-runs it. A fresh one gets the group roles and memberships those revisions made
-(the logins are ``app.db.bootstrap``'s), their extensions, and
-``alembic/baseline/{sql}``. A database stamped before {cut} is refused at boot
-and told to start {tag} first (``app.db.init_db.check_pre_baseline_db``).
+{about}
 
 Revision ID: {cut}
 Revises:
@@ -706,14 +713,17 @@ def tidy(paths: list[Path]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _report(cut: str, old_base: str) -> None:
+def _report(cut: str, old_base: str, edited: list[Path]) -> None:
     named = _git("grep", "-l", "-F", old_base, "--", ".").split()
-    tests = _git("grep", "-l", "-E", "[0-9]{8}_[0-9]{4}", "--", "backend").split()
     stale = [
-        path
-        for path in tests
-        if path.endswith("_test.py")
-        and all(i <= cut for i in REVISION_ID.findall((REPO / path).read_text()))
+        str(path.relative_to(REPO))
+        for path in edited
+        if any(
+            i <= cut
+            for i in REVISION_ID.findall(
+                ast.get_docstring(ast.parse(path.read_text())) or ""
+            )
+        )
     ]
     print("\nLeft for a person:")
     print("  * the upgrade floor in docs/en/running-a-server/backups-and-updates.md")
@@ -721,7 +731,7 @@ def _report(cut: str, old_base: str) -> None:
     if named:
         print(f"  * files that still name the old baseline {old_base}: {named}")
     if stale:
-        print(f"  * tests that name only collapsed revisions, in docstrings: {stale}")
+        print(f"  * edited tests whose docstring names a collapsed revision: {stale}")
 
 
 def main() -> int:
@@ -772,7 +782,7 @@ def main() -> int:
         print(f"\n{len(differences)} differences; the tree is back as it was.")
         return 1
 
-    tidy(done["edited"])
+    tidy([*done["edited"], written[0]])
     print(
         json.dumps(
             {
@@ -789,7 +799,7 @@ def main() -> int:
         )
     )
     print("The collapsed chain builds the same database as the chain did.")
-    _report(cut, old_base)
+    _report(cut, old_base, done["edited"])
     return 0
 
 
