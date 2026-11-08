@@ -530,7 +530,7 @@ export const useCodeLanguageActions = (): EditorAction[] => {
 /** Undo and redo, and whether there is anything to undo or redo. */
 export const useHistoryActions = () => {
   const [editor] = useLexicalComposerContext();
-  const { activeEditor, $updateToolbar } = useToolbarContext();
+  const { activeEditor } = useToolbarContext();
   const [isEditable, setIsEditable] = useState(editor.isEditable());
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -538,11 +538,6 @@ export const useHistoryActions = () => {
   useEffect(() => {
     return mergeRegister(
       editor.registerEditableListener(setIsEditable),
-      activeEditor.registerUpdateListener(({ editorState }) => {
-        editorState.read(() => {
-          $updateToolbar();
-        });
-      }),
       activeEditor.registerCommand<boolean>(
         CAN_UNDO_COMMAND,
         (payload) => {
@@ -560,7 +555,7 @@ export const useHistoryActions = () => {
         COMMAND_PRIORITY_CRITICAL
       )
     );
-  }, [$updateToolbar, activeEditor, editor]);
+  }, [activeEditor, editor]);
 
   return {
     undo: () => activeEditor.dispatchCommand(UNDO_COMMAND, undefined),
