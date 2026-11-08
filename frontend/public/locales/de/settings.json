@@ -257,6 +257,11 @@
   },
   "interface": {
     "colorTheme": "Farbdesign",
+    "mode": "Hell oder dunkel",
+    "eventThemes": {
+      "label": "Event-Designs",
+      "description": "Die App zu Feiertagen und Anlässen schmücken."
+    },
     "colorThemeDescription": "Wähle ein Farbdesign für die Anwendung.",
     "weekStartsOn": "Woche beginnt am",
     "weekStartsOnDescription": "Wähle, welcher Tag in Kalendern und Datumsauswahlfeldern zuerst angezeigt wird.",

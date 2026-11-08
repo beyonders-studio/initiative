@@ -47,7 +47,7 @@ const Header = ({ current }: { current?: Place }) => {
           aria-label={t("nav.home")}
         >
           <LogoIcon className="h-8 w-8" aria-hidden="true" />
-          <span className="pride-wordmark">initiative</span>
+          <span className="event-wordmark">initiative</span>
         </Link>
         <div className="flex items-center gap-1.5">
           <nav className="mr-2 hidden items-center gap-0.5 md:flex" aria-label={t("nav.mainAria")}>
@@ -167,7 +167,7 @@ const Footer = () => {
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2.5 font-bold text-foreground text-xl">
               <LogoIcon className="h-7 w-7" aria-hidden="true" />
-              <span className="pride-wordmark">initiative</span>
+              <span className="event-wordmark">initiative</span>
             </div>
             <p className="mt-3 max-w-xs text-muted-foreground text-sm">{t("footer.tagline")}</p>
           </div>

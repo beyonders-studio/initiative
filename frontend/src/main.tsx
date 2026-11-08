@@ -15,8 +15,8 @@ import { TaskCompletionEffectHost } from "@/components/effects/TaskCompletionEff
 import { AppErrorBoundary } from "@/components/errors/AppErrorBoundary";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { CommunityProvider, useCommunities } from "@/hooks/useCommunities";
+import { EventThemeProvider } from "@/hooks/useEventTheme";
 import { KeepScreenAwakeProvider } from "@/hooks/useKeepScreenAwake";
-import { PrideProvider } from "@/hooks/usePride";
 import { useRouteGuardSync } from "@/hooks/useRouteGuardSync";
 import { ServerProvider, useServer } from "@/hooks/useServer";
 import { ThemeProvider } from "@/hooks/useTheme";
@@ -122,7 +122,7 @@ async function bootstrap() {
       <Suspense fallback={null}>
         <AppErrorBoundary>
           <ThemeProvider>
-            <PrideProvider>
+            <EventThemeProvider>
               <KeepScreenAwakeProvider>
                 <ServerProvider>
                   {withQueryClient(
@@ -134,7 +134,7 @@ async function bootstrap() {
                   )}
                 </ServerProvider>
               </KeepScreenAwakeProvider>
-            </PrideProvider>
+            </EventThemeProvider>
           </ThemeProvider>
         </AppErrorBoundary>
       </Suspense>

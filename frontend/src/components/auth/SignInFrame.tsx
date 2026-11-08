@@ -44,7 +44,7 @@ export const SignInFrame = ({
           )}
         >
           <LogoIcon className="h-12 w-12" aria-hidden="true" focusable="false" />
-          <span className="pride-wordmark">{t("appName")}</span>
+          <span className="event-wordmark">{t("appName")}</span>
           <BetaBadge className="self-center" />
         </div>
         {children}

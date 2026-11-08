@@ -93,7 +93,7 @@ export const HomeSidebarContent = () => {
         style={{ paddingTop: "var(--safe-area-inset-top)" }}
       >
         <div className="flex h-12 min-w-0 items-center justify-between gap-2 px-2.5">
-          <h2 className="pride-wordmark min-w-0 flex-1 truncate font-semibold text-lg">
+          <h2 className="event-wordmark min-w-0 flex-1 truncate font-semibold text-lg">
             initiative
           </h2>
         </div>
