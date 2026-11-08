@@ -70,12 +70,7 @@ import { useRecordOpen } from "@/hooks/usePersonalItems";
 import { propertySaves, useProperties } from "@/hooks/useProperties";
 import { useRouteId } from "@/hooks/useRouteId";
 import { useKnownTagIds } from "@/hooks/useTags";
-import {
-  detailLayoutOf,
-  instanceTarget,
-  listLayouts,
-  useInstanceLayouts,
-} from "@/hooks/useToolLayouts";
+import { instanceTarget, useInstanceLayouts, useSaveLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { FILE_DETAIL } from "@/lib/layouts/fileLayout";
 import { collectionFileFields } from "@/lib/layouts/files";
@@ -91,6 +86,7 @@ import { Label } from "@/ui/label";
 import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
 import { requiredKeys, type StoredRegions } from "@/ui/layouts/detailLayout";
 import { withDisplays } from "@/ui/layouts/fields";
+import { detailLayoutOf, listLayouts } from "@/ui/layouts/layoutSet";
 import { formatPeriod } from "@/ui/lib/formatDate";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { Lightbox, type LightboxItem } from "@/ui/lightbox";
@@ -176,6 +172,7 @@ export function CollectionPage() {
 
   // The lists the collection shows, and the one it opens on.
   const layoutsQuery = useInstanceLayouts("collection", collectionId);
+  const saveLayouts = useSaveLayouts(instanceTarget("collection", collectionId ?? 0));
   const shown = useMemo(
     () => listLayouts(layoutsQuery.data).filter((layout) => !layout.hidden),
     [layoutsQuery.data]
@@ -814,7 +811,7 @@ export function CollectionPage() {
             </DialogHeader>
             <LayoutsOverview
               layouts={layoutsQuery.data.layouts}
-              target={instanceTarget("collection", collection.id)}
+              save={saveLayouts.mutateAsync}
               editor={gp(`${collectionRoute(collection.initiative_id, collection.id)}/layouts`)}
             />
           </DialogContent>

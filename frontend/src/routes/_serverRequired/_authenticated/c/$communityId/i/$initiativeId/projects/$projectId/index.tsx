@@ -7,11 +7,12 @@ import { getListTaskStatusesQueryOptions } from "@/api/generated/task-statuses/t
 import { keptView } from "@/hooks/useListView";
 import { projectViewSpec, resolveProjectView } from "@/hooks/useProjectTaskView";
 import { tasksQuery } from "@/hooks/useTasks";
-import { instanceTarget, listLayouts } from "@/hooks/useToolLayouts";
+import { instanceTarget } from "@/hooks/useToolLayouts";
 import { parseListLayout, parsePreset } from "@/lib/filters/layoutSearch";
 import { buildTaskListParams } from "@/lib/filters/taskFilters";
 import { viewPreferencesQuery } from "@/lib/viewPreferences";
 import { ProjectDetailPage } from "@/pages/initiativeTools/projects/ProjectDetailPage";
+import { listLayouts } from "@/ui/layouts/layoutSet";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/projects/$projectId/"

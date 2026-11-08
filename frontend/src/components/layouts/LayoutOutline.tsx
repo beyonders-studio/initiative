@@ -14,16 +14,10 @@ import {
   Search,
   Square,
 } from "lucide-react";
-import { createContext, type ReactNode, useContext, useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { MetadataType } from "@/api/generated/initiativeAPI.schemas";
-import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
-import { useDragSensors } from "@/hooks/useDragSensors";
-import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
-import { addablePluginParts, type PluginOnItems } from "@/lib/layouts/plugins";
-import { localized } from "@/lib/widgets/widgetMeta";
-import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { isRequired, LAYOUT_REGIONS, withRequired } from "@/ui/layouts/detailLayout";
@@ -46,8 +40,9 @@ import {
   type Selection,
   sameSelection,
 } from "@/ui/layouts/draft";
-import { type FieldDef, groupFields, propertyFieldId } from "@/ui/layouts/fields";
+import { type FieldDef, groupFields, type LayoutEnv, propertyFieldId } from "@/ui/layouts/fields";
 import type { LayoutNode } from "@/ui/layouts/tree";
+import { useDragSensors } from "@/ui/lib/useDragSensors";
 import { cn } from "@/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import {
@@ -59,11 +54,12 @@ import type { MetadataOwner } from "@/ui/properties/propertyHelpers";
 import { iconForPropertyType } from "@/ui/properties/propertyTypeIcons";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
-import type { EditableDetail } from "./details";
-import type { LayoutEdits } from "./LayoutEditor";
+import type { EditableDetail, LayoutEdits, LayoutPlugins } from "./LayoutEditor";
+
+type Translate = LayoutEnv["t"];
 
 /** A plug-in as the picker offers it: its name, and its parts by theirs. */
-type PickerPlugin = {
+export type PickerPlugin = {
   id: number;
   name: string;
   parts: { id: string; name: string; description?: string }[];
@@ -90,7 +86,7 @@ const LAYOUT_BLOCKS = {
 const block = (
   name: keyof typeof LAYOUT_BLOCKS,
   node: LayoutNode,
-  translate: TranslateFn
+  translate: Translate
 ): PickerPart => ({
   group: "layout",
   label: translate(`layouts:blocks.${name}`),
@@ -108,12 +104,7 @@ const row = (): LayoutNode => ({
 });
 
 /** The title an accordion is added with, selected so typing names it. */
-export const accordionTitle = (translate: TranslateFn) => translate("layouts:blocks.accordion");
-
-/** What the part showing every property is called, as an i18n key: where a
- *  project or a collection has properties of its own, it shows those and the
- *  initiative's metadata. */
-export const PropertiesPartName = createContext("layouts:allMetadata");
+const accordionTitle = (translate: Translate) => translate("layouts:blocks.accordion");
 
 /** What Add offers where something is added: the fields, each plug-in's
  *  parts, and the other parts. */
@@ -139,9 +130,9 @@ export type Adders = {
 export const listChoices = (
   layout: ListLayout,
   fields: ReadonlyMap<string, FieldDef>,
-  plugins: PickerPlugin[],
-  translate: TranslateFn,
-  propertiesPart = "layouts:allMetadata"
+  { installs, addable }: LayoutPlugins,
+  translate: Translate,
+  propertiesPart: string
 ): AddChoices => {
   if (layout.kind === "calendar" || layout.kind === "gantt") {
     return { fields: [], plugins: [], parts: [] };
@@ -151,9 +142,9 @@ export const listChoices = (
   return {
     fields: addableFields(layout, fields),
     // A table draws fields only; a card takes parts as well.
-    plugins: plugins.map((plugin) => ({
+    plugins: installs.map((plugin) => ({
       ...plugin,
-      parts: board ? addablePluginParts(card, plugin.id, plugin.parts) : [],
+      parts: board ? addable(card, plugin.id, plugin.parts) : [],
     })),
     parts: board
       ? [
@@ -178,9 +169,9 @@ export const detailChoices = (
   detail: LayoutNode,
   { spec, words }: EditableDetail,
   fields: ReadonlyMap<string, FieldDef>,
-  plugins: PickerPlugin[],
-  translate: TranslateFn,
-  propertiesPart = "layouts:allMetadata"
+  { installs, addable }: LayoutPlugins,
+  translate: Translate,
+  propertiesPart: string
 ): AddChoices => {
   const named = namedFields(detail);
   return {
@@ -191,9 +182,9 @@ export const detailChoices = (
           field.source === "property" ||
           field.source === "plugin")
     ),
-    plugins: plugins.map((plugin) => ({
+    plugins: installs.map((plugin) => ({
       ...plugin,
-      parts: addablePluginParts(detail, plugin.id, plugin.parts),
+      parts: addable(detail, plugin.id, plugin.parts),
     })),
     parts: [
       block(
@@ -228,34 +219,24 @@ const FIXED = new Set<string>(LAYOUT_REGIONS);
 
 const INTO = "into:";
 
-const usePickerPlugins = (plugins: ReadonlyMap<number, PluginOnItems>): PickerPlugin[] => {
-  const { i18n } = useTranslation();
-  return [...plugins.values()].map((plugin) => ({
-    id: plugin.id,
-    name: plugin.name,
-    parts: [...plugin.parts.values()].map((part) => ({
-      id: part.id,
-      name: localized(part.name, i18n.language) ?? part.id,
-      description: localized(part.description, i18n.language),
-    })),
-  }));
+/** What a field and a part are called in the outline, the picker and the
+ *  settings. */
+export type PartLabels = {
+  labelOf: (field: FieldDef) => string;
+  partLabel: (node: LayoutNode) => string;
 };
 
-/** What a part is called in the outline and the settings. */
-export const usePartLabel = (
+/** What a part is called, read with `translate`: a plug-in's part by what
+ *  its install calls it, and the part showing every property as
+ *  `propertiesPart` says. */
+export const partLabels = (
+  translate: Translate,
   fields: ReadonlyMap<string, FieldDef>,
-  plugins: ReadonlyMap<number, PluginOnItems>,
+  installs: PickerPlugin[],
+  propertiesPart: string,
   /** Where the names of the open detail's own parts are. */
-  partWords = "layouts:",
-  /** What the part showing every property is called, where the caller
-   *  provides {@link PropertiesPartName} rather than reading it. */
-  propertiesPartName?: string
-) => {
-  const { t } = useTranslation(LAYOUT_NAMESPACES);
-  const translate = t as TranslateFn;
-  const pickerPlugins = usePickerPlugins(plugins);
-  const provided = useContext(PropertiesPartName);
-  const propertiesPart = propertiesPartName ?? provided;
+  partWords = "layouts:"
+): PartLabels => {
   const labelOf = (field: FieldDef) =>
     field.source === "builtin" ? translate(field.label) : field.label;
   const partLabel = (node: LayoutNode): string => {
@@ -277,7 +258,7 @@ export const usePartLabel = (
       case "properties":
         return translate(propertiesPart);
       case "plugin": {
-        const plugin = pickerPlugins.find((each) => each.id === Number(node.props?.plugin));
+        const plugin = installs.find((each) => each.id === Number(node.props?.plugin));
         const part = plugin?.parts.find((each) => each.id === node.props?.part);
         return part?.name ?? translate("layouts:missingPart");
       }
@@ -293,7 +274,7 @@ export const usePartLabel = (
         return translate(`${partWords}parts.${node.type}`);
     }
   };
-  return { labelOf, partLabel, pickerPlugins };
+  return { labelOf, partLabel };
 };
 
 /**
@@ -304,18 +285,21 @@ export const usePartLabel = (
  * comes from.
  */
 export const ListLayoutOutline = ({
+  name,
   layout: open,
   fields,
-  plugins,
+  labels: { labelOf, partLabel },
   choices,
   adders,
   selection,
   edits,
   locked,
 }: {
+  /** What the list is called. */
+  name: string;
   layout: ListLayout;
   fields: ReadonlyMap<string, FieldDef>;
-  plugins: ReadonlyMap<number, PluginOnItems>;
+  labels: PartLabels;
   /** What Add offers, and what a pick does. */
   choices: AddChoices;
   adders: Adders;
@@ -324,10 +308,8 @@ export const ListLayoutOutline = ({
   /** A save is under way, and nothing changes until it answers. */
   locked: boolean;
 }) => {
-  const { t } = useTranslation(LAYOUT_NAMESPACES);
-  const translate = t as TranslateFn;
+  const { t } = useTranslation(["layouts"]);
   const sensors = useDragSensors({ keyboard: true });
-  const { labelOf, partLabel } = usePartLabel(fields, plugins);
   const { definition, kind: layout } = open;
   const card = cardOf(definition, fields, open.shape);
   const columns = columnsOf(definition, fields, open.shape);
@@ -339,12 +321,12 @@ export const ListLayoutOutline = ({
   };
 
   return (
-    <nav aria-label={translate("layouts:outline")} className="flex h-full flex-col">
+    <nav aria-label={t("layouts:outline")} className="flex h-full flex-col">
       <div className="flex-1 space-y-1 overflow-y-auto p-3">
         <OutlineRow
           id="layout"
           depth={0}
-          label={translate(listLayoutLooks[layout].labelKey)}
+          label={name}
           icon={<LayoutList className="h-4 w-4" aria-hidden="true" />}
           selected={isSelected({ kind: "layout" })}
           onSelect={() => edits.select({ kind: "layout" })}
@@ -365,9 +347,7 @@ export const ListLayoutOutline = ({
               depth={2}
               partLabel={partLabel}
               hideAction={(node) =>
-                removable(node, fields)
-                  ? translate("layouts:hide", { name: partLabel(node) })
-                  : null
+                removable(node, fields) ? t("layouts:hide", { name: partLabel(node) }) : null
               }
               selection={selection}
               edits={edits}
@@ -378,12 +358,12 @@ export const ListLayoutOutline = ({
         {layout === "table" ? (
           <DndContext sensors={sensors} onDragEnd={onColumnDragEnd}>
             <p className="px-2 pt-2 font-medium text-muted-foreground text-xs">
-              {translate("layouts:columns")}
+              {t("layouts:columns")}
             </p>
             <SortableContext items={columns} strategy={verticalListSortingStrategy}>
               {columns.map((id) => {
                 const field = fields.get(id);
-                const label = field ? labelOf(field) : translate("layouts:missingField");
+                const label = field ? labelOf(field) : t("layouts:missingField");
                 return (
                   <OutlineRow
                     key={id}
@@ -397,7 +377,7 @@ export const ListLayoutOutline = ({
                       field?.hideable === false
                         ? undefined
                         : {
-                            label: translate("layouts:hide", { name: label }),
+                            label: t("layouts:hide", { name: label }),
                             run: () => edits.removeColumn(id),
                           }
                     }
@@ -424,40 +404,40 @@ export const ListLayoutOutline = ({
  * section as well; a part taken off is hidden, and Add puts it back.
  */
 export const DetailLayoutOutline = ({
+  t,
   detail,
   of,
   fields,
-  plugins,
+  labels: { labelOf, partLabel },
   choices,
   adders,
   selection,
   edits,
   locked,
 }: {
+  /** Reads the words of the kind it lays out. */
+  t: Translate;
   /** The detail as one tree: the layout, holding its header, main and side. */
   detail: LayoutNode;
   /** Which kind of detail it is. */
   of: EditableDetail;
   fields: ReadonlyMap<string, FieldDef>;
-  plugins: ReadonlyMap<number, PluginOnItems>;
+  labels: PartLabels;
   choices: AddChoices;
   adders: Adders;
   selection: Selection;
   edits: LayoutEdits;
   locked: boolean;
 }) => {
-  const { t } = useTranslation(LAYOUT_NAMESPACES);
-  const translate = t as TranslateFn;
-  const { labelOf, partLabel } = usePartLabel(fields, plugins, of.words.parts);
   const { requiredParts } = of.spec;
   return (
     <TooltipProvider delayDuration={300}>
-      <nav aria-label={translate("layouts:outline")} className="flex h-full flex-col">
+      <nav aria-label={t("layouts:outline")} className="flex h-full flex-col">
         <div className="flex-1 space-y-1 overflow-y-auto p-3">
           <OutlineRow
             id="layout"
             depth={0}
-            label={translate(of.words.name)}
+            label={t(of.words.name)}
             icon={<FileText className="h-4 w-4" aria-hidden="true" />}
             selected={sameSelection(selection, { kind: "layout" })}
             onSelect={() => edits.select({ kind: "layout" })}
@@ -470,7 +450,7 @@ export const DetailLayoutOutline = ({
             hideAction={(node) =>
               FIXED.has(node.type) || !removable(node, fields)
                 ? null
-                : translate("layouts:hide", { name: partLabel(node) })
+                : t("layouts:hide", { name: partLabel(node) })
             }
             requirement={(node) =>
               requiredParts === null
@@ -604,7 +584,7 @@ const PartTree = ({
 
 /** Where a dragged row goes to the end of a group. */
 const EndSlot = ({ id, depth, empty }: { id: string; depth: number; empty: boolean }) => {
-  const { t } = useTranslation(["projects", "layouts"]);
+  const { t } = useTranslation(["layouts"]);
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div
@@ -646,7 +626,7 @@ const OutlineRow = ({
   fixed?: boolean;
   locked?: boolean;
 }) => {
-  const { t } = useTranslation(["projects", "layouts"]);
+  const { t } = useTranslation(["layouts"]);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
     disabled: fixed || locked,
@@ -781,7 +761,7 @@ export const AddPicker = ({
   trigger?: ReactNode;
   onOpenChange?: (open: boolean) => void;
 }) => {
-  const { t } = useTranslation(["projects", "layouts", "properties"]);
+  const { t } = useTranslation(["layouts", "properties"]);
   const [open, setOpenState] = useState(false);
   const [search, setSearch] = useState("");
   // The kind of field being made, while its form is open.
@@ -942,7 +922,7 @@ export const AddPicker = ({
               </PickerGroup>
             ) : null}
             {fieldGroups.map((group) => (
-              <PickerGroup key={group.key} heading={(t as TranslateFn)(group.heading)}>
+              <PickerGroup key={group.key} heading={(t as Translate)(group.heading)}>
                 {group.fields.map((field) => (
                   <FieldItem
                     key={field.id}

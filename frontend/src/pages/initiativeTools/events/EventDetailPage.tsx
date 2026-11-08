@@ -27,7 +27,7 @@ import { useInitiative } from "@/hooks/useInitiatives";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
 import { useRouteId } from "@/hooks/useRouteId";
-import { detailLayoutOf, sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
+import { sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { EVENT_DETAIL } from "@/lib/layouts/eventLayout";
 import { usePluginMenuActions } from "@/lib/layouts/plugins";
@@ -44,6 +44,7 @@ import {
 } from "@/ui/dropdown-menu";
 import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
 import type { StoredRegions } from "@/ui/layouts/detailLayout";
+import { detailLayoutOf } from "@/ui/layouts/layoutSet";
 import { DetailPageSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 /**

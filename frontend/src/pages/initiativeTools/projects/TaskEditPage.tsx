@@ -46,7 +46,7 @@ import {
   useSkipTask,
   useTask,
 } from "@/hooks/useTasks";
-import { detailLayoutOf, useInstanceLayouts } from "@/hooks/useToolLayouts";
+import { useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { getErrorMessage, getHttpStatus, requiredKeysIn } from "@/lib/errorMessage";
 import { usePluginMenuActions } from "@/lib/layouts/plugins";
@@ -65,6 +65,7 @@ import {
 } from "@/ui/dropdown-menu";
 import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
 import type { StoredRegions } from "@/ui/layouts/detailLayout";
+import { detailLayoutOf } from "@/ui/layouts/layoutSet";
 import { TaskEditSkeleton } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
 

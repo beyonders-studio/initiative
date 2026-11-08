@@ -52,7 +52,7 @@ import {
   useTaskSaveOptions,
   useUpdateTask,
 } from "@/hooks/useTasks";
-import { detailLayoutOf, instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
+import { instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { dateRangeBounds } from "@/lib/dateRange";
 import { toast } from "@/lib/mascotToast";
 import {
@@ -96,6 +96,7 @@ import {
 } from "@/ui/layouts/editing";
 import { TitleField, type TypeaheadField } from "@/ui/layouts/fieldEditors";
 import { PROPERTY_FIELD_PREFIX } from "@/ui/layouts/fields";
+import { detailLayoutOf } from "@/ui/layouts/layoutSet";
 import { fromPickerValue, toPickerValue } from "@/ui/lib/localDateTime";
 import { dateTimePattern } from "@/ui/lib/timeFormat";
 import { useDateLocale } from "@/ui/lib/useDateLocale";

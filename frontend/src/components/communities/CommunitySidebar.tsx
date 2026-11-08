@@ -24,7 +24,6 @@ import { useSidebar } from "@/components/sidebar/sidebar";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { type CommunityEntry, useCommunities } from "@/hooks/useCommunities";
-import { useDragSensors } from "@/hooks/useDragSensors";
 import { useMessagesWaiting } from "@/hooks/useMyMessages";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { communityPath } from "@/lib/communityUrl";
@@ -45,6 +44,7 @@ import {
 } from "@/ui/dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { useDragSensors } from "@/ui/lib/useDragSensors";
 import { cn } from "@/ui/lib/utils";
 import { Textarea } from "@/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";

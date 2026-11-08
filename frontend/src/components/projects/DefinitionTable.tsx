@@ -17,7 +17,6 @@ import type { IconName } from "lucide-react/dynamic";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useDragSensors } from "@/hooks/useDragSensors";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
@@ -26,6 +25,7 @@ import { Checkbox } from "@/ui/checkbox";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { IconPicker } from "@/ui/icon-picker";
 import { Input } from "@/ui/input";
+import { useDragSensors } from "@/ui/lib/useDragSensors";
 import { cn } from "@/ui/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
 

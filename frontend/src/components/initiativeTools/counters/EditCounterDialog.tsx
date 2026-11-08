@@ -7,7 +7,7 @@ import { type CounterRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { counterSaves, type SteppedCount, useResetCounter } from "@/hooks/useCounters";
 import { usePendingShown } from "@/hooks/useFieldSave";
-import { detailLayoutOf, instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
+import { instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { COUNTER_DETAIL } from "@/lib/layouts/counterLayout";
 import { usePluginMenuActions } from "@/lib/layouts/plugins";
 import type { DialogProps } from "@/types/dialog";
@@ -22,6 +22,7 @@ import {
 } from "@/ui/dropdown-menu";
 import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
 import type { StoredRegions } from "@/ui/layouts/detailLayout";
+import { detailLayoutOf } from "@/ui/layouts/layoutSet";
 
 type EditCounterDialogProps = DialogProps & {
   groupId: number;

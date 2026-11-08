@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { GetLayoutsParams } from "@/api/generated/initiativeAPI.schemas";
 import { useOwnedDefinitions } from "@/hooks/useProperties";
 import { useSetItemLinks } from "@/hooks/useRelationships";
-import { detailLayoutOf, useToolLayouts } from "@/hooks/useToolLayouts";
+import { useToolLayouts } from "@/hooks/useToolLayouts";
 import { AddingLinks, type InitiativeDetail } from "@/lib/layouts/initiativeExtension";
 import type { LinkedRef } from "@/lib/relationships";
 import type { DialogProps } from "@/types/dialog";
@@ -20,6 +20,7 @@ import {
 import { type DetailItem, DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
 import { missingRequired, requiredKeys, type StoredRegions } from "@/ui/layouts/detailLayout";
 import { ItemDraftContext, useItemDraft, type Written } from "@/ui/layouts/editing";
+import { detailLayoutOf } from "@/ui/layouts/layoutSet";
 import { cn } from "@/ui/lib/utils";
 
 type AddItemProps<I extends DetailItem, C, P, R extends { id: number }> = {

@@ -19,6 +19,7 @@ import {
   type PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import type { PluginDataParam } from "@/api/pluginData";
+import type { LayoutPlugins } from "@/components/layouts/LayoutEditor";
 import { PluginParamControl } from "@/components/plugins/PluginParamControl";
 import contract from "@/contract/manifest.contract.json";
 import { useCommunityPlugins, useRunPluginAction } from "@/hooks/useCommunityPlugins";
@@ -380,6 +381,33 @@ export const pluginFields = (
       })
     )
   );
+
+/** The community's installs on the items a detail of `kind` lays out, as the
+ *  layout editor offers them, in the reader's language. */
+export const useLayoutPlugins = (
+  initiativeId: number | null | undefined,
+  kind: DetailLayoutReadKind | undefined
+): LayoutPlugins => {
+  const plugins = usePluginsOnItems(initiativeId, true, kind ? pluginKindOf(kind) : null);
+  const { language } = useTranslation().i18n;
+  return useMemo(
+    () => ({
+      fields: pluginFields(plugins, language),
+      shipped: shippedPluginParts(plugins),
+      installs: [...plugins.values()].map((plugin) => ({
+        id: plugin.id,
+        name: plugin.name,
+        parts: [...plugin.parts.values()].map((part) => ({
+          id: part.id,
+          name: localized(part.name, language) ?? part.id,
+          description: localized(part.description, language),
+        })),
+      })),
+      addable: addablePluginParts,
+    }),
+    [plugins, language]
+  );
+};
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);

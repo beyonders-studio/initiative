@@ -50,7 +50,6 @@ import { TaskFilters } from "@/components/tasks/TaskFilters";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useColumnLimits } from "@/hooks/useColumnLimits";
-import { useDragSensors } from "@/hooks/useDragSensors";
 import { useFieldCatalog } from "@/hooks/useFieldCatalog";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
@@ -93,6 +92,7 @@ import { useWeekStart } from "@/ui/host";
 import { activeGrouping, catalogChoices } from "@/ui/layouts/grouping";
 import { presetName } from "@/ui/layouts/presets";
 import type { LayoutNode } from "@/ui/layouts/tree";
+import { useDragSensors } from "@/ui/lib/useDragSensors";
 import { StatusMessage } from "@/ui/status-message";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 

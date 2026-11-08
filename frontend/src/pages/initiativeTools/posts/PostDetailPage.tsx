@@ -15,7 +15,7 @@ import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
 import { usePost, useUpdatePost } from "@/hooks/usePosts";
 import { useRouteId } from "@/hooks/useRouteId";
-import { detailLayoutOf, sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
+import { sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { usePluginMenuActions } from "@/lib/layouts/plugins";
 import { POST_DETAIL } from "@/lib/layouts/postLayout";
@@ -25,6 +25,7 @@ import { Button } from "@/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdown-menu";
 import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
 import type { StoredRegions } from "@/ui/layouts/detailLayout";
+import { detailLayoutOf } from "@/ui/layouts/layoutSet";
 import { DetailHeaderSkeleton } from "@/ui/page-skeletons";
 import { Skeleton } from "@/ui/skeleton";
 
