@@ -18,12 +18,14 @@ import {
   CalloutExtension,
   INSERT_CALLOUT_COMMAND,
 } from "@/components/editor/extensions/callout-extension";
-import { MARKDOWN_TRANSFORMERS } from "@/components/editor/extensions/markdown-shortcuts-extension";
+import { markdownTransformers } from "@/components/editor/extensions/markdown-shortcuts-extension";
 import {
   $createCalloutNode,
   $isCalloutNode,
   calloutVariantFrom,
 } from "@/components/editor/nodes/callout-node";
+
+const transformers = markdownTransformers([]);
 
 function makeEditor(): LexicalEditor {
   return buildEditorFromExtensions(
@@ -217,12 +219,12 @@ describe("callouts in markdown", () => {
     const source = ["> [!warning] Careful", "> Two things:", ">", "> - one", "> - two"].join("\n");
     let exported = "";
     update(editor, () => {
-      $convertFromMarkdownString(source, MARKDOWN_TRANSFORMERS);
+      $convertFromMarkdownString(source, transformers);
     });
     editor.getEditorState().read(() => {
       const callout = $getRoot().getFirstChild();
       expect($isCalloutNode(callout) && callout.getVariant()).toBe("warning");
-      exported = $convertToMarkdownString(MARKDOWN_TRANSFORMERS);
+      exported = $convertToMarkdownString(transformers);
     });
     const [callout] = rootJSON(editor);
     expect(callout.children?.map((node) => node.type)).toEqual(["paragraph", "paragraph", "list"]);
@@ -237,14 +239,14 @@ describe("callouts in markdown", () => {
     update(editor, () => {
       $convertFromMarkdownString(
         ["> [!tip]- Spoilers", "> The butler did it.", "", "> [!note]+ Open", "> Seen."].join("\n"),
-        MARKDOWN_TRANSFORMERS
+        transformers
       );
     });
     editor.getEditorState().read(() => {
       const [folded, open] = $getRoot().getChildren().filter($isCalloutNode);
       expect(folded.getCollapsed()).toBe(true);
       expect(open.getCollapsed()).toBe(false);
-      exported = $convertToMarkdownString(MARKDOWN_TRANSFORMERS);
+      exported = $convertToMarkdownString(transformers);
     });
     expect(exported).toContain("> [!tip]-\n");
     expect(exported).toContain("> [!note]\n");
@@ -253,7 +255,7 @@ describe("callouts in markdown", () => {
   it("leave an ordinary quote a quote", () => {
     const editor = makeEditor();
     update(editor, () => {
-      $convertFromMarkdownString("> just a quote", MARKDOWN_TRANSFORMERS);
+      $convertFromMarkdownString("> just a quote", transformers);
     });
     expect(rootJSON(editor).map((node) => node.type)).toEqual(["quote"]);
   });

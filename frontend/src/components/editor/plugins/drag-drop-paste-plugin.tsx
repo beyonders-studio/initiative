@@ -4,7 +4,7 @@ import { isMimeType, mediaFileReader } from "@lexical/utils";
 import { COMMAND_PRIORITY_LOW } from "lexical";
 import { useEffect } from "react";
 
-import { INSERT_IMAGE_COMMAND } from "@/components/editor/plugins/images-plugin";
+import { INSERT_IMAGE_COMMAND } from "@/components/editor/extensions/images-extension";
 
 const ACCEPTABLE_IMAGE_TYPES = ["image/", "image/heic", "image/heif", "image/gif", "image/webp"];
 

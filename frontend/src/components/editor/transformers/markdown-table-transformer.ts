@@ -7,6 +7,7 @@ import {
   MULTILINE_ELEMENT_TRANSFORMERS,
   TEXT_FORMAT_TRANSFORMERS,
   TEXT_MATCH_TRANSFORMERS,
+  type Transformer,
 } from "@lexical/markdown";
 import {
   $computeTableMapSkipCellCheck,
@@ -26,10 +27,6 @@ import { $isParagraphNode, $isTextNode, type LexicalNode } from "lexical";
 // import { EMOJI } from "@/components/editor/transformers/markdown-emoji-transformer"
 import { HR } from "@/components/editor/transformers/markdown-hr-transformer";
 import { IMAGE } from "@/components/editor/transformers/markdown-image-transformer";
-import {
-  PERSON_MENTION,
-  REFERENCE,
-} from "@/components/editor/transformers/markdown-reference-transformers";
 import { STATUS } from "@/components/editor/transformers/markdown-status-transformer";
 
 // import { TWEET } from "@/components/editor/transformers/markdown-tweet-transformer"
@@ -37,22 +34,6 @@ import { STATUS } from "@/components/editor/transformers/markdown-status-transfo
 // Tables, with MultiMarkdown's syntax for merged cells.
 const TABLE_ROW_REG_EXP = /^(?:\|)(.+)(?:\|)\s?$/;
 const TABLE_ROW_DIVIDER_REG_EXP = /^(\| ?:?-+:? ?)+\|\s?$/;
-
-const OTHER_MARKDOWN_TRANSFORMERS = [
-  HR,
-  IMAGE,
-  // EMOJI,
-  // TWEET,
-  CHECK_LIST,
-  // What a cell points at, as anywhere else in the page.
-  STATUS,
-  REFERENCE,
-  PERSON_MENTION,
-  ...ELEMENT_TRANSFORMERS,
-  ...MULTILINE_ELEMENT_TRANSFORMERS,
-  ...TEXT_FORMAT_TRANSFORMERS,
-  ...TEXT_MATCH_TRANSFORMERS,
-];
 
 /** One row of a markdown table, as MultiMarkdown writes merged cells: a
  * cell followed by an empty `||` spans the next column too, and a cell that
@@ -89,7 +70,12 @@ const gridWidth = (cells: ParsedCell[]) => cells.reduce((sum, cell) => sum + cel
 
 /** Append parsed rows to a table, reaching `^^` cells up into the row above
  * and padding a short row out to the table's width. */
-function $appendRows(table: TableNode, rows: ParsedCell[][], width: number): void {
+function $appendRows(
+  table: TableNode,
+  rows: ParsedCell[][],
+  width: number,
+  cellTransformers: Transformer[]
+): void {
   for (const cells of rows) {
     const [map] = $computeTableMapSkipCellCheck(table, null, null);
     const above = map[map.length - 1];
@@ -100,7 +86,7 @@ function $appendRows(table: TableNode, rows: ParsedCell[][], width: number): voi
       if (owner) {
         owner.setRowSpan(owner.getRowSpan() + 1);
       } else {
-        const created = $createTableCell(cell.up ? "" : cell.text);
+        const created = $createTableCell(cell.up ? "" : cell.text, cellTransformers);
         if (cell.colSpan > 1) {
           created.setColSpan(cell.colSpan);
         }
@@ -109,7 +95,7 @@ function $appendRows(table: TableNode, rows: ParsedCell[][], width: number): voi
       column += cell.colSpan;
     }
     for (; column < width; column++) {
-      row.append($createTableCell(""));
+      row.append($createTableCell("", cellTransformers));
     }
     table.append(row);
   }
@@ -120,132 +106,150 @@ const tableWidth = (table: TableNode): number => {
   return map[0]?.length ?? 0;
 };
 
-export const TABLE: ElementTransformer = {
-  dependencies: [TableNode, TableRowNode, TableCellNode],
-  export: (node: LexicalNode) => {
-    if (!$isTableNode(node)) {
-      return null;
-    }
-
-    const [map] = $computeTableMapSkipCellCheck(node, null, null);
-    const width = map[0]?.length ?? 0;
-    const output: string[] = [];
-
-    map.forEach((line, rowIndex) => {
-      const parts: string[] = [];
-      let isHeaderRow = false;
-      for (let column = 0; column < width; column++) {
-        const entry = line[column];
-        if (!entry || entry.startColumn !== column) {
-          continue;
-        }
-        const span = entry.cell.getColSpan();
-        const pipes = "|".repeat(Math.max(0, span - 1));
-        if (entry.startRow !== rowIndex) {
-          parts.push(`| ^^ ${pipes}`);
-          continue;
-        }
-        if (entry.cell.__headerState === TableCellHeaderStates.ROW) {
-          isHeaderRow = true;
-        }
-        const text = $convertToMarkdownString(OTHER_MARKDOWN_TRANSFORMERS, entry.cell)
-          .replace(/\n/g, "\\n")
-          .replace(/\|/g, "\\|");
-        parts.push(`| ${text} ${pipes}`);
-      }
-      output.push(`${parts.join("")}|`);
-      if (isHeaderRow) {
-        output.push(`| ${Array.from({ length: width }, () => "---").join(" | ")} |`);
-      }
-    });
-
-    return output.join("\n");
-  },
-  regExp: TABLE_ROW_REG_EXP,
-  replace: (parentNode, _1, match) => {
-    // Header row
-    if (TABLE_ROW_DIVIDER_REG_EXP.test(match[0])) {
-      const table = parentNode.getPreviousSibling();
-      if (!table || !$isTableNode(table)) {
-        return;
+/** Tables, whose cells are read and written with the core's text transformers
+ *  and the host's (`inline`). */
+export const createTableTransformer = (inline: readonly Transformer[]): ElementTransformer => {
+  const cellTransformers: Transformer[] = [
+    HR,
+    IMAGE,
+    // EMOJI,
+    // TWEET,
+    CHECK_LIST,
+    // What a cell points at, as anywhere else in the page.
+    STATUS,
+    ...inline,
+    ...ELEMENT_TRANSFORMERS,
+    ...MULTILINE_ELEMENT_TRANSFORMERS,
+    ...TEXT_FORMAT_TRANSFORMERS,
+    ...TEXT_MATCH_TRANSFORMERS,
+  ];
+  return {
+    dependencies: [TableNode, TableRowNode, TableCellNode],
+    export: (node: LexicalNode) => {
+      if (!$isTableNode(node)) {
+        return null;
       }
 
-      const rows = table.getChildren();
-      const lastRow = rows[rows.length - 1];
-      if (!lastRow || !$isTableRowNode(lastRow)) {
-        return;
-      }
+      const [map] = $computeTableMapSkipCellCheck(node, null, null);
+      const width = map[0]?.length ?? 0;
+      const output: string[] = [];
 
-      // Add header state to row cells
-      lastRow.getChildren().forEach((cell) => {
-        if (!$isTableCellNode(cell)) {
-          return;
+      map.forEach((line, rowIndex) => {
+        const parts: string[] = [];
+        let isHeaderRow = false;
+        for (let column = 0; column < width; column++) {
+          const entry = line[column];
+          if (!entry || entry.startColumn !== column) {
+            continue;
+          }
+          const span = entry.cell.getColSpan();
+          const pipes = "|".repeat(Math.max(0, span - 1));
+          if (entry.startRow !== rowIndex) {
+            parts.push(`| ^^ ${pipes}`);
+            continue;
+          }
+          if (entry.cell.__headerState === TableCellHeaderStates.ROW) {
+            isHeaderRow = true;
+          }
+          const text = $convertToMarkdownString(cellTransformers, entry.cell)
+            .replace(/\n/g, "\\n")
+            .replace(/\|/g, "\\|");
+          parts.push(`| ${text} ${pipes}`);
         }
-        cell.setHeaderStyles(TableCellHeaderStates.ROW, TableCellHeaderStates.ROW);
+        output.push(`${parts.join("")}|`);
+        if (isHeaderRow) {
+          output.push(`| ${Array.from({ length: width }, () => "---").join(" | ")} |`);
+        }
       });
 
-      // Remove line
-      parentNode.remove();
-      return;
-    }
+      return output.join("\n");
+    },
+    regExp: TABLE_ROW_REG_EXP,
+    replace: (parentNode, _1, match) => {
+      // Header row
+      if (TABLE_ROW_DIVIDER_REG_EXP.test(match[0])) {
+        const table = parentNode.getPreviousSibling();
+        if (!table || !$isTableNode(table)) {
+          return;
+        }
 
-    const matchCells = parseRow(match[0]);
+        const rows = table.getChildren();
+        const lastRow = rows[rows.length - 1];
+        if (!lastRow || !$isTableRowNode(lastRow)) {
+          return;
+        }
 
-    if (matchCells == null) {
-      return;
-    }
+        // Add header state to row cells
+        lastRow.getChildren().forEach((cell) => {
+          if (!$isTableCellNode(cell)) {
+            return;
+          }
+          cell.setHeaderStyles(TableCellHeaderStates.ROW, TableCellHeaderStates.ROW);
+        });
 
-    const rows = [matchCells];
-    let sibling = parentNode.getPreviousSibling();
-    let width = gridWidth(matchCells);
-
-    while (sibling) {
-      if (!$isParagraphNode(sibling)) {
-        break;
+        // Remove line
+        parentNode.remove();
+        return;
       }
 
-      if (sibling.getChildrenSize() !== 1) {
-        break;
+      const matchCells = parseRow(match[0]);
+
+      if (matchCells == null) {
+        return;
       }
 
-      const firstChild = sibling.getFirstChild();
+      const rows = [matchCells];
+      let sibling = parentNode.getPreviousSibling();
+      let width = gridWidth(matchCells);
 
-      if (!$isTextNode(firstChild)) {
-        break;
+      while (sibling) {
+        if (!$isParagraphNode(sibling)) {
+          break;
+        }
+
+        if (sibling.getChildrenSize() !== 1) {
+          break;
+        }
+
+        const firstChild = sibling.getFirstChild();
+
+        if (!$isTextNode(firstChild)) {
+          break;
+        }
+
+        const cells = parseRow(firstChild.getTextContent());
+
+        if (cells == null) {
+          break;
+        }
+
+        width = Math.max(width, gridWidth(cells));
+        rows.unshift(cells);
+        const previousSibling = sibling.getPreviousSibling();
+        sibling.remove();
+        sibling = previousSibling;
       }
 
-      const cells = parseRow(firstChild.getTextContent());
-
-      if (cells == null) {
-        break;
+      const previousSibling = parentNode.getPreviousSibling();
+      if ($isTableNode(previousSibling) && tableWidth(previousSibling) === width) {
+        $appendRows(previousSibling, rows, width, cellTransformers);
+        parentNode.remove();
+        previousSibling.selectEnd();
+        return;
       }
 
-      width = Math.max(width, gridWidth(cells));
-      rows.unshift(cells);
-      const previousSibling = sibling.getPreviousSibling();
-      sibling.remove();
-      sibling = previousSibling;
-    }
-
-    const previousSibling = parentNode.getPreviousSibling();
-    if ($isTableNode(previousSibling) && tableWidth(previousSibling) === width) {
-      $appendRows(previousSibling, rows, width);
-      parentNode.remove();
-      previousSibling.selectEnd();
-      return;
-    }
-
-    const table = $createTableNode();
-    $appendRows(table, rows, width);
-    parentNode.replace(table);
-    table.selectEnd();
-  },
-  type: "element",
+      const table = $createTableNode();
+      $appendRows(table, rows, width, cellTransformers);
+      parentNode.replace(table);
+      table.selectEnd();
+    },
+    type: "element",
+  };
 };
 
-const $createTableCell = (textContent: string): TableCellNode => {
+const $createTableCell = (textContent: string, transformers: Transformer[]): TableCellNode => {
   textContent = textContent.replace(/\\n/g, "\n");
   const cell = $createTableCellNode(TableCellHeaderStates.NO_STATUS);
-  $convertFromMarkdownString(textContent, OTHER_MARKDOWN_TRANSFORMERS, cell);
+  $convertFromMarkdownString(textContent, transformers, cell);
   return cell;
 };

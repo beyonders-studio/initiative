@@ -10,19 +10,45 @@ import {
   COMMAND_PRIORITY_EDITOR,
   COMMAND_PRIORITY_HIGH,
   COMMAND_PRIORITY_LOW,
+  createCommand,
   DRAGOVER_COMMAND,
   DRAGSTART_COMMAND,
   DROP_COMMAND,
   defineExtension,
+  type LexicalCommand,
   type LexicalEditor,
+  safeCast,
 } from "lexical";
 
-import { $createImageNode, $isImageNode, ImageNode } from "@/components/editor/nodes/image-node";
+import type { ShowModal } from "@/components/editor/editor-hooks/use-modal";
 import {
-  INSERT_IMAGE_COMMAND,
-  type InsertImagePayload,
-} from "@/components/editor/plugins/images-plugin";
+  $createImageNode,
+  $isImageNode,
+  ImageNode,
+  type ImagePayload,
+} from "@/components/editor/nodes/image-node";
 import { CAN_USE_DOM } from "@/components/editor/shared/can-use-dom";
+
+export type InsertImagePayload = Readonly<ImagePayload>;
+
+export const INSERT_IMAGE_COMMAND: LexicalCommand<InsertImagePayload> =
+  createCommand("INSERT_IMAGE_COMMAND");
+
+declare global {
+  interface DragEvent {
+    rangeOffset?: number;
+    rangeParent?: Node;
+  }
+}
+
+/** Where the document's pictures come from, which the host decides. */
+export interface ImagesConfig {
+  /** Asks for a picture and puts it in with `INSERT_IMAGE_COMMAND`. The toolbar
+   *  and the `/` menu offer a picture only when there is one. */
+  insert: ((editor: LexicalEditor, showModal: ShowModal) => void) | null;
+  /** The address a stored picture is drawn from. */
+  resolveSrc: (src: string) => string;
+}
 
 const getDOMSelection = (targetWindow: Window | null): Selection | null =>
   CAN_USE_DOM ? (targetWindow || window).getSelection() : null;
@@ -151,6 +177,7 @@ function $onDrop(event: DragEvent, editor: LexicalEditor): boolean {
 export const ImagesExtension = defineExtension({
   name: "@initiative/images",
   nodes: [ImageNode],
+  config: safeCast<ImagesConfig>({ insert: null, resolveSrc: (src) => src }),
   register: (editor) =>
     mergeRegister(
       editor.registerCommand<InsertImagePayload>(

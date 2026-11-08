@@ -15,7 +15,7 @@ import { $applyNodeReplacement, createEditor, DecoratorNode } from "lexical";
 import * as React from "react";
 import { type JSX, Suspense } from "react";
 
-const ImageComponent = React.lazy(() => import("../editor-ui/image-component"));
+const ImageComponent = React.lazy(() => import("@/components/editor/editor-ui/image-component"));
 
 export interface ImagePayload {
   altText: string;

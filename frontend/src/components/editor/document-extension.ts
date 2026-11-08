@@ -18,7 +18,12 @@ import { CheckListExtension, ListExtension } from "@lexical/list";
 import { OverflowNode } from "@lexical/overflow";
 import { RichTextExtension } from "@lexical/rich-text";
 import { TableCellNode, TableNode, TableRowNode } from "@lexical/table";
-import { configExtension, defineExtension, type InitialEditorStateType } from "lexical";
+import {
+  type AnyLexicalExtension,
+  configExtension,
+  defineExtension,
+  type InitialEditorStateType,
+} from "lexical";
 
 import { CalloutExtension } from "@/components/editor/extensions/callout-extension";
 import { EmojisExtension } from "@/components/editor/extensions/emojis-extension";
@@ -33,11 +38,7 @@ import { MarkdownShortcutsExtension } from "@/components/editor/extensions/markd
 import { StatusExtension } from "@/components/editor/extensions/status-extension";
 import { TweetNode } from "@/components/editor/nodes/embeds/tweet-node";
 import { YouTubeNode } from "@/components/editor/nodes/embeds/youtube-node";
-import { EntityMentionNode } from "@/components/editor/nodes/entity-mention-node";
 import { LEGACY_NODES } from "@/components/editor/nodes/legacy-nodes";
-import { MentionNode } from "@/components/editor/nodes/mention-node";
-import { ReferenceEmbedNode } from "@/components/editor/nodes/reference-embed-node";
-import { SmartChipNode } from "@/components/editor/nodes/smart-chip-node";
 import { editorTheme } from "@/components/editor/themes/editor-theme";
 import { validateUrl } from "@/components/editor/utils/url";
 
@@ -62,11 +63,13 @@ export interface DocumentExtensionOptions {
   initialEditorState?: InitialEditorStateType;
   /** What becomes of an error the editor catches; logged by default. */
   onError?: (error: Error) => void;
+  /** The host's own nodes and behaviours, added to the core's. */
+  extension?: AnyLexicalExtension;
 }
 
 /**
  * Everything the document editor is made of: its nodes, and the behaviours
- * registered on top of them.
+ * registered on top of them, with the host's own beside the core's.
  *
  * A module of its own because what is in this list decides what typing does —
  * an extension that claims a character claims it from the pickers as well.
@@ -76,6 +79,7 @@ export function documentExtension({
   editable,
   initialEditorState = null,
   onError = (error) => console.error(error),
+  extension,
 }: DocumentExtensionOptions) {
   return defineExtension({
     name: "@initiative/document-editor",
@@ -85,12 +89,8 @@ export function documentExtension({
       TableNode,
       TableCellNode,
       TableRowNode,
-      MentionNode,
       TweetNode,
       YouTubeNode,
-      EntityMentionNode,
-      SmartChipNode,
-      ReferenceEmbedNode,
       ...LEGACY_NODES,
     ],
     theme: editorTheme,
@@ -129,6 +129,7 @@ export function documentExtension({
       HeadingAnchorExtension,
       ListMaxIndentLevelExtension,
       MarkdownShortcutsExtension,
+      ...(extension ? [extension] : []),
     ],
   });
 }

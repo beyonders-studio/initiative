@@ -4,6 +4,7 @@ import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
 import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
 import { LexicalNestedComposer } from "@lexical/react/LexicalNestedComposer";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
+import { useExtensionDependency } from "@lexical/react/useExtensionComponent";
 import { useLexicalEditable } from "@lexical/react/useLexicalEditable";
 import { useLexicalNodeSelection } from "@lexical/react/useLexicalNodeSelection";
 import { mergeRegister } from "@lexical/utils";
@@ -37,12 +38,12 @@ import {
 } from "@/components/editor/context/featured-image-context";
 import { ContentEditable } from "@/components/editor/editor-ui/content-editable";
 import { ImageResizer } from "@/components/editor/editor-ui/image-resizer";
+import { ImagesExtension } from "@/components/editor/extensions/images-extension";
 import { $isImageNode } from "@/components/editor/nodes/image-node";
 // import brokenImage from '@/components/editor/images/image-broken.svg';
-import { useImageLightbox } from "@/components/markdown/ProseImage";
-import { resolveUploadUrl } from "@/lib/uploadUrl";
 import { Button } from "@/ui/button";
 import { cn } from "@/ui/lib/utils";
+import { useImageLightbox } from "@/ui/lightbox";
 
 const imageCache = new Set();
 
@@ -141,8 +142,7 @@ export default function ImageComponent({
   width: "inherit" | number;
   captionsEnabled: boolean;
 }): JSX.Element {
-  // Resolve upload URLs to full paths on native platforms
-  const resolvedSrc = resolveUploadUrl(src) ?? src;
+  const resolvedSrc = useExtensionDependency(ImagesExtension).config.resolveSrc(src);
   const imageRef = useRef<null | HTMLImageElement>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const [isSelected, setSelected, clearSelection] = useLexicalNodeSelection(nodeKey);

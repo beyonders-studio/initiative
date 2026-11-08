@@ -15,8 +15,8 @@ import type {
 } from "lexical";
 import type { JSX } from "react";
 
-import { matchSmartLinkProvider } from "@/lib/smartLinkProviders";
 import { EmbedFrame } from "@/ui/embed-frame";
+import { matchSmartLinkProvider } from "@/ui/lib/smartLinkProviders";
 
 type YouTubeComponentProps = Readonly<{
   className: Readonly<{

@@ -10,6 +10,8 @@ import {
 } from "lexical";
 import { describe, expect, it } from "vitest";
 
+import { InitiativeExtension } from "@/components/editor/initiative/initiative-extension";
+
 import { documentExtension } from "./document-extension";
 
 function Grab({ take }: { take: (editor: LexicalEditor) => void }): null {
@@ -23,7 +25,11 @@ function typedIntoADocument(line: string): string[] {
   let editor!: LexicalEditor;
   render(
     <LexicalExtensionComposer
-      extension={documentExtension({ collaborative: false, editable: true })}
+      extension={documentExtension({
+        collaborative: false,
+        editable: true,
+        extension: InitiativeExtension,
+      })}
       contentEditable={null}
     >
       <Grab

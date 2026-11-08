@@ -23,7 +23,7 @@ import {
   tableSortFields,
   taskTableSorting,
 } from "@/lib/filters/taskFilters";
-import { slugify } from "@/lib/slug";
+import { slugify } from "@/ui/lib/slug";
 
 /** A preset as a list offers it, holding its tool's filters `F`. A shipped
  *  one is named by `nameKey`, in the reader's words. */

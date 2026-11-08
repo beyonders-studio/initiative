@@ -1,5 +1,14 @@
 import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/ui/button";
@@ -485,5 +494,71 @@ export const Lightbox = ({
         </div>
       </DialogContent>
     </Dialog>
+  );
+};
+
+interface Picture {
+  src: string;
+  alt: string;
+}
+
+interface Scope {
+  register: (element: HTMLElement, picture: Picture) => () => void;
+  open: (element: HTMLElement) => void;
+}
+
+const ScopeContext = createContext<Scope | null>(null);
+
+/** The `ImageLightboxScope` a picture is drawn inside, or null outside one. */
+export const useImageLightbox = () => useContext(ScopeContext);
+
+const inReadingOrder = ([a]: [Node, Picture], [b]: [Node, Picture]) =>
+  a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+
+/**
+ * One block of rendered prose whose pictures open full size. Every picture
+ * that registers with it pages with the others, in the order they are read,
+ * so a description with five screenshots is one lightbox rather than five.
+ */
+export const ImageLightboxScope = ({ children }: { children: ReactNode }) => {
+  const pictures = useRef(new Map<HTMLElement, Picture>());
+  const [items, setItems] = useState<LightboxItem[]>([]);
+  const [index, setIndex] = useState(0);
+  const [open, setOpen] = useState(false);
+
+  const scope = useMemo<Scope>(
+    () => ({
+      register: (element, picture) => {
+        pictures.current.set(element, picture);
+        return () => {
+          pictures.current.delete(element);
+        };
+      },
+      open: (element) => {
+        const ordered = [...pictures.current].sort(inReadingOrder);
+        setItems(ordered.map(([, picture], position) => ({ id: position, ...picture })));
+        setIndex(
+          Math.max(
+            0,
+            ordered.findIndex(([each]) => each === element)
+          )
+        );
+        setOpen(true);
+      },
+    }),
+    []
+  );
+
+  return (
+    <ScopeContext value={scope}>
+      {children}
+      <Lightbox
+        open={open}
+        onOpenChange={setOpen}
+        items={items}
+        index={index}
+        onIndexChange={setIndex}
+      />
+    </ScopeContext>
   );
 };

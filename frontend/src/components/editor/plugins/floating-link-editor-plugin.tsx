@@ -27,8 +27,8 @@ import {
   pasteOverDefaultLinkUrl,
   withoutDefaultScheme,
 } from "@/components/editor/utils/url";
-import { openExternal } from "@/lib/openExternal";
 import { Button } from "@/ui/button";
+import { host } from "@/ui/host";
 import { Input } from "@/ui/input";
 import { sanitizeUrl } from "@/ui/lib/safeUrl";
 
@@ -358,7 +358,7 @@ function useFloatingLinkEditorToolbar(
             const node = getSelectedNode(selection);
             const linkNode = $findMatchingParent(node, $isLinkNode);
             if ($isLinkNode(linkNode) && (payload.metaKey || payload.ctrlKey)) {
-              openExternal(linkNode.getURL());
+              host.openExternal(linkNode.getURL());
               return true;
             }
           }

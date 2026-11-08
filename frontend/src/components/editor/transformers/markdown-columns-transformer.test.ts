@@ -7,12 +7,14 @@ import { describe, expect, it } from "vitest";
 
 import { CalloutExtension } from "@/components/editor/extensions/callout-extension";
 import { LayoutExtension } from "@/components/editor/extensions/layout-extension";
-import { MARKDOWN_TRANSFORMERS } from "@/components/editor/extensions/markdown-shortcuts-extension";
+import { markdownTransformers } from "@/components/editor/extensions/markdown-shortcuts-extension";
 import { $isLayoutContainerNode } from "@/components/editor/nodes/layout-container-node";
 import {
   templateFromWidths,
   widthsFromTemplate,
 } from "@/components/editor/transformers/markdown-columns-transformer";
+
+const transformers = markdownTransformers([]);
 
 function makeEditor(): LexicalEditor {
   return buildEditorFromExtensions(
@@ -42,7 +44,7 @@ describe("columns in markdown", () => {
   it("are Pandoc's fenced divs, both ways", () => {
     const editor = makeEditor();
     let exported = "";
-    editor.update(() => $convertFromMarkdownString(SOURCE.join("\n"), MARKDOWN_TRANSFORMERS), {
+    editor.update(() => $convertFromMarkdownString(SOURCE.join("\n"), transformers), {
       discrete: true,
     });
     editor.getEditorState().read(() => {
@@ -51,7 +53,7 @@ describe("columns in markdown", () => {
       const [narrow, wide] = $isLayoutContainerNode(container) ? container.getChildren() : [];
       expect(narrow?.getTextContent()).toBe("The narrow one.");
       expect($isElementNode(wide) && wide.getFirstChild()?.getType()).toBe("list");
-      exported = $convertToMarkdownString(MARKDOWN_TRANSFORMERS);
+      exported = $convertToMarkdownString(transformers);
     });
     expect(exported.split("\n")).toEqual(SOURCE);
   });
@@ -72,7 +74,7 @@ describe("columns in markdown", () => {
             "::::",
             "after",
           ].join("\n"),
-          MARKDOWN_TRANSFORMERS
+          transformers
         ),
       { discrete: true }
     );

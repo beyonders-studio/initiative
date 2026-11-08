@@ -2,10 +2,10 @@ import { type JSX, useCallback, useMemo, useState } from "react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/ui/dialog";
 
-export function useEditorModal(): [
-  JSX.Element | null,
-  (title: string, showModal: (onClose: () => void) => JSX.Element) => void,
-] {
+/** Opens a dialog over the editor, with its title and what it holds. */
+export type ShowModal = (title: string, getContent: (onClose: () => void) => JSX.Element) => void;
+
+export function useEditorModal(): [JSX.Element | null, ShowModal] {
   const [modalContent, setModalContent] = useState<null | {
     closeOnClickOutside: boolean;
     content: JSX.Element;

@@ -7,13 +7,13 @@ import {
   SearchEntityType,
   type SmartChipState,
 } from "@/api/generated/initiativeAPI.schemas";
+import { CHIP_TONE_CLASSES } from "@/components/editor/editor-ui/chip-tones";
 import { MemberAvatar } from "@/components/members/MemberSearchSelect";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { entityRefTypeFor } from "@/lib/entityResolver";
 import { fileIcon } from "@/lib/fileIcon";
 import { isItem, relatedTarget } from "@/lib/relationships";
 import { hitIcon, searchHitPath } from "@/lib/searchResults";
-import { CHIP_TONE_CLASSES } from "@/lib/smartChips";
 import { entityRefRoute } from "@/lib/tools";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
 import { Button } from "@/ui/button";
