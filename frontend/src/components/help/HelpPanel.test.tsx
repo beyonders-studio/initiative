@@ -63,6 +63,8 @@ vi.mock("@/api/generated/help/help", () => ({
   }),
 }));
 vi.mock("@/hooks/useActiveCommunityId", () => ({ useActiveCommunityId: () => 3 }));
+const openExternal = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/openExternal", () => ({ openExternal }));
 vi.mock("@/components/tickets/DeviceContext", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/components/tickets/DeviceContext")>()),
   useDeviceContext: () => CONTEXT,
@@ -94,7 +96,7 @@ const openPanel = async () => {
   // Opened once the host has claimed Help for the account signed in.
   await act(async () => {});
   act(() => openHelp());
-  return screen.findByRole("searchbox", { name: "Search the user guide" });
+  return screen.findByRole("combobox", { name: "Search the user guide" });
 };
 
 describe("Help", () => {
@@ -121,10 +123,8 @@ describe("Help", () => {
   it("opens on answers for the page, before anything is typed", async () => {
     await openPanel();
     expect(screen.getByText("For this page")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Projects and tasks/ })).toHaveAttribute(
-      "href",
-      `${DOCS_SITE_URL}en/guides/projects/`
-    );
+    await userEvent.click(screen.getByRole("option", { name: /Projects and tasks/ }));
+    expect(openExternal).toHaveBeenCalledWith(`${DOCS_SITE_URL}en/guides/projects/`);
   });
 
   it("finds the answer to what is typed, and says when nothing matches", async () => {
@@ -132,9 +132,8 @@ describe("Help", () => {
     const user = userEvent.setup();
 
     await user.type(search, "invite link");
-    expect(
-      await screen.findByRole("link", { name: /My invite link doesn't work/ })
-    ).toHaveAttribute("href", `${DOCS_SITE_URL}en/faq/#my-invite-link-doesnt-work`);
+    await user.click(await screen.findByRole("option", { name: /My invite link doesn't work/ }));
+    expect(openExternal).toHaveBeenCalledWith(`${DOCS_SITE_URL}en/faq/#my-invite-link-doesnt-work`);
 
     await user.clear(search);
     await user.type(search, "zebra");

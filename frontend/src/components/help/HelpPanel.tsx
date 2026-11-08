@@ -1,23 +1,22 @@
 /**
- * Help: the user guide searched from inside the app, and the team asked
- * where the search did not answer it.
+ * Help: the user guide, searched from inside the app, and the team asked where
+ * the search did not answer it.
  *
  * Drawn once at the root by `HelpHost`, so the question mark in the sidebar,
  * the desktop title bar and every "Ask for help" button open the same panel,
- * signed in or not. It docks at the corner and leaves the page usable; on a phone it is a
- * sheet over the page. It opens on the search, with answers for the page
+ * signed in or not. A sheet beside the page on a computer, which stays usable,
+ * and over it on a phone. It opens on the search, with answers for the page
  * showing before anything is typed. Where the server takes help requests,
  * "Ask the team" carries the search into a request; where it gave an address
- * instead, the panel shows the address; where neither, the user guide is
- * the answer.
+ * instead, the panel shows the address.
  *
  * What somebody writes is kept until it is sent or discarded: closing the
  * panel leaves a pill that opens it again.
  */
 
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, Check, Copy, ExternalLink, Search, X } from "lucide-react";
-import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import { ArrowLeft, Check, ExternalLink } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useReadHelpIndex } from "@/api/generated/help/help";
@@ -49,14 +48,34 @@ import {
   useTicketAvailability,
 } from "@/hooks/useTickets";
 import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
-import { helpSearch, pageTerms } from "@/lib/helpSearch";
+import { forPage } from "@/lib/helpSearch";
 import { DOCS_SITE_URL, docsUrl } from "@/lib/links";
 import { toast } from "@/lib/mascotToast";
+import { openExternal } from "@/lib/openExternal";
 import { Button } from "@/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/ui/command";
+import { CopyButton } from "@/ui/copy-button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/ui/empty";
+import { commandFilter } from "@/ui/lib/fuzzyMatch";
 import { listFormat } from "@/ui/lib/intl";
-import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { useFileDrop } from "@/ui/lib/useFileDrop";
+import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import { cn } from "@/ui/lib/utils";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
 import { Switch } from "@/ui/switch";
 import { Textarea } from "@/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
@@ -64,90 +83,64 @@ import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 /** Matches the column behind it. */
 const BODY_MAX = 5000;
 
+const close = () => updateHelp({ open: false });
+
 export const HelpPanel = ({ help }: { help: HelpState }) => {
   const { user } = useAuth();
+  const phone = !atLeast(useWidthClass(), "sm");
   const routeCommunityId = useActiveCommunityId();
   const communityId = help.communityId === undefined ? routeCommunityId : help.communityId;
   const availability = useTicketAvailability(communityId, { enabled: Boolean(user) });
   const support = user ? availability.data?.support : undefined;
   const canAsk = support?.mode === "form";
   const contact = support?.mode === "email" ? (support.contact ?? null) : null;
-  const titleId = useId();
   // A surface may ask for the request where this server takes none: the
   // search is what is left, with the address at its foot where there is one.
   const view: HelpView = help.view === "ask" && !canAsk ? "search" : help.view;
 
-  const close = () => updateHelp({ open: false });
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      close();
-    }
-  };
-
   return (
-    <>
-      {/* On a phone the panel is a sheet, and the page behind it waits. */}
-      <div
-        className="fixed inset-0 z-50 bg-black/50 sm:hidden"
-        onClick={close}
-        aria-hidden="true"
-      />
-      <section
-        role="dialog"
-        aria-modal="false"
-        aria-labelledby={titleId}
-        onKeyDown={onKeyDown}
+    <Sheet open modal={phone} onOpenChange={(open) => !open && close()}>
+      <SheetContent
+        side={phone ? "bottom" : "right"}
+        aria-describedby={undefined}
+        // On a computer the page beside Help stays usable while it is open.
+        onInteractOutside={(event) => !phone && event.preventDefault()}
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 flex h-[88dvh] flex-col rounded-t-2xl border-t bg-background pb-[env(safe-area-inset-bottom)] shadow-xl",
-          "sm:inset-x-auto sm:right-4 sm:bottom-4 sm:h-[min(560px,calc(100dvh-var(--title-bar-height,0px)-2rem))] sm:w-[400px] sm:max-w-[calc(100vw-2rem)] sm:rounded-xl sm:border sm:pb-0"
+          "flex flex-col gap-0 p-0",
+          phone
+            ? "h-[88dvh] rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
+            : "top-[var(--title-bar-height,0px)] h-auto sm:max-w-md"
         )}
       >
         {view === "search" ? (
           <SearchView
-            titleId={titleId}
             query={help.query}
             communityId={communityId}
             canAsk={canAsk}
             contact={contact}
             signedIn={Boolean(user)}
-            onClose={close}
           />
         ) : view === "ask" && support ? (
           <AskView
-            titleId={titleId}
             draft={help.draft}
             communityId={communityId}
             topics={(support.types ?? []) as SupportTopic[]}
             policy={support.evidence}
-            onClose={close}
           />
         ) : (
-          <SentView titleId={titleId} onClose={close} />
+          <SentView />
         )}
-      </section>
-    </>
+      </SheetContent>
+    </Sheet>
   );
 };
 
 // ---------------------------------------------------------------------------
 
-const PanelHeader = ({
-  titleId,
-  title,
-  onBack,
-  onClose,
-  children,
-}: {
-  titleId: string;
-  title: string;
-  onBack?: () => void;
-  onClose: () => void;
-  children?: React.ReactNode;
-}) => {
-  const { t } = useTranslation(["intake", "common"]);
+const PanelHeader = ({ title, onBack }: { title: string; onBack?: () => void }) => {
+  const { t } = useTranslation("intake");
   return (
-    <div className="flex items-center gap-1 py-2 pr-2 pl-4">
+    <SheetHeader className="flex-row items-center gap-1 space-y-0 py-3 pr-12 pl-4 text-left">
       {onBack ? (
         <Button
           variant="ghost"
@@ -156,114 +149,53 @@ const PanelHeader = ({
           onClick={onBack}
           aria-label={t("help.panel.back")}
         >
-          <ArrowLeft className="size-4" />
+          <ArrowLeft />
         </Button>
       ) : null}
-      <h2 id={titleId} className="flex-1 font-semibold text-sm">
-        {title}
-      </h2>
-      {children}
-      <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label={t("common:close")}>
-        <X className="size-4" />
-      </Button>
-    </div>
+      <SheetTitle className="text-base">{title}</SheetTitle>
+    </SheetHeader>
   );
 };
 
-const HelpResult = ({
-  entry,
-  onKeyDown,
-}: {
-  entry: HelpIndexEntry;
-  onKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
-}) => (
-  <a
-    href={`${DOCS_SITE_URL}${entry.location}`}
-    onKeyDown={onKeyDown}
-    target="_blank"
-    rel="noopener noreferrer"
-    className="group grid gap-0.5 rounded-md p-2 hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+/** One page or section of the user guide, opened outside the app. */
+const HelpResult = ({ entry }: { entry: HelpIndexEntry }) => (
+  <CommandItem
+    value={entry.location}
+    keywords={[entry.title, entry.section, entry.snippet]}
+    onSelect={() => openExternal(`${DOCS_SITE_URL}${entry.location}`)}
+    className="flex-col items-start gap-0.5"
   >
     {entry.section ? <span className="text-muted-foreground text-xs">{entry.section}</span> : null}
-    <span className="flex items-start justify-between gap-2 font-medium text-sm">
-      {entry.title}
-      <ExternalLink
-        className="mt-1 size-3 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
-        aria-hidden="true"
-      />
-    </span>
+    <span className="font-medium">{entry.title}</span>
     {entry.snippet ? (
       <span className="line-clamp-2 text-muted-foreground text-xs">{entry.snippet}</span>
     ) : null}
-  </a>
+  </CommandItem>
 );
 
-/** The search over the user guide, as a function of what was typed. */
-const useHelpSearch = () => {
-  // The index changes only with the server's version, which a reload brings.
-  const { data } = useReadHelpIndex({ query: { staleTime: Number.POSITIVE_INFINITY } });
-  const entries = data?.items;
-  return useMemo(() => (entries?.length ? helpSearch(entries) : null), [entries]);
-};
-
 const SearchView = ({
-  titleId,
   query,
   communityId,
   canAsk,
   contact,
   signedIn,
-  onClose,
 }: {
-  titleId: string;
   query: string;
   /** The community a request asked from here is about. */
   communityId: number | null;
   canAsk: boolean;
   contact: string | null;
   signedIn: boolean;
-  onClose: () => void;
 }) => {
   const { t } = useTranslation(["intake", "common"]);
-  const search = useHelpSearch();
+  // The index changes only with the server's version, which a reload brings.
+  const { data } = useReadHelpIndex({ query: { staleTime: Number.POSITIVE_INFINITY } });
+  const entries = useMemo(() => data?.items ?? [], [data]);
   const route = useRouteTemplate();
-  const results = useRef<HTMLDivElement>(null);
+  const pageEntries = useMemo(() => forPage(entries, route), [entries, route]);
   const typed = query.trim();
-  // Searched once typing pauses: forgiving typos costs more than a keystroke.
-  const settled = useDebouncedValue(typed, 150);
-  const found = useMemo(
-    () => (search ? search(settled || pageTerms(route)) : []),
-    [search, settled, route]
-  );
   const filed = useFiledTickets({ enabled: signedIn && canAsk });
   const openRequests = (filed.data?.items ?? []).filter((item) => item.state !== "closed").length;
-
-  // The count is said once typing pauses, not on every key.
-  const [said, setSaid] = useState("");
-  useEffect(() => {
-    if (!typed) return;
-    const timer = setTimeout(
-      () =>
-        setSaid(
-          found.length
-            ? t("help.panel.answers", { count: found.length })
-            : t("help.panel.noMatch", { query: typed })
-        ),
-      400
-    );
-    return () => clearTimeout(timer);
-  }, [typed, found.length, t]);
-
-  const step = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-    const links = [...(results.current?.querySelectorAll<HTMLAnchorElement>("a") ?? [])];
-    if (links.length === 0) return;
-    event.preventDefault();
-    const at = links.indexOf(document.activeElement as HTMLAnchorElement);
-    if (event.key === "ArrowDown") links[at + 1 < links.length ? at + 1 : 0]?.focus();
-    else if (at <= 0) document.getElementById("help-search")?.focus();
-    else links[at - 1]?.focus();
-  };
 
   const ask = () => {
     // What was searched starts the request, unless a draft is already there,
@@ -276,21 +208,11 @@ const SearchView = ({
     });
   };
 
-  const copy = async () => {
-    if (!contact) return;
-    try {
-      await navigator.clipboard.writeText(contact);
-      toast.success(t("help.panel.copied"));
-    } catch {
-      toast.error(t("help.panel.copyFailed"));
-    }
-  };
-
   return (
     <>
-      <PanelHeader titleId={titleId} title={t("common:help")} onClose={onClose} />
-      {/* The user guide comes first: most people opening Help want to
-          learn the app, not to search for one answer. */}
+      <PanelHeader title={t("common:help")} />
+      {/* The user guide comes first: most people opening Help want to learn
+          the app, not to search for one answer. */}
       <a
         href={docsUrl()}
         target="_blank"
@@ -303,52 +225,47 @@ const SearchView = ({
         </span>
         <ExternalLink className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       </a>
-      <div className="mx-4 mb-2 flex items-center gap-2 rounded-md border bg-card px-2.5 focus-within:border-ring">
-        <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <input
-          id="help-search"
-          type="search"
-          // biome-ignore lint/a11y/noAutofocus: the panel opens to be typed into
+      <Command
+        filter={commandFilter}
+        label={t("help.panel.search")}
+        className="min-h-0 flex-1 rounded-none bg-transparent"
+      >
+        <CommandInput
           autoFocus
-          autoComplete="off"
           value={query}
-          onChange={(event) => updateHelp({ query: event.target.value })}
-          onKeyDown={step}
-          aria-label={t("help.panel.search")}
+          onValueChange={(value) => updateHelp({ query: value })}
           placeholder={t("help.panel.search")}
-          className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground"
         />
-      </div>
-      <div ref={results} className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        {search === null ? (
-          <p className="px-2 py-4 text-muted-foreground text-sm">{t("help.panel.unavailable")}</p>
-        ) : found.length > 0 ? (
-          <>
-            <p className="px-2 pt-2 pb-1 font-semibold text-muted-foreground text-xs uppercase tracking-wide">
-              {typed
-                ? t("help.panel.answers", { count: found.length })
-                : t("help.panel.forThisPage")}
+        <CommandList className="max-h-none flex-1 p-2">
+          {entries.length === 0 ? (
+            <p className="px-2 py-6 text-center text-muted-foreground text-sm">
+              {t("help.panel.unavailable")}
             </p>
-            {found.map((entry) => (
-              <HelpResult key={entry.location} entry={entry} onKeyDown={step} />
-            ))}
-          </>
-        ) : typed ? (
-          <div className="grid gap-1 px-2 py-4 text-sm">
-            <p className="font-medium">{t("help.panel.noMatch", { query: typed })}</p>
-            <p className="text-muted-foreground">
-              {canAsk
-                ? t("help.panel.noMatchAsk")
-                : contact
-                  ? t("help.panel.noMatchWrite")
-                  : t("help.panel.noMatchBrowse")}
-            </p>
-          </div>
-        ) : null}
-      </div>
-      <p className="sr-only" aria-live="polite">
-        {said}
-      </p>
+          ) : typed ? (
+            <>
+              <CommandEmpty className="grid gap-1 px-2 py-6 text-center text-sm">
+                <span className="font-medium">{t("help.panel.noMatch", { query: typed })}</span>
+                <span className="text-muted-foreground">
+                  {canAsk
+                    ? t("help.panel.noMatchAsk")
+                    : contact
+                      ? t("help.panel.noMatchWrite")
+                      : t("help.panel.noMatchBrowse")}
+                </span>
+              </CommandEmpty>
+              {entries.map((entry) => (
+                <HelpResult key={entry.location} entry={entry} />
+              ))}
+            </>
+          ) : pageEntries.length > 0 ? (
+            <CommandGroup heading={t("help.panel.forThisPage")}>
+              {pageEntries.map((entry) => (
+                <HelpResult key={entry.location} entry={entry} />
+              ))}
+            </CommandGroup>
+          ) : null}
+        </CommandList>
+      </Command>
       {canAsk ? (
         <div className="grid gap-2 border-t py-3 pr-3 pl-4">
           <span className="text-muted-foreground text-sm">{t("help.panel.noAnswer")}</span>
@@ -356,7 +273,7 @@ const SearchView = ({
             {openRequests > 0 ? (
               <Link
                 to="/my-tickets"
-                onClick={onClose}
+                onClick={close}
                 className="text-muted-foreground text-sm underline underline-offset-2 hover:text-foreground"
               >
                 {t("help.panel.openRequests", { count: openRequests })}
@@ -372,10 +289,7 @@ const SearchView = ({
           <span className="text-muted-foreground text-sm">{t("help.panel.writeTo")}</span>
           <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2">
             <span className="min-w-0 flex-1 select-all break-all font-mono text-sm">{contact}</span>
-            <Button variant="outline" size="sm" onClick={() => void copy()}>
-              <Copy className="size-4" aria-hidden="true" />
-              {t("common:copy")}
-            </Button>
+            <CopyButton value={contact} label={t("common:copy")} />
           </div>
         </div>
       ) : null}
@@ -386,23 +300,18 @@ const SearchView = ({
 // ---------------------------------------------------------------------------
 
 const AskView = ({
-  titleId,
   draft,
   communityId,
   topics,
   policy,
-  onClose,
 }: {
-  titleId: string;
   draft: HelpDraft;
   communityId: number | null;
   topics: SupportTopic[];
   policy: React.ComponentProps<typeof EvidencePicker>["policy"];
-  onClose: () => void;
 }) => {
   const { t } = useTranslation(["intake", "common"]);
   const context = useDeviceContext();
-  const search = useHelpSearch();
   const [showContext, setShowContext] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   // A community's own topics are asked from inside it.
@@ -412,16 +321,6 @@ const AskView = ({
     : offered.length === 1
       ? offered[0]
       : "";
-  // The answers that match what is being written stay in view; two, for the room.
-  const [writing, setWriting] = useState(draft.text);
-  useEffect(() => {
-    const timer = setTimeout(() => setWriting(draft.text), 300);
-    return () => clearTimeout(timer);
-  }, [draft.text]);
-  const mightAnswer = useMemo(
-    () => (search && writing.trim().length >= 8 ? search(writing).slice(0, 2) : []),
-    [search, writing]
-  );
 
   const take = (incoming: File[]) => {
     if (!policy || incoming.length === 0) return;
@@ -455,12 +354,11 @@ const AskView = ({
       : null;
   const send = () => {
     if (held || !topic || file.isPending) return;
-    const aboutCommunity = COMMUNITY_TOPICS.has(topic);
     file.mutate({
       ticket: {
         stream: "support",
         type: topic,
-        community_id: aboutCommunity ? communityId : null,
+        community_id: COMMUNITY_TOPICS.has(topic) ? communityId : null,
         subject: firstLine(draft.text),
         body: draft.text.trim(),
         context: draft.sendContext ? context : null,
@@ -471,12 +369,7 @@ const AskView = ({
 
   return (
     <>
-      <PanelHeader
-        titleId={titleId}
-        title={t("help.panel.askTeam")}
-        onBack={() => updateHelp({ view: "search" })}
-        onClose={onClose}
-      />
+      <PanelHeader title={t("help.panel.askTeam")} onBack={() => updateHelp({ view: "search" })} />
       <div
         {...handlers}
         className="relative grid min-h-0 flex-1 content-start gap-3 overflow-y-auto px-4 pb-3"
@@ -514,26 +407,16 @@ const AskView = ({
           onChange={(files) => setHelpDraft({ files })}
           disabled={file.isPending}
         />
-        {mightAnswer.length > 0 ? (
-          <div className="grid gap-0.5 rounded-lg bg-muted p-2">
-            <p className="px-2 font-semibold text-muted-foreground text-xs uppercase tracking-wide">
-              {t("help.panel.mightAnswer")}
-            </p>
-            {mightAnswer.map((entry) => (
-              <HelpResult key={entry.location} entry={entry} />
-            ))}
-          </div>
-        ) : null}
         {offered.length > 1 ? (
           <div className="grid gap-2">
-            <span id={`${titleId}-topic`} className="font-medium text-sm">
+            <span id="help-topic" className="font-medium text-sm">
               {t("help.topicLabel")}
             </span>
             <ToggleGroup
               type="single"
               value={topic}
               onValueChange={(value) => value && setHelpDraft({ topic: value as SupportTopic })}
-              aria-labelledby={`${titleId}-topic`}
+              aria-labelledby="help-topic"
               variant="outline"
               size="sm"
               className="flex-wrap justify-start"
@@ -557,14 +440,15 @@ const AskView = ({
           <span className="min-w-0 flex-1">
             {draft.sendContext ? t("help.panel.sendsContext") : t("help.panel.sendsNoContext")}
           </span>
-          <button
-            type="button"
-            className="underline underline-offset-2 hover:text-foreground"
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-muted-foreground text-xs"
             onClick={() => setShowContext((shown) => !shown)}
             aria-expanded={showContext}
           >
             {showContext ? t("help.panel.hideContext") : t("help.panel.showContext")}
-          </button>
+          </Button>
           <Switch
             checked={draft.sendContext}
             onCheckedChange={(checked) => setHelpDraft({ sendContext: checked })}
@@ -600,32 +484,30 @@ const AskView = ({
 
 // ---------------------------------------------------------------------------
 
-const SentView = ({ titleId, onClose }: { titleId: string; onClose: () => void }) => {
+const SentView = () => {
   const { t } = useTranslation(["intake", "common"]);
-  const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => heading.current?.focus(), []);
   return (
     <>
-      <PanelHeader titleId={titleId} title={t("common:help")} onClose={onClose} />
-      <div className="grid content-start justify-items-start gap-3 px-4 py-4" role="status">
-        <span className="grid size-9 place-items-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-          <Check className="size-5" aria-hidden="true" />
-        </span>
-        <h3 ref={heading} tabIndex={-1} className="font-semibold outline-none">
-          {t("help.panel.sent")}
-        </h3>
-        <p className="text-muted-foreground text-sm">{t("help.panel.sentBody")}</p>
-        <div className="flex flex-wrap gap-2">
+      <PanelHeader title={t("common:help")} />
+      <Empty role="status" className="border-0">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Check />
+          </EmptyMedia>
+          <EmptyTitle>{t("help.panel.sent")}</EmptyTitle>
+          <EmptyDescription>{t("help.panel.sentBody")}</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent className="flex-row justify-center">
           <Button variant="outline" size="sm" asChild>
-            <Link to="/my-tickets" onClick={onClose}>
+            <Link to="/my-tickets" onClick={close}>
               {t("help.panel.openTickets")}
             </Link>
           </Button>
-          <Button size="sm" onClick={onClose}>
+          <Button size="sm" onClick={close}>
             {t("common:done")}
           </Button>
-        </div>
-      </div>
+        </EmptyContent>
+      </Empty>
     </>
   );
 };
