@@ -2,188 +2,168 @@
 icon: lucide/folders
 ---
 
-# Working with initiatives
+# Initiatives
 
-An **initiative** is a folder for one big effort inside your community. It holds that effort's projects, files and other tools, and it's where you decide who's actually involved in it.
+An **initiative** is one effort inside your community, with its own people, like the spring play or the U10 soccer team's season. It holds that effort's [tools](tools.md) (its projects, files, calendars and the rest), and only the people in it can see what's inside. That's how the board keeps the budget away from the volunteers in the same community, without anyone having to be told they're on the outside of something.
 
-New to the idea? [How Initiative is organized](../concepts/index.md) explains the shape first.
+New to how the pieces fit? [How Initiative is organized](../concepts/index.md) draws the map first.
 
-## Making one
+## Make an initiative
 
-In the sidebar, find **Initiatives** and choose **Add initiative**. **New initiative** walks you through four questions:
+Community admins make initiatives. If **Add initiative** isn't in your sidebar, ask one of your community's admins to make it, or to put you in charge of one they've made.
 
-1. **What is it called?** Name it after the effort — "Spring Play", "2026 Budget", "Onboarding" — and pick a **colour**. The colour follows its tools around, so you can tell at a glance what belongs to what without reading a single word. A description is optional.
-2. **What is it made of?** Pick the [tools](tools.md) it needs. Projects and files start ticked; at least one has to stay.
-3. **Who can get in?** Invite only, by request, or anyone in the community. See [How people join an initiative](#how-people-join-an-initiative).
-4. **What can they do?** What an ordinary member may do with those tools: **Make things**, **See things**, or **Managers only**, for work that should stay with a few people until you say otherwise.
+1. In the sidebar, under **Initiatives**, select **Add initiative**.
+2. Type a **Name**, like "Spring Play" or "Onboarding".
+3. Add a **Description** if you like.
+4. Pick a **Color**. It follows the initiative's things around the app, so you can tell what belongs where at a glance.
+5. Select **Next: Tools**.
+6. Pick the tools it needs. **Projects** and **Files** start ticked, and at least one has to stay.
+7. Select **Next: Membership**.
+8. Choose who can get in: **Invite only**, **By request** or **Anyone can join**.
+9. Select **Next: Permissions**.
+10. Choose what an ordinary member can do with those tools: **Make things**, **See things**, or **Managers only** for sensitive work.
+11. Select **Create initiative**.
 
-Every answer can be changed later, and turning a tool off never deletes what's in it. So if you're stuck on question two, guess. Nobody is marking this.
+The new initiative appears in your sidebar, with you in it as a Moderator, the role community admins always hold in an initiative (see [Initiative roles](../sharing/initiative-roles.md)). Expand it to see its tools. [Choose who can get in](#how-people-join-an-initiative) explains the three ways in. Every answer in those steps can be changed later, and turning a tool off never deletes what's in it, so if you're stuck on a step, guess. Nobody is grading this.
 
-The new initiative shows up in the sidebar. Expand it to see its tools.
+![Making an initiative](../images/initiatives/create-initiative.png)
 
-![Creating an initiative](../images/initiatives/create-initiative.png)
+!!! info "Your community's first initiative"
+    A new community starts empty, and its front page asks you to make the first initiative before anything else. That's on purpose: an initiative is the name for a body of work, and only you know what your community's work is called. Some communities carry one named **Default Initiative**, which is an ordinary initiative you can rename, archive or delete.
 
-!!! info "Your first one"
-    A new community arrives empty, and the home page asks you to make the first initiative before anything else. That is deliberate: an initiative is a *name for a body of work*, and only you know what this community's work is called.
+## Find your way around an initiative
 
-    Some communities carry one called **Default Initiative**. There's nothing special about it. Rename it, archive it or delete it like any other.
+Select an initiative's name in the sidebar to open it. Its name sits at the top beside a stripe of its color, with the description under it. Then comes one short line: your role here, the faces of whoever's online right now, and the member count, which you can select to see and search everybody.
 
-## The initiative page
+Under that is a tab for each tool, each with one main button for making a new thing. **Initiative settings**, at the top right, is there for the people who run the initiative.
 
-Click an initiative's name to open it. Its name sits beside a rule in its colour, with the description under it, and then one quiet line: your role here, then the faces of whoever's online right now. Point at a face to see who it is; open the member count for everybody, searchable.
+## Join an initiative
 
-Under that is one tab per tool, each with one main button for making a new one. **Initiative settings** sits top right, for the people who run it.
+You can join any initiative that's open to you from the community's front page. Select **Browse initiatives** in the sidebar to jump there. The **Initiatives** section shows **Your initiatives** and the ones **Open to join**, and each card says how it lets people in.
 
-## Adding members
+A card that says **Open to all community members** has a **Join** button. Select it and you're in straight away, on the initiative's **Member** role.
 
-An initiative's contents are visible **only to its members**. To add somebody by hand:
+A card that says **Joins by request** needs a manager's yes:
 
-1. Open the initiative → **settings → Members**.
-2. **Add** people from your community.
-3. Give each one a **role** (see below).
+1. Select **Request to join** on its card.
+2. Add a line in **Message (optional)** if it helps, like who you are or why you're asking.
+3. Select **Send request**.
 
-Here's the important bit: an invite-only initiative isn't merely closed to people who aren't in it. It isn't *there* for them at all. No name in a list. No locked door to rattle. No "you do not have permission" message to feel odd about.
+The card says **Requested** until a manager answers, and you get a notification either way. A "no" isn't permanent, and you can ask again later. You can only have one request waiting per initiative, though, so nobody can show their enthusiasm by sending fifteen.
 
-That's how an initiative keeps sensitive work with the people involved — even from other members of the same community — without anybody ever having to be told they're on the outside of something.
+Invite-only initiatives don't appear on the front page at all. To get into one, ask one of its managers to add you.
 
-An initiative that opens itself up (below) shows its name, description and size so people can find it. That's all a non-member gets. The projects and files stay out of reach until they actually join.
+## Answer requests to join
 
-## How people join an initiative
+The initiative's managers (its Project Managers and Moderators) and community admins answer requests. Managers get a notification for each one, and on the front page, an initiative with people waiting shows a small badge with the count.
 
-Each initiative sets its own front door, under **settings → Members → Joining**:
+1. Select the notification, or open **Initiative settings** and select **Members**.
+2. Under **Requests to join**, read who asked and what they wrote. A note says if they've been denied here before.
+3. Select **Approve** or **Deny**.
 
-| Setting | What it means |
+Approving adds them on the Member role, and they're told, with a link straight in. Denying keeps them out and tells them so, and they can ask again later.
+
+!!! screenshot "Requests to join"
+    The **Members** tab of Initiative settings with two people under **Requests to join**, each with **Deny** and **Approve**. Save as `docs/en/images/initiatives/join-request-queue.png`.
+
+## Add someone to an initiative
+
+The initiative's managers and community admins can add people. Only people already in the community can be added; for anyone else, [invite them to the community](running-a-community.md#inviting-people) first, or make them a [guest](../sharing/guests.md).
+
+1. Open **Initiative settings** and select **Members**.
+2. Select **Select user** and pick the person.
+3. In **Select role**, choose their [role](../sharing/initiative-roles.md).
+4. Select **Add member**.
+
+They're told they were added, and the initiative appears in their sidebar. A community admin always lands on the Moderator role, whichever role you pick, because that matches what they can already do. Being in the initiative lets them use its tools as their role allows; each project and file inside still decides for itself who can open it (see [Sharing projects, files and more](../sharing/sharing-projects-and-files.md)).
+
+## Change someone's role in an initiative
+
+The initiative's managers and community admins can change roles. Only a community admin can put somebody on the Moderator role or take them off it.
+
+1. Open **Initiative settings** and select **Members**.
+2. In the person's **Role**, choose the new role.
+
+It takes effect immediately, with no need for them to sign in again. An initiative always keeps at least one Project Manager or Moderator, so the last one can't be moved to another role until somebody else takes over.
+
+## Take someone off an initiative
+
+The initiative's managers and community admins can take people off.
+
+1. Open **Initiative settings** and select **Members**.
+2. Select **Remove** on the person's row.
+3. Select **Remove** to confirm.
+
+They lose access to the initiative and to everything that was shared with them there. Anything they owned in it stays, with nobody owning it, until a community admin claims it. Taking people off is always a manager's job, your own name included, so to leave an initiative, ask one of its managers.
+
+## Choose who can get in { #how-people-join-an-initiative }
+
+Each initiative decides how people join it. Its managers and community admins can change this.
+
+1. Open **Initiative settings** and select **Members**.
+2. Under **Joining**, choose an option.
+
+It saves as soon as you choose.
+
+| Option | What it means |
 |---|---|
-| **Invite only** | Nobody joins on their own. A manager adds them. This is the default. |
-| **By request** | Listed for the community. Somebody asks, a manager says yes or no. |
-| **Anyone can join** | Listed for the community, and any member joins in one click. |
+| **Invite only** | Nobody joins on their own; a manager adds them. The initiative doesn't appear for anyone outside it. This is where new initiatives start unless you choose otherwise. |
+| **By request** | Listed on the community's front page. People ask, and a manager says yes or no. |
+| **Anyone can join** | Listed on the community's front page, and any community member joins with one click. |
 
-![Choosing how people join an initiative](../images/initiatives/join-policy.png)
+A listed initiative shows its name, color, description and member count, and nothing else, to people outside it. Joining puts people on the Member role, and sharing still decides each project and file inside, so opening an initiative up doesn't expose anything that was private within it. It only changes who can walk in.
 
-Anything that isn't invite-only appears in the **Initiatives** section of the community front page — name, colour, description, member count — split into the ones you're already in and the ones you could join.
+!!! screenshot "Choosing how people join"
+    The **Joining** card on the **Members** tab, with **By request** chosen and the auto-join switch below. Save as `docs/en/images/initiatives/join-policy.png`.
 
-![The initiative list on a community's front page](../images/initiatives/community-home-initiatives.png)
+### Add every new community member automatically
 
-However somebody arrives, they land on the built-in **Member** role, and sharing still decides each individual project and file inside.
+An initiative that welcomes everyone stops newcomers arriving to an empty community and quietly wondering what they did wrong. Community admins can turn this on, for an initiative anyone can join.
 
-So opening an initiative up doesn't suddenly expose anything that was private within it. It only changes who's allowed to walk in.
+1. Open **Initiative settings** and select **Members**.
+2. Under **Joining**, choose **Anyone can join**.
+3. Turn on **Add every new community member automatically**.
 
-### Asking to join
+From now on, everybody who joins the community, by invite, from the directory or through your group's sign-in, lands in this initiative already, on the Member role. People already in the community aren't added, though they can join it themselves. Admins and guests aren't added either. While it's on, the initiative has to stay open to everyone, so turn it off before changing **Joining**.
 
-On a **by request** initiative, the card offers **Request to join**, with room for a short note explaining who they are or why they're asking.
+## Community admins and initiatives { #community-admins-join-like-everybody-else }
 
-Managers get notified — in the app, plus push or email if they've got those on — and the request waits in **settings → Members**, above the roster, showing who asked, what they wrote, when, and whether they've been turned down here before. **Approve** adds them. **Decline** doesn't.
+A community admin can open and change everything in every initiative in their community. Their sidebar and front page still show only the initiatives they're actually in, the same as everybody else's, because an admin buried under a hundred initiatives they've never opened can't find the three they work in.
 
-Being declined isn't a ban and it isn't permanent. They can ask again later.
+To put an initiative in their own sidebar, an admin joins it from the front page. They walk straight in whatever its **Joining** says, with no request and no waiting, and arrive on the Moderator role. **Community settings** then **Initiatives** lists every initiative in the community, joined or not (see [Running a community](running-a-community.md#run-the-communitys-initiatives)).
 
-They can also only have one request open at a time, so nobody can express their enthusiasm by sending you fifteen.
+A Project Manager can add a community admin to their initiative like anyone else, and the admin arrives as a Moderator.
 
-![The join-request queue](../images/initiatives/join-request-queue.png)
+## Turn tools on and off
 
-### Adding everyone automatically
+Each initiative picks which [tools](tools.md) it uses. Its managers and community admins can change them.
 
-A community admin can mark an **anyone can join** initiative as **auto-join**. From then on, everybody arriving in the community — by invite, from the [directory](communities.md#finding-a-community-to-join), or through a work login — lands in it already a member, with nothing to click.
+1. Open **Initiative settings**. It opens on **Details**.
+2. Under **Tools**, turn on the tool's switch.
+3. Choose **Everyone in this initiative** or **Managers only, for now**.
+4. Select **Turn it on**.
 
-This is how you stop every new arrival meeting a completely empty community and quietly concluding they've done something wrong. Worth having at least one if your community is publicly listed.
+The tool's tab appears in the initiative for the people you chose. To decide role by role instead, see [Initiative roles](../sharing/initiative-roles.md). Turning a tool off asks you to confirm with **Turn it off**, and it hides the tool and everything in it from everyone, managers included. Nothing is deleted, and turning it back on brings it all back. A switch with a lock on it was set by your community for every initiative, and only a community admin can change that.
 
-Two things to know:
+## Rename an initiative or change its color
 
-- It applies **from now on**. It doesn't sweep in everybody who's already there.
-- Only an **anyone can join** initiative can carry it — so auto-join never hands out access that somebody couldn't have taken for themselves a moment later anyway.
+The initiative's managers and community admins can do this.
 
-### Community admins join like everybody else
+1. Open **Initiative settings**. It opens on **Details**.
+2. Change the **Name**, **Color** or **Description**.
+3. Select **Save changes**.
 
-A community admin has authority over every initiative in their community. But authority isn't navigation.
+## Add your own fields with metadata { #metadata }
 
-Their sidebar and front page show **the initiatives they're actually in**, then the ones on offer, exactly like everybody else's.
+**Metadata** is the fields your initiative needs that Initiative didn't think of: "Budget code", "Team", "Signed off by". It belongs to the initiative, and once it exists, every project, task, file, event and the rest in the initiative can carry it. The initiative's managers and community admins make it.
 
-An admin buried under a hundred initiatives they have never once opened cannot find the three they actually work in. That helps nobody, least of all the admin.
+1. Open **Initiative settings** and select **Metadata**.
+2. Select **New metadata**.
+3. Type a **Name**.
+4. Choose a **Type**. A **Select** or **Multi-select** asks for its **Options**, **Money** for its currency, and a **Counter** for its step and limits.
+5. Select **Save**.
 
-To put one in front of themselves, an admin joins it from the front page. They walk straight in whatever the joining setting says — no request, no waiting — and arrive on the **Moderator** role their standing already implies. **Community settings → Initiatives** still lists every initiative in the community.
-
-None of this changes what an admin may *do*. Open any initiative and they see all of it.
-
-!!! tip "Adding an admin to your initiative"
-    A project manager can add a community admin like anybody else — the member picker offers them, and they arrive as a Moderator, which is the standing they already had.
-
-## Roles and what they unlock
-
-Each member holds a **role**, which decides which *kinds of tools* they can use here — whether they can make projects, or only look at them.
-
-Every initiative comes with three: **Manager** (think project lead) and **Moderator**, whose permissions are fixed, and **Member**, whose you set. You build your own on top: "Coordinator". "Volunteer". "Client". "Guest". "Person Who Only Needs To See The Rota".
-
-Name them after how your group actually talks about itself, not after anything Initiative expects. Nobody has ever introduced themselves at a committee meeting as a view-only contributor.
-
-Permissions are grouped by tool — **Projects**, **Files**, **Counters**, **Events**, **Dashboards**, **Posts**, **Wikis**, **Contacts** — each offering **View** and **Create**. So "Volunteer" might view projects and files but create nothing, while "Coordinator" creates everything.
-
-![Setting permissions for an initiative role](../images/initiatives/roles.png)
-
-There's a full walkthrough in [Initiative roles](../sharing/initiative-roles.md).
-
-!!! warning "Moderators see absolutely everything"
-    The built-in **Moderator** role reaches every project and file in the initiative, whether or not it was ever shared with them. That's unique to Moderator — no other role gets it, or can be given it however much you'd like. A community admin hands it out, and arrives on it themselves.
-
-    So hand it to the people who genuinely need the whole picture. Not as a thank-you for being helpful, and not because somebody's been around a long time and it felt rude not to.
-
-## Moderation
-
-Moderators and community admins see one more entry at the top of the initiative in the sidebar: **Moderation**. Nobody else does, and nothing turns it off.
-
-| Tab | What's in it |
-|---|---|
-| **Reports** | What people have [reported](communities.md#reporting-something) here, **Open** and **Settled**. Each shows what was reported, how many people reported it, and what they said. |
-| **Members** | Who's in, and what each of them may do. |
-| **Sharing** | How widely each thing here is shared. Open one to change it. |
-| **Log** | What moderators have done here, newest first: what was removed and why, what a removed comment said, locks and warnings. **Put back** undoes a removal. |
-
-Open the reported thing to see it where it lives, then come back and settle it, with a note on why if you like:
-
-- **Dismiss** — nothing to do.
-- **Remove…** — takes it down, for the reason it was reported for unless you pick another. A comment becomes a line saying it was removed and why, and its replies stay; anything else goes to the bin. Whoever wrote it is told why, never by whom.
-- **Warn…** — sends whoever wrote it what you type, as a notice from the moderators. It never says who reported it.
-- **Send to the platform** — below.
-
-A report of something illegal shows **Platform notified**: it went to whoever runs the server as well, and they look at it whatever you decide here.
-
-You don't need a report to act. Moderators and community admins get a shield menu on comments, posts, pictures, wiki pages, events and tasks:
-
-- **Remove…**, as above.
-- **Warn…** — sends whoever wrote it what you type, as above, and leaves it up.
-- **Clear reactions**, on comments and posts.
-- **Hold for the platform…** — below. You won't see it either once it's held.
-
-**Lock comments**, at the top of any comment thread — on a task, a wiki page or any tool — closes it. The thread still reads, nobody adds to it or edits what's in it, moderators included, and authors can still delete their own comments. Its owner can't unlock it; a moderator can.
-
-A project manager runs the work and doesn't moderate it: they can delete their own comments, not other people's. Give a role **Full access** if it should moderate.
-
-**Send to the platform** is for the report that isn't this community's to settle. It goes to whoever runs the server, carrying what the reporters wrote and attached, and asks one question: while they look, should the reported thing stay up?
-
-- **Leave it up while they look** — everyone can still see it until they decide.
-- **Hide it now, and keep it exactly as it is** — for when the police or a court asked you to keep it, or it may be illegal. Say why, and if you like leave a note for whoever runs the server, such as who asked and a reference number. A report of something illegal starts with this one chosen.
-
-Hidden content is **held for the platform**:
-
-- Nobody in the community can see it, community admins and you included. Anything inside it is held too, like a project's tasks or a wiki's pages, and so are the pictures and files it shows.
-- Nobody here can change it or delete it. Deleting what it's inside leaves it in place, and the bin can't empty it.
-- Replies to a held comment stay, under an **Unavailable** placeholder.
-- Only whoever runs the server can release it: putting it back as it was, moving it to the bin, or deleting it for good.
-- Nobody is told. To its author it simply isn't there.
-
-## Initiative settings
-
-- **Details** — name, colour, description, and the **Tools** card, where you choose which tools it offers.
-- **Members** — **Joining**, any waiting requests, and who's in with their roles.
-- **Roles** — make roles and set what they can do.
-- **Metadata** — fields of your own that anything in this initiative can carry, and every project's and collection's properties beside them. See below.
-- **Layouts** — every layout in the initiative, when each last changed, and the way into each one's editor (managers and above). See [Layouts](layouts.md).
-- **Export** — download the initiative's data (managers and above). **Keep content in this initiative** stops anyone, managers and community admins included, from exporting things from it one at a time, or copying or moving them to another initiative. Copies and moves inside it, this whole-initiative download and the community's own export carry on as normal.
-- **Danger zone** — archive, unarchive, delete.
-
-### Metadata
-
-Metadata is the fields your initiative needs and Initiative didn't think of: "Budget code", "Squad", "Signed off by". It belongs to the initiative. Make it here, or from **Add metadata** on anything that has some. Once it exists, every project, task, file, event and the rest in this initiative can carry it.
-
-Something only one project or one collection cares about is a **property** of that project or collection instead: [a project's](projects-and-tasks.md#project-properties), managed in its settings or its layout editor, or [a collection's](files.md#a-collections-properties), managed in its layout editor. Both are gathered below the initiative's own.
+You can also make metadata from **Add metadata** on anything that already has some. Something only one project or one collection cares about is better as that project's or collection's own **property**, made in its settings or its layout editor (see [Projects & tasks](projects-and-tasks.md) and [Files](files.md)).
 
 | Type | Holds |
 |---|---|
@@ -193,36 +173,76 @@ Something only one project or one collection cares about is a **property** of th
 | **Date** | A day. |
 | **Date & time** | A day and a time. |
 | **URL** | A link. |
-| **Select** | One option from a list you set, each with a colour. |
+| **Select** | One option from a list you set, each with a color. |
 | **Multi-select** | Several options from that list. |
 | **Person** | Somebody who can open the thing it's on. |
 | **Money** | An amount, in the one currency it names. |
 | **Scale** | 0 to 100. A layout draws it as a percentage, stars or a bar. |
-| **Counter** | A number you tap up and down by its step, never past the minimum or maximum you give it. **Reset** sends it back to its initial value. A layout draws it as a number, a bar or a clock. |
-| **File** | One file from the initiative's Files: pick one, or make one with **New file**, which uploads a file, starts a document or saves a smart link. On the item's page a document, whiteboard, spreadsheet or smart link shows in place; any other file is a link to it. For several files, add them as links instead. |
-| **Signature** | Who signed and when. **Sign** asks for your name under a statement of what signing means, and you only ever sign as yourself: never for somebody else, and never through a plug-in. A copy of the thing comes unsigned. The thing's page says if it was updated after it was signed. |
+| **Counter** | A number you tap up and down by its step, never past the limits you give it. **Reset** sends it back to where it started. A layout draws it as a number, a bar or a clock. |
+| **File** | One file from the initiative's Files: pick one, or make one with **New file**. A document, whiteboard, spreadsheet or smart link shows in place on the item's page; any other file is a link to it. For several files, add them as links instead. |
+| **Signature** | Who signed and when. **Sign** asks for your name under a statement of what signing means, and you only ever sign as yourself. A copy of the thing comes unsigned, and the thing's page says if it changed after it was signed. |
 
-Typing a new option into a select adds it to the list. Two people tapping the same counter at once both count. Anyone who can edit something can sign its signature field or clear it. Clearing has no undo: putting a signature back takes its signer signing again. Deleting metadata deletes every value set for it in the initiative, so it asks first.
+Typing a new option into a select adds it to the list. Two people tapping the same counter at once both count. Anyone who can edit something can sign its signature field or clear it, and clearing has no undo: putting a signature back takes its signer signing again. Deleting metadata deletes every value set for it in the initiative, so it asks first.
 
-#### Everything in one place
+### See every project's and collection's properties in one place { #everything-in-one-place }
 
-Under the initiative's metadata, the page lists the properties of each project and collection, under its name. You see the ones you're allowed to edit: those of the projects and collections you can change. A community admin sees them all.
+Under the initiative's metadata, **Project and collection properties** lists the properties of each project and collection you can change, under its name. A community admin sees them all.
 
-- **Edit** one with the pencil: its name, its options and their colours, its colour, its currency, a counter's step and bounds.
-- **Tick** several to delete them in one go. Each takes all its values with it, so it asks first.
-- **Promote to metadata** is for the day four projects each grow a "Budget" box and somebody notices. Tick properties of one type, from as many projects and collections as you like, and name the result. They become one piece of the initiative's metadata, or join the one already called that, if it's the same type.
+- **Edit** one with its pencil: its name, its options and their colors, its currency, a counter's step and limits.
+- **Delete** several at once by ticking them. Each takes all its values with it, so it asks first.
+- **Promote to metadata** turns properties into one piece of the initiative's metadata.
 
-Promoting keeps the work. Options are pooled, values move across, every layout that showed one of them shows the metadata in its place, and the properties are deleted. If a file held a value for two of them, the most recently changed one wins. You need to be able to edit everything holding those values; if you can't, nothing changes and it says so.
+That last one is for the day four projects each grow a "Budget" box and somebody notices.
 
-### Archiving vs. deleting
+1. Tick the properties to merge. They must all be the same type, but they can come from any number of projects and collections.
+2. Select **Promote to metadata**.
+3. Type a **Name** for the result.
+4. Select **Promote to metadata**.
 
-- **Archive** tucks a finished effort out of sight without losing a single thing. Restorable whenever. This is the button for "the spring play is over, but I am absolutely not throwing away the records."
-- **Delete** sends the initiative and everything inside it to the community **Trash**, where an admin can still restore the whole lot until the retention period runs out. After that it's genuinely gone.
+The properties become one piece of metadata, or join the existing metadata of that name if it's the same type. Options are pooled, values move across, every layout that showed one of them shows the metadata instead, and the old properties are deleted. Where one thing held values for two of them, the most recently changed value wins. You need to be able to edit everything holding those values; if you can't, nothing changes and it says so.
 
-When in doubt, archive. Archiving has never once ruined anybody's week.
+## Change how an initiative's tools look
 
-## Related
+The **Layouts** tab of Initiative settings lists every layout in the initiative, when each last changed, and the way into each one's editor. See [Layouts](layouts.md).
 
-- [Projects & tasks](projects-and-tasks.md) — the work inside an initiative.
-- [Files](files.md) — the writing inside an initiative, and everything it's been sent.
-- [Initiative roles](../sharing/initiative-roles.md) — roles and sharing in depth.
+## Export an initiative
+
+The initiative's managers and community admins can download everything in it.
+
+1. Open **Initiative settings** and select **Export**.
+2. Select **Export…**.
+3. Choose **Importable backup**, for a file you can import here or on another server, or **Report à la carte**, to pick a readable format for each tool.
+4. Choose what to include.
+5. Select **Next**.
+6. Select **Start export**.
+
+The export runs in the background, and you get a notification when it's ready. It holds what you can see, since sharing still applies.
+
+### Keep an initiative's content inside it
+
+Some work shouldn't wander. The initiative's managers and community admins can keep it in.
+
+1. Open **Initiative settings** and select **Export**.
+2. Under **Keep content in this initiative**, turn on **Block exports, and copies and moves to other initiatives**.
+
+While it's on, nobody can export things from this initiative one at a time, or copy or move them to another initiative, managers and community admins included. Copies and moves inside the initiative still work, and so do the whole-initiative export above and the community's own export.
+
+## Archive or delete an initiative
+
+Community admins archive and delete initiatives. A manager sees the **Danger zone** tab with a note to ask a community admin.
+
+**Archive** tucks a finished effort out of everyone's sidebar without losing a thing, and you can bring it back whenever you like. It's the button for "the spring play is over, but I am absolutely not throwing away the records."
+
+1. Open **Initiative settings** and select **Danger zone**.
+2. Select **Archive initiative**.
+
+To bring it back, select **Unarchive initiative** in the same place, or find it under **Archived** in Community settings, **Initiatives**.
+
+**Delete** sends the initiative and everything inside it to the community's trash.
+
+1. Open **Initiative settings** and select **Danger zone**.
+2. Select **Delete initiative**.
+3. Type the initiative's name.
+4. Select **Delete**.
+
+A community admin can [restore the whole thing from the trash](running-a-community.md#trash-and-retention) until the trash's retention period runs out. After that it's gone for good. When in doubt, archive. Archiving has never once ruined anybody's week.

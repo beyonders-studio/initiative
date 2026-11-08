@@ -4,192 +4,215 @@ icon: lucide/bell
 
 # Notifications
 
-Initiative can tell you when something wants your attention — a task landed on you, somebody mentioned you, an event is creeping up.
+Initiative tells you when something wants your attention: a task landed on you, somebody mentioned you, an event is creeping up. What you're told about, and where, is up to you, row by row. Nothing reaches your inbox for your own good.
 
-What you get told about, and where, is entirely yours to decide. Nothing is being pushed into your inbox on your behalf for your own good.
+There are four places a notification can go:
 
-## The channels
-
-| Channel | What it is |
+| Channel | Where it turns up |
 |---|---|
-| **Bell** | The in-app bell, and the notifications page behind it. |
-| **Email** | Messages to your inbox. |
-| **Mobile** | Push notifications on your phone (needs the app, and permission). |
-| **Desktop** | Notifications from the [desktop app](../getting-started/install-the-app.md#the-desktop-app), whenever its window isn't the one in front. |
+| **Bell** | The bell in the app, and the Notifications page behind it. |
+| **Email** | Your inbox. |
+| **Mobile** | Your phone, through the [mobile app](../getting-started/install-the-app.md). |
+| **Desktop** | The [desktop app](../getting-started/install-the-app.md#the-desktop-app), whenever its window isn't the one in front. |
 
-All of them are yours, row by row, with no minimum — the bell included. Three rows keep the bell whatever you set: **Waiting on you**, **Moderation** and **Your account**. Somebody's waiting on your decision, or somebody did something about you or your account. None of that is a thing to discover in March. Their other switches turn off like anything else.
+## Check what's waiting
 
-## The bell, and the page behind it
+The **bell** sits at the bottom of the sidebar, beside your name (on a phone, open the menu first). Its number is how many notifications you haven't read, and opening it shows every one of them, not just the last twenty.
 
-The **bell** holds everything you haven't read. Not the last twenty — the lot. The number says how many; opening it says what.
+1. Select the bell.
+2. Select a notification to go to what it's about.
 
-Everywhere else you get a **dot**: on the community in the left rail, then the initiative, then the tool, then the project or file in that tool's list, then the task, event or page inside it. Follow the dots inward and you land on the thing, instead of opening five communities to work out which one was buzzing.
+The one you selected dims rather than vanishing, so the list doesn't shuffle under your finger, and it clears out when you close the bell. **Mark all read** clears the lot.
 
-Open it and the comments you haven't read are picked out, with the page scrolled to the first. Opening it also reads everything about it — the dots clear and the bell counts down, without you going back to click the notification.
+Elsewhere you get a **dot**: on the community in the rail, then the initiative, then the tool, then the item in that tool's list. Follow the dots inward and you land on the thing, instead of opening five communities to find out which one was buzzing. Opening a thing reads every notification about it, so the dots and the bell clear themselves, and the comments you haven't read yet are picked out, with the page scrolled to the first one.
 
-**See all**, at the foot of the bell, opens the full record — read and unread, grouped by day, filterable to unread, to mentions, or to one community. Anything in it can be marked read, marked unread again, or thrown away.
+Notifications arrive as they happen, and reading one in one tab or device clears it in the others, so you don't dismiss the same mention three times.
 
-A read notification stays in the record for **30 days** after you read it, then clears itself out. Unread ones wait for you however long you take, including the whole of August.
+## Look back through your notifications
 
-Two surfaces, two jobs. The bell is what's left to deal with. The page is what happened.
+The bell is what's left to deal with. The **Notifications** page is what happened, read and unread, grouped by day.
 
-Notifications arrive **as they happen** — a mention lands the moment it's written. Reading one clears it on your other tabs too, so you don't dismiss the same thing three times on three devices.
+1. Select the bell.
+2. Select **See all**.
 
-!!! note "Click one and it stays put"
-    It dims instead of vanishing, so the list doesn't reshuffle itself while you're still reading. It clears out when you close the bell.
+At the top, choose **All**, **Unread** or **Mentions**, and pick a community under **Filter by community**. Each notification has **Mark read** (or **Mark unread**, to deal with it later) and **Dismiss**, which throws it away.
 
-## Turning on mobile push
+A notification you've read stays here for 30 days, then clears itself out. Unread ones wait however long you take, including the whole of August.
 
-1. Install the mobile app and sign in.
-2. In **My Settings → Notifications**, choose **Turn on** beside **Push notifications**.
+## Choose what you hear about { #choose-what-you-hear-about }
+
+**What you hear about**, in **My Settings → Notifications**, has a row for each kind of notification and a switch for each channel. **Mobile** only appears once your server sends to phones.
+
+1. Open **My Settings → Notifications**.
+2. Find the row.
+3. Flip the switch under the channel. It saves straight away.
+
+| Row | You hear about it when |
+|---|---|
+| **Mentions and replies** | Somebody names you, replies to you, or reacts to your comment. |
+| **Assigned to you** | You're given a task or invited to something, or something you're on changes, is canceled or is about to start. |
+| **Subscribed** | Somebody changes, comments on or reacts to something you [subscribe to](your-space.md#subscribing), which includes everything you made, and the reminders you set on tasks. |
+| **New in your communities** | A post goes up, you're added to an initiative or a project, or your request to join one is answered. |
+| **Waiting on you** | Somebody's waiting on your decision: a request to join, a request for access, a plug-in asking for something. |
+| **Moderation** | A community's moderators took down something you wrote, or warned you about it. |
+| **Messages and connections** | Somebody messaged you, asked to connect, or accepted. You're told who and how many, never what a message says. |
+| **Exports and imports** | An export or import you asked for has finished. |
+| **Your account** | Something was done to your account, or the people running your server have an announcement. |
+
+**Waiting on you**, **Moderation** and **Your account** always show in the bell. Somebody's waiting on you, or somebody did something about you, and neither is a thing to discover in March. Their other channels switch off like anything else.
+
+**Mentions and replies** and **Subscribed** are separate on purpose. Somebody typing your name is a decision about you, while somebody tweaking the seventh task in a project you made is just how busy that project got. Turn the second down and keep the first.
+
+You only hear about things you can open. A comment on a project that isn't shared with you doesn't reach you, and neither does a mention in it, so somebody who wants you in a conversation shares the thing with you first.
+
+If you answer cases on your server, new [cases](../running-a-server/platform-roles.md#where-operations-work-lands) reach you too, with no row to switch, because answering them is the job.
+
+!!! screenshot "Notification settings"
+    **Show:** My Settings → Notifications, scrolled to **What you hear about**, with the rows grouped under their headings and the Bell, Email and Desktop columns.
+
+    Save as `en/images/notifications/settings.png`, then replace this box with:
+    `![Notification settings](../images/notifications/settings.png)`
+
+### Choose when event reminders arrive
+
+You get a reminder before each event you're going to, as part of **Assigned to you**. **Remind me**, just below that row, sets when: **At the time of the event**, or anywhere from 5 minutes to a day before. It starts at 15 minutes. Reminders you set on a task are a separate thing, set on the task itself, and arrive under **Subscribed**.
+
+## Get notifications on your phone
+
+You need the mobile app, signed in, and a server that sends to phones.
+
+1. In the app, open **My Settings → Notifications**.
+2. Beside **Push notifications**, select **Turn on**.
 3. Say yes when your phone asks.
 
-If push shows as **Blocked**, that's your phone rather than us. Open your device settings, find Initiative, and let it talk to you. We can ask; your phone decides.
+If it shows **Blocked**, your phone said no on Initiative's behalf at some point. Open your phone's settings, find Initiative, and allow notifications. The app can ask, but your phone decides.
 
-## What you hear about
+The desktop app shows notifications on its own, whenever its window isn't the one in front. Under **My Settings → Preferences**, **Keep running when the window closes** keeps it in the tray so they keep arriving after you close the window.
 
-**My Settings → Notifications** gives you a grid: one row each, with a **Bell**, **Email**, **Mobile** and **Desktop** switch. **Mobile** appears once your server sends to phones.
+## Get a summary instead { #digests }
 
-The first four rows are about what happens in your communities, sorted by how it involves you rather than by what kind of thing it was.
-
-| Row | You hear about it when… |
-|---|---|
-| **Mentions and replies** | Somebody writes your name, replies to something you said, or reacts to your comment. |
-| **Assigned to you** | You're given a task or invited to something, or something you're on changes, gets cancelled, or is about to start. |
-| **Subscribed** | Somebody changes, comments on or reacts to something you [follow](your-space.md#subscribing). That includes everything you made. |
-| **New in your communities** | A post goes up where you can see it, you're added to an initiative or a project, or your request to join one is answered. |
-| **Waiting on you** | Somebody needs your decision — a join request, an access request. |
-| **Moderation** | A community's moderators took something you wrote down, or warned you about it. |
-| **Messages and connections** | Somebody messaged you, asked to connect, or accepted. You're told who and how many — never what a message says, because nothing outside your own devices could tell you that. |
-| **Exports and imports** | Something you asked for has finished. |
-| **Your account** | Something was done to your account by somebody else. |
-
-Everything here is about something you can open. A comment on a project that isn't shared with you doesn't reach you, and neither does a mention there — so somebody who wants you in a thread shares it with you first.
-
-**Mentions and replies** and **Subscribed** are separate on purpose. Somebody typing your name is a decision about you. Somebody tweaking the seventh task in a project you made is just how busy the project got. Turn the second down; keep the first.
-
-If you answer [cases](../running-a-server/platform-roles.md#where-operations-work-lands) on your server, those reach you too, with no row to switch. Answering them is the job.
-
-![Notification settings](../images/notifications/settings.png)
-
-## Digests
-
-The grid is things as they happen. **Digests** are the summaries: one message, on a schedule, each with its own switches, its own day and its own time.
+A **digest** is one message on a schedule, listing things that are already in your bell. An empty one isn't sent, so no overdue tasks means no overdue email.
 
 | Digest | What's in it |
 |---|---|
-| **Overdue tasks** | Every task assigned to you that's past its due date, from every community, in one list. On until you say otherwise. |
-| **Coming up** | The tasks due and the events starting before the next one. Off until you ask for it. Weekly on a Monday at 08:00 is a decent way to meet the week before it meets you. |
+| **Overdue tasks** | Every task assigned to you that's past its due date, from every community. On until you turn it off. |
+| **Coming up** | Tasks due and events starting before the next one. Off until you turn it on. Weekly on Monday morning is a good way to meet the week before it meets you. |
 
-Each goes **every day** or **every week**, at the time you pick, by email, to your phone, or both. Everything in one is already in your bell, so a digest is the list rather than more news. An empty one doesn't arrive: no overdue tasks, no overdue email.
+1. Open **My Settings → Notifications**, and scroll to **Digests**.
+2. Turn on **Email**, **Mobile** or both for the digest.
+3. Under **How often**, pick **Every day** or **Every week**.
+4. For a weekly one, pick the day under **On**.
+5. Pick a time under **At**.
 
-### Gathered email
+## Gather your email into one message { #gathered-email }
 
-Everything in the grid can reach your inbox the moment it happens, or wait and come as one message. That's **Email arrives**.
+Everything in **What you hear about** can reach your inbox as it happens, or wait and arrive together.
+
+1. In **Gathered email**, at the bottom of **Digests**, pick how often under **Email arrives**.
+2. For once a day or once a week, pick the time under **At**, and for once a week, the day under **On**.
 
 | Email arrives | What lands in your inbox |
 |---|---|
-| **Right away** | One message per thing, as it happens. The default. |
+| **Right away** | One email per notification, as it happens. Where everybody starts. |
 | **Once an hour** | On the hour, everything since the last one. |
-| **Once a day** | One message, at a time you pick. |
-| **Once a week** | One message on a day you pick. |
+| **Once a day** | One email, at the time you pick. |
+| **Once a week** | One email, on the day and time you pick. |
 
-The digests above keep their own times, whatever you pick here.
-
-Anything held comes as a **single** message, grouped by community and then by what it was:
+A gathered email is grouped by community, then by row, so it reads like this:
 
 ```
-Foundry
+Rec League
   Mentions and replies
-    Alice mentioned you in a comment on Fix the login redirect
+    Alice mentioned you in a comment on Book the fields
   Subscribed
-    Alice and 2 others — 5 comments on Fix the login redirect
-Acme
+    Alice and 2 others left 5 comments on Book the fields
+PTA
   Assigned to you
-    Dana invited you to Sprint review (Tue 10:00)
+    Dana invited you to Bake sale setup
 ```
 
-Two things soften the edges of that:
+Two things keep it sensible:
 
-- **Things addressed to you skip the queue.** A mention, a reply, a task landing on you, an invitation, a direct message — those go out straight away whatever you've chosen. The ambient stuff waits. Turn off **Send things addressed to me right away** if you'd rather they waited too.
-- **Anything you've already read is dropped.** If you saw it in the bell before the email went, it doesn't go. The digest is what's still waiting, not a recap of your afternoon.
+- **Things addressed to you skip the wait.** Mentions, replies, tasks assigned to you, invitations and direct messages go out right away whatever you picked. Turn off **Send things addressed to me right away** if you'd rather they waited too.
+- **Anything you've already read is left out.** If you saw it in the bell before the email went, it doesn't go. The email is what's still waiting, not a recap of your afternoon.
 
-## Other timings worth knowing
+Digests keep their own times, whatever you pick here.
 
-- **Everything on one thing** arrives as **one line**, however much there is. Twenty edits and comments on a task you follow is one notification naming who and how many — not twenty. Once you've read it, the next one starts a fresh line, so new activity is still news.
-- **Changes** gather for about a minute before they're told, so somebody fixing a typo four times in a row is one change.
-- **A plug-in's changes** — an automation closing a task, a calendar moving an event — reach the people on the thing, under **Assigned to you**, with the plug-in named. They don't reach everyone following it, so a busy automation doesn't fill **Subscribed**.
-- **Mentions in a text document** arrive as one line too. Somebody tidying a page that names you in four places tells you once, until you've read it.
-- **Task assignments** arrive as one summary once the dust has settled. Somebody assigning you ten things reaches you as one message rather than ten.
-- **Reactions** work the same way, for the same reason: they arrive in flurries.
-- **Event reminders** are set per event — at the start, or a chosen number of minutes, hours or days before.
+## Stop being interrupted { #do-not-disturb }
 
-!!! tip "Set your timezone. Genuinely."
-    Digests, quiet hours, due dates and repeating-task maths all run on your timezone. Initiative guesses it from your browser at sign-up and is usually right.
+**Do not disturb** has three ways to be left alone: one for while you're using Initiative, one for every night, and one for the two weeks you're at the lake.
 
-    But if your daily email is arriving at 4am, you have not been cursed and nothing is broken. Check **My Settings → Preferences**.
+### While you're using Initiative
 
-## Do not disturb
+If you're here, the bell has already told you. With **Don't interrupt me while I'm using Initiative** on, which it is to start with, your phone stays quiet and email waits until you've been away for about ten minutes. If you read the notification in the meantime, the email never goes.
 
-Three ways to be left alone, all under **Do not disturb**: one for while you're here, one for every night, and one for the fortnight in Portugal.
+"Using" means clicking, typing and scrolling. A tab left open on a second monitor since Tuesday doesn't count. The desktop app goes by its own window instead, and speaks up whenever that window isn't the one in front.
 
-### Don't interrupt me while I'm using Initiative
+### Every night (quiet hours)
 
-If you're sat here with Initiative open, the bell has already told you. So it doesn't also tap you on the shoulder: **mobile stays quiet, and email waits about ten minutes** to see whether you read it yourself. If you did, it never sends. If you wandered off, it does.
+1. Turn on **Quiet hours**.
+2. Set **From** and **Until**, say 10:00 PM to 7:00 AM.
 
-"Here" means *at the keyboard* — clicking, typing, scrolling. A tab left open on a second monitor since Tuesday doesn't count, and neither does a phone in a pocket.
+Inside the window, email, your phone and the desktop app hold off. The bell keeps collecting, since it was never going to wake you. When the window ends, whatever was held arrives as one summary. If nothing happened, nothing arrives.
 
-Switch it off if you'd rather always be told.
+### While you're away (pause notifications)
 
-The desktop app goes by its own window instead: it speaks up whenever that window isn't the one in front, so the next thing reaches you the moment you've gone to answer an email.
+1. Under **Pause notifications**, pick the last day under **Until**.
+2. To start on a later day, pick it under **From**. Leave it empty to start now.
+3. Select **Pause**.
 
-### Quiet hours
+Both days are included, so you can book the two weeks at the lake before you leave instead of remembering at the gas station. While it's on, email, your phone and the desktop app say nothing at all, not even when somebody types your name in capitals. The bell keeps collecting.
 
-**Quiet hours** are for every night. Set a window — 22:00 to 07:00, say — and email, mobile and the desktop hold off inside it. The bell keeps collecting quietly; it was never going to wake you. When the window ends, everything held arrives as one message, the same digest shape as above. If nothing happened, nothing arrives.
+When the pause ends you get one summary email of everything that happened, minus anything you've read since, and your phone and desktop get a count. A digest that would have landed during the pause waits until the end of it too.
 
-### Pause notifications
+To end it early, select **Resume** (or **Cancel**, for a pause that hasn't started yet).
 
-Going away? **Pause notifications** stands email, mobile and the desktop down for the days you pick. Pick an end day and it starts now; pick a start day too and you can book the fortnight in Portugal before you leave, rather than remembering to do it at the airport. Both days are included.
+Password resets and sign-in emails arrive as usual while you're paused. Those aren't notifications; they're answers to something you just asked for.
 
-While it's on, nothing reaches you — not a mention, not a direct message, not somebody typing your name in capitals. That's the point. A pause you have to keep checking isn't one.
+## Quiet one community
 
-The bell keeps collecting the whole time. When the pause ends you get **one email** with everything that happened, grouped the same way a digest is, minus anything you've since read. Mobile and the desktop get a count.
+Open a community under **Per community** at the bottom of **My Settings → Notifications**, and the four community rows are there again, one switch each.
 
-A digest that would have landed in the middle of a booked pause waits for the end of it too, so the days you marked off stay marked off.
+1. Select the community to open it.
+2. Turn off the rows you don't want from it.
 
-!!! note "Password resets arrive regardless"
-    Pausing covers notifications. It doesn't cover the email that turns up because you just clicked "forgot password" — that isn't a notification, it's an answer.
+Switch **Subscribed** off for the HOA and you still hear when somebody names you there, while the treasurer's fourteenth edit to the minutes passes you by.
 
-## Per community
+To silence a community entirely, flip its **Mute** switch. That means everything from it, including somebody naming you directly. Messages, connections and your account aren't a community's, so muting one never touches them.
 
-Open a community under **Per community** and the first four rows are there again, one switch each. Switch **Subscribed** off for the parish council and you still hear when somebody names you there, while the vicar's fourteenth edit to the minutes passes you by.
+## Timings worth knowing
 
-**Mute** silences the whole community. That means everything, and somebody typing your name there is not an exception — a mute you have to keep checking isn't a mute.
+- **One line per thing.** Twenty edits and comments on a task you follow is one notification that names who and how many. Once you've read it, the next change starts a fresh line, so new activity is still news.
+- **Assignments and reactions wait for the flurry to end** before they email or ping your phone. Somebody assigning you ten things in a row reaches your phone and inbox once.
+- **A plug-in's changes** (a plug-in closing a task, say) reach the people assigned to or invited to the thing, naming the plug-in, but not everybody following it.
+- **Mentions in a document** arrive as one line too. Somebody tidying a page that names you four times tells you once.
 
-Neither reaches **messages**, **connections** or **your account**, which were never a community's to silence.
+!!! tip "Set your time zone"
+    Digests, quiet hours, reminders, due dates and repeating tasks all run on your time zone. Initiative takes it from your browser when you sign up, and it's usually right.
 
-## What your server and community decide
+    If your daily email turns up at 4 a.m., you haven't been cursed. The line under **Digests** says which time zone you're on, and **Change time zone** fixes it.
 
-Your settings pick from what's on offer. Two people decide what that is — whoever runs the server, and each community for itself — and both can only ever make things quieter.
+## Settings somebody else decides
 
-Either can keep notifications **inside the app**, rather than reaching phones, desktops or mailboxes. Either can also ask that what does travel says the kind of thing that happened — *"You were mentioned in a comment"* — and leaves the details for the app. Somewhere with a rule about what may appear on a lock screen has a reason for that.
+Your settings choose from what's on offer, and two people decide that: whoever runs your server, for everybody on it, and each community, for itself. Either can only make things quieter.
 
-The **bell always carries the whole thing**, wherever those two land. It stays inside the app, so it has everything.
+Either one can keep notifications from reaching phones and the desktop app, or keep them out of email. Either can also turn on **Hide notification details**, so a notification that leaves the app says only what kind of thing happened ("You were mentioned in a comment") and leaves the rest for the app. Somewhere with a rule about what can show on a lock screen has a reason for that.
 
-A switch that looks decided for you was decided in one of those two places, and whoever runs the community will know which. Your account's own post — sign-in codes, address confirmations, password resets — arrives regardless: that's correspondence, not notification.
+The bell always carries the whole notification, wherever those land, because it never leaves the app. A switch that seems decided for you was decided in one of those two places, and whoever runs the community will know which. Your account's own email (sign-in codes, address confirmations and password resets) arrives regardless.
 
-## Announcements
+Whoever runs the server sets these in **Platform Settings → Security**, and community admins in **Community Settings → Security**.
 
-Notifications are about *your* work. An **announcement** is about the app itself: a version that changed something, a setting that moved, a maintenance window whoever runs the server wants you to know about.
+## Read an announcement again
 
-They arrive as a dialog rather than quietly in the bell, because they're the kind of thing genuinely worth stopping you for. Some are a single card; a longer one becomes a few pages you step through with **Next**. **Got it** clears it and it doesn't come back — unless whoever wrote it asked for more than one acknowledgement, in which case the dialog says so up front.
+Notifications are about your work. An **announcement** is about the app or your server: a release that changed something you use, a setting that moved, a maintenance window on Sunday.
 
-Dismissed one at speed and immediately regretted it? Nothing is lost. Every announcement you close leaves a line in your notifications, already marked read. Click it and the announcement opens again, pictures and all. Like any read notification, the line clears itself after 30 days, and one whose announcement has reached its end date no longer opens.
+Announcements arrive as a dialog, because they're worth stopping you for. A longer one has a few pages you step through with **Continue**. **Got it** closes it for good, unless whoever wrote it asked to show it more than once, in which case the dialog says how many more times.
 
-Run a server and want to write one? See [Announcements](../running-a-server/announcements.md).
+Closed one too fast? Every announcement you close leaves a line in your notifications, already read.
 
-## Related
+1. Select the bell, then **See all**.
+2. Select the announcement's line.
 
-- [Your space](your-space.md) — where your tasks and events gather.
-- [Profile & preferences](../account/profile-and-preferences.md) — your timezone and everything else.
-- [Announcements](../running-a-server/announcements.md) — writing them, for operators.
+It opens again, pictures and all. Like any read notification, the line clears itself after 30 days, and one whose announcement has ended can't be opened again.
+
+Running a server and want to write one? See [Announcements](../running-a-server/announcements.md).

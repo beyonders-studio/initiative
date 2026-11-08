@@ -2,100 +2,151 @@
 icon: lucide/smartphone
 ---
 
-# Installing the app
+# Install the app
 
-Initiative runs in a browser, and using it that way forever is a completely respectable life choice. But you can also give it its own icon, its own window, and — on a phone — notifications that arrive when you aren't looking.
+Initiative runs in a browser, and using it that way forever is a respectable life choice. You can also give it its own icon and window, and on Android, notifications that arrive while the app is closed. None of these takes longer than finding the charger.
 
-A few ways to do that. None takes longer than finding the charger.
+## Find the right version for your device
+
+Your server has a **Download** page that works out what you're on and offers the right thing. Open your Initiative address with `/download` on the end, such as `https://initiative.example.com/download`. The **Get the app** step in Home's **Getting started** list goes there too.
+
+| You're on | Get |
+|---|---|
+| An Android phone or tablet | [The Android app](#install-the-android-app) |
+| An iPhone or iPad | [Initiative on your Home Screen](#on-an-iphone-or-ipad), from Safari |
+| A Windows, Mac or Linux computer | [The desktop app](#the-desktop-app), or [the browser version](#on-a-computer) |
+| Anything else with a screen | Nothing to install. Bookmark the address. |
+
+Every version is the same Initiative with the same account, so you can mix them freely.
 
 ## Install it from the browser
 
-Initiative is a **progressive web app**, which is a dreadful name for a nice thing: the website installs itself. Same app, same account, no store, no download.
+Your browser can install Initiative as an app of its own: an icon on your home screen or dock, a window without the browser around it, and you stay signed in. Browsers only offer this on a secure `https://` address. If yours starts with `http://`, the option won't appear, and that's a question for whoever set up the server.
 
-| Where you are | What to tap |
-|---|---|
-| **iPhone or iPad (Safari)** | Share button, then **Add to Home Screen** |
-| **Android (Chrome)** | The ⋮ menu, then **Install app** or **Add to Home screen** |
-| **Chrome or Edge on a computer** | The install icon at the right-hand end of the address bar |
-| **Firefox on Windows** | **Add tab to taskbar**, in that same corner of the address bar |
+### On an iPhone or iPad
 
-Firefox on Linux has the same button, once `browser.taskbarTabs.enabled` is switched on in `about:config`. On a Mac, Safari is the one that does this — Firefox there keeps Initiative in a tab, which works perfectly well and simply looks less like an app.
+1. Open your Initiative address in Safari.
+2. Tap the Share button.
+3. Tap **Add to Home Screen**.
+4. Tap **Add**.
 
-After that it opens in its own window with no browser furniture around it, stays signed in, and will still show you the projects and tasks you looked at recently when the train goes into a tunnel. Changing anything still wants a connection.
+On an iPhone or iPad, notifications collect in the bell inside the app rather than arriving as push notifications.
 
-!!! warning "The install option isn't there"
-    Browsers only offer this over a secure `https://` address. If your group's Initiative is on plain `http://`, the option quietly won't appear — nothing is broken and you haven't missed a setting. It's a question for whoever set the server up.
+### On an Android phone
 
-## The phone apps
+1. Open your Initiative address in Chrome.
+2. Tap the ⋮ menu.
+3. Tap **Install app** or **Add to Home screen**.
 
-There are proper apps for iPhone and Android as well. Same Initiative inside, but they do the thing a browser tab can't: **push notifications**, arriving on your phone while the app is shut. If whoever runs your server has [set that up](../running-a-server/push-notifications.md), this is the version you want.
+The [Android app](#install-the-android-app) does more, including push notifications and reading offline, so it's usually the better pick.
 
-| Phone | Where to get it |
-|---|---|
-| **iPhone or iPad** | The App Store. Search for **Initiative**, by Beyonders Studio. Needs iOS 16 or later. |
-| **Android** | Google Play, same search. Or [without Google Play](#android-without-google-play), straight from the project. |
+### On a computer
 
-The first launch asks which Initiative it's talking to, because there are a lot of them and it can't guess. See [the mobile app](signing-in.md#the-mobile-app).
+- **Chrome or Edge:** select the install icon at the right-hand end of the address bar, or **Or install it from the browser** on the Download page.
+- **Safari on a Mac:** choose **File**, then **Add to Dock**.
 
-The apps only talk to servers on a secure `https://` address. A server on plain `http://` won't connect from the app, though the browser still reaches it. Same answer as above: a question for whoever set the server up.
+Other browsers keep Initiative in a tab, which works just as well and looks less like an app.
 
-### Android, without Google Play
+## Install the Android app
 
-[![Get it on Obtainium](https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png){ width="240" }](https://apps.obtainium.imranr.dev/redirect?r=obtainium%3A%2F%2Fadd%2Fhttps%3A%2F%2Fgithub.com%2Fbeyonders-studio%2Finitiative)
+The Android app installs without an app store, and runs on Android 7.0 or later.
 
-[Obtainium](https://github.com/ImranR98/Obtainium) is a free app that watches a project's releases and keeps you updated from them. Install Obtainium first, then tap that button and it fills in the rest, including working back to the most recent release that actually carries an app. Doing it by hand instead: take the newest [release](https://github.com/beyonders-studio/initiative/releases) with an `.apk` on it. That often isn't the top one: the app is only rebuilt when it changes, and the releases in between are web-only.
+1. On your phone, open your server's Download page.
+2. Tap **Download for Android**.
+3. Open the downloaded file.
+4. When Android asks whether to allow apps from this source, allow it for your browser.
+5. Tap **Install**.
 
-Either way Android will check that you meant to install something from outside the Play Store. You did. Allow it for whichever app is doing the installing.
+Android checks because the app didn't come from an app store, and you did mean it.
 
-### Share things into it
+To have the app updated for you whenever a new one comes out, [add Initiative to Obtainium](https://apps.obtainium.imranr.dev/redirect?r=obtainium%3A%2F%2Fadd%2Fhttps%3A%2F%2Fgithub.com%2Fbeyonders-studio%2Finitiative), a free app that installs new versions from a project's releases. Installing by hand from the [releases page](https://github.com/beyonders-studio/initiative/releases)? Take the newest release with an `.apk` attached. That often isn't the top one, because the app is only rebuilt when it changes.
 
-Found the venue's address in a message, a photo of the broken urn, the PDF of last year's minutes, a link to the cheapest bunting in the county? Share it from that app and pick **Initiative** in the share sheet. It asks what the thing should become:
+## Install the desktop app { #the-desktop-app }
 
-| Pick | And it becomes |
-|---|---|
-| **Task** | A task in whichever project you choose, with the text in its description and the pictures below it |
-| **Document** | A new document, links clickable, pictures in place |
-| **File** | The files themselves, uploaded as they are, each under a name you can change |
-| **Post** | A post on an initiative's board |
+There's an app for Windows, Mac and Linux. It opens in its own window, signs in as one of your devices, and shows notifications when Initiative isn't the window in front.
 
-Then where it goes, then one last look at what it'll be called before it's made. The place you shared to last time sits at the top of the list, so the next one is quicker.
+1. On your computer, open your server's Download page.
+2. Select **Download for Windows**, **Download for Mac** or **Download for Linux**.
+3. Open the file you downloaded and install it the way you'd install anything else.
 
-Not signed in yet? Sign in and the share is waiting on the other side.
-
-### It keeps itself current
-
-When your community's server moves to a new version, the app fetches the matching update in the background and offers to reload. Most of the time, that's the whole story.
-
-Every so often a release changes the app itself rather than what runs inside it. Then the app says so and sends you back to wherever it came from: the App Store, Google Play, or a new APK. On iPhone, each feature release arrives that way too, and the fixes in between come over the air.
-
-### New phone, same app
-
-Restore your old phone's backup onto a new one and the app comes back with your server address and settings where you left them. It asks you to sign in again, because your sign-in and your message keys belong to the old phone and don't travel in the backup.
-
-??? techspec "How the over-the-air update works"
-    Each Docker image ships the Capacitor web bundle that matches its version, served from `/api/v1/native/bundle/`, along with a statement of that bundle (its version, checksum and the oldest app it runs on) signed with Initiative's release key. On launch the app checks the signature against the keys it was built with, compares the signed version with the one it's running, downloads the difference, verifies its checksum, and swaps it in behind the splash screen. A bundle without a valid signature is left alone and the app stays on the version it has.
-
-    It never goes back past the version the installed app shipped with. A server older than that leaves the app on what it already runs, so an old server can't swap in a bundle from before the app was built.
-
-    An over-the-air update can only replace web assets, never native code. Each bundle therefore declares a `minNativeVersion`, and the app refuses any bundle that needs a newer shell than the installed APK — prompting for a store or APK update instead. On iPhone a bundle from another minor release is refused the same way, so feature releases come through the App Store. Release CI rebuilds the APK only when that floor moves, so most releases attach none at all. An updater watching the releases falls back to the last one that did — which is the build you want, because it is still the shell this bundle runs on. Re-attaching that same APK to later releases would be worse than attaching nothing: an updater reads the release, not the file, so it would see a new version each time and reinstall the app you already have.
-
-## The desktop app
-
-There's an app for Windows, Mac and Linux as well. Same Initiative, in its own window, and it signs in as one of your devices, the way the phone apps do.
-
-Get it from the **Download** page on your community's Initiative, which picks the right file for your computer. Or take it from the newest [release](https://github.com/beyonders-studio/initiative/releases) that has one: the `.exe` for Windows, the `.dmg` for a Mac, the `.deb` for Debian and Ubuntu.
+You get an `.exe` installer for Windows, a `.dmg` for a Mac and a `.deb` for Debian and Ubuntu. The same files are on the [releases page](https://github.com/beyonders-studio/initiative/releases).
 
 !!! note "Your computer will ask whether you meant it"
-    The installers aren't signed with a publisher's certificate yet, so Windows and macOS stop and check. On Windows, choose **More info**, then **Run anyway**. On a Mac, open it once, then go to **System Settings › Privacy & Security** and choose **Open Anyway**.
+    The installers aren't signed with a publisher's certificate, so Windows and macOS stop to check. On Windows, choose **More info**, then **Run anyway**. On a Mac, open the app once, then go to **System Settings › Privacy & Security** and choose **Open Anyway**.
 
-The first launch asks which Initiative it's talking to, like the phone. It keeps itself current the same way too.
+## Connect the app to your server
 
-Once in a while a release changes the app itself, and then it says so. On Windows and Linux it can fetch and install the new app for you: choose **Update now**, and leave **Always update automatically** ticked if you'd rather not be asked again. After that it downloads the next one on its own and only asks you to restart. Change your mind with **Update the app automatically**, under **My Settings › Preferences**. A Mac gets a **Download** button instead, until the app is signed for macOS.
+The Android and desktop apps ask which Initiative to talk to the first time you open them.
 
-Notifications pop up on your computer whenever Initiative's window isn't the one in front, and clicking one takes you to it. The app's icon carries your unread count.
+1. Open the app.
+2. Leave **Self-hosted** chosen under **Server**.
+3. Type your group's Initiative address, the same one you use in a browser, such as `https://initiative.example.com`.
+4. Select **Connect**.
+5. [Sign in](signing-in.md).
 
-Close the window on Windows or Linux and Initiative carries on in the tray, so notifications keep reaching you; **Quit** is on the tray icon. A Mac keeps it in the dock, as Macs do. **My Settings › Preferences** has the switches: **Keep running when the window closes** and **Open when the computer starts**.
+The app remembers the server and keeps you signed in. The Android app only connects to `https://` addresses; if you get "The app connects to HTTPS servers only", ask whoever runs your server.
 
-## Next
+## Switch the app to another server
 
-Now go and find where everything lives: [take the quick tour](a-quick-tour.md).
+1. On the sign-in card, select the server's name after **Sign in to**.
+2. Select **Your own server**.
+3. Type the new address and select **Connect**.
+
+Switching signs you out of the old server. The app keeps the last address you typed, in case you want to go back. Signed in already? Go to **My Settings › Account**, select **Disconnect** under **Server connection**, and the app signs out and asks for a server again.
+
+## Turn on push notifications on Android
+
+The Android app can notify you while it's closed, once whoever runs your server has [switched push on](../running-a-server/push-notifications.md).
+
+1. A few seconds after you sign in, a banner says **Enable Push Notifications**. Select **Enable**.
+2. Allow notifications when Android asks.
+
+Dismissed the banner? Go to **My Settings › Notifications** and select **Turn on** under **Push notifications**. If it says **Blocked**, open your phone's settings, find Initiative, and allow notifications there. Which things notify you is up to you; see [Notifications](../guides/notifications.md).
+
+## Share something into Initiative from another app
+
+On Android, Initiative turns up in the share sheet. Found the venue's address in a text, a photo of the broken coffee urn, or last year's minutes as a PDF? Share it.
+
+1. In the other app, tap Share and pick **Initiative**.
+2. Choose what it becomes: **Task**, **Document**, **File** or **Post**.
+3. Pick where it goes, under **Select a community**, **Select an initiative** and, for a task, **Select a project**.
+4. Check the **Title** and **Note**, or each file's name.
+5. Select **Create task**, **Create document**, **Post** or **Upload file**.
+
+Initiative opens what you made. The place you shared to last time sits at the top as **Last used**, so the next one is two taps. **File** appears when you share files, and uploads them as they are; a task, document or post keeps the pictures and leaves other files out. Not signed in? Sign in, and the share is waiting on the other side.
+
+## Read offline in the app
+
+The Android and desktop apps keep what you've opened recently on the device. When the train goes into a tunnel, a banner says you're offline and showing what this device last loaded, and you can keep reading projects, tasks, documents and the rest. Changing anything needs a connection again, and signing out clears what the device kept.
+
+## Keep the app up to date
+
+Initiative updates itself to match your server. When a new version is ready, a message says so; select **Reload** and you're on it. Busy? The **Update** button waits beside the bell until you are, or in the title bar of the desktop app.
+
+Once in a while a release needs a newer app rather than a reload. Initiative says **App update required**:
+
+- **On Android,** select **Download** and install the new app over the old one. Obtainium does this for you.
+- **On Windows and Linux,** select **Update now**. Leave **Always update automatically** ticked and later updates download on their own, then ask you to **Restart**. Change your mind with **Update the app automatically** in **My Settings › Preferences**.
+- **On a Mac,** select **Download** and install the new app.
+
+## Keep the desktop app running in the background
+
+On Windows and Linux, closing the window leaves Initiative in the tray so notifications keep arriving. Select the tray icon to bring the window back, or **Quit Initiative** in its menu to close it properly. A Mac keeps it in the dock, as Macs do.
+
+Two switches in **My Settings › Preferences**, under **This device**, change this:
+
+- **Keep running when the window closes** (Windows and Linux)
+- **Open when the computer starts**
+
+The app's icon shows how many notifications you haven't read. The question mark in the title bar opens Help.
+
+## Set up Initiative on a new Android phone
+
+Restore your old phone's backup onto the new one and the app comes back with your server address and settings. It asks you to sign in again, because your sign-in stays with the old phone. Your message history arrives once you verify the new phone from a device you already use; see [Messages](../guides/messages.md).
+
+??? techspec "How the apps update over the air"
+    Each server image carries the app bundle that matches its version, served from `/api/v1/native/bundle/`, with a statement of that bundle (version, SHA-256 checksum, and the oldest app it runs on) signed with the project's release key. On launch and whenever it comes to the foreground, the app reads the manifest, checks the signature against the keys it was built with, downloads the bundle, verifies its checksum and swaps it in behind the splash screen. A bundle without a valid signature is ignored, and the app stays on its version. A bundle older than the installed app is ignored too, and one that fails to start is rolled back.
+
+    A bundle can only replace web assets, never native code. Each declares a minimum native version (`minNativeVersion`, and `minDesktopVersion` for the desktop app); an app older than that is asked to update itself. The release builds a new APK or desktop installer only when that floor moves, so most releases attach none. An updater watching the releases falls back to the last one that did, which is the build you want.
+
+    A browser checks the server's version every 5 minutes and offers the same reload.

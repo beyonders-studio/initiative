@@ -4,33 +4,39 @@ icon: lucide/settings
 
 # Account & settings
 
-Settings live in three places, depending on who they affect. Which sounds like two places too many right up until the moment you need it:
+Settings live in three places, depending on who they affect. That sounds like two places too many, right up until the day you need one of them.
 
-- **My Settings** — you. Open them from your name and picture at the bottom of the sidebar.
-- **Community settings** — a whole workspace, for community admins. See [Working with communities](../guides/communities.md).
-- **Platform settings** — the whole server, for its owner. See the [server guide](../running-a-server/index.md).
+- **My Settings** is just you. Open it from the account menu, under your name and picture at the bottom of the sidebar.
+- **Community Settings** covers one whole community, and belongs to its admins. See [Bringing work in from another tool](../guides/importing.md).
+- **Platform Settings** covers the whole server, and belongs to whoever runs it. See the [server guide](../running-a-server/index.md).
 
-This section is about **your** settings.
+This section is about yours. Nothing in My Settings changes anything for anybody else.
 
 ## What's in My Settings
 
-| Tab | What it's for |
+| Tab | What's there |
 |---|---|
-| **Profile** | The face other people see: picture, status, decorations. |
-| **Account** | Your handle and email addresses. Deactivating or deleting the account is at the bottom. In the phone or desktop app, **Server connection** too, for disconnecting from this server. |
-| **Preferences** | Theme, language, time zone, week start, task-completion effects, and settings kept on this device. |
-| **Notifications** | What you're told about, and where. See [Notifications](../guides/notifications.md). |
-| **Privacy** | Who can ask to message you, your connections, pending requests, accounts you've ignored, and whether your activity counts toward search ranking. See [Messages](../guides/messages.md#who-can-reach-you). |
-| **Security** | Every way you sign in: your password, [passkeys](passkeys.md) and [two-factor authentication](two-factor-authentication.md), showing only the ones your server offers. Also [where you're signed in](profile-and-preferences.md#where-youre-signed-in), and access keys. See [API keys & integrations](api-keys-and-integrations.md). |
-| **Trash** | Things you recently deleted. |
+| **Profile** | How you look to other people: your picture, your look and your decoration packs. |
+| **Account** | Your username and email addresses. Closing your account is at the bottom, and in the phone or desktop app, so is **Server connection**. |
+| **Preferences** | Theme, language, time zone, what happens when you add or finish a task, and settings for this device only. |
+| **Notifications** | What you hear about, and where. See [Notifications](../guides/notifications.md). |
+| **Privacy** | Who can ask to message you, your connections, accounts you've ignored, and whether your activity counts toward search ranking. |
+| **Security** | How you sign in (password, [passkeys](passkeys.md), [two-factor authentication](two-factor-authentication.md)), where you're signed in, and API keys. |
+| **Trash** | Things you deleted, from every community, ready to restore. |
 
 <div class="grid cards" markdown>
 
 -   :material-account-cog-outline: __Profile & preferences__
 
-    Your profile and decorations, how you sign in, and how the app looks.
+    Your profile, how the app looks, and closing your account.
 
     [:octicons-arrow-right-24: Profile & preferences](profile-and-preferences.md)
+
+-   :material-shield-account-outline: __Sign-in and security__
+
+    Your email addresses and password, where you're signed in, and what to do when something looks wrong.
+
+    [:octicons-arrow-right-24: Sign-in and security](sign-in-and-security.md)
 
 -   :material-robot-outline: __AI features__
 
@@ -40,12 +46,24 @@ This section is about **your** settings.
 
 -   :material-key-outline: __API keys & integrations__
 
-    Connect scripts, tools, and AI assistants safely.
+    Let scripts, other apps and AI assistants work with your account.
 
     [:octicons-arrow-right-24: API keys & integrations](api-keys-and-integrations.md)
 
+-   :material-two-factor-authentication: __Two-factor authentication__
+
+    A code from your phone on top of your password.
+
+    [:octicons-arrow-right-24: Two-factor authentication](two-factor-authentication.md)
+
+-   :material-fingerprint: __Passkeys__
+
+    Sign in with your fingerprint, face or device PIN instead of a password.
+
+    [:octicons-arrow-right-24: Passkeys](passkeys.md)
+
 </div>
 
-## Importing from another tool
+## Bringing work over from another tool
 
-Work coming over from **Todoist**, **TickTick** or **Vikunja** has to land somewhere, and "somewhere" is always a community. So the import wizard lives with that community's other data, in **Community settings → Data** — see [Bringing work in from another tool](../guides/communities.md#bringing-work-in-from-another-tool).
+Work you import has to land in a community, so importing lives in that community's settings rather than yours, under **Community Settings** › **Data**, where its superadmin runs it. See [Bringing work in from another tool](../guides/importing.md).
