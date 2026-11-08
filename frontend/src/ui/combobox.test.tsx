@@ -204,6 +204,27 @@ describe("Combobox", () => {
       expect(trigger).toHaveTextContent("All statuses");
     });
 
+    it("leaves a disabled item out of select all", async () => {
+      const user = userEvent.setup();
+      const onValueChange = vi.fn();
+      render(
+        <Combobox
+          multiple
+          aria-label="Statuses"
+          value={[]}
+          onValueChange={onValueChange}
+          items={[
+            { value: "1", label: "Doing" },
+            { value: "2", label: "Done", disabled: true },
+          ]}
+        />
+      );
+
+      await user.click(screen.getByRole("combobox", { name: "Statuses" }));
+      await user.click(screen.getByRole("option", { name: "Select all" }));
+      expect(onValueChange).toHaveBeenCalledWith(["1"]);
+    });
+
     it("says there is nothing to choose in place of the field", () => {
       render(<Combobox multiple value={[]} onValueChange={vi.fn()} items={[]} />);
 

@@ -255,9 +255,19 @@ export const Combobox = (props: ComboboxProps) => {
                   {props.multiple && !query ? (
                     <>
                       <CommandGroup>
+                        {/* Every item that can be chosen, keeping any chosen
+                            item that can't. */}
                         <CommandItem
-                          disabled={chosen.length === items.length}
-                          onSelect={() => props.onValueChange(items.map((item) => item.value))}
+                          disabled={items.every(
+                            (item) => item.disabled || chosen.includes(item.value)
+                          )}
+                          onSelect={() =>
+                            props.onValueChange(
+                              items
+                                .filter((item) => !item.disabled || chosen.includes(item.value))
+                                .map((item) => item.value)
+                            )
+                          }
                         >
                           {t("selectAll")}
                         </CommandItem>
