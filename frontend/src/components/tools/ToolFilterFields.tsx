@@ -23,7 +23,6 @@ import type {
   ListWikisParams,
 } from "@/api/generated/initiativeAPI.schemas";
 import { FileKind, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { PropertyFilter, parsePropertyFilters } from "@/components/properties/PropertyFilter";
 import { TagFilterPicker } from "@/components/tags/TagFilterPicker";
 import {
   NO_DEFINITIONS,
@@ -35,6 +34,7 @@ import { toolCamelPlural } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { PropertyFilter, parsePropertyFilters } from "@/ui/properties/PropertyFilter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** Each tool's list params, as its list route takes them. */

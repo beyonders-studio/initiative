@@ -24,13 +24,13 @@ import {
   usePutVideoThumbnail,
   useUploadFileVersion,
 } from "@/hooks/useFiles";
-import { fileIcon } from "@/lib/fileIcon";
-import { FILE_TYPE_KINDS } from "@/lib/fileTypes";
 import { resolveFileDownloadUrl, resolveFileVersionDownloadUrl } from "@/lib/uploadUrl";
 import { drawVideoFrame } from "@/lib/videoFrame";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { fileIcon } from "@/ui/lib/fileIcon";
+import { FILE_TYPE_KINDS } from "@/ui/lib/fileTypes";
 import { formatBytes, getFileExtension, getFileTypeLabel } from "@/ui/lib/fileUtils";
 import { numberFormat } from "@/ui/lib/intl";
 import { useRelativeTime } from "@/ui/lib/useRelativeTime";

@@ -21,11 +21,11 @@ import { useMarkReadOnScreen, usePostReadTracker } from "@/hooks/usePostReadTrac
 import { useMarkPostUnread, useUpdatePost } from "@/hooks/usePosts";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { toolDetailRoute } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { formatDateTime } from "@/ui/lib/formatDate";
 import { cn } from "@/ui/lib/utils";
 
 interface PostCardProps {

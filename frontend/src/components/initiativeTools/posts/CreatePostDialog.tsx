@@ -28,7 +28,6 @@ import {
 import { useCreatePost } from "@/hooks/usePosts";
 import { useProperties } from "@/hooks/useProperties";
 import { sharedTarget } from "@/hooks/useToolLayouts";
-import { fromLocalDateTimeInput } from "@/lib/formatDate";
 import { MAX_POST_TEXT_CHARS } from "@/lib/posts";
 import type { DialogProps } from "@/types/dialog";
 import { Button } from "@/ui/button";
@@ -45,6 +44,7 @@ import {
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { fromLocalDateTimeInput } from "@/ui/lib/formatDate";
 import { Skeleton } from "@/ui/skeleton";
 
 const Editor = lazy(() =>

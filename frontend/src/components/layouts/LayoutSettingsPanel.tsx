@@ -10,12 +10,6 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
-import {
-  COUNTER_DISPLAYS,
-  type FieldDisplay,
-  type MetadataOwner,
-  SCALE_DISPLAYS,
-} from "@/components/properties/propertyHelpers";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { MAX_COLUMN_LIMIT } from "@/hooks/useColumnLimits";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -38,6 +32,12 @@ import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { listFormat } from "@/ui/lib/intl";
+import {
+  COUNTER_DISPLAYS,
+  type FieldDisplay,
+  type MetadataOwner,
+  SCALE_DISPLAYS,
+} from "@/ui/properties/propertyHelpers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 

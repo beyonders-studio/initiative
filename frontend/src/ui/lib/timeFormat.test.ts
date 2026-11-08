@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { formatDateTime } from "@/lib/formatDate";
 import {
   getClock,
   notifyClock,
@@ -10,6 +9,7 @@ import {
   subscribeClock,
   writeClock,
 } from "@/ui/host";
+import { formatDateTime } from "@/ui/lib/formatDate";
 import {
   dateTimePattern,
   formatClockSlot,

@@ -25,7 +25,6 @@ import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCreateApiKey, useDeleteApiKey } from "@/hooks/useSecurity";
-import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -43,6 +42,7 @@ import {
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { formatDateTime } from "@/ui/lib/formatDate";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { StatusMessage } from "@/ui/status-message";

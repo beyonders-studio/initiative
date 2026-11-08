@@ -10,10 +10,6 @@ import type {
   TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
-import {
-  PropertyFilter,
-  type PropertyFilterCondition,
-} from "@/components/properties/PropertyFilter";
 import { TagPicker } from "@/components/tags/TagPicker";
 import {
   NO_DEFINITIONS,
@@ -33,6 +29,7 @@ import { pluginFilterFields, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { PRIORITY_ORDER } from "@/lib/sorting";
 import { Combobox } from "@/ui/combobox";
 import { Label } from "@/ui/label";
+import { PropertyFilter, type PropertyFilterCondition } from "@/ui/properties/PropertyFilter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 

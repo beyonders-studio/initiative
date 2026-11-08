@@ -14,7 +14,6 @@ import { RecoveryCodesPanel } from "@/components/settings/RecoveryCodesPanel";
 import { useAnnounceHeld } from "@/hooks/useHeldChange";
 import { useWizard } from "@/hooks/useWizard";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { queryClient } from "@/lib/queryClient";
 import { classifySecondFactorAnswer } from "@/lib/secondFactorAnswer";
@@ -30,6 +29,7 @@ import {
 } from "@/ui/dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { formatDateTime } from "@/ui/lib/formatDate";
 import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
 import { WizardDialog } from "@/ui/wizard-dialog";

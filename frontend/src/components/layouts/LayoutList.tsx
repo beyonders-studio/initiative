@@ -12,8 +12,8 @@ import type {
 import { layoutLook } from "@/components/projects/projectTasksConfig";
 import { TaskTypeDeleteDialog } from "@/components/projects/TaskTypeDeleteDialog";
 import { useSaveLayouts } from "@/hooks/useToolLayouts";
-import { formatDateTime } from "@/lib/formatDate";
 import { Button } from "@/ui/button";
+import { formatDateTime } from "@/ui/lib/formatDate";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import { Switch } from "@/ui/switch";
 

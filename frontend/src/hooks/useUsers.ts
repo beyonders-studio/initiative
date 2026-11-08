@@ -43,7 +43,6 @@ import {
   useSearchUsers,
 } from "@/api/generated/users/users";
 import { invalidate, q } from "@/api/query-keys";
-import type { SearchMembers } from "@/components/properties/PropertyInput";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useApiMutation, useCommunityMutation } from "@/hooks/useApiMutation";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -52,6 +51,7 @@ import { downloadBlob } from "@/lib/csv";
 import { toMember } from "@/lib/userDisplay";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
+import type { SearchMembers } from "@/ui/properties/PropertyInput";
 
 // ── Queries ─────────────────────────────────────────────────────────────────
 

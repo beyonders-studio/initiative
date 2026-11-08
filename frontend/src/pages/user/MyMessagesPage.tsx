@@ -48,11 +48,11 @@ import {
 } from "@/hooks/useMyMessages";
 import { useUserProfile } from "@/hooks/useUsers";
 import { groupName, isGroup, roster } from "@/lib/conversationName";
-import { formatDateTime, formatDayHeading, localDayKey } from "@/lib/formatDate";
 import { getUserHandle } from "@/lib/userDisplay";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { formatDateTime, formatDayHeading, localDayKey } from "@/ui/lib/formatDate";
 import { dateTimeFormat } from "@/ui/lib/intl";
 import { hour12Option } from "@/ui/lib/timeFormat";
 import { cn } from "@/ui/lib/utils";

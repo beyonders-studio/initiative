@@ -20,8 +20,6 @@ import {
   type TaskTypeRead,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { PropertyFilter } from "@/components/properties/PropertyFilter";
-import type { PropertyInputProps } from "@/components/properties/PropertyInput";
 import { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { TaskFilters } from "@/components/tasks/TaskFilters";
 import { TaskStatusPriorityFilters } from "@/components/tasks/TaskStatusPriorityFilters";
@@ -49,6 +47,8 @@ import type { LayoutNode } from "@/lib/layouts/tree";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
+import { PropertyFilter } from "@/ui/properties/PropertyFilter";
+import type { PropertyInputProps } from "@/ui/properties/PropertyInput";
 
 import { editablePresets } from "./LayoutPresets";
 import type { LayoutProject } from "./LayoutSettingsPanel";

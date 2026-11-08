@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
 import { type PersonalItemRead, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { fileIcon } from "@/lib/fileIcon";
 import { TOOL_ICONS } from "@/lib/tools";
+import { fileIcon } from "@/ui/lib/fileIcon";
 import { cn } from "@/ui/lib/utils";
 
 /**

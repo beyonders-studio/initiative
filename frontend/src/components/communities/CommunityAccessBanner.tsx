@@ -2,7 +2,7 @@ import { Clock, Lock } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useCommunities } from "@/hooks/useCommunities";
-import { minutesLeft } from "@/lib/formatDate";
+import { minutesLeft } from "@/ui/lib/formatDate";
 
 /**
  * Banner shown across community pages when the active community is reached via a

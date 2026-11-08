@@ -10,9 +10,9 @@ import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityBillingSummary } from "@/hooks/useCommunityBillingSummary";
 import { holdsBillingSeat, trialDaysLeft } from "@/lib/billingSummary";
-import { parseDateValue } from "@/lib/formatDate";
 import { Badge, type BadgeProps } from "@/ui/badge";
 import { Button } from "@/ui/button";
+import { parseDateValue } from "@/ui/lib/formatDate";
 import { dateTimeFormat, numberFormat } from "@/ui/lib/intl";
 import { Separator } from "@/ui/separator";
 

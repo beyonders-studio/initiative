@@ -3,8 +3,8 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
-import { formatDateTime } from "@/lib/formatDate";
 import { isOfflineCacheEnabled, offlineCacheSyncedAt } from "@/lib/offlineCache";
+import { formatDateTime } from "@/ui/lib/formatDate";
 
 /**
  * Says, plainly, that what is on screen came off this device rather than from

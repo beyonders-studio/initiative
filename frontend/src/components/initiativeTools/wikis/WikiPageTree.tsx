@@ -22,9 +22,9 @@ import { UnreadDot } from "@/components/notifications/UnreadDot";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/sidebar/sidebar";
 import { useDragSensors } from "@/hooks/useDragSensors";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
-import { fileIcon } from "@/lib/fileIcon";
 import { Button } from "@/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
+import { fileIcon } from "@/ui/lib/fileIcon";
 import { cn } from "@/ui/lib/utils";
 
 /** Which of a row's three bands a dragged page is over. */

@@ -41,7 +41,6 @@ import {
 } from "@/hooks/useCalendarEvents";
 import { ItemDraftContext } from "@/hooks/useFieldSave";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { formatDate, formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import {
   allDayReference,
@@ -59,6 +58,7 @@ import { Button } from "@/ui/button";
 import { DateTimePicker } from "@/ui/date-time-picker";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
 import { dateTimeFormat } from "@/ui/lib/intl";
 import { hour12Option } from "@/ui/lib/timeFormat";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";

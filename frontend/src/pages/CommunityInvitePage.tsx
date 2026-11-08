@@ -8,9 +8,9 @@ import { useApiMutation } from "@/hooks/useApiMutation";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { formatDateTime } from "@/lib/formatDate";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { formatDateTime } from "@/ui/lib/formatDate";
 import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
 
 export const CommunityInvitePage = () => {

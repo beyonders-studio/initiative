@@ -6,7 +6,6 @@ import type {
   RecurrenceStrategy,
 } from "@/api/generated/initiativeAPI.schemas";
 import { useRecurrencePreview } from "@/hooks/useRecurrencePreview";
-import { formatDate, formatDateTime } from "@/lib/formatDate";
 import {
   createRecurrenceFromPreset,
   detectRecurrencePreset,
@@ -34,6 +33,7 @@ import { DateTimePicker } from "@/ui/date-time-picker";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
 import { dateTimeFormat } from "@/ui/lib/intl";
 import { cn } from "@/ui/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";

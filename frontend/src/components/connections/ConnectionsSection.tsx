@@ -8,9 +8,9 @@ import {
   useRemoveConnection,
   useRequestConnection,
 } from "@/hooks/useDirectMessages";
-import { formatDate } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
+import { formatDate } from "@/ui/lib/formatDate";
 
 interface ConnectionsSectionProps {
   /** Show the "connect by handle" field. Off where the page is a directory. */

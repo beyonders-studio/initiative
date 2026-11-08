@@ -13,7 +13,6 @@ import { useTranslation } from "react-i18next";
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { BookmarkButton } from "@/components/BookmarkButton";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
-import { buildPropertyColumns, propertyColumnIds } from "@/components/properties/propertyColumns";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import type { ToolIndexRow } from "@/components/tools/ToolIndexPage";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -25,6 +24,7 @@ import { toolDetailRoute, toolRouteSegment } from "@/lib/tools";
 import { Checkbox } from "@/ui/checkbox";
 import { DataTable } from "@/ui/data-table";
 import type { AppColumnDef } from "@/ui/lib/table";
+import { buildPropertyColumns, propertyColumnIds } from "@/ui/properties/propertyColumns";
 import { RelativeTime } from "@/ui/relative-time";
 import { SortHeader } from "@/ui/sort-icon";
 

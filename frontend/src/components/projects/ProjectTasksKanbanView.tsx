@@ -37,7 +37,6 @@ import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import { useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useMoveTaskToGroup } from "@/hooks/useTasks";
 import { useTaskTypeChange } from "@/hooks/useTaskTypeChange";
-import { formatDateTime } from "@/lib/formatDate";
 import { cardOf } from "@/lib/layouts/draft";
 import { useCounterSteps, useProjectLayoutEnv, withDisplays } from "@/lib/layouts/fields";
 import { boardBands } from "@/lib/layouts/grouping";
@@ -46,6 +45,7 @@ import { taskFields } from "@/lib/layouts/tasks";
 import { type LayoutContext, type LayoutNode, namesField } from "@/lib/layouts/tree";
 import { Badge } from "@/ui/badge";
 import { GroupBySelect } from "@/ui/data-table";
+import { formatDateTime } from "@/ui/lib/formatDate";
 import { cn } from "@/ui/lib/utils";
 
 import { TaskAssigneeList } from "./TaskAssigneeList";

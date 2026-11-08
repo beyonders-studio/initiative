@@ -36,7 +36,6 @@ import { TagBadge } from "@/components/tags/TagBadge";
 import { POST_SAVES, useDeletePostPoll, useSetPostPoll, useUpdatePost } from "@/hooks/usePosts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { normalizeEditorState } from "@/lib/editorState";
-import { formatDateTime, fromLocalDateTimeInput, toLocalDateTimeInput } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { MAX_POST_TEXT_CHARS } from "@/lib/posts";
 import { referenceRef } from "@/lib/smartChips";
@@ -44,6 +43,7 @@ import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { DateTimePicker } from "@/ui/date-time-picker";
 import { Label } from "@/ui/label";
+import { formatDateTime, fromLocalDateTimeInput, toLocalDateTimeInput } from "@/ui/lib/formatDate";
 import { cn } from "@/ui/lib/utils";
 import { Skeleton } from "@/ui/skeleton";
 

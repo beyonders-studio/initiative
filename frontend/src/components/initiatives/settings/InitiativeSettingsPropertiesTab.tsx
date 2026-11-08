@@ -12,19 +12,6 @@ import {
   type PropertyDefinitionUpdate,
   type PropertyOption,
 } from "@/api/generated/initiativeAPI.schemas";
-import {
-  CounterSettingsFields,
-  counterSettingsValid,
-} from "@/components/properties/CounterSettingsFields";
-import { CurrencySelect, useDefaultCurrency } from "@/components/properties/CurrencySelect";
-import { PROPERTY_TYPES } from "@/components/properties/NewPropertyForm";
-import {
-  type MetadataOwner,
-  normalizeOptionList,
-  ownerColumns,
-  typeRequiresOptions,
-} from "@/components/properties/propertyHelpers";
-import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import {
   useCreateProperty,
@@ -54,6 +41,16 @@ import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { collator } from "@/ui/lib/intl";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { CounterSettingsFields, counterSettingsValid } from "@/ui/properties/CounterSettingsFields";
+import { CurrencySelect, useDefaultCurrency } from "@/ui/properties/CurrencySelect";
+import { PROPERTY_TYPES } from "@/ui/properties/NewPropertyForm";
+import {
+  type MetadataOwner,
+  normalizeOptionList,
+  ownerColumns,
+  typeRequiresOptions,
+} from "@/ui/properties/propertyHelpers";
+import { iconForPropertyType } from "@/ui/properties/propertyTypeIcons";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
 

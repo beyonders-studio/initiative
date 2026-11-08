@@ -7,7 +7,7 @@ import type { CollectionCard } from "@/components/files/collections/collectionLi
 import { TimelineRail } from "@/components/timeline/TimelineRail";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
 import { fileRatio, formatDay, groupByDay } from "@/lib/collections";
-import { formatPeriod, formatPeriodYear } from "@/lib/formatDate";
+import { formatPeriod, formatPeriodYear } from "@/ui/lib/formatDate";
 import { type VirtualRow, VirtualRows } from "@/ui/virtual-rows";
 
 interface CollectionTimelineViewProps {

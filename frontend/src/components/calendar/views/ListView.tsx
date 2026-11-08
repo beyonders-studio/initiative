@@ -4,8 +4,6 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { UnreadDot } from "@/components/notifications/UnreadDot";
-import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
-import { nonEmptyPropertySummaries } from "@/components/properties/propertyHelpers";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { getInitials } from "@/lib/initials";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
@@ -14,6 +12,8 @@ import { Checkbox } from "@/ui/checkbox";
 import { dateTimeFormat } from "@/ui/lib/intl";
 import { formatCompactTime as formatTime } from "@/ui/lib/timeFormat";
 import { cn } from "@/ui/lib/utils";
+import { PropertyValueCell } from "@/ui/properties/PropertyValueCell";
+import { nonEmptyPropertySummaries } from "@/ui/properties/propertyHelpers";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 import type { CalendarEntry } from "../CalendarView";

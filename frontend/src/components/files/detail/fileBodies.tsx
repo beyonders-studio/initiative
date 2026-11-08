@@ -19,13 +19,13 @@ import type { UseCollaborationResult } from "@/hooks/useCollaboration";
 import { useCommunities, useSelfInCommunity } from "@/hooks/useCommunities";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { normalizeEditorState } from "@/lib/editorState";
-import { type EditorFileType, isStoredFileType } from "@/lib/fileTypes";
 import { supportsEntityMentions } from "@/lib/mentions";
 import { referenceRef } from "@/lib/smartChips";
 import type { SpreadsheetSheetContent } from "@/lib/spreadsheet/content";
 import { toolDetailRoute } from "@/lib/tools";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
+import { type EditorFileType, isStoredFileType } from "@/ui/lib/fileTypes";
 import { sanitizeUrl } from "@/ui/lib/safeUrl";
 import { cn } from "@/ui/lib/utils";
 

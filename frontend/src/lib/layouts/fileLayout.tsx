@@ -7,10 +7,10 @@ import {
   PropertyTarget,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { nonEmptyPropertySummaries } from "@/components/properties/propertyHelpers";
 import { collectionMetadataSaves } from "@/hooks/useCollections";
 import { propertySaves } from "@/hooks/useProperties";
 import type { TranslateFn } from "@/types/i18n";
+import { nonEmptyPropertySummaries } from "@/ui/properties/propertyHelpers";
 
 import { type DetailKind, useItemContext } from "./DetailLayoutView";
 import { filledBy, PlacedProperties } from "./detailLayout";

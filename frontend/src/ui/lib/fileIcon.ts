@@ -30,7 +30,7 @@ import {
 import type { ComponentType } from "react";
 
 import { FileKind, FileType } from "@/api/generated/initiativeAPI.schemas";
-import { FILE_TYPE_KINDS } from "@/lib/fileTypes";
+import { FILE_TYPE_KINDS } from "@/ui/lib/fileTypes";
 import { getFileTypeLabel } from "@/ui/lib/fileUtils";
 import { matchSmartLinkProvider } from "@/ui/lib/smartLinkProviders";
 

@@ -14,7 +14,6 @@ import { SearchCategoryTabs } from "@/components/search/SearchCategoryTabs";
 import { useUploadFile } from "@/hooks/useFiles";
 import { type ToolRef, useRelate } from "@/hooks/useRelationships";
 import type { MemberSearchScope } from "@/hooks/useUsers";
-import { fileIcon } from "@/lib/fileIcon";
 import { toast } from "@/lib/mascotToast";
 import {
   canAssert,
@@ -44,6 +43,7 @@ import { Field } from "@/ui/field";
 import { FileDropArea } from "@/ui/file-drop";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { fileIcon } from "@/ui/lib/fileIcon";
 import { formatBytes, getFileTypeLabel, nameWithoutExtension } from "@/ui/lib/fileUtils";
 import { cn } from "@/ui/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";

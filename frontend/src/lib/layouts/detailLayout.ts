@@ -11,7 +11,7 @@ import type {
   DetailLayoutRead,
   PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
-import { isEmptyPropertyValue } from "@/components/properties/propertyHelpers";
+import { isEmptyPropertyValue } from "@/ui/properties/propertyHelpers";
 
 import { PROPERTY_FIELD_PREFIX } from "./fields";
 import type { LayoutNode } from "./tree";

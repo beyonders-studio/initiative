@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useFilesList } from "@/hooks/useFiles";
-import { fileIcon } from "@/lib/fileIcon";
 import { Button } from "@/ui/button";
 import {
   Dialog,
@@ -13,6 +12,7 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { Input } from "@/ui/input";
+import { fileIcon } from "@/ui/lib/fileIcon";
 import { cn } from "@/ui/lib/utils";
 
 interface FileChooserDialogProps {

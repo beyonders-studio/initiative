@@ -24,17 +24,17 @@ import {
   useListPropertyDefinitionsByOwner,
 } from "@/api/generated/property-definitions/property-definitions";
 import { invalidate, q } from "@/api/query-keys";
-import {
-  buildUniqueOptionSlug,
-  findOptionByLabel,
-  type MetadataOwner,
-  ownerColumns,
-} from "@/components/properties/propertyHelpers";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { type FieldSaveKind, heldKey } from "@/hooks/useFieldSave";
 import { toast } from "@/lib/mascotToast";
 import type { MutationOpts } from "@/types/mutation";
+import {
+  buildUniqueOptionSlug,
+  findOptionByLabel,
+  type MetadataOwner,
+  ownerColumns,
+} from "@/ui/properties/propertyHelpers";
 
 // ── Queries ──────────────────────────────────────────────────────────────────
 

@@ -18,10 +18,10 @@ import {
   normalizePluginTarget,
 } from "@/lib/entityResolver";
 import { downloadExportArtifact } from "@/lib/exportDownload";
-import { formatDate } from "@/lib/formatDate";
 import { storeSellingNow } from "@/lib/storeSelling";
 import { entityRefRoute, toolKebabSingular } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
+import { formatDate } from "@/ui/lib/formatDate";
 
 /** Whether plan lines may ask the reader to choose a plan here. Not until a
  *  phone's store has answered (`@/lib/storeSelling`). */

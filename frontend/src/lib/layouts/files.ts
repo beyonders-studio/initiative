@@ -8,7 +8,7 @@ import type {
   CollectionFileSummary,
   PropertyDefinitionRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { listedValue, nonEmptyPropertySummaries } from "@/components/properties/propertyHelpers";
+import { listedValue, nonEmptyPropertySummaries } from "@/ui/properties/propertyHelpers";
 
 import { at, detailLayoutSpec, type Region } from "./detailLayout";
 import type { ListShape } from "./draft";

@@ -42,13 +42,13 @@ import {
 } from "@/hooks/useCommunityPluginDetail";
 import { useUserSearch } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { formatDate } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import { localized } from "@/lib/widgets/widgetMeta";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { formatDate } from "@/ui/lib/formatDate";
 import { PaginationBar } from "@/ui/pagination-bar";
 import { Skeleton } from "@/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";

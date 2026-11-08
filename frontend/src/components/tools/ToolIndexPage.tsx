@@ -67,7 +67,6 @@ import { UnreadDot } from "@/components/notifications/UnreadDot";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { useProjectColumns } from "@/components/projects/projectColumns";
-import { parsePropertyFilters } from "@/components/properties/PropertyFilter";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { TagBrowseLayout } from "@/components/tags/TagBrowseLayout";
 import {
@@ -123,6 +122,7 @@ import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { useFileDrop } from "@/ui/lib/useFileDrop";
 import { CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { PaginationBar } from "@/ui/pagination-bar";
+import { parsePropertyFilters } from "@/ui/properties/PropertyFilter";
 import { StatusMessage } from "@/ui/status-message";
 
 // ---------------------------------------------------------------------------

@@ -5,9 +5,9 @@ import {
   MetadataType,
   type PropertyDefinitionRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { namePropertyColumns } from "@/components/properties/propertyColumns";
-import { listedValue } from "@/components/properties/propertyHelpers";
-import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
+import { namePropertyColumns } from "@/ui/properties/propertyColumns";
+import { listedValue } from "@/ui/properties/propertyHelpers";
+import { iconForPropertyType } from "@/ui/properties/propertyTypeIcons";
 
 import { at, detailLayoutSpec, type Region, storedLayout } from "./detailLayout";
 import { type FieldDef, propertyFieldId } from "./fields";

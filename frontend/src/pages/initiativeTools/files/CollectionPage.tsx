@@ -76,7 +76,6 @@ import {
   useInstanceLayouts,
 } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { formatPeriod } from "@/lib/formatDate";
 import { DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
 import { requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
 import { useCounterSteps, withDisplays } from "@/lib/layouts/fields";
@@ -91,6 +90,7 @@ import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
 import { DropdownMenuItem } from "@/ui/dropdown-menu";
 import { Label } from "@/ui/label";
+import { formatPeriod } from "@/ui/lib/formatDate";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { Lightbox, type LightboxItem } from "@/ui/lightbox";
 import { LoadMore } from "@/ui/load-more";

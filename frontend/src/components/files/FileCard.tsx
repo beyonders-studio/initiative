@@ -1,19 +1,19 @@
 import { useTranslation } from "react-i18next";
 
 import { type FileSummary, FileType, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
-import { nonEmptyPropertySummaries } from "@/components/properties/propertyHelpers";
 import { ToolCard } from "@/components/tools/ToolCard";
-import { fileIcon } from "@/lib/fileIcon";
-import { isStoredFileType } from "@/lib/fileTypes";
 import { toolDetailRoute } from "@/lib/tools";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
 import { Badge } from "@/ui/badge";
 import { LazyImage } from "@/ui/lazy-image";
+import { fileIcon } from "@/ui/lib/fileIcon";
+import { isStoredFileType } from "@/ui/lib/fileTypes";
 import { filePicture, getFileTypeLabel } from "@/ui/lib/fileUtils";
 import { matchSmartLinkProvider } from "@/ui/lib/smartLinkProviders";
 import { useRelativeTime } from "@/ui/lib/useRelativeTime";
 import { cn } from "@/ui/lib/utils";
+import { PropertyValueCell } from "@/ui/properties/PropertyValueCell";
+import { nonEmptyPropertySummaries } from "@/ui/properties/propertyHelpers";
 
 export const FileCard = ({ file }: { file: FileSummary }) => {
   const { t } = useTranslation("files");

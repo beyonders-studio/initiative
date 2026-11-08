@@ -7,7 +7,6 @@ import {
   type PropertyOption,
   type PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
-import type { MemberLike } from "@/components/members/MemberSearchSelect";
 
 /** Who a definition belongs to where it is not the initiative's: a project
  *  (its metadata, on its tasks) or a collection (its metadata, on its files). */
@@ -186,13 +185,23 @@ export const nonEmptyPropertySummaries = (
   return ownProperties(summaries).filter((summary) => !isEmptyPropertyValue(summary.value));
 };
 
+/** A person a value names, as the server reads it back: their handle, name
+ *  and picture, or their id alone where the reader cannot see them. */
+export interface UserValue {
+  id: number;
+  username?: string | null;
+  discriminator?: number | null;
+  display_name?: string | null;
+  avatar_url?: string | null;
+}
+
 /** The person a ``user_reference`` value carries (the server reads it back as
  *  ``{id, display_name, …}``), so a picker can render them without a search. */
-export const userReferenceValue = (property: PropertySummary): MemberLike | null => {
+export const userReferenceValue = (property: PropertySummary): UserValue | null => {
   if (property.type !== MetadataType.user_reference) return null;
   const raw = property.value;
   if (raw && typeof raw === "object" && typeof (raw as { id?: unknown }).id === "number") {
-    return raw as MemberLike;
+    return raw as UserValue;
   }
   return null;
 };
@@ -215,7 +224,7 @@ export const fileFieldValue = (raw: unknown): FileFieldValue | null =>
  *  the reader cannot see them, nobody where their account is gone), the name
  *  they typed, and when. */
 export interface SignatureValue {
-  user: MemberLike | null;
+  user: UserValue | null;
   name: string;
   signed_at: string;
 }

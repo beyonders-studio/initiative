@@ -14,10 +14,10 @@ import {
   useMarkNotificationUnread,
   useNotificationHistory,
 } from "@/hooks/useNotifications";
-import { formatDayHeading, localDayKey } from "@/lib/formatDate";
 import { useStoreSellingAnswer } from "@/lib/storeSelling";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
+import { formatDayHeading, localDayKey } from "@/ui/lib/formatDate";
 import { LoadMore } from "@/ui/load-more";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { RelativeTime } from "@/ui/relative-time";

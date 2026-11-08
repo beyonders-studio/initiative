@@ -19,10 +19,10 @@ import {
   useUploadRegistryBundle,
 } from "@/hooks/useMarketplaceRegistry";
 import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
-import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { FileDropArea } from "@/ui/file-drop";
+import { formatDateTime } from "@/ui/lib/formatDate";
 import { Switch } from "@/ui/switch";
 
 /** What the status row records for an uploaded bundle. */
