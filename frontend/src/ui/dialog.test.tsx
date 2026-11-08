@@ -106,35 +106,24 @@ describe("DialogContent", () => {
 
   it("no dialog sets an unprefixed fixed max width", () => {
     const offenders: string[] = [];
-    const walk = (dir: string) => {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          walk(full);
-        } else if (entry.name.endsWith(".tsx")) {
-          const source = fs.readFileSync(full, "utf-8");
-          for (const match of source.matchAll(/<DialogContent\s+className="([^"]*)"/g)) {
-            const classes = match[1].split(/\s+/);
-            // Does the element bound its own width against the viewport?
-            const selfBounded = classes.some(
-              (cls) => !cls.includes(":") && /^w-(?:full|\[.*(?:vw|%).*\])$/.test(cls)
-            );
-            for (const cls of classes) {
-              // Anything behind a breakpoint or state is fine — the base cap
-              // still governs below it.
-              if (cls.includes(":") || !cls.startsWith("max-w-")) continue;
-              const value = cls.slice("max-w-".length);
-              const fitsAnyway =
-                value === "full" || /v[wh]|%/.test(value) || (value === "none" && selfBounded);
-              if (!fitsAnyway) {
-                offenders.push(`${path.relative(SRC, full)}: ${cls}`);
-              }
-            }
-          }
+    for (const { file, source } of sources(path.join(SRC, "src"))) {
+      for (const match of source.matchAll(/<DialogContent\s+className="([^"]*)"/g)) {
+        const classes = match[1].split(/\s+/);
+        // Does the element bound its own width against the viewport?
+        const selfBounded = classes.some(
+          (cls) => !cls.includes(":") && /^w-(?:full|\[.*(?:vw|%).*\])$/.test(cls)
+        );
+        for (const cls of classes) {
+          // Anything behind a breakpoint or state is fine — the base cap
+          // still governs below it.
+          if (cls.includes(":") || !cls.startsWith("max-w-")) continue;
+          const value = cls.slice("max-w-".length);
+          const fitsAnyway =
+            value === "full" || /v[wh]|%/.test(value) || (value === "none" && selfBounded);
+          if (!fitsAnyway) offenders.push(`${file}: ${cls}`);
         }
       }
-    };
-    walk(SRC);
+    }
 
     expect(offenders, `put these behind sm: — ${offenders.join(", ")}`).toEqual([]);
   });
