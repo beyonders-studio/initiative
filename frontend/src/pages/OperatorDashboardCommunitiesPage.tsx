@@ -147,7 +147,6 @@ const CommunityStatusCell = ({ community }: { community: PlatformCommunityStorag
             ? t("communities.holdConfirm.confirm")
             : t("communities.suspendConfirm.confirm")
         }
-        cancelLabel={t("common:cancel")}
         destructive
         isLoading={update.isPending}
         onConfirm={() => pending && apply(pending)}
@@ -235,7 +234,6 @@ const CommunitySuspensionButton = ({ community }: { community: PlatformCommunity
         confirmLabel={
           lifting ? t("communities.suspension.lift") : t("communities.suspendConfirm.confirm")
         }
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("common:submitting")}
         destructive={!lifting}
         isLoading={update.isPending}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/ui/button";
 import { cn } from "@/ui/lib/utils";
@@ -50,9 +51,10 @@ export const ColorPickerPopover = ({
   onChange,
   onChangeComplete,
   disabled,
-  triggerLabel = "Pick color",
+  triggerLabel,
   className,
 }: ColorPickerPopoverProps) => {
+  const { t } = useTranslation("ui");
   const [open, setOpen] = useState(false);
   const [draftColor, setDraftColor] = useState(value);
 
@@ -114,7 +116,7 @@ export const ColorPickerPopover = ({
             className
           )}
           disabled={disabled}
-          aria-label={triggerLabel}
+          aria-label={triggerLabel ?? t("colorPicker.pick")}
         >
           <span className="flex items-center gap-2">
             <span aria-hidden="true" className="h-6 w-6 rounded-md border" style={swatchStyle} />

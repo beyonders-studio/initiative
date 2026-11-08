@@ -511,7 +511,6 @@ export const ProviderRegistrySection = ({
         title={t("authProviders.deleteTitle", { name: deleting?.display_name ?? "" })}
         description={t("authProviders.deleteDescription")}
         confirmLabel={t("authProviders.delete")}
-        cancelLabel={t("authProviders.cancel")}
         destructive
         isLoading={deleteProvider.isPending}
         onConfirm={() => {

@@ -213,7 +213,6 @@ export const DecorationStore = ({ user }: { user: UserRead }) => {
         title={t("profiles:myPacks.confirmTitle", { name: pending?.name ?? "" })}
         description={t("profiles:myPacks.confirmBody")}
         confirmLabel={t("profiles:myPacks.remove")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("profiles:myPacks.removing")}
         isLoading={remove.isPending}
         onConfirm={() => {

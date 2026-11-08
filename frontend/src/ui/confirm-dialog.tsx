@@ -1,4 +1,5 @@
 import { type ReactNode, useId, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   AlertDialog,
@@ -44,16 +45,17 @@ export const ConfirmDialog = ({
   onOpenChange,
   title,
   description,
-  confirmLabel = "Continue",
-  cancelLabel = "Cancel",
+  confirmLabel,
+  cancelLabel,
   onConfirm,
   isLoading,
-  loadingLabel = "Please wait...",
+  loadingLabel,
   destructive,
   confirmationText,
   confirmationLabel,
   children,
 }: ConfirmDialogProps) => {
+  const { t } = useTranslation("ui");
   const inputId = useId();
   const [confirmationInput, setConfirmationInput] = useState("");
 
@@ -91,13 +93,15 @@ export const ConfirmDialog = ({
           </div>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isLoading}>{cancelLabel}</AlertDialogCancel>
+          <AlertDialogCancel disabled={isLoading}>{cancelLabel ?? t("cancel")}</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
             disabled={isLoading || !confirmationSatisfied}
             className={cn(destructive && buttonVariants({ variant: "destructive" }))}
           >
-            {isLoading ? loadingLabel : confirmLabel}
+            {isLoading
+              ? (loadingLabel ?? t("confirm.working"))
+              : (confirmLabel ?? t("confirm.continue"))}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

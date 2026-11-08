@@ -168,7 +168,6 @@ export const OperatorDashboardPlacementPage = () => {
         title={t("providerPlacement.everywhere.confirmTitle")}
         description={t("providerPlacement.everywhere.confirmDescription")}
         confirmLabel={t("providerPlacement.everywhere.confirm")}
-        cancelLabel={t("authProviders.cancel")}
         isLoading={setEverywhere.isPending}
         onConfirm={() => applyEverywhere(true)}
       />
@@ -181,7 +180,6 @@ export const OperatorDashboardPlacementPage = () => {
           community: removing?.community_name ?? "",
         })}
         confirmLabel={t("providerPlacement.remove")}
-        cancelLabel={t("authProviders.cancel")}
         destructive
         isLoading={deleteRule.isPending}
         onConfirm={() => removing && removeRule(removing)}

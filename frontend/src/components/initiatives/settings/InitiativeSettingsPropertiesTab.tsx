@@ -479,7 +479,6 @@ const PropertyDeleteDialog = ({
       title={t(words.deleteTitle)}
       description={t(words.deleteBody)}
       confirmLabel={t(words.delete)}
-      cancelLabel={t("common:cancel")}
       onConfirm={() => void handleConfirm()}
       isLoading={deleteMutation.isPending}
       destructive
@@ -1092,7 +1091,6 @@ const InitiativeMetadata = ({ initiativeId }: { initiativeId: number }) => {
         title={t("properties:manager.bulkDeleteTitle", { count: chosen.length })}
         description={t("properties:manager.bulkDeleteBody")}
         confirmLabel={t("common:delete")}
-        cancelLabel={t("common:cancel")}
         onConfirm={() => void handleDeleteSelected()}
         isLoading={deleteMany.isPending}
         destructive

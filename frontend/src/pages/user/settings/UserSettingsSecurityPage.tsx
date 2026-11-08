@@ -369,7 +369,6 @@ export const UserSettingsSecurityPage = () => {
         title={t("security.deleteDialogTitle")}
         description={t("security.deleteDialogDescription", { name: deleteTarget?.name ?? "" })}
         confirmLabel={t("security.deleteButton")}
-        cancelLabel={t("common:cancel")}
         loadingLabel={t("security.deleting")}
         isLoading={deleteKey.isPending}
         destructive

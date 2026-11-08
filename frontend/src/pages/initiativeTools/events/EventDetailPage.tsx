@@ -294,7 +294,6 @@ export function EventDetailPage() {
         title={t("deleteEvent")}
         description={t("deleteEventConfirm")}
         confirmLabel={t("deleteEvent")}
-        cancelLabel={t("common:cancel")}
         onConfirm={() => deleteEvent.mutate({ eventId: parsedId })}
         isLoading={deleteEvent.isPending}
         destructive
