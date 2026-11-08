@@ -1,13 +1,13 @@
 import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
-import Fuse from "fuse.js";
 import type { LucideIcon, LucideProps } from "lucide-react";
 import { dynamicIconImports, type IconName } from "lucide-react/dynamic";
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useDebounceValue } from "usehooks-ts";
 
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
+import { commandFilter } from "@/ui/lib/fuzzyMatch";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { cn } from "@/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Skeleton } from "@/ui/skeleton";
@@ -104,30 +104,33 @@ const IconPicker = React.forwardRef<React.ComponentRef<typeof PopoverTrigger>, I
   ) => {
     const [selectedIcon, setSelectedIcon] = useState<IconName | undefined>(defaultValue);
     const [isOpen, setIsOpen] = useState(defaultOpen || false);
-    const [search, setSearch] = useDebounceValue("", 100);
+    const [typed, setSearch] = useState("");
+    const search = useDebouncedValue(typed, 100);
     const [isPopoverVisible, setIsPopoverVisible] = useState(false);
     const { icons } = useIconsData();
     const [isLoading, setIsLoading] = useState(true);
 
     const iconsToUse = useMemo(() => iconsList || icons, [iconsList, icons]);
 
-    const fuseInstance = useMemo(() => {
-      return new Fuse(iconsToUse, {
-        keys: ["name", "tags", "categories"],
-        threshold: 0.3,
-        ignoreLocation: true,
-        includeScore: true,
-      });
-    }, [iconsToUse]);
-
+    // Best match first, forgiving typos: the icon's name, then its tags, then
+    // its categories, which are broad groups many icons share.
     const filteredIcons = useMemo(() => {
-      if (search.trim() === "") {
+      const query = search.trim();
+      if (query === "") {
         return iconsToUse;
       }
-
-      const results = fuseInstance.search(search.toLowerCase().trim());
-      return results.map((result) => result.item);
-    }, [search, iconsToUse, fuseInstance]);
+      return iconsToUse
+        .map((icon) => ({
+          icon,
+          score: Math.max(
+            commandFilter(icon.name, query, icon.tags),
+            ...icon.categories.map((category) => commandFilter(category, query) * 0.8)
+          ),
+        }))
+        .filter(({ score }) => score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map(({ icon }) => icon);
+    }, [search, iconsToUse]);
 
     const categorizedIcons = useMemo(() => {
       if (!categorized || search.trim() !== "") {

@@ -212,6 +212,24 @@ function GroupedHarness() {
   );
 }
 
+describe("DataTable filter", () => {
+  it("keeps the rows that hold what was typed, whatever its case, and no near ones", async () => {
+    const user = userEvent.setup();
+    render(<DataTable columns={columns} data={rows} enableFilterInput />);
+    const filter = screen.getByPlaceholderText("Filter...");
+
+    await user.type(filter, "ARL");
+    expect(screen.getByText("Charlie")).toBeInTheDocument();
+
+    // The letters of Charlie in order, and Charlie with two swapped: neither is Charlie.
+    for (const near of ["chrl", "Chralie"]) {
+      await user.clear(filter);
+      await user.type(filter, near);
+      expect(screen.queryByText("Charlie")).not.toBeInTheDocument();
+    }
+  });
+});
+
 describe("DataTable grouping", () => {
   it("groups on a hidden column, listing a fanned-out row under each of its groups", () => {
     render(<GroupedHarness />);
