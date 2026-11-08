@@ -7,6 +7,8 @@ import { describe, expect, it } from "vitest";
 
 import { renderPage } from "@/__tests__/helpers/render";
 import { Editor } from "@/components/editor/editor";
+// Smart chips are Initiative's, so a document holding one opens in its editor.
+import { Editor as InitiativeEditor } from "@/components/editor/initiative/editor";
 
 const THEME_CSS = fs.readFileSync(path.resolve(__dirname, "../themes/editor-theme.css"), "utf-8");
 
@@ -89,7 +91,7 @@ describe("the editor's right-click menu", () => {
 
   it("deletes the chip it was opened on", async () => {
     renderPage(() => (
-      <Editor editorSerializedState={CHIP_STATE as unknown as SerializedEditorState} />
+      <InitiativeEditor editorSerializedState={CHIP_STATE as unknown as SerializedEditorState} />
     ));
 
     const chip = await waitFor(() => {
