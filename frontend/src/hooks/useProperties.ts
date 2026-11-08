@@ -119,6 +119,8 @@ export const useOwnedDefinitions = (options: {
     data,
     isLoading: properties.isLoading || (owned && metadata.isLoading),
     isError: properties.isError || (owned && metadata.isError),
+    /** Whether `data` is a previous place's, shown while this one's is read. */
+    isPlaceholderData: properties.isPlaceholderData || (owned && metadata.isPlaceholderData),
     refetch: () => Promise.all([properties.refetch(), metadata.refetch()]),
   };
 };
