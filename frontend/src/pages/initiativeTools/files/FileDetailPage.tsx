@@ -1,6 +1,6 @@
 import { useParams } from "@tanstack/react-router";
 import type { SerializedEditorState } from "lexical";
-import { ListTree, Loader2, Maximize2, Minimize2, PanelRight, Save } from "lucide-react";
+import { ListTree, Loader2, Maximize2, Minimize2, Save, Sparkles } from "lucide-react";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -575,19 +575,6 @@ export const FileDetailPage = () => {
             <ToolChestSegment label={t("collections.heading")}>
               <FileCollections file={file} />
             </ToolChestSegment>
-            {showSummaryTab ? (
-              <ToolChestSegment>
-                <Button
-                  variant={sidePanel.isOpen ? "secondary" : "outline"}
-                  size="sm"
-                  onClick={sidePanel.toggle}
-                  title={sidePanel.isOpen ? t("detail.closePanel") : t("detail.openPanel")}
-                >
-                  <PanelRight className="h-4 w-4" />
-                  <span className="sr-only">{t("detail.togglePanel")}</span>
-                </Button>
-              </ToolChestSegment>
-            ) : null}
           </ToolChest>
         }
         title={
@@ -650,7 +637,7 @@ export const FileDetailPage = () => {
                 {/* Collaboration status - shown between featured image and editor.
                   Also shown when offline even in non-collaborative mode, so the
                   user sees an explicit offline indicator at the top of the editor. */}
-                {/* Wraps rather than overflows: the row carries up to four
+                {/* Wraps rather than overflows: the row carries up to five
                   controls and none of them shrink. */}
                 <div className="flex flex-wrap items-center gap-2">
                   {prose && (
@@ -664,6 +651,17 @@ export const FileDetailPage = () => {
                     >
                       <ListTree className="h-4 w-4" />
                       {t("editor:outline.title")}
+                    </Button>
+                  )}
+                  {showSummaryTab && (
+                    <Button
+                      type="button"
+                      variant={sidePanel.isOpen ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={sidePanel.toggle}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      {t("editor:summary.title")}
                     </Button>
                   )}
                   {(joinsRoom || !isOnline) && (
