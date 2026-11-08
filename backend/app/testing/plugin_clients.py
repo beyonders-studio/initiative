@@ -12,8 +12,9 @@ from __future__ import annotations
 import json
 import secrets
 import time
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any
 
 import jwt
 from cryptography.hazmat.primitives.asymmetric import ed25519, rsa
@@ -24,17 +25,16 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.plugin_access_token import seal_install_token
 from app.core.plugin_scopes import ALL_SCOPES
-
 from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.file import File
 from app.models.tenant.guild_plugin import GuildPlugin
+from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.testing.factories import (
-    create_plugin_service_registration,
     create_guild_plugin,
     create_initiative,
+    create_plugin_service_registration,
 )
 from app.testing.routing import route_as
 from app.testing.schema_harness import route_session_to_guild
@@ -46,8 +46,8 @@ __all__ = [
     "InstalledPlugin",
     "assert_names_nobody",
     "client_jwks",
-    "install_plugin",
     "install_headers",
+    "install_plugin",
     "lift_person_and_guild_ids",
     "mint_client_assertion",
     "share_with_members",
@@ -75,13 +75,13 @@ def mint_client_assertion(
     audience: str,
     key: str = "plugin",
     client_id: str = CLIENT,
-    kid: Optional[str] = None,
-    algorithm: Optional[str] = None,
-    issued_at: Optional[float] = None,
+    kid: str | None = None,
+    algorithm: str | None = None,
+    issued_at: float | None = None,
     lifetime: int = 60,
-    jti: Optional[str] = None,
-    subject: Optional[str] = None,
-    extra: Optional[dict[str, Any]] = None,
+    jti: str | None = None,
+    subject: str | None = None,
+    extra: dict[str, Any] | None = None,
 ) -> str:
     """A client assertion signed by the plug-in's key (EdDSA).
 
@@ -141,8 +141,8 @@ async def install_plugin(
     listing_uid: str = LISTING,
     register: bool = True,
     enabled: bool = True,
-    requested: Optional[Sequence[str]] = None,
-    declares: Optional[Mapping[str, Any]] = None,
+    requested: Sequence[str] | None = None,
+    declares: Mapping[str, Any] | None = None,
 ) -> InstalledPlugin:
     """An install of ``client_id``'s listing, placed in one of two
     initiatives and granted ``granted`` by the community's seat, with the
@@ -217,8 +217,8 @@ def install_headers(
     installed: InstalledPlugin,
     scopes: Sequence[str],
     *,
-    initiative_id: Optional[int] = None,
-    install_id: Optional[int] = None,
+    initiative_id: int | None = None,
+    install_id: int | None = None,
     client_id: str = CLIENT,
 ) -> dict[str, str]:
     """The ``Authorization`` header of an installation token for ``installed``,

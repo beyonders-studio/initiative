@@ -6,7 +6,6 @@ import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import httpx
 from fastapi import APIRouter
@@ -41,7 +40,7 @@ _SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
 
 @dataclass
 class _LatestVersion:
-    version: Optional[str] = None
+    version: str | None = None
     expires_at: float = 0.0
     #: Whether the last fetch failed, so an outage is logged once rather than
     #: on every retry.
@@ -52,7 +51,7 @@ _latest = _LatestVersion()
 _latest_lock = asyncio.Lock()
 
 
-async def _fetch_latest_version() -> Optional[str]:
+async def _fetch_latest_version() -> str | None:
     """The highest version among the project's published releases.
 
     The highest, not GitHub's "latest": a fix released on an older line is
@@ -80,7 +79,7 @@ async def _fetch_latest_version() -> Optional[str]:
 
 
 @router.get("/version/latest")
-async def get_latest_release_version() -> dict[str, Optional[str]]:
+async def get_latest_release_version() -> dict[str, str | None]:
     """
     The latest released version (e.g. "0.3.1"), read from the project's
     GitHub releases. When GitHub cannot be reached this is the last version it
@@ -113,7 +112,7 @@ async def get_latest_release_version() -> dict[str, Optional[str]]:
 
 
 @router.get("/changelog")
-def get_changelog(version: Optional[str] = None, limit: int = 1) -> ChangelogResponse:
+def get_changelog(version: str | None = None, limit: int = 1) -> ChangelogResponse:
     """
     Get changelog entries.
 

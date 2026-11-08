@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -17,7 +17,6 @@ from alembic.operations import Operations
 from pycrdt import Doc, Map, Text
 from sqlalchemy import text
 
-from app.testing.later_revisions import step_later_revisions
 from app.services import editor_engine
 from app.testing import (
     create_file,
@@ -27,6 +26,7 @@ from app.testing import (
     create_tag,
     create_user,
 )
+from app.testing.later_revisions import step_later_revisions
 
 _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 
@@ -149,7 +149,7 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     # A gallery as 0.68 stored one, archived: two pictures, the first replaced
     # once and captioned, a restricted grant, a comment, tags on it and on a
     # picture, and links.
-    archived = datetime(2026, 1, 3, tzinfo=timezone.utc)
+    archived = datetime(2026, 1, 3, tzinfo=UTC)
     connection = await session.connection()
     await connection.execute(text("SET LOCAL session_replication_role = replica"))
     # Galleries on and Files off, and a role that reaches galleries alone.
@@ -187,8 +187,8 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     )
     pictures = []
     for title, caption, at in (
-        ("Sunset", " Golden hour ", datetime(2026, 2, 1, tzinfo=timezone.utc)),
-        (None, " ", datetime(2026, 3, 1, tzinfo=timezone.utc)),
+        ("Sunset", " Golden hour ", datetime(2026, 2, 1, tzinfo=UTC)),
+        (None, " ", datetime(2026, 3, 1, tzinfo=UTC)),
     ):
         pictures.append(
             await _one(
@@ -361,8 +361,8 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
         [
             # Added when the picture was uploaded, as the gallery's timeline
             # dated it.
-            (sunset_file, owner.id, datetime(2026, 2, 1, tzinfo=timezone.utc)),
-            (dunes_file, owner.id, datetime(2026, 3, 1, tzinfo=timezone.utc)),
+            (sunset_file, owner.id, datetime(2026, 2, 1, tzinfo=UTC)),
+            (dunes_file, owner.id, datetime(2026, 3, 1, tzinfo=UTC)),
         ]
     )
     # Each picture takes every grant its gallery gave, and the gallery none.

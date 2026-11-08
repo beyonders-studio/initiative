@@ -18,7 +18,6 @@ from app.core.audit_events import AuditEventType
 from app.models.platform.guild import CommunityRole
 from app.testing import emitted
 
-
 _WEBHOOK_HOST = "hooks.example.com"
 _TARGET_URL = f"https://{_WEBHOOK_HOST}/in/secret-path"
 # A public unicast IPv4 (example.com) with a real stream socket type/proto, so

@@ -29,9 +29,9 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
 from app.db.public_rls import role_name
+from app.db.request_context import Billing
 from app.db.session import set_rls_context
 from app.testing import create_guild, create_guild_membership
-from app.db.request_context import Billing
 
 
 async def _denied(billing_session, sql: str) -> None:

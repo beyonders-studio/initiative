@@ -10,11 +10,10 @@ sweep that takes each due row in turn.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-import logging
-from typing import Generic, TypeVar
 
 from sqlalchemy import ColumnElement, and_
 from sqlmodel import col, select
@@ -28,14 +27,11 @@ from app.models.platform.user import User, UserStatus
 from app.services.platform import rules
 from app.services.platform.rules import Values
 
-
 logger = logging.getLogger(__name__)
-
-RowT = TypeVar("RowT", User, Guild)
 
 
 @dataclass(frozen=True)
-class RetentionWindow(Generic[RowT]):
+class RetentionWindow[RowT: (User, Guild)]:
     """One window: rows of ``model`` in ``status``, kept for the number of days
     the deployment's rule ``setting`` holds."""
 

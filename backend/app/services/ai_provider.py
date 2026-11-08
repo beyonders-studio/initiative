@@ -17,7 +17,7 @@ from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, TypeVar
+from typing import Any
 
 import anthropic
 import httpx
@@ -443,10 +443,7 @@ async def complete_text(
     return (await _send(target, job, prompt, guild_id)).strip()
 
 
-Answer = TypeVar("Answer", bound=BaseModel)
-
-
-async def complete_json(
+async def complete_json[Answer: BaseModel](
     target: Target,
     job: Job,
     prompt: tuple[str, str],
@@ -472,17 +469,19 @@ async def _anthropic_stream(
     target: Target, job: Job, prompt: tuple[str, str], used: list[int]
 ) -> AsyncIterator[str]:
     system, user = prompt
-    async with _anthropic_client(target, job.timeout) as client:
-        async with client.messages.stream(
+    async with (
+        _anthropic_client(target, job.timeout) as client,
+        client.messages.stream(
             model=target.model or "",
             max_tokens=job.max_tokens,
             system=system,
             messages=[{"role": "user", "content": user}],
-        ) as stream:
-            # Only the text: a model that thinks first streams that apart.
-            async for text in stream.text_stream:
-                yield text
-            usage = (await stream.get_final_message()).usage
+        ) as stream,
+    ):
+        # Only the text: a model that thinks first streams that apart.
+        async for text in stream.text_stream:
+            yield text
+        usage = (await stream.get_final_message()).usage
     used[:] = [
         usage.input_tokens,
         usage.output_tokens,

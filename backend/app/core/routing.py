@@ -7,7 +7,8 @@ so a request is resolved once however many layers ask.
 
 from __future__ import annotations
 
-from typing import Any, MutableMapping
+from collections.abc import MutableMapping
+from typing import Any
 
 from starlette.routing import Match
 

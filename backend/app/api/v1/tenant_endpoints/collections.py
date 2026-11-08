@@ -11,8 +11,8 @@ A collection's metadata is defined at ``/property-definitions`` with
 whoever may change the collection.
 """
 
-from datetime import datetime, timezone
-from typing import Annotated, List, Optional
+from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import selectinload
@@ -36,7 +36,6 @@ from app.db.frozen import row_is_frozen
 from app.models.tenant.collection import Collection
 from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative
-from app.schemas.tenant.share_request import HiddenFiles
 from app.schemas.tenant.collection import (
     MAX_FILES_PER_CHANGE,
     CollectionCan,
@@ -49,6 +48,7 @@ from app.schemas.tenant.collection import (
     serialize_collection,
 )
 from app.schemas.tenant.property import PropertySummary, PropertyValuesSetRequest
+from app.schemas.tenant.share_request import HiddenFiles
 from app.services.permissions import Action
 from app.services.tenant import archive as archive_service
 from app.services.tenant import collections as collections_service
@@ -56,8 +56,8 @@ from app.services.tenant import metadata as metadata_service
 from app.services.tenant import required_fields
 from app.services.tenant import share_requests as share_requests_service
 from app.services.tenant import tags as tags_service
-from app.services.tenant.soft_delete import trash
 from app.services.tenant.initiative_tools import tool_on_sql
+from app.services.tenant.soft_delete import trash
 
 router = APIRouter(route_class=ActorRoute)
 
@@ -69,7 +69,7 @@ _TAGS = tags_service.TAG_LINKS["collection"]
 
 
 async def _require_readable(
-    session: AsyncSession, initiative_id: int, file_ids: List[int]
+    session: AsyncSession, initiative_id: int, file_ids: list[int]
 ) -> None:
     """A 422 unless every file is a live one of the initiative the reader can
     open."""
@@ -84,8 +84,8 @@ async def _require_readable(
 
 
 async def _serialize(
-    session: AsyncSession, rows: List[Collection], context: ActorContext
-) -> List[CollectionRead]:
+    session: AsyncSession, rows: list[Collection], context: ActorContext
+) -> list[CollectionRead]:
     cards = await collections_service.annotate(session, rows)
     # A plug-in knows of nothing it can't read, so it is asked nothing.
     hidden = (
@@ -100,7 +100,7 @@ async def _serialize(
     # above it, the initiative.
     editable: dict[tuple[int, bool], bool] = {}
     restorable: dict[int, bool] = {}
-    reads: List[CollectionRead] = []
+    reads: list[CollectionRead] = []
     for row in rows:
         key = (row.initiative_id, row_is_frozen(row))
         if key not in editable:
@@ -141,11 +141,11 @@ async def _read(
     return read
 
 
-@router.get("/shapes", response_model=List[CollectionShapeGroup])
+@router.get("/shapes", response_model=list[CollectionShapeGroup])
 async def list_collection_shapes(
     current_user: ActorUserDep,
     guild_context: FilesRead,
-) -> List[CollectionShapeGroup]:
+) -> list[CollectionShapeGroup]:
     """The ready-made shapes a new collection can start as, grouped, in the
     reader's language: the lists each shows and opens on, and its metadata."""
     return collections_service.shapes(getattr(current_user, "locale", None) or "en")
@@ -157,7 +157,7 @@ async def list_collections(
     current_user: ActorUserDep,
     guild_context: FilesRead,
     initiative_id: int = Query(),
-    archived: Optional[bool] = Query(
+    archived: bool | None = Query(
         default=None, description=archive_service.ARCHIVED_QUERY_DESCRIPTION
     ),
 ) -> CollectionListResponse:
@@ -288,7 +288,7 @@ async def update_collection(
             tag_ids=payload.tag_ids,
         )
     await metadata_service.write_on_update(session, collection, payload.properties)
-    collection.updated_at = datetime.now(timezone.utc)
+    collection.updated_at = datetime.now(UTC)
     session.add(collection)
     await session.commit()
     return await _read(session, collection_id, guild_context)
@@ -350,14 +350,14 @@ async def add_collection_files(
 
 
 @router.get(
-    "/{collection_id}/files/{file_id}/metadata", response_model=List[PropertySummary]
+    "/{collection_id}/files/{file_id}/metadata", response_model=list[PropertySummary]
 )
 async def get_collection_file_metadata(
     collection_id: int,
     file_id: int,
     session: ActorSessionDep,
     guild_context: FilesRead,
-) -> List[PropertySummary]:
+) -> list[PropertySummary]:
     """One file's values of the collection's metadata, for a file in the
     collection the reader can open."""
     collection = await resource_access.load_child(session, Collection, collection_id)
@@ -370,7 +370,7 @@ async def get_collection_file_metadata(
 
 
 @router.put(
-    "/{collection_id}/files/{file_id}/metadata", response_model=List[PropertySummary]
+    "/{collection_id}/files/{file_id}/metadata", response_model=list[PropertySummary]
 )
 async def set_collection_file_metadata(
     collection_id: int,
@@ -379,7 +379,7 @@ async def set_collection_file_metadata(
     session: ActorSessionDep,
     current_user: ActorUserDep,
     guild_context: FilesWrite,
-) -> List[PropertySummary]:
+) -> list[PropertySummary]:
     """Replace one file's values of the collection's metadata, or with
     ``merge`` write only the ones named, as ``PUT /properties`` does for a
     property. The file is one in the collection the reader can open, and the
@@ -428,7 +428,7 @@ async def remove_collection_files(
     current_user: ActorUserDep,
     guild_context: FilesWrite,
     file_ids: Annotated[
-        List[int], Query(min_length=1, max_length=MAX_FILES_PER_CHANGE)
+        list[int], Query(min_length=1, max_length=MAX_FILES_PER_CHANGE)
     ],
 ) -> None:
     """Take files out of a collection. The files stay where they are. A

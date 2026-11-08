@@ -25,7 +25,6 @@ from app.services.marketplace.installs import (
 from app.testing import create_guild, create_guild_plugin, create_user
 from app.testing.schema_harness import route_session_to_guild
 
-
 PLUGIN_UID = "TYG4VVZKAWRMBZ"
 DASH_UID = "J9H7S9T7GP7FAG"
 OTHER_DASH_UID = "P3R9WT5HZ2NM6D"

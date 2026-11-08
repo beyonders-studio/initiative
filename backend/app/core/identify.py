@@ -21,14 +21,14 @@ import jwt
 from starlette.datastructures import Headers
 from starlette.requests import HTTPConnection
 
+from app.core.messages import AuthMessages
 from app.core.plugin_access_token import (
     AccessTokenError,
-    PluginAccessToken,
     InstallAccessToken,
+    PluginAccessToken,
     is_access_token,
     unseal_access_token,
 )
-from app.core.messages import AuthMessages
 from app.core.security import (
     SESSION_COOKIE_NAME,
     UploadTokenClaims,

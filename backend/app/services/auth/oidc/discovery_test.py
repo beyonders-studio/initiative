@@ -17,7 +17,6 @@ from app.services.auth.oidc.discovery import (
     OidcDiscovery,
 )
 
-
 ISSUER = "https://idp.example.com"
 
 

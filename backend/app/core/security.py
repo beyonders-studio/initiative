@@ -1,7 +1,8 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from collections.abc import Iterable, Sequence
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
-from typing import Any, Iterable, Literal, Sequence
+from typing import Any, Literal
 
 import bcrypt
 import jwt
@@ -22,7 +23,6 @@ from pydantic import (
 )
 
 from app.core.config import settings
-
 
 # ──────────────────────────────────────────────────────────────────────────
 # Verifying keys for the services that call us
@@ -344,7 +344,7 @@ def mint_access_token(
     ``services.auth.assurance``). Absent when no provider contributed one, so a
     password session's token keeps the shape it always had.
     """
-    issued = now or datetime.now(timezone.utc)
+    issued = now or datetime.now(UTC)
     ttl = expires_in or timedelta(minutes=settings.AUTH_ACCESS_TTL_MINUTES)
     payload: dict[str, Any] = {
         "sub": subject,
@@ -462,7 +462,7 @@ def create_upload_token(
     ``not_after`` is the latest the token may stand, whatever ``expires_in``
     says: the expiry of the credential that asked for it.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires = now + expires_in
     if not_after is not None:
         expires = min(expires, not_after)
@@ -509,7 +509,7 @@ HANDLE_OFFER_LIFETIME = timedelta(days=1)
 
 def create_handle_offer(name: str, discriminator: int) -> str:
     """Sign the number shown beside ``name`` while somebody picks a handle."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "aud": HANDLE_OFFER_AUDIENCE,
         "name": name.lower(),
@@ -606,7 +606,7 @@ def create_billing_portal_handoff_token(
     Connect Core §8.1); no row id of ours is a parameter here, so none can
     reach the claims.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "jti": str(uuid.uuid4()),
         "sub": user_ref,
@@ -703,7 +703,7 @@ def create_billing_control_handoff_token(
 def _billing_staff_handoff(
     audience: str, user_ref: str, expires_in: timedelta
 ) -> tuple[str, int]:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "jti": str(uuid.uuid4()),
         "sub": user_ref,
@@ -840,7 +840,7 @@ def create_billing_support_handoff_token(
             " HANDOFF_SIGNING_PRIVATE_KEY_PEM"
         )
     lifetime = min(expires_in, BILLING_SUPPORT_HANDOFF_MAX_LIFETIME)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "jti": str(uuid.uuid4()),
         "sub": user_ref,

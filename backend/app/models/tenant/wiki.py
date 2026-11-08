@@ -1,7 +1,6 @@
-from datetime import datetime, timezone
-from typing import ClassVar, List, Optional, TYPE_CHECKING
-
+from datetime import UTC, datetime
 from enum import Enum
+from typing import TYPE_CHECKING, ClassVar, Optional
 
 from sqlalchemy import (
     Boolean,
@@ -93,9 +92,9 @@ class Wiki(
     # A tool row is written before anything has been shared, so it is read
     # back by no RETURNING clause: the id comes from the sequence first and
     # the INSERT stands alone. See app/db/initiative_rls.py.
-    __table_args__ = {"implicit_returning": False}
+    __table_args__: ClassVar[dict[str, bool]] = {"implicit_returning": False}
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     initiative_id: int = Field(
         sa_column=Column(
             Integer,
@@ -105,10 +104,8 @@ class Wiki(
         ),
     )
     name: str = Field(nullable=False, max_length=255)
-    description: Optional[str] = Field(
-        default=None, sa_column=Column(Text, nullable=True)
-    )
-    home_page_id: Optional[int] = Field(
+    description: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    home_page_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -168,14 +165,14 @@ class Wiki(
     )
     #: The wiki's own accent, used for its chrome so two wikis open side by side
     #: are told apart at a glance. NULL takes the app's.
-    accent_color: Optional[str] = Field(
+    accent_color: str | None = Field(
         default=None, sa_column=Column(String(length=32), nullable=True)
     )
     #: A page whose body seeds every new page. Nullable, and declared
     #: ``use_alter`` for the same reason ``home_page_id`` is — the two tables
     #: point at each other. ``SET NULL`` so deleting the template leaves the
     #: wiki without one rather than without a wiki.
-    template_page_id: Optional[int] = Field(
+    template_page_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -189,16 +186,16 @@ class Wiki(
         ),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
     initiative: Optional["Initiative"] = Relationship()
-    grants: List["ResourceGrant"] = Relationship(
+    grants: list["ResourceGrant"] = Relationship(
         sa_relationship_kwargs={
             "primaryjoin": (
                 "and_(foreign(ResourceGrant.resource_id) == Wiki.id, "
@@ -210,7 +207,7 @@ class Wiki(
     # The pages. Ordered by the tree's own spine here — siblings by position,
     # then by id so a tie is still a stable order — because that is the order
     # the navigation renders in and every other surface is a filter over it.
-    pages: List["WikiPage"] = Relationship(
+    pages: list["WikiPage"] = Relationship(
         back_populates="wiki",
         sa_relationship_kwargs={
             "cascade": "all, delete-orphan",
@@ -269,7 +266,7 @@ class WikiPage(
     # What labels a page in a bare list of mixed things (the trash can).
     _display_field: ClassVar[str] = "title"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     wiki_id: int = Field(
         sa_column=Column(
             Integer,
@@ -281,7 +278,7 @@ class WikiPage(
     #: What this page is filed under, or nothing if it sits at the top of the
     #: wiki. ``CASCADE`` so a purge takes the branch with it; a soft-delete
     #: walks the same edge through ``CASCADE_CHILDREN``.
-    parent_page_id: Optional[int] = Field(
+    parent_page_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -309,24 +306,24 @@ class WikiPage(
         default_factory=dict,
         sa_column=Column(JSONB, nullable=False, server_default=text("'{}'::jsonb")),
     )
-    yjs_state: Optional[bytes] = Field(
+    yjs_state: bytes | None = Field(
         default=None,
         sa_column=Column(LargeBinary, nullable=True),
     )
-    yjs_updated_at: Optional[datetime] = Field(
+    yjs_updated_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
-    wiki: Optional[Wiki] = Relationship(
+    wiki: Wiki | None = Relationship(
         back_populates="pages",
         sa_relationship_kwargs={"foreign_keys": "WikiPage.wiki_id"},
     )

@@ -9,16 +9,16 @@ over the ``Tool`` enum rather than written per tool. What belongs to one tool
 the end.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.api.v1.tenant_endpoints.tool_lists import TOOL_LISTS
 from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.testing import (
-    strip_non_owner_grants,
     Actor,
     create_calendar,
     create_guild,
@@ -30,8 +30,8 @@ from app.testing import (
     create_tool_entity,
     create_user,
     get_auth_headers,
+    strip_non_owner_grants,
 )
-from app.api.v1.tenant_endpoints.tool_lists import TOOL_LISTS
 
 per_tool = pytest.mark.parametrize("tool", list(Tool), ids=lambda t: t.value)
 
@@ -113,7 +113,7 @@ async def test_each_list_is_its_tools_live_view_in_every_guild(
             actor.initiative,
             a.user,
             name="Archived",
-            archived_at=datetime.now(timezone.utc),
+            archived_at=datetime.now(UTC),
         )
         if "templates" in TOOL_LISTS[tool].views:
             await create_tool_entity(

@@ -11,19 +11,20 @@ every caller has already been refused by the database before it asks.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
-from sqlalchemy import ColumnElement, Select, null as sa_null
+from sqlalchemy import ColumnElement, Select
+from sqlalchemy import null as sa_null
 from sqlmodel import select
 
 from app.core.tools import Tool
 from app.db import cohorts
 from app.db.base import MODELS_BY_TABLE
-from app.db.session import set_rls_context
 from app.db.request_context import SystemGuild
+from app.db.session import set_rls_context
 
 
-def _comment_initiative() -> ColumnElement[Optional[int]]:
+def _comment_initiative() -> ColumnElement[int | None]:
     """A comment's initiative, through whichever parent it names.
 
     A comment hangs off exactly one of them, so the parents are tried in the
@@ -63,7 +64,7 @@ def _comment_initiative() -> ColumnElement[Optional[int]]:
     return sa_func.coalesce(*lookups)
 
 
-def _initiative_query(model: Any, row_id: int) -> Select[tuple[int, Optional[int]]]:
+def _initiative_query(model: Any, row_id: int) -> Select[tuple[int, int | None]]:
     """A select yielding ``row_id`` and its initiative, or no row at all.
 
     The id rides along so the two cases stay apart: a row that exists and

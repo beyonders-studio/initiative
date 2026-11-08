@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import text
@@ -10,8 +10,10 @@ from sqlmodel import select
 
 from app.api.v1.platform_endpoints.tickets_feedback_test import cloud  # noqa: F401
 from app.core.intake import IntakeStream, offered_streams
+from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.app_setting import AppSetting
+from app.models.platform.guild import CommunityRole, Guild
 from app.models.platform.user import User
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
@@ -26,8 +28,6 @@ from app.testing import (
     get_auth_headers,
     route_session_to_guild,
 )
-from app.models.platform.guild import Guild, CommunityRole
-from app.db.request_context import SystemGuild, Unattributed
 
 
 @pytest.fixture
@@ -583,7 +583,7 @@ async def test_a_stream_cannot_be_bound_to_an_archived_project(client, session, 
         await session.exec(select(User).where(User.id == owner["guild_owner_id"]))
     ).one()
     shelved = await create_project(
-        session, initiative, guild_owner, archived_at=datetime.now(timezone.utc)
+        session, initiative, guild_owner, archived_at=datetime.now(UTC)
     )
     shelved_id = shelved.id
     await set_rls_context(session, Unattributed())
@@ -618,7 +618,7 @@ async def test_a_binding_says_when_its_project_has_been_archived(
     project = (
         await session.exec(select(Project).where(Project.id == project_id))
     ).one()
-    project.archived_at = datetime.now(timezone.utc)
+    project.archived_at = datetime.now(UTC)
     session.add(project)
     await session.commit()
     await set_rls_context(session, Unattributed())

@@ -28,7 +28,8 @@ dragged into place, a calendar's is by name), so a request that asks for none
 of these is left exactly as it was.
 """
 
-from typing import Any, Callable, Optional, Sequence
+from collections.abc import Callable, Sequence
+from typing import Any
 
 from sqlalchemy import ColumnElement, func, or_
 from sqlmodel import select
@@ -47,12 +48,12 @@ from app.services.tenant.initiative_tools import tool_on_sql
 def apply_tool_order(
     statement,
     model,
-    sort_by: Optional[str],
-    sort_dir: Optional[str],
+    sort_by: str | None,
+    sort_dir: str | None,
     *,
     default,
     initiative_joined: bool = False,
-    extra_fields: Optional[dict[str, Any]] = None,
+    extra_fields: dict[str, Any] | None = None,
 ):
     """Order a tool list by ``name``, ``initiative`` or ``updated_at``, else by
     ``default``.
@@ -118,9 +119,9 @@ def base_conditions(
     user_id: int | None,
     *,
     context: ActorContext,
-    initiative_id: Optional[int] = None,
-    search: Optional[str] = None,
-    tag_ids: Optional[Sequence[int]] = None,
+    initiative_id: int | None = None,
+    search: str | None = None,
+    tag_ids: Sequence[int] | None = None,
     guild_level_rows: bool = False,
 ) -> list:
     """The WHERE legs every tool list and every tool count share.
@@ -168,13 +169,13 @@ async def list_tool_rows(
     *,
     conditions: Sequence[Any],
     loader_options: Sequence[Any],
-    sort_by: Optional[str],
-    sort_dir: Optional[str],
+    sort_by: str | None,
+    sort_dir: str | None,
     default_order: Sequence[Any],
     page: int,
     page_size: int,
-    extra_sort_fields: Optional[dict[str, Any]] = None,
-    refine: Optional[Callable[[Any], Any]] = None,
+    extra_sort_fields: dict[str, Any] | None = None,
+    refine: Callable[[Any], Any] | None = None,
     clamp: bool = False,
 ) -> tuple[list, int, int]:
     """One page of a tool, with the total the pager underneath it reads.

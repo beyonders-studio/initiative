@@ -20,13 +20,13 @@ the task's layout written by the kind of value it holds
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, Optional
+from typing import Any
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-
 from app.core.identity_boundary import STORED_MENTION
+from app.core.user_display import display_name
 from app.models.platform.user import User
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.task import TaskStatusCategory
@@ -36,19 +36,18 @@ from app.schemas.tenant.tool_layout import (
     PROPERTY_FIELD_PREFIX,
     TaskFieldId,
 )
+from app.services.export import limits as export_limits
+from app.services.export import values
 from app.services.export.adapters._common import (
     grouped_for_export,
     grouped_row_count,
     require_may_leave,
 )
-from app.services.export import values
-from app.services.marketplace.widget_meta import in_language
 from app.services.export.contract import RenderItem, RenderRequest
 from app.services.export.i18n import et, export_locale
 from app.services.export.markdown import blocks_from_markdown
 from app.services.import_engine.mentions import mention_namer
-from app.core.user_display import display_name
-from app.services.export import limits as export_limits
+from app.services.marketplace.widget_meta import in_language
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import task_queries
 
@@ -63,9 +62,7 @@ from app.services.tenant import task_queries
 #: as the registry names it, which heads the column, and what fills its cell.
 #: ``None`` for one an export leaves out. Every ``TaskFieldId`` has an entry
 #: (``tasks_table_test``), so a new layout field cannot quietly miss exports.
-TASK_EXPORT_FIELDS: dict[
-    str, Optional[tuple[str, Callable[[TaskListRead, str], Any]]]
-] = {
+TASK_EXPORT_FIELDS: dict[str, tuple[str, Callable[[TaskListRead, str], Any]] | None] = {
     TaskFieldId.title: ("title", lambda t, loc: t.title),
     TaskFieldId.type: ("task_type_id", lambda t, loc: t.task_type.name),
     # The excerpt the list shows; its mentions are named where it is written.
@@ -337,10 +334,10 @@ class TasksTableAdapter:
 
 async def task_columns(
     session: AsyncSession,
-    names: Optional[list[str]],
+    names: list[str] | None,
     tasks: list[TaskListRead],
     locale: str,
-    tz: Optional[str],
+    tz: str | None,
 ) -> list[values.Column]:
     """The columns a table of ``tasks`` shows: the layout fields ``names``
     (the shipped few where none), the title first, the project after it where
@@ -393,15 +390,15 @@ async def task_columns(
             field, read = entry
             title = values.label(field, locale)
             if name == TaskFieldId.description:
-                cell = lambda t, read=read: STORED_MENTION.sub(  # noqa: E731
+                cell = lambda t, read=read: STORED_MENTION.sub(
                     lambda m: f"@{m.group(1)}", named(read(t, locale) or "")
                 )
             else:
-                cell = lambda t, read=read: read(t, locale)  # noqa: E731
+                cell = lambda t, read=read: read(t, locale)
         elif property_ids.get(name) in definitions:
             pid = property_ids[name]
             title = definitions[pid].name
-            cell = lambda t, pid=pid: values.property_value(  # noqa: E731
+            cell = lambda t, pid=pid: values.property_value(
                 next((p for p in t.properties if p.property_id == pid), None),
                 locale,
                 tz,
@@ -426,20 +423,19 @@ async def task_columns(
                 if isinstance(given, dict)
                 else given or key
             )
-            cell = lambda t, install=install, key=key, kind=decl.get("kind"): (  # noqa: E731
-                values.plugin_value(
-                    next(
-                        (
-                            v.value
-                            for v in t.properties
-                            if v.install_id == install and v.key == key
-                        ),
-                        None,
+            kind = decl.get("kind")
+            cell = lambda t, install=install, key=key, kind=kind: values.plugin_value(
+                next(
+                    (
+                        v.value
+                        for v in t.properties
+                        if v.install_id == install and v.key == key
                     ),
-                    str(kind or "text"),
-                    locale,
-                    tz,
-                )
+                    None,
+                ),
+                str(kind or "text"),
+                locale,
+                tz,
             )
         else:
             continue

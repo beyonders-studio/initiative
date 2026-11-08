@@ -11,37 +11,37 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException
-from starlette.datastructures import Headers
 from sqlalchemy import insert, update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
+from starlette.datastructures import Headers
 
 from app.core import billing_capabilities
+from app.core.audit_events import AuditEventType
 from app.core.config import settings
 from app.core.errors import CodedError
 from app.core.identify import bearer_token
 from app.core.messages import BillingMessages
 from app.core.rules import SYNCED_RULES, SetBy
 from app.core.security import PublicKeyBundleError, load_verification_keys
+from app.db import cohorts
+from app.db.request_context import SystemGuild
+from app.db.session import set_rls_context
 from app.models.platform.billing import (
     BILLING_SOURCE,
     BillingEventLog,
     BillingJti,
     BillingOp,
 )
-from app.models.platform.guild import Guild, CommunityStatus
+from app.models.platform.guild import CommunityStatus, Guild
 from app.models.platform.guild_administration import GuildAdministration
 from app.models.platform.rule import CommunityRule
 from app.schemas.platform.billing import CommunityFields
-from app.core.audit_events import AuditEventType
-from app.db import cohorts
-from app.db.request_context import SystemGuild
-from app.db.session import set_rls_context
 from app.services import audit as audit_service
 from app.services.marketplace import community_hooks
 from app.services.platform import billing_envelope as envelope
@@ -151,7 +151,7 @@ async def burn_jti(claims: BillingClaims) -> None:
         session.add(
             BillingJti(
                 jti=claims.jti,
-                redeemed_at=datetime.now(timezone.utc),
+                redeemed_at=datetime.now(UTC),
                 expires_at=claims.expires_at,
             )
         )
@@ -219,7 +219,7 @@ async def _claim_event(
         op=op.value,
         source=BILLING_SOURCE,
         actor=None,
-        applied_at=datetime.now(timezone.utc),
+        applied_at=datetime.now(UTC),
     )
     try:
         async with session.begin_nested():
@@ -297,7 +297,7 @@ async def apply_community_sync(
     await _refuse_what_is_not_offered(system, guild_id, synced)
     await _apply_custom_roles(guild_id, fields)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     administration_values: dict[str, Any] = {
         "tier_name": fields.tier_name,
         "billing_status": fields.status.value,

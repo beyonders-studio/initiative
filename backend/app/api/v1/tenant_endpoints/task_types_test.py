@@ -255,7 +255,7 @@ async def test_reorder_puts_the_types_in_the_order_given(
     )
     types = await _types(session, a.project)
     await session.commit()
-    task, bug, idea, milestone = types
+    task, _bug, _idea, milestone = types
 
     response = await client.post(
         a.g(f"/projects/{a.project.id}/task-types/reorder"),
@@ -283,7 +283,7 @@ async def test_delete_moves_every_task_of_the_type_and_takes_its_page(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    task_type, bug, idea, _ = await _types(session, a.project)
+    _task_type, bug, idea, _ = await _types(session, a.project)
     live = await create_task(session, a.project, task_type_id=bug.id)
     trashed = await create_task(session, a.project, task_type_id=bug.id)
     await soft_delete_entity(

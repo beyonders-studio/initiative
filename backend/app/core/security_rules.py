@@ -14,10 +14,11 @@ settings.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
-from typing import Any, Callable, Mapping, Optional
+from typing import Any
 
 from app.core.audit_events import AuditEventType
 
@@ -49,7 +50,7 @@ class Severity(str, Enum):
 Watched = AuditEventType | Signal
 
 
-def signal_envelope(signal: Signal, *, source_ip: Optional[str]) -> dict[str, Any]:
+def signal_envelope(signal: Signal, *, source_ip: str | None) -> dict[str, Any]:
     """What a rule sees of a signal: the shape of an audit line, carrying
     only where it came from."""
     return {
@@ -67,28 +68,28 @@ def signal_envelope(signal: Signal, *, source_ip: Optional[str]) -> dict[str, An
 # -- What a rule counts by ------------------------------------------------------
 
 
-def source_ip(envelope: Envelope) -> Optional[str]:
+def source_ip(envelope: Envelope) -> str | None:
     context = envelope.get("context") or {}
     return context.get("source_ip")
 
 
-def subject_user(envelope: Envelope) -> Optional[str]:
+def subject_user(envelope: Envelope) -> str | None:
     """The account it happened to: the target, else whoever acted."""
     user = envelope.get("target_user_id") or envelope.get("actor_user_id")
     return str(user) if user is not None else None
 
 
-def actor(envelope: Envelope) -> Optional[str]:
+def actor(envelope: Envelope) -> str | None:
     user = envelope.get("actor_user_id")
     return str(user) if user is not None else None
 
 
-def target(envelope: Envelope) -> Optional[str]:
+def target(envelope: Envelope) -> str | None:
     named = envelope.get("target") or {}
     return str(named["id"]) if named.get("id") is not None else None
 
 
-def actor_in_community(envelope: Envelope) -> Optional[str]:
+def actor_in_community(envelope: Envelope) -> str | None:
     """One person breaking glass on one community: the content grant and the
     settings grant it issues together are one occasion."""
     user = envelope.get("actor_user_id")
@@ -97,7 +98,7 @@ def actor_in_community(envelope: Envelope) -> Optional[str]:
     return f"{user}:{envelope.get('guild_id')}"
 
 
-def replay_source(envelope: Envelope) -> Optional[str]:
+def replay_source(envelope: Envelope) -> str | None:
     """Which channel was replayed into, and for which install or key."""
     detail = envelope.get("detail") or {}
     channel = detail.get("channel")
@@ -122,13 +123,13 @@ class SecurityRule:
     watches: frozenset[Watched]
     #: What one count is of: an address, an account, a key. ``None`` is not
     #: counted.
-    key: Callable[[Envelope], Optional[str]]
+    key: Callable[[Envelope], str | None]
     #: How many in one window open the case.
     threshold: int
     window: timedelta
     severity: Severity
     #: Narrows ``watches`` past the event's type.
-    when: Optional[Callable[[Envelope], bool]] = field(default=None)
+    when: Callable[[Envelope], bool] | None = field(default=None)
 
 
 _DAY = timedelta(hours=24)

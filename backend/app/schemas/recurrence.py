@@ -1,7 +1,7 @@
 """Repeat rules on the wire: RFC 5545 lines as picked (``app.core.recurrence``)."""
 
 from datetime import datetime
-from typing import Annotated, List, Literal, Optional
+from typing import Annotated, Literal
 
 from pydantic import AfterValidator, Field
 
@@ -57,11 +57,11 @@ class RecurrencePreviewRequest(SanitizedBaseModel):
     start: datetime
     #: The zone the rule's days were picked in; UTC without one, and for an
     #: all-day event, whose days are UTC dates.
-    tz: Optional[str] = Field(default=None, max_length=64)
+    tz: str | None = Field(default=None, max_length=64)
     kind: Literal["task", "event"]
     #: A stored rule's own shift, to preview it as it runs; without one, the
     #: shift is taken in ``tz``.
-    shift: Optional[int] = Field(default=None, ge=-1440, le=1440)
+    shift: int | None = Field(default=None, ge=-1440, le=1440)
     count: int = Field(default=5, ge=1, le=20)
 
 
@@ -71,4 +71,4 @@ class RecurrencePreview(SanitizedBaseModel):
     #: The shift stored beside it (``app.core.recurrence``).
     shift: int
     #: The next starts, from the series start.
-    occurrences: List[datetime]
+    occurrences: list[datetime]

@@ -1,7 +1,7 @@
 """What a member may know exists without opening it, held by the database:
 the rows of the initiatives they are a member of, and nothing beyond them."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import text
@@ -45,9 +45,7 @@ async def test_a_member_knows_what_is_in_their_initiative_and_no_more(
 ):
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     hidden = await create_file(session, a.initiative, a.user)
-    await create_file(
-        session, a.initiative, a.user, deleted_at=datetime.now(timezone.utc)
-    )
+    await create_file(session, a.initiative, a.user, deleted_at=datetime.now(UTC))
     project = await create_project(session, a.initiative, a.user)
     task = await create_task(session, project)
     elsewhere = await create_initiative(session, a.guild, a.user)

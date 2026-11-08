@@ -8,7 +8,7 @@ comes from its listing.
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -42,7 +42,7 @@ class PluginVendorFieldRead(SanitizedBaseModel):
     #: ``string``, ``secret`` or ``url``. A secret is write-only.
     type: str
     required: bool = False
-    label: Dict[str, str] = {}
+    label: dict[str, str] = {}
 
 
 class PluginServiceRegistrationRead(SanitizedBaseModel):
@@ -53,7 +53,7 @@ class PluginServiceRegistrationRead(SanitizedBaseModel):
     id: int
     public_id: str
     #: The catalog listing its plug-in facts come from. Null until it arrives.
-    listing_uid: Optional[str] = None
+    listing_uid: str | None = None
     #: ``container``, or ``declarative`` for a plug-in whose calls Initiative
     #: makes itself: it has no address, origins or keys.
     kind: str = "container"
@@ -64,19 +64,19 @@ class PluginServiceRegistrationRead(SanitizedBaseModel):
     publisher_enabled: bool
     #: Where this deployment's server calls the plug-in. Null until the operator
     #: gives its address.
-    base_url: Optional[str] = None
+    base_url: str | None = None
     #: Where a browser loads its surfaces. Null when that is ``base_url`` too.
-    page_origin: Optional[str] = None
-    allowed_origins: List[str] = []
+    page_origin: str | None = None
+    allowed_origins: list[str] = []
     #: Public keys this plug-in signs with. Shown in full — the
     #: public half is meant to be read, and an operator provisioning it needs
     #: to see which ``kid`` landed.
-    jwks: Optional[Dict[str, Any]] = None
+    jwks: dict[str, Any] | None = None
     #: Where the plug-in publishes its key set, on its own origin.
-    jwks_uri: Optional[str] = None
+    jwks_uri: str | None = None
     #: The most an install of this plug-in may be granted, from its listing.
     #: Empty means no scope may be granted.
-    scope_ceiling: List[str] = []
+    scope_ceiling: list[str] = []
     #: Installed into every guild and not removable by guild admins.
     mandatory: bool = False
     #: Offered to, installed in and live in the operations community alone.
@@ -88,25 +88,25 @@ class PluginServiceRegistrationRead(SanitizedBaseModel):
     #: ``operator`` otherwise.
     source: str = "operator"
     #: The container image its listing names, pinned by digest.
-    image_digest: Optional[str] = None
+    image_digest: str | None = None
     #: The Compose service its listing's publisher wrote, with the image and
     #: this deployment's public address filled in, for the operator to copy.
     #: YAML text, shown as text.
-    compose_service: Optional[RawTextStr] = None
+    compose_service: RawTextStr | None = None
     #: Where that service answers on the Compose network: the base URL to give
     #: it.
-    compose_base_url: Optional[str] = None
+    compose_base_url: str | None = None
     #: The values the listing's manifest asks the operator for, in order.
-    vendor_fields: List[PluginVendorFieldRead] = []
+    vendor_fields: list[PluginVendorFieldRead] = []
     #: The plain values of the non-secret vendor fields that hold one.
-    vendor_values: Dict[str, str] = {}
+    vendor_values: dict[str, str] = {}
     #: Every vendor field that holds a value, secret or not.
-    vendor_set: List[str] = []
+    vendor_set: list[str] = []
     #: Whether every required vendor value is set.
     vendor_ready: bool = True
     #: The flow at the vendor that can create its client and fill in the
     #: vendor values (``github_app_manifest``), when the listing declares one.
-    vendor_setup: Optional[str] = None
+    vendor_setup: str | None = None
     #: The two addresses to register with the vendor's client: where it
     #: returns a person with a code, and where its install page returns them.
     connection_callback_url: str
@@ -145,16 +145,16 @@ class PluginServiceRegistrationCreate(_DeploymentFacts):
 
     public_id: str = Field(max_length=120)
     base_url: str = Field(max_length=1000)
-    page_origin: Optional[str] = Field(default=None, max_length=1000)
-    allowed_origins: Optional[List[str]] = None
+    page_origin: str | None = Field(default=None, max_length=1000)
+    allowed_origins: list[str] | None = None
     #: JWKS holding the public half of the plug-in's signing keys.
-    jwks: Optional[Dict[str, Any]] = None
-    jwks_uri: Optional[str] = Field(default=None, max_length=1000)
+    jwks: dict[str, Any] | None = None
+    jwks_uri: str | None = Field(default=None, max_length=1000)
     mandatory: bool = False
     operations_only: bool = False
     enabled: bool = True
     #: Values for the vendor fields the listing's manifest declares, by key.
-    vendor_values: Optional[Dict[str, Optional[RawTextStr]]] = None
+    vendor_values: dict[str, RawTextStr | None] | None = None
 
 
 class PluginServiceRegistrationUpdate(_DeploymentFacts):
@@ -167,20 +167,20 @@ class PluginServiceRegistrationUpdate(_DeploymentFacts):
     by not sending it.
     """
 
-    base_url: Optional[str] = Field(default=None, max_length=1000)
-    page_origin: Optional[str] = Field(default=None, max_length=1000)
-    allowed_origins: Optional[List[str]] = None
+    base_url: str | None = Field(default=None, max_length=1000)
+    page_origin: str | None = Field(default=None, max_length=1000)
+    allowed_origins: list[str] | None = None
     #: Replace the key set. An empty object clears it.
-    jwks: Optional[Dict[str, Any]] = None
-    jwks_uri: Optional[str] = Field(default=None, max_length=1000)
-    mandatory: Optional[bool] = None
-    operations_only: Optional[bool] = None
+    jwks: dict[str, Any] | None = None
+    jwks_uri: str | None = Field(default=None, max_length=1000)
+    mandatory: bool | None = None
+    operations_only: bool | None = None
     #: Let one vendor installation connect to several communities. Turning it
     #: off is refused while one is connected to more than one.
-    shared_routes: Optional[bool] = None
-    enabled: Optional[bool] = None
+    shared_routes: bool | None = None
+    enabled: bool | None = None
     #: Set or clear vendor values, by key.
-    vendor_values: Optional[Dict[str, Optional[RawTextStr]]] = None
+    vendor_values: dict[str, RawTextStr | None] | None = None
 
 
 class PluginServicePublishedKey(SanitizedBaseModel):
@@ -199,7 +199,7 @@ class PluginServiceConnect(SanitizedBaseModel):
     """Pin the key set the plug-in serves, as the operator confirmed it."""
 
     #: The keys the operator was shown and confirmed.
-    keys: List[PluginServicePublishedKey] = Field(min_length=1, max_length=20)
+    keys: list[PluginServicePublishedKey] = Field(min_length=1, max_length=20)
 
 
 class PluginServiceVendorSetupStart(SanitizedBaseModel):
@@ -207,7 +207,7 @@ class PluginServiceVendorSetupStart(SanitizedBaseModel):
 
     #: The GitHub organization to own the new app. Empty: the operator's own
     #: account.
-    organization: Optional[str] = Field(default=None, max_length=100)
+    organization: str | None = Field(default=None, max_length=100)
 
 
 class PluginServiceVendorSetup(SanitizedBaseModel):
@@ -256,5 +256,5 @@ class PluginPublisherCreate(SanitizedBaseModel):
 class PluginPublisherUpdate(SanitizedBaseModel):
     """Rename a publisher, or switch it on or off."""
 
-    display_name: Optional[str] = Field(default=None, max_length=200)
-    enabled: Optional[bool] = None
+    display_name: str | None = Field(default=None, max_length=200)
+    enabled: bool | None = None

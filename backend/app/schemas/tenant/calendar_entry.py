@@ -9,8 +9,6 @@ normalized entry type — no data is lost (bulk event-selection still gets full
 event objects, tasks keep project/guild ids for colors + navigation).
 """
 
-from typing import List
-
 from pydantic import ConfigDict
 
 from app.schemas.base import SanitizedBaseModel
@@ -24,13 +22,13 @@ class CalendarEntriesResponse(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     #: A repeating event once for each of its occurrences in the window.
-    events: List[CalendarEventSummary] = []
-    tasks: List[TaskListRead] = []
+    events: list[CalendarEventSummary] = []
+    tasks: list[TaskListRead] = []
     #: The upcoming occurrences of repeating tasks in the window: each the
     #: series' current task with its dates moved there. They are not tasks yet;
     #: completing the current one creates the next.
-    task_occurrences: List[TaskListRead] = []
+    task_occurrences: list[TaskListRead] = []
     #: The projects that start or end in the window, slim, with their dates.
-    projects: List[ProjectRead] = []
+    projects: list[ProjectRead] = []
     #: The published notices whose poll closes in the window.
-    polls: List[PostRead] = []
+    polls: list[PostRead] = []

@@ -14,7 +14,7 @@ it after that.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, LargeBinary, String
 from sqlalchemy.dialects.postgresql import JSONB
@@ -46,21 +46,21 @@ class PluginHookDelivery(SQLModel, table=True):
         )
     )
     #: The delivery as the vendor sent it, until it is done.
-    body: Optional[bytes] = Field(
+    body: bytes | None = Field(
         default=None, sa_column=Column(LargeBinary, nullable=True)
     )
     #: The vendor's own ``x-`` headers.
-    headers: Optional[dict[str, Any]] = Field(
+    headers: dict[str, Any] | None = Field(
         default=None, sa_column=Column(JSONB, nullable=True)
     )
     #: The value it was routed to the install by.
-    route: Optional[str] = Field(
+    route: str | None = Field(
         default=None, sa_column=Column(String(length=200), nullable=True)
     )
     attempts: int = Field(
         default=0, sa_column=Column(Integer, nullable=False, server_default="0")
     )
     #: Until when the visit working on it holds it.
-    taken_until: Optional[datetime] = Field(
+    taken_until: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )

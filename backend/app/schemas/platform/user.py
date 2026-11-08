@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from enum import Enum
-from typing import Any, List, Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import (
     AliasChoices,
@@ -14,34 +14,33 @@ from pydantic import (
     model_validator,
 )
 
-from app.schemas.base import RawTextStr, SanitizedBaseModel
-from app.schemas.platform.guild import NewCommunity
-from app.schemas.query import PageMeta
-
 from app.core.capabilities import Capability, standing_capabilities
 from app.core.cookie_categories import CookieCategory
 from app.core.email_masking import mask_email
-from app.core.messages import UserMessages
 from app.core.emoji import validate_emoji
-from app.models.platform.account_change_hold import HeldChangeKind
-from app.core.profile_decorations import (
-    DATED_DECORATIONS,
-    MAX_FRAME_TINTS,
-    MIN_GRAD_YEAR,
-    TINTABLE_FRAMES,
-    TROPHY,
-    BANNER,
-    FRAME,
-    max_grad_year,
-    validate_decoration_id,
-    validate_tint,
-)
 from app.core.identity_boundary import (
     PersonId,
     names_withheld,
     responding_to_install,
 )
+from app.core.messages import UserMessages
+from app.core.profile_decorations import (
+    BANNER,
+    DATED_DECORATIONS,
+    FRAME,
+    MAX_FRAME_TINTS,
+    MIN_GRAD_YEAR,
+    TINTABLE_FRAMES,
+    TROPHY,
+    max_grad_year,
+    validate_decoration_id,
+    validate_tint,
+)
+from app.models.platform.account_change_hold import HeldChangeKind
 from app.models.platform.user import Presence, UserRole, UserStatus
+from app.schemas.base import RawTextStr, SanitizedBaseModel
+from app.schemas.platform.guild import NewCommunity
+from app.schemas.query import PageMeta
 from app.services.platform import user_avatars
 
 # ``avatar_url`` is where a user's picture is: either a path this API serves
@@ -103,20 +102,20 @@ class UserCreate(SanitizedBaseModel):
     # new account starts at the user's wall clock instead of the model
     # default ``"UTC"``. Validated server-side by ``normalize_timezone``;
     # omitted by non-SPA callers, in which case the model default applies.
-    timezone: Optional[str] = None
+    timezone: str | None = None
     # Optional captcha token supplied by the SPA's widget when the
     # deployment has ``CAPTCHA_PROVIDER`` configured. Verified
     # server-side via ``app.services.captcha`` before the row is
     # written. Ignored when captcha isn't configured.
-    captcha_token: Optional[str] = None
+    captcha_token: str | None = None
     # The community this account is made with, when it is made to start one
     # rather than to join one.
-    community: Optional[NewCommunity] = None
+    community: NewCommunity | None = None
     # The signed number the name check showed beside the handle, kept if
     # still free.
-    username_offer: Optional[str] = Field(default=None, max_length=1024)
+    username_offer: str | None = Field(default=None, max_length=1024)
     # Answers the directory's age question at sign-up; the date is not kept.
-    birthdate: Optional[date] = None
+    birthdate: date | None = None
     # The documents the form showed above its button, by slug: what pressing
     # it agreed to. Only these are recorded; any other required one is asked
     # for after sign-in.
@@ -134,10 +133,10 @@ class PluginPerson(SanitizedBaseModel):
     """
 
     id: PersonId
-    username: Optional[str] = None
-    discriminator: Optional[int] = None
-    display_name: Optional[str] = None
-    avatar_url: Optional[str] = Field(
+    username: str | None = None
+    discriminator: int | None = None
+    display_name: str | None = None
+    avatar_url: str | None = Field(
         default=None,
         description=(
             "Where the plug-in reads the picture this member uploaded: "
@@ -202,7 +201,7 @@ class UserIdentity(SanitizedBaseModel):
     id: PersonId
     username: str
     discriminator: int
-    avatar_url: Optional[str] = None
+    avatar_url: str | None = None
     status: UserStatus = UserStatus.active
 
 
@@ -210,7 +209,7 @@ class UserPublic(UserIdentity, PersonShape):
     """A person, as everyone else sees them — the handle, and the name they
     set in the guild being read."""
 
-    display_name: Optional[str] = None
+    display_name: str | None = None
 
 
 class UserCommunityRead(UserIdentity):
@@ -228,7 +227,7 @@ class UserCommunityRead(UserIdentity):
 
     status: UserStatus
     created_at: datetime
-    initiative_roles: List["UserInitiativeRole"] = Field(default_factory=list)
+    initiative_roles: list["UserInitiativeRole"] = Field(default_factory=list)
 
 
 class UserCommunityMember(UserCommunityRead):
@@ -242,24 +241,24 @@ class UserCommunityMember(UserCommunityRead):
     #: The rung this member holds in the guild, set by the endpoint. Shown as
     #: it stands, and asked of the ladder where a surface needs to know
     #: whether it administers the place.
-    community_role: Optional[str] = Field(
+    community_role: str | None = Field(
         default=None, validation_alias=AliasChoices("community_role", "guild_role")
     )
     oidc_managed: bool = False  # Whether membership is managed via OIDC claim mappings
     #: The name set for this member in this guild. ``None`` when nobody set
     #: one, and the handle renders.
-    display_name: Optional[str] = None
+    display_name: str | None = None
     #: SEAT-ONLY. Whether this member's personal API keys reach the guild.
     #: ``None`` for anyone who does not hold the superadmin seat.
-    api_keys_allowed: Optional[bool] = None
+    api_keys_allowed: bool | None = None
     #: When a guest's time ends; ``None`` for a member.
-    guest_until: Optional[datetime] = None
+    guest_until: datetime | None = None
 
 
 class UserCommunityMemberListResponse(PageMeta):
     """One page of the guild's roster."""
 
-    items: List[UserCommunityMember]
+    items: list[UserCommunityMember]
 
 
 class UserSummary(UserIdentity, PersonShape):
@@ -280,12 +279,12 @@ class UserSummary(UserIdentity, PersonShape):
     catalog shape it names is declared further down this file.
     """
 
-    display_name: Optional[str] = None
+    display_name: str | None = None
     profile_decorations: Optional["ProfileDecorations"] = None
     #: The rung this member holds in the guild this was read under. Absent
     #: where the caller asked outside a guild, which is why it is optional
     #: rather than defaulted to the quietest of them.
-    community_role: Optional[str] = Field(
+    community_role: str | None = Field(
         default=None, validation_alias=AliasChoices("community_role", "guild_role")
     )
 
@@ -293,7 +292,7 @@ class UserSummary(UserIdentity, PersonShape):
 class UserSummaryListResponse(PageMeta):
     """Paginated envelope for the slim user search/typeahead endpoints."""
 
-    items: List[UserSummary]
+    items: list[UserSummary]
 
 
 #: How long the line beside the emoji may run. Short on purpose: the bubble is
@@ -319,12 +318,12 @@ class CustomStatus(SanitizedBaseModel):
         extra="forbid", json_schema_serialization_defaults_required=True
     )
 
-    emoji: Optional[str] = None
-    text: Optional[str] = Field(default=None, max_length=STATUS_TEXT_MAX_LENGTH)
+    emoji: str | None = None
+    text: str | None = Field(default=None, max_length=STATUS_TEXT_MAX_LENGTH)
 
     @field_validator("emoji")
     @classmethod
-    def _check_emoji(cls, value: Optional[str]) -> Optional[str]:
+    def _check_emoji(cls, value: str | None) -> str | None:
         """Hold the status emoji to the same shape a reaction's is held to.
 
         An empty string means "take it off", which is how a picker sends a
@@ -336,7 +335,7 @@ class CustomStatus(SanitizedBaseModel):
 
     @field_validator("text")
     @classmethod
-    def _blank_is_none(cls, value: Optional[str]) -> Optional[str]:
+    def _blank_is_none(cls, value: str | None) -> str | None:
         return None if value is None else (value.strip() or None)
 
 
@@ -363,28 +362,28 @@ class ProfileDecorations(SanitizedBaseModel):
         extra="forbid", json_schema_serialization_defaults_required=True
     )
 
-    banner: Optional[str] = None
-    frame: Optional[str] = None
+    banner: str | None = None
+    frame: str | None = None
     #: The colours the wearer picked for a frame that takes them. Kept beside
     #: the frame rather than folded into its id, because the id names a catalog
     #: entry and a colour is not part of what was granted. Ignored — and
     #: dropped on write — for any frame that is not tintable.
-    frame_tint: List[str] = Field(default_factory=list, max_length=MAX_FRAME_TINTS)
-    trophies: List[str] = Field(default_factory=list, max_length=MAX_PROFILE_TROPHIES)
+    frame_tint: list[str] = Field(default_factory=list, max_length=MAX_FRAME_TINTS)
+    trophies: list[str] = Field(default_factory=list, max_length=MAX_PROFILE_TROPHIES)
     #: The year on a decoration that carries one. Kept beside them for the same
     #: reason a tint is kept beside its frame: the id names what was granted,
     #: and the year is the wearer's. The client draws it. Ignored — and dropped
     #: on write — unless something worn takes a year.
-    grad_year: Optional[int] = None
+    grad_year: int | None = None
 
     @field_validator("banner", "frame")
     @classmethod
-    def _check_single(cls, value: Optional[str]) -> Optional[str]:
+    def _check_single(cls, value: str | None) -> str | None:
         return None if value is None else validate_decoration_id(value)
 
     @field_validator("frame_tint")
     @classmethod
-    def _check_tints(cls, value: List[str]) -> List[str]:
+    def _check_tints(cls, value: list[str]) -> list[str]:
         return [validate_tint(colour) for colour in value]
 
     @model_validator(mode="after")
@@ -402,7 +401,7 @@ class ProfileDecorations(SanitizedBaseModel):
 
     @field_validator("grad_year")
     @classmethod
-    def _check_grad_year(cls, value: Optional[int]) -> Optional[int]:
+    def _check_grad_year(cls, value: int | None) -> int | None:
         if value is None:
             return None
         if not MIN_GRAD_YEAR <= value <= max_grad_year():
@@ -423,8 +422,8 @@ class ProfileDecorations(SanitizedBaseModel):
 
     @field_validator("trophies")
     @classmethod
-    def _check_trophies(cls, value: List[str]) -> List[str]:
-        seen: List[str] = []
+    def _check_trophies(cls, value: list[str]) -> list[str]:
+        seen: list[str] = []
         for trophy in value:
             identifier = validate_decoration_id(trophy)
             # Wearing the same one twice is a duplicate, not a second trophy.
@@ -432,14 +431,14 @@ class ProfileDecorations(SanitizedBaseModel):
                 seen.append(identifier)
         return seen
 
-    def worn(self) -> List[tuple[str, str]]:
+    def worn(self) -> list[tuple[str, str]]:
         """``(id, slot)`` for everything this profile is wearing.
 
         The one place a slot is paired with its id, so the check against a
         person's library and the shape they wrote it in cannot disagree about
         which is which.
         """
-        pairs: List[tuple[str, str]] = []
+        pairs: list[tuple[str, str]] = []
         if self.banner:
             pairs.append((self.banner, BANNER))
         if self.frame:
@@ -467,13 +466,13 @@ class OwnedDecoration(SanitizedBaseModel):
     kind: str
     #: What its publisher called it. Absent for the set that ships with the
     #: app, whose names are translated in the client.
-    name: Optional[str] = None
+    name: str | None = None
     #: The listing uid of the pack that granted it, or ``None`` for the set
     #: that ships with the app.
-    source: Optional[str] = None
+    source: str | None = None
     #: The picture its pack carries for it, served by the marketplace. Absent
     #: where the client ships the art for the id itself.
-    image_url: Optional[str] = None
+    image_url: str | None = None
 
 
 class DecorationPack(SanitizedBaseModel):
@@ -492,8 +491,8 @@ class DecorationPack(SanitizedBaseModel):
     publisher: str
     description: str
     #: Artwork for the pack itself, from the listing.
-    avatar_url: Optional[str] = None
-    contents: List[OwnedDecoration]
+    avatar_url: str | None = None
+    contents: list[OwnedDecoration]
     installed: bool = False
 
 
@@ -503,7 +502,7 @@ class DecorationPackListResponse(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    items: List[DecorationPack]
+    items: list[DecorationPack]
 
 
 class OwnedDecorationsResponse(SanitizedBaseModel):
@@ -512,7 +511,7 @@ class OwnedDecorationsResponse(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    items: List[OwnedDecoration]
+    items: list[OwnedDecoration]
 
 
 class UserProfile(SanitizedBaseModel):
@@ -535,7 +534,7 @@ class UserProfile(SanitizedBaseModel):
     id: int
     username: str
     discriminator: int
-    avatar_url: Optional[str] = None
+    avatar_url: str | None = None
     status: UserStatus = UserStatus.active
     custom_status: CustomStatus = Field(default_factory=CustomStatus)
     profile_decorations: ProfileDecorations = Field(default_factory=ProfileDecorations)
@@ -567,7 +566,7 @@ class CommunityRosterResponse(PageMeta):
     """A page of the roster, and how many people are in each presence group
     across every page, so a group's heading can count people not yet loaded."""
 
-    items: List[CommunityRosterMember]
+    items: list[CommunityRosterMember]
     presence_counts: dict[Presence, int]
 
 
@@ -587,21 +586,21 @@ class UserEmailRead(SanitizedBaseModel):
     #: signup | added | oidc — how the account came to hold it.
     source: str
     created_at: datetime
-    last_login_at: Optional[datetime] = None
+    last_login_at: datetime | None = None
 
 
 class UserEmailCreate(SanitizedBaseModel):
     """Adding an address asks for the password, where there is one."""
 
     email: EmailStr
-    current_password: Optional[str] = None
+    current_password: str | None = None
 
 
 class UserEmailChange(SanitizedBaseModel):
     """Removing an address or making one primary asks for the password, where
     there is one."""
 
-    current_password: Optional[str] = None
+    current_password: str | None = None
 
 
 class HeldChangeRead(SanitizedBaseModel):
@@ -610,7 +609,7 @@ class HeldChangeRead(SanitizedBaseModel):
 
     id: int
     kind: HeldChangeKind
-    subject: Optional[str] = None
+    subject: str | None = None
     requested_at: datetime
     applies_at: datetime
 
@@ -621,11 +620,11 @@ class HeldChangeOutcome(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    held: Optional[HeldChangeRead] = None
+    held: HeldChangeRead | None = None
 
 
 class UserEmailListResponse(SanitizedBaseModel):
-    items: List[UserEmailRead]
+    items: list[UserEmailRead]
     #: Whether changing the list asks for the password. Where it does not, a
     #: recent sign-in answers instead.
     password_required: bool
@@ -638,7 +637,7 @@ class CookieConsentRead(SanitizedBaseModel):
         from_attributes=True, json_schema_serialization_defaults_required=True
     )
 
-    granted: List[str]
+    granted: list[str]
     #: Which version of the question was answered. A client holding an answer
     #: to an older one treats it as unanswered and asks again.
     version: int
@@ -650,7 +649,7 @@ class CookieConsentRead(SanitizedBaseModel):
 class CookieConsentUpdate(SanitizedBaseModel):
     """An answer given in one browser, for the account to carry to the rest."""
 
-    granted: List[CookieCategory] = Field(default_factory=list)
+    granted: list[CookieCategory] = Field(default_factory=list)
     version: int
 
 
@@ -659,16 +658,16 @@ class AccountTimeOutRead(SanitizedBaseModel):
 
     #: Who to contact about it: the deployment's moderation contact, else its
     #: general one, else ``None``.
-    contact_email: Optional[str] = None
+    contact_email: str | None = None
     #: When the suspension began, where it was recorded.
-    since: Optional[datetime] = None
+    since: datetime | None = None
     #: The reason the moderator gave, where one was given.
-    reason: Optional[str] = None
+    reason: str | None = None
     #: Whether an appeal can be filed here, rather than written to
     #: ``contact_email``.
     can_appeal: bool = False
     #: The account's most recent appeal, which it follows on this screen.
-    appeal_task_id: Optional[int] = None
+    appeal_task_id: int | None = None
 
 
 class UserRead(UserBase):
@@ -686,12 +685,12 @@ class UserRead(UserBase):
     #: community directory, ``None`` where it never has. Read by the
     #: directory's Join button, which asks before it joins rather than letting
     #: the server refuse.
-    age_confirmed_at: Optional[datetime] = None
+    age_confirmed_at: datetime | None = None
     #: When this account answered the age question as under the minimum,
     #: ``None`` where it has not. Turns the directory's dialog from a form into
     #: an explanation: the answer stands, and putting it right is somebody
     #: else's to do.
-    age_below_minimum_at: Optional[datetime] = None
+    age_below_minimum_at: datetime | None = None
     #: Whether this account still owes its agreement to this deployment's
     #: terms and privacy policy. Always false where there are none to agree
     #: to, which is every self-hosted deployment. An account created through
@@ -715,11 +714,11 @@ class UserRead(UserBase):
     status: UserStatus
     #: Both resolved from ``user_emails`` by whoever builds this shape (see
     #: ``services.platform.users.to_read``) — the ``users`` row carries neither.
-    email: Optional[EmailStr] = None
+    email: EmailStr | None = None
     email_verified: bool = False
     created_at: datetime
     updated_at: datetime
-    avatar_url: Optional[str] = None
+    avatar_url: str | None = None
     custom_status: CustomStatus = Field(default_factory=CustomStatus)
     #: What this account picked, not what a reader would be shown: on your own
     #: record this is the setting itself, and the control that writes it.
@@ -731,8 +730,8 @@ class UserRead(UserBase):
     recent_tabs_limit: int = 20
     count_toward_engagement_ranking: bool = True
     timezone: str = "UTC"
-    event_reminder_minutes_before: Optional[int] = 15
-    last_overdue_notification_at: Optional[datetime] = None
+    event_reminder_minutes_before: int | None = 15
+    last_overdue_notification_at: datetime | None = None
     color_theme: str = "kobold"
     task_completion_visual_feedback: str = "none"
     task_completion_audio_feedback: bool = True
@@ -757,20 +756,20 @@ class UserRead(UserBase):
     #: When the demo copy this account was made for is deleted, with the
     #: account; ``None`` for every other account. Populated with the fields
     #: above.
-    demo_expires_at: Optional[datetime] = None
+    demo_expires_at: datetime | None = None
     #: The demo copy this account was made for; ``None`` for every other
     #: account. Populated with the fields above.
-    demo_community_id: Optional[int] = None
+    demo_community_id: int | None = None
     #: Whether this account may create a community: the deployment lets
     #: anybody (``community_creation_enabled``), or the account manages
     #: communities. Never a suspended account or a demo visitor. Populated
     #: with the fields above.
     can_create_communities: bool = False
-    initiative_roles: List["UserInitiativeRole"] = Field(default_factory=list)
+    initiative_roles: list["UserInitiativeRole"] = Field(default_factory=list)
 
-    @computed_field(return_type=List[Capability])  # type: ignore[misc]
+    @computed_field(return_type=list[Capability])  # type: ignore[misc]
     @property
-    def capabilities(self) -> List[Capability]:
+    def capabilities(self) -> list[Capability]:
         """Platform capabilities granted by this user's standing role — none
         while the account is suspended.
 
@@ -840,11 +839,11 @@ class OperatorUserRead(UserRead):
     #: plus the deployment's window. Null unless ``status`` is ``deleted``, and
     #: null for a deployment that keeps deleted accounts. Computed from the
     #: columns beside it rather than stored, so the window is stated once.
-    purge_at: Optional[datetime] = None
+    purge_at: datetime | None = None
 
     #: Set while wrong passwords or codes have turned the account's password
     #: and code sign-in off; it turns back on by itself at that time.
-    sign_in_locked_until: Optional[datetime] = None
+    sign_in_locked_until: datetime | None = None
 
     #: Whether the account holds an authenticator it has proved — what the
     #: roster offers to clear when its holder has lost it.
@@ -855,7 +854,7 @@ class OperatorUserRead(UserRead):
     api_key_count: int = 0
 
     #: What the reader may do to this account.
-    allowed_actions: List[UserAction] = Field(default_factory=list)
+    allowed_actions: list[UserAction] = Field(default_factory=list)
 
     #: How many open operations cases the account filed or is the subject of.
     open_case_count: int = 0
@@ -869,7 +868,7 @@ class OperatorUserRead(UserRead):
 class OperatorUserListResponse(PageMeta):
     """One page of the operator roster."""
 
-    items: List[OperatorUserRead]
+    items: list[OperatorUserRead]
 
 
 class UsernameClaim(SanitizedBaseModel):
@@ -882,7 +881,7 @@ class UsernameClaim(SanitizedBaseModel):
 
     username: str = Field(max_length=64)
     #: The signed number the name check showed, kept if still free.
-    offer: Optional[str] = Field(default=None, max_length=1024)
+    offer: str | None = Field(default=None, max_length=1024)
 
 
 class AgeConfirmation(SanitizedBaseModel):
@@ -907,38 +906,38 @@ class UserInitiativeRole(SanitizedBaseModel):
     initiative_id: int
     initiative_name: str
     # The role's own name; ``None`` when the role it pointed at was deleted.
-    role: Optional[str] = None
+    role: str | None = None
 
 
 class UserSelfUpdate(SanitizedBaseModel):
-    password: Optional[RawTextStr] = Field(default=None, max_length=256)
+    password: RawTextStr | None = Field(default=None, max_length=256)
     # Required to set a new ``password`` (verified server-side). Exempt for
     # OIDC-only accounts, which have no local password to confirm.
-    current_password: Optional[RawTextStr] = Field(default=None, max_length=256)
+    current_password: RawTextStr | None = Field(default=None, max_length=256)
     # A picture hosted elsewhere, by an https address; empty takes it off.
-    avatar_url: Optional[str] = Field(default=None, max_length=2000)
+    avatar_url: str | None = Field(default=None, max_length=2000)
     # Sending ``null`` takes the status off; leaving it out leaves it alone.
-    custom_status: Optional[CustomStatus] = None
-    presence: Optional[Presence] = None
+    custom_status: CustomStatus | None = None
+    presence: Presence | None = None
     # The whole set at once rather than one key at a time: a profile wears a
     # look, and a partial write would have no way to say "take the frame off".
-    profile_decorations: Optional[ProfileDecorations] = None
-    week_starts_on: Optional[int] = None
-    time_format: Optional[str] = None
-    recent_tabs_limit: Optional[int] = Field(default=None, ge=1, le=100)
-    count_toward_engagement_ranking: Optional[bool] = None
-    timezone: Optional[str] = None
-    event_reminder_minutes_before: Optional[int] = None
-    color_theme: Optional[str] = None
-    task_completion_visual_feedback: Optional[str] = None
-    task_completion_audio_feedback: Optional[bool] = None
-    task_completion_haptic_feedback: Optional[bool] = None
-    smart_task_titles: Optional[bool] = None
-    locale: Optional[str] = Field(default=None, pattern=r"^[a-z]{2}(-[A-Z]{2})?$")
+    profile_decorations: ProfileDecorations | None = None
+    week_starts_on: int | None = None
+    time_format: str | None = None
+    recent_tabs_limit: int | None = Field(default=None, ge=1, le=100)
+    count_toward_engagement_ranking: bool | None = None
+    timezone: str | None = None
+    event_reminder_minutes_before: int | None = None
+    color_theme: str | None = None
+    task_completion_visual_feedback: str | None = None
+    task_completion_audio_feedback: bool | None = None
+    task_completion_haptic_feedback: bool | None = None
+    smart_task_titles: bool | None = None
+    locale: str | None = Field(default=None, pattern=r"^[a-z]{2}(-[A-Z]{2})?$")
 
     @field_validator("avatar_url")
     @classmethod
-    def _https_picture(cls, value: Optional[str]) -> Optional[str]:
+    def _https_picture(cls, value: str | None) -> str | None:
         if value and not (value.startswith("https://") and len(value) > 8):
             raise ValueError("avatar_url must be an https:// URL")
         return value
@@ -974,7 +973,7 @@ class DeletionEligibilityResponse(SanitizedBaseModel):
     last_owner: bool = False
     #: Communities this account holds the only superadmin seat of, which the
     #: dialog offers to delete.
-    sole_superadmin_communities: List[str] = Field(
+    sole_superadmin_communities: list[str] = Field(
         default_factory=list,
         validation_alias=AliasChoices(
             "sole_superadmin_communities", "sole_superadmin_guilds"

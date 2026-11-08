@@ -12,9 +12,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import GuildAccessError
 from app.models.platform.guild import CommunityRole
+from app.models.platform.user import UserRole
 from app.models.tenant.initiative import DEFAULT_PERMISSION_VALUES, PermissionKey
 from app.models.tenant.project import Project
-from app.models.platform.user import UserRole
 from app.services.rls import (
     check_initiative_permission,
     is_initiative_manager,
@@ -29,7 +29,6 @@ from app.testing import (
     route_as,
     route_system,
 )
-
 
 # ---------------------------------------------------------------------------
 # Guild-level access checks (sync / unit)

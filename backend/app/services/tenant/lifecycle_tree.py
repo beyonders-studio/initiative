@@ -20,7 +20,7 @@ trashed or archived row freezes everything under it at the database (see
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import delete, update
 from sqlmodel import SQLModel
@@ -118,7 +118,7 @@ async def subtree_levels(
     roots: Iterable[SQLModel],
     *,
     tree: Tree = CASCADE_CHILDREN,
-    where: Optional[Callable[[type], Any]] = None,
+    where: Callable[[type], Any] | None = None,
 ) -> list[Level]:
     """The roots and everything under them, grouped by depth — roots first.
 

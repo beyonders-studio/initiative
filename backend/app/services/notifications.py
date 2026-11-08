@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from functools import partial
 from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import quote, urlencode
@@ -42,9 +42,11 @@ from app.core.notification_categories import (
 )
 from app.core.tools import COMMENT_TARGETS, KINDS, Tool
 from app.core.user_display import name_here
-from app.db.guild_standing import ActorContext, InstallContext
+from app.core.user_input_validators import resolve_zone
 from app.db import cohorts
 from app.db.advisory_locks import LockNamespace, advisory_lock
+from app.db.guild_standing import ActorContext, InstallContext
+from app.db.request_context import Platform, Unattributed
 from app.db.session import (
     SystemSessionLocal,
     guild_context,
@@ -57,13 +59,13 @@ from app.models.platform.notice_outbox import NoticeOutboxItem
 from app.models.platform.notification import Notification, NotificationType
 from app.models.platform.user import User
 from app.models.platform.user_notification_prefs import UserNotificationPrefs
+from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.models.tenant.calendar_event import (
     CalendarEvent,
     CalendarEventAnswer,
     CalendarEventAttendee,
     RSVPStatus,
 )
-from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.models.tenant.event_reminder_dispatch import EventReminderDispatch
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.initiative import Initiative
@@ -72,12 +74,6 @@ from app.models.tenant.project import Project
 from app.models.tenant.task import Task, TaskAssignee, TaskStatus, TaskStatusCategory
 from app.services import email as email_service
 from app.services import permissions as permissions_service
-from app.services.tenant.named_people import (
-    Governing,
-    governing_of,
-    readers_of,
-    roster_session,
-)
 from app.services.cross_guild import gather_across_guilds, member_guild_ids
 from app.services.guild_sweeps import Scan, Scope
 from app.services.platform import accounts as accounts_service
@@ -90,8 +86,12 @@ from app.services.platform import (
     push_notifications,
     user_notifications,
 )
-from app.core.user_input_validators import resolve_zone
-from app.db.request_context import Platform, Unattributed
+from app.services.tenant.named_people import (
+    Governing,
+    governing_of,
+    readers_of,
+    roster_session,
+)
 
 if TYPE_CHECKING:
     from app.services.tenant.expiry import Expiring
@@ -115,7 +115,7 @@ class PluginAuthor:
     id: None = None
 
 
-async def actor_name(session: AsyncSession, actor: "User | PluginAuthor") -> str:
+async def actor_name(session: AsyncSession, actor: User | PluginAuthor) -> str:
     """What a notification calls whoever caused it: a person's name in the
     community ``session`` is routed into, or an installed plug-in's name."""
     if isinstance(actor, PluginAuthor):
@@ -125,7 +125,7 @@ async def actor_name(session: AsyncSession, actor: "User | PluginAuthor") -> str
 
 async def author_of(
     session: AsyncSession, actor: ActorContext, user: User | None
-) -> "User | PluginAuthor":
+) -> User | PluginAuthor:
     """Who a request's notifications say acted: the person, or — for an
     installed plug-in — the install's name in its community, read from its own
     row on the request's session."""
@@ -349,7 +349,7 @@ async def notify(
     key: str,
     values: Mapping[str, str | Callable[[User], str]] | None = None,
     data: Mapping[str, Any] | None = None,
-    actor: "User | PluginAuthor | None" = None,
+    actor: User | PluginAuthor | None = None,
     rollup_key: str | None = None,
     email: Callable[[User], email_service.EmailPieces] | None = None,
     email_names_line: bool = True,
@@ -597,7 +597,7 @@ async def deliver_notices(
     return push
 
 
-def actor_id(actor: "User | PluginAuthor | None") -> int | None:
+def actor_id(actor: User | PluginAuthor | None) -> int | None:
     """The account behind whoever acted, or ``None`` for an installed plug-in."""
     return actor.id if actor is not None else None
 
@@ -745,8 +745,7 @@ def _rolled_up_comment(
         if isinstance(entry, Mapping)
     )
     return {
-        "opened_at": previous.get("opened_at")
-        or datetime.now(timezone.utc).isoformat(),
+        "opened_at": previous.get("opened_at") or datetime.now(UTC).isoformat(),
         "comment_count": count,
         "commenters": roster[-MAX_ROLLED_UP_COMMENTERS:],
         "commenter_count": people if seen_before else people + 1,
@@ -826,7 +825,7 @@ BATCH_MAX_WINDOW = timedelta(minutes=30)
 
 
 async def notify_project_added(
-    session: AsyncSession, project: Project, actor: "User"
+    session: AsyncSession, project: Project, actor: User
 ) -> None:
     """Tell everyone ``project`` is shared with that it now exists, whether it
     was made from nothing, from a template or as a copy. ``project.initiative``
@@ -861,7 +860,7 @@ async def notify_assigned(
     task: Task,
     assignee_ids: Iterable[int | None],
     *,
-    assigned_by: "User | PluginAuthor",
+    assigned_by: User | PluginAuthor,
     project_name: str,
 ) -> None:
     """Tell the people just assigned to ``task``, among those who can open it.
@@ -1347,7 +1346,7 @@ async def expire_batched_notices(
     off in a guild an admin could not reach) or so stale that announcing them
     would be noise.
     """
-    cutoff = (now or datetime.now(timezone.utc)) - BATCH_RETENTION
+    cutoff = (now or datetime.now(UTC)) - BATCH_RETENTION
     await routed.exec(
         delete(BatchedNotice).where(col(BatchedNotice.created_at) < cutoff)
     )
@@ -1959,7 +1958,7 @@ def _overdue_assignments(*columns: Any, overdue: bool = True) -> Any:
         )
     )
     if overdue:
-        statement = statement.where(Task.due_date < datetime.now(timezone.utc))
+        statement = statement.where(Task.due_date < datetime.now(UTC))
     return statement
 
 
@@ -2064,7 +2063,7 @@ async def _coming_up_for_reader(
     """What the reader the session is routed as has due or starting before
     ``until``, in the routed community."""
     user_id = require_guild_context(session).user_id
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     tasks = (
         await session.exec(
             coming_up_tasks(
@@ -2642,7 +2641,7 @@ async def _run_hold_summary_pass(session: AsyncSession, *, now: datetime) -> Non
 
 async def process_hold_summaries() -> None:
     async with SystemSessionLocal() as session:
-        await _run_hold_summary_pass(session, now=datetime.now(timezone.utc))
+        await _run_hold_summary_pass(session, now=datetime.now(UTC))
 
 
 async def reminder_scan(*, now: datetime) -> Scan:
@@ -2833,7 +2832,7 @@ async def reminder_scan(*, now: datetime) -> Scan:
                     event_id=event_id,
                     user_id=user_id,
                     event_start_at=start_at,
-                    sent_at=datetime.now(timezone.utc),
+                    sent_at=datetime.now(UTC),
                 )
                 .on_conflict_do_nothing()
             )
@@ -2945,7 +2944,7 @@ def task_reminder_scan(*, now: datetime) -> Scan:
                     col(PersonalItem.user_id) == user_id,
                     col(PersonalItem.remind_at) <= now,
                 )
-                .values(reminded_at=datetime.now(timezone.utc))
+                .values(reminded_at=datetime.now(UTC))
                 .returning(PersonalItem.entity_id)
             )
         ).all()

@@ -14,9 +14,9 @@ from sqlalchemy import delete
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 
+from app.core.file_types import FileType
 from app.core.tools import Tool
 from app.db.install_standing_test import _install, _route
-from app.core.file_types import FileType
 from app.models.tenant.file import File
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.testing import (
@@ -25,7 +25,6 @@ from app.testing import (
     route_as,
     route_session_to_guild,
 )
-
 
 _SHARES = ["files:write", "sharing:write"]
 

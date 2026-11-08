@@ -36,17 +36,18 @@ import weakref
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, TypeVar
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import and_, func, or_
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import audit_context
+from app.core.config import settings
 from app.db import cohorts
 from app.db.advisory_locks import LockNamespace, advisory_lock
-from app.core.config import settings
+from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.notification import NotificationType
 from app.models.tenant.data_job import (
@@ -58,7 +59,6 @@ from app.models.tenant.data_job import (
 from app.services import sweep_timers
 from app.services.guild_sweeps import Scope, each_guild
 from app.services.platform import notice_outbox
-from app.db.request_context import SystemGuild, Unattributed
 
 logger = logging.getLogger(__name__)
 
@@ -160,7 +160,7 @@ class Dispatcher:
         outcomes = await self.sweep(
             session,
             guild_id=guild_id,
-            now=datetime.now(timezone.utc),
+            now=datetime.now(UTC),
             own=self.own_job_ids(guild_id),
         )
         await session.commit()
@@ -173,9 +173,7 @@ class Dispatcher:
         Returns the task it started."""
         if not any(self.free_slot(kind) for kind in self.kinds):
             return None
-        claimed = await self._claim(
-            session, guild_id=guild_id, now=datetime.now(timezone.utc)
-        )
+        claimed = await self._claim(session, guild_id=guild_id, now=datetime.now(UTC))
         if claimed is None:
             return None
         job_id, kind = claimed
@@ -290,10 +288,7 @@ class Dispatcher:
         sweep_timers.wake("data_jobs", guild_id)
 
 
-Result = TypeVar("Result")
-
-
-async def while_beating(
+async def while_beating[Result](
     work: Awaitable[Result],
     beat: Callable[[], Awaitable[None]] | None,
     *,
@@ -402,7 +397,7 @@ async def expire_files(session: AsyncSession, guild_id: int) -> None:
     deployment a pitch's newest backup is kept: it is what its links copy."""
     from app.services.storage import get_guild_storage
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     jobs = list(
         await session.exec(
             select(DataJob).where(

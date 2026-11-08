@@ -29,7 +29,7 @@ published one), and what the client sends must be something the server takes
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 __all__ = ["missing_from"]
 
@@ -49,9 +49,9 @@ class _Side:
     def __init__(self, document: dict[str, Any]) -> None:
         self.document = document
 
-    def resolve(self, node: Any) -> tuple[Any, Optional[str]]:
+    def resolve(self, node: Any) -> tuple[Any, str | None]:
         """``node`` with its ``$ref`` followed, and the last reference taken."""
-        ref: Optional[str] = None
+        ref: str | None = None
         seen: set[str] = set()
         while isinstance(node, dict) and "$ref" in node:
             ref = node["$ref"]
@@ -68,7 +68,7 @@ class _Side:
             node = target
         return node, ref
 
-    def flatten(self, schema: Any) -> tuple[dict[str, Any], Optional[str]]:
+    def flatten(self, schema: Any) -> tuple[dict[str, Any], str | None]:
         """``schema`` resolved, with an ``allOf`` merged into one object."""
         resolved, ref = self.resolve(schema)
         if not isinstance(resolved, dict):
@@ -80,9 +80,7 @@ class _Side:
         }
         properties = dict(merged.get("properties", {}))
         required = list(merged.get("required", []))
-        types: Optional[frozenset[str]] = (
-            self.types(merged) if "type" in merged else None
-        )
+        types: frozenset[str] | None = self.types(merged) if "type" in merged else None
         for part in resolved["allOf"]:
             flat, _ = self.flatten(part)
             properties.update(flat.get("properties", {}))
@@ -104,7 +102,7 @@ class _Side:
             merged["type"] = sorted(types)
         return merged, ref
 
-    def types(self, schema: Any) -> Optional[frozenset[str]]:
+    def types(self, schema: Any) -> frozenset[str] | None:
         """The JSON types ``schema`` allows, or ``None`` for any."""
         flat, _ = self.flatten(schema) if isinstance(schema, dict) else ({}, None)
         variants = flat.get("anyOf", flat.get("oneOf"))
@@ -153,7 +151,7 @@ def _value_types(values: list[Any]) -> frozenset[str]:
     return frozenset(found)
 
 
-def _within(inner: Optional[frozenset[str]], outer: Optional[frozenset[str]]) -> bool:
+def _within(inner: frozenset[str] | None, outer: frozenset[str] | None) -> bool:
     """Whether every value of the types ``inner`` is one of ``outer``."""
     if outer is None:
         return True
@@ -163,7 +161,7 @@ def _within(inner: Optional[frozenset[str]], outer: Optional[frozenset[str]]) ->
     return inner <= widened
 
 
-def _describe(types: Optional[frozenset[str]]) -> str:
+def _describe(types: frozenset[str] | None) -> str:
     return "any" if types is None else "|".join(sorted(types)) or "nothing"
 
 
@@ -179,7 +177,7 @@ def _members(schema: dict[str, Any], side: _Side) -> list[Any]:
     return [v for v in variants if side.types(v) != frozenset({"null"})]
 
 
-def _ref_name(schema: Any) -> Optional[str]:
+def _ref_name(schema: Any) -> str | None:
     if isinstance(schema, dict) and isinstance(schema.get("$ref"), str):
         return schema["$ref"].rsplit("/", 1)[-1]
     return None

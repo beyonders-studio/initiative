@@ -6,7 +6,7 @@ Covers the at-rest hashing and TTL:
 - expired / past-TTL tokens are rejected
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -74,7 +74,7 @@ async def test_expired_token_rejected(session: AsyncSession):
             user_id=user.id,
             token=_hash_token(raw),
             purpose=UserTokenPurpose.password_reset,
-            expires_at=datetime.now(timezone.utc) - timedelta(minutes=1),
+            expires_at=datetime.now(UTC) - timedelta(minutes=1),
         )
     )
     await session.commit()
@@ -138,7 +138,7 @@ async def test_the_sweep_clears_the_part_way_sign_ins_too(session: AsyncSession)
     standing = await challenge_service.create(session, user_id=user.id, purpose=purpose)
     stale = await challenge_service.create(session, user_id=user.id, purpose=purpose)
     spent = await challenge_service.create(session, user_id=user.id, purpose=purpose)
-    stale.challenge.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    stale.challenge.expires_at = datetime.now(UTC) - timedelta(minutes=1)
     session.add(stale.challenge)
     assert await challenge_service.consume(session, spent.challenge)
     await session.commit()

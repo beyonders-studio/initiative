@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import Field as PydanticField
 
@@ -22,12 +21,12 @@ class HoldCreate(SanitizedBaseModel):
     target_id: int
     reason: HoldReason
     #: Required for ``illegal_content``.
-    legal_basis: Optional[LegalBasis] = None
+    legal_basis: LegalBasis | None = None
     #: Who asked, a reference number. Read only by the platform.
-    note: Optional[str] = PydanticField(default=None, max_length=NOTE_LENGTH)
+    note: str | None = PydanticField(default=None, max_length=NOTE_LENGTH)
     #: The operations case a platform moderator is holding it under. A
     #: community moderator's hold opens its own.
-    case_task_id: Optional[int] = None
+    case_task_id: int | None = None
 
 
 class HoldPlaced(SanitizedBaseModel):
@@ -50,12 +49,12 @@ class ContentHoldRead(SanitizedBaseModel):
     target_type: str
     target_id: int
     #: What the held thing is called, where it has a name.
-    label: Optional[str] = None
-    case_task_id: Optional[int] = None
+    label: str | None = None
+    case_task_id: int | None = None
     placed_via: HoldVia
     reason: HoldReason
-    legal_basis: Optional[LegalBasis] = None
-    note: Optional[str] = None
+    legal_basis: LegalBasis | None = None
+    note: str | None = None
     placed_at: datetime
-    released_at: Optional[datetime] = None
-    release_outcome: Optional[HoldRelease] = None
+    released_at: datetime | None = None
+    release_outcome: HoldRelease | None = None

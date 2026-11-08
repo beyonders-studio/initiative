@@ -8,7 +8,7 @@ community's known reference) in its response phase.
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 
 import pytest
 from pydantic import BaseModel, ValidationError
@@ -16,11 +16,11 @@ from pydantic_core import PydanticSerializationError
 
 from app.core.config import settings
 from app.core.identity_boundary import (
-    UNKNOWN_REFERENCE_ERROR,
-    BoundaryPhase,
     LEXICAL_MENTIONS,
     MARKDOWN_MENTIONS,
+    UNKNOWN_REFERENCE_ERROR,
     UPLOAD_PATH,
+    BoundaryPhase,
     GuildId,
     InstallBoundary,
     PersonId,
@@ -33,7 +33,6 @@ from app.db.guild_standing import named_ref_candidates
 from app.models.platform.identity_ref import IdentityEntity
 from app.schemas.platform.user import UserPublic
 
-
 _GUILD = 7
 _INSTALL = 3
 _PERSON_REF = "uplu_person-one"
@@ -45,14 +44,14 @@ class _Payload(BaseModel):
     guild_id: GuildId
     owner: PersonId
     helpers: list[PersonId] = []
-    reviewer: Optional[PersonId] = None
+    reviewer: PersonId | None = None
 
 
 class _Plain(BaseModel):
     guild_id: int
     owner: int
     helpers: list[int] = []
-    reviewer: Optional[int] = None
+    reviewer: int | None = None
 
 
 def _boundary(**overrides) -> InstallBoundary:
@@ -337,9 +336,9 @@ def test_an_install_reads_a_mention_and_no_stored_file_s_path(own_origin):
 
 class _Files(BaseModel):
     picture: Annotated[str, UPLOAD_PATH]
-    file: Annotated[Optional[str], UPLOAD_PATH] = None
-    cover: Annotated[Optional[str], UPLOAD_PATH] = None
-    missing: Annotated[Optional[str], UPLOAD_PATH] = None
+    file: Annotated[str | None, UPLOAD_PATH] = None
+    cover: Annotated[str | None, UPLOAD_PATH] = None
+    missing: Annotated[str | None, UPLOAD_PATH] = None
 
 
 def test_an_install_reads_a_stored_file_as_an_empty_string(own_origin):

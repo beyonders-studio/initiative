@@ -7,7 +7,7 @@ what a reader may know is there is ``app.db.presence``.
 
 from __future__ import annotations
 
-from typing import Annotated, List, Optional
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -99,7 +99,7 @@ async def create_share_request(
     return batch
 
 
-async def _read(session, rows) -> List[ShareRequestRead]:
+async def _read(session, rows) -> list[ShareRequestRead]:
     if not rows:
         return []
     names = await share_requests_service.names(
@@ -143,15 +143,15 @@ async def _read(session, rows) -> List[ShareRequestRead]:
     ]
 
 
-@router.get("/", response_model=List[ShareRequestRead])
+@router.get("/", response_model=list[ShareRequestRead])
 async def list_share_requests(
     session: RLSSessionDep,
     current_user: CurrentUserDep,
     guild_context: GuildContextDep,
-    batch_id: Annotated[Optional[UUID], Query()] = None,
-    resource_type: Annotated[Optional[Tool], Query()] = None,
-    resource_id: Annotated[Optional[int], Query()] = None,
-) -> List[ShareRequestRead]:
+    batch_id: Annotated[UUID | None, Query()] = None,
+    resource_type: Annotated[Tool | None, Query()] = None,
+    resource_id: Annotated[int | None, Query()] = None,
+) -> list[ShareRequestRead]:
     """The requests waiting on the reader's answer: from one ask, or on one
     thing, oldest first."""
     rows = await share_requests_service.answerable(

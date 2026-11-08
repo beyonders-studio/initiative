@@ -54,7 +54,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import lru_cache
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any
 from urllib.parse import urlsplit
 
 from fastapi import HTTPException, status
@@ -73,18 +73,18 @@ from app.core.messages import PluginMessages
 from app.models.platform.identity_ref import IdentityEntity
 
 __all__ = [
-    "BoundaryPhase",
-    "GuildId",
-    "InstallBoundary",
     "LEXICAL_MENTIONS",
     "MARKDOWN_MENTIONS",
-    "MentionForm",
-    "Mentions",
-    "PersonId",
     "STORED_MENTION",
     "UNKNOWN_REFERENCE_ERROR",
     "UPLOAD_PATH",
     "UPLOAD_PATH_SHAPE",
+    "BoundaryPhase",
+    "GuildId",
+    "InstallBoundary",
+    "MentionForm",
+    "Mentions",
+    "PersonId",
     "admit_install",
     "boundary_scope",
     "current_install_boundary",
@@ -131,7 +131,7 @@ class InstallBoundary:
 
     guild_id: int
     install_id: int
-    guild_ref: Optional[str]
+    guild_ref: str | None
     named: Mapping[str, tuple[IdentityEntity, int]]
     members: frozenset[int] = frozenset()
     reads_names: bool = False
@@ -183,10 +183,10 @@ class _Slot:
     __slots__ = ("boundary",)
 
     def __init__(self) -> None:
-        self.boundary: Optional[InstallBoundary] = None
+        self.boundary: InstallBoundary | None = None
 
 
-_SLOT: ContextVar[Optional[_Slot]] = ContextVar("identity_boundary", default=None)
+_SLOT: ContextVar[_Slot | None] = ContextVar("identity_boundary", default=None)
 
 
 @contextmanager
@@ -212,7 +212,7 @@ def admit_install(boundary: InstallBoundary) -> None:
     slot.boundary = boundary
 
 
-def current_install_boundary() -> Optional[InstallBoundary]:
+def current_install_boundary() -> InstallBoundary | None:
     """The install boundary of the request in progress, or ``None``."""
     slot = _SLOT.get()
     return None if slot is None else slot.boundary
@@ -237,7 +237,7 @@ def filter_people(value: Any) -> Any:
         ) from None
 
 
-def _boundary_in(phase: BoundaryPhase) -> Optional[InstallBoundary]:
+def _boundary_in(phase: BoundaryPhase) -> InstallBoundary | None:
     boundary = current_install_boundary()
     if boundary is None or boundary.phase is not phase:
         return None
@@ -347,7 +347,7 @@ def written_mention_refs(text: str) -> list[str]:
 def _rewrite_nodes(
     value: Any,
     rewrite: Callable[[dict[str, Any]], Any],
-    text: Optional[Callable[[str], str]] = None,
+    text: Callable[[str], str] | None = None,
 ) -> Any:
     """``value`` copied, with every node that names a person in
     ``mentionUserId`` passed through ``rewrite``, and every string through

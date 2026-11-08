@@ -23,17 +23,18 @@ import asyncio
 import contextlib
 import json
 import logging
+from collections.abc import Awaitable, Callable, Mapping
 from time import monotonic
-from typing import Any, Awaitable, Callable, Mapping, Optional
+from typing import Any
 
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect, status
 from sqlalchemy.orm import selectinload, undefer
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.errors import CodedError
 from app.api import resource_access
 from app.api.deps import GuildAccessError, establish_guild_access
+from app.core.errors import CodedError
 from app.core.identify import presented_credential
 from app.core.tools import Tool
 from app.db.cohorts import request_sessionmaker
@@ -73,7 +74,7 @@ HEARTBEAT_FRAME = {"heartbeat": True}
 
 async def read_auth_frame(
     websocket: WebSocket,
-) -> Optional[tuple[str, Mapping[str, Any]]]:
+) -> tuple[str, Mapping[str, Any]] | None:
     """The credential in an accepted socket's first frame, and the rest of it.
 
     ``None`` once the socket has been closed: no frame in time, a frame that
@@ -81,14 +82,14 @@ async def read_auth_frame(
     """
     try:
         frame = await asyncio.wait_for(websocket.receive(), AUTH_TIMEOUT_SECONDS)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         await _refuse(websocket)
         return None
     except WebSocketDisconnect:
         return None
     if frame.get("type") == "websocket.disconnect":
         return None
-    raw: Optional[bytes | str]
+    raw: bytes | str | None
     data = frame.get("bytes")
     if data is not None:
         raw = data[1:] if len(data) > 1 and data[0] == MSG_AUTH else None
@@ -120,10 +121,10 @@ async def admit(
     wire: Wire,
     authorize: Authorizer,
     presence: bool = False,
-    meta: Optional[dict[str, Any]] = None,
-    prepare: Optional[Callable[[AsyncSession, User], Awaitable[None]]] = None,
-    joined: Optional[Callable[[AsyncSession, Subscriber], Awaitable[None]]] = None,
-) -> Optional[Subscriber]:
+    meta: dict[str, Any] | None = None,
+    prepare: Callable[[AsyncSession, User], Awaitable[None]] | None = None,
+    joined: Callable[[AsyncSession, Subscriber], Awaitable[None]] | None = None,
+) -> Subscriber | None:
     """Accept, authenticate, enter the guild, authorize and register a socket.
 
     Returns the registered socket, or ``None`` once it has been refused.
@@ -176,7 +177,7 @@ async def admit(
 
 
 async def hold_open(
-    sub: Subscriber, on_bytes: Optional[Callable[[bytes], None]] = None
+    sub: Subscriber, on_bytes: Callable[[bytes], None] | None = None
 ) -> None:
     """Keep a socket open until it closes, beating when the server is quiet.
 
@@ -199,7 +200,7 @@ async def hold_open(
                 frame = await asyncio.wait_for(
                     sub.websocket.receive(), HEARTBEAT_SECONDS - quiet_for
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             if frame.get("type") == "websocket.disconnect":
                 break
@@ -230,9 +231,7 @@ def tool_authorizer(guild_id: int, tool: Tool, resource_id: int) -> Authorizer:
     check every REST read of the row makes."""
     model = tool_models()[tool.plural]
 
-    async def authorize(
-        session: AsyncSession, user: User
-    ) -> Optional[frozenset[RoomKey]]:
+    async def authorize(session: AsyncSession, user: User) -> frozenset[RoomKey] | None:
         row = (
             await session.exec(
                 select(model)

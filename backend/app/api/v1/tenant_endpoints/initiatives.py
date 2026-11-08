@@ -1,23 +1,22 @@
-from typing import Annotated, List, Optional, TypeVar
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import ColumnElement, Select, func
 from sqlalchemy.orm import contains_eager, selectinload, undefer
 from sqlmodel import select
 
-from app.db.session import routed_guild_id
 from app.api.actor_route import ActorRoute
 from app.api.deps import (
     ActorContext,
     ActorSessionDep,
     ActorUserDep,
+    GuildContext,
     IncludeDeletedDep,
     RLSSessionDep,
-    plugin_scope,
     SessionDep,
     get_current_active_user,
     get_guild_membership,
-    GuildContext,
+    plugin_scope,
     require_surface,
 )
 from app.core.audit_events import AuditEventType
@@ -28,18 +27,26 @@ from app.core.messages import (
     UserMessages,
 )
 from app.core.tools import Tool
+from app.db.query import (
+    MAX_ID_FILTER_VALUES,
+    build_paginated_response,
+    ids_in,
+    paginated_query,
+)
+from app.db.session import routed_guild_id
+from app.models.platform.guild import AdminSurface
+from app.models.platform.notification import NotificationType
+from app.models.platform.user import Presence, User
+from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.initiative import (
+    LOCKED_PERMISSION_ROLE_NAMES,
     Initiative,
     InitiativeJoinRequest,
     InitiativeMember,
     InitiativeRoleModel,
     JoinRequestStatus,
-    LOCKED_PERMISSION_ROLE_NAMES,
 )
-from app.models.platform.guild import AdminSurface
-from app.models.platform.notification import NotificationType
-from app.models.platform.user import Presence, User
-from app.models.platform.user_profile_view import MemberProfile
+from app.schemas.platform.user import UserSummaryListResponse
 from app.schemas.tenant.initiative import (
     InitiativeCreate,
     InitiativeDefaultsRead,
@@ -56,31 +63,23 @@ from app.schemas.tenant.initiative import (
     InitiativeRoleRead,
     InitiativeRoleUpdate,
     InitiativeUpdate,
+    community_holds_role,
     serialize_initiative,
     serialize_initiative_member,
-    community_holds_role,
     serialize_role,
-)
-from app.schemas.platform.user import UserSummaryListResponse
-from app.db.query import (
-    MAX_ID_FILTER_VALUES,
-    build_paginated_response,
-    ids_in,
-    paginated_query,
 )
 from app.services import audit as audit_service
 from app.services import email as email_service
 from app.services import notifications as notifications_service
+from app.services import rls as rls_service
+from app.services.content_sockets import sockets as content_sockets
+from app.services.membership import initiative_scope_clause
 from app.services.platform import accounts as accounts_service
-from app.services.tenant import initiatives as initiatives_service
-from app.services.tenant.names import ensure_name_free
 from app.services.platform import guilds as guilds_service
 from app.services.platform import presence
 from app.services.platform import users as users_service
-from app.services.content_sockets import sockets as content_sockets
-from app.services import rls as rls_service
-from app.services.membership import initiative_scope_clause
-
+from app.services.tenant import initiatives as initiatives_service
+from app.services.tenant.names import ensure_name_free
 
 #: A route that administers the community's initiatives.
 InitiativesContext = Annotated[
@@ -89,7 +88,6 @@ InitiativesContext = Annotated[
 
 router = APIRouter(route_class=ActorRoute)
 
-_S = TypeVar("_S", bound=Select)
 
 #: The routes an installed plug-in may call, under the initiatives scope.
 InitiativesRead = Annotated[ActorContext, Depends(plugin_scope("initiatives:read"))]
@@ -276,13 +274,13 @@ async def _guard_full_access_role(
 # ============================================================================
 
 
-@router.get("/", response_model=List[InitiativeRead])
+@router.get("/", response_model=list[InitiativeRead])
 async def list_initiatives(
     session: ActorSessionDep,
     current_user: ActorUserDep,
     guild_context: InitiativesRead,
     scope: Annotated[InitiativeListScope, Query()] = InitiativeListScope.member,
-) -> List[InitiativeRead]:
+) -> list[InitiativeRead]:
     """The initiatives the caller belongs to, or — for a guild admin asking for
     ``scope=community`` — every initiative in the guild, which the admin rung's
     reach into all content already reads.
@@ -338,12 +336,12 @@ async def list_initiatives(
     ]
 
 
-@router.get("/directory", response_model=List[InitiativeDirectoryEntry])
+@router.get("/directory", response_model=list[InitiativeDirectoryEntry])
 async def list_initiative_directory(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: Annotated[GuildContext, Depends(get_guild_membership)],
-) -> List[InitiativeDirectoryEntry]:
+) -> list[InitiativeDirectoryEntry]:
     """Initiatives in this guild that any member may discover and join.
 
     Open to every guild member — it lists only what each initiative published
@@ -678,7 +676,7 @@ async def create_join_request(
 
 @router.get(
     "/{initiative_id}/join-requests",
-    response_model=List[InitiativeJoinRequestRead],
+    response_model=list[InitiativeJoinRequestRead],
 )
 async def list_join_requests(
     initiative_id: int,
@@ -695,7 +693,7 @@ async def list_join_requests(
             ),
         ),
     ] = None,
-) -> List[InitiativeJoinRequestRead]:
+) -> list[InitiativeJoinRequestRead]:
     """The join-request queue for one initiative.
 
     Manager-only, matching who may answer it; a plain member of the initiative
@@ -797,15 +795,18 @@ async def get_initiative(
     # RLS admin leg grants), by a PAM / break-glass grantee — who holds no
     # membership row in this guild and reads it through the grant for its window
     # — and by a guest given items in it.
-    if current_user is not None and not _reaches_whole_guild(guild_context):
-        if (
+    if (
+        current_user is not None
+        and not _reaches_whole_guild(guild_context)
+        and (
             initiative_id not in guild_context.member_initiatives
             and initiative_id not in guild_context.guest_item_initiatives
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=InitiativeMessages.NOT_A_MEMBER,
-            )
+        )
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=InitiativeMessages.NOT_A_MEMBER,
+        )
     return serialize_initiative(initiative, context=guild_context)
 
 
@@ -987,23 +988,25 @@ async def delete_initiative(
 # ============================================================================
 
 
-@router.get("/{initiative_id}/roles", response_model=List[InitiativeRoleRead])
+@router.get("/{initiative_id}/roles", response_model=list[InitiativeRoleRead])
 async def list_initiative_roles(
     initiative_id: int,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: Annotated[GuildContext, Depends(get_guild_membership)],
-) -> List[InitiativeRoleRead]:
+) -> list[InitiativeRoleRead]:
     """List all roles for an initiative with their permissions."""
     await _get_initiative_or_404(initiative_id, session)
 
     # Same readership as the initiative itself: member, guild admin, or grantee.
-    if not _reaches_whole_guild(guild_context):
-        if initiative_id not in guild_context.member_initiatives:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=InitiativeMessages.NOT_A_MEMBER,
-            )
+    if (
+        not _reaches_whole_guild(guild_context)
+        and initiative_id not in guild_context.member_initiatives
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=InitiativeMessages.NOT_A_MEMBER,
+        )
 
     roles = await initiatives_service.list_initiative_roles(
         session, initiative_id=initiative_id
@@ -1293,12 +1296,12 @@ async def _require_roster_access(
         )
 
 
-def _roster_where(
-    statement: _S,
+def _roster_where[S: Select](
+    statement: S,
     *,
     initiative_id: int,
-    search: Optional[str],
-) -> tuple[_S, tuple[ColumnElement, ...]]:
+    search: str | None,
+) -> tuple[S, tuple[ColumnElement, ...]]:
     """``statement`` (which joins ``InitiativeMember`` to ``MemberProfile``)
     narrowed to the initiative's listable members matching ``search``, and the
     order to read them in: nearest first while searching, alphabetical
@@ -1326,11 +1329,11 @@ async def get_initiative_members(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: Annotated[GuildContext, Depends(get_guild_membership)],
-    search: Optional[str] = Query(
+    search: str | None = Query(
         default=None,
         description="Case-insensitive substring match on the member's name.",
     ),
-    is_manager: Optional[bool] = Query(
+    is_manager: bool | None = Query(
         default=None,
         description="Only the members whose role is (or is not) a manager role.",
     ),
@@ -1399,7 +1402,7 @@ async def search_initiative_members(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: Annotated[GuildContext, Depends(get_guild_membership)],
-    search: Optional[str] = Query(
+    search: str | None = Query(
         default=None,
         description="Case-insensitive substring match on the member's name.",
     ),

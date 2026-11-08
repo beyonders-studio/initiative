@@ -32,9 +32,9 @@ from __future__ import annotations
 from app.models.platform.user import User
 
 __all__ = [
+    "PRIVATE_COLUMNS",
     "PUBLIC_PROFILE_COLUMNS",
     "PUBLISHED_COLUMNS",
-    "PRIVATE_COLUMNS",
     "all_user_columns",
 ]
 

@@ -25,7 +25,7 @@ over, on the same ``SECURITY DEFINER`` pattern the rest of the DM rules use.
 
 import uuid
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 from pydantic import ConfigDict
@@ -93,7 +93,7 @@ class DmConversation(SQLModel, table=True):
     #: conversation that predates roster identity and that everybody has left.
     roster_key: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
@@ -122,7 +122,7 @@ class DmConversationMember(SQLModel, table=True):
         )
     )
     joined_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     #: When this account answered. Null while it has been asked and has not --

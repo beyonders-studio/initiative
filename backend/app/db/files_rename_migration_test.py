@@ -17,7 +17,6 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
 
-from app.testing.later_revisions import step_later_revisions
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
 from app.models.platform.notification import NotificationType
@@ -37,6 +36,7 @@ from app.testing import (
     create_relationship,
     create_user,
 )
+from app.testing.later_revisions import step_later_revisions
 
 _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 

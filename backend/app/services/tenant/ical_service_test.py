@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import icalendar
@@ -34,9 +34,7 @@ def test_fractional_offset_repeat_survives_ical_export_and_import(zone_name):
     calendar = icalendar.Calendar.from_ical(exported)
     parsed = calendar.walk("VEVENT")[0]
     # A subscriber must resolve the same instant without knowing our importer.
-    assert parsed.decoded("dtstart").astimezone(timezone.utc) == start.astimezone(
-        timezone.utc
-    )
+    assert parsed.decoded("dtstart").astimezone(UTC) == start.astimezone(UTC)
     assert calendar.walk("VTIMEZONE")
     imported, errors, skipped = ical_service.build_calendar_events(
         exported.decode(), 1, 1, 1
@@ -47,14 +45,14 @@ def test_fractional_offset_repeat_survives_ical_export_and_import(zone_name):
     assert event.end_at == start + timedelta(hours=1)
     assert recurrence.first(
         event.recurrence, event.start_at, event.recurrence_shift, 3
-    ) == [(start + timedelta(days=days)).astimezone(timezone.utc) for days in (0, 1, 2)]
+    ) == [(start + timedelta(days=days)).astimezone(UTC) for days in (0, 1, 2)]
 
 
 @pytest.mark.parametrize(
     ("start", "shift"),
     [
-        (datetime(2026, 10, 4, 22, 30, tzinfo=timezone.utc), 1440),
-        (datetime(2026, 10, 6, 2, 30, tzinfo=timezone.utc), -1440),
+        (datetime(2026, 10, 4, 22, 30, tzinfo=UTC), 1440),
+        (datetime(2026, 10, 6, 2, 30, tzinfo=UTC), -1440),
     ],
 )
 def test_picked_date_exceptions_survive_ical_round_trip(start, shift):
@@ -118,8 +116,8 @@ def test_ical_duration_sets_the_imported_event_end(
     )
     imported, errors, skipped = ical_service.build_calendar_events(content, 1, 1, 1)
     assert (errors, skipped) == ([], 0)
-    assert imported[0].start_at.astimezone(timezone.utc).isoformat() == expected_start
-    assert imported[0].end_at.astimezone(timezone.utc).isoformat() == expected_end
+    assert imported[0].start_at.astimezone(UTC).isoformat() == expected_start
+    assert imported[0].end_at.astimezone(UTC).isoformat() == expected_end
 
 
 def test_duration_preserves_case_insensitive_components_and_ignores_alarm_duration():
@@ -132,7 +130,7 @@ def test_duration_preserves_case_insensitive_components_and_ignores_alarm_durati
     )
     imported, errors, skipped = ical_service.build_calendar_events(content, 1, 1, 1)
     assert (errors, skipped) == ([], 0)
-    assert imported[0].end_at == datetime(2026, 10, 20, 11, tzinfo=timezone.utc)
+    assert imported[0].end_at == datetime(2026, 10, 20, 11, tzinfo=UTC)
 
 
 def _feed(rule: str, start: datetime, *, tz: str | None = "Europe/London"):
@@ -160,7 +158,7 @@ def test_a_subscription_anchors_a_days_repeat_off_utc(hour):
     """With ``X-WR-TIMEZONE`` an app may read a UTC start in that zone, so a
     repeat of days is written an hour off UTC, on its own date. Read strictly,
     it still lands where Initiative puts it, across the October clock change."""
-    start = datetime(2026, 10, 19, hour, 30, tzinfo=timezone.utc)
+    start = datetime(2026, 10, 19, hour, 30, tzinfo=UTC)
     rule = "RRULE:FREQ=WEEKLY;BYDAY=MO"
     feed = _feed(rule, start)
     event = feed.walk("VEVENT")[0]
@@ -170,7 +168,7 @@ def test_a_subscription_anchors_a_days_repeat_off_utc(hour):
     assert not icalendar.is_utc(anchor)
     assert anchor.date() == start.date()
     read = rrulestr(event["RRULE"].to_ical().decode(), dtstart=anchor)
-    assert [moment.astimezone(timezone.utc) for moment in read[:4]] == (
+    assert [moment.astimezone(UTC) for moment in read[:4]] == (
         recurrence.first(rule, start, 0, 4)
     )
     # A download names no zone, so its starts stay as stored.
@@ -182,7 +180,7 @@ def test_a_subscription_anchors_a_days_repeat_off_utc(hour):
 def test_a_subscription_with_a_repeat_of_hours_in_utc_names_no_zone():
     """A rule of hours keeps its exact offset, UTC here, so the feed leaves the
     header out rather than have it move the repeat."""
-    start = datetime(2026, 10, 19, 9, tzinfo=timezone.utc)
+    start = datetime(2026, 10, 19, 9, tzinfo=UTC)
     feed = _feed("RRULE:FREQ=DAILY;BYHOUR=9,17", start)
 
     assert "X-WR-TIMEZONE" not in feed

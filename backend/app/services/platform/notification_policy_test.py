@@ -20,13 +20,13 @@ from app.services.platform import (
     email_outbox,
     notice_outbox,
     notification_policy,
+    rules,
 )
 from app.testing import (
     create_guild,
     create_user,
     push_switched_on,
 )
-from app.services.platform import rules
 
 
 async def _platform(session: AsyncSession, **fields: bool) -> None:

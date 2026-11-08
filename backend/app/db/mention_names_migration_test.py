@@ -8,7 +8,7 @@ they were before 20261006_0464.
 from __future__ import annotations
 
 import importlib.util
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from types import ModuleType
 
@@ -23,7 +23,6 @@ from app.models.tenant.file import File
 from app.models.tenant.task import Task
 from app.services.tenant.mention_parser import nameless_state
 from app.testing import MENTIONING_YJS_STATE, route_session_to_guild
-from app.testing.later_revisions import step_later_revisions
 from app.testing.factories import (
     checklist_items,
     create_comment,
@@ -35,6 +34,7 @@ from app.testing.factories import (
     create_user,
     lexical_body,
 )
+from app.testing.later_revisions import step_later_revisions
 
 _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 _REVISION = _VERSIONS / "20261002_0444_a_mention_keeps_no_name.py"
@@ -67,10 +67,10 @@ async def test_a_mention_written_before_keeps_no_name(session):
         project,
         description=named,
         checklist=checklist_items(named),
-        archived_at=datetime.now(timezone.utc),
+        archived_at=datetime.now(UTC),
     )
     comment = await create_comment(
-        session, author, task=task, content=named, deleted_at=datetime.now(timezone.utc)
+        session, author, task=task, content=named, deleted_at=datetime.now(UTC)
     )
     mentioning = await create_file(
         session,

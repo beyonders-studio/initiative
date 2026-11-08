@@ -17,7 +17,7 @@ which mints them where a subscription is shown or delivered to.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     Column,
@@ -62,6 +62,6 @@ class WebhookRef(SQLModel, table=True):
     ref: str = Field(sa_column=Column(String(REF_MAX_LENGTH), nullable=False))
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

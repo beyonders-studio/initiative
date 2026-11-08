@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from app.models.tenant.comment import Comment
-
 from seed.common import Community
 
 #: Each comment names the ``task`` or ``file`` it is on, by title.

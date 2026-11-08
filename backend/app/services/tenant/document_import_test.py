@@ -61,9 +61,13 @@ _ODF = " ".join(
 )
 
 
-def _odt(text: str, *, automatic: str = "", pictures: dict[str, bytes] = {}) -> bytes:
+def _odt(
+    text: str, *, automatic: str = "", pictures: dict[str, bytes] | None = None
+) -> bytes:
     """An ``.odt`` as an office suite writes one: its mimetype first and stored,
     common styles in ``styles.xml``, automatic ones in ``content.xml``."""
+    if pictures is None:
+        pictures = {}
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as package:
         package.writestr(

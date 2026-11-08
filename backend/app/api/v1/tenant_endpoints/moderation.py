@@ -19,15 +19,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
+    GuildContextDep,
     RLSSessionDep,
     get_current_active_user,
-    GuildContextDep,
 )
 from app.core.messages import ModerationMessages
+from app.core.moderation import LegalBasis, ModerationAct, RemovalReason
 from app.db.query import build_paginated_response
 from app.models.platform.user import User
 from app.models.tenant.moderation import ModerationAction
-from app.core.moderation import LegalBasis, ModerationAct, RemovalReason
+from app.schemas.tenant.evidence import EvidenceRead
 from app.schemas.tenant.moderation import (
     InitiativeSharingRead,
     ModerationActCreate,
@@ -41,13 +42,11 @@ from app.schemas.tenant.moderation import (
     ReportTargetLink,
     SharedResourceRead,
 )
-from app.schemas.tenant.evidence import EvidenceRead
 from app.services.platform import evidence as evidence_service
+from app.services.platform import grant_cases
 from app.services.platform.holds import HoldWhy
 from app.services.tenant import moderation as moderation_service
-from app.services.tenant import moderation_acts
-from app.services.tenant import sharing_overview
-from app.services.platform import grant_cases
+from app.services.tenant import moderation_acts, sharing_overview
 
 router = APIRouter()
 

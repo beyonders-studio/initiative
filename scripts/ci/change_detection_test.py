@@ -13,6 +13,7 @@ import pathlib
 import subprocess
 import tempfile
 import unittest
+from typing import ClassVar
 
 import yaml
 
@@ -212,7 +213,7 @@ class TreeIdTest(unittest.TestCase):
                 text=True,
             ).stdout.split()
 
-    BASE = {
+    BASE: ClassVar[dict[str, str]] = {
         "backend/app/main.py": "app\n",
         "VERSION": "1.2.2\n",
         "CHANGELOG.md": "## [Unreleased]\n",
@@ -273,7 +274,14 @@ class UpgradeTest(unittest.TestCase):
 
 
 class ForkTest(unittest.TestCase):
-    AREAS = ["backend", "seam", "upgrade", "frontend", "codegen", "tooling"]
+    AREAS: ClassVar[list[str]] = [
+        "backend",
+        "seam",
+        "upgrade",
+        "frontend",
+        "codegen",
+        "tooling",
+    ]
 
     def test_a_push_to_a_fork_checks_nothing(self) -> None:
         outputs = detect(["backend/app/db/session.py"], "push", fork=True)

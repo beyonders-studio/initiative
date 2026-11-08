@@ -21,41 +21,41 @@ from urllib.parse import quote
 
 import asyncpg
 import pytest
-from sqlalchemy.engine import make_url
-from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from cryptography.hazmat.primitives import serialization as _serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519 as _ed25519
 from httpx import ASGITransport, AsyncClient
-from starlette.requests import HTTPConnection
 from sqlalchemy import event, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
-from starlette.testclient import TestClient
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
+from starlette.requests import HTTPConnection
+from starlette.testclient import TestClient
 
-from app.core.config import settings
+from alembic import command
 from app.api import content_socket
+from app.core.config import settings
 from app.core.rate_limit import limiter
 from app.db import cohorts, post_commit
 from app.db.advisory_locks import LockNamespace
-from app.db.session import (
-    clear_rls_context,
-    get_system_session,
-    get_session,
-    prepare_query_engine,
-    served_guild_id,
-)
-from app.testing import guild_pool
-from app.testing.schema_harness import clear_search_path_pin
-from app.testing.server import in_request_tasks
 from app.db.guild_ddl import render_guild_schema_ddl
 from app.db.guild_migrations import GUILD_SCHEMA_REGEX
 from app.db.schema_provisioning import guild_schema_name
+from app.db.session import (
+    clear_rls_context,
+    get_session,
+    get_system_session,
+    prepare_query_engine,
+    served_guild_id,
+)
 from app.db.tenancy import SHARED_TABLES
 from app.main import app
+from app.testing import guild_pool
+from app.testing.schema_harness import clear_search_path_pin
+from app.testing.server import in_request_tasks
 
 # Quarantined tests and a shuffled order (the nightly run).
 pytest_plugins = ["app.testing.run_options", "pytester"]
@@ -826,8 +826,8 @@ async def _schema_test_harness(engine, _worker_engines, monkeypatch, request):
       when none did, and to hand out a pooled schema where one is parked
       (``app/testing/guild_pool.py``).
     """
-    import app.db.schema_provisioning as schema_provisioning
     import app.db.session as db_session
+    from app.db import schema_provisioning
     from app.testing.schema_harness import install_guild_routing
 
     install_guild_routing()

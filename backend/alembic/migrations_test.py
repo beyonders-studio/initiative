@@ -26,21 +26,20 @@ from __future__ import annotations
 
 import asyncio
 import os
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 from urllib.parse import urlparse
 
 import asyncpg
 import pytest
-from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 
+from alembic import command
 from app.core.config import settings
-from conftest import CHECKOUT_ID, connect_su_postgres
 from app.db.advisory_locks import LockNamespace
 from app.db.tenancy import GUILD_SCOPED_TABLES
-
+from conftest import CHECKOUT_ID, connect_su_postgres
 
 ALEMBIC_SCRIPT_LOCATION = Path(__file__).resolve().parent
 BACKEND_DIR = ALEMBIC_SCRIPT_LOCATION.parent

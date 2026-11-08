@@ -25,7 +25,6 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import auth_context
-
 from app.core.audit_events import AuditEventType
 from app.core.login_methods import LoginMethod
 from app.core.messages import AuthProviderMessages
@@ -37,14 +36,14 @@ from app.models.platform.guild_provider_connection import (
 )
 from app.models.platform.platform_provider_default import PlatformProviderDefault
 from app.schemas.platform.settings import (
-    ConnectableProviderRead,
     CommunityProviderConnectionCreate,
     CommunityProviderConnectionRead,
     CommunityProviderConnectionUpdate,
+    ConnectableProviderRead,
 )
 from app.services import audit as audit_service
-from app.services.platform import rules
 from app.services.auth import narrowing_approval
+from app.services.platform import rules
 
 logger = logging.getLogger(__name__)
 

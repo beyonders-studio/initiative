@@ -10,7 +10,7 @@ policy moving away and back, so a week on ``public`` does not cost somebody
 their list.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import ConfigDict
 from sqlalchemy import Column, DateTime, ForeignKey, Integer
@@ -37,6 +37,6 @@ class UserDmGuildOptout(SQLModel, table=True):
         )
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

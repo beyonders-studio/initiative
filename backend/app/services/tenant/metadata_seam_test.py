@@ -10,9 +10,9 @@ import importlib
 
 import pytest
 
-from app.schemas.tenant.property import PropertiesOnCreate, PropertiesOnUpdate
 from app.db.frozen import render_resource_frozen_fn
 from app.db.initiative_rls import entity_tables, render_entity_initiative_fn
+from app.schemas.tenant.property import PropertiesOnCreate, PropertiesOnUpdate
 from app.services.tenant.metadata import PROPERTY_LINKS
 
 pytestmark = pytest.mark.always

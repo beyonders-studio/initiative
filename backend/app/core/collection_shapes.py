@@ -19,7 +19,7 @@ two collections never share a field by name.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Optional, Union
+from typing import Literal
 
 #: How a list shows a scale (a number, stars or a bar) or a counter (a
 #: number, a bar or a clock).
@@ -38,12 +38,12 @@ class ShapeField:
     #: A ``MetadataType`` value.
     type: str
     #: For a scale, how the shape's lists show it.
-    display: Optional[FieldDisplay] = None
+    display: FieldDisplay | None = None
 
 
 #: What a card or a table column shows: a file's own field, by the id a
 #: layout names it by (``FileFieldId``), or one of the shape's fields.
-ShownField = Union[str, ShapeField]
+ShownField = str | ShapeField
 
 
 @dataclass(frozen=True)

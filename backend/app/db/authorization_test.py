@@ -27,7 +27,6 @@ from app.db.authorization import (
 from app.db.schema_provisioning import guild_schema_name
 from app.testing import create_guild
 
-
 #: ``pg_get_functiondef`` needs the argument types to identify an overload.
 #: These are the only signatures in ``public``; a second overload
 #: of any of them would be a design change, and

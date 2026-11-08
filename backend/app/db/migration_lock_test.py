@@ -5,8 +5,8 @@ import asyncio
 import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-import app.db.init_db as init_db
 from app.core.config import settings
+from app.db import init_db
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.session import migration_lock
 from conftest import TEST_DATABASE_URL

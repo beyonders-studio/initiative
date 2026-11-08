@@ -1,10 +1,11 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from enum import Enum
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar, Optional
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, String, Text
-from sqlmodel import Enum as SQLEnum, Field, Relationship
+from sqlmodel import Enum as SQLEnum
+from sqlmodel import Field, Relationship
 
 from app.core.tools import Tool
 from app.models.tenant._mixins import (
@@ -45,33 +46,33 @@ class CounterGroup(
     # A tool row is written before anything has been shared, so it is read
     # back by no RETURNING clause: the id comes from the sequence first and
     # the INSERT stands alone. See app/db/initiative_rls.py.
-    __table_args__ = {"implicit_returning": False}
+    __table_args__: ClassVar[dict[str, bool]] = {"implicit_returning": False}
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     initiative_id: int = Field(foreign_key="initiatives.id", nullable=False, index=True)
     name: str = Field(nullable=False, max_length=255)
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None,
         sa_column=Column(Text, nullable=True),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
     initiative: Optional["Initiative"] = Relationship(back_populates="counter_groups")
-    counters: List["Counter"] = Relationship(
+    counters: list["Counter"] = Relationship(
         back_populates="group",
         sa_relationship_kwargs={
             "cascade": "all, delete-orphan",
             "order_by": "Counter.position",
         },
     )
-    grants: List["ResourceGrant"] = Relationship(
+    grants: list["ResourceGrant"] = Relationship(
         sa_relationship_kwargs={
             "primaryjoin": (
                 "and_(foreign(ResourceGrant.resource_id) == CounterGroup.id, "
@@ -98,7 +99,7 @@ class Counter(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
 
     __tablename__ = "counters"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     counter_group_id: int = Field(
         sa_column=Column(
             Integer,
@@ -108,28 +109,28 @@ class Counter(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
         ),
     )
     name: str = Field(nullable=False, max_length=255)
-    color: Optional[str] = Field(
+    color: str | None = Field(
         default=None,
         sa_column=Column(String(length=32), nullable=True),
     )
     count: Decimal = Field(
-        default=Decimal("0"),
+        default=Decimal(0),
         sa_column=Column(COUNTER_NUMBER, nullable=False, server_default="0"),
     )
-    min: Optional[Decimal] = Field(
+    min: Decimal | None = Field(
         default=None,
         sa_column=Column(COUNTER_NUMBER, nullable=True),
     )
-    max: Optional[Decimal] = Field(
+    max: Decimal | None = Field(
         default=None,
         sa_column=Column(COUNTER_NUMBER, nullable=True),
     )
     step: Decimal = Field(
-        default=Decimal("1"),
+        default=Decimal(1),
         sa_column=Column(COUNTER_NUMBER, nullable=False, server_default="1"),
     )
     initial_count: Decimal = Field(
-        default=Decimal("0"),
+        default=Decimal(0),
         sa_column=Column(COUNTER_NUMBER, nullable=False, server_default="0"),
     )
     view_mode: CounterViewMode = Field(
@@ -145,19 +146,19 @@ class Counter(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
         ),
     )
     position: Decimal = Field(
-        default=Decimal("0"),
+        default=Decimal(0),
         sa_column=Column(COUNTER_NUMBER, nullable=False, server_default="0"),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
-    group: Optional[CounterGroup] = Relationship(back_populates="counters")
+    group: CounterGroup | None = Relationship(back_populates="counters")
 
 
 attach_actions(CounterGroup, Tool.counter_group)

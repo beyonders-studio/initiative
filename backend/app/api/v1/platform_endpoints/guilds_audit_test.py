@@ -24,7 +24,6 @@ from app.testing.factories import (
     get_auth_token,
 )
 
-
 PASSWORD = "testpassword123"
 
 

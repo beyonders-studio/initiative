@@ -2,15 +2,15 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from app.api.deps import UserSessionDep, CurrentUser, require_first_party_session
+from app.api.deps import CurrentUser, UserSessionDep, require_first_party_session
 from app.core import auth_context
+from app.core.messages import NotificationMessages
 from app.core.rate_limit import limiter
 from app.schemas.platform.push import (
     PushTokenRegisterRequest,
-    PushTokenUnregisterRequest,
     PushTokenResponse,
+    PushTokenUnregisterRequest,
 )
-from app.core.messages import NotificationMessages
 from app.services.platform import push_tokens, rules
 
 router = APIRouter()

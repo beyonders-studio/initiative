@@ -44,7 +44,7 @@ __all__ = [
     "OidcFlowState",
     "OidcMetadata",
     "OidcProvider",
-    "verify_id_token",
     "create_flow_state",
     "decode_flow_state",
+    "verify_id_token",
 ]

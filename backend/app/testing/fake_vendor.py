@@ -21,8 +21,8 @@ import ipaddress
 import itertools
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from urllib.parse import parse_qsl
 
 import httpx
@@ -30,7 +30,7 @@ import httpx
 from app.services import safe_http
 from app.services.webhook_target_url import ValidatedTarget
 
-__all__ = ["FakeVendor", "declarative_plugin", "declarative_github"]
+__all__ = ["FakeVendor", "declarative_github", "declarative_plugin"]
 
 VENDOR_HOST = "github.test"
 API_HOST = "api.github.test"
@@ -333,7 +333,7 @@ class FakeVendor:
             plugin_connection_flows, "http_transport", httpx.MockTransport(self.handle)
         )
 
-    def authorize(self, challenge: Optional[str]) -> str:
+    def authorize(self, challenge: str | None) -> str:
         """What the vendor's authorization page does when the person agrees:
         mint a code bound to the challenge it was sent."""
         code = f"code-{next(self._serial)}"
@@ -462,7 +462,7 @@ class FakeVendor:
         )
         if self.exchange_status >= 300:
             return httpx.Response(self.exchange_status)
-        expires = datetime.now(timezone.utc) + timedelta(hours=1)
+        expires = datetime.now(UTC) + timedelta(hours=1)
         return httpx.Response(
             self.exchange_status,
             json={

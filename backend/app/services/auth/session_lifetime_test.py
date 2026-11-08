@@ -1,21 +1,21 @@
 """The absolute limit on staying signed in, and the standard a community sets."""
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
-
 from app.models.platform.guild import CommunityRole
-from app.services.auth import session_lifetime, sessions as session_service
+from app.services.auth import session_lifetime
+from app.services.auth import sessions as session_service
+from app.services.platform import rules
 from app.testing import (
     create_guild,
     create_guild_membership,
     create_user,
     guild_administration,
 )
-from app.services.platform import rules
 
-_AT = datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc)
+_AT = datetime(2026, 8, 1, 12, 0, tzinfo=UTC)
 
 
 async def _set_platform_hours(session, hours):

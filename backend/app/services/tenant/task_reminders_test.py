@@ -2,7 +2,7 @@
 the next task of a repeating series, and told to them once when it comes due."""
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlmodel import col, select
@@ -72,7 +72,7 @@ async def _set(client, a, task_id: int, remind_at: datetime) -> dict:
 async def test_a_reminder_is_set_moved_and_cleared(client, session, acting_user):
     a = await acting_user(guild_role="member", initiative=True, project=True)
     task = await create_task(session, a.project)
-    at = datetime(2026, 11, 2, 9, tzinfo=timezone.utc)
+    at = datetime(2026, 11, 2, 9, tzinfo=UTC)
 
     state = await _set(client, a, task.id, at)
     assert datetime.fromisoformat(state["remind_at"]) == at
@@ -103,7 +103,7 @@ async def test_a_reminder_is_only_for_a_task_the_reader_can_open(
     response = await client.put(
         outsider.g(f"/personal-items/reminder/task/{task.id}"),
         headers=outsider.headers,
-        json={"remind_at": datetime.now(timezone.utc).isoformat()},
+        json={"remind_at": datetime.now(UTC).isoformat()},
     )
     assert response.status_code == 404
 
@@ -125,7 +125,7 @@ async def test_a_repeating_task_carries_its_reminder_at_the_same_distance(
     client, session, acting_user, operation
 ):
     a = await acting_user(guild_role="member", initiative=True, project=True)
-    due = datetime(2026, 10, 5, 9, tzinfo=timezone.utc)
+    due = datetime(2026, 10, 5, 9, tzinfo=UTC)
     first = await create_task(
         session,
         a.project,
@@ -168,7 +168,7 @@ async def test_a_completed_repeat_leaves_other_marks_on_the_finished_task(
     client, session, acting_user
 ):
     a = await acting_user(guild_role="member", initiative=True, project=True)
-    due = datetime(2026, 10, 5, 9, tzinfo=timezone.utc)
+    due = datetime(2026, 10, 5, 9, tzinfo=UTC)
     first = await create_task(
         session, a.project, due_date=due, recurrence="RRULE:FREQ=DAILY"
     )
@@ -195,7 +195,7 @@ async def test_a_completed_repeat_leaves_other_marks_on_the_finished_task(
 async def test_a_due_reminder_is_told_once(client, session, acting_user):
     a = await acting_user(guild_role="member", initiative=True, project=True)
     task = await create_task(session, a.project, title="Water the plants")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await _set(client, a, task.id, now - timedelta(minutes=1))
     future = await create_task(session, a.project, title="Later")
     await _set(client, a, future.id, now + timedelta(hours=1))
@@ -213,7 +213,7 @@ async def test_a_due_reminder_is_told_once(client, session, acting_user):
 async def test_setting_a_sent_reminder_again_arms_it(client, session, acting_user):
     a = await acting_user(guild_role="member", initiative=True, project=True)
     task = await create_task(session, a.project)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await _set(client, a, task.id, now - timedelta(minutes=1))
     await _sweep(session, now)
     await _set(client, a, task.id, now - timedelta(seconds=30))
@@ -224,7 +224,7 @@ async def test_setting_a_sent_reminder_again_arms_it(client, session, acting_use
 async def test_a_finished_task_reminds_of_nothing(client, session, acting_user):
     a = await acting_user(guild_role="member", initiative=True, project=True)
     task = await create_task(session, a.project)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await _set(client, a, task.id, now - timedelta(minutes=1))
     response = await client.patch(
         a.g(f"/tasks/{task.id}"), headers=a.headers, json={"status_category": "done"}
@@ -240,7 +240,7 @@ async def test_a_reminder_is_switched_off_with_subscriptions(
 ):
     a = await acting_user(guild_role="member", initiative=True, project=True)
     task = await create_task(session, a.project)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await _set(client, a, task.id, now - timedelta(minutes=1))
     await set_rls_context(session, Unattributed())
     await set_notification_prefs(
@@ -266,7 +266,7 @@ async def test_a_series_moved_on_twice_at_once_follows_each_move(
     client, session, acting_user
 ):
     a = await acting_user(guild_role="member", initiative=True, project=True)
-    due = datetime(2026, 10, 5, 9, tzinfo=timezone.utc)
+    due = datetime(2026, 10, 5, 9, tzinfo=UTC)
     task = await create_task(
         session, a.project, due_date=due, recurrence="RRULE:FREQ=WEEKLY"
     )

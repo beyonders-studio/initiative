@@ -22,7 +22,7 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -131,7 +131,7 @@ async def convert(
         file.file_type = spec.converts_to
         file.content = content
         file.yjs_state = None
-        file.updated_at = datetime.now(timezone.utc)
+        file.updated_at = datetime.now(UTC)
         session.add(file)
     except BaseException:
         # Nothing has committed, so the pictures stored so far are nobody's.

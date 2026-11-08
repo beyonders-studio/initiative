@@ -13,7 +13,6 @@ those items carry.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from sqlalchemy import select as sa_select
 from sqlmodel import select
@@ -30,7 +29,7 @@ class SharedResource:
 
     resource_type: str
     resource_id: int
-    name: Optional[str]
+    name: str | None
     #: True when every member of the initiative can reach it.
     all_initiative_members: bool
     #: How many people hold a grant of their own, owners included.
@@ -41,7 +40,7 @@ class SharedResource:
 
 async def _names_for(
     session: AsyncSession, tool: Tool, ids: set[int]
-) -> dict[int, Optional[str]]:
+) -> dict[int, str | None]:
     """``id -> label`` for one tool's rows.
 
     The label column is the model's own ``display_field`` — ``name`` for most,
@@ -93,7 +92,7 @@ async def initiative_sharing(
         except ValueError:
             continue
         ids_by_tool.setdefault(tool, set()).add(resource_id)
-    names: dict[tuple[str, int], Optional[str]] = {}
+    names: dict[tuple[str, int], str | None] = {}
     for tool, ids in ids_by_tool.items():
         for resource_id, label in (await _names_for(session, tool, ids)).items():
             names[(tool.value, resource_id)] = label

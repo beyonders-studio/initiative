@@ -16,7 +16,6 @@ from app.services.tenant.comments import (
     _ensure_parent_access,
     _load_parent,
 )
-from app.testing.factories import TOOL_FACTORIES
 from app.testing import (
     create_access_grant,
     create_comment,
@@ -28,6 +27,7 @@ from app.testing import (
     create_user,
     route_as,
 )
+from app.testing.factories import TOOL_FACTORIES
 
 
 async def test_task_comment_access_honors_grant(session: AsyncSession, reading_as):
@@ -185,7 +185,7 @@ class TestCommentRlsLegs:
         await create_guild_membership(session, user=outsider, guild=guild)
 
         count_sql = text(
-            f"SELECT count(*) FROM comments WHERE {tool.value}_id = :eid"  # noqa: S608 — column name from the Tool enum
+            f"SELECT count(*) FROM comments WHERE {tool.value}_id = :eid"
         ).bindparams(eid=entity.id)
 
         s = await role_session("app_user")

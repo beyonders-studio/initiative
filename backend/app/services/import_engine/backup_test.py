@@ -2,7 +2,7 @@
 factory-made community: dates move from an anchor, and an initiative keeps its
 join policy."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -36,7 +36,7 @@ async def exported(client, acting_user, session, tmp_path):
     )
     a.initiative.join_policy = InitiativeJoinPolicy.request.value
     session.add(a.initiative)
-    due = datetime.now(timezone.utc).replace(microsecond=0) + DUE_IN
+    due = datetime.now(UTC).replace(microsecond=0) + DUE_IN
     await create_task(session, a.project, title="Proof the dough", due_date=due)
 
     queued = await client.get(a.g("/exports/community"), headers=a.headers)
@@ -92,7 +92,7 @@ async def test_an_anchored_backup_lands_its_dates_as_far_from_now(exported, sess
     a, due, bundle = exported
 
     initiative = await _restore(
-        session, a, bundle, anchor=datetime.now(timezone.utc) - timedelta(days=30)
+        session, a, bundle, anchor=datetime.now(UTC) - timedelta(days=30)
     )
 
     # Due two days after the anchor, so two days from now.

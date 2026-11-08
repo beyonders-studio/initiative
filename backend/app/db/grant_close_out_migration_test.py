@@ -8,7 +8,7 @@ row security like any other role until the migration lifts it.
 from __future__ import annotations
 
 import importlib.util
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy import text
@@ -42,7 +42,7 @@ async def test_ended_grants_are_closed_out_and_live_ones_are_not(
 ):
     user = await create_user(session)
     guild = await create_guild(session)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     def grant(status: str, expires_in: timedelta) -> AccessGrant:
         return AccessGrant(

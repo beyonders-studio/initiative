@@ -16,7 +16,8 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from datetime import date as Date, datetime, timezone
+from datetime import UTC, datetime
+from datetime import date as Date
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any
@@ -94,7 +95,7 @@ def moment(value: Any, tz: str | None) -> str:
             return str(value)
     if not isinstance(value, datetime):
         return ""
-    aware = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    aware = value if value.tzinfo else value.replace(tzinfo=UTC)
     return aware.astimezone(resolve_zone(tz)).strftime("%Y-%m-%d %H:%M %Z")
 
 

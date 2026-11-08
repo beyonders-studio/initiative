@@ -62,11 +62,10 @@ async def test_host_header_includes_explicit_port():
 
 
 async def test_private_resolution_is_refused():
-    with _resolves_to("10.0.0.5"):
-        with pytest.raises(WebhookTargetUrlPrivateError):
-            await build_validated_request(
-                "POST", "https://internal.example.com/x", content=b""
-            )
+    with _resolves_to("10.0.0.5"), pytest.raises(WebhookTargetUrlPrivateError):
+        await build_validated_request(
+            "POST", "https://internal.example.com/x", content=b""
+        )
 
 
 async def test_send_connects_to_pinned_ip():
@@ -188,17 +187,17 @@ async def test_connect_timeout_does_not_fall_back():
         (2, 0, 0, "", ("93.184.216.34", 0)),
         (2, 0, 0, "", ("93.184.216.35", 0)),
     ]
-    with patch(
-        "app.services.webhook_target_url.socket.getaddrinfo", return_value=infos
+    with (
+        patch("app.services.webhook_target_url.socket.getaddrinfo", return_value=infos),
+        pytest.raises(httpx.ConnectTimeout),
     ):
-        with pytest.raises(httpx.ConnectTimeout):
-            await request_public_target(
-                "POST",
-                "https://cdn.example.com/deliver",
-                content=b"{}",
-                timeout=5.0,
-                transport=httpx.MockTransport(handler),
-            )
+        await request_public_target(
+            "POST",
+            "https://cdn.example.com/deliver",
+            content=b"{}",
+            timeout=5.0,
+            transport=httpx.MockTransport(handler),
+        )
 
     assert seen == ["93.184.216.34"]  # stopped after the timeout; no fallback
 
@@ -233,20 +232,18 @@ async def test_allow_private_permits_http_to_private():
 
 async def test_allow_private_still_rejects_http_to_public():
     """allow_private does not relax the http-to-public prohibition."""
-    with _resolves_to("93.184.216.34"):
-        with pytest.raises(WebhookTargetUrlError):
-            await build_validated_request(
-                "POST", "http://hooks.example.com/in", content=b"", allow_private=True
-            )
+    with _resolves_to("93.184.216.34"), pytest.raises(WebhookTargetUrlError):
+        await build_validated_request(
+            "POST", "http://hooks.example.com/in", content=b"", allow_private=True
+        )
 
 
 async def test_private_target_still_refused_without_allow_private():
     """Default (allow_private=False) still refuses a private target."""
-    with _resolves_to("10.0.0.5"):
-        with pytest.raises(WebhookTargetUrlPrivateError):
-            await build_validated_request(
-                "POST", "https://internal.example.com/x", content=b""
-            )
+    with _resolves_to("10.0.0.5"), pytest.raises(WebhookTargetUrlPrivateError):
+        await build_validated_request(
+            "POST", "https://internal.example.com/x", content=b""
+        )
 
 
 def _gzipped(body: bytes):

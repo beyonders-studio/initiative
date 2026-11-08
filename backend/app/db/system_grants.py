@@ -38,8 +38,8 @@ from app.db.public_rls import (
 )
 
 __all__ = [
-    "ROLE_GRANTS",
     "LOGIN_SETTINGS",
+    "ROLE_GRANTS",
     "VALID_GRANT_VERBS",
     "grant_sql",
     "grant_statements",

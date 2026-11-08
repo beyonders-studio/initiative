@@ -2,7 +2,7 @@
 them and the initiatives they are in, and nothing community-wide."""
 
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import text
@@ -116,7 +116,7 @@ async def test_a_guest_reads_the_files_of_the_initiatives_it_reaches(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     guest = await create_guest(session, a.guild)
     await create_resource_grant(session, a.project, user=guest)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     shown = await create_upload(
         session, a.guild, a.user, initiative_id=a.initiative.id, claimed_at=now
     )

@@ -14,11 +14,11 @@ from __future__ import annotations
 
 from app.core.tools import Tool
 from app.models.tenant.calendar import Calendar
+from app.models.tenant.collection import Collection
 from app.models.tenant.contact import Contact
 from app.models.tenant.counter import Counter, CounterGroup
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.file import File, FileVersion
-from app.models.tenant.collection import Collection
 from app.models.tenant.post import Post
 from app.models.tenant.wiki import Wiki, WikiPage
 from app.services.fields.derive import derive_fields

@@ -16,9 +16,9 @@ from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.auth_provider_secret import AuthProviderSecret
 from app.services.auth.platform_provider import (
     PLATFORM_OIDC_SLUG,
+    get_platform_provider,
     is_login_ready,
     login_ready_clause,
-    get_platform_provider,
     seed_platform_provider_from_env,
     upsert_platform_provider,
 )

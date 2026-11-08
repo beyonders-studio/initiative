@@ -1,9 +1,9 @@
 """Integration tests for counter group endpoints."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from decimal import Decimal
 
 import pytest
-from decimal import Decimal
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -12,6 +12,7 @@ from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.counter import COUNTER_LIMIT
+from app.services.tenant import counters as counters_service
 from app.testing import (
     Actor,
     create_counter,
@@ -19,7 +20,6 @@ from app.testing import (
     create_initiative,
     create_resource_grant,
 )
-from app.services.tenant import counters as counters_service
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -191,8 +191,8 @@ async def test_add_counter_clamps_initial_and_count(client: AsyncClient, acting_
         max_value="50",
         initial_count="60",
     )
-    assert Decimal(counter["count"]) == Decimal("50")
-    assert Decimal(counter["initial_count"]) == Decimal("50")
+    assert Decimal(counter["count"]) == Decimal(50)
+    assert Decimal(counter["initial_count"]) == Decimal(50)
 
 
 async def test_progress_bar_requires_bounds(client: AsyncClient, acting_user):
@@ -255,7 +255,7 @@ async def test_a_step_moves_by_the_counter_s_step_or_the_amount_given(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     group = await create_counter_group(session, a.initiative, a.user)
     counter = await create_counter(
-        session, group, count=Decimal("10"), step=Decimal("2"), max=Decimal("100")
+        session, group, count=Decimal(10), step=Decimal(2), max=Decimal(100)
     )
 
     landed = []
@@ -320,9 +320,7 @@ async def test_a_deleted_counter_does_not_step(
 ):
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     group = await create_counter_group(session, a.initiative, a.user)
-    counter = await create_counter(
-        session, group, deleted_at=datetime.now(timezone.utc)
-    )
+    counter = await create_counter(session, group, deleted_at=datetime.now(UTC))
 
     response = await client.post(
         a.g(f"/counters/{counter.id}/step"),
@@ -392,7 +390,7 @@ async def test_set_count_clamps(client: AsyncClient, acting_user):
         json={"count": "9999"},
     )
     assert response.status_code == 200
-    assert Decimal(response.json()["count"]) == Decimal("100")
+    assert Decimal(response.json()["count"]) == Decimal(100)
 
 
 async def test_reset_returns_to_initial(client: AsyncClient, acting_user):
@@ -420,7 +418,7 @@ async def test_reset_returns_to_initial(client: AsyncClient, acting_user):
         headers=a.headers,
     )
     assert response.status_code == 200
-    assert Decimal(response.json()["count"]) == Decimal("80")
+    assert Decimal(response.json()["count"]) == Decimal(80)
 
 
 async def test_reset_all_counters(client: AsyncClient, acting_user):
@@ -463,8 +461,8 @@ async def test_reset_all_counters(client: AsyncClient, acting_user):
     )
     assert response.status_code == 200
     counts = {c["name"]: Decimal(c["count"]) for c in response.json()["counters"]}
-    assert counts["A"] == Decimal("50")
-    assert counts["B"] == Decimal("25")
+    assert counts["A"] == Decimal(50)
+    assert counts["B"] == Decimal(25)
 
 
 # ---------------------------------------------------------------------------
@@ -485,7 +483,7 @@ async def test_update_min_max_reclamps_count(client: AsyncClient, acting_user):
         json={"max": "50"},
     )
     assert response.status_code == 200
-    assert Decimal(response.json()["count"]) == Decimal("50")
+    assert Decimal(response.json()["count"]) == Decimal(50)
 
 
 async def test_update_null_non_nullable_fields_is_refused(
@@ -750,7 +748,7 @@ async def test_sort_counters(client: AsyncClient, acting_user):
     assert _ordered_names(body) == ["alpha", "Bravo", "Charlie"]
     # Positions are reassigned to a clean 1..N sequence.
     positions = sorted(Decimal(c["position"]) for c in body["counters"])
-    assert positions == [Decimal("1"), Decimal("2"), Decimal("3")]
+    assert positions == [Decimal(1), Decimal(2), Decimal(3)]
 
     assert _ordered_names(await sort("name", "desc")) == ["Charlie", "Bravo", "alpha"]
     assert _ordered_names(await sort("count", "asc")) == ["alpha", "Bravo", "Charlie"]
@@ -838,8 +836,8 @@ async def test_duplicate_counter_group(client: AsyncClient, acting_user):
         c["name"]
         for c in sorted(copy["counters"], key=lambda c: Decimal(c["position"]))
     ] == ["HP", "Mana"]
-    assert Decimal(by_name["HP"]["count"]) == Decimal("40")
-    assert Decimal(by_name["HP"]["initial_count"]) == Decimal("100")
+    assert Decimal(by_name["HP"]["count"]) == Decimal(40)
+    assert Decimal(by_name["HP"]["initial_count"]) == Decimal(100)
     assert by_name["Mana"]["view_mode"] == "number"
 
     # The source group is untouched.
@@ -911,7 +909,7 @@ async def test_a_counter_resolves_by_its_own_id(client, session, acting_user):
 async def test_a_deleted_counter_reads_back(client, session, acting_user):
     """The read-back a ``counters.deleted`` event depends on. A hand-written
     deleted check used to refuse this even when the request asked for it."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.models.platform.guild import CommunityRole
     from app.testing import create_counter, create_counter_group
@@ -920,7 +918,7 @@ async def test_a_deleted_counter_reads_back(client, session, acting_user):
     group = await create_counter_group(session, a.initiative, a.user)
     counter = await create_counter(session, group)
     counter_id = counter.id
-    counter.deleted_at = datetime.now(timezone.utc)
+    counter.deleted_at = datetime.now(UTC)
     session.add(counter)
     await session.commit()
 

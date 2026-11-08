@@ -10,7 +10,6 @@ contacts plug-in (``authorization.COMMUNITY_ROWS``).
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import selectinload, undefer
@@ -105,7 +104,7 @@ async def organizations_of(
 
 
 async def community_holder(
-    session: AsyncSession, user: Optional[User], guild_context: ActorContext
+    session: AsyncSession, user: User | None, guild_context: ActorContext
 ) -> GuildPlugin:
     """The install a community contact goes into, once the request may put one
     there: a person holding the ``community_contacts`` surface, in a community

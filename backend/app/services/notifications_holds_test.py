@@ -6,7 +6,7 @@ throughout. What arrives when a hold ends is the content itself, by email, out
 of the outbox — the push that goes with it is only a count.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlmodel import select
@@ -16,7 +16,7 @@ from app.core.notification_categories import Channel, NotificationCategory
 from app.models.platform.notice_outbox import NoticeOutboxItem
 from app.models.platform.notification import NotificationType
 from app.services.notifications import _run_hold_summary_pass
-from app.services.platform import notification_prefs, user_notifications
+from app.services.platform import notification_prefs, rules, user_notifications
 from app.services.platform.notification_prefs import HoldKind
 from app.testing import (
     create_guild,
@@ -25,7 +25,6 @@ from app.testing import (
     set_notification_prefs,
 )
 from app.testing.sockets import settle
-from app.services.platform import rules
 
 NIGHT = {"quiet_hours": {"start": "22:00", "end": "07:00"}}
 MENTION = NotificationType.mention
@@ -33,13 +32,13 @@ MENTIONS = NotificationCategory.mentions
 
 
 def _at(hour: int, day: int = 9) -> datetime:
-    return datetime(2026, 9, day, hour, 0, tzinfo=timezone.utc)
+    return datetime(2026, 9, day, hour, 0, tzinfo=UTC)
 
 
 #: Well before any moment these tests call "now", so the pause this builds is
 #: one that is already running. A pause booked for later is written out in
 #: full, because when it starts is the point of those.
-_LONG_AGO = datetime(2026, 9, 1, tzinfo=timezone.utc)
+_LONG_AGO = datetime(2026, 9, 1, tzinfo=UTC)
 
 
 def _paused_until(moment: datetime, *, since: datetime | None = None) -> dict:

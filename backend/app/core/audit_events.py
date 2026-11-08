@@ -18,6 +18,7 @@ streams; the envelope carries the fields that stitch them together downstream.
 from __future__ import annotations
 
 from enum import Enum
+from typing import Self
 
 
 class AuditCategory(str, Enum):
@@ -65,7 +66,7 @@ class AuditEventType(str, Enum):
         category: AuditCategory,
         tier: int = 2,
         is_write: bool = True,
-    ) -> AuditEventType:
+    ) -> Self:
         member = str.__new__(cls, value)
         member._value_ = value
         member.category = category

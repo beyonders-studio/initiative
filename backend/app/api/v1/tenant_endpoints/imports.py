@@ -13,9 +13,9 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Annotated, BinaryIO, Optional
+from typing import Annotated, BinaryIO
 
 from fastapi import (
     APIRouter,
@@ -33,11 +33,11 @@ from fastapi.responses import JSONResponse
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
+    GuildContext,
+    GuildContextDep,
     RLSSessionDep,
     get_current_active_user,
     require_seat,
-    GuildContext,
-    GuildContextDep,
 )
 from app.core.body_limit import MULTIPART_SLACK_BYTES, max_body
 from app.core.messages import ImportEngineMessages, ResumableMessages
@@ -49,6 +49,7 @@ from app.schemas.tenant.atlassian import (
     AtlassianConnectResponse,
     AtlassianImportRequest,
 )
+from app.schemas.tenant.data_job import DataJobRead, serialize_data_job
 from app.schemas.tenant.import_job import (
     ContactCsvImportRequest,
     ContactCsvPreview,
@@ -58,22 +59,19 @@ from app.schemas.tenant.import_job import (
     ForeignPreview,
     ForeignSourceOption,
 )
-from app.schemas.tenant.data_job import DataJobRead, serialize_data_job
 from app.services import data_jobs, resumable
 from app.services.import_engine import atlassian as atlassian_service
-from app.services.import_engine import atlassian_job
+from app.services.import_engine import atlassian_job, contacts_csv, envelope_archive
 from app.services.import_engine import backup as backup_service
-from app.services.import_engine import contacts_csv
 from app.services.import_engine import engine as import_engine
-from app.services.import_engine import envelope_archive
 from app.services.import_engine import foreign as foreign_service
+from app.services.import_engine import limits as import_limits
 from app.services.import_engine.contract import (
     InlineImport,
 )
 from app.services.import_engine.engine import (
     spooled_upload,
 )
-from app.services.import_engine import limits as import_limits
 from app.services.storage import get_guild_storage, open_seekable
 
 logger = logging.getLogger(__name__)
@@ -162,7 +160,7 @@ async def import_envelope_archive(
     guild_context: GuildContextDep,
     file: UploadFile = File(...),
     initiative_id: int = Form(...),
-    envelope_type: Optional[str] = Form(
+    envelope_type: str | None = Form(
         default=None,
         description="The envelope type the import was started for; a zip "
         "holding another tool's export is refused",
@@ -280,7 +278,7 @@ async def preview_contacts_import(
     session: RLSSessionDep,
     _current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-    initiative_id: Optional[int] = Query(
+    initiative_id: int | None = Query(
         default=None,
         description="The initiative the contacts go into, whose properties a "
         "column headed with one's name fills; none for the community's contacts",
@@ -607,7 +605,7 @@ async def confirm_import(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-    body: Optional[dict] = None,
+    body: dict | None = None,
 ) -> DataJobRead:
     """Confirm a staged import: flips it to ``queued`` for the worker.
 
@@ -653,7 +651,7 @@ async def confirm_import(
     # A staged job whose TTL already elapsed is expired NOW, not silently on
     # GC's next pass: confirming it would return 200 and then vanish queued
     # (GC sweeps expired queued rows too) with no notification.
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if job.expires_at is not None and job.expires_at <= now:
         await asyncio.to_thread(
             import_engine.delete_payload, guild_context.guild_id, job.file_ref

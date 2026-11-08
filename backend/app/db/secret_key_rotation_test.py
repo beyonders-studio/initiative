@@ -18,13 +18,14 @@ from sqlalchemy import text
 from sqlmodel import SQLModel
 
 from app.core import config, security
+from app.core.audit_events import AuditEventType
 from app.core.encryption import (
     FERNET_SALT,
     SALT_AI_API_KEY,
+    SALT_EMAIL,
     SALT_PLUGIN_CONFIG,
     SALT_PLUGIN_PLATFORM_SIGNING_KEY,
     SALT_PLUGIN_VENDOR,
-    SALT_EMAIL,
     decrypt_field,
     encrypt_field,
     hash_email,
@@ -45,7 +46,6 @@ from app.services.platform.app_settings import (
     seed_app_settings,
 )
 from app.testing import create_plugin_service_registration, sealed_vendor_values
-from app.core.audit_events import AuditEventType
 from app.testing.audit import emitted
 
 # Distinct test-only keys (≥32 chars). Deliberately different from the ambient
@@ -374,7 +374,7 @@ async def test_rotate_visits_per_guild_schema_settings(engine, monkeypatch):
             )
             await conn.execute(
                 text(
-                    f'INSERT INTO "{schema}".guild_ai_connection_keys '  # noqa: S608
+                    f'INSERT INTO "{schema}".guild_ai_connection_keys '
                     "(connection_id, api_key_encrypted) VALUES (1, :a)"
                 ),
                 {
@@ -383,7 +383,7 @@ async def test_rotate_visits_per_guild_schema_settings(engine, monkeypatch):
             )
             await conn.execute(
                 text(
-                    f'INSERT INTO "{schema}".guild_plugin_secrets '  # noqa: S608
+                    f'INSERT INTO "{schema}".guild_plugin_secrets '
                     "(install_id, secrets) VALUES (1, CAST(:s AS jsonb))"
                 ),
                 {
@@ -407,11 +407,11 @@ async def test_rotate_visits_per_guild_schema_settings(engine, monkeypatch):
         async with engine.connect() as conn:
             conn_ct = await conn.scalar(
                 text(
-                    f'SELECT api_key_encrypted FROM "{schema}".guild_ai_connection_keys'  # noqa: S608
+                    f'SELECT api_key_encrypted FROM "{schema}".guild_ai_connection_keys'
                 ),
             )
             sealed = await conn.scalar(
-                text(f'SELECT secrets FROM "{schema}".guild_plugin_secrets'),  # noqa: S608
+                text(f'SELECT secrets FROM "{schema}".guild_plugin_secrets'),
             )
         assert decrypt_field(conn_ct, SALT_AI_API_KEY, secret_key=NEW) == "guild-ai"
         assert {

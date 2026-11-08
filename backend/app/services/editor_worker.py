@@ -31,8 +31,9 @@ from __future__ import annotations
 
 import base64
 import json
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from py_mini_racer import JSEvalException, JSOOMException, MiniRacer
 

@@ -23,8 +23,8 @@ UPDATEs by mapper rather than by the order they were added, so the levels are
 flushed explicitly rather than assumed.
 """
 
-from datetime import datetime, timezone
-from typing import Optional, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -61,7 +61,7 @@ async def _levels(
     session: AsyncSession,
     entities: Sequence[ArchiveMixin],
     *,
-    matching: Optional[datetime],
+    matching: datetime | None,
 ) -> list[Level]:
     """The entities and every archivable descendant, grouped by depth.
 
@@ -83,7 +83,7 @@ async def _levels(
 
 
 async def _write(
-    session: AsyncSession, levels: list[Level], archived_at: Optional[datetime]
+    session: AsyncSession, levels: list[Level], archived_at: datetime | None
 ) -> None:
     for level in levels:
         for model, ids in level.items():
@@ -106,7 +106,7 @@ async def archive_entities(
     """Archive live rows and everything inside them, all under one stamp, so
     each one's unarchive puts back what this took. Rows already archived keep
     the stamp they have. The caller commits."""
-    archived_at = datetime.now(timezone.utc)
+    archived_at = datetime.now(UTC)
     live = [entity for entity in entities if entity.archived_at is None]
     if live:
         await session.flush()
@@ -134,7 +134,7 @@ ARCHIVED_QUERY_DESCRIPTION = (
 )
 
 
-def archive_filter_clause(model: type[ArchiveMixin], archived: Optional[bool]):
+def archive_filter_clause(model: type[ArchiveMixin], archived: bool | None):
     """The WHERE clause a tool's list needs to answer ``archived``.
 
     A list shows live rows unless it is asked for the archive. That is what

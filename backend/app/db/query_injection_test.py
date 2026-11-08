@@ -16,7 +16,6 @@ from sqlalchemy.orm import declarative_base
 from app.db.query import apply_filters, apply_sorting
 from app.schemas.query import FilterCondition, FilterOp
 
-
 _Base = declarative_base()
 
 

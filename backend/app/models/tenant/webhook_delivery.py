@@ -26,7 +26,6 @@ was refused, and the subscription's later transactions wait behind it.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer
 from sqlmodel import Field, SQLModel
@@ -48,7 +47,7 @@ class WebhookDelivery(SQLModel, table=True):
     txn_id: int = Field(sa_column=Column(BigInteger, primary_key=True))
 
     #: Set once the target answered 2xx. NULL means claimed or awaiting retry.
-    delivered_at: Optional[datetime] = Field(
+    delivered_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
     )
@@ -61,7 +60,7 @@ class WebhookDelivery(SQLModel, table=True):
     #: While unclaimed, when this batch may next be attempted. While a pass holds
     #: it, the lease that pass must still own in order to settle. NULL once
     #: delivered.
-    next_attempt_at: Optional[datetime] = Field(
+    next_attempt_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
@@ -70,7 +69,7 @@ class WebhookDelivery(SQLModel, table=True):
     #: state alongside ``delivered_at``: the batch stops being retried, and
     #: later transactions for the same subscription are no longer held behind
     #: it.
-    dead_lettered_at: Optional[datetime] = Field(
+    dead_lettered_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
     )

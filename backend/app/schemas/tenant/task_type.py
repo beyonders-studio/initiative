@@ -1,4 +1,4 @@
-from typing import Annotated, List, Optional
+from typing import Annotated
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -25,13 +25,13 @@ class TaskTypeStartingValues(SanitizedBaseModel):
     makes it leaves that field empty. A repeat starts only on a task with a
     date to count from."""
 
-    description: Optional[RichMentionStr] = None
-    checklist: List[_ChecklistLine] = Field(
+    description: RichMentionStr | None = None
+    checklist: list[_ChecklistLine] = Field(
         default_factory=list, max_length=MAX_STARTING_CHECKLIST
     )
-    priority: Optional[TaskPriority] = None
-    recurrence: Optional[TaskRule] = None
-    recurrence_strategy: Optional[RecurrenceStrategy] = None
+    priority: TaskPriority | None = None
+    recurrence: TaskRule | None = None
+    recurrence_strategy: RecurrenceStrategy | None = None
 
     def is_empty(self) -> bool:
         return not (
@@ -55,32 +55,32 @@ class TaskTypeRead(SanitizedBaseModel):
     color: str
     icon: str
     layout_preset: str
-    starting_values: Optional[TaskTypeStartingValues] = None
+    starting_values: TaskTypeStartingValues | None = None
 
 
 class TaskTypeCreated(TaskTypeRead):
     """A type just added, and the fields it brought from the gallery (the
     initiative's properties it created or reused), for its page to place."""
 
-    field_ids: List[int] = Field(default_factory=list)
+    field_ids: list[int] = Field(default_factory=list)
 
 
 class TaskTypeCreate(SanitizedBaseModel):
     name: str = Field(min_length=1, max_length=100)
-    position: Optional[int] = Field(default=None, ge=0)
+    position: int | None = Field(default=None, ge=0)
     is_default: bool = False
-    color: Optional[str] = Field(
+    color: str | None = Field(
         default=None, min_length=4, max_length=9, pattern=HEX_COLOR_PATTERN
     )
-    icon: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    icon: str | None = Field(default=None, min_length=1, max_length=64)
     #: Another of the project's types to start from: its shape, colour and icon
     #: unless given, and its page as it is laid out.
-    start_from_type_id: Optional[int] = Field(default=None, gt=0)
+    start_from_type_id: int | None = Field(default=None, gt=0)
     #: One of the gallery's types to start from: its shape, colour and icon
     #: unless given, its starting values, and its fields.
-    gallery_key: Optional[str] = Field(default=None, pattern=_GALLERY_PATTERN)
-    layout_preset: Optional[str] = Field(default=None, pattern=_SHAPE_PATTERN)
-    starting_values: Optional[TaskTypeStartingValues] = None
+    gallery_key: str | None = Field(default=None, pattern=_GALLERY_PATTERN)
+    layout_preset: str | None = Field(default=None, pattern=_SHAPE_PATTERN)
+    starting_values: TaskTypeStartingValues | None = None
 
     @model_validator(mode="after")
     def _one_start(self) -> "TaskTypeCreate":
@@ -90,22 +90,22 @@ class TaskTypeCreate(SanitizedBaseModel):
 
 
 class TaskTypeUpdate(SanitizedBaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    position: Optional[int] = Field(default=None, ge=0)
-    is_default: Optional[bool] = None
-    color: Optional[str] = Field(
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    position: int | None = Field(default=None, ge=0)
+    is_default: bool | None = None
+    color: str | None = Field(
         default=None, min_length=4, max_length=9, pattern=HEX_COLOR_PATTERN
     )
-    icon: Optional[str] = Field(default=None, min_length=1, max_length=64)
-    layout_preset: Optional[str] = Field(default=None, pattern=_SHAPE_PATTERN)
+    icon: str | None = Field(default=None, min_length=1, max_length=64)
+    layout_preset: str | None = Field(default=None, pattern=_SHAPE_PATTERN)
     #: Null clears them.
-    starting_values: Optional[TaskTypeStartingValues] = None
+    starting_values: TaskTypeStartingValues | None = None
 
 
 class TaskTypeDeleteRequest(SanitizedBaseModel):
     #: Where its tasks go; the project's default (or, deleting the default, the
     #: first other type) when not given.
-    fallback_type_id: Optional[int] = None
+    fallback_type_id: int | None = None
 
 
 class TaskTypeReorderItem(SanitizedBaseModel):
@@ -114,7 +114,7 @@ class TaskTypeReorderItem(SanitizedBaseModel):
 
 
 class TaskTypeReorderRequest(SanitizedBaseModel):
-    items: List[TaskTypeReorderItem]
+    items: list[TaskTypeReorderItem]
 
 
 class TaskTypeCopyRequest(SanitizedBaseModel):
@@ -123,7 +123,7 @@ class TaskTypeCopyRequest(SanitizedBaseModel):
 
     source_project_id: int = Field(gt=0)
     #: Which of its types, in its order; every one when absent.
-    type_ids: Optional[List[int]] = Field(default=None, max_length=50)
+    type_ids: list[int] | None = Field(default=None, max_length=50)
 
 
 class TaskTypeGalleryField(SanitizedBaseModel):
@@ -140,11 +140,11 @@ class TaskTypeGalleryEntry(SanitizedBaseModel):
     icon: str
     color: str
     layout_preset: str
-    fields: List[TaskTypeGalleryField]
-    starting_values: Optional[TaskTypeStartingValues] = None
+    fields: list[TaskTypeGalleryField]
+    starting_values: TaskTypeStartingValues | None = None
 
 
 class TaskTypeGalleryGroup(SanitizedBaseModel):
     key: str
     name: str
-    entries: List[TaskTypeGalleryEntry]
+    entries: list[TaskTypeGalleryEntry]

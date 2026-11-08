@@ -1,11 +1,11 @@
 """What a credential is, read without the database."""
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from app.core.plugin_access_token import seal_install_token
 from app.core.identify import HEADER_CREDENTIALS, URL_CREDENTIALS, identify_token
 from app.core.messages import AuthMessages
+from app.core.plugin_access_token import seal_install_token
 from app.core.security import create_upload_token, mint_access_token
 
 
@@ -28,7 +28,7 @@ def test_a_session_token_carries_its_claims():
 
 
 def test_an_expired_session_token_is_refused():
-    expired = _session_token(now=datetime.now(timezone.utc) - timedelta(days=1))
+    expired = _session_token(now=datetime.now(UTC) - timedelta(days=1))
     assert (
         identify_token(expired, HEADER_CREDENTIALS).refused
         == AuthMessages.COULD_NOT_VALIDATE_CREDENTIALS

@@ -6,7 +6,7 @@ starting their time here over.
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.requests import Request
@@ -37,7 +37,7 @@ async def _session(
         satisfied_providers=[],
         install_id=uuid.uuid4() if device else None,
     )
-    issued.session.created_at = datetime.now(timezone.utc) - timedelta(hours=hours_ago)
+    issued.session.created_at = datetime.now(UTC) - timedelta(hours=hours_ago)
     session.add(issued.session)
     await session.commit()
     return issued.session
@@ -51,7 +51,7 @@ async def _notice(
     change: dict | None = None,
 ) -> None:
     """One earlier change's letter, as the outbox keeps it."""
-    at = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
+    at = datetime.now(UTC) - timedelta(minutes=minutes_ago)
     session.add(
         EmailOutboxItem(
             user_id=user.id,

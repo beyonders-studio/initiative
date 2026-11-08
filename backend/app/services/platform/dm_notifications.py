@@ -30,17 +30,18 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Collection, Mapping, cast
+from collections.abc import Collection, Mapping
+from datetime import UTC, datetime
+from typing import Any, cast
 
 from sqlalchemy import delete, update
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.email_i18n import translate
-from app.db.advisory_locks import LockNamespace, advisory_lock
-from app.core.user_display import handle_of
 from app.core.notification_categories import Channel, NotificationCategory
+from app.core.user_display import handle_of
+from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.models.platform.notification import Notification, NotificationType
 from app.models.platform.user import User
 from app.services.platform import (
@@ -164,7 +165,7 @@ async def notify(
                 others=others,
             )
             await session.commit()
-    except Exception:  # noqa: BLE001 - a bell line never fails a send
+    except Exception:
         logger.exception("direct-message notification failed")
     await dm_stream.signal_dm(recipient_id)
 
@@ -198,7 +199,7 @@ async def mark_conversation_read(
             Notification.read_at.is_(None),
             *_line_of(conversation_id),
         )
-        .values(read_at=datetime.now(timezone.utc))
+        .values(read_at=datetime.now(UTC))
     )
     closed = result.rowcount or 0
     if closed:
@@ -300,7 +301,7 @@ async def wake_own_devices(
                 ],
             )
             await session.commit()
-    except Exception:  # noqa: BLE001 - a wake never fails a send
+    except Exception:
         logger.exception("direct-message device wake failed")
 
 

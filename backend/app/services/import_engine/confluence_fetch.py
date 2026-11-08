@@ -15,12 +15,14 @@ import asyncio
 import logging
 import re
 from collections import Counter
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, BinaryIO, Callable, Optional
+from typing import Any, BinaryIO
 from urllib.parse import quote
 
 from app.core.messages import ImportEngineMessages
 from app.services.import_engine import confluence_attachments, confluence_mapping
+from app.services.import_engine import limits as import_limits
 from app.services.import_engine.atlassian import (
     AtlassianCredential,
     Heartbeat,
@@ -35,7 +37,6 @@ from app.services.import_engine.jira_attachments import (
     AssetSink,
     StoredImage,
 )
-from app.services.import_engine import limits as import_limits
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +111,7 @@ class ConfluenceFetchReport:
         return sum(self.dropped.values())
 
 
-def _next_path(payload: dict) -> Optional[str]:
+def _next_path(payload: dict) -> str | None:
     """The next page of a v2 listing, as a path on the site.
 
     The API hands back a path under ``/wiki``; anything that does not look
@@ -142,7 +143,7 @@ async def fetch_pages(
     space_id: str,
     *,
     max_pages: int,
-    walk: Optional[Walk] = None,
+    walk: Walk | None = None,
 ) -> list[dict[str, Any]]:
     """Every current page in the space, with its storage-format body.
 
@@ -151,7 +152,7 @@ async def fetch_pages(
     read, or the read stopped at ``max_pages`` or the request bound.
     """
     pages: list[dict[str, Any]] = []
-    path: Optional[str] = (
+    path: str | None = (
         f"/wiki/api/v2/spaces/{quote(space_id, safe='')}/pages"
         f"?body-format=storage&status=current&limit={PAGE_LIMIT}"
     )
@@ -265,7 +266,7 @@ async def fetch_attachments(
     """What a page has attached. A page whose list will not answer has
     none — not worth failing the space over. Being throttled is."""
     found: list[confluence_attachments.PageAttachment] = []
-    path: Optional[str] = f"/wiki/api/v2/pages/{page_id}/attachments?limit={PAGE_LIMIT}"
+    path: str | None = f"/wiki/api/v2/pages/{page_id}/attachments?limit={PAGE_LIMIT}"
     for _ in range(MAX_PAGE_REQUESTS):
         if path is None:
             break
@@ -289,7 +290,7 @@ async def fetch_page_media(
     store: AssetSink,
     report: confluence_attachments.AttachmentReport,
     files_allowed: bool,
-    tick: Optional[Heartbeat] = None,
+    tick: Heartbeat | None = None,
 ) -> confluence_attachments.PageMedia:
     """A page's attachments, downloaded within what the bundle can hold."""
 
@@ -323,7 +324,7 @@ async def fetch_page_media(
 async def _listing(credential: AtlassianCredential, path: str) -> list[dict[str, Any]]:
     """Every row of a v2 listing, bounded like the page walk is."""
     rows: list[dict[str, Any]] = []
-    next_path: Optional[str] = path
+    next_path: str | None = path
     for _ in range(MAX_PAGE_REQUESTS):
         if next_path is None:
             break
@@ -340,40 +341,42 @@ async def _listing(credential: AtlassianCredential, path: str) -> list[dict[str,
 async def fetch_comments(
     credential: AtlassianCredential,
     page_id: str,
-    report: Optional[ConfluenceFetchReport] = None,
+    report: ConfluenceFetchReport | None = None,
 ) -> list[confluence_mapping.SourceComment]:
     """What was said on a page: its footer comments and its inline ones, with
     every reply. An inline comment marked resolved is left behind, replies
     and all, and counted. A thread that will not answer is left out rather
     than failing the space. Being throttled is not."""
     found: list[confluence_mapping.SourceComment] = []
+
+    async def walk(kind: str, path: str, parent: str | None, depth: int) -> None:
+        try:
+            rows = await _listing(credential, path)
+        except ImportEngineError as exc:
+            if exc.code == ImportEngineMessages.IMPORT_SOURCE_RATE_LIMITED:
+                raise
+            return
+        for raw in rows:
+            comment = confluence_mapping.read_comment(raw, parent_id=parent)
+            if comment is None:
+                continue
+            if comment.resolved and parent is None:
+                if report is not None:
+                    report.comments_resolved += 1
+                continue
+            found.append(comment)
+            if depth < MAX_REPLY_DEPTH:
+                await walk(
+                    kind,
+                    f"/wiki/api/v2/{kind}/{comment.id}/children"
+                    f"?body-format=storage&limit={PAGE_LIMIT}",
+                    comment.id,
+                    depth + 1,
+                )
+
     for kind in ("footer-comments", "inline-comments"):
-
-        async def walk(path: str, parent: Optional[str], depth: int) -> None:
-            try:
-                rows = await _listing(credential, path)
-            except ImportEngineError as exc:
-                if exc.code == ImportEngineMessages.IMPORT_SOURCE_RATE_LIMITED:
-                    raise
-                return
-            for raw in rows:
-                comment = confluence_mapping.read_comment(raw, parent_id=parent)
-                if comment is None:
-                    continue
-                if comment.resolved and parent is None:
-                    if report is not None:
-                        report.comments_resolved += 1
-                    continue
-                found.append(comment)
-                if depth < MAX_REPLY_DEPTH:
-                    await walk(
-                        f"/wiki/api/v2/{kind}/{comment.id}/children"
-                        f"?body-format=storage&limit={PAGE_LIMIT}",
-                        comment.id,
-                        depth + 1,
-                    )
-
         await walk(
+            kind,
             f"/wiki/api/v2/pages/{page_id}/{kind}?body-format=storage&limit={PAGE_LIMIT}",
             None,
             0,
@@ -383,7 +386,7 @@ async def fetch_comments(
 
 def _account_ids(
     pages: list[confluence_mapping.SourcePage],
-    comments: Optional[dict[str, list[confluence_mapping.SourceComment]]] = None,
+    comments: dict[str, list[confluence_mapping.SourceComment]] | None = None,
 ) -> set[str]:
     ids = {page.author_id for page in pages if page.author_id}
     for page in pages:
@@ -417,11 +420,11 @@ async def fetch_spaces(
     *,
     space_keys: list[str],
     app_version: str,
-    progress: Optional[Callable[[ConfluenceFetchReport], Awaitable[None]]] = None,
-    max_rows: Optional[int] = None,
-    guild_id: Optional[int] = None,
-    asset_budget: Optional[AssetBudget] = None,
-    store: Optional[AssetSink] = None,
+    progress: Callable[[ConfluenceFetchReport], Awaitable[None]] | None = None,
+    max_rows: int | None = None,
+    guild_id: int | None = None,
+    asset_budget: AssetBudget | None = None,
+    store: AssetSink | None = None,
     files_allowed: bool = True,
     include_comments: bool = False,
 ) -> ConfluenceFetched:

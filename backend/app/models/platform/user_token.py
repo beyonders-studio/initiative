@@ -1,10 +1,11 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlmodel import Enum as SQLEnum, Field, SQLModel
+from sqlmodel import Enum as SQLEnum
+from sqlmodel import Field, SQLModel
 
 from app.core.encryption import FERNET_PATHS, FERNET_SALT, SALT_EMAIL
 
@@ -19,7 +20,7 @@ class UserTokenPurpose(str, Enum):
 class UserToken(SQLModel, table=True):
     __tablename__ = "user_tokens"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(
         foreign_key="users.id", ondelete="CASCADE", nullable=False, index=True
     )
@@ -34,7 +35,7 @@ class UserToken(SQLModel, table=True):
     )
     # Which address an email_verification token proves. NULL for the flows that
     # name the account rather than one of its addresses.
-    user_email_id: Optional[int] = Field(
+    user_email_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -44,7 +45,7 @@ class UserToken(SQLModel, table=True):
     )
     # The invite a sign-up joins once this token proves its address. NULL for
     # every other token.
-    invite_id: Optional[int] = Field(
+    invite_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -55,7 +56,7 @@ class UserToken(SQLModel, table=True):
     # What an account_change token may do, and the address it was sent to.
     # NULL for every other token. The address a removal took (``undo.email``)
     # and the one the link went to (``recipient``) are sealed under SALT_EMAIL.
-    change: Optional[dict[str, Any]] = Field(
+    change: dict[str, Any] | None = Field(
         default=None,
         sa_column=Column(
             JSONB,
@@ -70,10 +71,10 @@ class UserToken(SQLModel, table=True):
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
-    consumed_at: Optional[datetime] = Field(
+    consumed_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )

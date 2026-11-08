@@ -25,13 +25,14 @@ from app.api.v1.tenant_endpoints.tool_lists import TOOL_LISTS
 from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.calendar_event import CalendarEvent
+from app.models.tenant.collection import Collection
 from app.models.tenant.comment import Comment
 from app.models.tenant.counter import Counter
-from app.models.tenant.collection import Collection
+from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.models.tenant.task import Task
 from app.models.tenant.wiki import WikiPage
-from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.services.tenant.lifecycle_tree import CASCADE_CHILDREN
+from app.services.tenant.tags import TAG_LINKS
 from app.testing import (
     assign_tag,
     create_calendar_event,
@@ -41,11 +42,10 @@ from app.testing import (
     create_tag,
     create_task,
     create_tool_entity,
-    enable_all_tools,
     create_wiki_page,
+    enable_all_tools,
     grant_role_permission,
 )
-from app.services.tenant.tags import TAG_LINKS
 
 #: Every tool, as its own test case.
 TOOLS = pytest.mark.parametrize("tool", list(Tool), ids=[t.value for t in Tool])

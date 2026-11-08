@@ -18,9 +18,9 @@ stream shows none of these surfaces and every writer call is a no-op.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Mapping, Optional
 
 from app.core.cloud import is_cloud
 
@@ -193,21 +193,21 @@ class IntakeStreamMeta:
     #: among that topic's cases alone.
     topic_open_caps: Mapping[str, int] = field(default_factory=dict)
     #: Topics that take different attachments from the stream's own.
-    topic_evidence: Mapping[str, "EvidencePolicy"] = field(default_factory=dict)
+    topic_evidence: Mapping[str, EvidencePolicy] = field(default_factory=dict)
 
-    def evidence_for(self, topic: Optional[str]) -> "EvidencePolicy":
+    def evidence_for(self, topic: str | None) -> EvidencePolicy:
         """What may be attached to a case on ``topic``, or an answer on one."""
         if topic is None:
             return self.evidence
         return self.topic_evidence.get(topic, self.evidence)
 
-    def conversation_for(self, topic: Optional[str]) -> Conversation:
+    def conversation_for(self, topic: str | None) -> Conversation:
         """How a case on ``topic`` talks."""
         if topic is None:
             return self.conversation
         return self.topic_conversation.get(topic, self.conversation)
 
-    def open_cap_for(self, topic: Optional[str]) -> tuple[Optional[int], bool]:
+    def open_cap_for(self, topic: str | None) -> tuple[int | None, bool]:
         """One account's cap on open cases like this, and whether it counts
         that topic's cases alone rather than the stream's."""
         if topic is not None and topic in self.topic_open_caps:
@@ -308,7 +308,7 @@ def offered_streams() -> tuple[IntakeStream, ...]:
     return tuple(s for s in IntakeStream if cloud or not STREAMS[s].cloud_only)
 
 
-def conversation_for(stream: IntakeStream, topic: Optional[str]) -> Conversation:
+def conversation_for(stream: IntakeStream, topic: str | None) -> Conversation:
     """How a case in ``stream`` on ``topic`` talks with whoever filed it."""
     return STREAMS[stream].conversation_for(topic)
 

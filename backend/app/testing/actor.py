@@ -31,7 +31,7 @@ from typing import Any
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models.platform.guild import Guild, GuildMembership, CommunityRole
+from app.models.platform.guild import CommunityRole, Guild, GuildMembership
 from app.models.platform.user import User, UserRole
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project

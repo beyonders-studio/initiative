@@ -16,10 +16,12 @@ something else.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from enum import Enum
-from typing import Any, Iterable
+from typing import Any
 
-from sqlalchemy import and_, func, literal, or_, select as sa_select
+from sqlalchemy import and_, func, literal, or_
+from sqlalchemy import select as sa_select
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -48,7 +50,7 @@ def _choice(rule: StoredRule, value: Any) -> Enum:
 
 def _value(rule: StoredRule, row: PlatformRule | CommunityRule) -> Any:
     if rule.slot is Slot.choice:
-        return _choice(rule, getattr(row, "choice"))
+        return _choice(rule, row.choice)
     if rule.slot is Slot.methods:
         methods = frozenset(LoginMethod(m) for m in row.methods or ())
         if isinstance(row, PlatformRule):

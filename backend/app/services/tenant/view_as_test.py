@@ -12,7 +12,6 @@ from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserStatus
 from app.testing import create_counter_group, create_project, create_task
 
-
 COUNT_TASKS = "SELECT count(*) AS n FROM tasks"
 
 

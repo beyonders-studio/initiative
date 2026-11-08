@@ -6,15 +6,14 @@ state the screen can render.
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional
 
 from pydantic import AliasChoices, ConfigDict, Field
 
 from app.models.platform.user import Presence, UserStatus
 from app.models.platform.user_dm_settings import DmPolicy
 from app.schemas.base import SanitizedBaseModel
-from app.schemas.query import PageMeta
 from app.schemas.platform.user import ProfileDecorations
+from app.schemas.query import PageMeta
 
 
 class CommunityDmToggle(SanitizedBaseModel):
@@ -29,7 +28,7 @@ class CommunityDmToggle(SanitizedBaseModel):
 
     community_id: int = Field(validation_alias=AliasChoices("community_id", "guild_id"))
     name: str
-    icon_url: Optional[str] = None
+    icon_url: str | None = None
     enabled: bool
 
 
@@ -38,9 +37,9 @@ class DirectMessageSettingsRead(SanitizedBaseModel):
 
     dm_policy: DmPolicy
     #: In the reader's own rail order, the same rule the people roster uses.
-    communities: List[CommunityDmToggle]
+    communities: list[CommunityDmToggle]
     #: NULL while the account has not answered the age question.
-    age_confirmed_at: Optional[datetime] = None
+    age_confirmed_at: datetime | None = None
     #: Whether the age question is still owed: unanswered, on a deployment
     #: that checks age. True holds the policy at ``private`` whatever it says.
     age_answer_required: bool = False
@@ -61,9 +60,9 @@ class DirectMessageSettingsUpdate(SanitizedBaseModel):
     fourth it has never rendered.
     """
 
-    dm_policy: Optional[DmPolicy] = None
-    communities: Optional[List[CommunityDmToggleUpdate]] = None
-    send_receipts: Optional[bool] = None
+    dm_policy: DmPolicy | None = None
+    communities: list[CommunityDmToggleUpdate] | None = None
+    send_receipts: bool | None = None
 
 
 class IgnoredAccountRead(SanitizedBaseModel):
@@ -74,12 +73,12 @@ class IgnoredAccountRead(SanitizedBaseModel):
     user_id: int
     username: str
     discriminator: int
-    avatar_url: Optional[str] = None
+    avatar_url: str | None = None
     created_at: datetime
 
 
 class IgnoredAccountsResponse(PageMeta):
-    items: List[IgnoredAccountRead]
+    items: list[IgnoredAccountRead]
 
 
 class DirectMessagePermissionRead(SanitizedBaseModel):
@@ -105,7 +104,7 @@ class DirectMessagePermissionRead(SanitizedBaseModel):
 class DirectMessagePermissionsRequest(SanitizedBaseModel):
     """Which accounts a surface is about to draw controls for."""
 
-    user_ids: List[int] = Field(min_length=1, max_length=100)
+    user_ids: list[int] = Field(min_length=1, max_length=100)
 
 
 class DirectMessagePermissionsResponse(SanitizedBaseModel):
@@ -118,7 +117,7 @@ class DirectMessagePermissionsResponse(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    permissions: Dict[str, DirectMessagePermissionRead]
+    permissions: dict[str, DirectMessagePermissionRead]
 
 
 class ContactGrantRead(SanitizedBaseModel):
@@ -129,7 +128,7 @@ class ContactGrantRead(SanitizedBaseModel):
     user_id: int
     username: str
     discriminator: int
-    avatar_url: Optional[str] = None
+    avatar_url: str | None = None
     #: Carried so a grant renders as an ordinary person row wherever one is
     #: listed. No ``display_name``: that name belongs to one community, and a
     #: grant may name somebody the reader shares no community with.
@@ -143,15 +142,15 @@ class ContactGrantRead(SanitizedBaseModel):
     #: cancellable request from one waiting on them.
     outgoing: bool
     created_at: datetime
-    responded_at: Optional[datetime] = None
+    responded_at: datetime | None = None
 
 
 class ContactGrantsResponse(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    accepted: List[ContactGrantRead]
-    incoming: List[ContactGrantRead]
-    outgoing: List[ContactGrantRead]
+    accepted: list[ContactGrantRead]
+    incoming: list[ContactGrantRead]
+    outgoing: list[ContactGrantRead]
 
 
 class ConnectionRequestCreate(SanitizedBaseModel):

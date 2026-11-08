@@ -24,9 +24,8 @@ never markup."""
 
 from __future__ import annotations
 
-from typing import Any
-
 from collections.abc import Iterator
+from typing import Any
 
 from markdown_it import MarkdownIt
 from markdown_it.rules_core import StateCore
@@ -182,9 +181,13 @@ def _task_box(runs: list[dict[str, Any]]) -> bool | None:
     space, and the box is ticked; ``None`` where it does not."""
     first = runs[0] if runs else {}
     text = first.get("text", "") if first.keys() == {"text"} else ""
-    if text[:1] == "[" and text[2:3] == "]" and text[1:2] in (" ", "x", "X"):
-        if text[3:4] in (" ", "\t"):
-            return text[1:2] != " "
+    if (
+        text[:1] == "["
+        and text[2:3] == "]"
+        and text[1:2] in (" ", "x", "X")
+        and text[3:4] in (" ", "\t")
+    ):
+        return text[1:2] != " "
     return None
 
 

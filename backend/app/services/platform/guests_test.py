@@ -1,7 +1,7 @@
 """Guests: a membership row with an end. It admits its holder until then,
 takes no seat, and only on the demo deployment carries a rung above ``guest``."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import func
@@ -16,19 +16,17 @@ from app.models.platform.guild import CommunityRole, GuildInvite, GuildMembershi
 from app.models.platform.notification import Notification, NotificationType
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.guest_invite_grant import GuestInviteGrant
-from app.schemas.platform.guild import CommunityInviteGrant
 from app.models.tenant.initiative import InitiativeMember
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
+from app.schemas.platform.guild import CommunityInviteGrant
 from app.services import cross_guild
 from app.services import permissions as permissions_service
 from app.services.platform import app_settings as app_settings_service
-from app.services.platform import rules
-from app.services.platform import people as people_service
-from app.services.platform import guests
+from app.services.platform import guests, rules
 from app.services.platform import guilds as guilds_service
+from app.services.platform import people as people_service
 from app.services.platform import users as users_service
 from app.services.tenant import named_people
-from app.testing.routing import route_as
 from app.testing import (
     create_guest,
     create_guild,
@@ -43,6 +41,7 @@ from app.testing import (
     drain_notices,
     get_auth_headers,
 )
+from app.testing.routing import route_as
 
 HOUR = timedelta(hours=1)
 
@@ -307,7 +306,7 @@ async def test_a_new_guest_waits_on_the_guest_cap_and_not_on_a_seat(
         guild_id=guild_id,
         user_id=newcomer_id,
         role=CommunityRole.guest,
-        guest_until=datetime.now(timezone.utc) + HOUR,
+        guest_until=datetime.now(UTC) + HOUR,
     )
 
     if admitted:
@@ -411,7 +410,7 @@ async def test_a_guest_hears_of_an_item_only_while_it_reaches_it(
 
 
 def _days_from_now(until: datetime) -> float:
-    return (until - datetime.now(timezone.utc)) / timedelta(days=1)
+    return (until - datetime.now(UTC)) / timedelta(days=1)
 
 
 async def test_a_guest_invite_makes_a_guest_for_the_shortest_limit(
@@ -534,7 +533,7 @@ async def test_bringing_back_an_ended_guest_takes_a_place(
     )
 
     if brought_back:
-        assert (await extend).guest_until > datetime.now(timezone.utc)
+        assert (await extend).guest_until > datetime.now(UTC)
     else:
         with pytest.raises(guilds_service.GuildCapacityError):
             await extend
@@ -712,7 +711,7 @@ async def test_an_item_archived_since_is_skipped_and_the_rest_given(
             ),
         ],
     )
-    a.project.archived_at = datetime.now(timezone.utc)
+    a.project.archived_at = datetime.now(UTC)
     session.add(a.project)
     await session.commit()
 
@@ -750,7 +749,7 @@ async def test_an_invite_naming_an_archived_initiative_is_withdrawn(
         guest_days=7,
         grants=[CommunityInviteGrant(initiative_id=a.initiative.id)],
     )
-    a.initiative.archived_at = datetime.now(timezone.utc)
+    a.initiative.archived_at = datetime.now(UTC)
     session.add(a.initiative)
     await session.commit()
     guild_id, invite_id = a.guild.id, invite.id
@@ -777,7 +776,7 @@ async def test_a_guest_given_only_an_item_keeps_no_grant_on_leaving(
     # An archived item's share goes as well.
     archived = await create_project(session, a.initiative, a.user)
     await create_resource_grant(session, archived, user=guest)
-    archived.archived_at = datetime.now(timezone.utc)
+    archived.archived_at = datetime.now(UTC)
     session.add(archived)
     await session.commit()
     guild_id, guest_id = a.guild.id, guest.id

@@ -6,7 +6,7 @@ from __future__ import annotations
 import io
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from PIL import Image, ImageEnhance
@@ -28,7 +28,7 @@ from app.models.tenant.task import Task
 from app.services.tenant import tags as tags_service
 
 #: One "now" for the whole run, so every relative date in it agrees.
-NOW = datetime.now(timezone.utc)
+NOW = datetime.now(UTC)
 
 #: The photos every seeded picture is cut from: the front page's own.
 PHOTOS = Path(__file__).resolve().parents[2] / "frontend" / "public" / "homepage"

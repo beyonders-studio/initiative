@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer
 from sqlmodel import Field, SQLModel
@@ -32,28 +31,28 @@ class UserTotp(SQLModel, table=True):
         )
     )
 
-    confirmed_at: Optional[datetime] = Field(
+    confirmed_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
 
     #: Unix time divided by the 30-second step, so it outgrows an int.
-    last_timestep: Optional[int] = Field(
+    last_timestep: int | None = Field(
         default=None, sa_column=Column(BigInteger, nullable=True)
     )
 
-    last_used_at: Optional[datetime] = Field(
+    last_used_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(
             DateTime(timezone=True),
             nullable=False,
-            onupdate=lambda: datetime.now(timezone.utc),
+            onupdate=lambda: datetime.now(UTC),
         ),
     )

@@ -96,11 +96,14 @@ def test_rejects_when_hostname_resolves_to_private():
     """A public-looking hostname that resolves to a private address is
     rejected."""
     fake_infos = [(2, 0, 0, "", ("10.0.0.5", 0))]  # AF_INET, RFC1918
-    with patch(
-        "app.services.webhook_target_url.socket.getaddrinfo", return_value=fake_infos
+    with (
+        patch(
+            "app.services.webhook_target_url.socket.getaddrinfo",
+            return_value=fake_infos,
+        ),
+        pytest.raises(WebhookTargetUrlPrivateError),
     ):
-        with pytest.raises(WebhookTargetUrlPrivateError):
-            resolve_validated_target("https://internal.example.com/hook")
+        resolve_validated_target("https://internal.example.com/hook")
 
 
 def test_rejects_when_any_resolved_address_is_private():
@@ -109,11 +112,14 @@ def test_rejects_when_any_resolved_address_is_private():
         (2, 0, 0, "", ("93.184.216.34", 0)),  # public
         (2, 0, 0, "", ("10.0.0.5", 0)),  # private
     ]
-    with patch(
-        "app.services.webhook_target_url.socket.getaddrinfo", return_value=fake_infos
+    with (
+        patch(
+            "app.services.webhook_target_url.socket.getaddrinfo",
+            return_value=fake_infos,
+        ),
+        pytest.raises(WebhookTargetUrlPrivateError),
     ):
-        with pytest.raises(WebhookTargetUrlPrivateError):
-            resolve_validated_target("https://mixed.example.com/hook")
+        resolve_validated_target("https://mixed.example.com/hook")
 
 
 def test_resolve_returns_validated_addresses():
@@ -204,11 +210,14 @@ def test_dev_flag_still_rejects_http_to_public(monkeypatch):
     public host stays rejected even with it on."""
     _enable_dev_flag(monkeypatch)
     fake_infos = [(2, 0, 0, "", ("93.184.216.34", 0))]
-    with patch(
-        "app.services.webhook_target_url.socket.getaddrinfo", return_value=fake_infos
+    with (
+        patch(
+            "app.services.webhook_target_url.socket.getaddrinfo",
+            return_value=fake_infos,
+        ),
+        pytest.raises(WebhookTargetUrlError),
     ):
-        with pytest.raises(WebhookTargetUrlError):
-            resolve_validated_target("http://hooks.example.com/in")
+        resolve_validated_target("http://hooks.example.com/in")
 
 
 def test_dev_flag_rejects_http_to_mixed_public_private(monkeypatch):
@@ -220,11 +229,14 @@ def test_dev_flag_rejects_http_to_mixed_public_private(monkeypatch):
         (2, 0, 0, "", ("93.184.216.34", 0)),  # public
         (2, 0, 0, "", ("10.0.0.5", 0)),  # private
     ]
-    with patch(
-        "app.services.webhook_target_url.socket.getaddrinfo", return_value=fake_infos
+    with (
+        patch(
+            "app.services.webhook_target_url.socket.getaddrinfo",
+            return_value=fake_infos,
+        ),
+        pytest.raises(WebhookTargetUrlError),
     ):
-        with pytest.raises(WebhookTargetUrlError):
-            resolve_validated_target("http://mixed.example.com/hook")
+        resolve_validated_target("http://mixed.example.com/hook")
 
 
 def test_dev_flag_allows_https_to_mixed(monkeypatch):

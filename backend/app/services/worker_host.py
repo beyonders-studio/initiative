@@ -20,12 +20,11 @@ import select
 import signal
 import struct
 import sys
-from typing import Optional
 
 _LENGTH = struct.Struct(">I")
 
 
-def _read(stream: int, size: int) -> Optional[bytes]:
+def _read(stream: int, size: int) -> bytes | None:
     chunks = bytearray()
     while len(chunks) < size:
         chunk = os.read(stream, size - len(chunks))

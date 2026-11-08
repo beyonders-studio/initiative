@@ -21,8 +21,7 @@ that plug-in afterwards.
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
-
+from typing import Any
 
 from pydantic import Field
 
@@ -36,9 +35,9 @@ class PluginSummaryReturn(SanitizedBaseModel):
 
     key: str
     type: str
-    label: Optional[Dict[str, str]] = None
+    label: dict[str, str] | None = None
     list: bool = False
-    of: Optional[str] = None
+    of: str | None = None
 
 
 class PluginSummaryRead(SanitizedBaseModel):
@@ -47,11 +46,11 @@ class PluginSummaryRead(SanitizedBaseModel):
     plugin_id: int
     #: The install's name, which the community chose.
     name: str
-    returns: List[PluginSummaryReturn] = []
+    returns: list[PluginSummaryReturn] = []
 
 
 class PluginSummaryListResponse(SanitizedBaseModel):
-    items: List[PluginSummaryRead] = []
+    items: list[PluginSummaryRead] = []
 
 
 class PluginDataResponse(SanitizedBaseModel):
@@ -60,11 +59,11 @@ class PluginDataResponse(SanitizedBaseModel):
     #: One entry per index across the endpoint's ``list`` returns, read side by
     #: side. Values are carried as the plug-in sent them — the widget sandbox
     #: receives them as data, never as markup.
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     #: The endpoint's single-valued returns: what the answer says about itself
     #: rather than about any one item in it, and still there when there are no
     #: items at all.
-    values: Dict[str, Any] = {}
+    values: dict[str, Any] = {}
     #: When the *upstream* call happened. A cached body keeps the time it was
     #: actually obtained, so a viewer can tell how fresh the answer is rather
     #: than how recently they asked.
@@ -90,11 +89,11 @@ class PluginParamOptionSource(SanitizedBaseModel):
     #: returns — a menu comes from a column, not from a single value.
     key: str
     #: A second return holding what a person reads, where the value is opaque.
-    label_key: Optional[str] = None
+    label_key: str | None = None
     #: What to send that endpoint, as one of ITS parameter names to one of the
     #: parameters this same form collects. A repository's labels are that
     #: repository's, so the source has to be told which one was chosen.
-    needs: Dict[str, str] = {}
+    needs: dict[str, str] = {}
 
 
 class PluginDataParam(SanitizedBaseModel):
@@ -102,13 +101,13 @@ class PluginDataParam(SanitizedBaseModel):
 
     key: str
     type: str
-    label: Dict[str, str] = {}
+    label: dict[str, str] = {}
     required: bool = False
-    options: Optional[List[str]] = None
+    options: list[str] | None = None
     #: Where to fill a menu from, for the values only the plug-in can enumerate.
     #: A control is still the consumer's to draw — this says what the values
     #: are, not what to draw for them.
-    options_from: Optional[PluginParamOptionSource] = None
+    options_from: PluginParamOptionSource | None = None
     #: Whether the parameter takes several values. A fact about the value
     #: rather than about a control, and not inferable: whether to send one
     #: value or an array is the plug-in's to state.
@@ -126,7 +125,7 @@ class PluginDataReturn(SanitizedBaseModel):
 
     key: str
     type: str
-    label: Dict[str, str] = {}
+    label: dict[str, str] = {}
     #: Whether it holds several. The ones that do are read side by side into
     #: rows; the ones that do not describe the answer rather than any item in
     #: it, and stay whole beside them.
@@ -148,10 +147,10 @@ class PluginEndpointRead(SanitizedBaseModel):
     #: What the manifest asks for, already clamped at publish time. The proxy
     #: applies the deployment's own ceiling on top.
     cache_ttl_seconds: int = 0
-    params: List[PluginDataParam] = []
+    params: list[PluginDataParam] = []
     #: What it hands back. A widget binds against this, and a statement
     #: reading it has a column for each return marked ``list``.
-    returns: List[PluginDataReturn] = []
+    returns: list[PluginDataReturn] = []
 
 
 class PluginWidgetRead(SanitizedBaseModel):
@@ -162,7 +161,7 @@ class PluginWidgetRead(SanitizedBaseModel):
     type: str
     id: str
     #: The widget's own strings, in every language its author supplied.
-    meta: Dict[str, Any] = {}
+    meta: dict[str, Any] = {}
     #: The browser-side module. Opaque and carried verbatim: it is JavaScript,
     #: already size-capped by the manifest validator, and passing it through the
     #: plain-text sanitizer would rewrite operators like ``a < b`` into
@@ -170,11 +169,11 @@ class PluginWidgetRead(SanitizedBaseModel):
     #: evaluates it — the browser's sandbox is the only thing that runs it.
     module_source: RawTextStr
     #: Which of the plug-in's read endpoints this widget draws.
-    endpoints: List[str] = []
+    endpoints: list[str] = []
     #: What a preview draws instead of calling anything, keyed by endpoint id
     #: and projected through that endpoint's returns exactly as a live answer
     #: is — so a listing's tile and an installed one are the same widget.
-    sample_data: Dict[str, Any] = {}
+    sample_data: dict[str, Any] = {}
 
 
 class PluginWidgetCatalogEntry(SanitizedBaseModel):
@@ -184,15 +183,15 @@ class PluginWidgetCatalogEntry(SanitizedBaseModel):
     plugin_uid: str = Field(max_length=14)
     #: The id a statement names it by in ``plugin()``; each endpoint's id is
     #: ``plugin.<public_id>.<name>``.
-    public_id: Optional[str] = None
+    public_id: str | None = None
     name: str
     enabled: bool = True
-    widgets: List[PluginWidgetRead] = []
-    endpoints: List[PluginEndpointRead] = []
+    widgets: list[PluginWidgetRead] = []
+    endpoints: list[PluginEndpointRead] = []
 
 
 class PluginWidgetCatalogResponse(SanitizedBaseModel):
-    items: List[PluginWidgetCatalogEntry] = []
+    items: list[PluginWidgetCatalogEntry] = []
 
 
 class PluginParamOption(SanitizedBaseModel):
@@ -201,7 +200,7 @@ class PluginParamOption(SanitizedBaseModel):
     value: str
     #: What a person reads, when the value itself is opaque. Absent means the
     #: value is its own label.
-    label: Optional[str] = None
+    label: str | None = None
 
 
 class PluginParamOptionsResponse(SanitizedBaseModel):
@@ -214,9 +213,9 @@ class PluginParamOptionsResponse(SanitizedBaseModel):
     when there is one and a text field when there is not.
     """
 
-    options: List[PluginParamOption] = []
+    options: list[PluginParamOption] = []
     #: ``no-source``, ``needs-sibling`` or ``unresolved``.
-    unavailable: Optional[str] = None
+    unavailable: str | None = None
 
 
 ItemKind = Enum("ItemKind", {name: name for name in ITEM_KINDS}, type=str)
@@ -230,12 +229,12 @@ class PluginActionRun(SanitizedBaseModel):
     entity_id: int
     #: What the reader answered, by key, for the parameters the action asks
     #: for; nothing else is taken.
-    params: Optional[Dict[str, Any]] = None
+    params: dict[str, Any] | None = None
     #: The ``ref`` of the list element the action was run from, when it was.
-    element: Optional[str] = None
+    element: str | None = None
 
 
 class PluginActionResult(SanitizedBaseModel):
     """The values the plug-in shows on the item after its action, by key."""
 
-    values: Dict[str, Any]
+    values: dict[str, Any]

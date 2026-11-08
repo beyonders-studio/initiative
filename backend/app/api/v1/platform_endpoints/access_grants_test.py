@@ -1,10 +1,10 @@
 """End-to-end tests for the Privileged Access Management (PAM) endpoints."""
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
-
-from datetime import datetime, timedelta, timezone
 
 from app.core.capabilities import ROLE_MAX_GRANT_MINUTES
 from app.core.tools import Tool
@@ -31,7 +31,7 @@ async def _approved_grant(
 ) -> AccessGrant:
     """A live (or, with a negative ``expires_in``, a lapsed) approved grant on
     ``host``'s community, approved by ``host``."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     grant = AccessGrant(
         user_id=grantee.user.id,
         guild_id=host.guild.id,
@@ -108,7 +108,7 @@ async def test_my_requests_respects_limit_and_order(
     support = await acting_user("support")
 
     # Five historical grants with strictly increasing requested_at.
-    base = datetime.now(timezone.utc) - timedelta(days=5)
+    base = datetime.now(UTC) - timedelta(days=5)
     for i in range(5):
         session.add(
             AccessGrant(

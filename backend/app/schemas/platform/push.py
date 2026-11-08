@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import ConfigDict, Field
 
 from app.schemas.base import RawTextStr, SanitizedBaseModel
@@ -43,9 +41,9 @@ class FCMConfigResponse(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     enabled: bool
-    project_id: Optional[str] = None
-    application_id: Optional[str] = None
-    api_key: Optional[RawTextStr] = None
-    sender_id: Optional[str] = None
-    push_relay_server_id: Optional[str] = None
+    project_id: str | None = None
+    application_id: str | None = None
+    api_key: RawTextStr | None = None
+    sender_id: str | None = None
+    push_relay_server_id: str | None = None
     android_via_relay: bool = False

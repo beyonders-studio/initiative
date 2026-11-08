@@ -17,7 +17,7 @@ kinds:
 Replaces the per-resource ``*_permissions`` / ``*_role_permissions`` tables.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
 
@@ -35,8 +35,7 @@ from sqlalchemy import (
 )
 from sqlmodel import Field, Relationship
 
-from app.core.tools import Tool  # noqa: F401  (re-exported for grant callers)
-
+from app.core.tools import Tool
 from app.models.tenant._mixins import CreatedByMixin
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -107,14 +106,14 @@ class ResourceGrant(CreatedByMixin, table=True):
         ),
     )
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     # Carried directly so RLS is a plain initiative_access(initiative_id) — no hop.
     #
     # NULL means the grant is on a guild-level resource: one that belongs to no
     # initiative, so its scope is the guild itself. The DAC semantics are
     # unchanged — a grant still names a user, a role, or everyone — and at guild
     # scope "everyone" reads as every guild member.
-    initiative_id: Optional[int] = Field(
+    initiative_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -130,7 +129,7 @@ class ResourceGrant(CreatedByMixin, table=True):
     # Typed as the canonical Tool enum (stored as its string value).
     resource_type: Tool = Field(sa_column=Column(String(length=32), nullable=False))
     resource_id: int = Field(sa_column=Column(Integer, nullable=False))
-    user_id: Optional[int] = Field(
+    user_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -138,7 +137,7 @@ class ResourceGrant(CreatedByMixin, table=True):
             nullable=True,
         ),  # indexed by composite partial ix_resource_grants_user
     )
-    role_id: Optional[int] = Field(
+    role_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -149,7 +148,7 @@ class ResourceGrant(CreatedByMixin, table=True):
     #: The installed plug-in this grant is made to. The row says what the install
     #: may reach when it acts as its community; uninstalling removes its
     #: grants with it.
-    plugin_install_id: Optional[int] = Field(
+    plugin_install_id: int | None = Field(
         default=None,
         sa_column=Column(
             Integer,
@@ -169,7 +168,7 @@ class ResourceGrant(CreatedByMixin, table=True):
         sa_column=Column(Boolean, nullable=False, server_default=text("false")),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 

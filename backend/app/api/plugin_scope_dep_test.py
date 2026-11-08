@@ -27,9 +27,9 @@ from app.api.deps import (
     plugin_scope,
     route_plugin_scope,
 )
-from app.core.plugin_access_token import seal_plugin_token, seal_install_token
 from app.core.identity_boundary import boundary_scope
-from app.core.messages import PluginMessages, AuthMessages
+from app.core.messages import AuthMessages, PluginMessages
+from app.core.plugin_access_token import seal_install_token, seal_plugin_token
 from app.db.guild_standing import GuildContext, InstallContext
 from app.main import app
 from app.models.platform.guild import CommunityRole

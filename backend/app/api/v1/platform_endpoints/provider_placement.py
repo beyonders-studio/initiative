@@ -6,11 +6,9 @@ the system engine, and the logic lives in
 ``app.services.platform.provider_placement``.
 """
 
-from typing import List, Optional
-
 from fastapi import APIRouter, Query, status
 
-from app.api.deps import SystemSessionDep, CommunityIdPath
+from app.api.deps import CommunityIdPath, SystemSessionDep
 from app.api.v1.platform_endpoints.operator import ConfigManageDep, GuildsManageDep
 from app.schemas.platform.settings import (
     CommunityNarrowingPending,
@@ -37,11 +35,11 @@ async def list_provider_placement(
     return await provider_placement.list_rules(session)
 
 
-@router.get("/requests", response_model=List[CommunityNarrowingPending])
+@router.get("/requests", response_model=list[CommunityNarrowingPending])
 async def list_placement_requests(
     session: SystemSessionDep,
     _operator: GuildsManageDep,
-) -> List[CommunityNarrowingPending]:
+) -> list[CommunityNarrowingPending]:
     """Communities waiting for somebody to agree that the domain or tenant
     they named is theirs. Answered on the community's own narrowing route."""
     return await narrowing_review.unanswered(session)
@@ -61,13 +59,13 @@ async def set_provider_placement_everywhere(
     return PlacementEverywhereUpdate(enabled=enabled)
 
 
-@router.get("/communities", response_model=List[PlacementCommunityRead])
+@router.get("/communities", response_model=list[PlacementCommunityRead])
 async def list_placement_communities(
     session: SystemSessionDep,
     _operator: GuildsManageDep,
     provider_id: int,
-    search: Optional[str] = Query(default=None, max_length=100),
-) -> List[PlacementCommunityRead]:
+    search: str | None = Query(default=None, max_length=100),
+) -> list[PlacementCommunityRead]:
     """Communities a rule for this provider may name, by name."""
     return await provider_placement.list_communities(
         session, provider_id=provider_id, query=search
@@ -76,14 +74,14 @@ async def list_placement_communities(
 
 @router.get(
     "/providers/{provider_id}/communities/{community_id}/initiatives",
-    response_model=List[PlacementInitiativeRead],
+    response_model=list[PlacementInitiativeRead],
 )
 async def list_placement_targets(
     provider_id: int,
     guild_id: CommunityIdPath,
     session: SystemSessionDep,
     _operator: GuildsManageDep,
-) -> List[PlacementInitiativeRead]:
+) -> list[PlacementInitiativeRead]:
     """The initiatives and roles a rule for this community may place people
     in, for a community this provider's rules apply to."""
     return await provider_placement.list_targets(

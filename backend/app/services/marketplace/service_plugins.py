@@ -37,7 +37,8 @@ from __future__ import annotations
 
 import re
 import string
-from typing import Any, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any
 
 from app.core.currencies import CURRENCY_CODES
 from app.core.plugin_scopes import ALL_SCOPES, plugin_scope_target
@@ -71,24 +72,24 @@ from app.services.tenant.plugin_config import RESERVED_TOKEN_KEYS
 
 __all__ = [
     "ACTOR_KINDS",
-    "PLUGIN_PROTOCOL_VERSIONS",
-    "PLUGIN_WIDGET_TYPE_PREFIX",
-    "WIDGET_BINDABLE_DIRECTIONS",
     "CONNECTION_SCOPES",
     "DIRECTIONS",
-    "PAGE_CAPABILITIES",
     "FEATURES",
     "FEATURE_BLOCKS",
     "FIELD_KINDS",
     "FIELD_TYPES",
     "ITEM_KINDS",
+    "PAGE_CAPABILITIES",
     "PARAM_TYPES",
     "PART_NODES",
+    "PLUGIN_PROTOCOL_VERSIONS",
+    "PLUGIN_WIDGET_TYPE_PREFIX",
     "SURFACE_SCOPES",
     "TONES",
-    "plugin_widget_type",
+    "WIDGET_BINDABLE_DIRECTIONS",
     "is_admin_only",
     "normalize_service_plugin_definition",
+    "plugin_widget_type",
     "schedule_minutes",
 ]
 
@@ -1415,7 +1416,7 @@ def _host(raw: Any) -> str:
     to 63 characters, not edged with '-', and a name rather than an address."""
     if not isinstance(raw, str) or not raw or len(raw) > MAX_HOST_LENGTH:
         fail(f"service plug-in: host {raw!r} is not a host name")
-    labels = (raw[2:] if raw.startswith("*.") else raw).split(".")
+    labels = (raw.removeprefix("*.")).split(".")
     if (
         len(labels) < 2
         or any(
@@ -2469,7 +2470,7 @@ def _bundled_binding_params(raw: Any, *, what: str) -> dict[str, Any]:
         fail(f"{what}: a binding carries at most {MAX_DASHBOARD_BINDING_PARAMS} params")
 
     def scalar(value: Any, *, named: str) -> Any:
-        if isinstance(value, bool) or isinstance(value, int):
+        if isinstance(value, (bool, int)):
             return value
         if isinstance(value, str):
             return clean_text(
@@ -2494,7 +2495,7 @@ def _bundled_binding_params(raw: Any, *, what: str) -> dict[str, Any]:
     return cleaned
 
 
-def _grid_int(raw: Any, *, low: int, high: Optional[int], what: str) -> Optional[int]:
+def _grid_int(raw: Any, *, low: int, high: int | None, what: str) -> int | None:
     """A grid coordinate, or ``None`` when the publisher left it to the canvas."""
     if raw is None:
         return None
@@ -3277,7 +3278,7 @@ def _check_option_sources(
 
 
 def normalize_service_plugin_definition(
-    definition: Any, *, public_id: Optional[str] = None
+    definition: Any, *, public_id: str | None = None
 ) -> dict[str, Any]:
     """Validate and canonicalize a service plug-in's definition.
 

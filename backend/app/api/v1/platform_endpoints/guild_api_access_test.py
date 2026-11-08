@@ -9,7 +9,6 @@ content with a key in hand.
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.testing.schema_harness import route_session_to_guild
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
 from app.testing.factories import (
@@ -24,6 +23,7 @@ from app.testing.factories import (
     get_auth_headers,
     guild_administration,
 )
+from app.testing.schema_harness import route_session_to_guild
 
 
 async def _key_headers(client: AsyncClient, headers: dict, **body) -> dict[str, str]:

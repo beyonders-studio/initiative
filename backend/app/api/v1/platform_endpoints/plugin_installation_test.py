@@ -24,7 +24,7 @@ else in this build moves ``config_state`` off ``unverified``.
 """
 
 import json
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 from httpx import AsyncClient
@@ -34,37 +34,37 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.plugin_access_token import seal_install_token
 from app.core.encryption import SALT_PLUGIN_CONFIG, encrypt_field
 from app.core.messages import PluginChannelMessages, PluginMessages
-from app.models.platform.plugin_service_registration import PluginServiceRegistration
+from app.core.plugin_access_token import seal_install_token
 from app.models.platform.guild import CommunityRole
+from app.models.platform.plugin_service_registration import PluginServiceRegistration
 from app.models.platform.publisher import Publisher
 from app.models.platform.user import User
 from app.models.tenant.event_outbox import EventOutbox
-from app.models.tenant.initiative import InitiativeMember
-from app.models.tenant.plugin_event_outbox import PluginEventOutbox
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
+from app.models.tenant.initiative import InitiativeMember
 from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
+from app.models.tenant.plugin_event_outbox import PluginEventOutbox
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task
 from app.services.marketplace import plugin_refs
 from app.services.marketplace.registration_lookup import invalidate_registrations
-from app.services.tenant import plugin_channels as channels_service
 from app.services.tenant import metadata as metadata_service
+from app.services.tenant import plugin_channels as channels_service
 from app.testing import (
-    create_plugin_user_connection,
-    create_plugin_service_registration,
-    create_property_definition,
-    create_property_value,
-    create_guild,
-    create_guild_plugin,
-    create_project,
-    create_resource_grant,
     create_calendar,
     create_calendar_event,
+    create_guild,
+    create_guild_plugin,
+    create_plugin_service_registration,
+    create_plugin_user_connection,
+    create_project,
+    create_property_definition,
+    create_property_value,
+    create_resource_grant,
     create_task,
     create_user,
     guild_url,
@@ -73,7 +73,6 @@ from app.testing import (
     route_session_to_guild,
 )
 from app.testing.plugin_clients import CLIENT, install_headers, install_plugin
-
 
 BASE = "/api/v1/plugin-platform/installation"
 SHOP = "tests.shop"
@@ -185,7 +184,7 @@ async def _member_connection(
             else None
         ),
         status="blocked" if blocked else ("connected" if with_secret else "pending"),
-        blocked_at=datetime.now(timezone.utc) if blocked else None,
+        blocked_at=datetime.now(UTC) if blocked else None,
     )
 
 
@@ -1231,7 +1230,7 @@ class TestShownValues:
     ):
         """On every write, and again when the install moves to a version that
         declares other fields; the install's own values never."""
-        installed, _member, task = await _shown_board(
+        installed, _member, _task = await _shown_board(
             client, session, acting_user, role_session
         )
         await client.put(

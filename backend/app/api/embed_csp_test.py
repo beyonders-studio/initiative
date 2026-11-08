@@ -19,7 +19,6 @@ from app.services.marketplace.registration_lookup import (
 )
 from app.testing import create_plugin_service_registration, create_publisher
 
-
 FRAMED = "https://framed.example.test"
 SECOND = "https://second.example.test"
 

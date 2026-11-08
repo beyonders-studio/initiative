@@ -26,7 +26,6 @@ from app.services.tenant import attachments as attachments_service
 from app.services.tenant import collections as collections_service
 from app.services.tenant import file_versions
 from app.services.tenant import metadata as metadata_service
-
 from seed.common import Community, days_ago, photo, share, tag
 
 #: Each collection, its pictures shared with the initiative for reading.

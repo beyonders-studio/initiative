@@ -8,8 +8,7 @@ Own-row by policy: a library is the person's, and the only question anyone else
 asks about it has already been answered by the profile they are looking at.
 """
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from pydantic import ConfigDict
 from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String
@@ -40,10 +39,10 @@ class UserDecoration(SQLModel, table=True):
     kind: str = Field(sa_column=Column(String(16), nullable=False))
     #: The pack this came from, for granting and revoking as one. NULL means it
     #: was granted on its own.
-    source: Optional[str] = Field(
+    source: str | None = Field(
         default=None, sa_column=Column(String(120), nullable=True)
     )
     acquired_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

@@ -9,9 +9,12 @@ real Postgres rather than against the rendering code.
 
 from __future__ import annotations
 
+from datetime import UTC
+
 import pytest
 from sqlmodel import delete, select
 
+from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.collection import CollectionFile
@@ -25,7 +28,6 @@ from app.testing import (
     create_task,
     route_as,
 )
-from app.db.request_context import SystemGuild, Unattributed
 
 
 async def _outbox(session, guild_id: int) -> list[EventOutbox]:
@@ -109,9 +111,9 @@ async def test_soft_delete_is_reported_as_deleted(session, acting_user):
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     task = await create_task(session, a.project)
 
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    task.deleted_at = datetime.now(timezone.utc)
+    task.deleted_at = datetime.now(UTC)
     session.add(task)
     await session.commit()
 
@@ -384,14 +386,14 @@ async def test_a_hard_delete_on_a_trash_table_never_surfaces(session, acting_use
     """Deleting a task is soft — it moves to the trash, and that is the event.
     The hard delete that follows is retention clearing it out, which must stay
     silent: a repeat of an announced delete, naming an id nothing can resolve."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.services.tenant.soft_delete import hard_purge_entity
 
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     task = await create_task(session, a.project)
 
-    task.deleted_at = datetime.now(timezone.utc)
+    task.deleted_at = datetime.now(UTC)
     session.add(task)
     await session.commit()
 
@@ -703,8 +705,8 @@ async def test_an_install_write_names_the_install(session, acting_user, role_ses
     """A change an installed plug-in's request wrote names the install, and no
     person: the plug-in acts as its community. A person's write names the person
     and no install."""
-    from app.db.install_standing_test import _install, _route
     from app.core.file_types import FileType
+    from app.db.install_standing_test import _install, _route
     from app.models.tenant.file import File
 
     install = await _install(

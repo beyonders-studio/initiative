@@ -18,7 +18,7 @@ os.environ.setdefault(
     "SECRET_KEY", "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0"
 )
 
-from app.main import app, plugin_openapi  # noqa: E402
+from app.main import app, plugin_openapi
 
 
 def main():

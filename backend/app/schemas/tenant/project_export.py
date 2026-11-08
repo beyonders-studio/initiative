@@ -9,7 +9,7 @@ cross-database move.
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, List, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import (
     AliasChoices,
@@ -18,9 +18,6 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-
-from app.schemas.base import SanitizedBaseModel
-from app.schemas.recurrence import validate_task_recurrence
 
 from app.core import recurrence
 from app.core.relationships import RelationshipType
@@ -33,14 +30,15 @@ from app.core.tools import (
 )
 from app.models.tenant.metadata import MetadataType
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
-from app.schemas.tenant.property import CounterSettings
+from app.schemas.base import SanitizedBaseModel
+from app.schemas.recurrence import validate_task_recurrence
 from app.schemas.tenant.import_envelopes import EnvelopePropertyValue, _EnvelopeBase
+from app.schemas.tenant.property import CounterSettings
 from app.schemas.tenant.tool_layout import (
     DetailLayoutWrite,
     ListLayoutWrite,
     ToolLayoutDefaultWrite,
 )
-
 
 #: Where a row's property values are read from. ``property_values`` is what
 #: project exports called them before every envelope said ``properties``.
@@ -49,15 +47,15 @@ _PROPERTIES = AliasChoices("properties", "property_values")
 
 class ProjectExportProject(SanitizedBaseModel):
     name: str
-    icon: Optional[str] = None
-    description: Optional[str] = None
+    icon: str | None = None
+    description: str | None = None
     is_template: bool = False
-    archived_at: Optional[datetime] = None
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
+    archived_at: datetime | None = None
+    start_date: date | None = None
+    end_date: date | None = None
     # The project's own values, encoded as every envelope's are. Empty in an
     # export taken before projects carried them.
-    properties: List[EnvelopePropertyValue] = Field(
+    properties: list[EnvelopePropertyValue] = Field(
         default=[], validation_alias=_PROPERTIES
     )
 
@@ -73,8 +71,8 @@ class ProjectExportTaskStatus(SanitizedBaseModel):
     position: int = 0
     # Absent from what another tool's export is mapped into: the importer
     # then gives the column its category's own look.
-    color: Optional[str] = None
-    icon: Optional[str] = None
+    color: str | None = None
+    icon: str | None = None
     is_default: bool = False
 
 
@@ -84,30 +82,30 @@ class ProjectExportTaskType(SanitizedBaseModel):
     is_default: bool = False
     # Absent from what another tool's export is mapped into: the importer
     # then gives the type the plain look.
-    color: Optional[str] = None
-    icon: Optional[str] = None
-    layout_preset: Optional[str] = None
+    color: str | None = None
+    icon: str | None = None
+    layout_preset: str | None = None
     #: What a new task of the type starts with
     #: (``app.schemas.tenant.task_type.TaskTypeStartingValues``).
-    starting_values: Optional[dict[str, Any]] = None
+    starting_values: dict[str, Any] | None = None
 
 
 class ProjectExportPropertyDefinition(SanitizedBaseModel):
     name: str
     type: MetadataType
     position: float = 0.0
-    color: Optional[str] = None
-    options: Optional[List[dict]] = None
+    color: str | None = None
+    options: list[dict] | None = None
     #: A money property's currency.
-    currency: Optional[str] = None
+    currency: str | None = None
     #: A counter's settings; a counter carried without them takes the
     #: defaults, and every other type drops them.
-    counter: Optional[CounterSettings] = None
+    counter: CounterSettings | None = None
     #: The project's own metadata, not one of the initiative's properties.
     project: bool = False
 
     @model_validator(mode="after")
-    def _counter_settings(self) -> "ProjectExportPropertyDefinition":
+    def _counter_settings(self) -> ProjectExportPropertyDefinition:
         if self.type is not MetadataType.counter:
             self.counter = None
         elif self.counter is None:
@@ -135,18 +133,18 @@ class ProjectExportComment(SanitizedBaseModel):
     original author named in it. See ``project_import._comment_body``.
     """
 
-    author_handle: Optional[str] = None
-    author_name: Optional[str] = None
+    author_handle: str | None = None
+    author_name: str | None = None
     body: str
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
     # What this comment was called where it came from, and the comment it
     # answers, so a thread arrives as a thread. Refs for the reason a task's
     # are; they live for the length of one job.
-    external_ref: Optional[str] = None
-    reply_to_ref: Optional[str] = None
+    external_ref: str | None = None
+    reply_to_ref: str | None = None
     # The handles the body mentions as ``@<handle>``. Each one the people step
     # places becomes a mention of that account; the rest stay a name.
-    mention_handles: List[str] = []
+    mention_handles: list[str] = []
 
 
 class ProjectExportTaskLink(SanitizedBaseModel):
@@ -164,64 +162,64 @@ class ProjectExportTaskLink(SanitizedBaseModel):
 
 class ProjectExportTask(SanitizedBaseModel):
     title: str
-    description: Optional[str] = None
+    description: str | None = None
     priority: TaskPriority = TaskPriority.medium
-    start_date: Optional[datetime] = None
-    due_date: Optional[datetime] = None
+    start_date: datetime | None = None
+    due_date: datetime | None = None
     # RRULE lines; an export taken before RRULE carries the older JSON shape.
-    recurrence: Optional[str | dict] = None
+    recurrence: str | dict | None = None
     recurrence_shift: int = 0
-    recurrence_anchor: Optional[AwareDatetime] = None
+    recurrence_anchor: AwareDatetime | None = None
     recurrence_anchor_count: int = Field(default=0, ge=0)
     recurrence_strategy: str = "fixed"
     recurrence_occurrence_count: int = 0
-    recurrence_limit: Optional[int] = Field(default=None, ge=1, le=24, strict=True)
+    recurrence_limit: int | None = Field(default=None, ge=1, le=24, strict=True)
     #: The repeating series the task is in, as a number the tasks of one series
     #: share in this export; the import gives each series a new one.
-    series: Optional[int] = None
+    series: int | None = None
     #: What an edit of just this task changed from (``Task.recurrence_carry``),
     #: its tags as ``{"name", "color"}`` under ``tags``, its assignees under
     #: ``assignee_handles`` and its type under ``type_name``, as the rest of the
     #: envelope names them.
-    recurrence_carry: Optional[dict[str, Any]] = None
+    recurrence_carry: dict[str, Any] | None = None
     position: float = 0.0
-    archived_at: Optional[datetime] = None
+    archived_at: datetime | None = None
     # Absent in exports taken before completion timestamps existed; the
     # importer derives it from the restored status in that case.
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     status_name: str
     #: Which of the envelope's ``task_types`` the task is, by name; the
     #: project's default when absent or unknown.
-    type_name: Optional[str] = None
+    type_name: str | None = None
     # When the work was written down, and when it was last touched. Optional
     # because an export taken before these existed carries neither; the
     # importer falls back to the moment of the import, which is the only
     # honest answer it has.
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
     # What this task was called where it came from — ``"jira:ACME-123"``, or a
     # backup's own ``"task:41"``. It is the name ``links`` point at, and it is
     # never written to a column: it lives for the length of one job.
-    external_ref: Optional[str] = None
+    external_ref: str | None = None
     # Required, as the envelope's lists are: every export writes them, so one
     # missing is a file cut short, where an empty list is a real "none".
-    tags: List[ProjectExportTag]
-    assignee_handles: List[str]
-    checklist: List[ProjectExportChecklistItem]
-    properties: List[EnvelopePropertyValue] = Field(validation_alias=_PROPERTIES)
+    tags: list[ProjectExportTag]
+    assignee_handles: list[str]
+    checklist: list[ProjectExportChecklistItem]
+    properties: list[EnvelopePropertyValue] = Field(validation_alias=_PROPERTIES)
     # Both default to empty: an envelope written before they existed is a
     # task with nothing said on it and nothing pointing anywhere, which is
     # exactly what an absent field means here.
-    links: List[ProjectExportTaskLink] = []
-    comments: List[ProjectExportComment] = []
+    links: list[ProjectExportTaskLink] = []
+    comments: list[ProjectExportComment] = []
     # What the community called each assignee, beside ``assignee_handles``
     # (which an import matches on), for a reader of the file.
-    assignee_names: List[str] = []
+    assignee_names: list[str] = []
     # The handles the description mentions, as a comment's are.
-    mention_handles: List[str] = []
+    mention_handles: list[str] = []
 
     @model_validator(mode="after")
-    def _valid_recurrence(self) -> "ProjectExportTask":
+    def _valid_recurrence(self) -> ProjectExportTask:
         rule, _ = recurrence.imported(
             self.recurrence,
             kind="task",
@@ -258,11 +256,11 @@ class ProjectExportLayout(SanitizedBaseModel):
     kind: str
     #: A task page's type, by its place in ``task_types``; the project's
     #: default type when absent.
-    task_type: Optional[int] = Field(default=None, ge=1)
+    task_type: int | None = Field(default=None, ge=1)
     definition: dict[str, Any]
 
     @model_validator(mode="after")
-    def _a_layout(self) -> "ProjectExportLayout":
+    def _a_layout(self) -> ProjectExportLayout:
         if self.kind not in _PROJECT_LAYOUTS:
             raise ValueError(f"a project's layouts are {', '.join(_PROJECT_LAYOUTS)}")
         if self.task_type is not None and self.kind != TYPED_DETAILS[Tool.project]:
@@ -294,28 +292,28 @@ class ProjectExportEnvelope(_EnvelopeBase):
     type: Literal["initiative-project"] = "initiative-project"
     app_version: str
     exported_at: datetime
-    exported_by_handle: Optional[str] = None
+    exported_by_handle: str | None = None
 
     project: ProjectExportProject
     # Required: every export writes these, so a missing one is a truncated or
     # hand-assembled file, which is refused rather than imported as a project
     # with nothing in it. An empty list is a real "none" and is accepted.
-    tags: List[ProjectExportTag]
-    task_statuses: List[ProjectExportTaskStatus]
+    tags: list[ProjectExportTag]
+    task_statuses: list[ProjectExportTaskStatus]
     #: Absent from an export taken before task types existed, whose project is
     #: then given the types a new one starts with.
-    task_types: List[ProjectExportTaskType] = Field(default_factory=list)
-    property_definitions: List[ProjectExportPropertyDefinition]
-    tasks: List[ProjectExportTask]
+    task_types: list[ProjectExportTaskType] = Field(default_factory=list)
+    property_definitions: list[ProjectExportPropertyDefinition]
+    tasks: list[ProjectExportTask]
     # The layouts it changed from the shipped ones; a project drawn as shipped
     # has none.
-    layouts: List[ProjectExportLayout]
+    layouts: list[ProjectExportLayout]
 
     @field_validator("layouts")
     @classmethod
     def _one_of_each(
-        cls, value: List[ProjectExportLayout]
-    ) -> List[ProjectExportLayout]:
+        cls, value: list[ProjectExportLayout]
+    ) -> list[ProjectExportLayout]:
         kinds = [(layout.kind, layout.task_type) for layout in value]
         if len(set(kinds)) != len(kinds):
             raise ValueError("a project has one layout of each kind, and type")

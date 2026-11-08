@@ -60,8 +60,10 @@ class TestEmojiRule:
         "emoji",
         [
             "\N{THUMBS UP SIGN}\N{EMOJI MODIFIER FITZPATRICK TYPE-4}",  # skin tone
-            "\N{REGIONAL INDICATOR SYMBOL LETTER U}"
-            "\N{REGIONAL INDICATOR SYMBOL LETTER S}",  # flag
+            (
+                "\N{REGIONAL INDICATOR SYMBOL LETTER U}"
+                "\N{REGIONAL INDICATOR SYMBOL LETTER S}"
+            ),  # flag
             "1\N{VARIATION SELECTOR-16}\N{COMBINING ENCLOSING KEYCAP}",  # keycap
         ],
     )

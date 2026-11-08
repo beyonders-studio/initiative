@@ -4,17 +4,18 @@ Focus: the per-row skip guard correctly identifies rows that an earlier
 cascade pass already queued for deletion, so we don't double-purge them.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.db.request_context import SystemGuild
 from app.db.soft_delete_filter import select_including_deleted
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task
-from app.services.tenant.soft_delete import soft_delete_entity
 from app.services.guild_sweeps import Scope, each_guild
+from app.services.tenant.soft_delete import soft_delete_entity
 from app.services.tenant.trash_purge import _run_purge_pass, purge_guild
 from app.testing.factories import (
     create_guild,
@@ -23,7 +24,6 @@ from app.testing.factories import (
     create_task,
     create_user,
 )
-from app.db.request_context import SystemGuild
 
 
 async def test_auto_purge_does_not_double_purge_cascaded_descendants(
@@ -44,7 +44,7 @@ async def test_auto_purge_does_not_double_purge_cascaded_descendants(
     await session.commit()
 
     # Backdate purge_at so the auto-purge picks both up.
-    past = datetime.now(timezone.utc) - timedelta(days=2)
+    past = datetime.now(UTC) - timedelta(days=2)
     refreshed_initiative = (
         await session.exec(
             select_including_deleted(Initiative).where(Initiative.id == initiative.id)
@@ -66,7 +66,7 @@ async def test_auto_purge_does_not_double_purge_cascaded_descendants(
 
     # One pass — should sweep both rows without raising. Drive the inner
     # loop with the test session.
-    await _run_purge_pass(session, now=datetime.now(timezone.utc))
+    await _run_purge_pass(session, now=datetime.now(UTC))
     await session.commit()
 
     # Verify against the DB directly: the test session's identity map is
@@ -101,7 +101,7 @@ async def test_auto_purge_sweeps_every_guild_schema(
     from app.db.session import set_rls_context
 
     user = await create_user(session)
-    past = datetime.now(timezone.utc) - timedelta(days=2)
+    past = datetime.now(UTC) - timedelta(days=2)
     targets: list[tuple[int, int]] = []  # (guild_id, initiative_id)
 
     for label in ("Gamma", "Delta"):
@@ -163,7 +163,7 @@ async def test_auto_purge_clears_content_table_guard(
             select_including_deleted(Project).where(Project.id == project.id)
         )
     ).one()
-    refreshed.purge_at = datetime.now(timezone.utc) - timedelta(days=2)
+    refreshed.purge_at = datetime.now(UTC) - timedelta(days=2)
     session.add(refreshed)
     await session.commit()
     project_id = project.id
@@ -203,7 +203,7 @@ async def test_auto_purge_skips_non_active_guilds(session: AsyncSession, role_se
             select_including_deleted(Initiative).where(Initiative.id == initiative.id)
         )
     ).one()
-    refreshed.purge_at = datetime.now(timezone.utc) - timedelta(days=2)
+    refreshed.purge_at = datetime.now(UTC) - timedelta(days=2)
     session.add(refreshed)
 
     guild.status = CommunityStatus.suspended.value
@@ -263,11 +263,11 @@ async def test_a_task_with_assignees_can_be_purged(session: AsyncSession):
     refreshed = (
         await session.exec(select_including_deleted(Task).where(Task.id == task.id))
     ).one()
-    refreshed.purge_at = datetime.now(timezone.utc) - timedelta(days=2)
+    refreshed.purge_at = datetime.now(UTC) - timedelta(days=2)
     session.add(refreshed)
     await session.commit()
 
-    await _run_purge_pass(session, now=datetime.now(timezone.utc))
+    await _run_purge_pass(session, now=datetime.now(UTC))
     await session.commit()
 
     assert (

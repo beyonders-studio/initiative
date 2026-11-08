@@ -23,30 +23,29 @@ from fastapi import (
     status,
 )
 
-from app.api.deps import UserSessionDep, CurrentUser
-from app.core import audit_context
-from app.core import auth_context
+from app.api.deps import CurrentUser, UserSessionDep
+from app.core import audit_context, auth_context
 from app.core.messages import DirectMessageTransportMessages as Messages
 from app.core.rate_limit import limiter
 from app.core.user_display import handle_of
 from app.schemas.platform.dm_transport import (
     MAX_GROUP_MEMBERS,
     DmConversationCreate,
-    DmGroupCreate,
-    DmRosterCheckRequest,
-    DmRosterCheckResponse,
     DmConversationRead,
     DmConversationsResponse,
     DmDeviceRegistration,
     DmDeviceSignature,
     DmDevicesResponse,
+    DmGroupCreate,
     DmOneTimeKeyBatch,
     DmOwnSessionKeysRequest,
-    DmSessionKeysRequest,
     DmQueueAck,
     DmQueueResponse,
+    DmRosterCheckRequest,
+    DmRosterCheckResponse,
     DmSendRequest,
     DmSendResponse,
+    DmSessionKeysRequest,
     DmSessionKeysResponse,
     DmVerificationInbox,
     DmVerificationSend,

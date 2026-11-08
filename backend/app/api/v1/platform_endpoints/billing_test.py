@@ -25,7 +25,6 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.testing import community_plan
 from app.core import config as config_module
 from app.core.login_methods import LoginMethod
 from app.models.platform.billing import BillingJti
@@ -40,6 +39,7 @@ from app.services.tenant.attachments import (
 from app.testing import (
     billing_boundary,
     billing_guild_ref,
+    community_plan,
     create_guest,
     create_guild,
     create_guild_membership,

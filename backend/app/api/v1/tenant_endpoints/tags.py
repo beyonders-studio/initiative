@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
-from typing import Annotated, List
+from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, literal, union_all
@@ -14,41 +14,41 @@ from app.api.deps import (
     ActorContext,
     ActorSessionDep,
     ActorUserDep,
+    GuildContextDep,
     IncludeDeletedDep,
     RLSSessionDep,
     SessionDep,
-    plugin_scope,
     get_current_active_user,
-    GuildContextDep,
+    plugin_scope,
 )
-from app.core.plugin_scopes import tool_resource
-from app.core.messages import PluginMessages, TagMessages
 from app.api.v1.tenant_endpoints.tool_lists import TOOL_LISTS, view_conditions
+from app.core.messages import PluginMessages, TagMessages
+from app.core.plugin_scopes import tool_resource
 from app.core.tools import KINDS, Tool
-from app.models.tenant.initiative import Initiative
 from app.db.guild_standing import GuildContext, InstallContext
 from app.db.initiative_rls import governing_path
 from app.db.query import build_paginated_response, paginated_query
-from app.models.tenant._mixins import ArchiveMixin
-from app.models.tenant.tag import Tag
 from app.models.platform.user import User
-from app.services.tenant import tags as tags_service
-from app.services.tenant.archive import archive_filter_clause
-from app.services.tenant.names import ensure_name_free
-from app.services.tenant.soft_delete import trash
-from app.services.tenant.initiative_tools import tool_on_sql
+from app.models.tenant._mixins import ArchiveMixin
+from app.models.tenant.initiative import Initiative
+from app.models.tenant.tag import Tag
 from app.schemas.tenant.tag import (
     TagBulkEditRequest,
     TagBulkEditResponse,
     TagCreate,
     TagEntityCountsResponse,
-    TagRead,
-    TagTarget,
-    serialize_tag,
-    TagUpdate,
     TaggedEntitiesResponse,
     TaggedEntity,
+    TagRead,
+    TagTarget,
+    TagUpdate,
+    serialize_tag,
 )
+from app.services.tenant import tags as tags_service
+from app.services.tenant.archive import archive_filter_clause
+from app.services.tenant.initiative_tools import tool_on_sql
+from app.services.tenant.names import ensure_name_free
+from app.services.tenant.soft_delete import trash
 
 # The tag dictionary is a guild-wide folksonomy BY DESIGN: every guild member
 # (initiative membership not required) may list, create, rename, recolor, and
@@ -100,7 +100,7 @@ async def _get_tag_or_404(session: SessionDep, tag_id: int, guild_id: int) -> Ta
     return tag
 
 
-@router.get("/", response_model=List[TagRead])
+@router.get("/", response_model=list[TagRead])
 async def list_tags(
     session: ActorSessionDep,
     current_user: ActorUserDep,
@@ -214,7 +214,7 @@ async def bulk_edit_tags(
             await session.exec(
                 sa_update(parent)
                 .where(parent.id.in_(parent_ids))
-                .values(updated_at=datetime.now(timezone.utc))
+                .values(updated_at=datetime.now(UTC))
             )
 
     await tags_service.bulk_edit_tags(
@@ -267,7 +267,7 @@ async def update_tag(
     if "color" in update_data and update_data["color"] is not None:
         tag.color = update_data["color"]
 
-    tag.updated_at = datetime.now(timezone.utc)
+    tag.updated_at = datetime.now(UTC)
     session.add(tag)
     await session.commit()
     await session.refresh(tag)

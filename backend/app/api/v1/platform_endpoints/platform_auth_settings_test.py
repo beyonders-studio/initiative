@@ -1,25 +1,26 @@
 """Which ways in the deployment permits."""
 
+from datetime import UTC
+
 import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models.platform.user import UserRole
 from app.core.audit_events import AuditEventType
 from app.core.login_methods import LoginMethod
-from app.testing.audit import emitted
+from app.core.rules import SignInRequirement
+from app.models.platform.user import UserRole
+from app.services.platform import rules
 from app.testing import (
-    create_guild_provider_connection,
     create_auth_provider,
     create_federated_identity,
     create_guild,
     create_guild_auth_policy,
+    create_guild_provider_connection,
     create_user,
     get_auth_headers,
 )
-from app.core.rules import SignInRequirement
-from app.services.platform import rules
-
+from app.testing.audit import emitted
 
 URL = "/api/v1/settings/auth/platform"
 
@@ -493,11 +494,11 @@ async def test_withdrawing_two_ways_in_at_once_counts_them_together(
 
 async def _enrol(session: AsyncSession, user) -> None:
     """Give the account an authenticator it has proved."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.models.platform.user_totp import UserTotp
 
-    session.add(UserTotp(user_id=user.id, confirmed_at=datetime.now(timezone.utc)))
+    session.add(UserTotp(user_id=user.id, confirmed_at=datetime.now(UTC)))
     await session.commit()
 
 
@@ -646,7 +647,7 @@ async def test_the_read_says_who_is_asked_and_what_it_would_cost(
 ):
     """Both figures on every read, so the page states the consequence before
     the write rather than after it binds anybody."""
-    owner, headers = await _owner(session)
+    _, headers = await _owner(session)
     await create_user(session)
 
     answered = await client.get(URL, headers=headers)
@@ -742,7 +743,7 @@ async def test_a_refused_rule_leaves_the_others_as_they_were(
 ):
     """One change: the limit beside a requirement its writer does not meet is
     not written either."""
-    owner, headers = await _owner(session)
+    _, headers = await _owner(session)
 
     refused = await client.patch(
         URL,

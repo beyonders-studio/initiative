@@ -1,14 +1,10 @@
-from datetime import datetime, timezone
-from typing import Optional, TYPE_CHECKING
+from datetime import UTC, datetime
 
+from pydantic import ConfigDict
 from sqlalchemy import Column, DateTime, String
 from sqlmodel import Field
-from pydantic import ConfigDict
 
 from app.models.tenant._mixins import CreatedByMixin, HoldMixin, SoftDeleteMixin
-
-if TYPE_CHECKING:  # pragma: no cover
-    pass
 
 
 class Tag(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
@@ -22,7 +18,7 @@ class Tag(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
     __allow_unmapped__ = True
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     name: str = Field(
         sa_column=Column(String(length=100), nullable=False),
     )
@@ -31,10 +27,10 @@ class Tag(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
         sa_column=Column(String(length=9), nullable=False, server_default="#6366F1"),
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

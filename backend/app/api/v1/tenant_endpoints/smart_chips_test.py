@@ -8,37 +8,35 @@ under the same gates as the thing it is about.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
-
-from app.core.smart_chips import SMART_CHIP_KINDS, SmartChipKind, kind_value
-from app.models.platform.guild import CommunityRole
 from sqlmodel import select
 
-from app.models.tenant.task import TaskPriority, TaskStatus, TaskStatusCategory
+from app.core.file_types import FileType
 from app.core.references import NOT_REFERENCEABLE, REFERENCEABLE_TYPES
+from app.core.smart_chips import SMART_CHIP_KINDS, SmartChipKind, kind_value
 from app.db.reference_targets import referenceable_types
+from app.models.platform.guild import CommunityRole
+from app.models.tenant.task import TaskPriority, TaskStatus, TaskStatusCategory
 from app.schemas.tenant.smart_chip import MAX_EMBEDS, MAX_REFS
 from app.services.tenant.smart_chips import SMART_CHIP_SOURCES
 from app.testing import (
-    create_resource_grant,
     Actor,
     create_calendar,
     create_calendar_event,
-    create_counter,
     create_comment,
+    create_counter,
     create_counter_group,
     create_file,
+    create_resource_grant,
     create_task,
     create_task_status,
     create_user,
     create_wiki,
     create_wiki_page,
 )
-from app.core.file_types import FileType
-
 
 ActingUser = Callable[..., Awaitable[Actor]]
 
@@ -124,7 +122,7 @@ async def test_a_date_is_late_only_while_the_work_is_not_done(
     client, session, acting_user: ActingUser
 ) -> None:
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
+    yesterday = datetime.now(UTC) - timedelta(days=1)
     task = await create_task(session, a.project, title="Overdue", due_date=yesterday)
 
     ref = f"task:{task.id}:due"
@@ -141,7 +139,7 @@ async def test_the_date_itself_comes_back_for_the_reader_to_format(
 ) -> None:
     """A date belongs in the reader's locale, which only their browser knows."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    due = datetime.now(timezone.utc) + timedelta(days=3)
+    due = datetime.now(UTC) + timedelta(days=3)
     task = await create_task(session, a.project, title="Soon", due_date=due)
 
     body = await _chips(client, a, f"task:{task.id}:due")
@@ -368,8 +366,8 @@ async def test_a_counter_reads_its_number_and_its_ceiling(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     group = await create_counter_group(session, a.initiative, a.user)
     counter = await create_counter(session, group)
-    counter.count = Decimal("7")
-    counter.max = Decimal("10")
+    counter.count = Decimal(7)
+    counter.max = Decimal(10)
     session.add(counter)
     await session.commit()
 
@@ -425,8 +423,8 @@ async def test_a_counter_at_its_ceiling_reads_as_arrived(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     group = await create_counter_group(session, a.initiative, a.user)
     counter = await create_counter(session, group)
-    counter.count = Decimal("10")
-    counter.max = Decimal("10")
+    counter.count = Decimal(10)
+    counter.max = Decimal(10)
     session.add(counter)
     await session.commit()
 
@@ -443,18 +441,16 @@ async def test_an_event_dims_once_it_has_happened(
         session,
         calendar,
         a.user,
-        start_at=datetime.now(timezone.utc) - timedelta(days=2),
+        start_at=datetime.now(UTC) - timedelta(days=2),
     )
     soon = await create_calendar_event(
         session,
         calendar,
         a.user,
-        start_at=datetime.now(timezone.utc) + timedelta(days=2),
+        start_at=datetime.now(UTC) + timedelta(days=2),
     )
     # A repeat reads as its next occurrence, and dims on its last once it ends.
-    began = (datetime.now(timezone.utc) - timedelta(days=10, hours=-1)).replace(
-        microsecond=0
-    )
+    began = (datetime.now(UTC) - timedelta(days=10, hours=-1)).replace(microsecond=0)
     daily = await create_calendar_event(
         session, calendar, a.user, start_at=began, recurrence="RRULE:FREQ=DAILY"
     )

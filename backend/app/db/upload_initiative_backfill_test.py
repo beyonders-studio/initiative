@@ -7,7 +7,7 @@ file columns it reads."""
 from __future__ import annotations
 
 import importlib.util
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from types import ModuleType
 
@@ -20,7 +20,6 @@ from app.core.config import settings
 from app.models.tenant.task import Task
 from app.models.tenant.upload import Upload
 from app.services.storage import get_guild_storage
-from app.testing.later_revisions import step_later_revisions
 from app.testing import (
     create_calendar,
     create_calendar_event,
@@ -32,6 +31,7 @@ from app.testing import (
     create_upload,
     create_user,
 )
+from app.testing.later_revisions import step_later_revisions
 from app.testing.schema_harness import route_session_to_guild
 
 _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
@@ -70,7 +70,7 @@ async def test_the_backfill_places_copies_and_leaves_alone(
         guild,
         user,
         filename="nothing.png",
-        claimed_at=datetime.now(timezone.utc),
+        claimed_at=datetime.now(UTC),
     )
     get_guild_storage(guild.id).write("shared.png", b"shared")
 

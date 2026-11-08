@@ -63,8 +63,10 @@ async def test_a_statement_names_the_rows_the_import_made(session: AsyncSession)
         format_ref(SearchEntityType.project, 12), SearchEntityType.project, project.id
     )
     assert await _imported(session, elsewhere, initiative, owner) == [
-        f"SELECT title FROM tasks WHERE project_id IN ({project.id}, 0) "
-        "AND created_by = 12 -- by id",
+        (
+            f"SELECT title FROM tasks WHERE project_id IN ({project.id}, 0) "
+            "AND created_by = 12 -- by id"
+        ),
         "SELECT count(*) AS n FROM sheet(0, 'Q3!A1:D')",
     ]
 

@@ -1,7 +1,7 @@
 import json
-from collections.abc import Awaitable, Callable, Iterable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Annotated, Any, NoReturn, Optional, Sequence
+from typing import Annotated, Any, NoReturn
 
 from fastapi import Cookie, Depends, HTTPException, Path, Query, Request, status
 from fastapi.security import OAuth2PasswordBearer
@@ -229,8 +229,8 @@ async def _authenticate(
 async def get_current_user(
     request: Request,
     session: SessionDep,
-    bearer_token: Annotated[Optional[str], Depends(oauth2_scheme)] = None,
-    session_cookie: Annotated[Optional[str], Cookie(alias=SESSION_COOKIE_NAME)] = None,
+    bearer_token: Annotated[str | None, Depends(oauth2_scheme)] = None,
+    session_cookie: Annotated[str | None, Cookie(alias=SESSION_COOKIE_NAME)] = None,
 ) -> User:
     # ``bearer_token`` and ``session_cookie`` declare the schemes for the API
     # description; the credential itself is read once, by ``identify``.
@@ -265,8 +265,8 @@ def require_first_party_session(request: Request) -> str:
 async def get_current_user_optional(
     request: Request,
     session: SessionDep,
-    bearer_token: Annotated[Optional[str], Depends(oauth2_scheme)] = None,
-    session_cookie: Annotated[Optional[str], Cookie(alias=SESSION_COOKIE_NAME)] = None,
+    bearer_token: Annotated[str | None, Depends(oauth2_scheme)] = None,
+    session_cookie: Annotated[str | None, Cookie(alias=SESSION_COOKIE_NAME)] = None,
 ) -> User | None:
     try:
         return await get_current_user(request, session, bearer_token, session_cookie)
@@ -1433,7 +1433,7 @@ async def establish_filer_access(session: AsyncSession, user: User) -> int:
     return guild_id
 
 
-async def establish_ideas_access(session: AsyncSession, user: Optional[User]) -> int:
+async def establish_ideas_access(session: AsyncSession, user: User | None) -> int:
     """Route ``session`` as whoever reads the published ideas, ``user`` or
     nobody signed in — the establishment seam for the ideas, beside
     :func:`establish_filer_access`.
@@ -1709,7 +1709,7 @@ def plugin_scope(scope: str) -> Callable[..., Awaitable[ActorContext]]:
         request: Request,
         session: SessionDep,
         guild_id: CommunityIdPath,
-        person: Annotated[Optional[User], Depends(get_actor_user)],
+        person: Annotated[User | None, Depends(get_actor_user)],
     ) -> ActorContext:
         if person is None:
             # ``get_actor_user`` answers ``None`` only for an access token.
@@ -1746,7 +1746,7 @@ def plugin_scope_by(
         request: Request,
         session: SessionDep,
         guild_id: CommunityIdPath,
-        person: Annotated[Optional[User], Depends(get_actor_user)],
+        person: Annotated[User | None, Depends(get_actor_user)],
     ) -> ActorContext:
         if person is None:
             scope = scopes.get(str(request.path_params.get(param)))
@@ -1801,7 +1801,7 @@ def plugin_scope_checked(
         request: Request,
         session: SessionDep,
         guild_id: CommunityIdPath,
-        person: Annotated[Optional[User], Depends(get_actor_user)],
+        person: Annotated[User | None, Depends(get_actor_user)],
     ) -> ActorContext:
         if person is None:
             return await _establish_install_request(request, session, None)
@@ -1824,9 +1824,9 @@ def plugin_scope_checked(
 async def get_actor_user(
     request: Request,
     session: SessionDep,
-    bearer_token: Annotated[Optional[str], Depends(oauth2_scheme)] = None,
-    session_cookie: Annotated[Optional[str], Cookie(alias=SESSION_COOKIE_NAME)] = None,
-) -> Optional[User]:
+    bearer_token: Annotated[str | None, Depends(oauth2_scheme)] = None,
+    session_cookie: Annotated[str | None, Cookie(alias=SESSION_COOKIE_NAME)] = None,
+) -> User | None:
     """The person a scoped route serves, or ``None`` for an installed plug-in.
 
     For a person, the same two dependencies a content route composes, in the
@@ -1842,7 +1842,7 @@ async def get_actor_user(
 
 
 #: The account a scoped route serves; ``None`` when an installed plug-in calls it.
-ActorUserDep = Annotated[Optional[User], Depends(get_actor_user)]
+ActorUserDep = Annotated[User | None, Depends(get_actor_user)]
 
 
 def _route_dependency_value(route: Any, attribute: str) -> Any:
@@ -2135,9 +2135,9 @@ UserSessionDep = Annotated[AsyncSession, Depends(get_user_session)]
 async def get_upload_user(
     request: Request,
     session: SessionDep,
-    bearer_token: Annotated[Optional[str], Depends(oauth2_scheme)] = None,
-    token_param: Annotated[Optional[str], Query(alias="token")] = None,
-    session_cookie: Annotated[Optional[str], Cookie(alias=SESSION_COOKIE_NAME)] = None,
+    bearer_token: Annotated[str | None, Depends(oauth2_scheme)] = None,
+    token_param: Annotated[str | None, Query(alias="token")] = None,
+    session_cookie: Annotated[str | None, Cookie(alias=SESSION_COOKIE_NAME)] = None,
 ) -> User:
     """Auth dependency for /uploads/* and authenticated file downloads.
 

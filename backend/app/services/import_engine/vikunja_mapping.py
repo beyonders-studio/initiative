@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Optional
+from typing import Any
 
 from app.core.relationships import RelationshipType
 from app.models.tenant.task import TaskPriority
@@ -143,7 +143,7 @@ def html_to_markdown(html: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
-def _stamp(value: Any) -> Optional[str]:
+def _stamp(value: Any) -> str | None:
     """A Vikunja timestamp, or ``None`` for the zero value it writes when a
     date was never set."""
     text = str(value or "").strip()
@@ -316,9 +316,11 @@ def build_project_envelope(
 
     # A task whose bucket was deleted still has to land somewhere, and a
     # project with no buckets at all is ordinary in Vikunja's list view.
-    if any(task["status_name"] == NO_BUCKET for task in tasks):
-        if NO_BUCKET not in ordered_columns:
-            ordered_columns.append(NO_BUCKET)
+    if (
+        any(task["status_name"] == NO_BUCKET for task in tasks)
+        and NO_BUCKET not in ordered_columns
+    ):
+        ordered_columns.append(NO_BUCKET)
     statuses = statuses_from_names(ordered_columns)
     known = {status["name"] for status in statuses}
     default_name = next(

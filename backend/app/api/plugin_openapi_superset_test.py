@@ -200,8 +200,10 @@ class TestTheComparator:
 
         # A component is compared once, where it is first reached.
         assert _changed(change) == [
-            "GET /projects/ response 200 application/json.items[].name: "
-            "type string is now null|string"
+            (
+                "GET /projects/ response 200 application/json.items[].name: "
+                "type string is now null|string"
+            )
         ]
 
     def test_a_response_field_no_longer_always_sent_fails(self):
@@ -209,8 +211,10 @@ class TestTheComparator:
             _schemas(document)["Project"]["required"].remove("name")
 
         assert _changed(change) == [
-            "GET /projects/ response 200 application/json.items[].name: "
-            "no longer always sent"
+            (
+                "GET /projects/ response 200 application/json.items[].name: "
+                "no longer always sent"
+            )
         ]
 
     def test_a_narrower_response_type_is_fine(self):

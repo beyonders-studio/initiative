@@ -36,7 +36,8 @@ from __future__ import annotations
 import ipaddress
 import logging
 import time
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.requests import HTTPConnection, Request
@@ -45,8 +46,8 @@ from starlette.responses import PlainTextResponse, Response
 from app.core import audit_context, cloudflare, metrics
 from app.core.audit_events import AuditEventType
 from app.core.config import settings
-from app.services import audit as audit_service
 from app.core.security_rules import Signal
+from app.services import audit as audit_service
 from app.services.platform import security_signals
 from app.services.tenant import plugin_age
 
@@ -206,7 +207,7 @@ async def _record_activity(
                     )
                 )
             await session.commit()
-    except Exception:  # noqa: BLE001 — a record of the request, never a reason to fail it
+    except Exception:
         logger.exception("access grant activity: could not record a request")
 
 

@@ -19,13 +19,12 @@ from sqlalchemy.exc import ProgrammingError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db.public_rls import platform_tier, role_name
+from app.db.request_context import Platform, Unattributed
 from app.db.schema_provisioning import guild_role_name
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
 from app.testing import create_guild, create_guild_membership, create_user, route_as
-from app.db.request_context import Platform, Unattributed
-
 
 # The columns an account holder alone writes.
 # The address columns left ``users`` with H3; what stays here is the one

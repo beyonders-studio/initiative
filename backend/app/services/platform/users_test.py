@@ -8,7 +8,7 @@ Tests the business logic in app.services.users including:
 - User content reassignment
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy.orm import undefer
@@ -18,16 +18,16 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.capabilities import Capability
 from app.core.errors import CodedError
 from app.core.messages import UserMessages
+from app.db.request_context import SystemGuild, Unattributed
 from app.models.platform.guild import CommunityRole
-from app.services.auth import addresses
 from app.models.platform.user import User, UserStatus
+from app.services.auth import addresses
 from app.services.platform import users as user_service
 from app.testing.factories import (
     create_guild,
     create_guild_membership,
     create_user,
 )
-from app.db.request_context import SystemGuild, Unattributed
 
 
 async def test_the_sole_seat_is_reported(session: AsyncSession):
@@ -221,9 +221,9 @@ async def test_soft_delete_user_anonymizes_pii(session: AsyncSession, role_sessi
     from app.models.platform.federated_identity import FederatedIdentity
     from app.models.platform.federated_identity_secret import FederatedIdentitySecret
     from app.models.platform.push_token import PushToken
+    from app.models.platform.user import UserRole
     from app.models.platform.user_avatar import UserAvatar
     from app.models.platform.user_token import UserToken
-    from app.models.platform.user import UserRole
     from app.testing.factories import create_federated_identity
 
     user = await create_user(
@@ -264,7 +264,7 @@ async def test_soft_delete_user_anonymizes_pii(session: AsyncSession, role_sessi
             user_id=user.id,
             token="utoken-1",
             purpose="password_reset",
-            expires_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(UTC),
         )
     )
     session.add(PushToken(user_id=user.id, push_token="device-token", platform="web"))
@@ -394,7 +394,7 @@ async def test_soft_delete_user_scrubs_addressed_invites(
     )
 
     # Active invite addressed to the victim — the recoverable PII trace.
-    victim_invite, victim_invite_code = await guild_service.create_guild_invite(
+    victim_invite, _victim_invite_code = await guild_service.create_guild_invite(
         session,
         guild_id=guild.id,
         created_by=admin.id,
@@ -403,7 +403,7 @@ async def test_soft_delete_user_scrubs_addressed_invites(
         expires_at=None,
     )
     # Invite for someone else — must be untouched.
-    other_invite, other_invite_code = await guild_service.create_guild_invite(
+    other_invite, _other_invite_code = await guild_service.create_guild_invite(
         session,
         guild_id=guild.id,
         created_by=admin.id,
@@ -412,7 +412,7 @@ async def test_soft_delete_user_scrubs_addressed_invites(
         expires_at=None,
     )
     # Unbound shareable link (no address) — must be untouched.
-    open_invite, open_invite_code = await guild_service.create_guild_invite(
+    open_invite, _open_invite_code = await guild_service.create_guild_invite(
         session,
         guild_id=guild.id,
         created_by=admin.id,
@@ -476,7 +476,7 @@ async def test_hard_delete_user_scrubs_addressed_invites(
         session, user=victim, guild=guild, role=CommunityRole.member
     )
 
-    invite, invite_code = await guild_service.create_guild_invite(
+    invite, _invite_code = await guild_service.create_guild_invite(
         session,
         guild_id=guild.id,
         created_by=admin.id,
@@ -704,8 +704,8 @@ async def test_soft_delete_takes_their_name_out_of_collaboration(
     from sqlalchemy import text
 
     from app.db.session import set_rls_context
-    from app.models.tenant.file import File
     from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
+    from app.models.tenant.file import File
     from app.models.tenant.wiki import WikiPage
     from app.services.tenant.mention_parser import (
         ANONYMIZED_MENTION_NAME,
@@ -743,7 +743,7 @@ async def test_soft_delete_takes_their_name_out_of_collaboration(
         author,
         content=mentioning,
         yjs_state=MENTIONING_YJS_STATE,
-        archived_at=datetime.now(timezone.utc),
+        archived_at=datetime.now(UTC),
     )
     elsewhere = await create_file(
         session,

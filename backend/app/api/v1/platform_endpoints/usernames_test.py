@@ -13,7 +13,6 @@ from app.models.platform.guild import CommunityRole
 from app.testing import create_guild, create_guild_membership, create_user
 from app.testing.factories import get_auth_headers
 
-
 REGISTRATION = {
     "email": "handle-new@example.com",
     "password": "a-long-enough-password-123",

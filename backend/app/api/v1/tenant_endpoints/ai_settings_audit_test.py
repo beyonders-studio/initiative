@@ -16,7 +16,6 @@ from app.models.platform.guild import CommunityRole
 from app.services import ai_settings as ai_settings_service
 from app.testing.audit import emitted
 
-
 PLATFORM_MODE = "/api/v1/settings/ai/platform/mode"
 PLATFORM_CONNS = "/api/v1/settings/ai/platform/connections"
 API_KEY = "sk-never-in-the-log"

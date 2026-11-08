@@ -5,7 +5,7 @@ still reach it while it sits there, what the restore wizard's endpoint asks
 for, and when the purge finally destroys it.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -15,21 +15,21 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.audit_events import AuditEventType
 from app.core.messages import GuildMessages
 from app.core.moderation import HoldReason, HoldVia
-from app.db import cohorts, post_commit
-from app.db.holds import HoldsInForce
-from app.db.request_context import SystemGuild
-from app.db.session import set_rls_context
 from app.core.rules import (
     DEFAULT_GUILD_RETENTION_DAYS,
     DEFAULT_HOLD_DELETION_DAYS,
 )
+from app.db import cohorts, post_commit
+from app.db.holds import HoldsInForce
+from app.db.request_context import SystemGuild
+from app.db.session import set_rls_context
 from app.models.platform.guild import (
     LIVE_STATUSES,
     OPERATOR_SETTABLE_STATUSES,
-    Guild,
-    GuildMembership,
     CommunityRole,
     CommunityStatus,
+    Guild,
+    GuildMembership,
 )
 from app.models.platform.identity_ref import IdentityEntity, IdentityPurpose
 from app.models.tenant.content_hold import ContentHold
@@ -49,7 +49,6 @@ from app.testing.factories import (
     create_user,
     get_auth_headers,
 )
-
 
 PASSWORD = "testpassword123"
 
@@ -500,9 +499,7 @@ async def test_the_purge_waits_out_the_whole_window(
         await session.exec(select(Guild).where(Guild.id == guild_id))
     ).one_or_none() is not None
 
-    later = datetime.now(timezone.utc) + timedelta(
-        days=DEFAULT_GUILD_RETENTION_DAYS, minutes=1
-    )
+    later = datetime.now(UTC) + timedelta(days=DEFAULT_GUILD_RETENTION_DAYS, minutes=1)
     destroy = guild_purge._destroy
 
     async def _first_fails(session, row, days):
@@ -604,7 +601,7 @@ async def test_a_deployment_can_keep_deleted_communities_forever(
     session.expunge_all()
     assert (
         await guild_purge.purge_due_guilds(
-            session, now=datetime.now(timezone.utc) + timedelta(days=3650)
+            session, now=datetime.now(UTC) + timedelta(days=3650)
         )
         == 0
     )
@@ -649,15 +646,13 @@ async def test_the_purge_leaves_live_communities_alone(session: AsyncSession):
         guild = await create_guild(session, creator=await create_user(session))
         row = (await session.exec(select(Guild).where(Guild.id == guild.id))).one()
         row.status = status.value
-        row.status_changed_at = datetime.now(timezone.utc) - timedelta(days=365)
+        row.status_changed_at = datetime.now(UTC) - timedelta(days=365)
         session.add(row)
         kept.append(guild.id)
     await session.commit()
     session.expunge_all()
 
-    assert (
-        await guild_purge.purge_due_guilds(session, now=datetime.now(timezone.utc)) == 0
-    )
+    assert await guild_purge.purge_due_guilds(session, now=datetime.now(UTC)) == 0
     for guild_id in kept:
         assert (
             await session.exec(select(Guild).where(Guild.id == guild_id))
@@ -772,9 +767,7 @@ async def test_a_hold_that_runs_out_deletes_the_community(
         session, user=seat, guild=guild, role=CommunityRole.superadmin
     )
     guild_id, name = guild.id, guild.name
-    held_at = datetime.now(timezone.utc) - timedelta(
-        days=DEFAULT_HOLD_DELETION_DAYS + 1
-    )
+    held_at = datetime.now(UTC) - timedelta(days=DEFAULT_HOLD_DELETION_DAYS + 1)
     await _hold_since(session, guild_id, held_at)
     letters = []
 
@@ -785,10 +778,7 @@ async def test_a_hold_that_runs_out_deletes_the_community(
 
     async with billing_manages_plans(session):
         assert (
-            await guild_purge.delete_expired_holds(
-                session, now=datetime.now(timezone.utc)
-            )
-            == 1
+            await guild_purge.delete_expired_holds(session, now=datetime.now(UTC)) == 1
         )
 
     session.expunge_all()
@@ -810,7 +800,7 @@ async def test_a_hold_that_runs_out_deletes_the_community(
 async def test_a_hold_waits_out_its_whole_window(session: AsyncSession):
     _, guild = await _seated_guild(session)
     guild_id = guild.id
-    held_at = datetime.now(timezone.utc) - timedelta(days=1)
+    held_at = datetime.now(UTC) - timedelta(days=1)
     await _hold_since(session, guild_id, held_at)
     deletes_at = held_at + timedelta(days=DEFAULT_HOLD_DELETION_DAYS)
 
@@ -842,16 +832,13 @@ async def test_only_a_hold_runs_out(session: AsyncSession):
         guild = await create_guild(session, creator=await create_user(session))
         row = (await session.exec(select(Guild).where(Guild.id == guild.id))).one()
         row.status = status.value
-        row.status_changed_at = datetime.now(timezone.utc) - timedelta(days=365)
+        row.status_changed_at = datetime.now(UTC) - timedelta(days=365)
         session.add(row)
         kept[guild.id] = status.value
     await session.commit()
     session.expunge_all()
 
-    assert (
-        await guild_purge.delete_expired_holds(session, now=datetime.now(timezone.utc))
-        == 0
-    )
+    assert await guild_purge.delete_expired_holds(session, now=datetime.now(UTC)) == 0
     for guild_id, status in kept.items():
         row = (await session.exec(select(Guild).where(Guild.id == guild_id))).one()
         assert row.status == status
@@ -864,7 +851,7 @@ async def test_a_deployment_can_leave_holds_in_place(
     operator = await acting_user("owner")
     _, guild = await _seated_guild(session)
     guild_id = guild.id
-    await _hold_since(session, guild_id, datetime.now(timezone.utc))
+    await _hold_since(session, guild_id, datetime.now(UTC))
 
     response = await client.put(
         "/api/v1/settings/community",
@@ -880,7 +867,7 @@ async def test_a_deployment_can_leave_holds_in_place(
     session.expunge_all()
     assert (
         await guild_purge.delete_expired_holds(
-            session, now=datetime.now(timezone.utc) + timedelta(days=3650)
+            session, now=datetime.now(UTC) + timedelta(days=3650)
         )
         == 0
     )
@@ -919,7 +906,7 @@ async def test_the_hold_is_told_in_each_seats_language(
         session, user=german, guild=guild, role=CommunityRole.superadmin
     )
     guild_id, seat_id = guild.id, seat.id
-    held_at = datetime(2026, 9, 1, tzinfo=timezone.utc)
+    held_at = datetime(2026, 9, 1, tzinfo=UTC)
     await _hold_since(session, guild_id, held_at)
     sent: list[dict] = []
     written = email_service.community_on_hold_pieces
@@ -976,7 +963,7 @@ async def test_the_hold_notice_names_the_day_it_is_deleted(
     operator = await acting_user("owner")
     _, guild = await _seated_guild(session)
     guild_id = guild.id
-    held_at = datetime.now(timezone.utc)
+    held_at = datetime.now(UTC)
     await _hold_since(session, guild_id, held_at)
     sent = []
     written = email_service.community_on_hold_pieces

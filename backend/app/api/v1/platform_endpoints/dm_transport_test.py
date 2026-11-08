@@ -7,7 +7,7 @@ collected message stops existing.
 """
 
 import base64
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
@@ -418,7 +418,7 @@ async def test_a_device_signs_its_keys(client, session, acting_user):
     row = await app_settings_service.get_app_settings(session)
     row.transitions = {
         DM_SIGNED_DEVICES.name: (
-            datetime.now(timezone.utc) - DM_SIGNED_DEVICES.grace - timedelta(days=1)
+            datetime.now(UTC) - DM_SIGNED_DEVICES.grace - timedelta(days=1)
         ).isoformat()
     }
     session.add(row)
@@ -1274,7 +1274,7 @@ class TestAGroupSend:
     test, and it is already meant to carry any roster."""
 
     async def _group(self, client, session, members):
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from app.models.platform.dm_conversation import (
             DmConversation,
@@ -1293,7 +1293,7 @@ class TestAGroupSend:
             actor.user.id: await _register(client, actor, seed=1 + 40 * i)
             for i, actor in enumerate(members)
         }
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         conversation = DmConversation(
             kind=DmConversationKind.group,
             roster_key=roster_key(actor.user.id for actor in members),

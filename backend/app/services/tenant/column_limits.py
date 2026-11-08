@@ -13,7 +13,7 @@ copies) are not held to it, and nothing moves out of a column past its limit.
 from __future__ import annotations
 
 from collections import Counter
-from typing import Sequence
+from collections.abc import Sequence
 
 from fastapi import HTTPException, status
 from sqlalchemy import func

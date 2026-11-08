@@ -7,7 +7,8 @@ their pages merge (:func:`cross_guild.page_across_guilds`). Ids are unique per
 schema, so no single statement spans guilds.
 """
 
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from sqlalchemy import ColumnElement, func
 
@@ -20,8 +21,8 @@ def name_key(model: Any) -> ColumnElement[Any]:
 
 def sort_key(
     model: Any,
-    sort_by: Optional[str],
-    sort_dir: Optional[str],
+    sort_by: str | None,
+    sort_dir: str | None,
     *,
     default: Callable[[Any], ColumnElement[Any]],
     default_desc: bool = True,

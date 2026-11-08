@@ -26,7 +26,7 @@ into a guild role and a request handler doing the same.
 from __future__ import annotations
 
 from collections.abc import Collection, Iterable, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import tuple_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -213,7 +213,7 @@ async def _subscription_refs(
     held = await _held(session, keys)
     missing = sorted(keys - held.keys())
     if missing:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         await session.exec(
             pg_insert(WebhookRef.__table__)
             .values(

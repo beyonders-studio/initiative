@@ -9,12 +9,12 @@ from typing import Any
 from pydantic import BaseModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.db.session import routed_guild_id
+from app.core.file_types import EDITOR_TYPES, FileType
 from app.core.messages import ImportEngineMessages
 from app.core.search import SearchEntityType
 from app.core.tools import Tool, tool_envelope_type
+from app.db.session import routed_guild_id
 from app.models.platform.user import User
-from app.core.file_types import EDITOR_TYPES, FileType
 from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative, PermissionKey
 from app.schemas.tenant.import_envelopes import FileEnvelope
@@ -22,14 +22,11 @@ from app.services.import_engine.common import (
     load_initiative_member_handles,
     unique_name_in_initiative,
 )
+from app.services.import_engine.context import ImportContext
 from app.services.import_engine.contract import (
     EnvelopeImportResult,
     ImportEngineError,
 )
-from app.services.import_engine.context import ImportContext
-from app.services.import_engine.mentions import place_mentions
-from app.services.import_engine.references import note_or_settle
-from app.services.import_engine.people import PeopleMap
 from app.services.import_engine.importers._base import (
     NamesPeopleInPassing,
     PropertyRestore,
@@ -37,6 +34,9 @@ from app.services.import_engine.importers._base import (
     grant_ownership,
     parse_envelope,
 )
+from app.services.import_engine.mentions import place_mentions
+from app.services.import_engine.people import PeopleMap
+from app.services.import_engine.references import note_or_settle
 from app.services.tenant.files import (
     FileContentError,
     normalize_file_content,

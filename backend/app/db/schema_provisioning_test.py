@@ -12,25 +12,24 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 
-import app.db.schema_provisioning as schema_provisioning
+from app.db import schema_provisioning
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.guild_ddl import rendered_constraint_names, rendered_trigger_names
 from app.db.registry_checks import registry_checks
 from app.db.schema_provisioning import (
-    GuildRoleKind,
     PLUGIN_ROLE_MACHINERY_READS,
     SUPPORT_WRITE_PROTECTED_TABLES,
+    SYSTEM_LOGIN_ROLE,
+    GuildRoleKind,
     apply_guild_rls,
-    strip_template_registry_objects,
     backfill_guild_schemas,
     drop_guild_schema,
     guild_role_name,
     guild_schema_name,
     provision_guild_schema,
-    SYSTEM_LOGIN_ROLE,
+    strip_template_registry_objects,
 )
 from app.db.tenancy import GUILD_SCOPED_TABLES, OPERATIONS_TABLES
-
 
 # Synthetic ids well above any real guild; each test uses its own.
 _GID_COMPLETE = 990_101
@@ -1497,8 +1496,9 @@ async def test_engine_identities_warn_on_shared_app_and_admin_login(
 async def test_engine_identities_warn_on_privileged_app_login(
     engine, monkeypatch, caplog
 ):
-    import app.db.session as db_session
     from sqlalchemy.ext.asyncio import create_async_engine
+
+    import app.db.session as db_session
 
     # App engine as app_admin (BYPASSRLS) — a swapped-URLs deployment. A
     # DISTINCT engine from a distinct login must be the admin side so the

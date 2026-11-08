@@ -19,7 +19,7 @@ Grouped by what they defend:
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -29,9 +29,8 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
-from app.core.messages import PluginServiceMessages
 from app.core.messages import MarketplaceRegistryMessages as Codes
-from app.models.platform.plugin_service_registration import PluginServiceRegistration
+from app.core.messages import PluginServiceMessages
 from app.models.platform.marketplace import (
     MarketplaceListing,
     MarketplaceListingVersion,
@@ -40,6 +39,7 @@ from app.models.platform.marketplace_registry import (
     MarketplaceRegistryStatus,
     MarketplaceTufMetadata,
 )
+from app.models.platform.plugin_service_registration import PluginServiceRegistration
 from app.models.platform.publisher import Publisher
 from app.services.marketplace import registrations as registrations_service
 from app.services.marketplace import tuf_registry
@@ -56,7 +56,6 @@ from app.testing.tuf_repository import (
     container_registration,
     dashboard_definition,
 )
-
 
 PLUGIN_UID = "ACME0000000001"
 BOARD_UID = "ACME0000000002"
@@ -540,7 +539,7 @@ class TestRefusals:
         first_success = (await _status(session)).last_success_at
 
         repo.add_listing("acme", PLUGIN_UID, slug="tracker", name="Renamed")
-        repo.publish(timestamp_expires=datetime.now(timezone.utc) - timedelta(hours=1))
+        repo.publish(timestamp_expires=datetime.now(UTC) - timedelta(hours=1))
         result, _ = await _refresh(session, repo)
 
         assert result.code == Codes.EXPIRED
@@ -607,7 +606,7 @@ class TestRefusals:
         repo.publish()
         await _refresh(session, repo)
 
-        repo.publish(publisher_expires=datetime.now(timezone.utc) - timedelta(days=1))
+        repo.publish(publisher_expires=datetime.now(UTC) - timedelta(days=1))
         result, _ = await _refresh(session, repo)
 
         assert [(item.name, item.code) for item in result.skipped] == [

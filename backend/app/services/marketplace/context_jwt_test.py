@@ -32,7 +32,6 @@ from app.core.config import settings
 from app.core.security import PluginPlatformSigningNotConfiguredError
 from app.services.marketplace import context_jwt
 
-
 _keypair = ed25519.Ed25519PrivateKey.generate()
 _PRIVATE_PEM = _keypair.private_bytes(
     serialization.Encoding.PEM,

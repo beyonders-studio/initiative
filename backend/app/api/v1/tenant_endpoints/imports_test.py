@@ -3,41 +3,41 @@
 import io
 import json
 import zipfile
+from datetime import UTC
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import undefer
 
+from app.core.tools import CHILD_KINDS, KINDS, Tool
+from app.db.request_context import SystemGuild
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.data_job import DataJob, DataJobStatus
+from app.schemas.tenant.tag import annotated_tags
 from app.services import data_jobs
 from app.services.guild_sweeps import Scope, each_guild
+from app.services.import_engine import limits as import_limits
 from app.services.import_engine import worker as import_worker
+from app.services.import_engine.atlassian_test import answered
 from app.services.storage import get_guild_storage
-from app.core.tools import CHILD_KINDS, KINDS, Tool
+from app.services.tenant import tags as tags_service
+from app.testing import drain_notices
 from app.testing.factories import (
-    create_child_entity,
-    create_tool_entity,
     assign_tag,
-    guild_administration,
     create_calendar_event,
+    create_child_entity,
     create_counter_group,
     create_file,
     create_import_job,
     create_initiative,
     create_tag,
     create_task,
+    create_tool_entity,
     grant_role_permission,
+    guild_administration,
     png_bytes,
     route_session_to_guild,
 )
-from app.services.import_engine import limits as import_limits
-from app.services.import_engine.atlassian_test import answered
-from app.schemas.tenant.tag import annotated_tags
-from app.services.tenant import tags as tags_service
-from app.db.request_context import SystemGuild
-from app.testing import drain_notices
-
 
 # ---------------------------------------------------------------------------
 # Import engine: envelope imports + job lifecycle
@@ -80,17 +80,18 @@ async def test_envelope_import_roundtrips_counter_group(client, acting_user, ses
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     group = await create_counter_group(session, a.initiative, a.user, name="Party Gold")
-    from app.models.tenant.counter import Counter as C
     from decimal import Decimal
+
+    from app.models.tenant.counter import Counter as C
 
     session.add(
         C(
             counter_group_id=group.id,
             name="GP",
             count=Decimal("42.5"),
-            step=Decimal("1"),
-            initial_count=Decimal("0"),
-            position=Decimal("0"),
+            step=Decimal(1),
+            initial_count=Decimal(0),
+            position=Decimal(0),
         )
     )
     await assign_tag(session, group, await create_tag(session, a.guild, name="Loot"))
@@ -143,7 +144,6 @@ async def test_envelope_import_roundtrips_file_types(client, acting_user, sessio
     from sqlmodel import select
 
     from app.core.file_types import FileType
-
     from app.models.tenant.file import File
 
     a = await acting_user(
@@ -412,8 +412,8 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
         MetadataValue,
     )
     from app.testing.factories import (
-        create_property_definition,
         create_counter,
+        create_property_definition,
         create_property_value,
     )
 
@@ -686,13 +686,13 @@ async def test_stale_running_import_fails_closed_not_reapplied(
 ):
     """A running row older than the stale threshold is FAILED, never re-run
     (an interrupted apply may have committed rows already)."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     monkeypatch.setattr(import_limits, "IMPORT_INLINE_MAX_ROWS", 0)
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    stale_time = datetime.now(timezone.utc) - timedelta(minutes=30)
+    stale_time = datetime.now(UTC) - timedelta(minutes=30)
     job = await create_import_job(
         session,
         a.guild,
@@ -983,7 +983,6 @@ async def test_backup_import_end_to_end_with_assets(
     from app.models.tenant.counter import CounterGroup
     from app.models.tenant.file import File
     from app.models.tenant.initiative import Initiative, InitiativeMember
-
     from app.testing.factories import create_upload
 
     a = await acting_user(
@@ -1288,7 +1287,6 @@ async def test_an_archive_from_before_files_restores_its_documents(
     from sqlmodel import select
 
     from app.core.file_types import FileType
-
     from app.models.tenant.file import File
 
     a = await acting_user(
@@ -1920,7 +1918,7 @@ async def test_backup_staged_expiry_and_cancel(
     """An unconfirmed staged backup expires via GC (payload deleted); a
     staged backup can also be cancelled; a cancelled/expired one can't be
     confirmed."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
@@ -1934,7 +1932,7 @@ async def test_backup_staged_expiry_and_cancel(
 
     await route_session_to_guild(session, a.guild.id)
     row = await session.get(DataJob, job_id)
-    row.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    row.expires_at = datetime.now(UTC) - timedelta(hours=1)
     session.add(row)
     await session.commit()
 
@@ -2143,7 +2141,6 @@ async def test_backup_assets_are_stored_as_what_their_bytes_are(
     from sqlmodel import select
 
     from app.core.file_types import FileType
-
     from app.models.tenant.file import File
     from app.models.tenant.upload import Upload
     from app.testing import route_session_to_guild
@@ -2383,7 +2380,7 @@ async def test_project_envelope_carries_comments_dates_and_links(
     arrives attributed to the person who ran the import, with its original
     author named in the text rather than impersonated.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from sqlmodel import select
 
@@ -2399,7 +2396,7 @@ async def test_project_envelope_carries_comments_dates_and_links(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    written_at = datetime(2024, 3, 4, 9, 30, tzinfo=timezone.utc)
+    written_at = datetime(2024, 3, 4, 9, 30, tzinfo=UTC)
     blocker = await create_task(
         session, a.project, title="Pour the footings", created_at=written_at
     )
@@ -2722,12 +2719,12 @@ async def test_a_stale_fetch_is_re_claimed_not_failed(
     nothing to duplicate — the partial payload is thrown away and the job
     starts over.
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from sqlmodel import select
 
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    long_ago = datetime.now(timezone.utc) - timedelta(hours=3)
+    long_ago = datetime.now(UTC) - timedelta(hours=3)
     job = await create_import_job(
         session,
         a.guild,
@@ -3968,9 +3965,9 @@ async def test_a_restored_reference_points_at_the_restored_copy(
     restored bodies' references are edges from the start, as a save's are."""
     from sqlmodel import select
 
+    from app.api.v1.tenant_endpoints.exports_test import _export, _rendered_zip
     from app.core.relationships import RelationshipType
     from app.core.search import SearchEntityType
-    from app.api.v1.tenant_endpoints.exports_test import _export, _rendered_zip
     from app.models.tenant.relationship import EntityRelationship
     from app.services.import_engine.references import SOURCE_REF
     from app.services.tenant.relationships import Endpoint
@@ -4366,7 +4363,7 @@ async def test_confirm_refuses_a_malformed_people_map(client, acting_user, sessi
 # ---------------------------------------------------------------------------
 
 
-def _structural_entry(type_: str, payload: dict, initiative_id=1):  # noqa: D401
+def _structural_entry(type_: str, payload: dict, initiative_id=1):
     """One of the two files describing the initiative rather than its content."""
     name = type_.removeprefix("initiative-")
     entry = {
@@ -6717,12 +6714,12 @@ async def test_the_sweep_leaves_a_job_this_process_is_running(
     """A row that looks stale but belongs to a job this process is running is
     not failed out from under it."""
     import asyncio
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    stale_time = datetime.now(timezone.utc) - timedelta(minutes=30)
+    stale_time = datetime.now(UTC) - timedelta(minutes=30)
     job = await create_import_job(
         session,
         a.guild,

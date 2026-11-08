@@ -10,7 +10,7 @@ Covers /api/v1/property-definitions CRUD including:
 - Cascade delete to attached values
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -39,7 +39,6 @@ from app.testing import (
     create_task,
 )
 from app.testing.factories import grant_role_permission
-
 
 # ---------------------------------------------------------------------------
 # GET / — scope behavior
@@ -884,7 +883,7 @@ async def test_promote_merges_properties_into_one_metadata_field(
     one, two = await create_task(session, first), await create_task(session, second)
     await create_property_value(session, one, sizes[0], value_text="small")
     await create_property_value(session, two, sizes[1], value_text="large")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await create_property_value(
         session, shared, sizes[2], value_text="tiny", updated_at=now
     )

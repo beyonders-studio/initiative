@@ -23,7 +23,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 __all__ = ["Pool", "PoolError"]
 
@@ -52,7 +52,7 @@ class _Worker:
         self.stdin = self.process.stdin.fileno()
         self.stdout = self.process.stdout.fileno()
 
-    def call(self, data: bytes, deadline: float) -> Optional[bytes]:
+    def call(self, data: bytes, deadline: float) -> bytes | None:
         """The worker's answer, or ``None`` when it has stopped. Raises
         :class:`_Overran` past ``deadline``."""
         try:
@@ -66,7 +66,7 @@ class _Worker:
         except (BrokenPipeError, OSError):
             return None
 
-    def _read(self, size: int, deadline: float) -> Optional[bytes]:
+    def _read(self, size: int, deadline: float) -> bytes | None:
         chunks = bytearray()
         while len(chunks) < size:
             remaining = deadline - time.monotonic()
@@ -128,7 +128,7 @@ class Pool:
             self._release(None)
             raise
 
-    def _release(self, worker: Optional[_Worker]) -> None:
+    def _release(self, worker: _Worker | None) -> None:
         with self._lock:
             if worker is not None and not self._closed:
                 self._idle.append(worker)

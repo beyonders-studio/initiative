@@ -1,7 +1,7 @@
 """Ready-made task types, what a type starts a task with, and copying types
 between projects."""
 
-from typing import Any, Optional
+from typing import Any
 
 from httpx import AsyncClient
 from sqlmodel import select
@@ -24,7 +24,7 @@ def _types_url(a: Actor, project_id: int) -> str:
     return a.g(f"/projects/{project_id}/task-types/")
 
 
-def _set(values: Optional[dict[str, Any]]) -> dict[str, Any]:
+def _set(values: dict[str, Any] | None) -> dict[str, Any]:
     """Starting values as read, without the fields they leave empty."""
     return {k: v for k, v in (values or {}).items() if v not in (None, [])}
 

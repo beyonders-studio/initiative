@@ -22,7 +22,6 @@ from app.core.audit_events import AuditEventType
 from app.testing import emitted
 from app.testing.factories import create_user
 
-
 REGISTERED_EMAIL = "registered-audit@example.com"
 
 

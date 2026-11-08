@@ -11,8 +11,7 @@ go through :func:`store_media`, so the same bytes are stored once.
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -58,7 +57,7 @@ def media_path(digest: str) -> str:
     return f"{MEDIA_URL_PREFIX}{digest}"
 
 
-def digest_of(path: object) -> Optional[str]:
+def digest_of(path: object) -> str | None:
     """The digest a media path names, or ``None`` when it names none."""
     if not isinstance(path, str) or not path.startswith(MEDIA_URL_PREFIX):
         return None
@@ -77,7 +76,7 @@ def is_image_of_type(data: bytes, content_type: object) -> bool:
     return content_type != "image/webp" or data[8:12] == b"WEBP"
 
 
-def image_type_of(data: bytes) -> Optional[str]:
+def image_type_of(data: bytes) -> str | None:
     """The image type the bytes are, read from the bytes, or ``None``."""
     for content_type in _IMAGE_MAGIC:
         if is_image_of_type(data, content_type):
@@ -90,8 +89,8 @@ async def store_media(
     data: bytes,
     *,
     content_type: str,
-    source_url: Optional[str] = None,
-    now: Optional[datetime] = None,
+    source_url: str | None = None,
+    now: datetime | None = None,
 ) -> str:
     """Keep ``data`` and return the path it is served from.
 
@@ -112,14 +111,14 @@ async def store_media(
                 byte_size=len(data),
                 data=data,
                 source_url=(source_url or "")[:2000] or None,
-                created_at=now or datetime.now(timezone.utc),
+                created_at=now or datetime.now(UTC),
             )
         )
         await session.flush()
     return media_path(digest)
 
 
-async def read_media(session: AsyncSession, digest: str) -> Optional[tuple[bytes, str]]:
+async def read_media(session: AsyncSession, digest: str) -> tuple[bytes, str] | None:
     """The bytes kept under ``digest`` and their type, or ``None``."""
     row = (
         await session.exec(

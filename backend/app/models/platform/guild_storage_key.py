@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Integer, Text
 from sqlmodel import Field, SQLModel
@@ -54,25 +53,23 @@ class GuildStorageKey(SQLModel, table=True):
     #: header; a new key (after a suspected compromise) is a new generation.
     generation: int = Field(default=1, sa_column=Column(Integer, nullable=False))
 
-    local_sealed: Optional[str] = Field(
+    local_sealed: str | None = Field(
         default=None,
         sa_column=Column(Text, nullable=True, info={FERNET_SALT: SALT_STORAGE_KEY}),
     )
 
-    kms_sealed: Optional[str] = Field(
-        default=None, sa_column=Column(Text, nullable=True)
-    )
+    kms_sealed: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     #: The KMS key that wrapped ``kms_sealed``: the crypto key, not a version
     #: (KMS reads the version from the ciphertext).
-    kms_key: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    kms_key: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
 
     #: When the backfill finished encrypting what the community had stored
     #: before encryption was on. ``None`` until then.
-    backfilled_at: Optional[datetime] = Field(
+    backfilled_at: datetime | None = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )

@@ -13,11 +13,12 @@ Only Initiative Cloud has the board (``app.core.intake.offered_streams``).
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, AsyncIterator, Optional
+from typing import Any
 
 from limits import parse
 from sqlalchemy import String, and_, cast, false, func, literal
@@ -77,7 +78,7 @@ class IdeaStatus:
 
     id: int
     name: str
-    color: Optional[str]
+    color: str | None
     category: str
 
 
@@ -92,9 +93,9 @@ class IdeaRead:
     #: Whether the reader voted for it; False for somebody signed out.
     voted: bool
     created_at: datetime
-    updated_at: Optional[datetime]
+    updated_at: datetime | None
     #: Only on one idea's own page.
-    description: Optional[str] = None
+    description: str | None = None
 
     @property
     def closed(self) -> bool:
@@ -115,7 +116,7 @@ def board_open() -> bool:
 
 
 @asynccontextmanager
-async def _as_reader(user: Optional[User]) -> AsyncIterator[Optional[AsyncSession]]:
+async def _as_reader(user: User | None) -> AsyncIterator[AsyncSession | None]:
     """A request session routed as ``user``, or nobody signed in, reading the
     published ideas; ``None`` where there is no board to read."""
     from app.api.deps import FilerAccessError, establish_ideas_access
@@ -161,7 +162,7 @@ def _public(query):
     )
 
 
-def _ideas_query(user: Optional[User], *, with_description: bool = False):
+def _ideas_query(user: User | None, *, with_description: bool = False):
     # Counted as rows: the ideas role reads which task a vote is for and whose
     # it is, and no other column.
     votes = (
@@ -220,10 +221,10 @@ def _escape_like(text: str) -> str:
 
 
 async def list_ideas(
-    user: Optional[User],
+    user: User | None,
     *,
-    search: Optional[str] = None,
-    status_id: Optional[int] = None,
+    search: str | None = None,
+    status_id: int | None = None,
     voted_only: bool = False,
     sort: IdeaSort = IdeaSort.votes,
     page: int = 1,
@@ -274,7 +275,7 @@ async def list_ideas(
     )
 
 
-async def read_idea(user: Optional[User], task_id: int) -> tuple[int, IdeaRead]:
+async def read_idea(user: User | None, task_id: int) -> tuple[int, IdeaRead]:
     """One published idea, with its description, and the operations
     community it was read in."""
     async with _as_reader(user) as session:
@@ -288,7 +289,7 @@ async def read_idea(user: Optional[User], task_id: int) -> tuple[int, IdeaRead]:
     return guild_id, _read(row)
 
 
-async def similar(user: Optional[User], text: str) -> list[IdeaRead]:
+async def similar(user: User | None, text: str) -> list[IdeaRead]:
     """The open published ideas whose title is close to ``text``, closest
     first: what somebody writing feedback may vote for instead. Close either
     way round, so a few words find a longer title and a long draft finds a
@@ -313,7 +314,7 @@ async def similar(user: Optional[User], text: str) -> list[IdeaRead]:
     return [_read(row) for row in rows]
 
 
-async def joined_into(task_id: int) -> Optional[int]:
+async def joined_into(task_id: int) -> int | None:
     """The published idea an idea joined into another now is, following each
     join, so its old page opens it; ``None`` for any other task. A joined idea
     is archived, with a ``part_of`` edge to the one it joined."""
@@ -394,7 +395,7 @@ async def vote(user: User, task_id: int, *, on: bool) -> IdeaRead:
                 .values(
                     task_id=task_id,
                     user_id=user.id,
-                    voted_at=datetime.now(timezone.utc),
+                    voted_at=datetime.now(UTC),
                     notified_status_id=idea.status.id,
                 )
                 .on_conflict_do_nothing(constraint="uq_idea_votes_task_user")
@@ -413,7 +414,7 @@ async def vote(user: User, task_id: int, *, on: bool) -> IdeaRead:
 # ── The team's side ──────────────────────────────────────────────────────────
 
 
-async def published(session: AsyncSession, task_id: int) -> Optional[Any]:
+async def published(session: AsyncSession, task_id: int) -> Any | None:
     """When ``task_id`` was written and how many voted for it, as
     ``(created_at, votes)``, where it is a published idea; ``None`` for any
     other task. Read on the team's own session, for its case panel."""
@@ -461,7 +462,7 @@ def _edges_into_board(query):
     )
 
 
-async def board_project(session: AsyncSession) -> Optional[int]:
+async def board_project(session: AsyncSession) -> int | None:
     """The Ideas board's project, where this server has one and it is bound,
     on the team's own session."""
     if not board_open():
@@ -506,7 +507,7 @@ async def _joins(session: AsyncSession, case_task_id: int) -> list[EntityRelatio
     )
 
 
-async def joined_idea(session: AsyncSession, case_task_id: int) -> Optional[Task]:
+async def joined_idea(session: AsyncSession, case_task_id: int) -> Task | None:
     """The idea feedback case ``case_task_id`` is joined to, on the team's own
     session."""
     joins = await _joins(session, case_task_id)
@@ -533,7 +534,7 @@ async def _feedback(session: AsyncSession, task_id: int) -> None:
         raise NotOnTheBoard
 
 
-async def _sender(session: AsyncSession, case_task_id: int) -> Optional[int]:
+async def _sender(session: AsyncSession, case_task_id: int) -> int | None:
     """Who sent feedback case ``case_task_id``: its ``subject_user``, which it
     holds whether or not they offered to be contacted."""
     value = (
@@ -555,7 +556,7 @@ def _task(task_id: int) -> relationships.Endpoint:
 
 
 async def join(
-    session: AsyncSession, case: Task, idea_task_id: int, *, by: Optional[int]
+    session: AsyncSession, case: Task, idea_task_id: int, *, by: int | None
 ) -> None:
     """Join feedback case ``case`` to the idea ``idea_task_id`` on the Ideas
     board, published or not: a ``part_of`` edge from the case to the idea, in
@@ -593,14 +594,14 @@ async def join(
             .values(
                 task_id=idea.id,
                 user_id=sender,
-                voted_at=datetime.now(timezone.utc),
+                voted_at=datetime.now(UTC),
                 notified_status_id=idea.task_status_id,
             )
             .on_conflict_do_nothing(constraint="uq_idea_votes_task_user")
         )
 
 
-async def unjoin(session: AsyncSession, case: Task, *, by: Optional[int]) -> None:
+async def unjoin(session: AsyncSession, case: Task, *, by: int | None) -> None:
     """Take feedback case ``case`` off the idea it is joined to. Its sender's
     vote stays: taking it back is theirs. The caller commits.
 
@@ -627,7 +628,7 @@ async def join_sent(case_task_id: int, idea_task_id: int, sender: User) -> None:
 
 
 async def join_into(
-    session: AsyncSession, source: Task, target_task_id: int, *, by: Optional[int]
+    session: AsyncSession, source: Task, target_task_id: int, *, by: int | None
 ) -> None:
     """Join idea ``source`` into ``target_task_id``, both on the Ideas board.
     Its votes move to the target, each voter's once, as does everything that

@@ -20,7 +20,7 @@ from app.core.security import SESSION_COOKIE_NAME
 SERVED = "https://app.example.test"
 
 
-async def _write(request):  # noqa: ANN001 - Starlette endpoint
+async def _write(request):
     return JSONResponse({"wrote": True})
 
 

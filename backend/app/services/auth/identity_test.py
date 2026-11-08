@@ -11,7 +11,6 @@ import secrets
 
 from sqlmodel import select
 
-from app.services.platform import rules
 from app.core.encryption import hash_email
 from app.core.login_methods import LoginMethod
 from app.models.platform.auth_provider import AuthProvider, AuthProviderKind
@@ -26,8 +25,8 @@ from app.services.auth.identity import (
     resolve_oidc_identity,
     stranded_between,
 )
+from app.services.platform import rules
 from app.testing import create_user
-
 
 #: What a deployment offering everything it could permits, and the same set
 #: with one method withdrawn. The counts take this explicitly, so a test says

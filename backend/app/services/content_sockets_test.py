@@ -8,7 +8,6 @@ error) closes it. Frames go through each socket's own outbox.
 
 import asyncio
 from types import SimpleNamespace
-from typing import Optional
 
 import pytest
 from fastapi import status
@@ -40,7 +39,7 @@ class FakeWebSocket:
     def __init__(self) -> None:
         self.sent: list[dict] = []
         self.sent_bytes: list[bytes] = []
-        self.closed: Optional[int] = None
+        self.closed: int | None = None
 
     async def send_json(self, message: dict) -> None:
         self.sent.append(message)
@@ -48,7 +47,7 @@ class FakeWebSocket:
     async def send_bytes(self, payload: bytes) -> None:
         self.sent_bytes.append(payload)
 
-    async def close(self, code: Optional[int] = None) -> None:
+    async def close(self, code: int | None = None) -> None:
         self.closed = code
 
 
