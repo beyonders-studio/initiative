@@ -97,7 +97,7 @@
       "noMatchAsk": "Essayez d'autres mots, ou demandez à l'équipe ci-dessous. Votre recherche est reprise dans la demande.",
       "noMatchWrite": "Essayez d'autres mots, ou écrivez à l'adresse ci-dessous.",
       "noMatchBrowse": "Essayez d'autres mots, ou parcourez le guide d'utilisation.",
-      "unavailable": "La recherche n'est pas configurée sur ce serveur. Le lien vers le guide d'utilisation ci-dessus donne accès à tout.",
+      "unavailable": "La recherche n'a pas pu joindre le guide d'utilisation. Le lien ci-dessus l'ouvre.",
       "noAnswer": "Pas de réponse ici ?",
       "openRequests_one": "{{count}} demande ouverte",
       "openRequests_other": "{{count}} demandes ouvertes",

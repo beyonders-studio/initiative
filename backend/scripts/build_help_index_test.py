@@ -1,4 +1,4 @@
-"""The Help panel's index, as the image build makes it from Zensical's
+"""The Help panel's index, as the docs workflow makes it from Zensical's
 ``search.json``."""
 
 import json

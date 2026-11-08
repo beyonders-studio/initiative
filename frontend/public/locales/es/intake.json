@@ -97,7 +97,7 @@
       "noMatchAsk": "Prueba con otras palabras o pregunta al equipo abajo. Tu búsqueda pasa a la solicitud.",
       "noMatchWrite": "Prueba con otras palabras o escribe a la dirección de abajo.",
       "noMatchBrowse": "Prueba con otras palabras o recorre la guía de uso.",
-      "unavailable": "La búsqueda no está configurada en este servidor. El enlace a la guía de uso de arriba lo tiene todo.",
+      "unavailable": "La búsqueda no pudo conectar con la guía de uso. El enlace de arriba la abre.",
       "noAnswer": "¿No está la respuesta?",
       "openRequests_one": "{{count}} solicitud abierta",
       "openRequests_other": "{{count}} solicitudes abiertas",

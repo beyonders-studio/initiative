@@ -13,6 +13,7 @@ on:
     paths:
       - "docs/**"
       - "zensical.toml"
+      - "backend/scripts/build_help_index.py"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 
@@ -41,10 +42,11 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.x"
-      # The version the image builds the app's help search with (Dockerfile,
-      # help-deps stage); change the two together.
+      # Pinned: build_help_index.py reads the search.json this version writes.
       - run: pip install zensical==0.1.0
       - run: zensical build --clean
+      # The app's Help panel reads this from every server.
+      - run: python backend/scripts/build_help_index.py site/search.json site/help-index.json
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: site

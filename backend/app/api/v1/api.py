@@ -98,7 +98,6 @@ from app.api.v1.platform_endpoints import (
     guild_provider_connections,
     guilds,
     health,
-    help_center,
     ideas,
     legal,
     marketplace,
@@ -139,8 +138,6 @@ api_router.include_router(config.router, tags=["config"])
 # Unauthenticated: the signup form links to them.
 api_router.include_router(legal.router, tags=["legal"])
 api_router.include_router(ideas.router, prefix="/ideas", tags=["ideas"])
-# The help center's search index. Unauthenticated, like the help center.
-api_router.include_router(help_center.router, prefix="/help", tags=["help"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 # The demo deployment's routes; 404 unless the deployment runs as the demo.
 api_router.include_router(demo.router, prefix="/demo", tags=["demo"])

@@ -430,11 +430,13 @@ def test_app_url_scheme_decides_https():
         assert "ws:" in _directive(_csp(http), "connect-src").split()
 
 
-def test_csp_allows_spell_check_dictionary_cdn():
+def test_csp_allows_the_origins_the_spa_fetches():
     # The spell checker fetches its English dictionary from jsDelivr
-    # (frontend/src/lib/spell-check.ts); connect-src must allow it.
-    csp = _csp(_settings())
-    assert "https://cdn.jsdelivr.net" in _directive(csp, "connect-src")
+    # (frontend/src/lib/spell-check.ts) and the Help panel its search index
+    # from the published help center (frontend/src/hooks/useHelpIndex.ts).
+    connect_src = _directive(_csp(_settings()), "connect-src").split()
+    assert "https://cdn.jsdelivr.net" in connect_src
+    assert "https://beyonders-studio.github.io" in connect_src
 
 
 def test_csp_allows_excalidraw_font_cdn():
