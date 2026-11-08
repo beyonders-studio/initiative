@@ -283,6 +283,7 @@ export const ProjectTasksSection = ({
   }, [kind, sorting, grouping, layout, groupingCatalog, exportFields]);
   const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = useState(false);
   const [isBulkEditTagsDialogOpen, setIsBulkEditTagsDialogOpen] = useState(false);
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
   const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
   const [archiveDialogStatusId, setArchiveDialogStatusId] = useState<number | undefined>(undefined);
   const lastKanbanOverRef = useRef<DragOverEvent["over"] | null>(null);
@@ -1059,11 +1060,7 @@ export const ProjectTasksSection = ({
                 onEdit={() => setIsBulkEditDialogOpen(true)}
                 onEditTags={() => setIsBulkEditTagsDialogOpen(true)}
                 onArchive={() => bulkArchiveTasks.mutate(selectedTasks.map((t) => t.id))}
-                onDelete={() => {
-                  if (confirm(t("tasks.bulkDeleteConfirm", { count: selectedTasks.length }))) {
-                    bulkDeleteTasks.mutate(selectedTasks.map((t) => t.id));
-                  }
-                }}
+                onDelete={() => setIsBulkDeleteDialogOpen(true)}
                 isArchiving={bulkArchiveTasks.isPending}
               />
             )}
@@ -1219,6 +1216,15 @@ export const ProjectTasksSection = ({
           />
         </>
       ) : null}
+
+      <ConfirmDialog
+        open={isBulkDeleteDialogOpen}
+        onOpenChange={setIsBulkDeleteDialogOpen}
+        title={t("tasks.bulkDeleteConfirm", { count: selectedTasks.length })}
+        confirmLabel={t("common:delete")}
+        destructive
+        onConfirm={() => bulkDeleteTasks.mutate(selectedTasks.map((t) => t.id))}
+      />
 
       <ConfirmDialog
         open={isArchiveDialogOpen}

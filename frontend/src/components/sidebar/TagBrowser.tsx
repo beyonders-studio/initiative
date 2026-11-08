@@ -9,20 +9,11 @@ import { communityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { getItem, setItem } from "@/lib/storage";
 import { buildTagTree, type TagTreeNode } from "@/lib/tagTree";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/ui/alert-dialog";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/ui/dialog";
 import { Input } from "@/ui/input";
 import { cn } from "@/ui/lib/utils";
@@ -286,49 +277,26 @@ export const TagBrowser = ({
       </Dialog>
 
       {/* Single-tag delete confirmation */}
-      <AlertDialog
+      <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("detail.deleteTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("detail.deleteDescription", { name: deleteTarget?.name ?? "" })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("common:cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => void handleSingleDelete()}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {t("detail.delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={t("detail.deleteTitle")}
+        description={t("detail.deleteDescription", { name: deleteTarget?.name ?? "" })}
+        confirmLabel={t("detail.delete")}
+        destructive
+        onConfirm={() => void handleSingleDelete()}
+      />
 
       {/* Bulk delete confirmation */}
-      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("manage.bulkDeleteTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("manage.bulkDeleteDescription", { count: selectedCount })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("common:cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => void handleBulkDelete()}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {t("detail.delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        title={t("manage.bulkDeleteTitle")}
+        description={t("manage.bulkDeleteDescription", { count: selectedCount })}
+        confirmLabel={t("detail.delete")}
+        destructive
+        onConfirm={() => void handleBulkDelete()}
+      />
     </div>
   );
 };

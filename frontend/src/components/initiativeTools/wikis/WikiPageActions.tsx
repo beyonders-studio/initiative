@@ -25,17 +25,8 @@ import {
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { toolDetailRoute, wikiPageRoute } from "@/lib/tools";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/ui/alert-dialog";
 import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -218,31 +209,23 @@ export const WikiPageActions = ({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("pages.deleteTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("pages.deleteDescription")}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("common:cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() =>
-                deletePage.mutate(page.id, {
-                  onSuccess: () => {
-                    toast.success(t("pages.deleted"));
-                    void navigate({
-                      to: gp(toolDetailRoute(Tool.wiki, initiativeId, wiki.id)),
-                    });
-                  },
-                })
-              }
-            >
-              {t("page.delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title={t("pages.deleteTitle")}
+        description={t("pages.deleteDescription")}
+        confirmLabel={t("page.delete")}
+        onConfirm={() =>
+          deletePage.mutate(page.id, {
+            onSuccess: () => {
+              toast.success(t("pages.deleted"));
+              void navigate({
+                to: gp(toolDetailRoute(Tool.wiki, initiativeId, wiki.id)),
+              });
+            },
+          })
+        }
+      />
     </>
   );
 };

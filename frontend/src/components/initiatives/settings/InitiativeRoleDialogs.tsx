@@ -11,17 +11,8 @@ import { useTranslation } from "react-i18next";
 import type { InitiativeRoleRead } from "@/api/generated/initiativeAPI.schemas";
 import { useCreateRole, useDeleteRole, useUpdateRole } from "@/hooks/useInitiativeRoles";
 import { toast } from "@/lib/mascotToast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/ui/alert-dialog";
 import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -195,28 +186,17 @@ export const InitiativeRoleDialogs = ({
       </Dialog>
 
       {/* Delete Role Confirmation Dialog */}
-      <AlertDialog open={!!roleToDelete} onOpenChange={(open) => !open && setRoleToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("settings.deleteRoleTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("settings.deleteRoleDescription", { roleName: roleToDelete?.display_name })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteRoleMutation.isPending}>
-              {t("common:cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDeleteRole}
-              disabled={deleteRoleMutation.isPending}
-              className="bg-destructive text-white hover:bg-destructive/90"
-            >
-              {deleteRoleMutation.isPending ? t("settings.deletingRole") : t("common:delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!roleToDelete}
+        onOpenChange={(open) => !open && setRoleToDelete(null)}
+        title={t("settings.deleteRoleTitle")}
+        description={t("settings.deleteRoleDescription", { roleName: roleToDelete?.display_name })}
+        confirmLabel={t("common:delete")}
+        loadingLabel={t("settings.deletingRole")}
+        isLoading={deleteRoleMutation.isPending}
+        destructive
+        onConfirm={confirmDeleteRole}
+      />
 
       {/* Rename Role Dialog */}
       <Dialog open={!!roleToRename} onOpenChange={(open) => !open && setRoleToRename(null)}>

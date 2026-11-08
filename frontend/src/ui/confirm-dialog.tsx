@@ -1,4 +1,4 @@
-import { type ReactNode, useId, useState } from "react";
+import { type MouseEvent, type ReactNode, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -11,10 +11,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/ui/alert-dialog";
-import { buttonVariants } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
-import { cn } from "@/ui/lib/utils";
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -23,11 +21,19 @@ type ConfirmDialogProps = {
   description?: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
-  onConfirm: () => void;
+  /**
+   * The confirm button's click. The dialog closes after it unless the handler
+   * calls `event.preventDefault()`, which keeps it open, for instance to show
+   * an error beside the fields it asked for. Without one there is nothing to
+   * confirm: the dialog only informs, and its cancel button is its one button.
+   */
+  onConfirm?: (event: MouseEvent<HTMLButtonElement>) => void;
   isLoading?: boolean;
   /** Text shown on the confirm button while ``isLoading``. */
   loadingLabel?: string;
   destructive?: boolean;
+  /** Keeps the confirm button disabled while fields in ``children`` are not yet filled in. */
+  confirmDisabled?: boolean;
   /**
    * When set, render a text input beneath the description and keep the
    * confirm button disabled until the typed value matches this string
@@ -51,6 +57,7 @@ export const ConfirmDialog = ({
   isLoading,
   loadingLabel,
   destructive,
+  confirmDisabled,
   confirmationText,
   confirmationLabel,
   children,
@@ -58,6 +65,9 @@ export const ConfirmDialog = ({
   const { t } = useTranslation("ui");
   const inputId = useId();
   const [confirmationInput, setConfirmationInput] = useState("");
+  // What had focus when the dialog opened, usually the button that opened
+  // it: focus goes back there when it closes.
+  const opener = useRef<HTMLElement | null>(null);
 
   const requiresConfirmation = Boolean(confirmationText);
 
@@ -74,7 +84,17 @@ export const ConfirmDialog = ({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent
+        onOpenAutoFocus={() => {
+          opener.current =
+            document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        }}
+        onCloseAutoFocus={(event) => {
+          if (!opener.current?.isConnected) return;
+          event.preventDefault();
+          opener.current.focus();
+        }}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           {description && <AlertDialogDescription>{description}</AlertDialogDescription>}
@@ -94,15 +114,17 @@ export const ConfirmDialog = ({
         )}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isLoading}>{cancelLabel ?? t("cancel")}</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={onConfirm}
-            disabled={isLoading || !confirmationSatisfied}
-            className={cn(destructive && buttonVariants({ variant: "destructive" }))}
-          >
-            {isLoading
-              ? (loadingLabel ?? t("confirm.working"))
-              : (confirmLabel ?? t("confirm.continue"))}
-          </AlertDialogAction>
+          {onConfirm && (
+            <AlertDialogAction
+              onClick={onConfirm}
+              disabled={isLoading || confirmDisabled || !confirmationSatisfied}
+              variant={destructive ? "destructive" : "default"}
+            >
+              {isLoading
+                ? (loadingLabel ?? t("confirm.working"))
+                : (confirmLabel ?? t("confirm.continue"))}
+            </AlertDialogAction>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

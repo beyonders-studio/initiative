@@ -13,7 +13,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it, onTestFinished, vi } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
 
 import {
   buildContact,
@@ -375,7 +375,6 @@ describe("the tool index page's bulk actions", () => {
         return new HttpResponse(null, { status: 204 });
       })
     );
-    vi.spyOn(window, "confirm").mockReturnValue(true);
 
     renderIndex(Tool.counter_group);
     await screen.findByText("Standup");
@@ -386,6 +385,8 @@ describe("the tool index page's bulk actions", () => {
 
     await select("Retro");
     await userEvent.click(screen.getByRole("button", { name: shared("delete") }));
+    const confirm = await screen.findByRole("alertdialog");
+    await userEvent.click(within(confirm).getByRole("button", { name: shared("delete") }));
     await waitFor(() => expect(deleted).toEqual(["5"]));
   });
 
