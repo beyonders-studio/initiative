@@ -161,7 +161,7 @@ export function CounterGroupDetailPage() {
 
   if (groupQuery.isLoading) {
     return (
-      <SkeletonRegion label={t("loadingGroup")}>
+      <SkeletonRegion>
         <DetailPageSkeleton actions={4}>
           <CardGridSkeleton count={3} />
         </DetailPageSkeleton>

@@ -28,9 +28,7 @@
     "searchCalendars": "Kalender durchsuchen...",
     "tasks": "Aufgaben"
   },
-  "loading": "Wird geladen...",
   "loadError": "Termine konnten nicht geladen werden",
-  "loadingEvent": "Termin wird geladen...",
   "creating": "Wird erstellt...",
   "notFound": "Termin nicht gefunden",
   "notFoundDescription": "Dieser Termin wurde möglicherweise gelöscht oder du hast keinen Zugriff.",

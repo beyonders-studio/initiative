@@ -104,7 +104,7 @@ export const InitiativeDetailPage = ({ tool }: InitiativeDetailPageProps = {}) =
   if (initiativeQuery.isLoading) {
     // Its header, the tool tabs, and the first tab's list.
     return (
-      <SkeletonRegion label={t("detail.loadingInitiative")} className="space-y-4 sm:space-y-6">
+      <SkeletonRegion className="space-y-4 sm:space-y-6">
         <PageHeaderSkeleton dot description meta action tabs={TOOLS.length} />
         <ToolListSkeleton className="pt-2" />
       </SkeletonRegion>

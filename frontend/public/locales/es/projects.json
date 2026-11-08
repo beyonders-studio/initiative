@@ -1,6 +1,5 @@
 {
   "addProject": "Agregar proyecto",
-  "loading": "Cargando proyectos…",
   "error": "Algo salió mal",
   "noProjects": "Aún no hay proyectos",
   "noProjectsDescription": "Un proyecto reúne tareas y las sigue en un tablero o en una tabla hasta que estén terminadas.",
@@ -62,7 +61,6 @@
   },
   "detail": {
     "backToProjects": "← Volver a proyectos",
-    "loading": "Cargando proyecto…",
     "notFound": "Proyecto no encontrado",
     "notFoundDescription": "Este proyecto puede haber sido eliminado o el enlace está roto.",
     "noAccess": "Acceso denegado",
@@ -83,7 +81,6 @@
     "endLabel": "Fecha de finalización"
   },
   "tabsBar": {
-    "loadingRecent": "Cargando elementos recientes…",
     "closeItem": "Cerrar {{name}}",
     "closeOthers": "Cerrar las demás",
     "closeAll": "Cerrar todas",

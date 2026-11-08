@@ -83,7 +83,7 @@ export const InitiativeSettingsLayout = () => {
 
   if (isLoading) {
     return (
-      <SkeletonRegion label={t("settings.loadingInitiative")} className="space-y-6">
+      <SkeletonRegion className="space-y-6">
         <DetailPageSkeleton actions={0} description={false}>
           <PageHeaderSkeleton title={false} tabs={5} />
           <FormSkeleton />

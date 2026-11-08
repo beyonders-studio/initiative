@@ -3,7 +3,6 @@
     "title": "Mis estadísticas",
     "communityFilterPlaceholder": "Seleccionar comunidad",
     "allCommunities": "Todas las comunidades",
-    "loading": "Cargando estadísticas\u2026",
     "error": "No se pudieron cargar las estadísticas. Inténtalo más tarde."
   },
   "metrics": {

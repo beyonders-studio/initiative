@@ -81,7 +81,7 @@ export const ProjectDetailPage = () => {
   );
 
   if (projectQuery.isLoading || taskStatusesQuery.isLoading) {
-    return <ProjectDetailSkeleton label={t("detail.loading")} />;
+    return <ProjectDetailSkeleton />;
   }
 
   if (projectQuery.isError || taskStatusesQuery.isError || !project) {

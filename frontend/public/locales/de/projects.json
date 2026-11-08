@@ -1,6 +1,5 @@
 {
   "addProject": "Projekt hinzufügen",
-  "loading": "Projekte werden geladen…",
   "error": "Etwas ist schiefgelaufen",
   "noProjects": "Noch keine Projekte",
   "noProjectsDescription": "Ein Projekt sammelt Aufgaben und verfolgt sie auf einem Board oder in einer Tabelle, bis sie erledigt sind.",
@@ -62,7 +61,6 @@
   },
   "detail": {
     "backToProjects": "← Zurück zu den Projekten",
-    "loading": "Projekt wird geladen…",
     "notFound": "Projekt nicht gefunden",
     "notFoundDescription": "Dieses Projekt wurde möglicherweise gelöscht oder du bist einem fehlerhaften Link gefolgt.",
     "noAccess": "Zugriff verweigert",
@@ -83,7 +81,6 @@
     "endLabel": "Enddatum"
   },
   "tabsBar": {
-    "loadingRecent": "Aktuelle Elemente werden geladen…",
     "closeItem": "{{name}} schließen",
     "closeOthers": "Andere schließen",
     "closeAll": "Alle schließen",

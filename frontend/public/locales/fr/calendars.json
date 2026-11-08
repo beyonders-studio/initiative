@@ -28,9 +28,7 @@
     "searchCalendars": "Rechercher des calendriers...",
     "tasks": "Tâches"
   },
-  "loading": "Chargement...",
   "loadError": "Échec du chargement des événements",
-  "loadingEvent": "Chargement de l'événement...",
   "creating": "Création...",
   "notFound": "Événement introuvable",
   "notFoundDescription": "Cet événement a peut-être été supprimé ou vous n'y avez pas accès.",

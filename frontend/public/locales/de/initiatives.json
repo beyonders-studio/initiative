@@ -69,7 +69,6 @@
     "createError": "Initiative kann derzeit nicht erstellt werden."
   },
   "detail": {
-    "loadingInitiative": "Initiative wird geladen...",
     "backToInitiatives": "← Zurück zu 'Meine Initiativen'",
     "notFound": "Initiative nicht gefunden",
     "notFoundDescription": "Die gesuchte Initiative existiert nicht oder du hast keinen Zugriff mehr darauf.",
@@ -92,7 +91,6 @@
   "settings": {
     "title": "Initiative-Einstellungen",
     "breadcrumbSettings": "Einstellungen",
-    "loadingInitiative": "Initiative wird geladen...",
     "backToInitiatives": "← Zurück zu 'Meine Initiativen'",
     "backToInitiative": "← Zurück zur Initiative",
     "notFound": "Initiative nicht gefunden",

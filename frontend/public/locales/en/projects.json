@@ -1,6 +1,5 @@
 {
   "addProject": "Add Project",
-  "loading": "Loading projects…",
   "error": "Something went wrong",
   "noProjects": "No projects yet",
   "noProjectsDescription": "A project holds tasks and tracks them on a board or in a table until they are done.",
@@ -62,7 +61,6 @@
   },
   "detail": {
     "backToProjects": "← Back to projects",
-    "loading": "Loading project…",
     "notFound": "Project not found",
     "notFoundDescription": "This project may have been deleted or you may have followed a broken link.",
     "noAccess": "Access denied",
@@ -83,7 +81,6 @@
     "endLabel": "End date"
   },
   "tabsBar": {
-    "loadingRecent": "Loading recent items…",
     "closeItem": "Close {{name}}",
     "closeOthers": "Close others",
     "closeAll": "Close all",

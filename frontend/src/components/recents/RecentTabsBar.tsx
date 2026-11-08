@@ -53,7 +53,7 @@ export const RecentTabsBar = ({
     <ScrollArea className="h-12 pt-2.5">
       <div className="flex h-full items-end gap-2 px-4">
         {loading ? (
-          <SkeletonRegion label={t("tabsBar.loadingRecent")}>
+          <SkeletonRegion>
             <SkeletonPillRow count={3} pillClassName="h-9 w-36 rounded-t-md rounded-b-none" />
           </SkeletonRegion>
         ) : (

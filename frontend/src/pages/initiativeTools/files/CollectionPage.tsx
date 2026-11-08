@@ -630,7 +630,7 @@ export function CollectionPage() {
         className="min-h-40 rounded-xl"
       >
         {feed.isLoading || layoutsQuery.isLoading ? (
-          <SkeletonRegion label={t("collections.loadingFiles")}>
+          <SkeletonRegion>
             <CardGridSkeleton count={8} className="grid grid-cols-fill-36/4 gap-3" />
           </SkeletonRegion>
         ) : feed.isError ? (

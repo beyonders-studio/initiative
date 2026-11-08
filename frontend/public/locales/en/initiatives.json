@@ -69,7 +69,6 @@
     "createError": "Unable to create initiative right now."
   },
   "detail": {
-    "loadingInitiative": "Loading initiative...",
     "backToInitiatives": "← Back to My Initiatives",
     "notFound": "Initiative not found",
     "notFoundDescription": "The initiative you’re looking for doesn’t exist or you no longer have access.",
@@ -92,7 +91,6 @@
   "settings": {
     "title": "Initiative settings",
     "breadcrumbSettings": "Settings",
-    "loadingInitiative": "Loading initiative...",
     "backToInitiatives": "← Back to My Initiatives",
     "backToInitiative": "← Back to initiative",
     "notFound": "Initiative not found",
