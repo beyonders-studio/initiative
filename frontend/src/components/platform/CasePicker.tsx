@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 
 import type { GrantCaseRead } from "@/api/generated/initiativeAPI.schemas";
 import { useGrantCases } from "@/hooks/useAccessGrants";
-import { AsyncCombobox } from "@/ui/async-combobox";
+import { Combobox } from "@/ui/combobox";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 
 /** The value the "no case" row is chosen by, where a case is optional. */
@@ -66,7 +66,7 @@ export const CasePicker = ({
   const chosen = value == null ? undefined : cases.find((item) => item.task_id === value);
 
   return (
-    <AsyncCombobox
+    <Combobox
       className={className}
       aria-label={ariaLabel}
       value={value == null ? null : String(value)}

@@ -7,6 +7,7 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { PROVIDER_CONFIGS } from "@/lib/ai-providers";
 import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,6 @@ import {
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
-import { SuggestCombobox } from "@/ui/suggest-combobox";
 import { Switch } from "@/ui/switch";
 
 import { AIConnectionCommunitiesField } from "./AIConnectionCommunitiesField";
@@ -156,17 +156,21 @@ export const AIConnectionDialog = ({
           {form.provider && (
             <div className="space-y-2">
               <Label>{t("ai.modelLabel")}</Label>
-              <SuggestCombobox
-                suggestions={modelOptions}
+              <Combobox
+                items={modelOptions.map((model) => ({ value: model, label: model }))}
                 value={form.model}
+                selectedLabel={form.model}
                 onValueChange={(value) => setField("model", value)}
                 placeholder={t("aiConnections.modelPlaceholder")}
                 searchPlaceholder={t("aiConnections.modelSearchPlaceholder")}
                 loadingLabel={t("aiConnections.modelsLoading")}
-                emptyLabel={t("aiConnections.modelsEmpty")}
+                emptyMessage={t("aiConnections.modelsEmpty")}
                 typedLabel={(value) => t("aiConnections.modelUseTyped", { value })}
-                onOpen={fetchModels}
-                isLoading={isFetchingModels}
+                onOpenChange={(open) => {
+                  if (open) fetchModels();
+                }}
+                // The models already listed stay listed while they are looked up again.
+                loading={isFetchingModels && modelOptions.length === 0}
               />
               {!form.model && (
                 <p className="text-muted-foreground text-xs">

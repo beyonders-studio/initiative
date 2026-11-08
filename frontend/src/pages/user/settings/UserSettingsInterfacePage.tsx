@@ -22,10 +22,10 @@ import { getThemeList } from "@/lib/themes";
 import { TIMEZONE_OPTIONS } from "@/lib/timezones";
 import Desktop from "@/plugins/desktop";
 import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
 import { parseTimeFormat, TIME_FORMAT_PREFERENCES } from "@/ui/host";
 import { Input } from "@/ui/input";
 import { cn } from "@/ui/lib/utils";
-import { SearchableCombobox } from "@/ui/searchable-combobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 
@@ -367,7 +367,7 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
 
         <SettingsRow label={t("profile.timezoneLabel")} description={t("profile.timezoneHelp")}>
           <div className="w-full sm:w-52">
-            <SearchableCombobox
+            <Combobox
               items={TIMEZONE_OPTIONS.map((tz) => ({ value: tz, label: tz }))}
               value={prefs.timezone}
               onValueChange={(next) => savePrefs({ timezone: next })}

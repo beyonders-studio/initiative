@@ -27,8 +27,8 @@ import {
 } from "@/hooks/useProviderPlacement";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import { AsyncCombobox } from "@/ui/async-combobox";
 import { Button } from "@/ui/button";
+import { Combobox } from "@/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -251,7 +251,7 @@ export const ProviderPlacementRuleDialog = ({
               <p className="font-medium text-sm">{community?.name}</p>
             ) : (
               <>
-                <AsyncCombobox
+                <Combobox
                   aria-label={t("providerPlacement.communityLabel")}
                   items={communityItems}
                   value={community ? String(community.id) : null}
