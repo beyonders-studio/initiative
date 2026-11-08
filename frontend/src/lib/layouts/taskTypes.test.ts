@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { buildTask, buildTaskType } from "@/__tests__/factories";
 import i18n from "@/__tests__/helpers/i18n-test";
 import { renderPage } from "@/__tests__/helpers/render";
+import type { TaskListRead } from "@/api/generated/initiativeAPI.schemas";
 import { parseLayoutKind } from "@/lib/filters/layoutSearch";
 import type { TranslateFn } from "@/types/i18n";
 import { pageParts } from "@/ui/layouts/detailLayout";
@@ -61,7 +62,7 @@ describe("a task's type as a field", () => {
     const task = buildTask({ title: "Fix the door", task_type_id: type.id, task_type: type });
     // The cell links to the task, so it is drawn inside a router.
     const cell = (typed: boolean) => {
-      const view: LayoutContext = {
+      const view: LayoutContext<TaskListRead> = {
         fields: taskFields([], [], { typed }),
         variant: "cell",
         env: {
@@ -71,7 +72,7 @@ describe("a task's type as a field", () => {
         },
       };
       return renderPage(() =>
-        createElement(LayoutTree, {
+        createElement(LayoutTree<TaskListRead>, {
           node: { type: "field", props: { field: "title" } },
           item: task,
           view,

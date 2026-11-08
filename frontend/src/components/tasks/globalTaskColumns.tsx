@@ -58,14 +58,14 @@ interface GlobalTaskColumnsOptions {
   isPinned?: (task: TaskListRead) => boolean;
   togglePin?: (task: TaskListRead) => void;
   /** The page's fields, from `taskFields`. */
-  fields: ReadonlyMap<string, FieldDef>;
-  env: LayoutEnv;
+  fields: ReadonlyMap<string, FieldDef<TaskListRead>>;
+  env: LayoutEnv<TaskListRead>;
 }
 
 interface SharedTaskColumnsOptions<T extends TaskListRead> {
   /** The table's fields, from `taskFields`. */
-  fields: ReadonlyMap<string, FieldDef>;
-  env: LayoutEnv;
+  fields: ReadonlyMap<string, FieldDef<TaskListRead>>;
+  env: LayoutEnv<TaskListRead>;
   isPriorityDisabled: (task: T) => boolean;
 }
 
@@ -81,7 +81,7 @@ export function sharedTaskColumns<T extends TaskListRead>({
 }: SharedTaskColumnsOptions<T>) {
   // `taskFields` holds every built-in.
   const column = (id: string, options: FieldColumnOptions<T>) =>
-    fieldColumn<T>(fields.get(id) as FieldDef, env, { id: taskColumnId(id), ...options });
+    fieldColumn<T>(fields.get(id)!, env, { id: taskColumnId(id), ...options });
   const dateGroup: AppColumnDef<T> = {
     id: "date group",
     accessorFn: (task) => getTaskDateStatus(task.start_date, task.due_date),

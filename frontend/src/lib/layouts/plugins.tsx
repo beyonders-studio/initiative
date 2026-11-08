@@ -362,12 +362,12 @@ const pluginValue = (values: PropertySummary[] | undefined, install: number, key
 export const pluginFields = (
   plugins: ReadonlyMap<number, PluginOnItems>,
   language: string
-): FieldDef[] =>
+): FieldDef<PluginItem>[] =>
   [...plugins.values()].flatMap((plugin) =>
     [...plugin.fields.values()].map(
-      (field): FieldDef => ({
+      (field): FieldDef<PluginItem> => ({
         id: pluginFieldId(plugin.id, field.key),
-        render: memo((props: FieldRendererProps) => (
+        render: memo((props: FieldRendererProps<PluginItem>) => (
           <PluginField {...props} install={plugin.id} declared={field} />
         )),
         source: "plugin",
@@ -716,7 +716,7 @@ const PluginField = ({
   variant,
   install,
   declared,
-}: FieldRendererProps & { install: number; declared: PluginFieldDecl }) => {
+}: FieldRendererProps<PluginItem> & { install: number; declared: PluginFieldDecl }) => {
   if (value === null) return null;
   const drawn = (
     <PluginValue field={declared} kept={pluginSummary(item.properties, install, declared.key)} />
