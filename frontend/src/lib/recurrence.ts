@@ -417,14 +417,6 @@ export const summarizeRecurrence = (
   return parts.join(" ");
 };
 
-export const updateWeeklyWeekdays = (
-  rule: RecurrenceRule,
-  weekdays: RecurrenceWeekday[]
-): RecurrenceRule => ({
-  ...rule,
-  weekdays: sortWeekdays(weekdays),
-});
-
 /** Month days in order: the numbered ones, then the last. */
 export const sortMonthDays = (days: number[]) =>
   [...new Set(days)].sort((a, b) => (a === -1 ? 32 : a) - (b === -1 ? 32 : b));

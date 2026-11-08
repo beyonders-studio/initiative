@@ -1,4 +1,4 @@
-import type { EditorConfig, LexicalNode, NodeKey, SerializedTextNode, Spread } from "lexical";
+import type { EditorConfig, NodeKey, SerializedTextNode, Spread } from "lexical";
 import { $applyNodeReplacement, TextNode } from "lexical";
 
 export type SerializedEmojiNode = Spread<
@@ -59,10 +59,6 @@ export class EmojiNode extends TextNode {
     const self = this.getLatest();
     return self.__className;
   }
-}
-
-export function $isEmojiNode(node: LexicalNode | null | undefined): node is EmojiNode {
-  return node instanceof EmojiNode;
 }
 
 export function $createEmojiNode(className: string, emojiText: string): EmojiNode {

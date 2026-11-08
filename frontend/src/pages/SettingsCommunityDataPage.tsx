@@ -45,5 +45,3 @@ export const SettingsCommunityDataPage = () => {
     </div>
   );
 };
-
-export default SettingsCommunityDataPage;

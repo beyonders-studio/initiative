@@ -29,7 +29,6 @@ import type { QueryOpts } from "@/types/query";
 // each one reads and the invalidation each one fires.
 
 const dashboards = TOOL_HOOKS[Tool.dashboard];
-export const useDashboardsList = dashboards.useList;
 export const useDashboard = dashboards.useDetail;
 export const useCreateDashboard = dashboards.useCreate;
 export const useUpdateDashboard = dashboards.useUpdate;

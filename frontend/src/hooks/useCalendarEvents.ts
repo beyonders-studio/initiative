@@ -36,7 +36,6 @@ import { useCommunityMutation } from "@/hooks/useApiMutation";
 import {
   type FieldSaveKind,
   type FieldSaveOptions,
-  type ItemEdit,
   useItemFieldSave,
   useShownWithPending,
 } from "@/hooks/useFieldSave";
@@ -68,8 +67,6 @@ export const useCalendarEvent = (
 /** A change to some of an event's fields. Its attendees are set as a whole,
  *  on a route of their own. */
 export type EventPatch = CalendarEventUpdate & { attendee_ids?: number[] };
-
-export type EventEdit = ItemEdit<CalendarEventRead, EventPatch>;
 
 /** How an event is saved field by field, read at `occurrence` when it names
  *  one date of a repeating event. */
@@ -259,20 +256,6 @@ export const useImportIcalEvents = (options?: MutationOpts<ICalImportResult, ICa
   );
 
 // ── Association Mutations ───────────────────────────────────────────────────
-
-export const useSetEventAttendees = (
-  eventId: number,
-  options?: MutationOpts<CalendarEventRead, { userIds: number[] } & OccurrenceTarget>
-) =>
-  useCommunityMutation<CalendarEventRead, { userIds: number[] } & OccurrenceTarget>(
-    {
-      mutationFn: (communityId, { userIds, ...target }) =>
-        setAttendees(communityId, eventId, userIds, target),
-      invalidate: () => invalidate(q.allCalendarEvents()),
-      errorKey: "calendars:error",
-    },
-    options
-  );
 
 export const useUpdateEventRSVP = (
   eventId: number,

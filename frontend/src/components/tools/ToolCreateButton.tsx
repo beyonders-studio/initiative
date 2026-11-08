@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -16,7 +16,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
  */
 export function useToolCreate(tool: Tool, initiativeId: number) {
   const gp = useCommunityPath();
-  const _navigate = useNavigate();
   const { t } = useTranslation("nav");
 
   const target = toolCreateTarget(tool, initiativeId);

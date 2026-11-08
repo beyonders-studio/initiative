@@ -41,10 +41,3 @@ export const linkableToolTypes = (
   initiative: InitiativeRead | null | undefined
 ): SearchEntityType[] =>
   TOOLS.filter((tool) => !initiative || isToolEnabled(tool, initiative)).map(referenceTypeFor);
-
-/** Whether `[[ ]]` can make one of these from a name alone. */
-export const isCreatableFromName = (
-  entityType: SearchEntityType,
-  initiative: InitiativeRead | null | undefined
-): boolean =>
-  Boolean(initiative) && (linkableToolTypes(initiative) as string[]).includes(entityType);

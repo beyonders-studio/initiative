@@ -5,7 +5,6 @@ export {
   buildEventCalendarEntry,
   DEFAULT_CALENDAR_COLOR,
   type EventEntryMeta,
-  isRepeating,
   occurrenceTarget,
 } from "./eventCalendarEntry";
 export {

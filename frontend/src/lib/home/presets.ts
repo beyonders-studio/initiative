@@ -100,6 +100,3 @@ export const presetLayout = (id: HomePresetId): HomeLayout => {
     }),
   };
 };
-
-export const isHomePresetId = (value: unknown): value is HomePresetId =>
-  typeof value === "string" && (HOME_PRESET_IDS as readonly string[]).includes(value);

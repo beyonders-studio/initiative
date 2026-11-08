@@ -3,7 +3,6 @@ import type {
   FieldDescription,
   FilterOp as GeneratedFilterOp,
 } from "@/api/generated/initiativeAPI.schemas";
-import { FilterOp as FilterOpValues } from "@/api/generated/initiativeAPI.schemas";
 
 /**
  * The filter half of a data view.
@@ -38,10 +37,6 @@ import { FilterOp as FilterOpValues } from "@/api/generated/initiativeAPI.schema
  *  so neither is restated here. Negation is a flag on the condition, not a
  *  separate operator. */
 export type FilterOp = GeneratedFilterOp;
-/** Every operator, for reading a stored condition back. Derived from the
- *  generated enum rather than restated, so the server's vocabulary is the only
- *  one there is. */
-export const FILTER_OPS = Object.values(FilterOpValues) as readonly FilterOp[];
 
 /** A date expressed as an offset from "now", in days. Resolved at fetch time so
  *  a saved dashboard keeps asking the same *question* as the days pass. */
@@ -133,55 +128,6 @@ export const fieldSpec = (
 ): FilterFieldSpec | undefined => fields.find((candidate) => candidate.field === field);
 
 // --- reading ----------------------------------------------------------------
-
-const readValue = (raw: unknown): ConditionValue | undefined => {
-  if (raw === null) return null;
-  if (isRelativeDate(raw)) return { relative: raw.relative };
-  if (Array.isArray(raw)) {
-    return raw.filter(
-      (entry): entry is string | number => typeof entry === "string" || typeof entry === "number"
-    );
-  }
-  if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") return raw;
-  return undefined;
-};
-
-const readNode = (raw: unknown, depth: number): FilterNode | undefined => {
-  if (typeof raw !== "object" || raw === null) return undefined;
-  const record = raw as Record<string, unknown>;
-
-  if (Array.isArray(record.conditions)) {
-    // The endpoint caps group nesting; a definition deeper than that would 400
-    // the whole query, so an over-deep group is dropped rather than sent.
-    if (depth >= 1) return undefined;
-    const children = record.conditions
-      .map((child) => readNode(child, depth + 1))
-      .filter((child): child is FilterNode => Boolean(child));
-    if (!children.length) return undefined;
-    return { logic: record.logic === "or" ? "or" : "and", conditions: children };
-  }
-
-  if (typeof record.field !== "string") return undefined;
-  const op = FILTER_OPS.includes(record.op as FilterOp) ? (record.op as FilterOp) : undefined;
-  if (!op) return undefined;
-  const value = readValue(record.value);
-  return {
-    field: record.field,
-    op,
-    ...(value === undefined ? {} : { value }),
-    ...(record.negate === true ? { negate: true } : {}),
-  };
-};
-
-/** A stored `conditions` value as a typed list. Tolerates the single-group form
- *  a definition may carry, and drops anything unreadable. */
-export const readConditions = (raw: unknown): FilterNode[] => {
-  if (Array.isArray(raw)) {
-    return raw.map((node) => readNode(node, 0)).filter((node): node is FilterNode => Boolean(node));
-  }
-  const single = readNode(raw, 0);
-  return single ? [single] : [];
-};
 
 /** How many comparisons a filter makes, counted through groups — the number the
  *  provenance line shows. */

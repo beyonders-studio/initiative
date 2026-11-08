@@ -88,14 +88,6 @@ export const isAnonymizedUser = (user: DisplayableUser | null | undefined): bool
   user?.status === "anonymized";
 
 /**
- * True when the account is no longer in use — deactivated by its owner, or
- * anonymized. Its handle still renders; this drives the muted styling and the
- * badge that say so, rather than replacing the name.
- */
-export const isInactiveUser = (user: DisplayableUser | null | undefined): boolean =>
-  user?.status === "anonymized" || user?.status === "deactivated";
-
-/**
  * Whether we hold enough of a user to name them — i.e. whether
  * {@link getUserDisplayName} would return something real rather than the
  * caller's fallback. Pickers use this to decide which selected ids they still

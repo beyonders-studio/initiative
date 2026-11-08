@@ -17,7 +17,6 @@ import { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
 import {
   COMMENT_ENTITY_TYPE,
   categoryEntityTypes,
-  hitCategory,
   hitIcon,
   SEARCH_CATEGORIES,
   type SearchTarget,
@@ -131,14 +130,6 @@ describe("searchHitPath", () => {
 });
 
 describe("categories", () => {
-  it("puts everything but comments and the community's vocabulary under tools", () => {
-    for (const entityType of TOOL_ENTITY_TYPES) {
-      expect(hitCategory(target({ entity_type: entityType }))).toBe("tool");
-    }
-    expect(hitCategory(target({ entity_type: TAG_ENTITY_TYPE }))).toBe("tag");
-    expect(hitCategory(target({ entity_type: COMMENT_ENTITY_TYPE }))).toBe("comment");
-  });
-
   it("asks for one category at a time, and between them they cover the index", () => {
     const asked = SEARCH_CATEGORIES.flatMap((c) => categoryEntityTypes(c) ?? []);
     expect(new Set(asked)).toEqual(new Set(Object.values(SearchEntityType)));

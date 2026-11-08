@@ -113,13 +113,6 @@ export const useTasks = (params: ListTasksParams, options?: QueryOpts<TaskListRe
   return useQuery<TaskListResponse>({ ...tasksQuery(communityId, params), ...options });
 };
 
-export const usePrefetchTasks = () => {
-  const qc = useQueryClient();
-  const communityId = useActiveCommunityId();
-  return (params: ListTasksParams) =>
-    qc.prefetchQuery({ ...tasksQuery(communityId, params), staleTime: 30_000 });
-};
-
 // ── Task Mutations ──────────────────────────────────────────────────────────
 
 export const useCreateTask = (options?: MutationOpts<TaskRead, Parameters<typeof createTask>[1]>) =>

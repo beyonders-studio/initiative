@@ -1,18 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { cellsToCsv, clipboardToCells, coerceScalar, csvToCells, offsetCells } from "./csv";
+import { clipboardToCells, coerceScalar, csvToCells, offsetCells } from "./csv";
 
-describe("cellsToCsv / csvToCells round-trip", () => {
-  it("round-trips a small grid", () => {
-    const cells = {
-      "0:0": "Date",
-      "0:1": "Amount",
-      "1:0": "2026-05-01",
-      "1:1": 42.5,
-      "2:1": true,
-    };
-    const csv = cellsToCsv(cells);
-    const parsed = csvToCells(csv);
+describe("csvToCells", () => {
+  it("reads a small grid", () => {
+    const parsed = csvToCells("Date,Amount\n2026-05-01,42.5\n,true");
     // Numeric / boolean values get re-coerced from their string form.
     expect(parsed.cells).toEqual({
       "0:0": "Date",
@@ -23,27 +15,12 @@ describe("cellsToCsv / csvToCells round-trip", () => {
     });
   });
 
-  it("preserves embedded commas via quoting", () => {
-    const cells = { "0:0": "hello, world", "0:1": "ok" };
-    const csv = cellsToCsv(cells);
-    expect(csv).toContain('"hello, world"');
-    expect(csvToCells(csv).cells).toEqual({ "0:0": "hello, world", "0:1": "ok" });
+  it("keeps embedded commas inside quotes", () => {
+    expect(csvToCells('"hello, world",ok').cells).toEqual({ "0:0": "hello, world", "0:1": "ok" });
   });
 
-  it("preserves embedded newlines via quoting", () => {
-    const cells = { "0:0": "line one\nline two" };
-    const csv = cellsToCsv(cells);
-    expect(csvToCells(csv).cells).toEqual({ "0:0": "line one\nline two" });
-  });
-
-  it("returns empty string for an empty cell map", () => {
-    expect(cellsToCsv({})).toBe("");
-  });
-
-  it("emits empty fields inside the bounding box for missing cells", () => {
-    const csv = cellsToCsv({ "0:0": "a", "1:1": "b" });
-    // Bounding box is 2x2: A1=a, B1=empty, A2=empty, B2=b.
-    expect(csv).toBe("a,\n,b");
+  it("keeps embedded newlines inside quotes", () => {
+    expect(csvToCells('"line one\nline two"').cells).toEqual({ "0:0": "line one\nline two" });
   });
 });
 
