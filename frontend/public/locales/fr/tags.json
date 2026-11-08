@@ -49,11 +49,7 @@
     "creating": "Création en cours…",
     "create": "Créer",
     "searchPlaceholder": "Rechercher ou créer des étiquettes…",
-    "loading": "Chargement…",
-    "existingTags": "Étiquettes existantes",
-    "noTagsFound": "Aucune étiquette trouvée.",
     "createTag": "Créer « {{name}} »",
-    "selected": "{{count}} sélectionné(e)(s)",
     "filterLabel": "Tags",
     "anyTag": "N'importe quel tag"
   },

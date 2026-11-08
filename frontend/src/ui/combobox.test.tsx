@@ -150,6 +150,85 @@ describe("Combobox", () => {
       expect(screen.queryByText('Use "groups"')).not.toBeInTheDocument();
       expect(screen.getByRole("option", { name: "groups" })).toBeInTheDocument();
     });
+
+    it("matches the line under a name as well as the name", async () => {
+      const user = userEvent.setup();
+      const roles = [
+        { value: "1", label: "Editor", sublabel: "Apollo" },
+        { value: "2", label: "Viewer", sublabel: "Gemini" },
+      ];
+
+      render(<Combobox items={roles} />);
+
+      await user.click(screen.getByRole("combobox"));
+      await user.type(screen.getByPlaceholderText("Search"), "gemini");
+
+      expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+        "ViewerGemini",
+      ]);
+    });
+
+    it("makes a new item in a form of the caller's, from what was typed or from nothing", async () => {
+      const user = userEvent.setup();
+      const onValueChange = vi.fn();
+      const Maker = () => {
+        const [open, setOpen] = useState(false);
+        const [draft, setDraft] = useState<string | null>(null);
+        return (
+          <Combobox
+            items={ITEMS}
+            onValueChange={onValueChange}
+            open={open}
+            onOpenChange={setOpen}
+            typedLabel={() => "New item"}
+            onCreate={setDraft}
+            trigger={<button type="button">Add</button>}
+          >
+            {draft !== null ? (
+              <button type="button" onClick={() => setOpen(false)}>
+                Make "{draft}"
+              </button>
+            ) : null}
+          </Combobox>
+        );
+      };
+
+      render(<Maker />);
+
+      await user.click(screen.getByRole("button", { name: "Add" }));
+      // Offered before anything is typed, since this list makes items from
+      // scratch as well.
+      expect(screen.getByRole("option", { name: "New item" })).toBeInTheDocument();
+
+      await user.type(screen.getByPlaceholderText("Search"), " Gamma ");
+      await user.click(screen.getByRole("option", { name: "New item" }));
+
+      expect(onValueChange).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: 'Make "Gamma"' }));
+      expect(screen.queryByRole("button", { name: 'Make "Gamma"' })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add" })).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("keeps what was typed when making the item fails, to try again", async () => {
+      const user = userEvent.setup();
+      const onCreate = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValue(null);
+      render(
+        <Combobox
+          items={ITEMS}
+          typedLabel={(typed) => typed && `Create "${typed}"`}
+          onCreate={onCreate}
+        />
+      );
+
+      await user.click(screen.getByRole("combobox"));
+      await user.type(screen.getByPlaceholderText("Search"), "Gamma");
+      await user.click(screen.getByRole("option", { name: 'Create "Gamma"' }));
+      expect(screen.getByPlaceholderText("Search")).toHaveValue("Gamma");
+
+      await user.click(screen.getByRole("option", { name: 'Create "Gamma"' }));
+      await waitFor(() => expect(screen.getByPlaceholderText("Search")).toHaveValue(""));
+      expect(onCreate).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("multiple", () => {
@@ -204,14 +283,14 @@ describe("Combobox", () => {
       expect(trigger).toHaveTextContent("All statuses");
     });
 
-    it("leaves a disabled item out of select all", async () => {
+    it("adds every item that can be chosen to what is chosen, listed or not", async () => {
       const user = userEvent.setup();
       const onValueChange = vi.fn();
       render(
         <Combobox
           multiple
           aria-label="Statuses"
-          value={[]}
+          value={["removed"]}
           onValueChange={onValueChange}
           items={[
             { value: "1", label: "Doing" },
@@ -222,7 +301,7 @@ describe("Combobox", () => {
 
       await user.click(screen.getByRole("combobox", { name: "Statuses" }));
       await user.click(screen.getByRole("option", { name: "Select all" }));
-      expect(onValueChange).toHaveBeenCalledWith(["1"]);
+      expect(onValueChange).toHaveBeenCalledWith(["removed", "1"]);
     });
 
     it("says there is nothing to choose in place of the field", () => {
@@ -230,6 +309,36 @@ describe("Combobox", () => {
 
       expect(screen.getByText("No options available")).toBeInTheDocument();
       expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    });
+
+    it("searched on the server, treats the items as one page of matches", async () => {
+      const user = userEvent.setup();
+
+      // The one chosen is not on the page the server returned.
+      const { rerender } = render(
+        <Combobox
+          multiple
+          value={["9"]}
+          onValueChange={vi.fn()}
+          items={[]}
+          onSearchChange={vi.fn()}
+        />
+      );
+      expect(screen.getByRole("combobox")).toHaveTextContent("1 selected");
+
+      rerender(
+        <Combobox
+          multiple
+          value={["1", "2"]}
+          onValueChange={vi.fn()}
+          items={ITEMS}
+          onSearchChange={vi.fn()}
+        />
+      );
+      // Every row of a page is not every match, so neither is offered as "all".
+      expect(screen.getByRole("combobox")).toHaveTextContent("2 selected");
+      await user.click(screen.getByRole("combobox"));
+      expect(screen.queryByRole("option", { name: "Select all" })).not.toBeInTheDocument();
     });
   });
 });

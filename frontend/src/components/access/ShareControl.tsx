@@ -1,4 +1,4 @@
-import { Blocks, ChevronDown, Loader2, Lock, Users, X } from "lucide-react";
+import { Blocks, ChevronDown, Lock, Users, X } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -14,16 +14,8 @@ import { resolveArtworkUrl } from "@/lib/uploadUrl";
 import { getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/ui/command";
+import { Combobox } from "@/ui/combobox";
 import { Label } from "@/ui/label";
-import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { cn } from "@/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
@@ -154,7 +146,6 @@ export const ShareControl = ({
 
   const [peoplePickerOpen, setPeoplePickerOpen] = useState(false);
   const [peopleQuery, setPeopleQuery] = useState("");
-  const debouncedPeopleQuery = useDebouncedValue(peopleQuery, 250);
 
   // The picker asks the server for the people matching what was typed, and the
   // people already named here (owner, grantees) are looked up by id.
@@ -163,7 +154,7 @@ export const ShareControl = ({
     [communityScoped, initiativeId]
   );
   const peopleSearch = useMemberSearch(peopleScope, {
-    search: debouncedPeopleQuery,
+    search: peopleQuery,
     enabled: peoplePickerOpen,
   });
   const peopleResults = useMemo(() => peopleSearch.data?.items ?? [], [peopleSearch.data]);
@@ -325,15 +316,7 @@ export const ShareControl = ({
     [onChange, userGrants, roleGrants]
   );
 
-  // ── Picker open state ────────────────────────────────────────────────────
-
   const [modePickerOpen, setModePickerOpen] = useState(false);
-  const [rolePickerOpen, setRolePickerOpen] = useState(false);
-
-  const handlePeoplePickerOpenChange = (open: boolean) => {
-    setPeoplePickerOpen(open);
-    if (!open) setPeopleQuery("");
-  };
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -445,59 +428,28 @@ export const ShareControl = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label className="font-medium text-sm">{t("share.people")}</Label>
-              <Popover open={peoplePickerOpen} onOpenChange={handlePeoplePickerOpenChange}>
-                <PopoverTrigger asChild>
+              {/* People are matched on the server, never re-filtered here. */}
+              <Combobox
+                items={availableMembers.map((member) => ({
+                  value: String(member.id),
+                  label: getUserDisplayName(member),
+                  sublabel: member.display_name?.trim() ? getUserHandle(member) : undefined,
+                }))}
+                onValueChange={(value) => addUser(Number(value))}
+                onSearchChange={setPeopleQuery}
+                onOpenChange={setPeoplePickerOpen}
+                loading={peopleSearch.isFetching && availableMembers.length === 0}
+                searchPlaceholder={t("share.searchPeople")}
+                emptyMessage={t("share.noPeople")}
+                align="end"
+                disabled={disabled}
+                trigger={
                   <Button type="button" variant="outline" size="sm" disabled={disabled}>
                     {t("share.addPeople")}
                     <ChevronDown className="h-4 w-4 opacity-50" />
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-72 p-0" align="end">
-                  {/* People are matched on the server, never re-filtered here. */}
-                  <Command shouldFilter={false}>
-                    <CommandInput
-                      placeholder={t("share.searchPeople")}
-                      value={peopleQuery}
-                      onValueChange={setPeopleQuery}
-                    />
-                    <CommandList>
-                      {peopleSearch.isFetching && availableMembers.length === 0 ? (
-                        <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground text-sm">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          {t("common:loading")}
-                        </div>
-                      ) : (
-                        <CommandEmpty>{t("share.noPeople")}</CommandEmpty>
-                      )}
-                      <CommandGroup>
-                        {availableMembers.map((member) => {
-                          const displayName = getUserDisplayName(member);
-                          return (
-                            <CommandItem
-                              key={member.id}
-                              value={`${displayName} ${getUserHandle(member)}`}
-                              onSelect={() => {
-                                addUser(member.id);
-                                handlePeoplePickerOpenChange(false);
-                              }}
-                              className="cursor-pointer"
-                            >
-                              <div className="flex flex-col">
-                                <span className="truncate text-sm">{displayName}</span>
-                                {member.display_name?.trim() && (
-                                  <span className="truncate text-muted-foreground text-xs">
-                                    {getUserHandle(member)}
-                                  </span>
-                                )}
-                              </div>
-                            </CommandItem>
-                          );
-                        })}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                }
+              />
             </div>
 
             <div className="space-y-1">
@@ -566,37 +518,23 @@ export const ShareControl = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="font-medium text-sm">{t("share.roles")}</Label>
-                <Popover open={rolePickerOpen} onOpenChange={setRolePickerOpen}>
-                  <PopoverTrigger asChild>
+                <Combobox
+                  items={availableRoles.map((role) => ({
+                    value: String(role.id),
+                    label: role.display_name,
+                  }))}
+                  onValueChange={(value) => addRole(Number(value))}
+                  searchPlaceholder={t("share.searchRoles")}
+                  emptyMessage={t("share.noRoles")}
+                  align="end"
+                  disabled={disabled}
+                  trigger={
                     <Button type="button" variant="outline" size="sm" disabled={disabled}>
                       {t("share.addRoles")}
                       <ChevronDown className="h-4 w-4 opacity-50" />
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-72 p-0" align="end">
-                    <Command>
-                      <CommandInput placeholder={t("share.searchRoles")} />
-                      <CommandList>
-                        <CommandEmpty>{t("share.noRoles")}</CommandEmpty>
-                        <CommandGroup>
-                          {availableRoles.map((role) => (
-                            <CommandItem
-                              key={role.id}
-                              value={role.display_name}
-                              onSelect={() => {
-                                addRole(role.id);
-                                setRolePickerOpen(false);
-                              }}
-                              className="cursor-pointer"
-                            >
-                              <span className="truncate text-sm">{role.display_name}</span>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                  }
+                />
               </div>
 
               <div className="space-y-1">

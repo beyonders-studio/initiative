@@ -49,11 +49,7 @@
     "creating": "Wird erstellt…",
     "create": "Erstellen",
     "searchPlaceholder": "Tags suchen oder erstellen...",
-    "loading": "Wird geladen…",
-    "existingTags": "Vorhandene Tags",
-    "noTagsFound": "Keine Tags gefunden.",
     "createTag": "\"{{name}}\" erstellen",
-    "selected": "{{count}} ausgewählt",
     "filterLabel": "Tags",
     "anyTag": "Beliebiges Tag"
   },

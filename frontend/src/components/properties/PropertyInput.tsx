@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Minus, Plus, RotateCcw, Star, X } from "lucide-react";
+import { ChevronDown, Minus, Plus, RotateCcw, Star, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -13,20 +13,11 @@ import { type MemberLike, MemberSelect } from "@/components/members/MemberSearch
 import { useAppendPropertyOption } from "@/hooks/useProperties";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from "@/ui/command";
+import { Combobox } from "@/ui/combobox";
 import { DateTimePicker } from "@/ui/date-time-picker";
 import { Input } from "@/ui/input";
 import { toPickerValue } from "@/ui/lib/localDateTime";
 import { cn } from "@/ui/lib/utils";
-import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Slider } from "@/ui/slider";
 
 import { FileFieldInput } from "./FileFieldInput";
@@ -602,7 +593,6 @@ const PropertyOptionPicker = ({
 }: PropertyOptionPickerProps) => {
   const { t } = useTranslation(["properties", "common"]);
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
   const { appendOption, isPending } = useAppendPropertyOption();
 
   const isMulti = mode === "multi";
@@ -610,54 +600,16 @@ const PropertyOptionPicker = ({
 
   const knownValues = useMemo(() => new Set(options.map((option) => option.value)), [options]);
 
-  const filteredOptions = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    if (!needle) return options;
-    return options.filter((option) => option.label.toLowerCase().includes(needle));
-  }, [options, search]);
-
-  const exactLabelMatch = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    if (!needle) return null;
-    return options.find((option) => option.label.trim().toLowerCase() === needle) ?? null;
-  }, [options, search]);
-
-  const canCreate = search.trim().length > 0 && !exactLabelMatch && !disabled;
-
-  const handleToggle = (value: string) => {
+  // A failure is toasted by the hook, and rejects so the picker keeps the
+  // typed name to try again.
+  const handleCreate = async (label: string) => {
+    if (isPending) return;
+    const slug = (await appendOption(toDefinitionForPatch(definition), label)).option.value;
     if (isMulti) {
-      const current = selectedMulti ?? [];
-      const next = current.includes(value)
-        ? current.filter((v) => v !== value)
-        : [...current, value];
-      onChangeMulti(next);
-      return;
-    }
-    if (selected === value) {
-      onChangeSingle(null);
+      if (!selectedArr.includes(slug)) onChangeMulti([...selectedArr, slug]);
     } else {
-      onChangeSingle(value);
+      onChangeSingle(slug);
       setOpen(false);
-    }
-  };
-
-  const handleCreate = async () => {
-    if (!search.trim()) return;
-    try {
-      const result = await appendOption(toDefinitionForPatch(definition), search);
-      setSearch("");
-      const slug = result.option.value;
-      if (isMulti) {
-        const current = selectedMulti ?? [];
-        if (!current.includes(slug)) {
-          onChangeMulti([...current, slug]);
-        }
-      } else {
-        onChangeSingle(slug);
-        setOpen(false);
-      }
-    } catch {
-      // Toast surfaced by the hook.
     }
   };
 
@@ -675,131 +627,98 @@ const PropertyOptionPicker = ({
     ? t("properties:input.multiSelectPlaceholder")
     : t("properties:input.selectPlaceholder");
 
-  return (
-    <Popover open={open} onOpenChange={(next) => (!disabled ? setOpen(next) : null)}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={disabled}
-          className={cn(
-            "h-9 w-full justify-between bg-transparent font-normal",
-            selectedOptions.length === 0 && "text-muted-foreground",
-            className
-          )}
-        >
-          {selectedOptions.length === 0 ? (
-            <span className="truncate">{placeholder}</span>
-          ) : (
-            <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1 overflow-hidden">
-              {selectedOptions.map((option) => (
-                <span
-                  key={option.value}
-                  className={cn(
-                    "inline-flex max-w-full items-center gap-1 truncate rounded-sm px-1.5 py-0.5 text-xs",
-                    option.known
-                      ? "bg-muted text-foreground"
-                      : "bg-muted text-muted-foreground italic"
-                  )}
-                >
-                  {option.color ? (
-                    <span
-                      className="inline-block h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: option.color }}
-                    />
-                  ) : null}
-                  <span className="truncate">
-                    {option.known
-                      ? option.label
-                      : t("properties:input.unknownOption", { value: option.value })}
-                  </span>
-                  {isMulti ? (
-                    // biome-ignore lint/a11y/useSemanticElements: can't nest a <button> inside the parent PopoverTrigger button; span+role is the workaround
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      aria-label={t("properties:input.clear")}
-                      className="shrink-0 text-muted-foreground hover:text-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onChangeMulti((selectedMulti ?? []).filter((v) => v !== option.value));
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onChangeMulti((selectedMulti ?? []).filter((v) => v !== option.value));
-                        }
-                      }}
-                    >
-                      <X className="h-3 w-3" />
-                    </span>
-                  ) : null}
+  const shared = {
+    items: options.map((option) => ({
+      value: option.value,
+      label: option.label,
+      icon: option.color ? (
+        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: option.color }} />
+      ) : undefined,
+    })),
+    open,
+    onOpenChange: setOpen,
+    typedLabel: (typed: string) => typed && t("properties:input.createOption", { label: typed }),
+    onCreate: handleCreate,
+    loading: isPending,
+    searchPlaceholder: t("properties:input.searchOptions"),
+    emptyMessage: t("properties:picker.empty"),
+    disabled,
+    trigger: (
+      <Button
+        type="button"
+        variant="outline"
+        disabled={disabled}
+        className={cn(
+          "h-9 w-full justify-between bg-transparent font-normal",
+          selectedOptions.length === 0 && "text-muted-foreground",
+          className
+        )}
+      >
+        {selectedOptions.length === 0 ? (
+          <span className="truncate">{placeholder}</span>
+        ) : (
+          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1 overflow-hidden">
+            {selectedOptions.map((option) => (
+              <span
+                key={option.value}
+                className={cn(
+                  "inline-flex max-w-full items-center gap-1 truncate rounded-sm px-1.5 py-0.5 text-xs",
+                  option.known
+                    ? "bg-muted text-foreground"
+                    : "bg-muted text-muted-foreground italic"
+                )}
+              >
+                {option.color ? (
+                  <span
+                    className="inline-block h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: option.color }}
+                  />
+                ) : null}
+                <span className="truncate">
+                  {option.known
+                    ? option.label
+                    : t("properties:input.unknownOption", { value: option.value })}
                 </span>
-              ))}
-            </span>
-          )}
-          <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder={t("properties:input.searchOptions")}
-            value={search}
-            onValueChange={setSearch}
-            disabled={isPending}
-          />
-          <CommandList>
-            {filteredOptions.length === 0 && !canCreate ? (
-              <CommandEmpty>{t("properties:picker.empty")}</CommandEmpty>
-            ) : null}
-            {filteredOptions.length > 0 ? (
-              <CommandGroup>
-                {filteredOptions.map((option) => {
-                  const isSelected = selectedArr.includes(option.value);
-                  return (
-                    <CommandItem
-                      key={option.value}
-                      value={option.value}
-                      onSelect={() => handleToggle(option.value)}
-                      className="flex items-center gap-2"
-                    >
-                      {option.color ? (
-                        <span
-                          className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: option.color }}
-                        />
-                      ) : null}
-                      <span className="flex-1 truncate">{option.label}</span>
-                      {isSelected ? <Check className="h-4 w-4 shrink-0" /> : null}
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            ) : null}
-            {canCreate ? (
-              <>
-                {filteredOptions.length > 0 ? <CommandSeparator /> : null}
-                <CommandGroup>
-                  <CommandItem
-                    value="__create__"
-                    onSelect={handleCreate}
-                    disabled={isPending}
-                    className="flex items-center gap-2"
+                {isMulti ? (
+                  // biome-ignore lint/a11y/useSemanticElements: can't nest a <button> inside the parent PopoverTrigger button; span+role is the workaround
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label={t("properties:input.clear")}
+                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onChangeMulti(selectedArr.filter((v) => v !== option.value));
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onChangeMulti(selectedArr.filter((v) => v !== option.value));
+                      }
+                    }}
                   >
-                    <Plus className="h-4 w-4 shrink-0" />
-                    <span className="truncate">
-                      {t("properties:input.createOption", { label: search.trim() })}
-                    </span>
-                  </CommandItem>
-                </CommandGroup>
-              </>
-            ) : null}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+                    <X className="h-3 w-3" />
+                  </span>
+                ) : null}
+              </span>
+            ))}
+          </span>
+        )}
+        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+      </Button>
+    ),
+  };
+
+  return isMulti ? (
+    <Combobox {...shared} multiple value={selectedArr} onValueChange={onChangeMulti} />
+  ) : (
+    // Choosing the chosen option again clears it.
+    <Combobox
+      {...shared}
+      value={selected || null}
+      onValueChange={(next) => onChangeSingle(next === selected ? null : next)}
+    />
   );
 };
 

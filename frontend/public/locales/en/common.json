@@ -64,7 +64,6 @@
   "selectAll": "Select all",
   "selectRow": "Select row",
   "noResultsDot": "No results.",
-  "countSelected": "{{count}} selected",
   "clearAll": "Clear all",
   "calendar": {
     "today": "Today",
