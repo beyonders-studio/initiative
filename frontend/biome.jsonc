@@ -151,9 +151,11 @@
         "noGlobalIsNan": "warn"
       },
       "nursery": {
-        // Replaces prettier-plugin-tailwindcss
+        // Replaces prettier-plugin-tailwindcss. A safe fix sorts classes on every
+        // `biome check --write`, the pre-commit hook included, as the plugin did.
         "useSortedClasses": {
           "level": "warn",
+          "fix": "safe",
           "options": {
             "attributes": ["className"],
             "functions": ["cn", "clsx", "cva", "tw"]
