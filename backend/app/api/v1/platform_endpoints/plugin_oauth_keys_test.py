@@ -8,7 +8,7 @@ set's fetch is stood in for here; ``plugin_keys_test`` covers it.
 
 from __future__ import annotations
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 

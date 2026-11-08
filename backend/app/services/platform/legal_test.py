@@ -80,7 +80,7 @@ def _serve(monkeypatch, body=INDEX_BODY, *, fail: bool = False):
                 raise RuntimeError("portal is down")
             return _Response()
 
-    monkeypatch.setattr(legal_service.httpx, "AsyncClient", _Client)
+    monkeypatch.setattr(legal_service.httpx2, "AsyncClient", _Client)
     return calls
 
 
@@ -323,6 +323,6 @@ async def test_a_slug_outside_the_slug_characters_is_not_asked_for(
         def __init__(self, *args, **kwargs):
             raise AssertionError("the portal was asked")
 
-    monkeypatch.setattr(legal_service.httpx, "AsyncClient", _NoPortal)
+    monkeypatch.setattr(legal_service.httpx2, "AsyncClient", _NoPortal)
     with pytest.raises(KeyError):
         await legal_service.get_document(slug)

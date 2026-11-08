@@ -13,6 +13,7 @@ The plain ``set(registry) == set(enum)`` rows live together in
 """
 
 import pytest
+from fastapi.routing import iter_route_contexts
 
 from app.core.tools import Tool
 
@@ -193,7 +194,7 @@ def test_every_tool_carries_the_comment_switch():
         columns = {c.name for c in sa_inspect(target.model).persist_selectable.columns}
         assert "comments_enabled" in columns, tool
 
-    routes = {getattr(route, "path", "") for route in app.routes}
+    routes = {getattr(route, "path", "") for route in iter_route_contexts(app.routes)}
     assert any(path.endswith("/tools/{tool}/{tool_id}/comments") for path in routes)
 
 

@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Every tool's cards look alike.** Project, counter and dashboard cards lift under the pointer like the others and share their spacing, and pointing at a name cut short shows all of it.
 - **Fields look and read the same everywhere.** Text boxes, selects, searchable lists and the date, colour and emoji pickers share one box and focus ring, and an invalid field is outlined in red wherever it is. A screen reader reads a field's hint and error with it and announces an error as it appears, and clicking a label focuses or opens its field.
 - **One colour picker everywhere.** A spreadsheet's text, fill and border colours and a profile decoration's colours open the same picker as the rest of the app, rather than the system's. The picker opens with its cursor on the current colour, and a single click in its field picks.
+- **Secure connections out of the server trust the machine's own certificates.** Sign-in providers, plug-ins, AI connections and the other services Initiative calls are checked against the operating system's certificate store rather than a bundle shipped with Initiative, so a certificate authority your organisation installs on the host is trusted. `SSL_CERT_FILE` and `SSL_CERT_DIR` still point it elsewhere.
 
 ### Fixed
 

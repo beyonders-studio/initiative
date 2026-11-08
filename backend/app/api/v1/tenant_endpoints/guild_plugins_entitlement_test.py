@@ -16,9 +16,9 @@ import asyncio
 import json
 from typing import ClassVar
 
-import httpx
+import httpx2
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import config as config_module
@@ -125,10 +125,10 @@ def billing(monkeypatch):
             if Billing.delay:
                 await asyncio.sleep(Billing.delay)
             if Billing.answer is None:
-                return httpx.Response(204)
-            return httpx.Response(200, json=Billing.answer)
+                return httpx2.Response(204)
+            return httpx2.Response(200, json=Billing.answer)
 
-    monkeypatch.setattr(billing_ping.httpx, "AsyncClient", Client)
+    monkeypatch.setattr(billing_ping.httpx2, "AsyncClient", Client)
     return Billing
 
 

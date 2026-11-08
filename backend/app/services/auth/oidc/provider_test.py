@@ -1,7 +1,7 @@
 """Tests for the composed OIDC relying-party flow (begin/complete).
 
 A fake IdP (discovery + JWKS + token endpoint) runs behind an
-``httpx.MockTransport``, so the full begin → callback → verified-claims path is
+``httpx2.MockTransport``, so the full begin → callback → verified-claims path is
 exercised with no network. Failure tests attack each trust decision in
 ``complete``: the state, the token response, the signing key, and the id_token
 claims.
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlsplit
 
-import httpx
+import httpx2
 import pytest
 
 from app.services.auth.oidc.flow_state import decode_flow_state
@@ -49,7 +49,7 @@ async def _begin_and_complete(idp: FakeIdp, provider: OidcProvider):
     begun = await provider.begin()
     nonce = parse_qs(urlsplit(begun.authorization_url).query)["nonce"][0]
     if idp.token_response is None:
-        idp.token_response = httpx.Response(
+        idp.token_response = httpx2.Response(
             200,
             json={
                 "access_token": "at-123",
@@ -125,7 +125,7 @@ async def test_complete_sends_code_exchange_form():
 
     begun = await provider.begin()
     flow = decode_flow_state(begun.state)
-    idp.token_response = httpx.Response(
+    idp.token_response = httpx2.Response(
         200, json={"id_token": _mint_id_token(nonce=flow.nonce)}
     )
     await provider.complete(code="auth-code-1", state=begun.state)
@@ -146,7 +146,7 @@ async def test_public_client_sends_no_secret():
 
     begun = await provider.begin()
     flow = decode_flow_state(begun.state)
-    idp.token_response = httpx.Response(
+    idp.token_response = httpx2.Response(
         200, json={"id_token": _mint_id_token(nonce=flow.nonce)}
     )
     done = await provider.complete(code="c", state=begun.state)
@@ -179,7 +179,7 @@ async def test_token_endpoint_error_rejected():
     idp = FakeIdp()
     provider = _provider(idp)
     begun = await provider.begin()
-    idp.token_response = httpx.Response(
+    idp.token_response = httpx2.Response(
         400,
         json={
             "error": "invalid_grant",
@@ -208,7 +208,7 @@ async def test_token_response_missing_id_token_rejected():
     idp = FakeIdp()
     provider = _provider(idp)
     begun = await provider.begin()
-    idp.token_response = httpx.Response(200, json={"access_token": "at-only"})
+    idp.token_response = httpx2.Response(200, json={"access_token": "at-only"})
     with pytest.raises(OidcFlowError) as err:
         await provider.complete(code="c", state=begun.state)
     assert err.value.code == "token_missing_id_token"
@@ -218,7 +218,7 @@ async def test_token_response_non_object_rejected():
     idp = FakeIdp()
     provider = _provider(idp)
     begun = await provider.begin()
-    idp.token_response = httpx.Response(200, json=["not", "an", "object"])
+    idp.token_response = httpx2.Response(200, json=["not", "an", "object"])
     with pytest.raises(OidcFlowError) as err:
         await provider.complete(code="c", state=begun.state)
     assert err.value.code == "token_request_failed"
@@ -253,7 +253,7 @@ async def test_an_id_token_we_cannot_trust_is_rejected(case, idp_kwargs, mint, c
     provider = _provider(idp)
     begun = await provider.begin()
     claims = {"nonce": decode_flow_state(begun.state).nonce, **mint}
-    idp.token_response = httpx.Response(
+    idp.token_response = httpx2.Response(
         200, json={"id_token": _mint_id_token(**claims)}
     )
     with pytest.raises(OidcFlowError) as err:
@@ -291,7 +291,7 @@ async def test_fetch_userinfo_none_when_not_advertised():
 
 async def test_fetch_userinfo_failure_raises_flow_error():
     idp = FakeIdp(userinfo_claims={"sub": "idp-subject-1"})
-    idp.userinfo_response = httpx.Response(401, json={"error": "invalid_token"})
+    idp.userinfo_response = httpx2.Response(401, json={"error": "invalid_token"})
     provider = _provider(idp)
     with pytest.raises(OidcFlowError) as err:
         await provider.fetch_userinfo("expired")

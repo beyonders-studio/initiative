@@ -4,7 +4,7 @@ endpoint, soft-delete interaction, and the cross-initiative isolation gate.
 
 from datetime import UTC
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 
 from app.core.relationships import node_id

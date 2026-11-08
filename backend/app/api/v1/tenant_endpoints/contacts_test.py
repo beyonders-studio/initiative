@@ -11,7 +11,7 @@ and coming back in.
 import csv
 import io
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 

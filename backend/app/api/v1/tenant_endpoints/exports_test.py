@@ -20,7 +20,7 @@ from typing import Any
 
 import docx
 import pytest
-from httpx import AsyncClient, Response
+from httpx2 import AsyncClient, Response
 from openpyxl import load_workbook
 from pypdf import PdfReader
 from sqlalchemy import delete as sa_delete

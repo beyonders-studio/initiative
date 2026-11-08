@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from httpx import AsyncClient, Response
+from httpx2 import AsyncClient, Response
 from sqlmodel import select
 
 from app.core.intake import CaseField, IntakeStream

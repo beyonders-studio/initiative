@@ -7,7 +7,7 @@ before this existed, the two non-tools, and what a repeat of the same call does.
 
 from datetime import datetime
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import KINDS

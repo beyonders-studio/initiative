@@ -7,9 +7,9 @@ import json
 import pytest
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
-from fastapi.routing import APIRoute
+from fastapi.routing import APIRoute, iter_route_contexts
 from fastapi.testclient import TestClient
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
@@ -336,8 +336,8 @@ def test_mcp_is_served_with_or_without_the_trailing_slash() -> None:
 def test_every_operation_has_its_own_name() -> None:
     names = [
         route.name
-        for route in main_module.app.routes
-        if isinstance(route, APIRoute) and route.include_in_schema
+        for route in iter_route_contexts(main_module.app.routes)
+        if isinstance(route.original_route, APIRoute) and route.include_in_schema
     ]
     assert sorted({n for n in names if names.count(n) > 1}) == []
 

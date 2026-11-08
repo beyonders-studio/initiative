@@ -46,7 +46,7 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import parse_qsl, quote, urljoin, urlsplit
 
-import httpx
+import httpx2
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -438,7 +438,7 @@ class _Run:
                 "the vendor answered too much",
             ) from exc
         except (
-            httpx.HTTPError,
+            httpx2.HTTPError,
             WebhookTargetUrlError,
             WebhookTargetUrlPrivateError,
         ) as exc:

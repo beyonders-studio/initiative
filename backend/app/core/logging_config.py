@@ -309,11 +309,11 @@ def logging_config() -> dict[str, Any]:
             SERVER_LOGGER_NAME: {"handlers": [], "propagate": True},
             ACCESS_LOGGER_NAME: {"handlers": [], "propagate": True},
             # Every outgoing request is logged once, by ``services.safe_http``.
-            "httpx": {"level": "WARNING"},
-            "httpcore": {"level": "WARNING"},
-            # The Anthropic SDK's own copy of the same library.
             "httpx2": {"level": "WARNING"},
             "httpcore2": {"level": "WARNING"},
+            # fastmcp's client, which is still the original library.
+            "httpx": {"level": "WARNING"},
+            "httpcore": {"level": "WARNING"},
         },
     }
 

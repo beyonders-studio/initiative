@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-import httpx
+import httpx2
 from fastapi import APIRouter
 
 from app.core.version import __version__
@@ -56,7 +56,7 @@ async def _fetch_latest_version() -> str | None:
 
     The highest, not GitHub's "latest": a fix released on an older line is
     newer by date but not the version to update to."""
-    async with httpx.AsyncClient(timeout=5.0) as client:
+    async with httpx2.AsyncClient(timeout=5.0) as client:
         response = await client.get(
             _RELEASES_URL,
             params={"per_page": 100},

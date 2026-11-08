@@ -7,6 +7,7 @@ from datetime import timedelta
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.calendar import DEFAULT_CALENDAR_COLOR, Calendar
 from app.models.tenant.calendar_event import (
     CalendarEvent,
@@ -268,6 +269,7 @@ async def seed(c: Community) -> None:
                 name="Default Calendar",
                 color=initiative.color or DEFAULT_CALENDAR_COLOR,
                 created_by=creator.id,
+                created_by_kind=ActorKind.member,
             )
             c.session.add(calendar)
             await c.session.flush()
@@ -284,6 +286,7 @@ async def seed(c: Community) -> None:
             all_day=d.get("all_day", False),
             recurrence=d.get("recurrence"),
             created_by=creator.id,
+            created_by_kind=ActorKind.member,
         )
         c.session.add(event)
         await c.session.flush()

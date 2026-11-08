@@ -1,7 +1,7 @@
 """A project's task types: the four it starts with, in its maker's language,
 and adding, changing, ordering and deleting them."""
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 

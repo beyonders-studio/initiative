@@ -34,7 +34,7 @@ from datetime import timedelta
 from typing import Any
 from urllib.parse import quote
 
-import httpx
+import httpx2
 from cryptography.fernet import InvalidToken
 from fastapi import HTTPException
 from fastapi import status as http_status
@@ -93,7 +93,7 @@ _CODE_CHARS = frozenset(
 _MAX_CODE = 128
 
 #: Injectable for tests: the transport the conversion uses.
-http_transport: httpx.AsyncBaseTransport | None = None
+http_transport: httpx2.AsyncBaseTransport | None = None
 
 
 @dataclass(frozen=True)
@@ -268,7 +268,7 @@ async def _convert(code: str) -> dict[str, Any]:
         )
         body = response.json() if response.status_code < 400 else None
     except (
-        httpx.HTTPError,
+        httpx2.HTTPError,
         ResponseTooLargeError,
         WebhookTargetUrlError,
         WebhookTargetUrlPrivateError,

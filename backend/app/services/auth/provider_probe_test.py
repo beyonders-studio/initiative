@@ -1,6 +1,6 @@
 """What a look at a provider reports, and what it keeps to itself."""
 
-import httpx
+import httpx2
 
 from app.core.messages import AuthProviderMessages
 from app.services.auth import provider_probe
@@ -14,7 +14,9 @@ def _discovery(idp: FakeIdp) -> OidcDiscovery:
 
 def _discovery_from(handler) -> OidcDiscovery:
     return provider_probe.fresh_discovery(
-        client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        client_factory=lambda: httpx2.AsyncClient(
+            transport=httpx2.MockTransport(handler)
+        )
     )
 
 
@@ -80,8 +82,8 @@ async def test_a_pasted_well_known_url_is_trimmed():
 
 
 async def test_nothing_answering_says_unreachable():
-    def handler(request: httpx.Request) -> httpx.Response:
-        raise httpx.ConnectError("no route", request=request)
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("no route", request=request)
 
     result = await provider_probe.probe_issuer(
         ISSUER, discovery=_discovery_from(handler)
@@ -112,8 +114,8 @@ async def test_a_document_missing_an_endpoint_says_invalid():
 
 
 async def test_an_upstream_error_body_is_not_reported_back():
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(
             500, json={"internal": "db host pg-01.internal refused the connection"}
         )
 
@@ -152,8 +154,8 @@ async def test_reports_where_the_callback_will_be():
 
 
 async def test_reports_the_callback_even_when_nothing_answered():
-    def handler(request: httpx.Request) -> httpx.Response:
-        raise httpx.ConnectError("no route", request=request)
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("no route", request=request)
 
     result = await provider_probe.probe_issuer(
         ISSUER, discovery=_discovery_from(handler)

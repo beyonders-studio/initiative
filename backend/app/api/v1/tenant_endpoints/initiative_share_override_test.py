@@ -8,7 +8,7 @@ guild-admin override). A guild admin is the one who puts somebody on it, and a
 guild admin joining an initiative lands on it.
 """
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 

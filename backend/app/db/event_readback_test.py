@@ -21,6 +21,8 @@ Between the two, a new evented table owes no new API surface.
 
 from __future__ import annotations
 
+from fastapi.routing import iter_route_contexts
+
 import app.db.base
 from app.db.event_capture import build_specs
 from app.db.initiative_rls import parent_types
@@ -30,7 +32,7 @@ from app.main import app
 def _detail_paths() -> set[str]:
     """Guild-scoped detail GETs, as ``<segment>`` for ``/<segment>/{id}``."""
     found: set[str] = set()
-    for route in app.routes:
+    for route in iter_route_contexts(app.routes):
         path = getattr(route, "path", "")
         methods = getattr(route, "methods", set()) or set()
         if "GET" not in methods or "/c/{community_id}/" not in path:

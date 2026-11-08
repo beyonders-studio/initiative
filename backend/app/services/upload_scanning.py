@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable, Iterator
 
-import httpx
+import httpx2
 
 from app.core.config import settings
 from app.core.errors import CodedError
@@ -28,7 +28,7 @@ from app.core.messages import FileMessages
 logger = logging.getLogger(__name__)
 
 #: How long a scan may take: a large file, read whole by every engine.
-_TIMEOUT = httpx.Timeout(connect=5.0, read=900.0, write=900.0, pool=5.0)
+_TIMEOUT = httpx2.Timeout(connect=5.0, read=900.0, write=900.0, pool=5.0)
 
 
 class ScanRefusedError(CodedError):
@@ -56,7 +56,7 @@ def enabled() -> bool:
 
 def _post(content: bytes | Iterator[bytes], size: int) -> None:
     try:
-        response = httpx.post(
+        response = httpx2.post(
             f"{settings.UPLOAD_SCANNER_URL.rstrip('/')}/v1/scan",
             content=content,
             headers={
@@ -66,7 +66,7 @@ def _post(content: bytes | Iterator[bytes], size: int) -> None:
             },
             timeout=_TIMEOUT,
         )
-    except httpx.HTTPError as exc:
+    except httpx2.HTTPError as exc:
         logger.warning("upload scanner unreachable: %s", type(exc).__name__)
         raise ScannerUnavailableError() from exc
     if response.status_code == 413:
