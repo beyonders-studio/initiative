@@ -40,7 +40,8 @@
   "errors": {
     "communityContext": "Impossible de déterminer le contexte de la communauté pour cette tâche.",
     "statusUpdate": "Impossible de mettre à jour le statut de la tâche.",
-    "statusNoMatch": "Impossible de mettre à jour le statut de la tâche : aucun statut correspondant."
+    "statusNoMatch": "Impossible de mettre à jour le statut de la tâche : aucun statut correspondant.",
+    "reorder": "Impossible de déplacer la tâche."
   },
   "updating": "Mise à jour…",
   "projectFallback": "Projet n° {{id}}",

@@ -8,7 +8,6 @@ import {
   usePurgeTrashEntity,
   useRestoreTrashEntity,
 } from "@/hooks/useTrash";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -67,18 +66,12 @@ export const TrashTable = ({ variant, showPurgeAction }: TrashTableProps) => {
     onSuccess: () => {
       toast.success(t("restoreSuccess"));
     },
-    onError: (err) => {
-      toast.error(getErrorMessage(err, "trash:restoreError"));
-    },
   });
 
   const purgeMutation = usePurgeTrashEntity({
     onSuccess: () => {
       toast.success(t("purgeSuccess"));
       setPurgeConfirm({ open: false });
-    },
-    onError: (err) => {
-      toast.error(getErrorMessage(err, "trash:purgeError"));
     },
   });
 

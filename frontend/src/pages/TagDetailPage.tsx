@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next";
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TagToolTab, toolTabCount } from "@/components/tags/TagToolTab";
 import { useDeleteTag, useTag, useTagCounts, useUpdateTag } from "@/hooks/useTags";
-import { toast } from "@/lib/mascotToast";
 import {
   TOOL_ICONS,
   TOOLS,
@@ -104,7 +103,6 @@ export const TagDetailPage = () => {
   const handleDelete = async () => {
     try {
       await deleteTagMutation.mutateAsync(tag.id);
-      toast.success(t("detail.deleted"));
       router.navigate({ to: "/" });
     } catch {
       // Error handled by mutation

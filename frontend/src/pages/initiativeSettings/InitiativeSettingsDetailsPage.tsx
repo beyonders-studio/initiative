@@ -24,7 +24,6 @@ import { useGrantToolToRoles, useInitiativeRoles } from "@/hooks/useInitiativeRo
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
 import { useUpdateInitiative } from "@/hooks/useInitiatives";
 import { useServerForm } from "@/hooks/useServerForm";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { DEFAULT_COLOR } from "@/lib/initiativeColors";
 import { toast } from "@/lib/mascotToast";
 import { isToolEnabled, TOOLS, toolCamelPlural, toolViewPermission } from "@/lib/tools";
@@ -68,9 +67,6 @@ export const InitiativeSettingsDetailsPage = () => {
   const updateInitiative = useUpdateInitiative({
     onSuccess: () => {
       toast.success(t("settings.updated"));
-    },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "initiatives:settings.updateError"));
     },
   });
 
@@ -128,8 +124,6 @@ export const InitiativeSettingsDetailsPage = () => {
               tool: t(`initiatives:${toolCamelPlural(tool)}Feature` as never),
             })
           ),
-        onError: (error) =>
-          toast.error(getErrorMessage(error, "initiatives:settings.roleUpdateError")),
       }
     );
 

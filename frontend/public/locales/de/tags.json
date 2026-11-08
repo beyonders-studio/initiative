@@ -9,7 +9,6 @@
     "delete": "Löschen",
     "deleteTitle": "Tag löschen?",
     "deleteDescription": "Der Tag \"{{name}}\" wird in den Papierkorb verschoben und in allen Aufgaben, Projekten und Dateien ausgeblendet, die ihn verwenden. Du kannst ihn unter Einstellungen → Papierkorb wiederherstellen, bevor die Aufbewahrungsfrist endet.",
-    "deleted": "Tag gelöscht",
     "saving": "Wird gespeichert…",
     "save": "Speichern",
     "toolTab": "{{tool}} ({{count}})",

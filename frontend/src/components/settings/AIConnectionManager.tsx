@@ -7,7 +7,7 @@ import type {
   AIProvider,
   ConnectionScope,
 } from "@/api/generated/initiativeAPI.schemas";
-import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
+import { messageForCode } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -70,17 +70,11 @@ export const AIConnectionManager = ({
           toast.error(messageForCode(data.message, "settings:ai.testError"));
         }
       },
-      onError: (error) => toast.error(getErrorMessage(error, "settings:ai.testError")),
     });
   };
 
   const handleToggle = (connection: AIConnectionResponse, enabled: boolean) => {
-    mutations.update.mutate(
-      { connectionId: connection.id, data: { enabled } },
-      {
-        onError: (error) => toast.error(getErrorMessage(error, "settings:aiConnections.saveError")),
-      }
-    );
+    mutations.update.mutate({ connectionId: connection.id, data: { enabled } });
   };
 
   const confirmDelete = () => {
@@ -90,7 +84,6 @@ export const AIConnectionManager = ({
         toast.success(t("aiConnections.deleted"));
         setPendingDelete(null);
       },
-      onError: (error) => toast.error(getErrorMessage(error, "settings:aiConnections.deleteError")),
     });
   };
 

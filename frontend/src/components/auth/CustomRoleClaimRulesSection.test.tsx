@@ -68,7 +68,7 @@ describe("CustomRoleClaimRulesSection", () => {
 
     expect(screen.getAllByText("Through Entra, gives Door person")).toHaveLength(2);
     await user.click(screen.getByRole("button", { name: "Move crew up" }));
-    expect(orderRules).toHaveBeenCalledWith([2, 1], expect.anything());
+    expect(orderRules).toHaveBeenCalledWith([2, 1]);
     expect(screen.getByRole("button", { name: "Move staff up" })).toBeDisabled();
   });
 

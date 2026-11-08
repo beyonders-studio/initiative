@@ -39,6 +39,7 @@ import {
 } from "@/api/generated/personal-items/personal-items";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useApiMutation } from "@/hooks/useApiMutation";
 
 type QueryOpts<TData> = Omit<UseQueryOptions<TData>, "queryKey" | "queryFn">;
 
@@ -163,24 +164,14 @@ export const useRecordOpen = (
  * the current context, and per-community entity ids are only unique within their
  * community, so the tab's ``community_id`` travels with the call.
  */
-export const useClearRecentView = () => {
-  return useMutation({
-    mutationFn: async ({
-      entityType,
-      entityId,
-      communityId,
-    }: {
-      entityType: Tool;
-      entityId: number;
-      communityId: number;
-    }) => {
+export const useClearRecentView = () =>
+  useApiMutation({
+    mutationFn: async ({ entityType, entityId, communityId }: ClearRecentTarget) => {
       await clearView(communityId, entityType, entityId);
     },
-    onSuccess: () => {
-      void invalidate(q.personalItems());
-    },
+    invalidate: () => invalidate(q.personalItems()),
+    errorKey: "projects:tabsBar.closeError",
   });
-};
 
 export interface ClearRecentTarget {
   entityType: Tool;
@@ -199,20 +190,24 @@ export interface ClearRecentTarget {
  * earlier deletes may already have succeeded server-side, so we must resync
  * regardless of outcome rather than leave stale tabs until the query expires.
  */
-export const useClearRecentViews = () => {
-  return useMutation({
-    mutationFn: async (targets: ClearRecentTarget[]) => {
-      await Promise.all(
-        targets.map(({ entityType, entityId, communityId }) =>
-          clearView(communityId, entityType, entityId)
-        )
-      );
+export const useClearRecentViews = () =>
+  useApiMutation(
+    {
+      mutationFn: async (targets: ClearRecentTarget[]) => {
+        await Promise.all(
+          targets.map(({ entityType, entityId, communityId }) =>
+            clearView(communityId, entityType, entityId)
+          )
+        );
+      },
+      errorKey: "projects:tabsBar.closeSomeError",
     },
-    onSettled: () => {
-      void invalidate(q.personalItems());
-    },
-  });
-};
+    {
+      onSettled: () => {
+        void invalidate(q.personalItems());
+      },
+    }
+  );
 
 /** The reader's bookmarks in one community (the active one unless named), newest first. */
 export const useCommunityBookmarks = (
