@@ -1,10 +1,14 @@
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { TagSummary, TagTarget } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  TagBulkEditRequest,
+  TagSummary,
+  TagTarget,
+} from "@/api/generated/initiativeAPI.schemas";
 import { bulkEditTags } from "@/api/generated/tags/tags";
 import { TagPicker } from "@/components/tags/TagPicker";
-import { getErrorMessage } from "@/lib/errorMessage";
+import { useApiMutation } from "@/hooks/useApiMutation";
 import { toast } from "@/lib/mascotToast";
 import type { DialogWithSuccessProps } from "@/types/dialog";
 import {
@@ -47,7 +51,6 @@ export function BulkEditTagsDialog<T extends TaggableItem>({
   const [mode, setMode] = useState<"add" | "remove">("add");
   const [tagsToAdd, setTagsToAdd] = useState<TagSummary[]>([]);
   const [tagsToRemove, setTagsToRemove] = useState<TagSummary[]>([]);
-  const [isPending, setIsPending] = useState(false);
 
   const existingTags = useMemo(() => {
     const tagMap = new Map<number, TagSummary>();
@@ -77,48 +80,40 @@ export function BulkEditTagsDialog<T extends TaggableItem>({
     [onOpenChange, resetState]
   );
 
-  const handleApply = useCallback(async () => {
-    if (mode === "add" && tagsToAdd.length === 0) return;
-    if (mode === "remove" && tagsToRemove.length === 0) return;
-
-    setIsPending(true);
-    try {
+  const apply = useApiMutation(
+    {
       // One atomic server-side call: adds/removals are computed against
       // current DB state, so a stale client cache can't corrupt the merge,
       // and a mid-batch failure can't leave items half-edited.
-      await bulkEditTags(communityId, {
-        target_type: targetType,
-        target_ids: items.map((item) => item.id),
-        add_tag_ids: mode === "add" ? tagsToAdd.map((tag) => tag.id) : [],
-        remove_tag_ids: mode === "remove" ? tagsToRemove.map((tag) => tag.id) : [],
-      });
-      toast.success(
-        mode === "add" ? t("bulkTags.tagsAdded", { count }) : t("bulkTags.tagsRemoved", { count })
-      );
-
-      onInvalidate();
-      resetState();
-      onOpenChange(false);
-      onSuccess();
-    } catch (error) {
-      toast.error(getErrorMessage(error, "common:bulkTags.updateError"));
-    } finally {
-      setIsPending(false);
+      mutationFn: (body: TagBulkEditRequest) => bulkEditTags(communityId, body),
+      invalidate: onInvalidate,
+      errorKey: "common:bulkTags.updateError",
+    },
+    {
+      onSuccess: (_data, { target_ids, add_tag_ids }) => {
+        const edited = target_ids.length;
+        toast.success(
+          add_tag_ids?.length
+            ? t("bulkTags.tagsAdded", { count: edited })
+            : t("bulkTags.tagsRemoved", { count: edited })
+        );
+        resetState();
+        onOpenChange(false);
+        onSuccess();
+      },
     }
-  }, [
-    mode,
-    tagsToAdd,
-    tagsToRemove,
-    items,
-    count,
-    targetType,
-    communityId,
-    onInvalidate,
-    resetState,
-    onOpenChange,
-    onSuccess,
-    t,
-  ]);
+  );
+
+  const handleApply = () => {
+    if (mode === "add" && tagsToAdd.length === 0) return;
+    if (mode === "remove" && tagsToRemove.length === 0) return;
+    apply.mutate({
+      target_type: targetType,
+      target_ids: items.map((item) => item.id),
+      add_tag_ids: mode === "add" ? tagsToAdd.map((tag) => tag.id) : [],
+      remove_tag_ids: mode === "remove" ? tagsToRemove.map((tag) => tag.id) : [],
+    });
+  };
 
   const canApply = mode === "add" ? tagsToAdd.length > 0 : tagsToRemove.length > 0;
 
@@ -165,8 +160,8 @@ export function BulkEditTagsDialog<T extends TaggableItem>({
 
         <DialogFooter
           submitLabel={t("bulkTags.apply")}
-          onSubmit={() => void handleApply()}
-          pending={isPending}
+          onSubmit={handleApply}
+          pending={apply.isPending}
           pendingLabel={t("bulkTags.applying")}
           disabled={!canApply}
         />

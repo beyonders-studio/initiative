@@ -2,10 +2,11 @@ import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { updateCommunity } from "@/api/generated/communities/communities";
-import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
+import type { CommunityUpdate } from "@/api/generated/initiativeAPI.schemas";
 import { CommunityArtworkPanel } from "@/components/communities/CommunityArtworkPanel";
 import { CommunityDiscoveryPanel } from "@/components/communities/CommunityDiscoveryPanel";
 import { CommunityLocationPanel } from "@/components/communities/CommunityLocationPanel";
+import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { useCommunities } from "@/hooks/useCommunities";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { Button } from "@/ui/button";
@@ -19,9 +20,12 @@ export const SettingsCommunityPage = () => {
   const { t } = useTranslation(["communities", "common"]);
   const [name, setName] = useState(activeCommunity?.name ?? "");
   const [description, setDescription] = useState(activeCommunity?.description ?? "");
-  const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const save = useCommunityMutation({
+    mutationFn: async (communityId, body: CommunityUpdate) => {
+      updateCommunityInState(await updateCommunity(communityId, body));
+      await refreshCommunities();
+    },
+  });
 
   const [prevCommunity, setPrevCommunity] = useState(activeCommunity);
   if (prevCommunity !== activeCommunity) {
@@ -30,28 +34,9 @@ export const SettingsCommunityPage = () => {
     setDescription(activeCommunity?.description ?? "");
   }
 
-  const handleSave = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSave = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!activeCommunity) {
-      return;
-    }
-    setSaving(true);
-    setSaveError(null);
-    setSaveMessage(null);
-    try {
-      const result = await (updateCommunity(activeCommunity.id, {
-        name,
-        description,
-      } as Parameters<typeof updateCommunity>[1]) as unknown as Promise<CommunityRead>);
-      updateCommunityInState(result);
-      await refreshCommunities();
-      setSaveMessage(t("settings.updatedSuccessfully"));
-    } catch (err) {
-      console.error(err);
-      setSaveError(getErrorMessage(err, "communities:settings.unableToUpdate"));
-    } finally {
-      setSaving(false);
-    }
+    save.mutate({ name, description });
   };
 
   if (!activeCommunity) {
@@ -83,10 +68,16 @@ export const SettingsCommunityPage = () => {
                 rows={3}
               />
             </Field>
-            {saveError ? <p className="text-destructive text-sm">{saveError}</p> : null}
-            {saveMessage ? <p className="text-primary text-sm">{saveMessage}</p> : null}
-            <Button type="submit" disabled={saving}>
-              {saving ? t("settings.saving") : t("settings.saveChanges")}
+            {save.error ? (
+              <p className="text-destructive text-sm">
+                {getErrorMessage(save.error, "communities:settings.unableToUpdate")}
+              </p>
+            ) : null}
+            {save.isSuccess ? (
+              <p className="text-primary text-sm">{t("settings.updatedSuccessfully")}</p>
+            ) : null}
+            <Button type="submit" disabled={save.isPending}>
+              {save.isPending ? t("settings.saving") : t("settings.saveChanges")}
             </Button>
           </form>
         </CardContent>

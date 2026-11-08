@@ -1,11 +1,9 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { removeMember } from "@/api/generated/users/users";
 import { invalidate, q } from "@/api/query-keys";
-import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { useCommunities } from "@/hooks/useCommunities";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 
@@ -33,30 +31,27 @@ export const RemoveCommunityMemberDialog = ({
   onSuccess,
 }: RemoveCommunityMemberDialogProps) => {
   const { t } = useTranslation(["communities", "common"]);
-  const communityId = useActiveCommunityId();
   const { refreshCommunities } = useCommunities();
-  const [removing, setRemoving] = useState(false);
-
-  const handleRemove = async () => {
-    if (userId === null) return;
-    setRemoving(true);
-    try {
-      await removeMember(communityId, userId);
-      void invalidate(q.communityMembers());
-      // The community entry carries member_count, which the invite surfaces read
-      // to tell a full community from one with a seat free. It is provider state,
-      // not a query, so it refreshes rather than invalidates.
-      void refreshCommunities();
-      toast.success(t("removeMember.removed", { email }));
-      onSuccess?.();
-      onOpenChange(false);
-    } catch (err) {
-      console.error("Failed to remove member", err);
-      toast.error(getErrorMessage(err, "communities:removeMember.failedToRemove"));
-    } finally {
-      setRemoving(false);
+  const remove = useCommunityMutation(
+    {
+      mutationFn: (communityId, memberId: number) => removeMember(communityId, memberId),
+      invalidate: () => {
+        void invalidate(q.communityMembers());
+        // The community entry carries member_count, which the invite surfaces read
+        // to tell a full community from one with a seat free. It is provider state,
+        // not a query, so it refreshes rather than invalidates.
+        void refreshCommunities();
+      },
+      errorKey: "communities:removeMember.failedToRemove",
+    },
+    {
+      onSuccess: () => {
+        toast.success(t("removeMember.removed", { email }));
+        onSuccess?.();
+        onOpenChange(false);
+      },
     }
-  };
+  );
 
   return (
     <ConfirmDialog
@@ -66,9 +61,11 @@ export const RemoveCommunityMemberDialog = ({
       description={t("removeMember.description", { email })}
       confirmLabel={t("removeMember.removeButton")}
       loadingLabel={t("removeMember.removing")}
-      isLoading={removing}
+      isLoading={remove.isPending}
       destructive
-      onConfirm={handleRemove}
+      onConfirm={() => {
+        if (userId !== null) remove.mutate(userId);
+      }}
     >
       <p className="text-muted-foreground text-sm">{t("removeMember.ownershipReleased")}</p>
     </ConfirmDialog>
