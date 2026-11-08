@@ -30,7 +30,6 @@ from typing import Any, Optional
 import sqlalchemy as sa
 from alembic import op
 from pycrdt import Doc, Text, XmlElement, XmlText
-from pycrdt._base import base_types
 from sqlalchemy.engine import Connection
 
 from app.db.guild_migrations import guild_schema_names
@@ -127,9 +126,8 @@ def _nameless_state(state: bytes) -> Optional[bytes]:
 
     def walk(text: Text) -> None:
         nonlocal changed
-        for value, _ in text.diff():
-            kind = base_types.get(type(value))
-            node = kind(_doc=doc, _integrated=value) if kind else None
+        # An embedded type comes back as its own wrapper.
+        for node, _ in text.diff():
             if isinstance(node, XmlText):
                 walk(node)
             elif (
