@@ -11,6 +11,7 @@ from pydantic import EmailStr, Field, field_validator
 from app.core.messages import ContactMessages
 from app.schemas.base import SanitizedBaseModel, TitleStr, reject_null
 from app.schemas.query import PageMeta
+from app.schemas.tenant.archive import ToolCan
 from app.schemas.tenant.property import PropertiesOnCreate
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
 from app.schemas.tenant.tool import ToolSummaryBase
@@ -125,7 +126,7 @@ class ContactOrganization(SanitizedBaseModel):
     initiative_id: int | None = None
 
 
-class ContactSummary(ToolSummaryBase):
+class ContactSummary(ToolSummaryBase[ToolCan]):
     #: NULL on a community contact.
     initiative_id: int | None = None
     name: str

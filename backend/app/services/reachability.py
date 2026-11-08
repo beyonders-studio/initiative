@@ -13,9 +13,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import ColumnElement, Select
+from sqlalchemy import ColumnElement, Select, select
 from sqlalchemy import null as sa_null
-from sqlmodel import select
 
 from app.core.tools import Tool
 from app.db import cohorts

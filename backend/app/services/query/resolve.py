@@ -905,7 +905,9 @@ def _join_is_bound(join: ast.JoinExpr, left: set[str], right: set[str]) -> bool:
 
 def _check_nodes(select: ast.SelectStmt) -> None:
     class Check(Visitor):
-        def visit(self, ancestors: Any, node: Any) -> None:
+        # pglast's stub declares ``visit`` an optional callable attribute; its
+        # visitors define it as a method, the default for every node.
+        def visit(self, ancestors: Any, node: Any) -> None:  # ty: ignore[invalid-mutable-override]
             if type(node) not in _ALLOWED_NODES:
                 raise QueryError(QueryMessages.UNSUPPORTED_SYNTAX, type(node).__name__)
 

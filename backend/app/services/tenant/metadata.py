@@ -30,7 +30,7 @@ import json
 import time
 from collections import defaultdict
 from collections.abc import (
-    AsyncIterator,
+    AsyncGenerator,
     Awaitable,
     Callable,
     Collection,
@@ -2864,12 +2864,13 @@ def _targeted(answer: Any) -> list[tuple[dict[str, Any], Change]]:
 @asynccontextmanager
 async def _as_install(
     plugin: GuildPlugin, registration: RegistrationSnapshot, guild_id: int
-) -> AsyncIterator[
+) -> AsyncGenerator[
     tuple[
         AsyncSession,
         Callable[[], Awaitable[InstallContext]],
         Callable[[], Awaitable[Any]],
-    ]
+    ],
+    None,
 ]:
     """A session of its own routed as the install, through the install seam
     with the scopes the install holds (:func:`guild_plugins.install_scopes`):

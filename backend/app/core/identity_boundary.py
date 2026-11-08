@@ -48,7 +48,7 @@ from __future__ import annotations
 
 import re
 import secrets
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Generator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -190,7 +190,7 @@ _SLOT: ContextVar[_Slot | None] = ContextVar("identity_boundary", default=None)
 
 
 @contextmanager
-def boundary_scope() -> Iterator[_Slot]:
+def boundary_scope() -> Generator[_Slot, None, None]:
     """Open a request's slot for the rest of the request, and close it after."""
     slot = _Slot()
     token = _SLOT.set(slot)

@@ -28,7 +28,7 @@ case was closed opens a new one.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -1000,7 +1000,7 @@ async def claim_subject_guild(task_id: int, guild_id: int) -> ClaimOutcome:
 
 
 @asynccontextmanager
-async def case_locked(task_id: int) -> AsyncIterator[AsyncSession | None]:
+async def case_locked(task_id: int) -> AsyncGenerator[AsyncSession | None, None]:
     """Hold case ``task_id``'s task locked for as long as the block runs, as
     the evidence retention sweep locks it: what the block commits elsewhere
     about the case — a hold naming it — is there before the sweep decides

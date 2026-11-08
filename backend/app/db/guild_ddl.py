@@ -2052,7 +2052,7 @@ def _build_tables(sync_conn, tables: frozenset[str]) -> list[str]:
             con._creation_order = order
         for col in t.columns:
             if hasattr(col.type, "create_type"):
-                col.type.create_type = False  # ty: ignore[invalid-assignment]
+                col.type.create_type = False
         out.append(
             str(
                 CreateTable(

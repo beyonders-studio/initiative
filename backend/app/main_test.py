@@ -236,7 +236,7 @@ async def _hsts_for(app_url: str) -> str | None:
     """
     hsts_value = (
         "max-age=63072000; includeSubDomains"
-        if Settings(APP_URL=app_url).app_url_is_https  # ty: ignore[missing-argument]
+        if Settings(APP_URL=app_url).app_url_is_https
         else None
     )
     probe = FastAPI()

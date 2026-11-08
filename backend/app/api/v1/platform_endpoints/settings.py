@@ -1,5 +1,5 @@
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated, Any, Literal
 
@@ -1467,7 +1467,7 @@ async def agree_community_narrowing(
 @asynccontextmanager
 async def _routed_to_community(
     session: AsyncSession, guild_id: int
-) -> AsyncIterator[AsyncSession]:
+) -> AsyncGenerator[AsyncSession, None]:
     """A system session routed to a community that is still there."""
     guild = await session.get(Guild, guild_id)
     if guild is None or guild.status == CommunityStatus.deleted:

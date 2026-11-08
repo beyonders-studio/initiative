@@ -25,7 +25,7 @@ opens the row themselves.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable, Iterable
+from collections.abc import AsyncGenerator, Callable, Iterable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
@@ -254,7 +254,7 @@ def readers_of(governing: Governing, guild_id: int) -> Select:
 @asynccontextmanager
 async def roster_session(
     session: AsyncSession, *, whole: bool = False
-) -> AsyncIterator[AsyncSession]:
+) -> AsyncGenerator[AsyncSession, None]:
     """Where the routed community's roster is read for ``session``'s request.
 
     The request's own session for a person, so a row it has just made is seen.

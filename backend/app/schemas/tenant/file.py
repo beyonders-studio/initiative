@@ -15,6 +15,7 @@ from app.core.identity_boundary import UPLOAD_PATH
 from app.schemas.base import LexicalState, SanitizedBaseModel
 from app.schemas.platform.user import UserPublic
 from app.schemas.query import PageMeta
+from app.schemas.tenant.archive import ToolCan
 from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.initiative import InitiativeSummary
 from app.schemas.tenant.ownership import OwnerPluginSummary, owner_profile
@@ -63,7 +64,8 @@ class FileUpdate(SanitizedBaseModel):
     is_template: bool | None = None
 
 
-class FileSummary(FileBase, ToolSummaryBase):
+class FileSummary(FileBase, ToolSummaryBase[ToolCan]):
+    initiative_id: int
     # ``validate_by_name`` so ``derived_fields`` can set ``owner`` and
     # ``owner_plugin`` by name; their aliases keep ``from_attributes`` from reading
     # an ORM relationship.

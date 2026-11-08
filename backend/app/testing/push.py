@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from unittest.mock import AsyncMock, patch
 
@@ -10,7 +10,7 @@ from app.services.platform import push_config
 
 
 @contextmanager
-def push_switched_on() -> Iterator[None]:
+def push_switched_on() -> Generator[None, None, None]:
     """Resolve the push configuration as enabled for the duration.
 
     The switch lives on the settings row, behind a process-wide snapshot, so

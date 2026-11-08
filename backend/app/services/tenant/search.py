@@ -20,6 +20,7 @@ from sqlalchemy import (
     false,
     func,
     literal,
+    not_,
     select,
     text,
     union,
@@ -359,7 +360,7 @@ class Filters:
             # caller so it comes off before ``limit``, and a picker that asks
             # for five rows is offered five.
             subject_type, subject_id = self.subject
-            clause = clause & ~(
+            clause = clause & not_(
                 (SearchEntry.entity_type == subject_type)
                 & (SearchEntry.entity_id == subject_id)
             )
@@ -585,7 +586,7 @@ def _with_context(rows: Select) -> Select:
             (container.entity_type == inner.c.tool)
             & (container.entity_id == inner.c.tool_id)
             & (container.chunk_ix == 0)
-            & ~(
+            & not_(
                 (container.entity_type == inner.c.entity_type)
                 & (container.entity_id == inner.c.entity_id)
             ),

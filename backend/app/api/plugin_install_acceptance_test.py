@@ -10,7 +10,7 @@ revocation, authorship, the identity boundary, route opt-in and round trips.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
 
@@ -80,7 +80,7 @@ async def _seat_session(installed: Any, role_session: Any) -> Any:
 
 
 @contextmanager
-def _counting() -> Iterator[list[str]]:
+def _counting() -> Generator[list[str], None, None]:
     """Every statement any engine runs meanwhile, in order."""
     statements: list[str] = []
 
@@ -510,7 +510,9 @@ def test_every_marked_route_names_scopes_in_the_vocabulary():
 
 
 @contextmanager
-def _handler_start(monkeypatch: Any, statements: list[str]) -> Iterator[list[int]]:
+def _handler_start(
+    monkeypatch: Any, statements: list[str]
+) -> Generator[list[int], None, None]:
     """Record how many statements had run when the route's own code began."""
     seen: list[int] = []
     original = actor_route._enter

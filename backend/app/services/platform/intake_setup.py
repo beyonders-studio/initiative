@@ -13,7 +13,7 @@ that reads guild rows does.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
@@ -80,7 +80,7 @@ class BindingView:
 
 
 @asynccontextmanager
-async def _route(guild_id: int) -> AsyncIterator[AsyncSession]:
+async def _route(guild_id: int) -> AsyncGenerator[AsyncSession, None]:
     """A system session from the guild's cohort, routed into its schema. The
     caller commits what it writes."""
     async with cohorts.system_session(guild_id) as session:

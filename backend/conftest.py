@@ -12,7 +12,7 @@ import asyncio
 import functools
 import hashlib
 import os
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
@@ -1135,7 +1135,7 @@ async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     @asynccontextmanager
     async def _override(
         login: str, connection: HTTPConnection
-    ) -> AsyncIterator[AsyncSession]:
+    ) -> AsyncGenerator[AsyncSession, None]:
         await _publish_setup_state()
         reused = await _served_session(login, served_guild_id(connection))
         # Production gets a FRESH session (empty info) per request; this reused

@@ -27,7 +27,7 @@ and whoever triggers a purge cannot reach rows that are someone else's alone.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncGenerator, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -241,7 +241,7 @@ async def clear_mark(
 @asynccontextmanager
 async def _own_row(
     session: AsyncSession, user_id: int, kind: str, entity_id: int
-) -> AsyncIterator[PersonalItem | None]:
+) -> AsyncGenerator[PersonalItem | None, None]:
     """The reader's row on an item, locked, to let go of something on it: run
     as the platform and limited to that row, so it comes off something they can
     no longer open. Kept if it still holds anything, deleted if not."""

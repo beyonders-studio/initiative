@@ -12,6 +12,7 @@ from app.core.messages import CounterMessages
 from app.models.tenant.counter import COUNTER_DIGITS, COUNTER_PLACES, CounterViewMode
 from app.schemas.base import MentionStr, SanitizedBaseModel, TitleStr, reject_null
 from app.schemas.query import PageMeta
+from app.schemas.tenant.archive import ToolCan
 from app.schemas.tenant.property import (
     PropertiesOnCreate,
     PropertySummary,
@@ -207,9 +208,11 @@ class CounterPreview(SanitizedBaseModel):
     count: DecimalText
 
 
-class CounterGroupSummary(CounterGroupBase, ToolSummaryBase):
+class CounterGroupSummary(CounterGroupBase, ToolSummaryBase[ToolCan]):
     """A counter group in a list: the group alone, without its counters —
     unless the list was asked for previews, when its first few come along."""
+
+    initiative_id: int
 
     preview: list[CounterPreview] | None = None
 

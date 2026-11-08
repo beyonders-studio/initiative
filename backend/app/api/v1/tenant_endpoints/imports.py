@@ -11,7 +11,7 @@ Reading an import job is ``data_jobs``'s.
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -516,7 +516,7 @@ async def _payload(
     upload_id: str | None,
     purpose: str,
     initiative_id: int | None,
-) -> AsyncIterator[tuple[Path | BinaryIO, str | None]]:
+) -> AsyncGenerator[tuple[Path | BinaryIO, str | None], None]:
     """An import's zip for the block, with its key in the community's storage
     when it is already there: sent with the request as ``file`` and copied to
     a local file, or taken from the resumable upload ``upload_id`` and read

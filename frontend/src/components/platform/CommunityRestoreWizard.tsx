@@ -89,7 +89,7 @@ export const CommunityRestoreWizard = ({
   const userItems = (usersQuery.data?.items ?? []).map((user) => ({
     value: String(user.id),
     label: getUserHandle(user),
-    hint: user.email,
+    hint: user.email ?? undefined,
   }));
 
   if (wizard.step === "seat") {

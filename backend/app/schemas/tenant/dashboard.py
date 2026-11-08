@@ -8,6 +8,7 @@ from pydantic import ConfigDict, Field
 from app.models.tenant.dashboard import DashboardViewMode
 from app.schemas.base import SanitizedBaseModel, TitleStr
 from app.schemas.query import PageMeta
+from app.schemas.tenant.archive import ToolCan
 from app.schemas.tenant.property import PropertiesOnCreate
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
 from app.schemas.tenant.tool import ToolSummaryBase
@@ -94,7 +95,8 @@ class DashboardPreview(SanitizedBaseModel):
     config: dict[str, Any]
 
 
-class DashboardSummary(DashboardBase, ToolSummaryBase):
+class DashboardSummary(DashboardBase, ToolSummaryBase[ToolCan]):
+    initiative_id: int
     # Marketplace provenance; both null for a dashboard authored from scratch.
     listing_uid: str | None = None
     listing_version: str | None = None

@@ -27,7 +27,7 @@ import logging
 import math
 import random
 import time
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -248,7 +248,7 @@ def normalize_site_url(raw: str) -> str:
 
 
 @asynccontextmanager
-async def _deadline(seconds: float, path: str) -> AsyncIterator[None]:
+async def _deadline(seconds: float, path: str) -> AsyncGenerator[None, None]:
     """Run the block within ``seconds``, or end it as the site being
     unreachable."""
     try:

@@ -77,7 +77,8 @@ class ProjectCan(ToolCan):
     configure: bool = False
 
 
-class ProjectRead(ProjectBase, ToolSummaryBase):
+class ProjectRead(ProjectBase, ToolSummaryBase[ProjectCan]):
+    initiative_id: int
     # ``validate_by_name`` so ``derived_fields`` can set ``owner``,
     # ``owner_plugin``, ``task_statuses`` and ``task_types`` by name; their aliases keep
     # ``from_attributes`` from reading an ORM relationship.

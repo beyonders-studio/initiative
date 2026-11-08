@@ -221,6 +221,8 @@ def _slim_project_reads(
                 end_date=project.end_date,
                 owner_id=ownership_service.owner_user_id_of(project),
                 initiative_id=project.initiative_id,
+                created_by=project.created_by,
+                created_by_kind=project.created_by_kind,
                 created_at=project.created_at,
                 updated_at=project.updated_at,
                 is_template=project.is_template,

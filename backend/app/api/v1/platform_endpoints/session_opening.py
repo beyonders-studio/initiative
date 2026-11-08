@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -582,7 +582,7 @@ def mint_for(
 @asynccontextmanager
 async def session_store(
     system_session: AsyncSession, *, user_id: int
-) -> AsyncIterator[None]:
+) -> AsyncGenerator[None, None]:
     """Commit a session and everything staged beside it, or none of it.
 
     A sign-in *is* the session. If it cannot be written the request says so
