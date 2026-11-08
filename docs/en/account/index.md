@@ -7,7 +7,7 @@ icon: lucide/settings
 Settings live in three places, depending on who they affect. That sounds like two places too many, right up until the day you need one of them.
 
 - **My Settings** is just you. Open it from the account menu, under your name and picture at the bottom of the sidebar.
-- **Community Settings** covers one whole community, and belongs to its admins. See [Bringing work in from another tool](../guides/importing.md).
+- **Community Settings** covers one whole community, and belongs to its admins. See [Running a community](../guides/running-a-community.md).
 - **Platform Settings** covers the whole server, and belongs to whoever runs it. See the [server guide](../running-a-server/index.md).
 
 This section is about yours. Nothing in My Settings changes anything for anybody else.
