@@ -27,7 +27,7 @@ import json
 from datetime import UTC, date, datetime
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import delete, update
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import selectinload

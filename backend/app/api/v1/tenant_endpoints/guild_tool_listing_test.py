@@ -15,7 +15,7 @@ weaker test than the one the guild home needs.
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from app.models.platform.guild import CommunityRole
 from app.testing import (

@@ -1,5 +1,5 @@
 """A fake OIDC IdP for tests: discovery, JWKS, token, and userinfo endpoints
-served through an ``httpx.MockTransport``.
+served through an ``httpx2.MockTransport``.
 
 Lets both the unit tests of the relying-party flow and the endpoint tests of
 the login/callback routes exercise the full begin → callback → verified-claims
@@ -13,7 +13,7 @@ import json
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
-import httpx
+import httpx2
 import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -100,33 +100,33 @@ class FakeIdp:
             doc["userinfo_endpoint"] = f"{ISSUER}/userinfo"
         self.discovery_doc = doc
         self.jwks_doc = jwks_doc()
-        # A fixed httpx.Response, or a callable building one from the parsed form.
+        # A fixed httpx2.Response, or a callable building one from the parsed form.
         self.token_response: (
-            httpx.Response | Callable[[dict[str, str]], httpx.Response] | None
+            httpx2.Response | Callable[[dict[str, str]], httpx2.Response] | None
         ) = None
         self.token_request_form: dict[str, str] = {}
         self.userinfo_claims = userinfo_claims
         # Override to simulate a userinfo failure (takes precedence over claims).
-        self.userinfo_response: httpx.Response | None = None
+        self.userinfo_response: httpx2.Response | None = None
         self.userinfo_bearer_tokens: list[str] = []
         self.calls: list[str] = []
 
-    def handler(self, request: httpx.Request) -> httpx.Response:
+    def handler(self, request: httpx2.Request) -> httpx2.Response:
         from urllib.parse import parse_qs
 
         path = request.url.path
         self.calls.append(path)
         if path.endswith("/.well-known/openid-configuration"):
-            return httpx.Response(200, json=self.discovery_doc)
+            return httpx2.Response(200, json=self.discovery_doc)
         if path == "/jwks":
-            return httpx.Response(200, json=self.jwks_doc)
+            return httpx2.Response(200, json=self.jwks_doc)
         if path == "/token":
             form = parse_qs(request.content.decode())
             self.token_request_form = {k: v[0] for k, v in form.items()}
             resp = self.token_response
             if resp is None:
-                return httpx.Response(500, text="test did not set token_response")
-            if isinstance(resp, httpx.Response):
+                return httpx2.Response(500, text="test did not set token_response")
+            if isinstance(resp, httpx2.Response):
                 return resp
             return resp(self.token_request_form)
         if path == "/userinfo":
@@ -134,10 +134,10 @@ class FakeIdp:
             if self.userinfo_response is not None:
                 return self.userinfo_response
             if self.userinfo_claims is not None:
-                return httpx.Response(200, json=self.userinfo_claims)
-            return httpx.Response(404)
-        return httpx.Response(404)
+                return httpx2.Response(200, json=self.userinfo_claims)
+            return httpx2.Response(404)
+        return httpx2.Response(404)
 
     def client_factory(self):
-        transport = httpx.MockTransport(self.handler)
-        return lambda: httpx.AsyncClient(transport=transport)
+        transport = httpx2.MockTransport(self.handler)
+        return lambda: httpx2.AsyncClient(transport=transport)

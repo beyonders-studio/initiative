@@ -25,7 +25,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-import httpx
+import httpx2
 
 from app.core.config import _origin_of
 from app.services.safe_http import ResponseTooLargeError, request_public_target
@@ -37,7 +37,7 @@ from app.services.webhook_target_url import (
 logger = logging.getLogger(__name__)
 
 
-_TIMEOUT = httpx.Timeout(connect=3.0, read=5.0, write=5.0, pool=5.0)
+_TIMEOUT = httpx2.Timeout(connect=3.0, read=5.0, write=5.0, pool=5.0)
 #: The most one delivery may take, end to end, and the most of a receiver's
 #: answer it reads: only the status is used.
 _DEADLINE_SECONDS = 15.0

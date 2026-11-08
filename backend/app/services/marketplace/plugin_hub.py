@@ -35,7 +35,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-import httpx
+import httpx2
 from sqlalchemy import or_, text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -178,7 +178,7 @@ async def call_plugin(
     target_public_id: str,
     endpoint_id: str,
     params: Mapping[str, Any],
-    transport: httpx.AsyncBaseTransport | None = None,
+    transport: httpx2.AsyncBaseTransport | None = None,
 ) -> HubAnswer:
     """Check one call against checks 2–7 and make it.
 
@@ -280,7 +280,7 @@ async def call_plugin(
         initiative_id=caller.initiative_id,
     )
 
-    async def read(request: httpx.Request | plugin_data.Answered) -> dict[str, Any]:
+    async def read(request: httpx2.Request | plugin_data.Answered) -> dict[str, Any]:
         return await plugin_data._read_body(request, transport=transport)
 
     async def call() -> dict[str, Any]:

@@ -1,7 +1,7 @@
 """The guild's top seat: who gets it, and who Postgres lets write as it."""
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import func, text
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import select

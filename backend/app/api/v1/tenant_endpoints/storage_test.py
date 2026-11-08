@@ -10,7 +10,7 @@ and a non-member can't reach another guild's usage at all.
 from __future__ import annotations
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.access_grant import AccessGrantPurpose, SettingsLevel

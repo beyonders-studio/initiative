@@ -9,7 +9,7 @@ created.
 import json
 from datetime import UTC
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import update
 from sqlmodel.ext.asyncio.session import AsyncSession
 

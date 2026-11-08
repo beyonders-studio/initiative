@@ -20,7 +20,7 @@ from enum import Enum
 from typing import Any
 
 import anthropic
-import httpx
+import httpx2
 import openai
 from pydantic import BaseModel, ValidationError
 
@@ -207,7 +207,7 @@ def _openai_client(target: Target, timeout: float) -> openai.AsyncOpenAI:
         # runs answers the same way the second time.
         max_retries=0 if PRESETS[target.provider].self_hosted else 2,
         default_headers={"User-Agent": "Initiative"},
-        http_client=httpx.AsyncClient(
+        http_client=httpx2.AsyncClient(
             timeout=timeout,
             follow_redirects=False,
             transport=PinnedTransport(

@@ -6,7 +6,7 @@ testing setup are functioning properly.
 """
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.security import AUTH_ACCESS_AUDIENCE, TOKEN_ISSUER

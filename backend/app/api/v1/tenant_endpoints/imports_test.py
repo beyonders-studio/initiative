@@ -6,7 +6,7 @@ import zipfile
 from datetime import UTC
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy.orm import undefer
 
 from app.core.tools import CHILD_KINDS, KINDS, Tool
@@ -4565,26 +4565,26 @@ async def test_backup_structure_never_overwrites_what_is_already_there(
 
 def _atlassian_site(*, jira_status=200, confluence_status=200):
     """Stub one Atlassian site for the endpoint's egress."""
-    import httpx
+    import httpx2
 
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
         if "/rest/api/3/project/search" in url:
             if jira_status != 200:
-                return httpx.Response(jira_status, json={})
-            return httpx.Response(
+                return httpx2.Response(jira_status, json={})
+            return httpx2.Response(
                 200, json={"values": [{"id": "1", "key": "ACME", "name": "Acme"}]}
             )
         if "/rest/api/3/search/approximate-count" in url:
-            return httpx.Response(200, json={"count": 12})
+            return httpx2.Response(200, json={"count": 12})
         if "/wiki/api/v2/spaces" in url:
             if confluence_status != 200:
-                return httpx.Response(confluence_status, json={})
-            return httpx.Response(
+                return httpx2.Response(confluence_status, json={})
+            return httpx2.Response(
                 200, json={"results": [{"id": "9", "key": "DOCS", "name": "Docs"}]}
             )
         if "/wiki/rest/api/search" in url:
-            return httpx.Response(200, json={"totalSize": 4})
-        return httpx.Response(404, json={})
+            return httpx2.Response(200, json={"totalSize": 4})
+        return httpx2.Response(404, json={})
 
     return fake_request
 
@@ -4697,7 +4697,7 @@ def _jira_site(
     a fetch. ``catalog`` is the site's field list and ``boards`` maps a board
     id to its name.
     """
-    import httpx
+    import httpx2
 
     probe = _atlassian_site()
     requested: list[str] = []
@@ -4707,30 +4707,30 @@ def _jira_site(
         if on_request is not None:
             await on_request(url)
         if any(f"/rest/api/3/project/{key}" in url for key in locked):
-            return httpx.Response(403, json={})
+            return httpx2.Response(403, json={})
         if "/rest/api/3/project/search" in url:
             return await probe(method, url, headers=headers, json=json)
         if url.endswith("/statuses"):
-            return httpx.Response(200, json=_JIRA_STATUSES)
+            return httpx2.Response(200, json=_JIRA_STATUSES)
         if "/rest/api/3/project/" in url:
             key = url.rsplit("/", 1)[-1]
-            return httpx.Response(200, json={"key": key, "name": f"{key} Board"})
+            return httpx2.Response(200, json={"key": key, "name": f"{key} Board"})
         if "/rest/api/3/search/jql" in url:
-            return httpx.Response(200, json={"issues": issues or []})
+            return httpx2.Response(200, json={"issues": issues or []})
         if "/rest/agile/1.0/board?" in url:
-            return httpx.Response(404, json={})
+            return httpx2.Response(404, json={})
         if "/attachment/content/" in url and files:
             attachment_id = url.split("/attachment/content/")[1].split("?")[0]
             if attachment_id in files:
                 return await answered(
-                    method, url, httpx.Response(200, content=files[attachment_id]), kw
+                    method, url, httpx2.Response(200, content=files[attachment_id]), kw
                 )
         if url.endswith("/rest/api/3/field") and catalog is not None:
-            return httpx.Response(200, json=catalog)
+            return httpx2.Response(200, json=catalog)
         if "/rest/agile/1.0/board/" in url and boards:
             board_id = int(url.rsplit("/", 1)[-1])
             if board_id in boards:
-                return httpx.Response(
+                return httpx2.Response(
                     200, json={"id": board_id, "name": boards[board_id]}
                 )
         return await probe(method, url, headers=headers, json=json)
@@ -5792,7 +5792,7 @@ def _confluence_site(
     *, pages, users=None, labels=None, attachments=None, files=None, comments=None
 ):
     """Stub a Confluence site answering a connect and a fetch of one space."""
-    import httpx
+    import httpx2
 
     probe = _atlassian_site()
     names: dict[str, str] = users or {}
@@ -5804,22 +5804,22 @@ def _confluence_site(
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
         if "-comments" in url:
             path = url.split("/wiki/api/v2/")[1].split("?")[0]
-            return httpx.Response(200, json={"results": threads.get(path, [])})
+            return httpx2.Response(200, json={"results": threads.get(path, [])})
         if "/attachments?" in url:
             page_id = url.split("/pages/")[1].split("/")[0]
-            return httpx.Response(
+            return httpx2.Response(
                 200, json={"results": page_attachments.get(page_id, [])}
             )
         if "/child/attachment/" in url:
             att_id = url.split("/child/attachment/")[1].split("/")[0]
-            return httpx.Response(
+            return httpx2.Response(
                 302, headers={"location": f"https://media.example.com/{att_id}"}
             )
         if url.startswith("https://media.example.com/"):
             blob = blobs[url.rsplit("/", 1)[1]]
-            return await answered(method, url, httpx.Response(200, content=blob), kw)
+            return await answered(method, url, httpx2.Response(200, content=blob), kw)
         if "/wiki/api/v2/spaces?keys=" in url:
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json={
                     "results": [
@@ -5828,16 +5828,16 @@ def _confluence_site(
                 },
             )
         if "/wiki/api/v2/spaces/9/pages" in url:
-            return httpx.Response(200, json={"results": pages})
+            return httpx2.Response(200, json={"results": pages})
         if "/labels" in url:
             page_id = url.split("/pages/")[1].split("/")[0]
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json={"results": [{"name": n} for n in page_labels.get(page_id, [])]},
             )
         if url.endswith("/wiki/api/v2/users-bulk"):
             wanted = (json or {}).get("accountIds") or []
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json={
                     "results": [
@@ -6452,7 +6452,7 @@ async def test_one_atlassian_import_joins_its_issues_and_pages_both_ways(
     to the page is a mention of the wiki page, and the page the issue lists
     under "Confluence pages" is related to its task. Found through the job
     itself — the Jira key property is unticked here, and it still joins."""
-    import httpx
+    import httpx2
     from sqlmodel import select
 
     from app.models.tenant.relationship import EntityRelationship
@@ -6495,7 +6495,7 @@ async def test_one_atlassian_import_joins_its_issues_and_pages_both_ways(
 
     async def both(method, url, *, headers=None, json=None, timeout=None, **kw):
         if url.endswith("/remotelink"):
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json=[
                     {

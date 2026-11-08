@@ -3,7 +3,7 @@ authorization gates (initiative isolation, role create gate, feature gate,
 DAC levels, guild-admin override)."""
 
 import icalendar
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 

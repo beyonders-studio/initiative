@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import hashlib
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from app.api.v1.platform_endpoints import native
 from app.core.messages import NativeMessages

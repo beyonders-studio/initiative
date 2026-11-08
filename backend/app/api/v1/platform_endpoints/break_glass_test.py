@@ -20,7 +20,7 @@ grant. These tests state what that grant is and what it permits:
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import auth_context

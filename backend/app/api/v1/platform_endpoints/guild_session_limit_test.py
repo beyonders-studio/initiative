@@ -4,7 +4,7 @@ The switch is the guild's own, on the same surface and behind the same seat as
 the rest of its sign-in configuration.
 """
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole

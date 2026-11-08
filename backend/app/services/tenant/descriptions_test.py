@@ -5,7 +5,7 @@ saved — create, edit, duplicate — and each has its own answer to "who hears
 about it".
 """
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 

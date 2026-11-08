@@ -133,9 +133,9 @@ import json
 import os
 from pathlib import Path
 import secrets
-import httpx
+import httpx2
 state_file = Path(os.environ["TEST_STATE_FILE"])
-client = httpx.Client(base_url="http://127.0.0.1:8173/api/v1", timeout=60)
+client = httpx2.Client(base_url="http://127.0.0.1:8173/api/v1", timeout=60)
 def call(method, path, **kwargs):
     response = client.request(method, path, **kwargs)
     response.raise_for_status()
@@ -166,7 +166,7 @@ assert json.loads(manifest["statement"])["version"].startswith(call("GET", "/ver
 # Keep random fixture credentials private, never print them.
 state_file.touch(mode=0o600, exist_ok=True)
 state_file.write_text(json.dumps(state))
-assert httpx.get("http://127.0.0.1:8173/", timeout=5).status_code == 200
+assert httpx2.get("http://127.0.0.1:8173/", timeout=5).status_code == 200
 PYTEST
 }
 start_server

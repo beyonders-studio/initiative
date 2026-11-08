@@ -7,7 +7,7 @@ opens a guild. There is no server-held guild context anymore — the
 URL is the single source of truth, per request and per tab.
 """
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.testing.factories import (
