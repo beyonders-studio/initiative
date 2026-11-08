@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.v1.platform_endpoints.auth_test import (

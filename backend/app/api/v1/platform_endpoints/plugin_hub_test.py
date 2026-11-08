@@ -15,10 +15,10 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-import httpx
+import httpx2
 import jwt
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -149,7 +149,7 @@ def upstream(monkeypatch):
 
     class Recorder:
         def __init__(self) -> None:
-            self.calls: list[httpx.Request] = []
+            self.calls: list[httpx2.Request] = []
 
         def claims(self, index: int = -1) -> dict[str, Any]:
             header = self.calls[index].headers["Authorization"]

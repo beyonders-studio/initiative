@@ -6,7 +6,7 @@ setting on the roster, the mint, and every path that reaches the guild's
 content with a key in hand.
 """
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole

@@ -8,7 +8,7 @@ it reads has to be readable from there — a guild session reads people through
 than a request does.
 """
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool

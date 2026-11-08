@@ -8,7 +8,7 @@ provisioning engine at the test DB and cleans up any schemas/roles created.
 
 from datetime import UTC, datetime, timedelta
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlmodel import select

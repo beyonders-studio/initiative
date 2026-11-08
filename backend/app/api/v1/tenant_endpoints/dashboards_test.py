@@ -6,7 +6,7 @@ dashboard shares the canvas, never the data it displays, and no endpoint
 accepts anything that would let a definition write.
 """
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool

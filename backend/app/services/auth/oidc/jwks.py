@@ -4,7 +4,7 @@ Given a trusted ``jwks_uri`` and a raw token, fetch the provider's JSON Web Key
 Set and return the ``PyJWK`` whose ``kid`` matches the token header, for the
 verifier (:mod:`app.services.auth.oidc.id_token`) to check the signature against.
 
-Fetched with httpx (async) rather than PyJWT's blocking ``PyJWKClient``, so the
+Fetched with httpx2 (async) rather than PyJWT's blocking ``PyJWKClient``, so the
 request is controlled directly:
 
 * the ``jwks_uri`` must be ``https`` (rejected before any request otherwise);
@@ -53,7 +53,7 @@ class JwksResolver:
 
     Hold one instance per process (the cache is shared across requests). The
     network client is built per fetch via ``client_factory`` so tests can inject
-    an ``httpx.MockTransport`` without patching globals.
+    an ``httpx2.MockTransport`` without patching globals.
     """
 
     def __init__(

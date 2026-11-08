@@ -3,7 +3,7 @@
 from typing import Annotated
 
 from fastapi import Depends, FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.requests import Request
 

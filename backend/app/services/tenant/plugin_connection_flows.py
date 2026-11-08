@@ -51,7 +51,7 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
-import httpx
+import httpx2
 import jwt
 from sqlalchemy import func, text
 from sqlmodel import select
@@ -190,7 +190,7 @@ HOOK_NAMES: frozenset[str] = frozenset(
 MAX_ACCOUNT_LABEL_LENGTH = 200
 
 #: Injectable for tests: the transport every vendor and plug-in call uses.
-http_transport: httpx.AsyncBaseTransport | None = None
+http_transport: httpx2.AsyncBaseTransport | None = None
 
 
 class ConnectionFlowError(CodedError):
@@ -749,7 +749,7 @@ async def mint_jwt_bearer(
         )
         body = response.json() if response.status_code < 400 else None
     except (
-        httpx.HTTPError,
+        httpx2.HTTPError,
         ResponseTooLargeError,
         WebhookTargetUrlError,
         WebhookTargetUrlPrivateError,
@@ -830,7 +830,7 @@ async def call_hook(
                 "Authorization": f"Bearer {token}",
             },
             content=json.dumps(dict(body)).encode("utf-8"),
-            timeout=httpx.Timeout(
+            timeout=httpx2.Timeout(
                 REQUEST_TIMEOUT_SECONDS, connect=REQUEST_TIMEOUT_SECONDS
             ),
             transport=http_transport,
@@ -840,7 +840,7 @@ async def call_hook(
             max_bytes=MAX_RESPONSE_BYTES,
         )
     except (
-        httpx.HTTPError,
+        httpx2.HTTPError,
         ResponseTooLargeError,
         WebhookTargetUrlError,
         WebhookTargetUrlPrivateError,

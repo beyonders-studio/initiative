@@ -3,7 +3,7 @@
 from datetime import UTC, datetime, timedelta
 
 import pyotp
-from httpx import AsyncClient, Response
+from httpx2 import AsyncClient, Response
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.login_methods import LoginMethod

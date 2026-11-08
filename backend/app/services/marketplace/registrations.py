@@ -45,7 +45,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-import httpx
+import httpx2
 from fastapi import HTTPException
 from fastapi import status as http_status
 from jwt import PyJWK
@@ -763,7 +763,7 @@ class PublishedKey:
 
 
 async def _served_key_set(
-    base_url: str | None, transport: httpx.AsyncBaseTransport | None
+    base_url: str | None, transport: httpx2.AsyncBaseTransport | None
 ) -> tuple[dict, list[PublishedKey]]:
     """The key set the plug-in serves under ``base_url``, held to what a pasted
     set must be, with each key's fingerprint."""
@@ -804,7 +804,7 @@ async def published_keys(
     session: AsyncSession,
     registration_id: int,
     *,
-    transport: httpx.AsyncBaseTransport | None = None,
+    transport: httpx2.AsyncBaseTransport | None = None,
 ) -> list[PublishedKey]:
     """The keys the plug-in serves, for the operator to compare with the
     fingerprints its container logged. Writes nothing."""
@@ -819,7 +819,7 @@ async def connect_registration(
     *,
     keys: Sequence[PublishedKey],
     actor_user_id: int | None = None,
-    transport: httpx.AsyncBaseTransport | None = None,
+    transport: httpx2.AsyncBaseTransport | None = None,
 ) -> PluginServiceRegistration:
     """Pin the key set the plug-in serves as the registration's ``jwks``, and
     clear its ``jwks_uri`` so the pinned set is the only one it is verified

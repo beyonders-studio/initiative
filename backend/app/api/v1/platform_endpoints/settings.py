@@ -3,7 +3,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated, Any, Literal
 
-import httpx
+import httpx2
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, or_
 from sqlmodel import select
@@ -867,7 +867,7 @@ async def get_fcm_config(
     via_relay = platform == "ios" or (
         platform == "android" and not cfg.service_account_json
     )
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx2.AsyncClient(timeout=10.0) as client:
         relay_server_id = (
             await push_relay.current_server_id(client) if via_relay else None
         )

@@ -18,7 +18,7 @@ import ipaddress
 import json
 from datetime import UTC, datetime, timedelta
 
-import httpx
+import httpx2
 import jwt
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -71,7 +71,7 @@ class Plugins:
         self.answers = {host: list(statuses) for host, statuses in answers.items()}
         self.calls: list[tuple[str, str, dict, dict]] = []
 
-    def handle(self, request: httpx.Request) -> httpx.Response:
+    def handle(self, request: httpx2.Request) -> httpx2.Response:
         # The request is sent to the address the name resolved to; the name
         # rides in the Host header.
         host = request.headers["host"].split(".")[0]
@@ -87,7 +87,7 @@ class Plugins:
         )
         statuses = self.answers.get(host, [204])
         status = statuses.pop(0) if len(statuses) > 1 else statuses[0]
-        return httpx.Response(status)
+        return httpx2.Response(status)
 
     def paths(self, host: str = "hooked") -> list[str]:
         return [path for called, path, _, _ in self.calls if called == host]
@@ -100,7 +100,7 @@ def _signing(monkeypatch):
 
     async def resolve(url: str, *, allow_private: bool = False) -> ValidatedTarget:
         return ValidatedTarget(
-            hostname=httpx.URL(url).host,
+            hostname=httpx2.URL(url).host,
             addresses=(ipaddress.ip_address("93.184.216.34"),),
         )
 
@@ -110,7 +110,7 @@ def _signing(monkeypatch):
 def _answering(monkeypatch, **answers: list[int]) -> Plugins:
     plugins = Plugins(**answers)
     monkeypatch.setattr(
-        plugin_connection_flows, "http_transport", httpx.MockTransport(plugins.handle)
+        plugin_connection_flows, "http_transport", httpx2.MockTransport(plugins.handle)
     )
     return plugins
 
@@ -1094,13 +1094,13 @@ class TestSendingAtOnce:
         open_during_send: list[int] = []
         plugins = Plugins()
 
-        def handle(request: httpx.Request) -> httpx.Response:
+        def handle(request: httpx2.Request) -> httpx2.Response:
             engine = db_session.SystemSessionLocal.kw["bind"]
             open_during_send.append(engine.sync_engine.pool.checkedout())
             return plugins.handle(request)
 
         monkeypatch.setattr(
-            plugin_connection_flows, "http_transport", httpx.MockTransport(handle)
+            plugin_connection_flows, "http_transport", httpx2.MockTransport(handle)
         )
         await _deliver(guild.id, hook="installed")
         await _visit(guild.id)

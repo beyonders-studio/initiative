@@ -10,7 +10,7 @@ is, while it is off; uninstalling leaves its content unowned.
 from typing import Any
 
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 

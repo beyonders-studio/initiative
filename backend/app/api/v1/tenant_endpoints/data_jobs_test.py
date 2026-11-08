@@ -1,4 +1,4 @@
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.data_job import DataJobStatus

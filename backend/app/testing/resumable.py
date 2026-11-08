@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import base64
 
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 
 TUS = {"Tus-Resumable": "1.0.0"}
 
