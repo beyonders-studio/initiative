@@ -35,7 +35,6 @@ A new kind of auth (SAML, SCIM, a passkey policy) joins this enum, a Postgres
 """
 
 from enum import Enum
-from typing import Iterable, Optional
 
 
 class CommunityAuthOption(str, Enum):
@@ -44,29 +43,3 @@ class CommunityAuthOption(str, Enum):
     providers = "providers"
     #: May refuse personal API keys and shorten the session limit.
     restrictions = "restrictions"
-
-
-#: Mirrors the Postgres enum type created in migration 0285, extended in 0301
-#: and rebuilt in 0313. A value added to one has to be added to the other.
-GUILD_AUTH_OPTION_VALUES: tuple[str, ...] = tuple(o.value for o in CommunityAuthOption)
-
-#: What a guild gets when nobody has granted it anything — the default a fresh
-#: guild is created with, and what ``guild_auth_enabled = false`` meant.
-NO_GUILD_AUTH_OPTIONS: tuple[CommunityAuthOption, ...] = ()
-
-
-def effective_options(
-    stored: Optional[Iterable[str]],
-) -> frozenset[CommunityAuthOption]:
-    """What a guild holds, from what is stored against it.
-
-    Nothing nests any more, so this only drops the unknown: a label this build
-    does not know yet, from a column that is an enum.
-    """
-    resolved = set()
-    for value in stored or ():
-        try:
-            resolved.add(CommunityAuthOption(value))
-        except ValueError:
-            continue
-    return frozenset(resolved)

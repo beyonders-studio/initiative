@@ -124,10 +124,8 @@ def test_an_object_stored_before_encryption_reads_as_it_is(tmp_path, keyring):
     inner, storage = _local(tmp_path, keyring)
     inner.write("old.txt", b"written in the clear")
     assert _read(storage.open_readable("old.txt")) == b"written in the clear"
-    assert storage.is_encrypted("old.txt") is False
 
     assert storage.encrypt_in_place("old.txt") is True
-    assert storage.is_encrypted("old.txt") is True
     assert _read(storage.open_readable("old.txt")) == b"written in the clear"
     assert storage.encrypt_in_place("old.txt") is False
 

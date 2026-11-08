@@ -43,9 +43,6 @@ from app.services.tenant import search as search_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.initiative_tools import tool_on_sql
 
-#: What ``sort_by`` accepts on every guild-wide tool list.
-TOOL_SORT_FIELDS = ("name", "initiative", "updated_at")
-
 
 def apply_tool_order(
     statement,
@@ -57,7 +54,8 @@ def apply_tool_order(
     initiative_joined: bool = False,
     extra_fields: Optional[dict[str, Any]] = None,
 ):
-    """Order a tool list by one of :data:`TOOL_SORT_FIELDS`, else by ``default``.
+    """Order a tool list by ``name``, ``initiative`` or ``updated_at``, else by
+    ``default``.
 
     Ordering by initiative means ordering by its *name*, which is the column
     the table shows, so the statement is joined to ``Initiative`` for it —

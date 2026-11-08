@@ -6563,7 +6563,6 @@ export interface EnvelopeImportResult {
   matched?: EnvelopeImportResultMatched;
   failed?: EnvelopeImportResultFailed;
   failed_rows?: ImportRowFailure[];
-  renamed_properties?: string[];
   renamed_property_count?: number;
   links_created?: number;
   links_unresolved?: number;
@@ -8900,14 +8899,11 @@ export const OperatorUserDeleteRequestAction = {
   hard_delete: "hard_delete",
 } as const;
 
-export type OperatorUserDeleteRequestProjectTransfers = { [key: string]: number } | null;
-
 /**
  * Request to deactivate, anonymize (soft delete), or hard delete another account.
  */
 export interface OperatorUserDeleteRequest {
   action: OperatorUserDeleteRequestAction;
-  project_transfers?: OperatorUserDeleteRequestProjectTransfers;
 }
 
 export interface UserInitiativeRole {

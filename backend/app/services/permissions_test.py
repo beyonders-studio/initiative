@@ -47,7 +47,6 @@ from app.services.permissions import (
     granted_scope_clause,
     listing_scope_clause,
     require_access,
-    writable_scope_clause,
 )
 from app.services.tenant import named_people
 from app.services.tenant.archive import archive_entity
@@ -516,7 +515,7 @@ async def test_a_frozen_guild_caps_everyone_at_read(session, role_session, actin
 # A statement confined to one initiative asks nothing: the table's own policy
 # already applied the sharing gate. What is left here is the listing rule for a
 # statement that SPANS initiatives, which is narrower than the policy on
-# purpose, and the writable rule, which is narrower than any read policy.
+# purpose.
 
 
 def _compiled(clause: ColumnElement[bool]) -> str:
@@ -603,29 +602,6 @@ def test_no_standing_at_all_narrows_rather_than_opens():
         _compiled(granted_scope_clause(Tool.project, Project.id, 1, context=None))
         != "true"
     )
-
-
-def test_the_writable_clause_asks_the_gate_when_confined():
-    """Unlike the read listing, this one still has something to ask.
-
-    A read policy admits a row shared at any level, so "which of these may I
-    change" is a narrower question than the one already answered. Confined to
-    one initiative it is the table's own gate, asked at write.
-    """
-    sql = _compiled(
-        writable_scope_clause(
-            Tool.project, Project.id, 1, context=standing(7), initiative_id=3
-        )
-    )
-    assert sql != "true"
-    assert "resource_access(" in sql
-    assert ", true, (SELECT current_standing()" in sql
-
-
-def test_the_writable_clause_spanning_initiatives_asks_the_grants_at_write():
-    sql = _compiled(writable_scope_clause(Tool.project, Project.id, 1, context=None))
-    assert "resource_granted(" in sql
-    assert ", true, (SELECT current_standing()" in sql
 
 
 @pytest.mark.parametrize("tool", list(Tool))

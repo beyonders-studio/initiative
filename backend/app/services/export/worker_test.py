@@ -88,7 +88,7 @@ async def test_an_abandoned_render_is_started_over_until_it_has_been_too_often(
         updated_at=datetime.now(timezone.utc) - timedelta(minutes=30),
     )
 
-    await export_worker.process_export_jobs()
+    await export_worker.jobs.process()
 
     assert (await _reload(session, a.guild.id, job.id)).status == ends
     assert await _notices(session, a.user.id, job.id, told) == 1
@@ -123,7 +123,7 @@ async def test_a_render_that_lost_its_row_writes_nothing(
 
     monkeypatch.setattr(export_worker, "_execute", execute)
 
-    await export_worker.process_export_jobs()
+    await export_worker.jobs.process()
 
     assert calls == 2
     done = await _reload(session, a.guild.id, job.id)

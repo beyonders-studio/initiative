@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -1167,7 +1167,6 @@ dependencies = [
     { name = "premailer" },
     { name = "prometheus-client" },
     { name = "pycrdt" },
-    { name = "pycrdt-websocket" },
     { name = "pydantic-settings" },
     { name = "pyjwt" },
     { name = "pyotp" },
@@ -1227,7 +1226,6 @@ requires-dist = [
     { name = "premailer", specifier = ">=3.10.0" },
     { name = "prometheus-client", specifier = ">=0.23,<1" },
     { name = "pycrdt", specifier = ">=0.13.0,<0.15" },
-    { name = "pycrdt-websocket", specifier = ">=0.16.1,<0.17" },
     { name = "pydantic-settings", specifier = ">=2.14.2,<3" },
     { name = "pyjwt", specifier = ">=2.14.0,<3" },
     { name = "pyotp", specifier = ">=2.9.0,<3" },
@@ -2128,34 +2126,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pycrdt-store"
-version = "0.1.4"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "anyio" },
-    { name = "pycrdt" },
-    { name = "sqlite-anyio" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/ca/b8/e621d2a6f763a2c59e00c293feb7ad2e81adc71a1a269431b9c834079aab/pycrdt_store-0.1.4.tar.gz", hash = "sha256:85f1f008fda5ca9140739b608de7d8612f5276fccd80af06689053640d541d77", size = 14835, upload-time = "2026-05-07T07:35:04.671Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/fc/63/51732165c3a5ed25fd426735d17fcac14f5598b26eb22a6938cb00eaf66d/pycrdt_store-0.1.4-py3-none-any.whl", hash = "sha256:70f09b11de7fcde317079f7c5fc878bcd678f3a2ed0495571a87d0fca7011f22", size = 11840, upload-time = "2026-05-07T07:35:03.449Z" },
-]
-
-[[package]]
-name = "pycrdt-websocket"
-version = "0.16.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "anyio" },
-    { name = "pycrdt" },
-    { name = "pycrdt-store" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/96/ad/0c7a542beb2e3bf3b79d517fdbc2bf2b568a16b1c853994d61816b18043e/pycrdt_websocket-0.16.2.tar.gz", hash = "sha256:924333747f504f27784231870ecd39c380d73047698bf4dcc87de07b7b87522d", size = 23790, upload-time = "2026-06-01T15:09:31.052Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d0/05/6b60e3f15a1fb82fe2830959ecb4aec403ed5817f57f0ce284e5c470d329/pycrdt_websocket-0.16.2-py3-none-any.whl", hash = "sha256:f496e40189a000605bba135dfd84fe95bf20d825bcf89bcf3ea2cf25667b480c", size = 14904, upload-time = "2026-06-01T15:09:29.75Z" },
-]
-
-[[package]]
 name = "pydantic"
 version = "2.13.4"
 source = { registry = "https://pypi.org/simple" }
@@ -2914,19 +2884,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f2/e3/5aa06f167559f8c0bdae487e297d23ba548150ab016a3418265d617a4985/sqlalchemy-2.0.50-cp314-cp314t-win32.whl", hash = "sha256:1fbd55a969d7ac44a98e3dec75016074f809fa08f871585ace58dde110d1bf3e", size = 2150823, upload-time = "2026-05-24T20:08:58.644Z" },
     { url = "https://files.pythonhosted.org/packages/65/9b/112fb8f977582d7489d036e409e3723948bcf5320b3ac465f3c481bbe8f9/sqlalchemy-2.0.50-cp314-cp314t-win_amd64.whl", hash = "sha256:c5c3cdb753a9004183e1ccb634b41611654c989e61bc68617ce878e46d6f1e51", size = 2185794, upload-time = "2026-05-24T20:09:00.319Z" },
     { url = "https://files.pythonhosted.org/packages/d0/10/f7220e9b784d295d241c86ed99aeb537f92afcd469a64861f2717e9bb077/sqlalchemy-2.0.50-py3-none-any.whl", hash = "sha256:92064363517a3ff8212b5a93b8c62876579d8dfd1ca5b561335f30152d884fa9", size = 1943861, upload-time = "2026-05-24T19:59:01.119Z" },
-]
-
-[[package]]
-name = "sqlite-anyio"
-version = "0.2.8"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "anyio" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/20/a3/7830c95b37f1268dbb47e559d1f1ae027f3a4c36b1f7fc1b2dc5de1c5073/sqlite_anyio-0.2.8.tar.gz", hash = "sha256:d68b51a18c01a7dfa9cedbc319871ce77ab3ed0822518fb32810bb465b52d761", size = 3271, upload-time = "2026-03-02T10:37:43.466Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/7e/aa/182981b92659df83c3eb7d6f8fb0874984d72ad688fa4054cb96bc044bb0/sqlite_anyio-0.2.8-py3-none-any.whl", hash = "sha256:bbdfefb144aed2633d2618ee1508edd3abe67a00389379360949da4671640d86", size = 4041, upload-time = "2026-03-02T10:37:42.246Z" },
 ]
 
 [[package]]

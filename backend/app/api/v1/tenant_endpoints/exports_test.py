@@ -115,7 +115,7 @@ async def _run_worker() -> None:
     """Render the queued jobs the way the worker does. It re-queries as the
     creator on a read session from the community's cohort, which the standard
     harness points at the test database."""
-    await export_worker.process_export_jobs()
+    await export_worker.jobs.process()
 
 
 async def _download(client: AsyncClient, a, job_id: int) -> Response:

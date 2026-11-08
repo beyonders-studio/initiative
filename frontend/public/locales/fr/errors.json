@@ -241,7 +241,6 @@
   "QUERY_QUALIFIED_RELATION": "Nommez la table seule, sans schéma.",
   "QUERY_MISSING_RELATION": "Une requête doit lire quelque chose.",
   "QUERY_UNKNOWN_FIELD": "Ce champ n'existe pas ici.",
-  "QUERY_UNGROUPED_FIELD": "Lue à côté d'un total, cette colonne doit être regroupée.",
   "QUERY_FIELD_NOT_SELECTABLE": "Ce champ peut servir de filtre mais pas être sélectionné.",
   "QUERY_AMBIGUOUS_FIELD": "Précisez à quelle table appartient ce champ.",
   "QUERY_DUPLICATE_ALIAS": "Deux tables partagent le même alias. Donnez-en un à chacune.",

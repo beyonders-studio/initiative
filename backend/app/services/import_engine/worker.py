@@ -197,12 +197,6 @@ jobs = data_jobs.Dispatcher(
 )
 
 
-async def process_import_jobs() -> None:
-    """Run passes until one starts nothing, waiting for each pass's jobs.
-    Everything queued is dealt with by the time this returns."""
-    await jobs.process()
-
-
 async def _apply(session: AsyncSession, job: DataJob, *, guild_id: int) -> JobOutcome:
     """Apply a claimed job and record how it ended."""
     try:

@@ -234,9 +234,6 @@ class TufRepository:
     def remove_terms(self, uid: str) -> None:
         self.content["package"].pop(f"entitlements/{uid}.json", None)
 
-    def set_entry(self, prefix: str, uid: str, entry: dict[str, Any]) -> None:
-        self.content[prefix][f"publishers/{prefix}/{uid}/listing.json"] = _dump(entry)
-
     def remove_listing(self, prefix: str, uid: str) -> None:
         base = f"publishers/{prefix}/{uid}/"
         for path in [p for p in self.content[prefix] if p.startswith(base)]:

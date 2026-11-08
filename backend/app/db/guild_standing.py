@@ -1042,23 +1042,6 @@ class GuildContext:
             return False
         return initiative_id in self.override_initiatives
 
-    def membership_only(self) -> "GuildContext":
-        """This standing with what a grant reaches taken off.
-
-        For a decision that has to rest on somebody's own place in the
-        community rather than on a window somebody opened for them.
-        """
-        return replace(
-            self,
-            grant=None,
-            settings_grant=None,
-            settings_grant_level=None,
-            settings_rung=None,
-            pam_read=False,
-            pam_write=False,
-            pam_moderate=False,
-        )
-
     # --- The standing --------------------------------------------------------
 
     def with_standing(self, row: dict[str, Any]) -> "GuildContext":

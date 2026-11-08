@@ -72,9 +72,6 @@ logger = logging.getLogger(__name__)
 #: ``data_jobs.source`` for every import read from an Atlassian site.
 SOURCE = "atlassian"
 
-#: The provider a credential has to have been stored under to start one.
-PROVIDER = "atlassian"
-
 #: The importer whose permission a Jira project needs.
 _PROJECT_ENVELOPE = tool_envelope_type(Tool.project)
 

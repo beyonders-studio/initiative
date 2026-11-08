@@ -47,21 +47,6 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from app.services.import_engine.context import ImportContext
 
 
-class QuotesNobody:
-    """An envelope that names no people, which is most of them.
-
-    The people step exists to ask who the handles in an envelope are, and an
-    envelope carrying no handles has nothing to ask. Mixed in rather than
-    left to a default on the protocol, so "this one quotes nobody" is a
-    statement each importer makes rather than something it forgot to say —
-    the day a tool's envelope starts carrying comments, dropping this base
-    class is what makes the wizard notice.
-    """
-
-    def people(self, validated: BaseModel) -> list["ManifestPerson"]:
-        return []
-
-
 class NamesPeopleInPassing:
     """An envelope that names people without quoting them: through user-type
     property values, and through the mentions in its body.

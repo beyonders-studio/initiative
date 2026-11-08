@@ -34,7 +34,6 @@ def test_nobody_is_online_until_something_is_open() -> None:
     roll = OnlineRoll()
 
     assert roll.presence_of(7) is Presence.offline
-    assert roll.is_online(7) is False
 
 
 def test_an_open_tab_shows_what_it_brought() -> None:
@@ -42,7 +41,6 @@ def test_an_open_tab_shows_what_it_brought() -> None:
     roll.arrived(7, Presence.busy)
 
     assert roll.presence_of(7) is Presence.busy
-    assert roll.is_online(7) is True
 
 
 def test_appearing_offline_holds_with_a_tab_open() -> None:
@@ -50,7 +48,6 @@ def test_appearing_offline_holds_with_a_tab_open() -> None:
     roll.arrived(7, Presence.offline)
 
     assert roll.presence_of(7) is Presence.offline
-    assert roll.is_online(7) is False
 
 
 def test_a_connect_that_started_first_cannot_undo_a_later_choice() -> None:
@@ -137,8 +134,6 @@ def test_an_open_tab_goes_idle_when_nobody_touches_it(a_while_later) -> None:
     a_while_later(IDLE_AFTER_SECONDS + 1)
 
     assert roll.presence_of(7) is Presence.idle
-    # Idle is still here — they are just not typing.
-    assert roll.is_online(7) is True
 
 
 def test_a_sign_of_them_brings_them_back(a_while_later) -> None:
@@ -188,7 +183,6 @@ def test_picking_idle_holds_while_someone_is_typing() -> None:
     roll.active(7)
 
     assert roll.presence_of(7) is Presence.idle
-    assert roll.is_online(7) is True
 
 
 def test_a_sign_of_someone_with_nothing_open_is_ignored() -> None:

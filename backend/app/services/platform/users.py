@@ -1296,11 +1296,6 @@ async def _deployment_rules() -> Values:
         return await rules.platform_values(system_session)
 
 
-async def to_operator_read_one(user: User) -> "OperatorUserRead":
-    """``to_operator_read`` for the routes that return one account."""
-    return (await to_operator_read([user]))[0]
-
-
 #: The age below which somebody may not take part in the parts of the platform
 #: that are open to people they have not met.
 MINIMUM_AGE_YEARS = 16

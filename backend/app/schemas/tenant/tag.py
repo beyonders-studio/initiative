@@ -154,36 +154,3 @@ class TagEntityCountsResponse(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     counts: Dict[str, int] = Field(default_factory=dict)
-
-
-class TaggedTaskSummary(SanitizedBaseModel):
-    model_config = ConfigDict(
-        from_attributes=True, json_schema_serialization_defaults_required=True
-    )
-
-    id: int
-    title: str
-    project_id: int
-    project_name: Optional[str] = None
-
-
-class TaggedFileSummary(SanitizedBaseModel):
-    model_config = ConfigDict(
-        from_attributes=True, json_schema_serialization_defaults_required=True
-    )
-
-    id: int
-    name: str
-    initiative_id: int
-    initiative_name: Optional[str] = None
-
-
-class TaggedEventSummary(SanitizedBaseModel):
-    model_config = ConfigDict(
-        from_attributes=True, json_schema_serialization_defaults_required=True
-    )
-
-    id: int
-    title: str
-    initiative_id: int
-    initiative_name: Optional[str] = None

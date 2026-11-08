@@ -241,7 +241,6 @@
   "QUERY_QUALIFIED_RELATION": "Nombra la tabla sola, sin esquema.",
   "QUERY_MISSING_RELATION": "Una consulta tiene que leer de algo.",
   "QUERY_UNKNOWN_FIELD": "Ese campo no existe aquí.",
-  "QUERY_UNGROUPED_FIELD": "Leída junto a un total, esa columna necesita agruparse.",
   "QUERY_FIELD_NOT_SELECTABLE": "Ese campo se puede filtrar, pero no seleccionar.",
   "QUERY_AMBIGUOUS_FIELD": "Indica a qué tabla pertenece este campo.",
   "QUERY_DUPLICATE_ALIAS": "Dos tablas comparten el mismo alias. Dale uno propio a cada una.",

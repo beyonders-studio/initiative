@@ -429,11 +429,3 @@ BUILTIN_ANNOUNCEMENTS: tuple[BuiltinAnnouncement, ...] = (
         ),
     ),
 )
-
-
-def builtin_by_key(key: str) -> BuiltinAnnouncement | None:
-    """The builtin a read receipt's key names, if this version still has it."""
-    for announcement in BUILTIN_ANNOUNCEMENTS:
-        if announcement.key == key:
-            return announcement
-    return None

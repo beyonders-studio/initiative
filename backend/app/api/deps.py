@@ -128,7 +128,6 @@ _SAFE_HTTP_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 #: something authority the credential itself carries, because there the
 #: credential is a party to the decision rather than a way of transporting it.
 CREDENTIAL_SESSION = CredentialKind.session.value
-CREDENTIAL_API_KEY = CredentialKind.api_key.value
 #: An installed plug-in's access token. Only a route that names a plug-in scope
 #: admits one (:func:`plugin_scope`).
 CREDENTIAL_INSTALL = "install"
@@ -1259,16 +1258,6 @@ async def get_guild_settings_session(
     return session
 
 
-async def get_guild_settings_write_session(
-    session: SessionDep,
-    guild_context: Annotated[GuildContext, Depends(get_guild_settings_context)],
-) -> AsyncSession:
-    """The same session, for a configuration route that changes something: a
-    grantee is asked for the ``read_write`` grant beside the rung."""
-    require_grant_writes(guild_context)
-    return session
-
-
 async def establish_guild_access(
     session: AsyncSession,
     current_user: User,
@@ -2040,9 +2029,6 @@ SettingsSeatWriteContextDep = Annotated[
     Depends(require_guild_roles(CommunityRole.superadmin, settings=True, write=True)),
 ]
 SettingsRLSSessionDep = Annotated[AsyncSession, Depends(get_guild_settings_session)]
-SettingsWriteSessionDep = Annotated[
-    AsyncSession, Depends(get_guild_settings_write_session)
-]
 SeatContextDep = Annotated[GuildContext, Depends(get_guild_seat_context)]
 SeatWriteContextDep = Annotated[GuildContext, Depends(get_guild_seat_write_context)]
 SeatSessionDep = Annotated[AsyncSession, Depends(get_guild_seat_session)]
@@ -2099,21 +2085,6 @@ async def _apply_user_session_context(
     )
     await set_rls_context(session, Platform(user_id=current_user.id, tier=tier))
     return session
-
-
-async def get_factor_exempt_user_session(
-    session: SessionDep,
-    current_user: FactorExemptUser,
-) -> AsyncSession:
-    """The platform-path session for a route that stays reachable while the
-    deployment's second-factor rule is unmet — routed exactly as the ordinary
-    one, and holding no more."""
-    return await _apply_user_session_context(session, current_user)
-
-
-FactorExemptSessionDep = Annotated[
-    AsyncSession, Depends(get_factor_exempt_user_session)
-]
 
 
 async def get_account_holder_session(

@@ -385,7 +385,3 @@ def category_of(notification_type: NotificationType) -> NotificationCategory:
 
 def spec_of(notification_type: NotificationType) -> CategorySpec:
     return CATEGORY_SPECS[CATEGORY_OF[notification_type]]
-
-
-def is_personal(notification_type: NotificationType) -> bool:
-    return notification_type in PERSONAL_TYPES

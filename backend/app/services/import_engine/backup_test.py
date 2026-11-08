@@ -41,7 +41,7 @@ async def exported(client, acting_user, session, tmp_path):
 
     queued = await client.get(a.g("/exports/community"), headers=a.headers)
     assert queued.status_code == 202, queued.text
-    await export_worker.process_export_jobs()
+    await export_worker.jobs.process()
     job_id = queued.json()["id"]
     job = await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)
     assert job.json()["status"] == DataJobStatus.done.value
@@ -67,7 +67,7 @@ async def _restore(session, a, bundle: Path, anchor: datetime | None) -> Initiat
     )
     await session.commit()
     job_id = job.id
-    await import_worker.process_import_jobs()
+    await import_worker.jobs.process()
 
     session.expire_all()
     await route_session_to_guild(session, guild_id)

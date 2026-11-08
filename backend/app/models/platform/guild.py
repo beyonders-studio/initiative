@@ -242,9 +242,6 @@ DEFAULT_BANNER: dict[str, str] = {
     "fade": BannerFade.strong.value,
 }
 
-#: The keys a banner has, and the only ones it may have.
-BANNER_KEYS: tuple[str, ...] = tuple(DEFAULT_BANNER)
-
 
 class Guild(SQLModel, table=True):
     __tablename__ = "guilds"

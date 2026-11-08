@@ -1,6 +1,6 @@
 """Schemas for the platform operator surfaces."""
 
-from typing import Dict, List, Literal, Optional
+from typing import List, Literal, Optional
 
 from pydantic import AliasChoices, ConfigDict, Field
 
@@ -20,9 +20,6 @@ class OperatorUserDeleteRequest(SanitizedBaseModel):
     """Request to deactivate, anonymize (soft delete), or hard delete another account."""
 
     action: Literal["deactivate", "soft_delete", "hard_delete"]
-    # Keyed by "guild_id:project_id" (NOT bare project_id) — numeric project ids
-    # repeat across per-guild schemas, so a bare id would collide.
-    project_transfers: Optional[Dict[str, int]] = None
 
 
 class CommunityBlockerInfo(SanitizedBaseModel):
