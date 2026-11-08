@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import type { TagSummary } from "@/api/generated/initiativeAPI.schemas";
 import { useCreateTag, useTags } from "@/hooks/useTags";
+import { DEFAULT_COLOR } from "@/lib/initiativeColors";
 import { Button, buttonVariants } from "@/ui/button";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { Combobox } from "@/ui/combobox";
@@ -13,7 +14,7 @@ import { cn } from "@/ui/lib/utils";
 import { TagBadge } from "./TagBadge";
 
 const DEFAULT_TAG_COLORS = [
-  "#6366F1", // Indigo
+  DEFAULT_COLOR, // Indigo
   "#8B5CF6", // Violet
   "#EC4899", // Pink
   "#EF4444", // Red

@@ -3,8 +3,6 @@
   "subtitle": "Ouvrez une initiative pour gérer les fichiers, projets et membres.",
   "newInitiative": "Nouvelle initiative",
   "selectCommunity": "Sélectionner une communauté",
-  "loading": "Chargement des initiatives…",
-  "loadError": "Impossible de charger les initiatives pour le moment.",
   "noDescription": "Pas encore de description.",
   "members": "Membres :",
   "createInitiative": "Créer une initiative",
@@ -24,7 +22,6 @@
     "requestError": "Impossible d’envoyer cette demande pour le moment.",
     "queueTitle": "Demandes d’adhésion",
     "queueDescription": "Les personnes qui ont demandé à rejoindre cette initiative. Approuver les ajoute comme membres.",
-    "queueLoadError": "Impossible de charger les demandes pour le moment.",
     "noMessage": "Aucun message",
     "unknownRequester": "Quelqu’un",
     "priorDenials_one": "Refusée {{count}} fois auparavant",
@@ -38,8 +35,6 @@
   "manage": {
     "description": "Toutes les initiatives de cette communauté et qui les dirige. Désignez quelqu'un comme chef de projet pour lui en confier une ; désignez-vous pour y travailler depuis votre propre barre latérale.",
     "adminRequired": "Vous devez être administrateur de la communauté pour gérer les initiatives.",
-    "loading": "Chargement des initiatives…",
-    "loadError": "Impossible de charger les initiatives pour le moment.",
     "filterByName": "Filtrer par nom",
     "nameColumn": "Initiative",
     "managersColumn": "Chefs de projet",
@@ -166,7 +161,6 @@
     "roleUpdateError": "Impossible de mettre à jour le rôle pour le moment.",
     "rolesTitle": "Permissions des rôles",
     "rolesDescription": "Ce que chaque rôle peut voir, et ce qu'il peut créer. Les gestionnaires ont tout.",
-    "loadingRoles": "Chargement des rôles…",
     "addCustomRole": "Ajouter un rôle personnalisé",
     "setByCommunity": "Ta communauté définit ce réglage pour toutes les initiatives.",
     "customRolesOff": "Ta communauté limite les initiatives à leurs rôles intégrés.",
@@ -270,8 +264,7 @@
     "layouts": {
       "heading": "Dispositions",
       "description": "Comment chaque outil de cette initiative présente ce qu'il contient : chaque disposition, sa dernière modification, et la liste sur laquelle un projet s'ouvre. Elles se modifient dans l'éditeur de chacun.",
-      "noProjects": "Cette initiative n'a encore aucun projet.",
-      "loadError": "Impossible de charger les dispositions."
+      "noProjects": "Cette initiative n'a encore aucun projet."
     },
     "fixedOn": "Activé",
     "fixedOff": "Désactivé"

@@ -22,6 +22,13 @@ vi.mock("@/lib/mascotToast", () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
 
+/** The picker's file field, which the drop area's button opens. */
+function fileInput(): HTMLInputElement {
+  const input = document.querySelector<HTMLInputElement>('input[type="file"]');
+  if (!input) throw new Error("no file input");
+  return input;
+}
+
 function job(overrides: Partial<DataJobRead> = {}): DataJobRead {
   return buildDataJob({
     id: 77,
@@ -207,10 +214,7 @@ describe("AtlassianExportStep", () => {
 
     const start = screen.getByRole("button", { name: /start reading/i });
     expect(start).toBeDisabled();
-    await userEvent.upload(
-      screen.getByLabelText(/choose the export/i),
-      new File(["zip"], "DOCS.zip", { type: "application/zip" })
-    );
+    await userEvent.upload(fileInput(), new File(["zip"], "DOCS.zip", { type: "application/zip" }));
     expect(screen.getByText("DOCS.zip")).toBeInTheDocument();
     // Both initiatives take wikis; one has to be picked.
     await userEvent.click(screen.getByRole("combobox"));
@@ -232,7 +236,7 @@ describe("AtlassianExportStep", () => {
     );
     renderWithProviders(<AtlassianExportStep initiatives={[TARGETS[0]]} onStarted={vi.fn()} />);
     await userEvent.upload(
-      screen.getByLabelText(/choose the export/i),
+      fileInput(),
       new File(["zip"], "backup.zip", { type: "application/zip" })
     );
     await userEvent.click(screen.getByRole("button", { name: /start reading/i }));

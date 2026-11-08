@@ -1,5 +1,4 @@
 import { Link, useParams } from "@tanstack/react-router";
-import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -12,6 +11,7 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { formatDateTime } from "@/lib/formatDate";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
 
 export const CommunityInvitePage = () => {
   const { code = "" } = useParams({ strict: false }) as { code: string };
@@ -78,9 +78,9 @@ export const CommunityInvitePage = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           {loading ? (
-            <p className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> {t("invite.loading")}
-            </p>
+            <SkeletonRegion>
+              <SkeletonLines lines={3} />
+            </SkeletonRegion>
           ) : (
             <>
               <div className="rounded border bg-muted/40 p-4 text-sm">

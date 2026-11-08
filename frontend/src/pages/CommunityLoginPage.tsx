@@ -10,6 +10,8 @@ import { useServer } from "@/hooks/useServer";
 import { providerSignInHref } from "@/lib/returnPath";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { SkeletonRegion } from "@/ui/page-skeletons";
+import { Skeleton } from "@/ui/skeleton";
 
 /**
  * A community's sign-in page — the URL its admins share with members.
@@ -52,7 +54,9 @@ export const CommunityLoginPage = () => {
               {t("communityLogin.nativeUnsupported")}
             </p>
           ) : providersQuery.isLoading ? (
-            <p className="text-center text-muted-foreground text-sm">{t("common:loading")}</p>
+            <SkeletonRegion>
+              <Skeleton className="h-10 w-full" />
+            </SkeletonRegion>
           ) : providers.length === 0 ? (
             <p className="text-center text-muted-foreground text-sm">
               {t("communityLogin.noProviders")}

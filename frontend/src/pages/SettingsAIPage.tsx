@@ -27,6 +27,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/
 import { Label } from "@/ui/label";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
+import { StatusMessage } from "@/ui/status-message";
 
 const MODES: AIConfigMode[] = ["disabled", "platform", "community"];
 
@@ -77,7 +78,7 @@ export const SettingsAIPage = () => {
   }
 
   if (modeQuery.isError || !modeQuery.data) {
-    return <p className="text-destructive text-sm">{t("ai.loadError")}</p>;
+    return <StatusMessage onRetry={modeQuery.refetch} />;
   }
 
   const isDirty = mode !== modeQuery.data.mode;

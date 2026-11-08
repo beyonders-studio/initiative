@@ -113,22 +113,17 @@
       "days_other": "{{count}} jours",
       "any": "N'importe quelle date"
     },
-    "loadError": "Liste Focus indisponible pour le moment.",
     "truncated": "Affichage des {{shown}} premières. Réduisez la période pour une liste plus courte.",
     "settingsHint": "Les tâches épinglées apparaissent toujours, quels que soient ces paramètres."
   },
   "myTasks": {
     "title": "Mes tâches",
     "noCommunity": "Aucune communauté",
-    "loadError": "Impossible de charger vos tâches.",
     "groupByDate": "Date",
     "groupByCommunity": "Communauté"
   },
   "myCalendar": {
     "title": "Mon calendrier"
-  },
-  "tagTasks": {
-    "loadError": "Impossible de charger les tâches."
   },
   "ai": {
     "fromComments_one": "Rédigé sans le commentaire de la tâche, qui ne tenait pas.",
@@ -183,8 +178,6 @@
   "move": {
     "title": "Déplacer la tâche vers un autre projet",
     "description": "Sélectionnez un projet de destination dans la communauté actuel. Vous ne pouvez déplacer des tâches que vers des projets où vous avez la permission de créer du travail.",
-    "loadError": "Impossible de charger les projets modifiables.",
-    "loading": "Chargement des projets disponibles…",
     "noProjects": "Vous n'avez encore aucun autre projet modifiable.",
     "searchPlaceholder": "Rechercher des projets…",
     "statusResetWarning": "Déplacer cette tâche réinitialisera son statut à « À traiter ».",

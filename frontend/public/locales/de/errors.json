@@ -119,7 +119,6 @@
   "PROJECT_INVALID_TEMPLATE": "Die ausgewählte Vorlage ist ungültig",
   "PROJECT_INITIATIVE_REQUIRED": "Eine Initiative ist erforderlich",
   "TASK_NOT_A_CASE": "Diese Aufgabe wurde nicht als Ticket eingereicht",
-  "TASK_NOT_AN_IDEA": "Diese Aufgabe ist nicht auf dem Ideen-Board",
   "IDEA_NOT_FOUND": "Diese Idee gibt es hier nicht mehr",
   "IDEA_CLOSED": "Diese Idee ist abgeschlossen, ihre Stimmen bleiben, wie sie sind",
   "TASK_STATUS_AT_LIMIT": "Diese Spalte ist voll. Verschiebe zuerst eine Aufgabe daraus.",

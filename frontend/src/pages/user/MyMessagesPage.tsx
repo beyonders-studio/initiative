@@ -56,6 +56,7 @@ import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { dateTimeFormat } from "@/ui/lib/intl";
 import { hour12Option } from "@/ui/lib/timeFormat";
 import { cn } from "@/ui/lib/utils";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
 import { Textarea } from "@/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
@@ -340,7 +341,9 @@ export function MyMessagesPage() {
             </Button>
           </div>
         ) : target.isLoading || !conversationsLoaded || channelOpen ? (
-          <p className="text-muted-foreground text-sm">{t("loading")}</p>
+          <SkeletonRegion>
+            <ListSkeleton rows={3} />
+          </SkeletonRegion>
         ) : target.data ? (
           <StartWithPerson person={target.data} />
         ) : (

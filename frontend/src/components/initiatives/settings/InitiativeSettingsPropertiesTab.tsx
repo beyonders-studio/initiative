@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ArrowUpToLine, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpToLine, Pencil, Plus, Trash2, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -50,6 +50,7 @@ import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { collator } from "@/ui/lib/intl";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
 
@@ -789,10 +790,9 @@ const OwnerProperties = ({
   let list: ReactNode;
   if (propertiesQuery.isLoading) {
     list = (
-      <div className="flex items-center gap-2 text-muted-foreground text-sm">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        {t("common:loading")}
-      </div>
+      <SkeletonRegion>
+        <ListSkeleton rows={3} avatar={false} />
+      </SkeletonRegion>
     );
   } else if (definitions.length === 0) {
     list = <p className="text-muted-foreground text-sm">{t(words.none)}</p>;
@@ -962,10 +962,9 @@ const InitiativeMetadata = ({ initiativeId }: { initiativeId: number }) => {
 
   if (groupsQuery.isLoading) {
     return (
-      <div className="flex items-center gap-2 text-muted-foreground text-sm">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        {t("common:loading")}
-      </div>
+      <SkeletonRegion>
+        <ListSkeleton rows={3} avatar={false} />
+      </SkeletonRegion>
     );
   }
 

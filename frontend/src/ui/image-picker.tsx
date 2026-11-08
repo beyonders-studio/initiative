@@ -34,18 +34,23 @@ const IMAGE_EXTENSIONS = new Set([
   ".bmp",
 ]);
 
-/** Whether this accept list would also take something that is not an image.
- *  An empty one takes anything. */
-export const acceptsNonImages = (accept: string): boolean =>
-  !accept.trim() ||
+const tokensOf = (accept: string) =>
   accept
     .split(",")
     .map((token) => token.trim().toLowerCase())
-    .filter(Boolean)
-    .some(
-      (token) =>
-        !token.startsWith("image/") && !["*", "*/*"].includes(token) && !IMAGE_EXTENSIONS.has(token)
-    );
+    .filter(Boolean);
+
+const isImage = (token: string) => token.startsWith("image/") || IMAGE_EXTENSIONS.has(token);
+const isAnything = (token: string) => token === "*" || token === "*/*";
+
+/** Whether this accept list would also take something that is not an image.
+ *  An empty one takes anything. */
+export const acceptsNonImages = (accept: string): boolean =>
+  !accept.trim() || tokensOf(accept).some((token) => !isImage(token) && !isAnything(token));
+
+/** Whether this accept list takes a picture at all. An empty one takes anything. */
+const acceptsImages = (accept: string): boolean =>
+  !accept.trim() || tokensOf(accept).some((token) => isImage(token) || isAnything(token));
 
 /**
  * Taking a picture with the camera, or choosing one from the photo library, on
@@ -93,7 +98,8 @@ interface ImagePickerProps {
   className?: string;
   /**
    * Off-native shape: the file field itself, or a button that opens the file
-   * dialog. On native both become the same menu button.
+   * dialog. On native, where the field takes pictures, both become the same
+   * menu button.
    */
   variant?: "input" | "button";
   /** Button content. Ignored by `variant="input"` off-native, where there is no button. */
@@ -118,6 +124,8 @@ export const ImagePicker = ({
   const { t } = useTranslation("ui");
   const inputRef = useRef<HTMLInputElement>(null);
   const { capturing, capture } = usePhotoCapture(onSelect);
+  // The camera is offered only where a picture is something the field takes.
+  const camera = Boolean(host.camera) && acceptsImages(accept);
 
   const handleInput = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -134,11 +142,11 @@ export const ImagePicker = ({
       accept={accept}
       disabled={disabled}
       onChange={handleInput}
-      className={variant === "button" || host.camera ? "hidden" : className}
+      className={variant === "button" || camera ? "hidden" : className}
       data-test-id={dataTestId}
       // A control the person never sees should not be a tab stop of its own.
-      tabIndex={variant === "button" || host.camera ? -1 : undefined}
-      aria-hidden={variant === "button" || host.camera ? true : undefined}
+      tabIndex={variant === "button" || camera ? -1 : undefined}
+      aria-hidden={variant === "button" || camera ? true : undefined}
     />
   );
 
@@ -149,7 +157,7 @@ export const ImagePicker = ({
     </>
   );
 
-  if (!host.camera) {
+  if (!camera) {
     if (variant === "input") return fileInput;
     return (
       <>

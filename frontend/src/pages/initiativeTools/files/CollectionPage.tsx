@@ -97,6 +97,7 @@ import { CardGridSkeleton, DetailHeaderSkeleton, SkeletonRegion } from "@/ui/pag
 import { RelativeTime } from "@/ui/relative-time";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
+import { StatusMessage } from "@/ui/status-message";
 
 /** A file as the wall and the table both list it. */
 type FileRow = CollectionFileSummary & { card: null };
@@ -634,7 +635,7 @@ export function CollectionPage() {
             <CardGridSkeleton count={8} className="grid grid-cols-fill-36/4 gap-3" />
           </SkeletonRegion>
         ) : feed.isError ? (
-          <p className="text-destructive text-sm">{t("loadError")}</p>
+          <StatusMessage onRetry={feed.refetch} />
         ) : rows.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
             <p className="font-medium">

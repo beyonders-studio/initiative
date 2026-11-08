@@ -19,9 +19,10 @@ from sqlalchemy import text
 
 from app.core.intake import IntakeStream
 from app.db import operations_schema
+from app.db import session as db_session
 from app.db.request_context import SystemGuild, Unattributed
+from app.db.schema_provisioning import guild_schema_name
 from app.db.session import set_rls_context
-from app.db.tenancy import OPERATIONS_TABLES
 from app.models.tenant.intake import IntakeBinding
 from app.testing import (
     create_guild,
@@ -55,9 +56,14 @@ def _upgrade(migration: ModuleType):
     return apply
 
 
+#: The operations tables there were when the revision ran; later ones are not
+#: its to keep or take.
+_TABLES = set(_load().TABLES)
+
+
 async def _tables(session, guild_id: int) -> set[str]:
     found = set()
-    for table in OPERATIONS_TABLES:
+    for table in _TABLES:
         result = await (await session.connection()).execute(
             text("SELECT to_regclass(:t) IS NOT NULL"),
             {"t": f'"guild_{guild_id}".{table}'},
@@ -79,6 +85,15 @@ async def test_only_a_community_with_operations_rows_keeps_their_tables(
     await make_operations_community(session, operations.id)
     for guild in (empty, former):
         await operations_schema.provision_operations(guild.id)
+        # The ideas role came after this revision, and its policies on the
+        # community's own tables read the operations tables.
+        async with db_session.provisioning_engine.begin() as conn:
+            await operations_schema._deprovision_role(
+                conn,
+                operations_schema.IDEAS,
+                operations_schema.IDEAS.name(guild.id),
+                guild_schema_name(guild.id),
+            )
     await set_rls_context(session, SystemGuild(former.id))
     session.add(IntakeBinding(stream=IntakeStream.support, project_id=project.id))
     await session.commit()
@@ -86,8 +101,8 @@ async def test_only_a_community_with_operations_rows_keeps_their_tables(
 
     try:
         await session.run_sync(_upgrade(_load()))
-        assert await _tables(session, operations.id) == OPERATIONS_TABLES
-        assert await _tables(session, former.id) == OPERATIONS_TABLES
+        assert await _tables(session, operations.id) == _TABLES
+        assert await _tables(session, former.id) == _TABLES
         assert await _tables(session, empty.id) == set()
     finally:
         await session.rollback()

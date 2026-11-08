@@ -73,8 +73,6 @@
   "addresses": {
     "title": "E-Mail-Adressen",
     "description": "Mit jeder bestätigten Adresse melden Sie sich an, und Ihre Kontopost geht an alle.",
-    "loadFailed": "Ihre Adressen konnten nicht geladen werden.",
-    "retry": "Erneut versuchen",
     "primary": "Hauptadresse",
     "unverified": "Nicht bestätigt",
     "makePrimary": "Als Hauptadresse festlegen",
@@ -118,8 +116,6 @@
     "waits": "Diese Änderung wartet bis {{date}}. Alle Adressen deines Kontos haben eine E-Mail dazu bekommen."
   },
   "security": {
-    "loadingDevices": "Geräte werden geladen…",
-    "devicesError": "Geräte konnten nicht geladen werden.",
     "unknownDevice": "Unbekanntes Gerät",
     "revoking": "Wird widerrufen…",
     "revokeError": "Gerätezugriff konnte nicht widerrufen werden",
@@ -143,8 +139,6 @@
     "nameRequired": "Name ist erforderlich",
     "createSuccess": "API-Schlüssel erstellt",
     "createError": "API-Schlüssel konnte nicht erstellt werden",
-    "loadingKeys": "API-Schlüssel werden geladen…",
-    "keysError": "API-Schlüssel konnten nicht geladen werden.",
     "noKeys": "Noch keine API-Schlüssel.",
     "statusExpired": "Abgelaufen",
     "statusDisabled": "Deaktiviert",
@@ -194,7 +188,6 @@
   },
   "ai": {
     "loading": "KI-Einstellungen werden geladen…",
-    "loadError": "KI-Einstellungen konnten nicht geladen werden.",
     "providerFieldLabel": "Anbieter",
     "providerPlaceholder": "Anbieter auswählen",
     "modelLabel": "Modell",
@@ -540,7 +533,6 @@
     "colorsTitle": "Markenfarben",
     "colorsDescription": "Passe die Akzentfarben für den hellen und dunklen Modus an.",
     "loadingInterface": "Oberflächeneinstellungen werden geladen…",
-    "interfaceError": "Oberflächeneinstellungen konnten nicht geladen werden.",
     "lightModeLabel": "Akzent im hellen Modus",
     "lightModeHelp": "Schaltflächen, Hervorhebungen und Fokuszustände verwenden diese Farbe, während sich die App im hellen Modus befindet.",
     "darkModeLabel": "Akzent im dunklen Modus",
@@ -615,8 +607,6 @@
   "email": {
     "platformOnly": "Nur der Plattform-Eigentümer kann die E-Mail-Einstellungen verwalten.",
     "title": "SMTP-E-Mail",
-    "loading": "E-Mail-Einstellungen werden geladen…",
-    "loadError": "E-Mail-Einstellungen konnten nicht geladen werden.",
     "hostLabel": "Host",
     "hostPlaceholder": "smtp.mailprovider.com",
     "portLabel": "Port",
@@ -645,7 +635,6 @@
   "push": {
     "platformOnly": "Nur der Plattform-Eigentümer kann die Einstellungen für Push-Benachrichtigungen verwalten.",
     "loading": "Einstellungen für Push-Benachrichtigungen werden geladen…",
-    "loadError": "Einstellungen für Push-Benachrichtigungen konnten nicht geladen werden.",
     "title": "Firebase Cloud Messaging",
     "description": "Optional. Ohne Dienstkontoschlüssel laufen Push-Benachrichtigungen über das Push-Relay von BeyondersStudio, und diese Felder können leer bleiben. Mit einem laufen Android-Pushes über dein eigenes Firebase-Projekt; iPhone-Pushes nutzen immer das Relay.",
     "enabledLabel": "Push-Benachrichtigungen senden",
@@ -702,7 +691,6 @@
   "auth": {
     "platformOnly": "Nur der Plattform-Eigentümer kann die Authentifizierungseinstellungen verwalten.",
     "loading": "Authentifizierungseinstellungen werden geladen…",
-    "loadError": "Authentifizierungseinstellungen konnten nicht geladen werden.",
     "postLoginRedirect": "Weiterleitung nach Anmeldung:",
     "mobileCallback": "Callback der mobilen App:",
     "deploymentTitle": "Diese Installation",
@@ -803,7 +791,6 @@
   },
   "platformUsers": {
     "loading": "Benutzer werden geladen…",
-    "loadError": "Benutzer konnten nicht geladen werden.",
     "filterPlaceholder": "Nach Handle filtern…",
     "columnId": "Benutzer-ID",
     "columnHandle": "Handle",
@@ -926,8 +913,6 @@
         "title": "Vorgänge",
         "count_one": "{{count}} offener Vorgang, den die Person eingereicht hat oder der sie betrifft.",
         "count_other": "{{count}} offene Vorgänge, die die Person eingereicht hat oder die sie betreffen.",
-        "loading": "Vorgänge werden geladen…",
-        "loadError": "Die Vorgänge konnten nicht geladen werden.",
         "filed": "Von der Person eingereicht",
         "about": "Betrifft die Person",
         "help": "Um einen Vorgang zu öffnen, brauchst du Zugriff auf das Projekt, in dem er geführt wird."
@@ -1109,7 +1094,6 @@
   "pluginServices": {
     "platformOnly": "Nur Plattform-Eigentümer können Plug-in-Dienste verwalten.",
     "loading": "Plug-in-Dienste werden geladen…",
-    "loadError": "Plug-in-Dienste konnten nicht geladen werden.",
     "title": "Plug-in-Dienste",
     "description": "Die Plug-ins, die diese Instanz ausführt. Das Listing eines Plug-ins sagt, was es ist und darf; hier gibst du an, wo es antwortet und mit welchen Schlüsseln es signiert.",
     "empty": "Noch keine Plug-in-Dienste. Ein Plug-in erscheint hier, sobald sein Listing eintrifft oder du es hinzufügst.",
@@ -1239,7 +1223,6 @@
   "providerPlacement": {
     "description": "Ordne die Leute, die ein Anmeldeanbieter anmeldet – nach der Gruppe oder dem Verzeichnis, das er meldet –, einer Community zu, und dort einer Initiative, wenn du eine nennst.",
     "loading": "Zuordnungsregeln werden geladen…",
-    "loadError": "Zuordnungsregeln konnten nicht geladen werden. Bitte versuche es erneut.",
     "platformOnly": "Die Zuordnung bei Anmeldung verwalten Plattform-Operatoren und -Owner.",
     "everywhere": {
       "label": "Zuordnungsregeln auf jede Community anwenden",
@@ -1309,7 +1292,6 @@
     "description": "Lege pro Community Obergrenzen für Speicher und Benutzeranzahl fest. Ein Limit unter die aktuelle Nutzung zu senken, blockiert neue Uploads oder Mitglieder, entfernt aber nie vorhandene Dateien oder Mitglieder.",
     "platformOnly": "Du benötigst eine Plattform-Mitarbeiterrolle, um Communities zu sehen.",
     "loading": "Communitys werden geladen…",
-    "loadError": "Communitys konnten nicht geladen werden. Bitte versuche es erneut.",
     "filterByName": "Communitys nach Namen filtern",
     "unlimitedPlaceholder": "Unbegrenzt",
     "helpText": "Speicherlimits sind in GB; Benutzerlimits sind eine Mitgliederzahl. Beide werden automatisch gespeichert – lass ein Feld leer für unbegrenzt.",
@@ -1389,7 +1371,6 @@
       "storageLabel": "Speicherlimit",
       "decidesForItself": "Was sie selbst entscheidet",
       "deleted": "Gelöscht",
-      "pluginSummariesUnavailable": "Die Plug-in-Nutzung konnte nicht geladen werden.",
       "narrowings": {
         "title": "Wen sie als ihre Leute zählt",
         "help": "Diese Community gibt an, welche Anmeldungen über einen Anbieter zu ihr gehören. Sie benennt die Werte selbst; erst Ihre Zustimmung erlaubt den automatischen Beitritt — bis dahin funktioniert die Verbindung nur für vorhandene Mitglieder.",
@@ -1442,7 +1423,6 @@
   "storage": {
     "platformOnly": "Nur Plattform-Eigentümer können den Speicher konfigurieren.",
     "loading": "Speichereinstellungen werden geladen…",
-    "loadError": "Speichereinstellungen konnten nicht geladen werden.",
     "title": "Objektspeicher",
     "description": "Lege fest, wo hochgeladene Dateien und Anhänge gespeichert werden. Standard ist das lokale Dateisystem; wechsle zu einem S3-kompatiblen Speicher für skalierbare oder geteilte Deployments.",
     "backendLabel": "Speicher-Backend",
@@ -1726,7 +1706,6 @@
     "title": "Identitätsanbieter",
     "description": "Die Single-Sign-on-Anbieter, mit denen sich Personen anmelden. Jeder erhält eine eigene Schaltfläche auf der Anmeldeseite.",
     "addProvider": "Anbieter hinzufügen",
-    "loading": "Anbieter werden geladen…",
     "empty": "Noch keine Anbieter konfiguriert.",
     "disabledBadge": "Deaktiviert",
     "editTitle": "Anmeldeanbieter bearbeiten",
@@ -1820,8 +1799,6 @@
     "add": "Verbindung hinzufügen",
     "toggleLabel": "{{label}} verwenden",
     "empty": "Noch keine Verbindungen. Füge eine hinzu, um KI-Funktionen zu aktivieren.",
-    "loading": "Verbindungen werden geladen…",
-    "loadError": "Verbindungen konnten nicht geladen werden.",
     "defaultBadge": "Standard",
     "keySet": "Gemeinsamer Schlüssel gesetzt",
     "noKey": "Kein gemeinsamer Schlüssel",
@@ -2049,7 +2026,6 @@
   "twoFactor": {
     "title": "Zwei-Faktor-Authentifizierung",
     "description": "Nach einem Passwort oder E-Mail-Code einen Code aus einer Authenticator-App abfragen, und immer dann, wenn eine Community oder dieser Server einen zweiten Faktor verlangt.",
-    "loading": "Wird geprüft …",
     "on": "Aktiv",
     "notSetUp": "Bei der Anmeldung wird kein Code aus einer App abgefragt.",
     "setUp": "Zwei-Faktor-Authentifizierung einrichten",
@@ -2085,7 +2061,6 @@
     "regenerateError": "Neue Codes konnten nicht erstellt werden.",
     "disableError": "Das konnte nicht deaktiviert werden.",
     "codePlaceholder": "123456",
-    "statusError": "Es ließ sich nicht prüfen, ob die Zwei-Faktor-Authentifizierung aktiv ist. Lade die Seite neu.",
     "copyUnavailable": "Kopieren nicht möglich – schreibe die Codes stattdessen auf.",
     "notOffered": "Diese Installation bietet die Authenticator-App nicht an.",
     "passwordlessCodes": "Dein Konto meldet sich ohne Passwort an. Mit diesen Codes legst du wieder eines fest, falls du deinen Passkey verlierst."
@@ -2093,8 +2068,6 @@
   "passkeys": {
     "title": "Passkeys",
     "description": "Melde dich mit Fingerabdruck, Gesicht oder Bildschirmsperre deines Geräts an – statt mit deinem Passwort.",
-    "loading": "Wird geprüft …",
-    "listError": "Es ließ sich nicht prüfen, welche Passkeys dieses Konto hat. Lade die Seite neu.",
     "empty": "Noch keine Passkeys.",
     "emptyHint": "Ein Passkey liegt auf deinem Telefon, deinem Laptop oder in deinem Passwort-Manager und funktioniert nur auf dieser Seite.",
     "add": "Passkey hinzufügen",
@@ -2267,7 +2240,6 @@
     "holdsNothing": "Umfasst noch nichts.",
     "builtIn": "Integriert",
     "loading": "Rollen werden geladen",
-    "loadError": "Die Rollen konnten nicht geladen werden.",
     "closed": "Wer diesen Server betreibt, hat eigene Rollen für diese Community geschlossen. Die vorhandenen Rollen gelten weiter.",
     "deleteTitle": "{{name}} löschen?",
     "deleteDescription": "Wer sie hat, kehrt zu seiner einfachen Rolle zurück.",
@@ -2348,9 +2320,6 @@
     "orderError": "Die Regeln konnten nicht neu sortiert werden",
     "removeError": "Die Regel konnte nicht entfernt werden",
     "closed": "Dein Server hat eigene Rollen für diese Community abgeschaltet. Diese Regeln gelten weiter; hier kann sie niemand ändern.",
-    "loading": "Regeln werden geladen …",
-    "loadError": "Die Regeln konnten nicht geladen werden.",
-    "retry": "Erneut versuchen",
     "editTitle": "Rollenregel bearbeiten",
     "saved": "Regel gespeichert",
     "saveError": "Die Regel konnte nicht gespeichert werden"

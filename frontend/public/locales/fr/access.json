@@ -156,8 +156,6 @@
     "batchTitle": "Demandes d'accès",
     "answered": "Déjà traitée",
     "answeredDescription": "Il n'y a plus rien à traiter ici.",
-    "loading": "Chargement des demandes…",
-    "loadError": "Impossible de charger ces demandes.",
     "error": "Impossible d'envoyer votre réponse. Veuillez réessayer."
   }
 }

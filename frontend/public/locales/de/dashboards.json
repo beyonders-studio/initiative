@@ -12,8 +12,6 @@
     "noMatchingDashboards": "Keine Dashboards entsprechen deinen Filtern."
   },
   "loading": "Dashboards werden geladen...",
-  "loadError": "Dashboards konnten nicht geladen werden.",
-  "loadingDashboard": "Dashboard wird geladen...",
   "creating": "Wird erstellt...",
   "notFound": "Dashboard nicht gefunden",
   "notFoundDescription": "Das gesuchte Dashboard existiert nicht oder wurde entfernt.",
@@ -197,7 +195,6 @@
     "absolute": "An einem Datum",
     "relativeDays": "Tage ab heute",
     "relativeHint": "Zählt ab dem Moment, in dem das Dashboard geöffnet wird – veraltet also nie.",
-    "loading": "Filter werden geladen…",
     "noFields": "Hier gibt es noch nichts zum Filtern.",
     "matchPrefix": "Auf",
     "match": "Alle oder einen erfüllen",

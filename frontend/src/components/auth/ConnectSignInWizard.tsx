@@ -45,7 +45,7 @@ import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
-import { WizardDialog } from "@/ui/wizard-dialog";
+import { WizardDialog, WizardOption } from "@/ui/wizard-dialog";
 
 /** Which claim narrows which provider. Each one spells "our tenant"
  *  differently, and only the provider knows which word it uses. */
@@ -282,28 +282,25 @@ export const ConnectSignInWizard = ({
         ) : (
           <div className="grid grid-cols-2 gap-2">
             {choosable.map((row) => (
-              <button
+              <WizardOption
                 key={row.id}
-                type="button"
                 disabled={!row.login_ready}
-                className="flex items-start gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
-                onClick={() => chooseProvider(row)}
-              >
-                <ProviderMark icon={row.icon} className="mt-0.5" />
-                <div className="min-w-0 space-y-1">
-                  <div className="truncate font-medium text-sm">{row.display_name}</div>
-                  {!row.login_ready && (
-                    <Badge variant="outline">
+                className="items-start"
+                icon={<ProviderMark icon={row.icon} className="mt-0.5" />}
+                title={row.display_name}
+                description={
+                  !row.login_ready ? (
+                    <Badge variant="outline" className="mt-1">
                       {t("settings:communityAuth.connections.notReady")}
                     </Badge>
-                  )}
-                  {row.login_ready && inheritedByProvider.has(row.id) && (
-                    <Badge variant="outline">
+                  ) : inheritedByProvider.has(row.id) ? (
+                    <Badge variant="outline" className="mt-1">
                       {t("settings:communityAuth.connections.inherited")}
                     </Badge>
-                  )}
-                </div>
-              </button>
+                  ) : null
+                }
+                onClick={() => chooseProvider(row)}
+              />
             ))}
           </div>
         ))}

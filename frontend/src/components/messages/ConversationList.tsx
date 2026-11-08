@@ -30,6 +30,7 @@ import { getUrlHandle, getUserHandle } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { cn } from "@/ui/lib/utils";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 const ROW = "flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-2 text-sm";
 
@@ -469,7 +470,9 @@ export const ConversationList = ({ explain = false }: { explain?: boolean } = {}
       </div>
 
       {conversations.isLoading ? (
-        <p className="px-2 py-1 text-muted-foreground text-sm">{t("loading")}</p>
+        <SkeletonRegion className="px-2 py-1">
+          <ListSkeleton rows={4} />
+        </SkeletonRegion>
       ) : (
         <>
           {waiting.length > 0 ? (

@@ -21,8 +21,7 @@
     },
     "columns": {
       "in": "In"
-    },
-    "loadError": "Couldn't load what carries this tag."
+    }
   },
   "manage": {
     "edit": "Edit tags",

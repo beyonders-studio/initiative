@@ -41,6 +41,7 @@ import { Markdown } from "@/components/Markdown";
 import { useGrantToolsToMembers } from "@/hooks/useInitiativeRoles";
 import { useCreateInitiative } from "@/hooks/useInitiatives";
 import { useWizard } from "@/hooks/useWizard";
+import { DEFAULT_COLOR } from "@/lib/initiativeColors";
 import { docsUrl } from "@/lib/links";
 import { toast } from "@/lib/mascotToast";
 import { DEFAULT_ENABLED_TOOLS, TOOLS, toolViewPermission } from "@/lib/tools";
@@ -53,8 +54,6 @@ import { Label } from "@/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 import { Textarea } from "@/ui/textarea";
 import { WizardBackButton, WizardDialog } from "@/ui/wizard-dialog";
-
-const DEFAULT_INITIATIVE_COLOR = "#6366F1";
 
 /** Where the idea is explained properly, for somebody who wants more than a
  *  paragraph. Opens in its own tab: the wizard is half-filled by this point. */
@@ -108,7 +107,7 @@ export const CreateInitiativeWizard = ({
   const { step, go, back, canGoBack, reset } = useWizard<Step>("details");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [color, setColor] = useState(DEFAULT_INITIATIVE_COLOR);
+  const [color, setColor] = useState(DEFAULT_COLOR);
   const [joinPolicy, setJoinPolicy] = useState<InitiativeJoinPolicy>(InitiativeJoinPolicy.private);
   const [selected, setSelected] = useState<Record<string, boolean>>(defaultSelection);
   const [audience, setAudience] = useState<MemberAudience>("view");
@@ -128,7 +127,7 @@ export const CreateInitiativeWizard = ({
     reset();
     setName("");
     setDescription("");
-    setColor(DEFAULT_INITIATIVE_COLOR);
+    setColor(DEFAULT_COLOR);
     setJoinPolicy(InitiativeJoinPolicy.private);
     setSelected(defaultSelection());
     setAudience("view");

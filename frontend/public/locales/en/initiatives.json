@@ -3,8 +3,6 @@
   "subtitle": "Open an initiative to manage files, projects, and membership.",
   "newInitiative": "New initiative",
   "selectCommunity": "Select a community",
-  "loading": "Loading initiatives…",
-  "loadError": "Unable to load initiatives right now.",
   "noDescription": "No description yet.",
   "members": "Members:",
   "createInitiative": "Create initiative",
@@ -24,7 +22,6 @@
     "requestError": "Unable to send this request right now.",
     "queueTitle": "Requests to join",
     "queueDescription": "People who asked to join this initiative. Approving adds them as a member.",
-    "queueLoadError": "Unable to load the join requests right now.",
     "noMessage": "No message",
     "unknownRequester": "Someone",
     "priorDenials_one": "Denied {{count}} time before",
@@ -38,8 +35,6 @@
   "manage": {
     "description": "Every initiative in this community and who runs it. Make someone a project manager to put them in charge of one; make yourself one to work in it from your own sidebar.",
     "adminRequired": "You need to be a community admin to manage initiatives.",
-    "loading": "Loading initiatives…",
-    "loadError": "Unable to load initiatives right now.",
     "filterByName": "Filter by name",
     "nameColumn": "Initiative",
     "managersColumn": "Project managers",
@@ -166,7 +161,6 @@
     "roleUpdateError": "Unable to update role right now.",
     "rolesTitle": "Role permissions",
     "rolesDescription": "What each role can see, and what it can make. Managers hold everything.",
-    "loadingRoles": "Loading roles...",
     "addCustomRole": "Add custom role",
     "setByCommunity": "Your community sets this for every initiative.",
     "customRolesOff": "Your community keeps initiatives to their built-in roles.",
@@ -270,8 +264,7 @@
     "layouts": {
       "heading": "Layouts",
       "description": "How each tool in this initiative draws what it holds: each layout, when it was last changed, and which list a project opens on. They are changed in each one's editor.",
-      "noProjects": "This initiative has no projects yet.",
-      "loadError": "Couldn't load the layouts."
+      "noProjects": "This initiative has no projects yet."
     },
     "fixedOn": "On",
     "fixedOff": "Off"

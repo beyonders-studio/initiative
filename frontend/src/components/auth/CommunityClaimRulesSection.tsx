@@ -56,6 +56,7 @@ import {
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
@@ -190,7 +191,9 @@ export const CommunityClaimRulesSection = ({ communityId }: { communityId: numbe
       </div>
 
       {rulesQuery.isLoading ? (
-        <p className="text-muted-foreground text-sm">{t("authProviders.loading")}</p>
+        <SkeletonRegion>
+          <ListSkeleton rows={3} />
+        </SkeletonRegion>
       ) : rules.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("communityAuth.rules.empty")}</p>
       ) : (

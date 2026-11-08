@@ -15,6 +15,7 @@ import { hitIcon } from "@/lib/searchResults";
 import { getAvatarSrc, getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
 import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
 import { cn } from "@/ui/lib/utils";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 /** How many rows a mention picker offers. */
 const MENTION_LIMIT = 8;
@@ -227,7 +228,9 @@ export const MentionPopover = ({
   if (isLoading) {
     return (
       <div ref={popoverRef} style={positionStyle} className={cn(shell, "p-2")}>
-        <p className="text-muted-foreground text-sm">{t("common:loading")}</p>
+        <SkeletonRegion>
+          <ListSkeleton rows={3} />
+        </SkeletonRegion>
       </div>
     );
   }

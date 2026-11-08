@@ -3,7 +3,6 @@
   "description": "Alles, womit dies verbunden ist — und wie.",
   "untitled": "Ohne Titel",
   "empty": "Noch nichts verknüpft.",
-  "loadFailed": "Verknüpfungen antworten nicht. Versuch es gleich noch einmal.",
   "add": "Verknüpfung hinzufügen",
   "graph": {
     "alt": "{{title}} und die {{count}} damit verknüpften Dinge",
@@ -95,7 +94,6 @@
       "option": "ist markiert"
     }
   },
-  "loading": "Wird geladen…",
   "empty_task": "Noch nichts verknüpft. Verknüpfe die Datei, die diese Aufgabe beschreibt, oder die Aufgabe, von der sie blockiert wird.",
   "empty_file": "Noch nichts verknüpft. Verknüpfe das Projekt, das dies erklärt, oder die Aufgabe, aus der es entstanden ist.",
   "empty_project": "Noch nichts verknüpft. Häng die Dateien an, auf denen dieses Projekt aufbaut.",

@@ -498,7 +498,7 @@ describe("ModerationPage", () => {
     state.sharingFailed = true;
     await openSharing();
 
-    expect(await screen.findByText("Could not load that. Try again.")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(
       screen.queryByText("Nothing here has been shared with anybody in particular.")
     ).not.toBeInTheDocument();

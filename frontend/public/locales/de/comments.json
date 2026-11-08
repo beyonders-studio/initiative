@@ -20,7 +20,6 @@
   "formattingSyntax": "Formatierung",
   "insertEntityMention": "Auf alles in dieser Initiative verweisen",
   "insertUserMention": "Ein Mitglied erwähnen",
-  "loadError": "Kommentare können derzeit nicht geladen werden.",
   "loadOlder": "Ältere Kommentare laden",
   "loading": "Kommentare werden geladen...",
   "markdownHint": "Markdown wird unterstützt: **fett**, *kursiv*, `Code`, Listen und Links.",
