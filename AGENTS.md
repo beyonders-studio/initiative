@@ -27,7 +27,7 @@ project files. Read `history/` only when asked to review past planning.
 - **A linked worktree needs nothing copied in.** It reads the main checkout's `backend/.env`, tests included, then its own `backend/.env` on top if it has one, for whatever it is trying out (an OIDC provider, say; `app/core/config.py`). `dev-ports.sh` points it at the main checkout's compose file and Postgres. It shares the main checkout's dev database unless its branch changes migrations, committed or not: then it runs on a dev database of its own (`initiative_dev_<id>`, its roles prefixed `dev_<id>_`), which `dev-migrate` creates, migrates and the launch seeds, and `python scripts/drop_test_dbs.py --orphaned --yes` drops once the worktree is gone. The seeder reads from the database whether it is seeded.
 - `.mcp.json` gives agents a `browser` MCP server: `@playwright/mcp`, running headless on the Chromium `pnpm exec playwright install chromium` downloads (no Google Chrome needed). An override in `frontend/pnpm-workspace.yaml` runs it on the Playwright `@playwright/test` is on, so either can be bumped alone; `frontend/src/__tests__/playwrightMcp.test.ts` fails if they would ever run different Chromium builds.
 - `docker-compose up --build` — start Postgres 17 and the app image (API and SPA from one uvicorn).
-- `cd backend && pytest` / `ruff check app` and `cd frontend && pnpm lint` — run tests and linters. Tests are co-located alongside source files in `app/` (not in a separate `tests/` directory).
+- `cd backend && pytest app/services/guilds_test.py` / `ruff check app` and `cd frontend && pnpm lint` — run the test files for the code you changed, and the linters. Tests are co-located alongside source files in `app/` (not in a separate `tests/` directory). CI runs the rest (see "Running Tests").
 - `scripts/ci/check` — the fast checks CI runs (ruff, ruff format, ty, no merged migration edited, one Alembic head, biome, tsc, and generated-types / `env-contract.json` drift), for what the branch changed against `origin/dev`. CI calls the same script for those steps, and the husky pre-push hook runs it (`git push --no-verify` skips it once). No tests and no database. `scripts/ci/check all` runs everything; `scripts/ci/check codegen` regenerates drifted files for you to review and commit.
 - `scripts/ci/api-compat` — whether the API still takes what the last release's did (oasdiff against the `openapi.json` that release's GitHub release carries; needs Docker and `gh`). CI runs it on pull requests. A break made on purpose is listed in `backend/api-breaking-changes.md`, under the release it ships in.
 
@@ -326,7 +326,7 @@ Python uses 4-space indentation, full type hints, `snake_case` modules/functions
 
 ## Testing Guidelines
 
-Tests are co-located next to their source files using a `_test.py` suffix (e.g., `app/services/guilds_test.py` tests `app/services/guilds.py`). Shared test factories live in `app/testing/factories.py` and are re-exported from `app/testing/__init__.py`. The root `backend/conftest.py` provides session, client, and auth fixtures. Run all tests with `cd backend && pytest` (testpaths is set to `app` in `pytest.ini`). For new UI logic, add Vitest + Testing Library specs under the relevant feature folder (or `frontend/src/__tests__`); prioritize coverage for auth, project CRUD, and optimistic updates.
+Tests are co-located next to their source files using a `_test.py` suffix (e.g., `app/services/guilds_test.py` tests `app/services/guilds.py`). Shared test factories live in `app/testing/factories.py` and are re-exported from `app/testing/__init__.py`. The root `backend/conftest.py` provides session, client, and auth fixtures. Locally, run the test files for the code you changed, by path, and leave the whole suite to CI: it runs the tests a change reaches on each pull request and every test on each push to `dev` (see "Which backend tests a pull request runs"). `testpaths` is `app` in `pytest.ini`. For new UI logic, add Vitest + Testing Library specs under the relevant feature folder (or `frontend/src/__tests__`); prioritize coverage for auth, project CRUD, and optimistic updates.
 
 ### Running Tests
 
@@ -455,29 +455,33 @@ cd backend && pytest --cov=app --cov-config=.coveragerc --cov-report=term-missin
 ```
 
 ```bash
-# Run all backend tests
-cd backend && pytest
+# Run tests for a specific module
+cd backend && pytest app/services/guilds_test.py
 
 # Single process — for a clean traceback or a debugger
 cd backend && pytest -n 0 app/services/guilds_test.py
 
-# Run tests for a specific module
-cd backend && pytest app/services/guilds_test.py
-
 # Run tests for a whole directory
 cd backend && pytest app/api/v1/endpoints/
 
-# Run tests for files you've changed (vs dev)
+# Run tests for files you've changed (vs dev); every test, with -n auto, when
+# app/testing, app/models, app/core, app/db or a conftest.py changed
 cd backend && ./scripts/test-changed.sh
 
 # Run tests for staged files only
 cd backend && ./scripts/test-changed.sh --staged
 
+# Every backend test, as CI runs it on dev
+cd backend && pytest -n auto
+
 # The request-context seam's conformance suite (deselected by default; CI runs
 # it on integration pushes and on pull requests that touch the seam)
 cd backend && pytest -m seam app/db/seam_conformance_test.py
 
-# Run all frontend tests
+# Run one frontend test file, in one worker
+cd frontend && NODE_OPTIONS=--max-old-space-size=1536 pnpm vitest run --pool=forks --maxWorkers=1 --no-file-parallelism src/lib/backupPeek.test.ts
+
+# Every frontend test, a worker per core
 cd frontend && pnpm test:run
 
 # The browser journeys (frontend/e2e/*.journey.ts) against a fresh install:
@@ -490,7 +494,8 @@ cd frontend && pnpm screenshots
 # Run frontend tests in watch mode
 cd frontend && pnpm test
 
-# Run frontend tests for files you've changed (vs dev)
+# Run frontend tests for files you've changed (vs dev); every test when
+# src/lib, src/types, src/api or the shared test helpers changed
 cd frontend && ./scripts/test-changed.sh
 
 # Run frontend tests for staged files only

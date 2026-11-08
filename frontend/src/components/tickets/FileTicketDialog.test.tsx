@@ -42,11 +42,11 @@ vi.mock("@/hooks/useTickets", async () => {
   };
 });
 
-import { FileTicketSheet, type FileTicketSheetProps } from "./FileTicketSheet";
+import { FileTicketDialog, type FileTicketDialogProps } from "./FileTicketDialog";
 
-const report = (props: Partial<FileTicketSheetProps> = {}) =>
+const report = (props: Partial<FileTicketDialogProps> = {}) =>
   renderWithProviders(
-    <FileTicketSheet
+    <FileTicketDialog
       open
       onOpenChange={() => {}}
       ticket={{ stream: "moderation", targetType: "comment", targetId: 42 }}
@@ -56,11 +56,15 @@ const report = (props: Partial<FileTicketSheetProps> = {}) =>
     { auth: { user: buildUser() } }
   );
 
-const chooseReason = async (user: ReturnType<typeof userEvent.setup>, name: string) => {
-  await user.click(screen.getByRole("radio", { name }));
+/** Picks `name` from the dropdown labelled `field`. */
+const choose = async (user: ReturnType<typeof userEvent.setup>, field: string, name: string) => {
+  await user.click(screen.getByLabelText(field));
+  await user.click(await screen.findByRole("option", { name }));
 };
+const chooseReason = (user: ReturnType<typeof userEvent.setup>, name: string) =>
+  choose(user, "What is wrong?", name);
 
-describe("FileTicketSheet", () => {
+describe("FileTicketDialog", () => {
   beforeEach(() => {
     fileMutate.mockClear();
     contacts.moderation = null;
@@ -100,7 +104,7 @@ describe("FileTicketSheet", () => {
 
       await chooseReason(user, "Illegal");
       expect(send).toBeDisabled();
-      await user.click(screen.getByRole("radio", { name: "Privacy" }));
+      await choose(user, "Which law?", "Privacy");
       // A law named, and still nothing said about it.
       expect(send).toBeDisabled();
       await user.type(screen.getByLabelText("Tell them what you saw"), "My home address.");
@@ -122,7 +126,7 @@ describe("FileTicketSheet", () => {
       const user = userEvent.setup();
 
       await chooseReason(user, "Illegal");
-      await user.click(screen.getByRole("radio", { name: "Child safety" }));
+      await choose(user, "Which law?", "Child safety");
 
       expect(screen.getByText(/Don't attach anything/)).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Attach files" })).not.toBeInTheDocument();
@@ -227,7 +231,7 @@ describe("FileTicketSheet", () => {
 
       contacts.moderation = "trust@example.org";
       view.rerender(
-        <FileTicketSheet
+        <FileTicketDialog
           open
           onOpenChange={() => {}}
           ticket={{ stream: "moderation", targetType: "comment", targetId: 42 }}
@@ -242,7 +246,7 @@ describe("FileTicketSheet", () => {
   describe("reporting a security problem", () => {
     it("sends what it is about, a line and the words, from nowhere in particular", async () => {
       renderWithProviders(
-        <FileTicketSheet
+        <FileTicketDialog
           open
           onOpenChange={() => {}}
           ticket={{ stream: "security" }}
@@ -257,7 +261,7 @@ describe("FileTicketSheet", () => {
       await user.type(screen.getByLabelText("What did you find?"), "On the sign-in reply.");
       // Not until it says what kind of problem it is.
       expect(send).toBeDisabled();
-      await user.click(screen.getByRole("radio", { name: "A weakness in this server" }));
+      await choose(user, "What is it about?", "A weakness in this server");
       await user.click(send);
 
       expect(fileMutate).toHaveBeenCalledWith({

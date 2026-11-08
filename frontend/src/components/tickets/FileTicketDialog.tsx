@@ -3,15 +3,15 @@
  * are asked from Help (`components/help/HelpPanel`), and feedback from its
  * own sheet.
  *
- * One sheet for both, opened by a Report flag or the security report. Like
- * Help and feedback it docks beside the page on a wide screen, so what is
- * being reported stays in view, and rises from the bottom on a phone. Each
- * kind brings its own fields; sending, the thanks and the fallback are shared.
+ * One dialog for both, opened by a Report flag or the security report: a
+ * report is about one thing, already chosen, so it holds the page still while
+ * it is written. Each kind brings its own fields; sending, the thanks and the
+ * fallback are shared.
  *
- * Once sent, the sheet thanks the reporter and, where the server gave one,
+ * Once sent, the dialog thanks the reporter and, where the server gave one,
  * shows an address to write to as well.
  *
- * Where the server takes no reports here but gave an address, the sheet
+ * Where the server takes no reports here but gave an address, the dialog
  * becomes that address, with what was written.
  *
  * A report of something illegal names the law and says what is wrong. A
@@ -43,13 +43,18 @@ import {
 import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/ui/empty";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
-import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
-import { cn } from "@/ui/lib/utils";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui/sheet";
-import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** Match the columns behind them, so a field stops where the server would. */
 const BODY_MAX = 5000;
@@ -95,7 +100,7 @@ export type TicketKind =
       targetId: number;
     };
 
-export interface FileTicketSheetProps {
+export interface FileTicketDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   ticket: TicketKind;
@@ -104,10 +109,11 @@ export interface FileTicketSheetProps {
   communityId: number | null;
 }
 
-/** One of a few answers, as a row of chips. */
+/** One of several answers, from a dropdown. */
 const Choice = <T extends string>({
   id,
   label,
+  placeholder,
   value,
   options,
   labelOf,
@@ -116,44 +122,37 @@ const Choice = <T extends string>({
 }: {
   id: string;
   label: string;
+  placeholder: string;
   value: T | "";
   options: T[];
   labelOf: (option: T) => string;
   onChange: (option: T) => void;
   disabled?: boolean;
 }) => (
-  <div className="grid gap-2">
-    <span id={id} className="font-medium text-sm">
-      {label}
-    </span>
-    <ToggleGroup
-      type="single"
-      value={value}
-      // An answer is kept once chosen: choosing it again keeps it.
-      onValueChange={(next) => next && onChange(next as T)}
-      aria-labelledby={id}
-      variant="outline"
-      size="sm"
-      className="flex-wrap justify-start"
-      disabled={disabled}
-    >
-      {options.map((option) => (
-        <ToggleGroupItem key={option} value={option} className="rounded-full px-3">
-          {labelOf(option)}
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
+  <div className="space-y-1.5">
+    <Label htmlFor={id}>{label}</Label>
+    <Select value={value} onValueChange={(next) => onChange(next as T)} disabled={disabled}>
+      <SelectTrigger id={id} className="w-full">
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((option) => (
+          <SelectItem key={option} value={option}>
+            {labelOf(option)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   </div>
 );
 
-export const FileTicketSheet = ({
+export const FileTicketDialog = ({
   open,
   onOpenChange,
   ticket,
   communityId,
-}: FileTicketSheetProps) => {
+}: FileTicketDialogProps) => {
   const { t } = useTranslation(["intake", "moderation", "common"]);
-  const wide = atLeast(useWidthClass(), "sm");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [reason, setReason] = useState<ReportReason | "">("");
@@ -252,19 +251,14 @@ export const FileTicketSheet = ({
 
   return (
     // Open until the send settles, so what is being sent is not sent twice.
-    <Sheet
+    <Dialog
       open={open}
       onOpenChange={(next) => {
         if (!pending) onOpenChange(next);
       }}
-      modal={!wide}
     >
-      <SheetContent
-        side={wide ? "bottom-right" : "bottom"}
-        className={cn("flex flex-col gap-0 p-0", !wide && "max-h-[85dvh] rounded-t-2xl")}
-        style={wide ? undefined : { paddingBottom: "var(--safe-area-inset-bottom)" }}
-        // Docked beside the page, it stays open while the page is used.
-        onInteractOutside={wide ? (event) => event.preventDefault() : undefined}
+      <DialogContent
+        className="flex max-h-[85dvh] flex-col"
         onKeyDown={(event) => {
           if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
             event.preventDefault();
@@ -272,14 +266,12 @@ export const FileTicketSheet = ({
           }
         }}
       >
-        <SheetHeader className="space-y-1 py-4 pr-12 pl-4 text-left">
-          <SheetTitle className="text-base">
-            {isReport ? t("moderation:report.title") : t("security.title")}
-          </SheetTitle>
-          <SheetDescription>
+        <DialogHeader>
+          <DialogTitle>{isReport ? t("moderation:report.title") : t("security.title")}</DialogTitle>
+          <DialogDescription>
             {isReport ? t("moderation:report.description") : t("security.description")}
-          </SheetDescription>
-        </SheetHeader>
+          </DialogDescription>
+        </DialogHeader>
 
         {sent ? (
           <Empty role="status" className="border-0">
@@ -298,12 +290,13 @@ export const FileTicketSheet = ({
           </Empty>
         ) : (
           <>
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-4">
+            <div className="-mx-1 min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-1">
               {isReport ? (
                 <>
                   <Choice
                     id="ticket-reason"
                     label={t("moderation:report.reasonLabel")}
+                    placeholder={t("moderation:report.reasonPlaceholder")}
                     value={reason}
                     options={REASONS}
                     labelOf={(value) => t(`moderation:reasons.${value}`)}
@@ -311,10 +304,11 @@ export const FileTicketSheet = ({
                     disabled={pending}
                   />
                   {illegal ? (
-                    <div className="grid gap-2">
+                    <div className="space-y-1.5">
                       <Choice
                         id="ticket-basis"
                         label={t("moderation:report.basisLabel")}
+                        placeholder={t("moderation:report.basisPlaceholder")}
                         value={basis}
                         options={BASES}
                         labelOf={(value) => t(`moderation:hold.bases.${value}`)}
@@ -363,6 +357,7 @@ export const FileTicketSheet = ({
                   <Choice
                     id="ticket-topic"
                     label={t("security.topicLabel")}
+                    placeholder={t("security.topicPlaceholder")}
                     value={topic}
                     options={SECURITY_TOPICS}
                     labelOf={(value) => t(`intake:security.topics.${value}`)}
@@ -409,22 +404,15 @@ export const FileTicketSheet = ({
               ) : null}
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t px-4 py-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={pending}
-                onClick={() => onOpenChange(false)}
-              >
-                {t("common:cancel")}
-              </Button>
-              <Button size="sm" disabled={!ready || pending} onClick={send}>
-                {isReport ? t("moderation:report.submit") : t("security.submit")}
-              </Button>
-            </div>
+            <DialogFooter
+              submitLabel={isReport ? t("moderation:report.submit") : t("security.submit")}
+              onSubmit={send}
+              pending={pending}
+              disabled={!ready}
+            />
           </>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 };
