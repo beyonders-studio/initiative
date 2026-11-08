@@ -1,8 +1,9 @@
-import { Outlet, useLocation, useRouter } from "@tanstack/react-router";
+import { Outlet } from "@tanstack/react-router";
 import { type ReactNode, Suspense, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SupportTopic } from "@/api/generated/initiativeAPI.schemas";
+import { SettingsPageHeader } from "@/components/settings/SettingsPageHeader";
 import { SettingsTabsNav } from "@/components/settings/SettingsTabsNav";
 import { HelpLink } from "@/components/support/HelpLink";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -10,8 +11,6 @@ import { useCommunityBillingSummary } from "@/hooks/useCommunityBillingSummary";
 import { useCommunitySettingsTabs } from "@/hooks/useCommunitySettingsTabs";
 import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { trialDaysLeft } from "@/lib/billingSummary";
-import { extractSubPath, isCommunityScopedPath } from "@/lib/communityUrl";
-import { matchActiveTab } from "@/lib/tabs";
 import { Badge } from "@/ui/badge";
 import { SettingsPaneSkeleton } from "@/ui/page-skeletons";
 
@@ -21,8 +20,6 @@ export const CommunitySettingsLayout = () => {
   // Whether what the reader holds may also be changed. Without it every
   // control on these pages is shown disabled.
   const changesSettings = useHeldSurfaces().writes;
-  const currentPath = useLocation({ select: (location) => location.pathname });
-  const router = useRouter();
   const { tabs, isLoading } = useCommunitySettingsTabs();
 
   // The Usage tab says when the plan wants a look: a failed payment, or a
@@ -66,32 +63,12 @@ export const CommunitySettingsLayout = () => {
 
   if (!canViewSettings) {
     return (
-      <div className="space-y-6">
-        <h1 className="font-semibold text-3xl tracking-tight">{t("communityLayout.title")}</h1>
-        <p className="text-muted-foreground text-sm">{t("communityLayout.permissionDenied")}</p>
-      </div>
+      <SettingsPageHeader
+        title={t("communityLayout.title")}
+        description={t("communityLayout.permissionDenied")}
+      />
     );
   }
-
-  // Normalize path for tab matching
-  const normalizedPath = isCommunityScopedPath(currentPath)
-    ? extractSubPath(currentPath).replace(/\/+$/, "") || "/"
-    : currentPath.replace(/\/+$/, "") || "/";
-
-  // Derived from the tabs themselves rather than restated: a second hand-kept
-  // list is a tab that highlights the wrong one the day someone adds a tab and
-  // updates only the list they happened to be looking at. The tab paths are
-  // community-prefixed; matching happens on the sub-path.
-  const tabSubPaths = communitySettingsTabs.map((tab) => ({
-    value: tab.value,
-    path: extractSubPath(tab.path),
-  }));
-
-  const activeTab = matchActiveTab(
-    tabSubPaths,
-    normalizedPath,
-    communitySettingsTabs[0]?.value ?? "community"
-  );
 
   // A read-only community shows the admin a prominent notice pointing them to the
   // platform operator (the status reaches admins only — see the backend
@@ -105,25 +82,18 @@ export const CommunitySettingsLayout = () => {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-semibold text-3xl tracking-tight">{t("communityLayout.title")}</h1>
-        </div>
+      <SettingsPageHeader
+        title={t("communityLayout.title")}
+        description={changesSettings ? null : t("communityLayout.viewOnly")}
+      >
         {statusNotice && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <p className="font-bold text-destructive text-sm">{statusNotice.message}</p>
             <HelpLink topic={SupportTopic.community} communityId={activeCommunity?.id ?? null} />
           </div>
         )}
-        {!changesSettings && (
-          <p className="text-muted-foreground text-sm">{t("communityLayout.viewOnly")}</p>
-        )}
-      </div>
-      <SettingsTabsNav
-        tabs={communitySettingsTabs}
-        activeTab={activeTab}
-        onNavigate={(path) => router.navigate({ to: path })}
-      />
+      </SettingsPageHeader>
+      <SettingsTabsNav tabs={communitySettingsTabs} />
       <fieldset disabled={!changesSettings} className="m-0 min-w-0 border-0 p-0">
         <Suspense fallback={<SettingsPaneSkeleton />}>
           <Outlet />

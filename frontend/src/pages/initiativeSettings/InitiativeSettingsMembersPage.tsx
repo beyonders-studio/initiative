@@ -17,9 +17,9 @@ import {
   InitiativeJoinPolicy,
   type InitiativeMemberRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { InitiativeSettingsPermissionRequired } from "@/components/initiatives/settings/InitiativeSettingsGuard";
 import { InitiativeSettingsMembersTab } from "@/components/initiatives/settings/InitiativeSettingsMembersTab";
 import { RemoveInitiativeMemberDialog } from "@/components/initiatives/settings/RemoveInitiativeMemberDialog";
+import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useInitiativeRoles } from "@/hooks/useInitiativeRoles";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
@@ -83,7 +83,7 @@ export const InitiativeSettingsMembersPage = () => {
   };
 
   if (!canManageMembers) {
-    return <InitiativeSettingsPermissionRequired />;
+    return <SettingsPermissionRequired scope="initiative" />;
   }
 
   if (!initiative) {

@@ -14,7 +14,7 @@ import { useMemo } from "react";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { taskDetails, taskPresets } from "@/components/layouts/details";
 import { LayoutEditor } from "@/components/layouts/LayoutEditor";
-import { ToolSettingsPermissionRequired } from "@/components/tools/settings/ToolSettingsGuard";
+import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { useProject, useProjectTaskStatuses, useProjectTaskTypes } from "@/hooks/useProjects";
 import { instanceTarget, useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -43,7 +43,7 @@ export const ProjectLayoutEditorPage = () => {
   const presets = useMemo(() => (editing ? taskPresets(editing) : null), [editing]);
 
   if (!project || !editing || !set || !presets) return null;
-  if (!set.can_configure) return <ToolSettingsPermissionRequired />;
+  if (!set.can_configure) return <SettingsPermissionRequired scope="tool" />;
   return (
     <LayoutEditor
       // Another project's editor starts afresh: a draft, and the question

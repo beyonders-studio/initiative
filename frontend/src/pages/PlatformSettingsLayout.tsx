@@ -1,7 +1,8 @@
-import { Navigate, Outlet, useLocation, useRouter } from "@tanstack/react-router";
+import { Navigate, Outlet } from "@tanstack/react-router";
 import { Suspense, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
+import { SettingsPageHeader } from "@/components/settings/SettingsPageHeader";
 import { SettingsTabsNav } from "@/components/settings/SettingsTabsNav";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -10,7 +11,6 @@ import {
   canManagePlatformConfig,
   hasCapability,
 } from "@/lib/permissions";
-import { matchActiveTab } from "@/lib/tabs";
 import { SettingsPaneSkeleton } from "@/ui/page-skeletons";
 
 /**
@@ -22,8 +22,6 @@ import { SettingsPaneSkeleton } from "@/ui/page-skeletons";
 export const PlatformSettingsLayout = () => {
   const { t } = useTranslation("settings");
   const { user } = useAuth();
-  const pathname = useLocation({ select: (location) => location.pathname });
-  const router = useRouter();
 
   const tabs = useMemo(() => {
     // Two capabilities reach this area: `config.manage` owns app-wide
@@ -88,9 +86,7 @@ export const PlatformSettingsLayout = () => {
         path: "/settings/platform/intake",
         visible: canManageConfig,
       },
-    ]
-      .filter((tab) => tab.visible)
-      .map(({ visible: _visible, ...tab }) => tab);
+    ];
   }, [t, user]);
 
   if (!canManagePlatformConfig(user)) {
@@ -98,18 +94,10 @@ export const PlatformSettingsLayout = () => {
     return <Navigate to={canAccessOperatorDashboard(user) ? "/settings/operator" : "/"} replace />;
   }
 
-  const normalizedPath = pathname.replace(/\/+$/, "") || "/";
-  // Fall back to whichever tab this user actually has, not always `auth`.
-  const activeTab = matchActiveTab(tabs, normalizedPath, tabs[0]?.value ?? "auth");
-
   return (
     <div className="space-y-6">
-      <h1 className="font-semibold text-3xl tracking-tight">{t("platformLayout.title")}</h1>
-      <SettingsTabsNav
-        tabs={tabs}
-        activeTab={activeTab}
-        onNavigate={(path) => router.navigate({ to: path })}
-      />
+      <SettingsPageHeader title={t("platformLayout.title")} />
+      <SettingsTabsNav tabs={tabs} />
       <Suspense fallback={<SettingsPaneSkeleton />}>
         <Outlet />
       </Suspense>
