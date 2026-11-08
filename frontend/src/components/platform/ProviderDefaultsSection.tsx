@@ -18,6 +18,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AuthProviderOwnerRead } from "@/api/generated/initiativeAPI.schemas";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import {
   useAuthProviders,
   useClearProviderDefault,
@@ -26,7 +27,6 @@ import {
 } from "@/hooks/useSettings";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
@@ -138,26 +138,23 @@ export const ProviderDefaultsSection = () => {
   const providers = providersQuery.data ?? [];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("providerDefaults.title")}</CardTitle>
-        <CardDescription>{t("providerDefaults.description")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {providersQuery.isLoading ? (
-          <SkeletonRegion>
-            <ListSkeleton rows={3} />
-          </SkeletonRegion>
-        ) : providers.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("providerDefaults.noProviders")}</p>
-        ) : (
-          <ul className="divide-y rounded-md border">
-            {providers.map((provider) => (
-              <ProviderDefaultRow key={provider.id} provider={provider} />
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
+    <SettingsSection
+      title={t("providerDefaults.title")}
+      description={t("providerDefaults.description")}
+    >
+      {providersQuery.isLoading ? (
+        <SkeletonRegion>
+          <ListSkeleton rows={3} />
+        </SkeletonRegion>
+      ) : providers.length === 0 ? (
+        <p className="text-muted-foreground text-sm">{t("providerDefaults.noProviders")}</p>
+      ) : (
+        <ul className="divide-y rounded-md border">
+          {providers.map((provider) => (
+            <ProviderDefaultRow key={provider.id} provider={provider} />
+          ))}
+        </ul>
+      )}
+    </SettingsSection>
   );
 };

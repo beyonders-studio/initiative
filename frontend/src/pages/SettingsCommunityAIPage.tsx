@@ -4,6 +4,7 @@ import {
   AIConnectionManager,
   type ConnectionMutations,
 } from "@/components/settings/AIConnectionManager";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import {
   useCommunityConnections,
@@ -16,7 +17,6 @@ import {
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityAuthSettings } from "@/hooks/useCommunityAuthPolicy";
 import { getProvidersForScope } from "@/lib/ai-providers";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
 
@@ -77,36 +77,32 @@ export const SettingsCommunityAIPage = () => {
 
   if (mode === "disabled") {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("communityAI.title")}</CardTitle>
-          <CardDescription>{t("communityAI.disabledDescription")}</CardDescription>
-        </CardHeader>
-      </Card>
+      <SettingsSection
+        title={t("communityAI.title")}
+        description={t("communityAI.disabledDescription")}
+      />
     );
   }
 
   return (
-    <Card>
-      <CardContent className="pt-6">
-        {canManageConnections ? (
-          <AIConnectionManager
-            scope="community"
-            connections={connectionsQuery.data ?? []}
-            isLoading={connectionsQuery.isLoading}
-            isError={connectionsQuery.isError}
-            providers={getProvidersForScope("community")}
-            mutations={mutations}
-            locked={aiOff}
-          />
-        ) : (
-          <p className="text-muted-foreground text-sm">
-            {mode === "platform"
-              ? t("communityAI.managedByPlatform")
-              : t("communityAI.managedByServer")}
-          </p>
-        )}
-      </CardContent>
-    </Card>
+    <SettingsSection>
+      {canManageConnections ? (
+        <AIConnectionManager
+          scope="community"
+          connections={connectionsQuery.data ?? []}
+          isLoading={connectionsQuery.isLoading}
+          isError={connectionsQuery.isError}
+          providers={getProvidersForScope("community")}
+          mutations={mutations}
+          locked={aiOff}
+        />
+      ) : (
+        <p className="text-muted-foreground text-sm">
+          {mode === "platform"
+            ? t("communityAI.managedByPlatform")
+            : t("communityAI.managedByServer")}
+        </p>
+      )}
+    </SettingsSection>
   );
 };

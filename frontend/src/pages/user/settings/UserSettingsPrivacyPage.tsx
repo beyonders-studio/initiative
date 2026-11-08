@@ -79,7 +79,6 @@ const MessagingSections = () => {
               checked={data?.send_receipts ?? true}
               disabled={isLoading || updateSettings.isPending}
               onCheckedChange={(checked) => save({ send_receipts: checked })}
-              aria-label={t("privacy.receipts.label")}
             />
           </SettingsRow>
         </div>

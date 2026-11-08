@@ -1,6 +1,7 @@
 import * as SwitchPrimitives from "@radix-ui/react-switch";
 import * as React from "react";
 
+import { useFieldControl } from "@/ui/field";
 import { cn } from "@/ui/lib/utils";
 
 const Switch = React.forwardRef<
@@ -13,6 +14,7 @@ const Switch = React.forwardRef<
       className
     )}
     {...props}
+    {...useFieldControl(props)}
     ref={ref}
   >
     <SwitchPrimitives.Thumb

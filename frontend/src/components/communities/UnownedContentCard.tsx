@@ -2,10 +2,10 @@ import { useTranslation } from "react-i18next";
 
 import type { OwnedContentResponse, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { useListUnownedContent } from "@/api/generated/users/users";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { toolCamelPlural } from "@/lib/tools";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 interface UnownedContentCardProps {
   onClaim: () => void;
@@ -27,30 +27,28 @@ export const UnownedContentCard = ({ onClaim }: UnownedContentCardProps) => {
   const total = content?.total ?? 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("unownedContent.title")}</CardTitle>
-        <CardDescription>{t("unownedContent.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {total === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("unownedContent.empty")}</p>
-        ) : (
-          <>
-            <p className="font-medium text-sm">{t("unownedContent.summary", { count: total })}</p>
-            <ul className="space-y-1">
-              {Object.entries(content?.counts ?? {}).map(([tool, count]) => (
-                <li key={tool} className="text-muted-foreground text-sm">
-                  {count} × {t(`nav:${toolCamelPlural(tool as Tool)}` as never)}
-                </li>
-              ))}
-            </ul>
-            <Button type="button" onClick={onClaim}>
-              {t("unownedContent.claimButton")}
-            </Button>
-          </>
-        )}
-      </CardContent>
-    </Card>
+    <SettingsSection
+      title={t("unownedContent.title")}
+      description={t("unownedContent.description")}
+      contentClassName="space-y-3"
+    >
+      {total === 0 ? (
+        <p className="text-muted-foreground text-sm">{t("unownedContent.empty")}</p>
+      ) : (
+        <>
+          <p className="font-medium text-sm">{t("unownedContent.summary", { count: total })}</p>
+          <ul className="space-y-1">
+            {Object.entries(content?.counts ?? {}).map(([tool, count]) => (
+              <li key={tool} className="text-muted-foreground text-sm">
+                {count} × {t(`nav:${toolCamelPlural(tool as Tool)}` as never)}
+              </li>
+            ))}
+          </ul>
+          <Button type="button" onClick={onClaim}>
+            {t("unownedContent.claimButton")}
+          </Button>
+        </>
+      )}
+    </SettingsSection>
   );
 };
