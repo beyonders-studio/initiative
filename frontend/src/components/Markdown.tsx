@@ -17,6 +17,13 @@ import { ThemeContext } from "@/hooks/useTheme";
 import { releaseImageUrl } from "@/lib/releaseImages";
 import { isStoredUpload, remarkImageLinks, remarkLineBreaks } from "@/lib/remarkProse";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/ui/carousel";
 import { sanitizeUrl } from "@/ui/lib/safeUrl";
 import { cn } from "@/ui/lib/utils";
 
@@ -131,9 +138,9 @@ function ReleaseImage({ src, alt, title }: ImageProps) {
   return <ReleasePicture src={src} alt={alt} title={title} />;
 }
 
-/** Pictures on lines of their own, two or more, scroll sideways as a strip of
- *  tiles with their count in its corner, each opening full size. Anything
- *  else is a paragraph. */
+/** Pictures on lines of their own, two or more, are a shelf of tiles with
+ *  their count in its corner, each opening full size. Anything else is a
+ *  paragraph. */
 function ReleaseParagraph({ node, children, ...props }: ParagraphProps) {
   const parts = node?.children ?? [];
   const pictures = parts.flatMap((part) =>
@@ -148,24 +155,25 @@ function ReleaseParagraph({ node, children, ...props }: ParagraphProps) {
   );
   if (pictures.length < 2 || !onlyPictures) return <p {...props}>{children}</p>;
   return (
-    <div className="relative">
-      <div className="scrollbar-thin flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
+    <Carousel>
+      <CarouselContent className="-ml-3">
         {pictures.map((picture) => (
-          <div
-            key={picture.src}
-            className="h-40 w-64 shrink-0 snap-start overflow-hidden rounded-lg border bg-muted p-1"
-          >
-            <ReleasePicture {...picture} fill />
-          </div>
+          <CarouselItem key={picture.src} className="basis-auto pl-3">
+            <div className="h-40 w-64 overflow-hidden rounded-lg border bg-muted p-1">
+              <ReleasePicture {...picture} fill />
+            </div>
+          </CarouselItem>
         ))}
-      </div>
+      </CarouselContent>
+      <CarouselPrevious />
+      <CarouselNext />
       <span
         aria-hidden="true"
         className="pointer-events-none absolute top-2 right-2 rounded-full bg-background/90 px-2 py-0.5 font-medium text-foreground text-xs shadow-sm"
       >
         {pictures.length}
       </span>
-    </div>
+    </Carousel>
   );
 }
 

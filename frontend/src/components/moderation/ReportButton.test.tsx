@@ -56,7 +56,7 @@ describe("ReportButton", () => {
     expect(screen.queryByRole("button", { name: "Report" })).not.toBeInTheDocument();
   });
 
-  it("opens one report at a time, a new one for each thing reported", async () => {
+  it("opens a new report for each thing reported", async () => {
     renderWithProviders(
       <>
         <ReportButton targetType="post" targetId={1} />
@@ -72,8 +72,10 @@ describe("ReportButton", () => {
     expect(await screen.findByRole("dialog", { name: "Report this" })).toBeInTheDocument();
     await user.type(screen.getByLabelText("Anything else?"), "About the first post.");
 
+    // The report holds the page still: it is closed before another is opened.
+    await user.keyboard("{Escape}");
     await user.click(second);
-    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(await screen.findAllByRole("dialog")).toHaveLength(1);
     expect(screen.getByLabelText("Anything else?")).toHaveValue("");
   });
 });

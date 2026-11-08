@@ -84,6 +84,8 @@ const PostCardInner = ({ post, canPin = false, canModerate = false, className }:
   return (
     <Card
       ref={cardRef}
+      // What a report of the post pictures.
+      data-report-target
       className={cn(
         // The card is the post's surface — the editor inside it draws no box
         // of its own, so this is what the body sits on.
