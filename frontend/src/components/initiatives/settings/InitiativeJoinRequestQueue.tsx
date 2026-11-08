@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 
 import type { InitiativeJoinRequestRead } from "@/api/generated/initiativeAPI.schemas";
 import { JoinRequestStatus } from "@/api/generated/initiativeAPI.schemas";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useInitiativeJoinRequests, useResolveJoinRequest } from "@/hooks/useInitiatives";
 import { toast } from "@/lib/mascotToast";
 import {
@@ -27,7 +28,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { RelativeTime } from "@/ui/relative-time";
 import { StatusMessage } from "@/ui/status-message";
 
@@ -132,21 +132,21 @@ export const InitiativeJoinRequestQueue = ({ initiativeId }: InitiativeJoinReque
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex flex-wrap items-center gap-2">
+    <SettingsSection
+      title={
+        <span className="flex flex-wrap items-center gap-2">
           {t("joinRequests.queueTitle")}
           {requests.length > 0 ? <Badge variant="secondary">{requests.length}</Badge> : null}
-        </CardTitle>
-        <CardDescription>{t("joinRequests.queueDescription")}</CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
-        {queueQuery.isError ? (
-          <StatusMessage onRetry={queueQuery.refetch} />
-        ) : (
-          <ul className="divide-y">{requests.map(renderRequest)}</ul>
-        )}
-      </CardContent>
-    </Card>
+        </span>
+      }
+      description={t("joinRequests.queueDescription")}
+      contentClassName="p-0"
+    >
+      {queueQuery.isError ? (
+        <StatusMessage onRetry={queueQuery.refetch} />
+      ) : (
+        <ul className="divide-y">{requests.map(renderRequest)}</ul>
+      )}
+    </SettingsSection>
   );
 };

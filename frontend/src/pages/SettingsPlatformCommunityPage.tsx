@@ -19,6 +19,7 @@ import type { DmPolicy } from "@/api/generated/initiativeAPI.schemas";
 import { DeletedAccountRetentionSection } from "@/components/platform/DeletedAccountRetentionSection";
 import { DeletedCommunityRetentionSection } from "@/components/platform/DeletedCommunityRetentionSection";
 import { OnHoldCommunityDeletionSection } from "@/components/platform/OnHoldCommunityDeletionSection";
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useServerForm } from "@/hooks/useServerForm";
@@ -28,7 +29,6 @@ import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { readOptionalWholeNumber } from "@/lib/text";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
@@ -178,169 +178,145 @@ export const SettingsPlatformCommunityPage = () => {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("community.title")}</CardTitle>
-        <CardDescription>{t("community.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center gap-3">
-          <Switch
-            id="community-directory-enabled"
-            checked={communityDirectoryEnabled}
-            disabled={isLoading || update.isPending}
-            onCheckedChange={(checked) =>
-              update.mutate({ community_directory_enabled: Boolean(checked) })
+    <SettingsSection title={t("community.title")} description={t("community.description")}>
+      <SettingsRow
+        label={t("community.toggleLabel")}
+        description={t("community.helpText")}
+        below={
+          // Turning it back off is not a punishment for the communities that
+          // opted in, and saying so up front stops it reading like one.
+          <p className="text-muted-foreground text-xs">{t("community.reversibleNote")}</p>
+        }
+      >
+        <Switch
+          checked={communityDirectoryEnabled}
+          disabled={isLoading || update.isPending}
+          onCheckedChange={(checked) =>
+            update.mutate({ community_directory_enabled: Boolean(checked) })
+          }
+        />
+      </SettingsRow>
+
+      {/* The second switch. Shown regardless of the first, so an owner can
+          settle it before opening the directory rather than discovering it
+          once people are already arriving. */}
+      <SettingsRow label={t("community.ageGateLabel")} description={t("community.ageGateHelpText")}>
+        <Switch
+          checked={communityAgeGateEnabled}
+          disabled={isLoading || update.isPending}
+          onCheckedChange={(checked) => {
+            if (checked) {
+              update.mutate({
+                community_directory_enabled: communityDirectoryEnabled,
+                age_gate_enabled: true,
+              });
+              return;
             }
-          />
-          <Label htmlFor="community-directory-enabled">{t("community.toggleLabel")}</Label>
-        </div>
-        <p className="text-muted-foreground text-sm">{t("community.helpText")}</p>
-        {/* Turning it back off is not a punishment for the communities that opted
-            in, and saying so up front stops it reading like one. */}
-        <p className="text-muted-foreground text-xs">{t("community.reversibleNote")}</p>
+            setConfirmingAgeGateOff(true);
+          }}
+        />
+      </SettingsRow>
 
-        {/* The second switch. Shown regardless of the first, so an owner can
-            settle it before opening the directory rather than discovering it
-            once people are already arriving. */}
-        <div className="space-y-4 border-t pt-4">
-          <div className="flex items-center gap-3">
-            <Switch
-              id="community-age-gate-enabled"
-              checked={communityAgeGateEnabled}
-              disabled={isLoading || update.isPending}
-              onCheckedChange={(checked) => {
-                if (checked) {
+      {/* The third switch, and the only one here that is not about the
+          directory: a deployment can run one without messaging, or messaging
+          without one. */}
+      <SettingsRow
+        label={t("community.directMessagesLabel")}
+        description={t("community.directMessagesHelpText")}
+        below={
+          <>
+            {/* Nothing is deleted while it is off, and an owner weighing the
+                switch is entitled to know that before they touch it rather
+                than after. */}
+            <p className="text-muted-foreground text-xs">
+              {t("community.directMessagesReversibleNote")}
+            </p>
+
+            {/* Read once, when an account is made, so changing it moves nobody
+                who is already here. Nested under the switch because it is a
+                question about messaging: with messaging off there is no policy
+                to start anybody on, and the control says so by going quiet
+                rather than disappearing. */}
+            <div className="ms-7 space-y-2 border-s ps-4">
+              <Label htmlFor="default-dm-policy">{t("community.defaultDmLabel")}</Label>
+              <Select
+                value={community?.default_dm_policy ?? "private"}
+                disabled={isLoading || update.isPending || !community || !directMessagesEnabled}
+                onValueChange={(value) =>
                   update.mutate({
                     community_directory_enabled: communityDirectoryEnabled,
-                    age_gate_enabled: true,
-                  });
-                  return;
+                    default_dm_policy: value as DmPolicy,
+                  })
                 }
-                setConfirmingAgeGateOff(true);
-              }}
-            />
-            <Label htmlFor="community-age-gate-enabled">{t("community.ageGateLabel")}</Label>
-          </div>
-          <p className="text-muted-foreground text-sm">{t("community.ageGateHelpText")}</p>
-        </div>
+              >
+                <SelectTrigger id="default-dm-policy" className="max-w-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="private">{t("privacy.dm.private")}</SelectItem>
+                  <SelectItem value="community">{t("privacy.dm.community")}</SelectItem>
+                  <SelectItem value="public">{t("privacy.dm.public")}</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground text-sm">{t("community.defaultDmHelpText")}</p>
+            </div>
+          </>
+        }
+      >
+        <Switch
+          checked={directMessagesEnabled}
+          disabled={isLoading || update.isPending}
+          onCheckedChange={(checked) => {
+            if (checked) {
+              update.mutate({
+                community_directory_enabled: communityDirectoryEnabled,
+                direct_messages_enabled: true,
+              });
+              return;
+            }
+            setConfirmingMessagesOff(true);
+          }}
+        />
+      </SettingsRow>
 
-        {/* The third switch, and the only one here that is not about the
-            directory: a deployment can run one without messaging, or messaging
-            without one. */}
-        <div className="space-y-4 border-t pt-4">
-          <div className="flex items-center gap-3">
-            <Switch
-              id="direct-messages-enabled"
-              checked={directMessagesEnabled}
-              disabled={isLoading || update.isPending}
-              onCheckedChange={(checked) => {
-                if (checked) {
-                  update.mutate({
-                    community_directory_enabled: communityDirectoryEnabled,
-                    direct_messages_enabled: true,
-                  });
-                  return;
-                }
-                setConfirmingMessagesOff(true);
-              }}
-            />
-            <Label htmlFor="direct-messages-enabled">{t("community.directMessagesLabel")}</Label>
-          </div>
-          <p className="text-muted-foreground text-sm">{t("community.directMessagesHelpText")}</p>
-          {/* Nothing is deleted while it is off, and an owner weighing the
-              switch is entitled to know that before they touch it rather than
-              after. */}
-          <p className="text-muted-foreground text-xs">
-            {t("community.directMessagesReversibleNote")}
-          </p>
+      <ConfirmDialog
+        open={confirmingMessagesOff}
+        onOpenChange={setConfirmingMessagesOff}
+        title={t("community.directMessagesOffTitle")}
+        description={t("community.directMessagesOffBody")}
+        confirmLabel={t("community.directMessagesOffConfirm")}
+        onConfirm={() =>
+          update.mutate({
+            community_directory_enabled: communityDirectoryEnabled,
+            direct_messages_enabled: false,
+          })
+        }
+      />
 
-          {/* Read once, when an account is made, so changing it moves nobody
-              who is already here. Nested under the switch because it is a
-              question about messaging: with messaging off there is no policy
-              to start anybody on, and the control says so by going quiet
-              rather than disappearing. */}
-          <div className="ms-7 space-y-2 border-s ps-4">
-            <Label htmlFor="default-dm-policy">{t("community.defaultDmLabel")}</Label>
-            <Select
-              value={community?.default_dm_policy ?? "private"}
-              disabled={isLoading || update.isPending || !community || !directMessagesEnabled}
-              onValueChange={(value) =>
-                update.mutate({
-                  community_directory_enabled: communityDirectoryEnabled,
-                  default_dm_policy: value as DmPolicy,
-                })
-              }
-            >
-              <SelectTrigger id="default-dm-policy" className="max-w-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="private">{t("privacy.dm.private")}</SelectItem>
-                <SelectItem value="community">{t("privacy.dm.community")}</SelectItem>
-                <SelectItem value="public">{t("privacy.dm.public")}</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-muted-foreground text-sm">{t("community.defaultDmHelpText")}</p>
-          </div>
-        </div>
-
-        <ConfirmDialog
-          open={confirmingMessagesOff}
-          onOpenChange={setConfirmingMessagesOff}
-          title={t("community.directMessagesOffTitle")}
-          description={t("community.directMessagesOffBody")}
-          confirmLabel={t("community.directMessagesOffConfirm")}
-          onConfirm={() =>
+      {/* Each community is asked too, and off wins, so this is the most any
+          community can have. */}
+      <SettingsRow
+        label={t("community.engagementRankingLabel")}
+        description={t("community.engagementRankingHelpText")}
+      >
+        <Switch
+          checked={community?.engagement_ranking_enabled ?? true}
+          disabled={isLoading || update.isPending || !community}
+          onCheckedChange={(checked) =>
             update.mutate({
               community_directory_enabled: communityDirectoryEnabled,
-              direct_messages_enabled: false,
+              engagement_ranking_enabled: Boolean(checked),
             })
           }
         />
+      </SettingsRow>
 
-        {/* Each community is asked too, and off wins, so this is the most any
-            community can have. */}
-        <div className="space-y-4 border-t pt-4">
-          <div className="flex items-center gap-3">
-            <Switch
-              id="engagement-ranking-enabled"
-              checked={community?.engagement_ranking_enabled ?? true}
-              disabled={isLoading || update.isPending || !community}
-              onCheckedChange={(checked) =>
-                update.mutate({
-                  community_directory_enabled: communityDirectoryEnabled,
-                  engagement_ranking_enabled: Boolean(checked),
-                })
-              }
-            />
-            <Label htmlFor="engagement-ranking-enabled">
-              {t("community.engagementRankingLabel")}
-            </Label>
-          </div>
-          <p className="text-muted-foreground text-sm">
-            {t("community.engagementRankingHelpText")}
-          </p>
-        </div>
-
-        {/* Each community may set a shorter longest stay of its own, and may
-            take no guests at all. */}
-        <div className="space-y-4 border-t pt-4">
-          <div className="flex items-center gap-3">
-            <Switch
-              id="guests-enabled"
-              checked={guestsEnabled}
-              disabled={isLoading || update.isPending}
-              onCheckedChange={(checked) =>
-                update.mutate({
-                  community_directory_enabled: communityDirectoryEnabled,
-                  guests_enabled: Boolean(checked),
-                })
-              }
-            />
-            <Label htmlFor="guests-enabled">{t("community.guestsEnabledLabel")}</Label>
-          </div>
-          <p className="text-muted-foreground text-sm">{t("community.guestsEnabledHelpText")}</p>
+      {/* Each community may set a shorter longest stay of its own, and may
+          take no guests at all. */}
+      <SettingsRow
+        label={t("community.guestsEnabledLabel")}
+        description={t("community.guestsEnabledHelpText")}
+        below={
           <div className="ms-7 space-y-2 border-s ps-4">
             <Label htmlFor="max-guest-days">{t("community.maxGuestDaysLabel")}</Label>
             <div className="flex flex-wrap items-center gap-3">
@@ -376,143 +352,148 @@ export const SettingsPlatformCommunityPage = () => {
             </div>
             <p className="text-muted-foreground text-sm">{t("community.maxGuestDaysHelpText")}</p>
           </div>
-        </div>
-
-        {/* Who may arrive without an invite, and who may start a community
-            once here. Registration closes with community creation, so the two
-            sit together. */}
-        <div className="space-y-4 border-t pt-4">
-          <h3 className="font-semibold text-sm">{t("community.joinAndCreateTitle")}</h3>
-          <div className="flex items-center gap-3">
-            <Switch
-              id="public-registration-enabled"
-              checked={community?.public_registration_enabled ?? true}
-              disabled={isLoading || update.isPending || !community}
-              onCheckedChange={(checked) =>
-                update.mutate({
-                  community_directory_enabled: communityDirectoryEnabled,
-                  public_registration_enabled: Boolean(checked),
-                })
-              }
-            />
-            <Label htmlFor="public-registration-enabled">
-              {t("community.publicRegistrationLabel")}
-            </Label>
-          </div>
-          <p className="text-muted-foreground text-sm">
-            {t("community.publicRegistrationHelpText")}
-          </p>
-          <div className="flex items-center gap-3">
-            <Switch
-              id="community-creation-enabled"
-              checked={community?.community_creation_enabled ?? true}
-              disabled={isLoading || update.isPending || !community}
-              onCheckedChange={(checked) =>
-                update.mutate({
-                  community_directory_enabled: communityDirectoryEnabled,
-                  community_creation_enabled: Boolean(checked),
-                })
-              }
-            />
-            <Label htmlFor="community-creation-enabled">
-              {t("community.communityCreationLabel")}
-            </Label>
-          </div>
-          <p className="text-muted-foreground text-sm">
-            {t("community.communityCreationHelpText")}
-          </p>
-          <Field
-            label={t("community.creationDailyLimitLabel")}
-            hint={t("community.creationDailyLimitHelpText")}
-            className="ms-7 border-s ps-4"
-          >
-            <div className="flex flex-wrap items-center gap-3">
-              <Input
-                type="number"
-                min={0}
-                max={MAX_CREATION_DAILY_LIMIT}
-                className="w-40"
-                value={creationLimitForm.values.count}
-                disabled={!community?.community_creation_enabled}
-                onChange={(event) => creationLimitForm.set({ count: event.target.value })}
-              />
-              <Button
-                aria-label={t("community.creationDailyLimitSave")}
-                disabled={
-                  !community?.community_creation_enabled ||
-                  creationLimit.value === null ||
-                  !creationLimit.valid ||
-                  creationLimit.value === community.community_creation_daily_limit ||
-                  update.isPending
-                }
-                onClick={() =>
-                  update.mutate({
-                    community_directory_enabled: communityDirectoryEnabled,
-                    community_creation_daily_limit: creationLimit.value,
-                  })
-                }
-              >
-                {update.isPending ? t("common:submitting") : t("common:save")}
-              </Button>
-            </div>
-          </Field>
-        </div>
-
-        <div className="space-y-2 border-t pt-4">
-          <Label htmlFor="community-export-cooldown">{t("community.exportCooldownLabel")}</Label>
-          <div className="flex flex-wrap items-center gap-3">
-            <Input
-              id="community-export-cooldown"
-              type="number"
-              min={0}
-              max={MAX_EXPORT_COOLDOWN_HOURS}
-              className="w-40"
-              value={exportCooldownForm.values.hours}
-              disabled={!community}
-              onChange={(event) => exportCooldownForm.set({ hours: event.target.value })}
-            />
-            <Button
-              aria-label={t("community.exportCooldownSave")}
-              disabled={
-                !community ||
-                exportCooldown.value === null ||
-                !exportCooldown.valid ||
-                exportCooldown.value === community.community_export_cooldown_hours ||
-                update.isPending
-              }
-              onClick={() =>
-                update.mutate({
-                  community_directory_enabled: communityDirectoryEnabled,
-                  community_export_cooldown_hours: exportCooldown.value,
-                })
-              }
-            >
-              {update.isPending ? t("common:submitting") : t("common:save")}
-            </Button>
-          </div>
-          <p className="text-muted-foreground text-sm">{t("community.exportCooldownHelpText")}</p>
-        </div>
-
-        <DeletedCommunityRetentionSection directoryEnabled={communityDirectoryEnabled} />
-
-        <OnHoldCommunityDeletionSection directoryEnabled={communityDirectoryEnabled} />
-
-        <DeletedAccountRetentionSection directoryEnabled={communityDirectoryEnabled} />
-
-        <ConfirmDialog
-          open={confirmingAgeGateOff}
-          onOpenChange={setConfirmingAgeGateOff}
-          title={t("community.ageGateOffTitle")}
-          description={t("community.ageGateOffBody")}
-          confirmLabel={t("community.ageGateOffConfirm")}
-          onConfirm={() =>
+        }
+      >
+        <Switch
+          checked={guestsEnabled}
+          disabled={isLoading || update.isPending}
+          onCheckedChange={(checked) =>
             update.mutate({
               community_directory_enabled: communityDirectoryEnabled,
-              age_gate_enabled: false,
+              guests_enabled: Boolean(checked),
             })
           }
         />
-      </CardContent>
-    </Card>
+      </SettingsRow>
+
+      {/* Who may arrive without an invite, and who may start a community
+          once here. Registration closes with community creation, so the two
+          sit together. */}
+      <div className="space-y-4">
+        <h3 className="font-semibold text-sm">{t("community.joinAndCreateTitle")}</h3>
+        <SettingsRow
+          label={t("community.publicRegistrationLabel")}
+          description={t("community.publicRegistrationHelpText")}
+        >
+          <Switch
+            checked={community?.public_registration_enabled ?? true}
+            disabled={isLoading || update.isPending || !community}
+            onCheckedChange={(checked) =>
+              update.mutate({
+                community_directory_enabled: communityDirectoryEnabled,
+                public_registration_enabled: Boolean(checked),
+              })
+            }
+          />
+        </SettingsRow>
+        <SettingsRow
+          label={t("community.communityCreationLabel")}
+          description={t("community.communityCreationHelpText")}
+          below={
+            <Field
+              label={t("community.creationDailyLimitLabel")}
+              hint={t("community.creationDailyLimitHelpText")}
+              className="ms-7 border-s ps-4"
+            >
+              <div className="flex flex-wrap items-center gap-3">
+                <Input
+                  type="number"
+                  min={0}
+                  max={MAX_CREATION_DAILY_LIMIT}
+                  className="w-40"
+                  value={creationLimitForm.values.count}
+                  disabled={!community?.community_creation_enabled}
+                  onChange={(event) => creationLimitForm.set({ count: event.target.value })}
+                />
+                <Button
+                  aria-label={t("community.creationDailyLimitSave")}
+                  disabled={
+                    !community?.community_creation_enabled ||
+                    creationLimit.value === null ||
+                    !creationLimit.valid ||
+                    creationLimit.value === community.community_creation_daily_limit ||
+                    update.isPending
+                  }
+                  onClick={() =>
+                    update.mutate({
+                      community_directory_enabled: communityDirectoryEnabled,
+                      community_creation_daily_limit: creationLimit.value,
+                    })
+                  }
+                >
+                  {update.isPending ? t("common:submitting") : t("common:save")}
+                </Button>
+              </div>
+            </Field>
+          }
+        >
+          <Switch
+            checked={community?.community_creation_enabled ?? true}
+            disabled={isLoading || update.isPending || !community}
+            onCheckedChange={(checked) =>
+              update.mutate({
+                community_directory_enabled: communityDirectoryEnabled,
+                community_creation_enabled: Boolean(checked),
+              })
+            }
+          />
+        </SettingsRow>
+      </div>
+
+      <div className="space-y-2 border-t pt-4">
+        <Label htmlFor="community-export-cooldown">{t("community.exportCooldownLabel")}</Label>
+        <div className="flex flex-wrap items-center gap-3">
+          <Input
+            id="community-export-cooldown"
+            type="number"
+            min={0}
+            max={MAX_EXPORT_COOLDOWN_HOURS}
+            className="w-40"
+            value={exportCooldownForm.values.hours}
+            disabled={!community}
+            onChange={(event) => exportCooldownForm.set({ hours: event.target.value })}
+          />
+          <Button
+            aria-label={t("community.exportCooldownSave")}
+            disabled={
+              !community ||
+              exportCooldown.value === null ||
+              !exportCooldown.valid ||
+              exportCooldown.value === community.community_export_cooldown_hours ||
+              update.isPending
+            }
+            onClick={() =>
+              update.mutate({
+                community_directory_enabled: communityDirectoryEnabled,
+                community_export_cooldown_hours: exportCooldown.value,
+              })
+            }
+          >
+            {update.isPending ? t("common:submitting") : t("common:save")}
+          </Button>
+        </div>
+        <p className="text-muted-foreground text-sm">{t("community.exportCooldownHelpText")}</p>
+      </div>
+
+      <DeletedCommunityRetentionSection directoryEnabled={communityDirectoryEnabled} />
+
+      <OnHoldCommunityDeletionSection directoryEnabled={communityDirectoryEnabled} />
+
+      <DeletedAccountRetentionSection directoryEnabled={communityDirectoryEnabled} />
+
+      <ConfirmDialog
+        open={confirmingAgeGateOff}
+        onOpenChange={setConfirmingAgeGateOff}
+        title={t("community.ageGateOffTitle")}
+        description={t("community.ageGateOffBody")}
+        confirmLabel={t("community.ageGateOffConfirm")}
+        onConfirm={() =>
+          update.mutate({
+            community_directory_enabled: communityDirectoryEnabled,
+            age_gate_enabled: false,
+          })
+        }
+      />
+    </SettingsSection>
   );
 };

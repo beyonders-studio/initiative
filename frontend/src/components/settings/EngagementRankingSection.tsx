@@ -35,7 +35,6 @@ export const EngagementRankingSection = () => {
           checked={user.count_toward_engagement_ranking ?? true}
           disabled={update.isPending}
           onCheckedChange={(checked) => update.mutate({ count_toward_engagement_ranking: checked })}
-          aria-label={t("privacy.engagementRanking.label")}
         />
       </SettingsRow>
     </SettingsSection>

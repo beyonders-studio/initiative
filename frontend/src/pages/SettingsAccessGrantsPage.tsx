@@ -11,6 +11,7 @@ import type {
 import { AccessGrantStatusBadge } from "@/components/platform/AccessGrantStatusBadge";
 import { CasePicker } from "@/components/platform/CasePicker";
 import { CommunityPicker, type PickedCommunity } from "@/components/platform/CommunityPicker";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { UserHandle } from "@/components/UserHandle";
 import {
   flattenGrants,
@@ -37,7 +38,6 @@ import { Capability, hasCapability } from "@/lib/permissions";
 import { classifySecondFactorAnswer } from "@/lib/secondFactorAnswer";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
@@ -393,94 +393,92 @@ const BreakGlassSection = () => {
   };
 
   return (
-    <Card className="border-destructive/50">
-      <CardHeader>
-        <CardTitle>{t("accessGrants.breakGlass.title")}</CardTitle>
-        <CardDescription>{t("accessGrants.breakGlass.description")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form className="grid grid-cols-pair gap-4" onSubmit={submit}>
-          <Field label={t("accessGrants.communityLabel")} className="space-y-1">
-            <CommunityPicker
-              aria-label={t("accessGrants.communityLabel")}
-              value={community}
-              onChange={setCommunity}
-            />
-          </Field>
-          <CaseField choice={caseChoice} community={community} optional />
-          <CommunityNoticeField
-            id="bg-notice"
-            chosen={caseChoice.chosen}
-            value={notice}
-            onChange={setNotice}
+    <SettingsSection
+      title={t("accessGrants.breakGlass.title")}
+      description={t("accessGrants.breakGlass.description")}
+      className="border-destructive/50"
+    >
+      <form className="grid grid-cols-pair gap-4" onSubmit={submit}>
+        <Field label={t("accessGrants.communityLabel")} className="space-y-1">
+          <CommunityPicker
+            aria-label={t("accessGrants.communityLabel")}
+            value={community}
+            onChange={setCommunity}
           />
-          <Field label={t("accessGrants.durationLabel")} className="space-y-1">
-            <Select value={duration} onValueChange={setDuration}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {breakGlassDurations.map((minutes) => (
-                  <SelectItem key={minutes} value={String(minutes)}>
-                    {t("accessGrants.durationHours", { count: minutes / 60 })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label={t("accessGrants.reasonLabel")} className="col-span-full space-y-1">
-            <Textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder={t("accessGrants.breakGlass.reasonPlaceholder")}
+        </Field>
+        <CaseField choice={caseChoice} community={community} optional />
+        <CommunityNoticeField
+          id="bg-notice"
+          chosen={caseChoice.chosen}
+          value={notice}
+          onChange={setNotice}
+        />
+        <Field label={t("accessGrants.durationLabel")} className="space-y-1">
+          <Select value={duration} onValueChange={setDuration}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {breakGlassDurations.map((minutes) => (
+                <SelectItem key={minutes} value={String(minutes)}>
+                  {t("accessGrants.durationHours", { count: minutes / 60 })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label={t("accessGrants.reasonLabel")} className="col-span-full space-y-1">
+          <Textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={t("accessGrants.breakGlass.reasonPlaceholder")}
+            required
+          />
+        </Field>
+        {needsCode && (
+          <div className="col-span-full space-y-1">
+            <Label htmlFor="bg-code">{t("accessGrants.breakGlass.codeLabel")}</Label>
+            <Input
+              id="bg-code"
+              autoComplete="one-time-code"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder={t("accessGrants.breakGlass.codePlaceholder")}
               required
             />
-          </Field>
-          {needsCode && (
-            <div className="col-span-full space-y-1">
-              <Label htmlFor="bg-code">{t("accessGrants.breakGlass.codeLabel")}</Label>
-              <Input
-                id="bg-code"
-                autoComplete="one-time-code"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder={t("accessGrants.breakGlass.codePlaceholder")}
-                required
-              />
-              <p className="text-muted-foreground text-xs">
-                {knownUnenrolled
-                  ? t("accessGrants.breakGlass.codeNotEnrolled")
-                  : t("accessGrants.breakGlass.codeHelp")}
-              </p>
-            </div>
-          )}
-          <div className="col-span-full flex flex-wrap gap-2">
+            <p className="text-muted-foreground text-xs">
+              {knownUnenrolled
+                ? t("accessGrants.breakGlass.codeNotEnrolled")
+                : t("accessGrants.breakGlass.codeHelp")}
+            </p>
+          </div>
+        )}
+        <div className="col-span-full flex flex-wrap gap-2">
+          <Button
+            type="submit"
+            variant="destructive"
+            disabled={!community || breakGlass.isPending || presenting}
+          >
+            {breakGlass.isPending ? t("common:submitting") : t("accessGrants.breakGlass.submit")}
+          </Button>
+          {needsCode && hasKey && passkeysRunHere() && (
             <Button
-              type="submit"
-              variant="destructive"
+              type="button"
+              variant="outline"
+              onClick={() => void presentAKey()}
               disabled={!community || breakGlass.isPending || presenting}
             >
-              {breakGlass.isPending ? t("common:submitting") : t("accessGrants.breakGlass.submit")}
+              {presenting
+                ? t("accessGrants.breakGlass.passkeyPresenting")
+                : t("accessGrants.breakGlass.passkeySubmit")}
             </Button>
-            {needsCode && hasKey && passkeysRunHere() && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void presentAKey()}
-                disabled={!community || breakGlass.isPending || presenting}
-              >
-                {presenting
-                  ? t("accessGrants.breakGlass.passkeyPresenting")
-                  : t("accessGrants.breakGlass.passkeySubmit")}
-              </Button>
-            )}
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+          )}
+        </div>
+      </form>
+    </SettingsSection>
   );
 };
 
@@ -570,153 +568,150 @@ const RequestSection = () => {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("accessGrants.requestTitle")}</CardTitle>
-        <CardDescription>{t("accessGrants.requestDescription")}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <form className="grid grid-cols-pair gap-4" onSubmit={submit}>
-          <Field label={t("accessGrants.communityLabel")} className="space-y-1">
-            <CommunityPicker
-              aria-label={t("accessGrants.communityLabel")}
-              value={community}
-              onChange={setCommunity}
-            />
-          </Field>
-          <CaseField choice={caseChoice} community={community} optional={false} />
-          <CommunityNoticeField
-            id="ag-notice"
-            chosen={caseChoice.chosen}
-            value={notice}
-            onChange={setNotice}
+    <SettingsSection
+      title={t("accessGrants.requestTitle")}
+      description={t("accessGrants.requestDescription")}
+    >
+      <form className="grid grid-cols-pair gap-4" onSubmit={submit}>
+        <Field label={t("accessGrants.communityLabel")} className="space-y-1">
+          <CommunityPicker
+            aria-label={t("accessGrants.communityLabel")}
+            value={community}
+            onChange={setCommunity}
           />
-          <div className="space-y-1">
-            <Label htmlFor="ag-level">{t("accessGrants.purposeContent")}</Label>
-            <Select value={level} onValueChange={setLevel}>
-              <SelectTrigger id="ag-level">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {canAskAny ? (
-                  <>
-                    <SelectItem value="none">{t("accessGrants.levelNone")}</SelectItem>
-                    <SelectItem value="read">{t("accessGrants.levelRead")}</SelectItem>
-                    <SelectItem value="read_write">{t("accessGrants.levelReadWrite")}</SelectItem>
-                  </>
-                ) : null}
-                {canModerate ? (
-                  <SelectItem value="moderate">{t("accessGrants.levelModerate")}</SelectItem>
-                ) : null}
-              </SelectContent>
-            </Select>
-            <p className="text-muted-foreground text-xs">{t("accessGrants.purposeContentHelp")}</p>
-          </div>
-          {canAskAny ? (
-            <Field
-              label={t("accessGrants.purposeSettings")}
-              hint={t("accessGrants.purposeSettingsHelp")}
-              className="space-y-1"
-            >
-              <Select value={settingsLevel} onValueChange={setSettingsLevel}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
+        </Field>
+        <CaseField choice={caseChoice} community={community} optional={false} />
+        <CommunityNoticeField
+          id="ag-notice"
+          chosen={caseChoice.chosen}
+          value={notice}
+          onChange={setNotice}
+        />
+        <div className="space-y-1">
+          <Label htmlFor="ag-level">{t("accessGrants.purposeContent")}</Label>
+          <Select value={level} onValueChange={setLevel}>
+            <SelectTrigger id="ag-level">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {canAskAny ? (
+                <>
                   <SelectItem value="none">{t("accessGrants.levelNone")}</SelectItem>
-                  <SelectItem value="admin">{t("accessGrants.levelAdmin")}</SelectItem>
-                  <SelectItem value="superadmin">{t("accessGrants.levelSuperadmin")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-          ) : null}
-          <Field label={t("accessGrants.durationLabel")} className="space-y-1">
-            <Select value={duration} onValueChange={setDuration}>
+                  <SelectItem value="read">{t("accessGrants.levelRead")}</SelectItem>
+                  <SelectItem value="read_write">{t("accessGrants.levelReadWrite")}</SelectItem>
+                </>
+              ) : null}
+              {canModerate ? (
+                <SelectItem value="moderate">{t("accessGrants.levelModerate")}</SelectItem>
+              ) : null}
+            </SelectContent>
+          </Select>
+          <p className="text-muted-foreground text-xs">{t("accessGrants.purposeContentHelp")}</p>
+        </div>
+        {canAskAny ? (
+          <Field
+            label={t("accessGrants.purposeSettings")}
+            hint={t("accessGrants.purposeSettingsHelp")}
+            className="space-y-1"
+          >
+            <Select value={settingsLevel} onValueChange={setSettingsLevel}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {durationOptions.map((minutes) => (
-                  <SelectItem key={minutes} value={String(minutes)}>
-                    {t("accessGrants.durationHours", { count: minutes / 60 })}
-                  </SelectItem>
-                ))}
+                <SelectItem value="none">{t("accessGrants.levelNone")}</SelectItem>
+                <SelectItem value="admin">{t("accessGrants.levelAdmin")}</SelectItem>
+                <SelectItem value="superadmin">{t("accessGrants.levelSuperadmin")}</SelectItem>
               </SelectContent>
             </Select>
           </Field>
-          <Field label={t("accessGrants.reasonLabel")} className="col-span-full space-y-1">
-            <Textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder={t("accessGrants.reasonPlaceholder")}
-              required
-            />
-          </Field>
-          <div className="col-span-full">
-            <Button
-              type="submit"
-              disabled={!community || createRequest.isPending || !asksForSomething || !namesItsCase}
-            >
-              {createRequest.isPending ? t("common:submitting") : t("accessGrants.submitRequest")}
-            </Button>
-            {!asksForSomething && (
-              <p className="mt-2 text-muted-foreground text-xs">{t("accessGrants.nothingAsked")}</p>
-            )}
-          </div>
-        </form>
-
-        <div className="space-y-2">
-          <h3 className="font-medium text-sm">{t("accessGrants.myRequests")}</h3>
-          {!sortedGrants.length ? (
-            <p className="text-muted-foreground text-sm">{t("accessGrants.noRequests")}</p>
-          ) : (
-            <ul className="divide-y rounded-md border">
-              {sortedGrants.map((grant) => {
-                const left = minutesLeft(grant.expires_at);
-                return (
-                  <li key={grant.id} className="flex items-center justify-between gap-3 p-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm">
-                        {communityLabel(grant)} · {grantScope(grant)}
-                      </p>
-                      <p className="flex gap-2 text-muted-foreground text-xs">
-                        <GrantCaseMark grant={grant} />
-                        <span className="truncate">{grant.reason}</span>
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {grant.is_live && left !== null && (
-                        <span className="text-muted-foreground text-xs">
-                          {t("accessGrants.expiresIn", { minutes: left })}
-                        </span>
-                      )}
-                      <AccessGrantStatusBadge grant={grant} />
-                      {grant.status === "pending" && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => cancelRequest.mutate(grant.id)}
-                          disabled={cancelRequest.isPending}
-                        >
-                          {t("common:cancel")}
-                        </Button>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          <LoadMore
-            className="pt-1"
-            hasMore={myGrants.hasNextPage}
-            loading={myGrants.isFetchingNextPage}
-            onLoadMore={myGrants.fetchNextPage}
+        ) : null}
+        <Field label={t("accessGrants.durationLabel")} className="space-y-1">
+          <Select value={duration} onValueChange={setDuration}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {durationOptions.map((minutes) => (
+                <SelectItem key={minutes} value={String(minutes)}>
+                  {t("accessGrants.durationHours", { count: minutes / 60 })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label={t("accessGrants.reasonLabel")} className="col-span-full space-y-1">
+          <Textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={t("accessGrants.reasonPlaceholder")}
+            required
           />
+        </Field>
+        <div className="col-span-full">
+          <Button
+            type="submit"
+            disabled={!community || createRequest.isPending || !asksForSomething || !namesItsCase}
+          >
+            {createRequest.isPending ? t("common:submitting") : t("accessGrants.submitRequest")}
+          </Button>
+          {!asksForSomething && (
+            <p className="mt-2 text-muted-foreground text-xs">{t("accessGrants.nothingAsked")}</p>
+          )}
         </div>
-      </CardContent>
-    </Card>
+      </form>
+
+      <div className="space-y-2">
+        <h3 className="font-medium text-sm">{t("accessGrants.myRequests")}</h3>
+        {!sortedGrants.length ? (
+          <p className="text-muted-foreground text-sm">{t("accessGrants.noRequests")}</p>
+        ) : (
+          <ul className="divide-y rounded-md border">
+            {sortedGrants.map((grant) => {
+              const left = minutesLeft(grant.expires_at);
+              return (
+                <li key={grant.id} className="flex items-center justify-between gap-3 p-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm">
+                      {communityLabel(grant)} · {grantScope(grant)}
+                    </p>
+                    <p className="flex gap-2 text-muted-foreground text-xs">
+                      <GrantCaseMark grant={grant} />
+                      <span className="truncate">{grant.reason}</span>
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {grant.is_live && left !== null && (
+                      <span className="text-muted-foreground text-xs">
+                        {t("accessGrants.expiresIn", { minutes: left })}
+                      </span>
+                    )}
+                    <AccessGrantStatusBadge grant={grant} />
+                    {grant.status === "pending" && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => cancelRequest.mutate(grant.id)}
+                        disabled={cancelRequest.isPending}
+                      >
+                        {t("common:cancel")}
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <LoadMore
+          className="pt-1"
+          hasMore={myGrants.hasNextPage}
+          loading={myGrants.isFetchingNextPage}
+          onLoadMore={myGrants.fetchNextPage}
+        />
+      </div>
+    </SettingsSection>
   );
 };
 
@@ -743,108 +738,105 @@ const ApprovalQueue = () => {
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("accessGrants.queueTitle")}</CardTitle>
-        <CardDescription>{t("accessGrants.queueDescription")}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="space-y-2">
-          <h3 className="font-medium text-sm">{t("accessGrants.pendingHeading")}</h3>
-          {!pendingItems.length ? (
-            <p className="text-muted-foreground text-sm">{t("accessGrants.noPending")}</p>
-          ) : (
-            <ul className="divide-y rounded-md border">
-              {pendingItems.map((grant) => (
+    <SettingsSection
+      title={t("accessGrants.queueTitle")}
+      description={t("accessGrants.queueDescription")}
+      contentClassName="space-y-5"
+    >
+      <div className="space-y-2">
+        <h3 className="font-medium text-sm">{t("accessGrants.pendingHeading")}</h3>
+        {!pendingItems.length ? (
+          <p className="text-muted-foreground text-sm">{t("accessGrants.noPending")}</p>
+        ) : (
+          <ul className="divide-y rounded-md border">
+            {pendingItems.map((grant) => (
+              <li key={grant.id} className="flex items-center justify-between gap-3 p-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm">
+                    <GrantHolder grant={grant} /> → {communityLabel(grant)} · {grantScope(grant)} ·{" "}
+                    {t("accessGrants.minutes", { minutes: grant.requested_duration_minutes })}
+                  </p>
+                  <p className="flex gap-2 text-muted-foreground text-xs">
+                    <GrantCaseMark grant={grant} />
+                    <span className="truncate">{grant.reason}</span>
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => approve.mutate({ grantId: grant.id })}
+                    disabled={approve.isPending}
+                  >
+                    {t("accessGrants.approve")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => deny.mutate(grant.id)}
+                    disabled={deny.isPending}
+                  >
+                    {t("accessGrants.deny")}
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        <LoadMore
+          className="pt-1"
+          hasMore={pending.hasNextPage}
+          loading={pending.isFetchingNextPage}
+          onLoadMore={pending.fetchNextPage}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="font-medium text-sm">{t("accessGrants.activeHeading")}</h3>
+        {!activeItems.length ? (
+          <p className="text-muted-foreground text-sm">{t("accessGrants.noActive")}</p>
+        ) : (
+          <ul className="divide-y rounded-md border">
+            {activeItems.map((grant) => {
+              const left = minutesLeft(grant.expires_at);
+              return (
                 <li key={grant.id} className="flex items-center justify-between gap-3 p-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm">
-                      <GrantHolder grant={grant} /> → {communityLabel(grant)} · {grantScope(grant)}{" "}
-                      · {t("accessGrants.minutes", { minutes: grant.requested_duration_minutes })}
+                      <GrantHolder grant={grant} /> → {communityLabel(grant)} · {grantScope(grant)}
                     </p>
-                    <p className="flex gap-2 text-muted-foreground text-xs">
-                      <GrantCaseMark grant={grant} />
-                      <span className="truncate">{grant.reason}</span>
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => approve.mutate({ grantId: grant.id })}
-                      disabled={approve.isPending}
-                    >
-                      {t("accessGrants.approve")}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deny.mutate(grant.id)}
-                      disabled={deny.isPending}
-                    >
-                      {t("accessGrants.deny")}
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          <LoadMore
-            className="pt-1"
-            hasMore={pending.hasNextPage}
-            loading={pending.isFetchingNextPage}
-            onLoadMore={pending.fetchNextPage}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <h3 className="font-medium text-sm">{t("accessGrants.activeHeading")}</h3>
-          {!activeItems.length ? (
-            <p className="text-muted-foreground text-sm">{t("accessGrants.noActive")}</p>
-          ) : (
-            <ul className="divide-y rounded-md border">
-              {activeItems.map((grant) => {
-                const left = minutesLeft(grant.expires_at);
-                return (
-                  <li key={grant.id} className="flex items-center justify-between gap-3 p-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm">
-                        <GrantHolder grant={grant} /> → {communityLabel(grant)} ·{" "}
-                        {grantScope(grant)}
+                    {(left !== null || grant.case_task_id != null) && (
+                      <p className="flex gap-2 text-muted-foreground text-xs">
+                        <GrantCaseMark grant={grant} />
+                        {left !== null && (
+                          <span>{t("accessGrants.expiresIn", { minutes: left })}</span>
+                        )}
                       </p>
-                      {(left !== null || grant.case_task_id != null) && (
-                        <p className="flex gap-2 text-muted-foreground text-xs">
-                          <GrantCaseMark grant={grant} />
-                          {left !== null && (
-                            <span>{t("accessGrants.expiresIn", { minutes: left })}</span>
-                          )}
-                        </p>
-                      )}
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => revoke.mutate(grant.id)}
-                      disabled={revoke.isPending}
-                    >
-                      {t("accessGrants.revoke")}
-                    </Button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          <LoadMore
-            className="pt-1"
-            hasMore={active.hasNextPage}
-            loading={active.isFetchingNextPage}
-            onLoadMore={active.fetchNextPage}
-          />
-        </div>
-      </CardContent>
-    </Card>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => revoke.mutate(grant.id)}
+                    disabled={revoke.isPending}
+                  >
+                    {t("accessGrants.revoke")}
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <LoadMore
+          className="pt-1"
+          hasMore={active.hasNextPage}
+          loading={active.isFetchingNextPage}
+          onLoadMore={active.fetchNextPage}
+        />
+      </div>
+    </SettingsSection>
   );
 };

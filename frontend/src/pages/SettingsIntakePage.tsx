@@ -26,6 +26,7 @@ import {
   type IntakeSettingsRead,
   type IntakeStream,
 } from "@/api/generated/initiativeAPI.schemas";
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useDeleteIntakeBinding,
@@ -122,47 +123,45 @@ export const SettingsIntakePage = () => {
       {settings ? <FeedbackCard enabled={settings.feedback_enabled} settled={settled} /> : null}
       {settings ? <ContactsCard settings={settings} settled={settled} /> : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("community.title")}</CardTitle>
-          <CardDescription>{t("community.description")}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Label>{t("community.label")}</Label>
-          <Combobox
-            className="max-w-md"
-            aria-label={t("community.label")}
-            value={boundCommunityId === null ? NONE : String(boundCommunityId)}
-            selectedLabel={
-              boundCommunityId === null
-                ? t("community.none")
-                : (settings?.operations_community_name ?? null)
+      <SettingsSection
+        title={t("community.title")}
+        description={t("community.description")}
+        contentClassName="space-y-3"
+      >
+        <Label>{t("community.label")}</Label>
+        <Combobox
+          className="max-w-md"
+          aria-label={t("community.label")}
+          value={boundCommunityId === null ? NONE : String(boundCommunityId)}
+          selectedLabel={
+            boundCommunityId === null
+              ? t("community.none")
+              : (settings?.operations_community_name ?? null)
+          }
+          items={[
+            { value: NONE, label: t("community.none") },
+            ...(communitiesQuery.data?.items ?? []).map((community) => ({
+              value: String(community.id),
+              label: community.name,
+            })),
+          ]}
+          onSearchChange={setCommunitySearch}
+          onOpenChange={setPickerOpen}
+          loading={communitiesQuery.isFetching}
+          placeholder={t("community.placeholder")}
+          disabled={isLoading || !settled || updateCommunity.isPending}
+          onValueChange={(value) => {
+            // Clearing it stops every stream at once, so it is confirmed;
+            // choosing a different one is an ordinary change.
+            if (value === NONE) {
+              setClearing(true);
+              return;
             }
-            items={[
-              { value: NONE, label: t("community.none") },
-              ...(communitiesQuery.data?.items ?? []).map((community) => ({
-                value: String(community.id),
-                label: community.name,
-              })),
-            ]}
-            onSearchChange={setCommunitySearch}
-            onOpenChange={setPickerOpen}
-            loading={communitiesQuery.isFetching}
-            placeholder={t("community.placeholder")}
-            disabled={isLoading || !settled || updateCommunity.isPending}
-            onValueChange={(value) => {
-              // Clearing it stops every stream at once, so it is confirmed;
-              // choosing a different one is an ordinary change.
-              if (value === NONE) {
-                setClearing(true);
-                return;
-              }
-              updateCommunity.mutate({ community_id: Number(value) });
-            }}
-          />
-          <p className="text-muted-foreground text-sm">{t("community.helpText")}</p>
-        </CardContent>
-      </Card>
+            updateCommunity.mutate({ community_id: Number(value) });
+          }}
+        />
+        <p className="text-muted-foreground text-sm">{t("community.helpText")}</p>
+      </SettingsSection>
 
       {boundCommunityId === null ? (
         <p className="text-muted-foreground text-sm">{t("streams.chooseCommunityFirst")}</p>
@@ -198,21 +197,18 @@ const FeedbackCard = ({ enabled, settled }: { enabled: boolean; settled: boolean
     onError: (err) => toast.error(getErrorMessage(err, "intake:feedbackSwitch.error")),
   });
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("feedbackSwitch.title")}</CardTitle>
-        <CardDescription>{t("feedbackSwitch.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex items-center gap-3">
+    <SettingsSection
+      title={t("feedbackSwitch.title")}
+      description={t("feedbackSwitch.description")}
+    >
+      <SettingsRow label={t("feedbackSwitch.label")}>
         <Switch
-          id="feedback-enabled"
           checked={enabled}
           disabled={!settled || update.isPending}
           onCheckedChange={(checked) => update.mutate({ enabled: checked })}
         />
-        <Label htmlFor="feedback-enabled">{t("feedbackSwitch.label")}</Label>
-      </CardContent>
-    </Card>
+      </SettingsRow>
+    </SettingsSection>
   );
 };
 
@@ -274,39 +270,33 @@ const ContactsCard = ({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("contacts.title")}</CardTitle>
-        <CardDescription>{t("contacts.description")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form className="max-w-md space-y-4" onSubmit={onSubmit}>
-          <Field label={t("contacts.generalLabel")}>
+    <SettingsSection title={t("contacts.title")} description={t("contacts.description")}>
+      <form className="max-w-md space-y-4" onSubmit={onSubmit}>
+        <Field label={t("contacts.generalLabel")}>
+          <Input
+            type="email"
+            value={draft.general}
+            placeholder={t("contacts.generalPlaceholder")}
+            disabled={!settled || saving}
+            onChange={(event) => form.set({ general: event.target.value })}
+          />
+        </Field>
+        {streams.map((stream) => (
+          <Field key={stream} label={t(`streams.${stream}.title`)}>
             <Input
               type="email"
-              value={draft.general}
-              placeholder={t("contacts.generalPlaceholder")}
+              value={draft[stream]}
+              placeholder={t("contacts.streamPlaceholder")}
               disabled={!settled || saving}
-              onChange={(event) => form.set({ general: event.target.value })}
+              onChange={(event) => form.set({ [stream]: event.target.value })}
             />
           </Field>
-          {streams.map((stream) => (
-            <Field key={stream} label={t(`streams.${stream}.title`)}>
-              <Input
-                type="email"
-                value={draft[stream]}
-                placeholder={t("contacts.streamPlaceholder")}
-                disabled={!settled || saving}
-                onChange={(event) => form.set({ [stream]: event.target.value })}
-              />
-            </Field>
-          ))}
-          <Button type="submit" disabled={!settled || saving || !changed}>
-            {saving ? t("contacts.saving") : t("contacts.save")}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        ))}
+        <Button type="submit" disabled={!settled || saving || !changed}>
+          {saving ? t("contacts.saving") : t("contacts.save")}
+        </Button>
+      </form>
+    </SettingsSection>
   );
 };
 

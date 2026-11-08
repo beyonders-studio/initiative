@@ -582,7 +582,6 @@ export const UserSettingsNotificationsPage = ({
             >
               <Switch
                 checked={schedule.personal_instant}
-                aria-label={t("notifications.timing.personalInstant")}
                 onCheckedChange={(personal_instant) => writeEmail({ personal_instant })}
               />
             </SettingsRow>
@@ -605,7 +604,6 @@ export const UserSettingsNotificationsPage = ({
         >
           <Switch
             checked={preferences?.respect_presence ?? true}
-            aria-label={t("notifications.timing.respectPresence")}
             onCheckedChange={(checked) => writeTiming({ respect_presence: checked })}
           />
         </SettingsRow>
@@ -636,11 +634,7 @@ export const UserSettingsNotificationsPage = ({
             ) : null
           }
         >
-          <Switch
-            checked={Boolean(preferences?.quiet_hours)}
-            aria-label={t("notifications.quietHours.title")}
-            onCheckedChange={saveQuietHours}
-          />
+          <Switch checked={Boolean(preferences?.quiet_hours)} onCheckedChange={saveQuietHours} />
         </SettingsRow>
 
         {booked ? (
@@ -654,19 +648,20 @@ export const UserSettingsNotificationsPage = ({
                   })
             }
             description={t("notifications.timing.pause.note")}
-          >
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={writePreferences.isPending}
-              onClick={resume}
-            >
-              {running
-                ? t("notifications.timing.pause.resume")
-                : t("notifications.timing.pause.cancel")}
-            </Button>
-          </SettingsRow>
+            action={
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={writePreferences.isPending}
+                onClick={resume}
+              >
+                {running
+                  ? t("notifications.timing.pause.resume")
+                  : t("notifications.timing.pause.cancel")}
+              </Button>
+            }
+          />
         ) : (
           <SettingsRow
             label={t("notifications.timing.pause.title")}

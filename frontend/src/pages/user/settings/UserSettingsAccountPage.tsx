@@ -66,11 +66,12 @@ export const UserSettingsAccountPage = ({ user, logout }: UserSettingsAccountPag
         <SettingsRow
           label={t("dangerZone.deactivateTitle")}
           description={t("dangerZone.deactivateDescription")}
-        >
-          <Button variant="outline" onClick={() => setLeaving("deactivate")}>
-            {t("dangerZone.deactivateButton")}
-          </Button>
-        </SettingsRow>
+          action={
+            <Button variant="outline" onClick={() => setLeaving("deactivate")}>
+              {t("dangerZone.deactivateButton")}
+            </Button>
+          }
+        />
         <SettingsRow
           label={t("dangerZone.permanentDeleteTitle")}
           description={
@@ -79,11 +80,12 @@ export const UserSettingsAccountPage = ({ user, logout }: UserSettingsAccountPag
               <strong>{t("dangerZone.cannotBeUndone")}</strong>
             </>
           }
-        >
-          <Button variant="destructive" onClick={() => setLeaving("soft_delete")}>
-            {t("dangerZone.deleteButton")}
-          </Button>
-        </SettingsRow>
+          action={
+            <Button variant="destructive" onClick={() => setLeaving("soft_delete")}>
+              {t("dangerZone.deleteButton")}
+            </Button>
+          }
+        />
       </SettingsSection>
 
       <DeleteAccountDialog

@@ -11,6 +11,7 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { BillingConsoleButton } from "@/components/platform/BillingConsoleButton";
 import { CommunityOperatorSettingsSheet } from "@/components/platform/CommunityOperatorSettingsSheet";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useServerTableState } from "@/hooks/useServerTableState";
@@ -24,7 +25,6 @@ import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { DataTable } from "@/ui/data-table";
 import { DropdownMenuItem } from "@/ui/dropdown-menu";
@@ -415,26 +415,20 @@ export const OperatorDashboardCommunitiesPage = () => {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("communities.title")}</CardTitle>
-        <CardDescription>{t("communities.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <DataTable
-          columns={columns}
-          data={rows}
-          getRowId={(community) => String(community.id)}
-          enableFilterInput
-          filterInputPlaceholder={t("communities.filterByName")}
-          enableResetSorting
-          enablePagination
-          {...table.tableProps(totalCount)}
-        />
-        <p className="text-muted-foreground text-xs">
-          {billing?.manages_plans ? t("communities.helpTextBilling") : t("communities.helpText")}
-        </p>
-      </CardContent>
+    <SettingsSection title={t("communities.title")} description={t("communities.description")}>
+      <DataTable
+        columns={columns}
+        data={rows}
+        getRowId={(community) => String(community.id)}
+        enableFilterInput
+        filterInputPlaceholder={t("communities.filterByName")}
+        enableResetSorting
+        enablePagination
+        {...table.tableProps(totalCount)}
+      />
+      <p className="text-muted-foreground text-xs">
+        {billing?.manages_plans ? t("communities.helpTextBilling") : t("communities.helpText")}
+      </p>
       <CommunityOperatorSettingsSheet
         community={managing}
         open={managing !== null}
@@ -443,6 +437,6 @@ export const OperatorDashboardCommunitiesPage = () => {
         }}
         supportBound={communitiesQuery.data?.support_bound ?? false}
       />
-    </Card>
+    </SettingsSection>
   );
 };

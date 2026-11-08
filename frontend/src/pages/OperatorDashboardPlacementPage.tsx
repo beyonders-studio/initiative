@@ -17,7 +17,7 @@ import {
   placementRoleLabel,
 } from "@/components/auth/ProviderPlacementRuleSummary";
 import { ProviderPlacementRuleDialog } from "@/components/platform/ProviderPlacementRuleDialog";
-import { SettingRow } from "@/components/platform/SettingRow";
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useAgreePlacementRequest,
@@ -109,30 +109,22 @@ export const OperatorDashboardPlacementPage = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardDescription>{t("providerPlacement.description")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <SettingRow
-            htmlFor="placement-everywhere"
-            label={t("providerPlacement.everywhere.label")}
-            help={
-              canSetEverywhere
-                ? t("providerPlacement.everywhere.help")
-                : `${t("providerPlacement.everywhere.help")} ${t("providerPlacement.everywhere.ownerOnly")}`
-            }
-            control={
-              <Switch
-                id="placement-everywhere"
-                checked={everywhere}
-                disabled={!canSetEverywhere || setEverywhere.isPending}
-                onCheckedChange={(checked) => changeEverywhere(Boolean(checked))}
-              />
-            }
+      <SettingsSection description={t("providerPlacement.description")}>
+        <SettingsRow
+          label={t("providerPlacement.everywhere.label")}
+          description={
+            canSetEverywhere
+              ? t("providerPlacement.everywhere.help")
+              : `${t("providerPlacement.everywhere.help")} ${t("providerPlacement.everywhere.ownerOnly")}`
+          }
+        >
+          <Switch
+            checked={everywhere}
+            disabled={!canSetEverywhere || setEverywhere.isPending}
+            onCheckedChange={(checked) => changeEverywhere(Boolean(checked))}
           />
-        </CardContent>
-      </Card>
+        </SettingsRow>
+      </SettingsSection>
 
       <PlacementRequestsCard />
 
@@ -290,54 +282,51 @@ const PlacementRequestsCard = () => {
   if (rows.length === 0) return null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("providerPlacement.requests.title")}</CardTitle>
-        <CardDescription>{t("providerPlacement.requests.help")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ul className="space-y-3">
-          {rows.map((row) => (
-            <li
-              key={row.connection_id}
-              className="flex items-start justify-between gap-3 rounded-md border px-4 py-3"
+    <SettingsSection
+      title={t("providerPlacement.requests.title")}
+      description={t("providerPlacement.requests.help")}
+    >
+      <ul className="space-y-3">
+        {rows.map((row) => (
+          <li
+            key={row.connection_id}
+            className="flex items-start justify-between gap-3 rounded-md border px-4 py-3"
+          >
+            <div className="min-w-0 space-y-1">
+              <p className="font-medium text-sm">{row.community_name}</p>
+              <p className="text-sm">
+                {t("communities.sheet.narrowings.claims", {
+                  provider: row.provider_display_name,
+                  claim: row.claim,
+                  values: row.claim_values.join(", "),
+                })}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                {row.auto_join
+                  ? t("communities.sheet.narrowings.joinsOnArrival")
+                  : t("communities.sheet.narrowings.admitsOnly")}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              disabled={agree.isPending}
+              onClick={() =>
+                agree.mutate(
+                  { communityId: row.community_id, connectionId: row.connection_id },
+                  {
+                    onSuccess: () =>
+                      toast.success(
+                        t("providerPlacement.requests.agreed", { community: row.community_name })
+                      ),
+                  }
+                )
+              }
             >
-              <div className="min-w-0 space-y-1">
-                <p className="font-medium text-sm">{row.community_name}</p>
-                <p className="text-sm">
-                  {t("communities.sheet.narrowings.claims", {
-                    provider: row.provider_display_name,
-                    claim: row.claim,
-                    values: row.claim_values.join(", "),
-                  })}
-                </p>
-                <p className="text-muted-foreground text-xs">
-                  {row.auto_join
-                    ? t("communities.sheet.narrowings.joinsOnArrival")
-                    : t("communities.sheet.narrowings.admitsOnly")}
-                </p>
-              </div>
-              <Button
-                size="sm"
-                disabled={agree.isPending}
-                onClick={() =>
-                  agree.mutate(
-                    { communityId: row.community_id, connectionId: row.connection_id },
-                    {
-                      onSuccess: () =>
-                        toast.success(
-                          t("providerPlacement.requests.agreed", { community: row.community_name })
-                        ),
-                    }
-                  )
-                }
-              >
-                {t("communities.sheet.narrowings.agree")}
-              </Button>
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
+              {t("communities.sheet.narrowings.agree")}
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </SettingsSection>
   );
 };

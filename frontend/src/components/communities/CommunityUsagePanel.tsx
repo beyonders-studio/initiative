@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
 
 import { useReadStorageUsage } from "@/api/generated/storage/storage";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
 import { formatBytes } from "@/ui/lib/fileUtils";
 import { Progress } from "@/ui/progress";
 
@@ -48,55 +48,51 @@ export const CommunityUsagePanel = () => {
   const showGuests = guestsEnabled && maxGuests !== 0;
 
   return (
-    <Card>
-      {billing ? (
-        <CardHeader>
-          <CardTitle>{t("usagePanel.title")}</CardTitle>
-        </CardHeader>
-      ) : null}
-      <CardContent className={billing ? "space-y-6" : "space-y-6 pt-6"}>
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="font-medium">{t("usagePanel.storage")}</span>
-            <span className="text-muted-foreground">
-              {usedBytes == null
-                ? isError
-                  ? t("usagePanel.storageUnavailable")
-                  : null
-                : maxBytes == null
-                  ? t("usagePanel.usedOfUnlimited", { used: formatBytes(usedBytes) })
-                  : t("usagePanel.usedOfMax", {
-                      used: formatBytes(usedBytes),
-                      max: formatBytes(maxBytes),
-                    })}
-            </span>
-          </div>
-          {storagePct != null && <Progress value={storagePct} />}
+    <SettingsSection
+      title={billing ? t("usagePanel.title") : undefined}
+      contentClassName="space-y-6"
+    >
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="font-medium">{t("usagePanel.storage")}</span>
+          <span className="text-muted-foreground">
+            {usedBytes == null
+              ? isError
+                ? t("usagePanel.storageUnavailable")
+                : null
+              : maxBytes == null
+                ? t("usagePanel.usedOfUnlimited", { used: formatBytes(usedBytes) })
+                : t("usagePanel.usedOfMax", {
+                    used: formatBytes(usedBytes),
+                    max: formatBytes(maxBytes),
+                  })}
+          </span>
         </div>
+        {storagePct != null && <Progress value={storagePct} />}
+      </div>
 
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="font-medium">{t("usagePanel.members")}</span>
-            <span className="text-muted-foreground">
-              {maxUsers == null
-                ? t("usagePanel.membersOfUnlimited", { used: members })
-                : t("usagePanel.membersOfMax", { used: members, max: maxUsers })}
-            </span>
-          </div>
-          {memberPct != null && <Progress value={memberPct} />}
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="font-medium">{t("usagePanel.members")}</span>
+          <span className="text-muted-foreground">
+            {maxUsers == null
+              ? t("usagePanel.membersOfUnlimited", { used: members })
+              : t("usagePanel.membersOfMax", { used: members, max: maxUsers })}
+          </span>
         </div>
+        {memberPct != null && <Progress value={memberPct} />}
+      </div>
 
-        {showGuests && (
-          <div className="flex justify-between text-sm">
-            <span className="font-medium">{t("usagePanel.guests")}</span>
-            <span className="text-muted-foreground">
-              {maxGuests == null
-                ? t("usagePanel.guestsUnlimited")
-                : t("usagePanel.guestsUpTo", { max: maxGuests })}
-            </span>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {showGuests && (
+        <div className="flex justify-between text-sm">
+          <span className="font-medium">{t("usagePanel.guests")}</span>
+          <span className="text-muted-foreground">
+            {maxGuests == null
+              ? t("usagePanel.guestsUnlimited")
+              : t("usagePanel.guestsUpTo", { max: maxGuests })}
+          </span>
+        </div>
+      )}
+    </SettingsSection>
   );
 };
