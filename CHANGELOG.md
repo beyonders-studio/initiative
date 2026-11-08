@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Send feedback is a quick review.** Rate how the app is working for you out of five, then say what you like most and what you wish it did, both optional. It docks beside the page on a wide screen, keeps your draft when you close it, and takes a screenshot pasted into it. Feedback goes one way unless you tick that the team can contact you with questions, and a low rating points you to **Ask for help** for anything that needs an answer. Feedback cases carry the rating on a **rating** field.
 - **Each AI connection has its own on/off switch** on its row under **Integrations**, in place of the Enabled field in its dialog. A community's **Allow AI features** switch moved to the **Security** tab, beside its other restrictions. When AI goes off, whether the community or the server turns it off, the community's connections go off with it, and none can be turned on again until AI is back on.
 - **The desktop app on Windows and Linux hides its menu bar.** The File, Edit, View and Window row no longer takes space under the title bar; press Alt to show it. Zoom, reload and full screen keep their shortcuts.
 

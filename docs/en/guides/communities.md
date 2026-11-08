@@ -294,7 +294,9 @@ Notices that used to say "contact whoever runs this server" — the age question
 
 Where the server takes no requests but has said who to write to, the button gives you that address instead. Where there's neither, the button isn't there, and **Documentation**, the question mark beside it, is where to look.
 
-**Send feedback**, in your account menu and the command palette, tells the people who run the server what you think: an idea, a problem, praise or something else, with screenshots if they help. It shows you where the app was — its version, platform, language, theme, the page (without anything that names what was on it) and the window's size — and sends that with it unless you remove it. A problem you need an answer to has **I need an answer**, which sends it as a help request instead. Feedback lands in **My Tickets** too; the team writes first if they write at all, and you're told when it's been read.
+**Send feedback**, in your account menu and the command palette, is a quick review for the people who run the server. Give it a rating out of five, then, if you like, say what you like most and what you wish it did. A screenshot pasted into the second box comes along too. **See what** shows exactly what else gets sent (the app's version, platform, language, theme, the page without anything that names what was on it, and the window's size), and the switch beside it leaves all that out.
+
+Feedback goes one way unless you tick **You can contact me with questions about this**. Then the team can write to you about it, and it shows up in **My Tickets** when they do. Anything you need an answer to belongs in **Ask for help**, which a low rating points you to.
 
 Every request you send lands in **My Tickets**, in the sidebar: where each one stands (**Received**, **In progress**, **Waiting on you**, **Closed**), what the team said, and your replies. You get a notification when it moves, so there's no need to keep checking. A report is listed there too, though the team looks into reports without replying to them.
 
