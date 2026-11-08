@@ -13,6 +13,7 @@ import {
   fieldsInParts,
   pluginFieldId,
   pluginFields,
+  pluginParts,
   pluginsOnItems,
   shippedPluginParts,
 } from "@/lib/layouts/plugins";
@@ -120,7 +121,7 @@ const draw = (
   const plugins = pluginsOnItems(installs, 7);
   const view = {
     fields: taskFields([], pluginFields(plugins, "en")),
-    plugins,
+    parts: pluginParts(plugins),
     variant: "card" as const,
     env: {
       t: i18n.getFixedT(null, ["projects", "dates", "relations"]) as TranslateFn,

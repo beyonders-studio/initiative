@@ -12,12 +12,13 @@ import { propertySaves } from "@/hooks/useProperties";
 import type { TranslateFn } from "@/types/i18n";
 import { nonEmptyPropertySummaries } from "@/ui/properties/propertyHelpers";
 
-import { type DetailKind, useItemContext } from "./DetailLayoutView";
+import { useItemContext } from "./DetailLayoutView";
 import { filledBy, PlacedProperties } from "./detailLayout";
 import { ReadField } from "./editing";
 import { PlacedPropertyField } from "./fieldEditors";
 import { FIELD_RENDERERS, isEmptyValue, type LayoutItem, PROPERTY_FIELD_PREFIX } from "./fields";
 import { collectionFileFields, FILE_LAYOUT } from "./files";
+import { type InitiativeDetail, useInitiativeExtension } from "./initiativeExtension";
 import type { LayoutContext } from "./tree";
 
 /** What a file's detail shares with its parts, beside the file itself. */
@@ -112,7 +113,7 @@ const FileProperties = ({ file }: { file: CollectionFileSummary }) => {
 
 /** A file opened from a collection: its own fields, the collection's metadata
  *  and the initiative's properties. */
-export const FILE_DETAIL: DetailKind<CollectionFileSummary, FileLayoutContext, never> = {
+export const FILE_DETAIL: InitiativeDetail<CollectionFileSummary, FileLayoutContext, never> = {
   spec: FILE_LAYOUT,
   fields: (definitions) => collectionFileFields([], definitions),
   namespaces: ["files", "common"],
@@ -131,6 +132,7 @@ export const FILE_DETAIL: DetailKind<CollectionFileSummary, FileLayoutContext, n
     canOpen: { tool: Tool.file, id: file.id },
     links: { entity: file },
   }),
+  useExtension: useInitiativeExtension,
   // A collection requires its own metadata, which the file holds there.
   filled: filledBy<CollectionFileSummary, never>({}, (file) => file.metadata),
 };

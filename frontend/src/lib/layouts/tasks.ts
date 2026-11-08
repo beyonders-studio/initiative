@@ -5,12 +5,22 @@ import {
   MetadataType,
   type PropertyDefinitionRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import {
+  ASSIGNEE_ME,
+  ASSIGNEE_NONE,
+  type StoredTaskFilters,
+  specFromStored,
+  type TaskFilterSpec,
+  tableSortFields,
+  taskTableSorting,
+} from "@/lib/filters/taskFilters";
 import { namePropertyColumns } from "@/ui/properties/propertyColumns";
 import { listedValue } from "@/ui/properties/propertyHelpers";
 import { iconForPropertyType } from "@/ui/properties/propertyTypeIcons";
 
 import { at, detailLayoutSpec, type Region, storedLayout } from "./detailLayout";
 import { type FieldDef, propertyFieldId } from "./fields";
+import type { PresetKind } from "./presets";
 import type { LayoutNode } from "./tree";
 
 const builtin = (
@@ -412,4 +422,20 @@ export const taskPageWithFields = (
     side[index] = { ...side[index], children: [...(side[index].children ?? []), ...fields] };
   }
   return { ...stored, side } as DetailLayoutDefinitionInput;
+};
+
+/** A project's lists' presets, which ship three; one a table keeps also
+ *  sorts it. */
+export const TASK_PRESETS: PresetKind<TaskFilterSpec> = {
+  shipped: [
+    {
+      slug: "incomplete",
+      nameKey: "presets.incomplete",
+      filters: { status_categories: ["backlog", "todo", "in_progress"] },
+    },
+    { slug: "unassigned", nameKey: "presets.unassigned", filters: { assignees: [ASSIGNEE_NONE] } },
+    { slug: "mine", nameKey: "presets.mine", filters: { assignees: [ASSIGNEE_ME] } },
+  ],
+  read: (raw) => specFromStored(raw as StoredTaskFilters | undefined),
+  sorting: { read: taskTableSorting, stored: tableSortFields },
 };

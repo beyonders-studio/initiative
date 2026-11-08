@@ -37,8 +37,6 @@ import { useAuth } from "@/hooks/useAuth";
 import {
   type FieldSaveKind,
   type FieldSaveOptions,
-  ItemDraftContext,
-  type ItemEdit,
   type ItemFieldSave,
   useHeldItem,
   useItemFieldSave,
@@ -74,7 +72,14 @@ import {
 import { iconForPropertyType } from "@/ui/properties/propertyTypeIcons";
 import { Textarea } from "@/ui/textarea";
 
-import { FieldFrame, ReadField, sameJson, useFieldDraft } from "./editing";
+import {
+  FieldFrame,
+  ItemDraftContext,
+  type ItemEdit,
+  ReadField,
+  sameJson,
+  useFieldDraft,
+} from "./editing";
 
 /** Without `field-sizing`, a textarea stays as many rows high as it was
  *  given, so it is grown to what it holds, again whenever its width changes. */

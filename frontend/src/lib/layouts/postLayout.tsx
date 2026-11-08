@@ -47,8 +47,9 @@ import { formatDateTime, fromLocalDateTimeInput, toLocalDateTimeInput } from "@/
 import { cn } from "@/ui/lib/utils";
 import { Skeleton } from "@/ui/skeleton";
 
-import { type DetailKind, useItemContext } from "./DetailLayoutView";
+import { useItemContext } from "./DetailLayoutView";
 import { filledBy } from "./detailLayout";
+import { type InitiativeDetail, useInitiativeExtension } from "./initiativeExtension";
 import { POST_LAYOUT, postFields } from "./posts";
 
 const Editor = lazy(() =>
@@ -322,7 +323,7 @@ const PostShell = ({ context, children }: { context: PostLayoutContext; children
 };
 
 /** A notice's detail: its tags, its own parts and where it lives. */
-export const POST_DETAIL: DetailKind<PostRead, PostLayoutContext, PostUpdate> = {
+export const POST_DETAIL: InitiativeDetail<PostRead, PostLayoutContext, PostUpdate> = {
   spec: POST_LAYOUT,
   fields: postFields,
   namespaces: ["posts", "common"],
@@ -342,6 +343,7 @@ export const POST_DETAIL: DetailKind<PostRead, PostLayoutContext, PostUpdate> = 
     canOpen: { tool: Tool.post, id: post.id },
     links: { entity: post, title: post.name },
   }),
+  useExtension: useInitiativeExtension,
   Shell: PostShell,
   filled: filledBy<PostRead, PostUpdate>(
     { tags: (post) => post.tags.length > 0 },

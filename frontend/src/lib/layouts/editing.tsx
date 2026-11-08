@@ -1,17 +1,22 @@
 import {
+  createContext,
   type FocusEvent,
   type KeyboardEvent,
   type ReactNode,
   useContext,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ItemDraftContext } from "@/hooks/useFieldSave";
-import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
+import type {
+  PropertyStep,
+  PropertySummary,
+  PropertyValueInput,
+} from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/ui/button";
 import { Label } from "@/ui/label";
 import { cn } from "@/ui/lib/utils";
@@ -23,9 +28,127 @@ export type FieldSaveState = "idle" | "saving" | "saved" | "error";
 export interface FieldSave {
   state: FieldSaveState;
   retry: () => void;
-  /** What the last save failed with. */
-  error?: unknown;
+  /** Why the value the last save sent was refused, where it was refused
+   *  rather than failed to save: said under the field, so it can be put
+   *  right rather than tried again. */
+  refused?: string;
 }
+
+/** A change to some of an item's fields: what is sent, and how the item reads
+ *  once it is saved. A change to its properties names only those it sets,
+ *  takes off or steps, so one person's leaves another's standing. */
+export type ItemEdit<I, P> = { shows: Partial<I> } & (
+  | { patch: P }
+  | {
+      properties: { values: PropertyValueInput[]; removed?: number[]; steps?: PropertyStep[] };
+    }
+);
+
+/**
+ * An item being added, which nothing has saved yet: its fields' saves change
+ * the copy the dialog holds, and Add makes it whole.
+ */
+export interface ItemDraft {
+  /** Takes in one field's change. */
+  edit: (edit: ItemEdit<unknown, unknown>) => void;
+  /** Adds it, as Enter in a typed field does. */
+  submit: () => void;
+  /** Whether the field `id` shows a value it cannot take (a number left
+   *  empty), which Add waits for. */
+  hold: (id: string, holding: boolean) => void;
+  /** The fields changed so far, as Add sends them. */
+  sent: () => Record<string, unknown>;
+}
+
+export const ItemDraftContext = createContext<ItemDraft | null>(null);
+
+type DraftItem = { id: number; properties: PropertySummary[] };
+
+/** An item changed field by field with nothing saved, as it is sent: as it is
+ *  drawn, the fields changed on it, and the properties it is given. */
+export interface Written<I, P> {
+  item: I;
+  fields: Partial<P>;
+  properties: PropertyValueInput[];
+}
+
+/** What a draft holds as its last change left it: read by a handler that can
+ *  run in the same event as the change it follows (leaving a field, or Enter
+ *  in it), before the render that shows it. */
+interface Held<I, P> {
+  item: I;
+  fields: Partial<P>;
+  values: Map<number, unknown>;
+  holding: Set<string>;
+}
+
+/**
+ * An item changed field by field with nothing saved: an item being added, or
+ * the fields a change of one asks for. Its fields' saves write into `draft`
+ * (as `ItemDraftContext`); `written()` is what it holds, as it is sent.
+ */
+export const useItemDraft = <I extends DraftItem, P>(
+  blank: I,
+  { onEdit, onSubmit }: { onEdit?: () => void; onSubmit: () => void }
+) => {
+  const [item, setItem] = useState(blank);
+  // The fields showing a value they cannot take, which sending waits for.
+  const [holding, setHolding] = useState<ReadonlySet<string>>(new Set());
+  const latest = useRef<Held<I, P>>({
+    item,
+    fields: {},
+    values: new Map(),
+    holding: new Set(),
+  });
+  const handlers = useRef({ onEdit, onSubmit });
+  handlers.current = { onEdit, onSubmit };
+  const draft = useMemo<ItemDraft>(
+    () => ({
+      edit: (edit: ItemEdit<unknown, unknown>) => {
+        handlers.current.onEdit?.();
+        const held = latest.current;
+        held.item = { ...held.item, ...(edit.shows as Partial<I>) };
+        if ("patch" in edit) {
+          held.fields = { ...held.fields, ...(edit.patch as Partial<P>) };
+        } else {
+          for (const { property_id, value } of edit.properties.values) {
+            held.values.set(property_id, value);
+          }
+          // A property taken off shows as gone: nothing reads it back.
+          const removed = edit.properties.removed ?? [];
+          for (const id of removed) held.values.delete(id);
+          held.item = {
+            ...held.item,
+            properties: held.item.properties.filter((each) => !removed.includes(each.property_id)),
+          };
+        }
+        setItem(held.item);
+      },
+      submit: () => handlers.current.onSubmit(),
+      hold: (id: string, holds: boolean) => {
+        const held = latest.current.holding;
+        if (held.has(id) === holds) return;
+        if (holds) held.add(id);
+        else held.delete(id);
+        setHolding(new Set(held));
+      },
+      sent: () => latest.current.fields as Record<string, unknown>,
+    }),
+    []
+  );
+  /** What it holds now, as it is sent. A description is named with what it
+   *  was written over, so a change of an item that exists is refused where
+   *  somebody else wrote it meanwhile. */
+  const written = (): Written<I, P> => {
+    const { item: now, fields, values } = latest.current;
+    return {
+      item: now,
+      fields,
+      properties: [...values].map(([property_id, value]) => ({ property_id, value })),
+    };
+  };
+  return { item, holding, latest, draft, written };
+};
 
 // The inputs a value is typed into, as against picked with. A combobox's
 // search box is typed into too, but what it changes is a pick.
@@ -222,9 +345,6 @@ export const ReadField = ({ label, children }: { label: string; children: ReactN
   </div>
 );
 
-/** The answers that refuse a value, rather than fail to save it. */
-const REFUSED: ReadonlySet<number> = new Set([400, 422]);
-
 /**
  * One field on a detail: its label, its own save state with Retry, a
  * note when it changed underneath an edit, and the editor.
@@ -283,10 +403,8 @@ export const FieldFrame = ({
         </div>
       )}
       {children}
-      {save.state === "error" && REFUSED.has(getHttpStatus(save.error) ?? 0) ? (
-        // A value the server refuses says why, so it can be put right rather
-        // than tried again.
-        <p className="text-destructive text-xs">{getErrorMessage(save.error)}</p>
+      {save.state === "error" && save.refused ? (
+        <p className="text-destructive text-xs">{save.refused}</p>
       ) : null}
       {changed ? (
         <p role="status" className="text-muted-foreground text-xs">

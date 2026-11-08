@@ -5,7 +5,6 @@ import {
   createContext,
   Fragment,
   type ReactNode,
-  useCallback,
   useContext,
   useId,
   useMemo,
@@ -14,20 +13,11 @@ import {
 import { useTranslation } from "react-i18next";
 
 import type {
-  EndpointRef,
   PropertyDefinitionRead,
   PropertySummary,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { EntityLinkField } from "@/components/entities/EntityLinkField";
-import type { RelationsLayout } from "@/components/entities/RelationsSection";
-import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
-import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { type FieldSaveKind, ItemDraftContext } from "@/hooks/useFieldSave";
-import { useCommunityPath } from "@/lib/communityUrl";
-import type { LinkedRef } from "@/lib/relationships";
-import type { ToolRelationEntity } from "@/lib/tools";
-import type { TranslateFn } from "@/types/i18n";
+import type { FieldSaveKind } from "@/hooks/useFieldSave";
 import { Button } from "@/ui/button";
 import { cn } from "@/ui/lib/utils";
 import { type MetadataOwner, ownProperties } from "@/ui/properties/propertyHelpers";
@@ -43,22 +33,13 @@ import {
   type StoredRegions,
 } from "./detailLayout";
 import { indexPaths } from "./draft";
+import { ItemDraftContext } from "./editing";
 import { PlacedPropertyField, PropertiesField } from "./fieldEditors";
-import { type FieldDef, PROPERTY_FIELD_PREFIX, useProjectLayoutEnv } from "./fields";
-import {
-  FieldsInParts,
-  fieldsInParts,
-  PluginFieldOnDetail,
-  type PluginItem,
-  pluginFields,
-  pluginKindOf,
-  shippedPluginParts,
-  usePluginsOnItems,
-} from "./plugins";
+import { type FieldDef, type LayoutEnv, PROPERTY_FIELD_PREFIX } from "./fields";
 import { LAYOUT_PARTS, type LayoutContext, type LayoutNode, type Parts, renderNode } from "./tree";
 
 /** What every kind of item drawn on a detail has. */
-type Item = PluginItem & { properties: PropertySummary[]; updated_at?: string };
+export type DetailItem = { id: number; properties: PropertySummary[]; updated_at?: string };
 
 /** Where one item lives, which the parts every item's detail has read. */
 export interface ItemHome<I, P> {
@@ -66,49 +47,66 @@ export interface ItemHome<I, P> {
   saves: FieldSaveKind<I, P>;
   /** The server says the reader cannot change it. */
   readOnly: boolean;
-  /** Its initiative, which holds its properties' definitions and places its
-   *  plug-ins; none for a community's own tool. */
+  /** Its initiative, which holds its properties' definitions; none for a
+   *  community's own tool. */
   initiativeId: number | null;
   /** The tool it is opened in: whose members a person-valued property names. */
   canOpen: { tool: Tool; id: number };
   /** The project whose metadata it holds beside its initiative's properties:
    *  a task's. */
   owner?: MetadataOwner;
-  /** What its links are kept under: the tool entity, and the item itself
-   *  where it is not that entity. */
-  links: {
-    entity: ToolRelationEntity;
-    target?: EndpointRef;
-    title?: string;
-    layout?: RelationsLayout;
-  };
   /** The menu of what else can be done with it. */
   actions?: ReactNode;
 }
 
 /**
+ * What the app drawing a kind's details adds to each, read as a hook while
+ * one is drawn: what its fields are drawn with, fields and parts beside the
+ * kind's own, and what a side drawn as shipped places after its own.
+ */
+export interface DetailExtension<I> {
+  env: LayoutEnv;
+  /** Fields beside the kind's own: what its `fields` is given beside its
+   *  initiative's properties. */
+  fields: FieldDef[];
+  /** Parts a side drawn as shipped places after its own. */
+  more: LayoutNode[];
+  /** Parts beside those every item's detail has, which the kind's own may
+   *  replace. One being added draws them all, so each draws what it does
+   *  then. */
+  parts: Parts<I>;
+  /** Draws a field the kind has no editor of its own for: one this adds. */
+  field: (field: FieldDef, item: I) => ReactNode;
+  /** The detail, drawn from `tree`, inside what its parts read. */
+  wrap: (tree: LayoutNode, children: ReactNode) => ReactNode;
+}
+
+/**
  * One kind of item's detail: its layout, its own fields' editors and parts,
  * and where an item of it lives. The fields placed from its initiative's
- * properties and its plug-ins, and its properties, links and actions, are
- * drawn alike for every kind.
+ * properties, its properties and its actions are drawn alike for every kind;
+ * what the app adds to each is its extension's. `H` is what the kind says of
+ * where an item lives that its extension reads.
  */
-export interface DetailKind<I extends Item, C, P> {
+export interface DetailKind<I extends DetailItem, C, P, H extends object = object> {
   spec: DetailLayoutSpec;
   /** For a kind laid out once per type of item (a task): the type an item is,
    *  whose stored page is its own, and the page its type is drawn as until
    *  that is changed. */
   typed?: { typeOf: (item: I) => number; spec: (item: I) => DetailLayoutSpec };
-  /** Its fields, given its initiative's properties and the plug-ins'. */
-  fields: (definitions: PropertyDefinitionRead[], plugins: FieldDef[]) => Map<string, FieldDef>;
+  /** Its fields, given its initiative's properties and the fields its
+   *  extension adds. */
+  fields: (definitions: PropertyDefinitionRead[], added: FieldDef[]) => Map<string, FieldDef>;
   /** Where its fields' labels are worded. */
   namespaces: readonly FlatNamespace[];
   /** Its own fields' editors, by field id. */
   editors: Readonly<Record<string, ComponentType<{ item: I; label: string }>>>;
   /** Its own parts, beside those every item has. */
   parts?: Parts<I>;
-  home: (item: I, context: C) => ItemHome<I, P>;
-  /** Where a task drawn on it opens, inside its community. */
-  taskRoute?: (item: I, context: C, taskId: number) => string;
+  home: (item: I, context: C) => ItemHome<I, P> & H;
+  /** What the app drawing it adds to each item's detail, given where the
+   *  item lives and the kind its layout is stored as. */
+  useExtension: (home: ItemHome<I, P>, kind: DetailLayoutSpec["kind"]) => DetailExtension<I>;
   /** Holds what its parts keep across a change of layout. */
   Shell?: ComponentType<{ context: C; children: ReactNode }>;
   /** Its own parts an item being added draws: those that need nothing saved. */
@@ -125,9 +123,10 @@ export interface DetailKind<I extends Item, C, P> {
 }
 
 interface Drawn {
-  detail: DetailKind<Item, unknown, unknown>;
+  detail: DetailKind<DetailItem, unknown, unknown>;
   context: unknown;
-  home: ItemHome<Item, unknown>;
+  home: ItemHome<DetailItem, unknown>;
+  extension: DetailExtension<DetailItem>;
 }
 
 const DrawnItem = createContext<Drawn | null>(null);
@@ -141,7 +140,12 @@ const useDrawn = (): Drawn => {
 /** What the page drawing the item gave its detail. */
 export const useItemContext = <C,>(): C => useDrawn().context as C;
 
-const propertiesOf = (item: Item, home: ItemHome<Item, unknown>) => ({
+/** Where the item being drawn lives, with what its kind says of it beside
+ *  what every detail reads (`H`). */
+export const useItemHome = <H extends object = object>(): ItemHome<unknown, unknown> & H =>
+  useDrawn().home as unknown as ItemHome<unknown, unknown> & H;
+
+const propertiesOf = (item: DetailItem, home: ItemHome<DetailItem, unknown>) => ({
   kind: home.saves,
   id: item.id,
   properties: item.properties,
@@ -152,11 +156,14 @@ const propertiesOf = (item: Item, home: ItemHome<Item, unknown>) => ({
   updatedAt: item.updated_at,
 });
 
-/** One field, by its id: one of its initiative's properties, a plug-in's, or
- *  the kind's own. */
-const ItemField = ({ id, item, view }: { id: string; item: Item; view: LayoutContext }) => {
-  const { detail, home } = useDrawn();
-  const t = useTranslation(detail.namespaces).t as TranslateFn;
+/** One field, by its id: one of its initiative's properties, the kind's own,
+ *  or one its extension adds. */
+const ItemField = ({ id, item, view }: { id: string; item: DetailItem; view: LayoutContext }) => {
+  const { detail, home, extension } = useDrawn();
+  const t = useTranslation(detail.namespaces).t as (
+    key: string,
+    options?: Record<string, unknown>
+  ) => string;
   if (id.startsWith(PROPERTY_FIELD_PREFIX)) {
     return home.initiativeId === null ? null : (
       <PlacedPropertyField
@@ -167,35 +174,19 @@ const ItemField = ({ id, item, view }: { id: string; item: Item; view: LayoutCon
   }
   const field = view.fields.get(id);
   if (!field) return null;
-  // A plug-in's value is the plug-in's to change.
-  if (field.source === "plugin") return <PluginFieldOnDetail field={field} item={item} />;
   const Editor = Object.hasOwn(detail.editors, id) ? detail.editors[id] : undefined;
-  return Editor ? <Editor item={item} label={t(field.label)} /> : null;
+  return Editor ? <Editor item={item} label={t(field.label)} /> : extension.field(field, item);
 };
 
 /** Its properties, but for those the layout places on their own. A reader
  *  sees none where it holds none; a community's own tool has none to offer. */
-const ItemProperties = ({ item }: { item: Item }) => {
+const ItemProperties = ({ item }: { item: DetailItem }) => {
   const { home } = useDrawn();
   const placed = useContext(PlacedProperties);
   if (home.initiativeId === null) return null;
   if (home.readOnly && ownProperties(item.properties).every((each) => placed.has(each.property_id)))
     return null;
   return <PropertiesField {...propertiesOf(item, home)} except={placed} />;
-};
-
-const ItemRelations = () => {
-  const { home } = useDrawn();
-  return (
-    <ToolRelationsPanel
-      tool={home.canOpen.tool}
-      entity={home.links.entity}
-      target={home.links.target}
-      canEdit={!home.readOnly}
-      entityTitle={home.links.title}
-      defaultLayout={home.links.layout}
-    />
-  );
 };
 
 /** What can be done with the item, at the end of the row it is in. A row too
@@ -219,7 +210,7 @@ const RequiredMark = ({
   children,
 }: {
   node: LayoutNode;
-  item: Item;
+  item: DetailItem;
   children: ReactNode;
 }) => {
   const { t } = useTranslation("layouts");
@@ -256,7 +247,7 @@ const markRequired = <I,>(parts: Parts<I>): Parts<I> =>
       type,
       (node: LayoutNode, item: I, view: LayoutContext, all: Parts<I>) =>
         isRequired(node) ? (
-          <RequiredMark node={node} item={item as Item}>
+          <RequiredMark node={node} item={item as DetailItem}>
             {draw(node, item, view, all)}
           </RequiredMark>
         ) : (
@@ -264,28 +255,6 @@ const markRequired = <I,>(parts: Parts<I>): Parts<I> =>
         ),
     ])
   );
-
-/** The links an item being added is to be made with. */
-export const AddingLinks = createContext<{
-  value: LinkedRef[];
-  onChange: (next: LinkedRef[]) => void;
-} | null>(null);
-
-/** What an item being added is to be linked to, written once it is made. */
-const LinksToMake = () => {
-  const { t } = useTranslation("relations");
-  const { home } = useDrawn();
-  const links = useContext(AddingLinks);
-  if (!links || home.initiativeId === null) return null;
-  return (
-    <EntityLinkField
-      label={t("groups.attached.title")}
-      initiativeId={home.initiativeId}
-      value={links.value}
-      onChange={links.onChange}
-    />
-  );
-};
 
 /** The side of an item being added, folded until it is asked for. What is
  *  folded stays drawn, so a field keeps what it is holding. */
@@ -336,19 +305,23 @@ const ADDING_PARTS = {
   ),
 };
 
-/** The parts every item's detail has, then its kind's own. One being added
- *  draws what needs nothing saved: its fields and properties, the links to
- *  make, and the parts of its kind's own it names; nothing a plug-in draws
- *  and nothing it could be done with yet. */
-const partsOf = <I extends Item>(own: Parts<I> = {}, adding?: readonly string[]): Parts<I> => {
+/** The parts every item's detail has, then its extension's, then its kind's
+ *  own. One being added draws what needs nothing saved: its fields and
+ *  properties, its extension's parts, and the parts of its kind's own it
+ *  names; nothing it could be done with yet. */
+const partsOf = <I extends DetailItem>(
+  added: Parts<I>,
+  own: Parts<I> = {},
+  adding?: readonly string[]
+): Parts<I> => {
   const parts: Parts<I> = {
     ...LAYOUT_PARTS,
     field: (node: LayoutNode, item: I, view: LayoutContext) => (
       <ItemField id={String(node.props?.field)} item={item} view={view} />
     ),
     properties: (_node: LayoutNode, item: I) => <ItemProperties item={item} />,
-    relations: () => (adding ? <LinksToMake /> : <ItemRelations />),
     actions: () => <ItemActions />,
+    ...added,
     ...own,
   };
   if (!adding) return markRequired(parts);
@@ -356,7 +329,7 @@ const partsOf = <I extends Item>(own: Parts<I> = {}, adding?: readonly string[])
     ...markRequired(
       Object.fromEntries(
         Object.entries(parts).filter(([type]) =>
-          Object.hasOwn(own, type) ? adding.includes(type) : type !== "plugin" && type !== "actions"
+          Object.hasOwn(own, type) ? adding.includes(type) : type !== "actions"
         )
       )
     ),
@@ -364,7 +337,7 @@ const partsOf = <I extends Item>(own: Parts<I> = {}, adding?: readonly string[])
   };
 };
 
-type ViewProps<I extends Item, C, P> = {
+type ViewProps<I extends DetailItem, C, P> = {
   detail: DetailKind<I, C, P>;
   item: I;
   context: C;
@@ -375,67 +348,57 @@ type ViewProps<I extends Item, C, P> = {
 };
 
 /**
- * An item's detail, drawn from its stored layout or as shipped, with the
- * plug-ins placed in its initiative drawn on it: what every item's page and
- * the layout editor's preview of it draw. Another item's detail starts
- * afresh, with none of this one's drafts.
+ * An item's detail, drawn from its stored layout or as shipped, with what its
+ * kind's extension adds drawn on it: what every item's page and the layout
+ * editor's preview of it draw. Another item's detail starts afresh, with none
+ * of this one's drafts.
  */
-export const DetailLayoutView = <I extends Item, C, P>(props: ViewProps<I, C, P>) => (
-  <ItemDetail key={`${useActiveCommunityId()}:${props.item.id}`} {...props} />
+export const DetailLayoutView = <I extends DetailItem, C, P>(props: ViewProps<I, C, P>) => (
+  <ItemDetail key={props.item.id} {...props} />
 );
 
-const ItemDetail = <I extends Item, C, P>({
+const ItemDetail = <I extends DetailItem, C, P>({
   detail,
   item,
   context,
   layout,
   editing,
 }: ViewProps<I, C, P>) => {
-  const { i18n } = useTranslation();
   const home = detail.home(item, context);
-  const { taskRoute, Shell } = detail;
+  const { Shell } = detail;
   const spec = detail.typed?.spec(item) ?? detail.spec;
-  const gp = useCommunityPath();
-  const taskHref = useCallback(
-    (taskId: number) => (taskRoute ? gp(taskRoute(item, context, taskId)) : ""),
-    [taskRoute, gp, item, context]
-  );
-  const env = useProjectLayoutEnv(taskHref);
-  const plugins = usePluginsOnItems(home.initiativeId, true, pluginKindOf(spec.kind));
+  const extension = detail.useExtension(home, spec.kind);
+  const { env, fields: added, more, parts: addedParts } = extension;
   const adding = useContext(ItemDraftContext) !== null;
   const upFront = adding ? detail.addingUpFront : undefined;
   const tree = useMemo(() => {
-    const laidOut = spec.tree(layout, shippedPluginParts(plugins));
+    const laidOut = spec.tree(layout, more);
     return upFront ? addingTree(laidOut, [...upFront, ...requiredKeys(layout)]) : laidOut;
-  }, [spec, layout, plugins, upFront]);
+  }, [spec, layout, more, upFront]);
   const placed = useMemo(() => placedProperties(tree), [tree]);
-  const inParts = useMemo(() => fieldsInParts(tree, plugins), [tree, plugins]);
   const view = useMemo<LayoutContext>(
     () => ({
-      fields: detail.fields([], pluginFields(plugins, i18n.language)),
-      plugins,
+      fields: detail.fields([], added),
       variant: "detail",
       env,
       editing: editing ? indexPaths(tree) : undefined,
     }),
-    [detail, plugins, i18n.language, env, editing, tree]
+    [detail, added, env, editing, tree]
   );
   const parts = useMemo(
-    () => partsOf(detail.parts, adding ? (detail.addingParts ?? []) : undefined),
-    [detail, adding]
+    () => partsOf(addedParts, detail.parts, adding ? (detail.addingParts ?? []) : undefined),
+    [addedParts, detail, adding]
   );
   // The parts every item has read the kind whatever its item is.
-  const drawn = { detail, context, home } as unknown as Drawn;
+  const drawn = { detail, context, home, extension } as unknown as Drawn;
   const body = (
     <PlacedProperties.Provider value={placed}>
-      <FieldsInParts.Provider value={inParts}>
-        {renderNode(tree, item, view, parts)}
-      </FieldsInParts.Provider>
+      {renderNode(tree, item, view, parts)}
     </PlacedProperties.Provider>
   );
   return (
     <DrawnItem.Provider value={drawn}>
-      {Shell ? <Shell context={context}>{body}</Shell> : body}
+      {extension.wrap(tree, Shell ? <Shell context={context}>{body}</Shell> : body)}
     </DrawnItem.Provider>
   );
 };

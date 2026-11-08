@@ -14,33 +14,27 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
-  PropertyStep,
   PropertySummary,
   PropertyTarget,
-  PropertyValueInput,
   PropertyValuesSetRequest,
 } from "@/api/generated/initiativeAPI.schemas";
 import { setProperties } from "@/api/generated/properties/properties";
 import { describes, type Spec } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
-import type { FieldSave, FieldSaveState } from "@/lib/layouts/editing";
+import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
+import {
+  type FieldSave,
+  type FieldSaveState,
+  ItemDraftContext,
+  type ItemEdit,
+} from "@/lib/layouts/editing";
 import { toast } from "@/lib/mascotToast";
 import { currentServerKey } from "@/lib/offlineSession";
-
-/** A change to some of an item's fields: what is sent, and how the item reads
- *  once it is saved. A change to its properties names only those it sets,
- *  takes off or steps, so one person's leaves another's standing. */
-export type ItemEdit<I, P> = { shows: Partial<I> } & (
-  | { patch: P }
-  | {
-      properties: { values: PropertyValueInput[]; removed?: number[]; steps?: PropertyStep[] };
-    }
-);
 
 /** One field's save, as {@link useItemFieldSave} answers it. */
 export type ItemFieldSave<I, P> = FieldSave & {
@@ -48,24 +42,6 @@ export type ItemFieldSave<I, P> = FieldSave & {
   error: unknown;
   reset: () => void;
 };
-
-/**
- * An item being added, which nothing has saved yet: its fields' saves change
- * the copy the dialog holds, and Add makes it whole.
- */
-export interface ItemDraft {
-  /** Takes in one field's change. */
-  edit: (edit: ItemEdit<unknown, unknown>) => void;
-  /** Adds it, as Enter in a typed field does. */
-  submit: () => void;
-  /** Whether the field `id` shows a value it cannot take (a number left
-   *  empty), which Add waits for. */
-  hold: (id: string, holding: boolean) => void;
-  /** The fields changed so far, as Add sends them. */
-  sent: () => Record<string, unknown>;
-}
-
-export const ItemDraftContext = createContext<ItemDraft | null>(null);
 
 /** How one kind of item is saved field by field. */
 export interface FieldSaveKind<I, P> {
@@ -110,6 +86,9 @@ export interface FieldSaveOptions<I, P> {
 }
 
 const SAVED_SHOWN_MS = 2_000;
+
+/** The answers that refuse a value, rather than fail to save it. */
+const REFUSED: ReadonlySet<number> = new Set([400, 422]);
 
 /** One save of some of an item's fields, as the mutation that sends it carries it. */
 interface FieldSaveCall<I, P> {
@@ -386,6 +365,7 @@ export const useItemFieldSave = <I, P>(
     retry: () => {
       if (last.current) void send(last.current.edit, last.current.undo);
     },
+    refused: REFUSED.has(getHttpStatus(error) ?? 0) ? getErrorMessage(error) : undefined,
   };
   return {
     ...field,

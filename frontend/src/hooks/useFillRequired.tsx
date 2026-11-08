@@ -1,12 +1,9 @@
 import { useState } from "react";
 
-import type { PropertySummary } from "@/api/generated/initiativeAPI.schemas";
-import type { Written } from "@/components/layouts/AddItemDialog";
 import { FillRequiredDialog } from "@/components/layouts/FillRequiredDialog";
 import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
-import type { DetailKind } from "@/lib/layouts/DetailLayoutView";
-
-type Item = { id: number; properties: PropertySummary[] };
+import type { DetailItem, DetailKind } from "@/lib/layouts/DetailLayoutView";
+import type { Written } from "@/lib/layouts/editing";
 
 /** A change waiting on what its item's new page requires. */
 export interface Asking<I, C, P> {
@@ -24,7 +21,7 @@ export interface Asking<I, C, P> {
  * opens it, and `dialog` is drawn wherever the change is made from. The
  * dialog is given the definitions of the place the item is going to.
  */
-export const useFillRequired = <I extends Item, C, P>(detail: DetailKind<I, C, P>) => {
+export const useFillRequired = <I extends DetailItem, C, P>(detail: DetailKind<I, C, P>) => {
   const [asking, setAsking] = useState<Asking<I, C, P> | null>(null);
   const [pending, setPending] = useState(false);
   const home = asking ? detail.home(asking.item, asking.context) : null;

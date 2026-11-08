@@ -983,19 +983,19 @@ const drawPart = (node: LayoutNode, drawing: Drawing): ReactNode => {
 /** One of a plug-in's parts on an item, drawn from its manifest's tree. A part
  *  the install no longer declares, or one placed where its plug-in does not
  *  reach the reader, draws nothing. */
-export const PluginPartView = ({
+const PluginPartView = ({
   plugins,
   pluginId,
   partId,
   item,
 }: {
-  plugins: ReadonlyMap<number, PluginOnItems> | undefined;
+  plugins: ReadonlyMap<number, PluginOnItems>;
   pluginId: number;
   partId: string;
   item: PluginItem;
 }) => {
   const { i18n } = useTranslation();
-  const plugin = plugins?.get(pluginId);
+  const plugin = plugins.get(pluginId);
   const runner = useActionRunner(plugin?.kind ?? "task", item.id);
   const part = plugin?.parts.get(partId);
   if (!plugin || !part) return null;
@@ -1012,3 +1012,16 @@ export const PluginPartView = ({
     </>
   );
 };
+
+/** The `plugin` part, which draws one of the parts the installs in `plugins`
+ *  declare, on whatever kind of item they were read for. */
+export const pluginParts = (plugins: ReadonlyMap<number, PluginOnItems>) => ({
+  plugin: <I extends PluginItem>(node: LayoutNode, item: I) => (
+    <PluginPartView
+      plugins={plugins}
+      pluginId={Number(node.props?.plugin)}
+      partId={String(node.props?.part)}
+      item={item}
+    />
+  ),
+});

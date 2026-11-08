@@ -12,22 +12,13 @@ import type {
   ListLayoutDefinitionInput,
   PresetSortField,
   SortDir,
+  SortField,
 } from "@/api/generated/initiativeAPI.schemas";
-import { type CalendarFilters, calendarFiltersFromStored } from "@/lib/filters/calendarFilters";
-import {
-  ASSIGNEE_ME,
-  ASSIGNEE_NONE,
-  type StoredTaskFilters,
-  specFromStored,
-  type TaskFilterSpec,
-  tableSortFields,
-  taskTableSorting,
-} from "@/lib/filters/taskFilters";
 import { slugify } from "@/ui/lib/slug";
 
 /** A preset as a list offers it, holding its tool's filters `F`. A shipped
  *  one is named by `nameKey`, in the reader's words. */
-export type Preset<F = TaskFilterSpec> = {
+export type Preset<F> = {
   slug: string;
   name: string;
   nameKey?: string;
@@ -39,31 +30,16 @@ export type Preset<F = TaskFilterSpec> = {
  *  filters as kept. */
 type ShippedPreset = { slug: string; nameKey: string; filters: Record<string, unknown> };
 
-/** One tool's presets: the ones it ships, and its filters read from what a
- *  layout keeps. */
+/** One tool's presets: the ones it ships, its filters read from what a
+ *  layout keeps, and, where a preset can sort its list, that sort as the
+ *  list's table names it, read from what a layout keeps and back. */
 export type PresetKind<F> = {
   shipped: readonly ShippedPreset[];
   read: (raw: Record<string, unknown> | undefined) => F;
-};
-
-/** A project's lists' presets, which ship three. */
-export const TASK_PRESETS: PresetKind<TaskFilterSpec> = {
-  shipped: [
-    {
-      slug: "incomplete",
-      nameKey: "presets.incomplete",
-      filters: { status_categories: ["backlog", "todo", "in_progress"] },
-    },
-    { slug: "unassigned", nameKey: "presets.unassigned", filters: { assignees: [ASSIGNEE_NONE] } },
-    { slug: "mine", nameKey: "presets.mine", filters: { assignees: [ASSIGNEE_ME] } },
-  ],
-  read: (raw) => specFromStored(raw as StoredTaskFilters | undefined),
-};
-
-/** The initiative calendar's presets, which ships none. */
-export const CALENDAR_PRESETS: PresetKind<CalendarFilters> = {
-  shipped: [],
-  read: calendarFiltersFromStored,
+  sorting?: {
+    read: (sort: SortField[]) => SortingState;
+    stored: (sorting: SortingState) => SortField[];
+  };
 };
 
 /** How many presets a list may offer, as the server allows. */
@@ -91,7 +67,7 @@ export const presetsOf = <F>(
           ? undefined
           : kind.shipped.find((shipped) => shipped.slug === preset.slug)?.nameKey,
         filters: kind.read(preset.filters as Record<string, unknown> | undefined),
-        sorting: taskTableSorting(preset.sort ?? []),
+        sorting: kind.sorting?.read(preset.sort ?? []) ?? [],
       }));
 
 /** A preset's name, in the reader's words where it is shipped. */
@@ -100,13 +76,13 @@ export const presetName = (
   t: (key: string) => string
 ): string => (preset.nameKey ? t(preset.nameKey) : preset.name);
 
-/** `preset` as a layout keeps it: a shipped one by its slug alone, so each
- *  reader still reads its name in their own words. */
-export const storedPreset = <F>(preset: Preset<F>): LayoutPreset => ({
+/** `preset` of `kind` as a layout keeps it: a shipped one by its slug alone,
+ *  so each reader still reads its name in their own words. */
+export const storedPreset = <F>(preset: Preset<F>, kind: PresetKind<F>): LayoutPreset => ({
   ...(preset.nameKey ? {} : { name: preset.name }),
   slug: preset.slug,
   filters: preset.filters as LayoutPreset["filters"],
-  sort: tableSortFields(preset.sorting).map(({ field, dir }) => ({
+  sort: (kind.sorting?.stored(preset.sorting) ?? []).map(({ field, dir }) => ({
     field: field as PresetSortField,
     dir: dir as SortDir,
   })),
