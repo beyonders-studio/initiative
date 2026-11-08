@@ -31,11 +31,10 @@ import { useId, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import { useProjects, useTaskTypesOf } from "@/hooks/useProjects";
 import { useProperties } from "@/hooks/useProperties";
 import { useTags } from "@/hooks/useTags";
-import type { MemberSearchScope } from "@/hooks/useUsers";
+import { useSearchMembers } from "@/hooks/useUsers";
 import { toolViewParams } from "@/lib/tools";
 import {
   type ConditionValue,
@@ -52,6 +51,7 @@ import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { MemberPicker, type MemberScope } from "@/ui/member-picker";
 import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
@@ -210,7 +210,7 @@ export function FilterBuilder({
         label: property.name,
       })),
       // People are searched on the server, among the initiative's members.
-      members: { type: "initiative", initiativeId } satisfies MemberSearchScope,
+      members: { type: "initiative", initiativeId } satisfies MemberScope,
     }),
     [projects.data, tags.data, properties.data, initiativeId]
   );
@@ -448,7 +448,7 @@ type Options = {
   project: { value: string; label: string }[];
   tag: { value: string; label: string }[];
   property: { value: string; label: string }[];
-  members: MemberSearchScope;
+  members: MemberScope;
 };
 
 function LeafRow({
@@ -535,9 +535,10 @@ function ValueControl({
   options: Options;
   onChange: (value: ConditionValue) => void;
 }) {
-  const { t } = useTranslation(["dashboards", "tasks", "common"]);
+  const { t } = useTranslation(["dashboards", "tasks", "common", "projects"]);
   const spec = fieldSpec(fields, leaf.field);
   const memberFieldId = useId();
+  const searchMembers = useSearchMembers();
 
   // "Is empty" compares against nothing, so there is nothing to choose.
   if (leaf.op === "is_null") return null;
@@ -569,12 +570,14 @@ function ValueControl({
         <Label htmlFor={memberFieldId} className="sr-only">
           {t("dashboards:filterBuilder.value")}
         </Label>
-        <MemberMultiSelect
+        <MemberPicker
+          multiple
           id={memberFieldId}
+          searchMembers={searchMembers}
           scope={options.members}
           variant="filter"
-          selectedIds={ids}
-          tokens={[
+          value={ids}
+          extras={[
             {
               value: "me",
               label: t("dashboards:provenance.me"),
@@ -586,6 +589,7 @@ function ValueControl({
             emit(multiple && me, multiple ? next : next.filter((id) => !ids.includes(id)))
           }
           placeholder={t("dashboards:filterBuilder.chooseValue")}
+          emptyMessage={t("projects:assignee.emptyMessage")}
         />
       </>
     );

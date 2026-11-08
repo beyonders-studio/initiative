@@ -74,7 +74,10 @@
     "close": "Schließen"
   },
   "memberPicker": {
-    "userWithId": "Benutzer #{{id}}"
+    "userWithId": "Benutzer #{{id}}",
+    "you": "Du",
+    "remove": "{{name}} entfernen",
+    "clearAll": "Zuständige Personen entfernen"
   },
   "multiSelect": {
     "empty": "Keine Optionen verfügbar",

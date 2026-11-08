@@ -24,7 +24,6 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { CommentSection } from "@/components/comments/CommentSection";
 import { usePersonMention } from "@/components/comments/usePersonMention";
-import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import type { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
 import { TagsField } from "@/components/tags/TagsField";
@@ -53,6 +52,7 @@ import {
   useUpdateTask,
 } from "@/hooks/useTasks";
 import { instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
+import { useSearchMembers } from "@/hooks/useUsers";
 import { dateRangeBounds } from "@/lib/dateRange";
 import { toast } from "@/lib/mascotToast";
 import {
@@ -71,6 +71,7 @@ import {
   getInitialsForUser,
   getUserDisplayName,
   isAnonymizedUser,
+  toMember,
 } from "@/lib/userDisplay";
 import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
 import { DateTimePicker } from "@/ui/date-time-picker";
@@ -101,6 +102,7 @@ import { fromPickerValue, toPickerValue } from "@/ui/lib/localDateTime";
 import { dateTimePattern } from "@/ui/lib/timeFormat";
 import { useDateLocale } from "@/ui/lib/useDateLocale";
 import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { MemberPicker } from "@/ui/member-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
@@ -548,9 +550,10 @@ const PriorityEditor = ({ item: task, label }: EditorProps) => {
 };
 
 const AssigneesEditor = ({ item: task, label }: EditorProps) => {
-  const { t } = useTranslation("tasks");
+  const { t } = useTranslation(["tasks", "projects"]);
   const { readOnly, currentUserId, askScope } = useTaskLayout();
   const save = useTaskFieldSave(task, label, askScope);
+  const searchMembers = useSearchMembers();
   const saved = task.assignees.map((assignee) => assignee.id);
   // Who is added shows from the draft until the task comes back naming them.
   const edit = (ids: number[]): TaskEdit => ({
@@ -570,12 +573,15 @@ const AssigneesEditor = ({ item: task, label }: EditorProps) => {
   );
   return (
     <FieldFrame label={label} save={save}>
-      <MemberMultiSelect
+      <MemberPicker
+        multiple
+        searchMembers={searchMembers}
         scope={{ type: "canOpen", tool: Tool.project, id: task.project_id }}
-        selectedIds={draft.value}
-        selectedUsers={task.assignees}
+        value={draft.value}
+        selected={task.assignees.map(toMember)}
         onChange={draft.edit}
         disabled={readOnly}
+        placeholder={t("projects:assignee.searchPlaceholder")}
         emptyMessage={t("taskForm.assigneesEmptyMessage")}
         currentUserId={currentUserId}
       />
