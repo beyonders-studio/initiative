@@ -39,7 +39,7 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { CasePicker } from "@/components/platform/CasePicker";
 import { OperatorDeleteUserDialog } from "@/components/platform/OperatorDeleteUserDialog";
-import { Section, SettingRow } from "@/components/platform/SettingRow";
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { useGrantCases } from "@/hooks/useAccessGrants";
 import { useAuth } from "@/hooks/useAuth";
@@ -123,8 +123,8 @@ const AccountCases = ({ user, open }: { user: OperatorUserRead; open: boolean })
   });
 
   return (
-    <Section title={t("platformUsers.sheet.cases.title")}>
-      <div className="space-y-3 py-3">
+    <SettingsSection plain title={t("platformUsers.sheet.cases.title")}>
+      <div className="space-y-3">
         <p className="text-sm">
           {t("platformUsers.sheet.cases.count", { count: user.open_case_count })}
         </p>
@@ -162,7 +162,7 @@ const AccountCases = ({ user, open }: { user: OperatorUserRead; open: boolean })
         )}
         <p className="text-muted-foreground text-xs">{t("platformUsers.sheet.cases.help")}</p>
       </div>
-    </Section>
+    </SettingsSection>
   );
 };
 
@@ -436,339 +436,319 @@ export const UserOperatorSettingsSheet = ({
 
           <div className="space-y-6 py-6">
             {showStanding && (
-              <Section title={t("platformUsers.sheet.standing")}>
+              <SettingsSection plain title={t("platformUsers.sheet.standing")}>
                 {showReactivate && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.reactivateLabel")}
-                    help={t("platformUsers.sheet.reactivateHelp")}
-                    control={
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => reactivate.mutate(user.id)}
-                        disabled={reactivate.isPending}
-                      >
-                        <UserCheck className="h-4 w-4" />
-                        {t("platformUsers.reactivate")}
-                      </Button>
-                    }
-                  />
+                    description={t("platformUsers.sheet.reactivateHelp")}
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => reactivate.mutate(user.id)}
+                      disabled={reactivate.isPending}
+                    >
+                      <UserCheck className="h-4 w-4" />
+                      {t("platformUsers.reactivate")}
+                    </Button>
+                  </SettingsRow>
                 )}
                 {/* Distinct from reactivating: nothing was dropped, so this
                     puts the account back exactly where it was. */}
                 {showRestore && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.restoreLabel")}
-                    help={t("platformUsers.sheet.restoreHelp")}
-                    control={
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => restore.mutate(user.id)}
-                        disabled={restore.isPending}
-                      >
-                        <UserCheck className="h-4 w-4" />
-                        {t("platformUsers.restore")}
-                      </Button>
-                    }
-                  />
+                    description={t("platformUsers.sheet.restoreHelp")}
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => restore.mutate(user.id)}
+                      disabled={restore.isPending}
+                    >
+                      <UserCheck className="h-4 w-4" />
+                      {t("platformUsers.restore")}
+                    </Button>
+                  </SettingsRow>
                 )}
                 {showAgeBlock && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.ageBlockLabel")}
-                    help={t("platformUsers.sheet.ageBlockHelp")}
-                    control={
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => clearAgeBlock.mutate(user.id)}
-                        disabled={clearAgeBlock.isPending}
-                      >
-                        <CalendarClock className="h-4 w-4" />
-                        {t("platformUsers.clearAgeBlock")}
-                      </Button>
-                    }
-                  />
+                    description={t("platformUsers.sheet.ageBlockHelp")}
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => clearAgeBlock.mutate(user.id)}
+                      disabled={clearAgeBlock.isPending}
+                    >
+                      <CalendarClock className="h-4 w-4" />
+                      {t("platformUsers.clearAgeBlock")}
+                    </Button>
+                  </SettingsRow>
                 )}
-              </Section>
+              </SettingsSection>
             )}
 
             {(showIdentity || showAvatar || clearable.length > 0) && (
-              <Section title={t("platformUsers.sheet.identity")}>
+              <SettingsSection plain title={t("platformUsers.sheet.identity")}>
                 {showIdentity && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.usernameLabel")}
-                    help={t("platformUsers.sheet.usernameHelp")}
-                    htmlFor="operator-user-username"
-                    control={
-                      <Input
-                        id="operator-user-username"
-                        className="w-48"
-                        value={form.values.username}
-                        autoCapitalize="none"
-                        onChange={(event) =>
-                          form.set({ username: event.target.value.toLowerCase() })
-                        }
-                        onBlur={commitUsername}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") event.currentTarget.blur();
-                        }}
-                        disabled={setUsername.isPending}
-                      />
-                    }
-                  />
+                    description={t("platformUsers.sheet.usernameHelp")}
+                  >
+                    <Input
+                      className="w-48"
+                      value={form.values.username}
+                      autoCapitalize="none"
+                      onChange={(event) => form.set({ username: event.target.value.toLowerCase() })}
+                      onBlur={commitUsername}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") event.currentTarget.blur();
+                      }}
+                      disabled={setUsername.isPending}
+                    />
+                  </SettingsRow>
                 )}
                 {showAvatar && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.avatarLabel")}
-                    help={t("platformUsers.sheet.avatarHelp")}
-                    control={
-                      <div className="flex items-center gap-3">
-                        {/* The picture itself, because deciding whether it
+                    description={t("platformUsers.sheet.avatarHelp")}
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* The picture itself, because deciding whether it
                             should go is looking at it. */}
-                        <ProfileAvatar user={user} hidePresence className="size-10" />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setAvatarConfirm(true)}
-                          disabled={removeAvatar.isPending}
-                        >
-                          <ImageOff className="h-4 w-4" />
-                          {t("platformUsers.sheet.avatarRemove")}
-                        </Button>
-                      </div>
-                    }
-                  />
+                      <ProfileAvatar user={user} hidePresence className="size-10" />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAvatarConfirm(true)}
+                        disabled={removeAvatar.isPending}
+                      >
+                        <ImageOff className="h-4 w-4" />
+                        {t("platformUsers.sheet.avatarRemove")}
+                      </Button>
+                    </div>
+                  </SettingsRow>
                 )}
                 {/* Like the picture: taken down for what breaches the terms
                     of use, and theirs to set again. */}
                 {clearable.map((item) => (
-                  <SettingRow
+                  <SettingsRow
                     key={item.field}
                     label={t(`platformUsers.sheet.clear.${item.key}.label`)}
-                    help={t(`platformUsers.sheet.clear.${item.key}.help`)}
-                    control={
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setClearing(item.field)}
-                        disabled={clearField.isPending}
-                        aria-label={t(`platformUsers.sheet.clear.${item.key}.action`)}
-                      >
-                        <Eraser className="h-4 w-4" />
-                        {t("platformUsers.sheet.clear.button")}
-                      </Button>
-                    }
-                  />
+                    description={t(`platformUsers.sheet.clear.${item.key}.help`)}
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setClearing(item.field)}
+                      disabled={clearField.isPending}
+                      aria-label={t(`platformUsers.sheet.clear.${item.key}.action`)}
+                    >
+                      <Eraser className="h-4 w-4" />
+                      {t("platformUsers.sheet.clear.button")}
+                    </Button>
+                  </SettingsRow>
                 ))}
-              </Section>
+              </SettingsSection>
             )}
 
             {(showSuspension || showApiKeys || showSignOut) && (
-              <Section title={t("platformUsers.sheet.access")}>
+              <SettingsSection plain title={t("platformUsers.sheet.access")}>
                 {showSuspension && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.suspendLabel")}
-                    help={t("platformUsers.sheet.suspendHelp")}
-                    htmlFor="operator-user-suspended"
-                    control={
-                      <Switch
-                        id="operator-user-suspended"
-                        checked={isSuspended}
-                        onCheckedChange={(checked) => {
-                          // Lifting takes no explanation; imposing does.
-                          if (checked) setSuspendOpen(true);
-                          else setSuspension.mutate({ userId: user.id, suspended: false });
-                        }}
-                        disabled={setSuspension.isPending}
-                      />
-                    }
-                  />
+                    description={t("platformUsers.sheet.suspendHelp")}
+                  >
+                    <Switch
+                      checked={isSuspended}
+                      onCheckedChange={(checked) => {
+                        // Lifting takes no explanation; imposing does.
+                        if (checked) setSuspendOpen(true);
+                        else setSuspension.mutate({ userId: user.id, suspended: false });
+                      }}
+                      disabled={setSuspension.isPending}
+                    />
+                  </SettingsRow>
                 )}
                 {showApiKeys && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.apiKeysLabel")}
-                    help={t("platformUsers.sheet.apiKeysHelp", { count: user.api_key_count })}
-                    control={
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setApiKeysConfirm(true)}
-                        disabled={revokeApiKeys.isPending}
-                      >
-                        <KeyRound className="h-4 w-4" />
-                        {t("platformUsers.sheet.apiKeysRevoke")}
-                      </Button>
-                    }
-                  />
+                    description={t("platformUsers.sheet.apiKeysHelp", {
+                      count: user.api_key_count,
+                    })}
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setApiKeysConfirm(true)}
+                      disabled={revokeApiKeys.isPending}
+                    >
+                      <KeyRound className="h-4 w-4" />
+                      {t("platformUsers.sheet.apiKeysRevoke")}
+                    </Button>
+                  </SettingsRow>
                 )}
                 {showSignOut && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.signOutLabel")}
-                    help={t("platformUsers.sheet.signOutHelp")}
-                    control={
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSignOutConfirm(true)}
-                        disabled={signOut.isPending}
-                      >
-                        <LogOut className="h-4 w-4" />
-                        {t("platformUsers.sheet.signOut")}
-                      </Button>
-                    }
-                  />
+                    description={t("platformUsers.sheet.signOutHelp")}
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSignOutConfirm(true)}
+                      disabled={signOut.isPending}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      {t("platformUsers.sheet.signOut")}
+                    </Button>
+                  </SettingsRow>
                 )}
-              </Section>
+              </SettingsSection>
             )}
 
             {showSignIn && (
-              <Section title={t("platformUsers.sheet.signIn")}>
+              <SettingsSection plain title={t("platformUsers.sheet.signIn")}>
                 {showReset && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.resetLabel")}
-                    help={t("platformUsers.sheet.resetHelp")}
-                    control={
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setResetConfirm(true)}
-                        disabled={resetPassword.isPending}
-                      >
-                        <Mail className="h-4 w-4" />
-                        {t("platformUsers.resetPassword")}
-                      </Button>
-                    }
-                  />
+                    description={t("platformUsers.sheet.resetHelp")}
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setResetConfirm(true)}
+                      disabled={resetPassword.isPending}
+                    >
+                      <Mail className="h-4 w-4" />
+                      {t("platformUsers.resetPassword")}
+                    </Button>
+                  </SettingsRow>
                 )}
                 {showResend && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.resendLabel")}
-                    help={t("platformUsers.sheet.resendHelp")}
-                    control={
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => resendVerification.mutate(user.id)}
-                        disabled={resendVerification.isPending}
-                      >
-                        <MailCheck className="h-4 w-4" />
-                        {t("platformUsers.sheet.resend")}
-                      </Button>
-                    }
-                  />
+                    description={t("platformUsers.sheet.resendHelp")}
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => resendVerification.mutate(user.id)}
+                      disabled={resendVerification.isPending}
+                    >
+                      <MailCheck className="h-4 w-4" />
+                      {t("platformUsers.sheet.resend")}
+                    </Button>
+                  </SettingsRow>
                 )}
                 {showSignInLock && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.signInLockLabel")}
-                    help={t("platformUsers.sheet.signInLockHelp")}
-                    control={
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => liftSignInLock.mutate(user.id)}
-                        disabled={liftSignInLock.isPending}
-                      >
-                        <LockOpen className="h-4 w-4" />
-                        {t("platformUsers.sheet.signInLockLift")}
-                      </Button>
-                    }
-                  />
+                    description={t("platformUsers.sheet.signInLockHelp")}
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => liftSignInLock.mutate(user.id)}
+                      disabled={liftSignInLock.isPending}
+                    >
+                      <LockOpen className="h-4 w-4" />
+                      {t("platformUsers.sheet.signInLockLift")}
+                    </Button>
+                  </SettingsRow>
                 )}
                 {showSecondFactor && (
-                  <SettingRow
+                  <SettingsRow
                     label={t("platformUsers.sheet.secondFactorLabel")}
-                    help={t("platformUsers.sheet.secondFactorHelp")}
-                    control={
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSecondFactorConfirm(true)}
-                        disabled={clearSecondFactor.isPending}
-                      >
-                        <ShieldOff className="h-4 w-4" />
-                        {t("platformUsers.sheet.secondFactorClear")}
-                      </Button>
-                    }
-                  />
+                    description={t("platformUsers.sheet.secondFactorHelp")}
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSecondFactorConfirm(true)}
+                      disabled={clearSecondFactor.isPending}
+                    >
+                      <ShieldOff className="h-4 w-4" />
+                      {t("platformUsers.sheet.secondFactorClear")}
+                    </Button>
+                  </SettingsRow>
                 )}
-              </Section>
+              </SettingsSection>
             )}
 
             {showRole && (
-              <Section title={t("platformUsers.sheet.role")}>
-                <SettingRow
+              <SettingsSection plain title={t("platformUsers.sheet.role")}>
+                <SettingsRow
                   label={t("platformUsers.sheet.roleLabel")}
-                  help={t("platformUsers.sheet.roleHelp")}
-                  htmlFor="operator-user-role"
-                  control={
-                    <Select
-                      value={user.role}
-                      onValueChange={(value) => setRoleConfirm(value as UserRole)}
-                      disabled={updateRole.isPending}
-                    >
-                      <SelectTrigger id="operator-user-role" className="h-8 w-[160px]">
-                        {platformRoleLabel(user.role, t as TranslateFn)}
-                      </SelectTrigger>
-                      <SelectContent className="max-w-xs">
-                        {PLATFORM_ROLE_ORDER.map((role) => (
-                          <SelectItem
-                            key={role}
-                            value={role}
-                            // You cannot mint a role above your own rung.
-                            // Demoting the platform's last owner is refused
-                            // by the server, which says so.
-                            disabled={platformRoleRank(role) > platformRoleRank(actorRole)}
-                          >
-                            <div className="flex flex-col gap-0.5">
-                              <span className="font-medium">
-                                {platformRoleLabel(role, t as TranslateFn)}
-                              </span>
-                              <span className="text-muted-foreground text-xs leading-snug">
-                                {platformRoleDescription(role, t as TranslateFn)}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  }
-                />
-              </Section>
+                  description={t("platformUsers.sheet.roleHelp")}
+                >
+                  <Select
+                    value={user.role}
+                    onValueChange={(value) => setRoleConfirm(value as UserRole)}
+                    disabled={updateRole.isPending}
+                  >
+                    <SelectTrigger className="h-8 w-[160px]">
+                      {platformRoleLabel(user.role, t as TranslateFn)}
+                    </SelectTrigger>
+                    <SelectContent className="max-w-xs">
+                      {PLATFORM_ROLE_ORDER.map((role) => (
+                        <SelectItem
+                          key={role}
+                          value={role}
+                          // You cannot mint a role above your own rung.
+                          // Demoting the platform's last owner is refused
+                          // by the server, which says so.
+                          disabled={platformRoleRank(role) > platformRoleRank(actorRole)}
+                        >
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-medium">
+                              {platformRoleLabel(role, t as TranslateFn)}
+                            </span>
+                            <span className="text-muted-foreground text-xs leading-snug">
+                              {platformRoleDescription(role, t as TranslateFn)}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </SettingsRow>
+              </SettingsSection>
             )}
 
             {user.open_case_count > 0 && <AccountCases user={user} open={open} />}
 
             {/* The one thing here that may not be undone, so it comes last. */}
             {showDelete && (
-              <Section title={t("platformUsers.sheet.deleteSection")}>
-                <SettingRow
+              <SettingsSection plain title={t("platformUsers.sheet.deleteSection")}>
+                <SettingsRow
                   label={t("platformUsers.deleteUser")}
-                  help={t("platformUsers.sheet.deleteHelp")}
-                  control={
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => setDeleting(true)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      {t("platformUsers.sheet.delete")}
-                    </Button>
-                  }
-                />
-              </Section>
+                  description={t("platformUsers.sheet.deleteHelp")}
+                >
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setDeleting(true)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {t("platformUsers.sheet.delete")}
+                  </Button>
+                </SettingsRow>
+              </SettingsSection>
             )}
           </div>
         </SheetContent>

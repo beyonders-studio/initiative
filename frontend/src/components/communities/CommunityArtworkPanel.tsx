@@ -47,6 +47,7 @@ import {
   type CommunityBannerWrite,
   type CommunityRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useCommunities } from "@/hooks/useCommunities";
 import { renderableBanner } from "@/lib/banner";
 import { DARK_TEXT, LIGHT_TEXT, readableTextColor, readableTextShadow } from "@/lib/contrastColor";
@@ -59,7 +60,6 @@ import {
 import { toast } from "@/lib/mascotToast";
 import { resolveHeaderlessApiUrl } from "@/lib/uploadUrl";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { Field } from "@/ui/field";
 import { ImagePicker } from "@/ui/image-picker";
@@ -176,216 +176,211 @@ export const CommunityArtworkPanel = ({ community }: { community: CommunityRead 
   const bannerUrl = renderableBanner(community.banner).image_url;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("communities:settings.artwork.title")}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="community-icon">{t("communities:settings.iconLabel")}</Label>
-          <div className="flex items-center gap-4">
-            {iconUrl ? (
-              <img
-                src={iconUrl}
-                alt={t("communities:settings.iconPreviewAlt")}
-                className="h-16 w-16 rounded-lg border object-cover"
-              />
-            ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed text-muted-foreground text-xs">
-                {t("communities:settings.artwork.none")}
-              </div>
-            )}
-            {iconUrl ? (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy !== null}
-                onClick={() => void run("icon", () => clearCommunityIcon(community.id))}
-              >
-                {t("communities:settings.removeIcon")}
-              </Button>
-            ) : null}
-          </div>
-          <ImagePicker
-            id="community-icon"
-            accept="image/*"
-            disabled={busy !== null}
-            onSelect={pickIcon}
-          />
-          <p className="text-muted-foreground text-sm">
-            {t("communities:settings.artwork.iconHint")}
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="community-banner">{t("communities:settings.artwork.bannerLabel")}</Label>
-          {/* The banner as it will be: the artwork over the fill that shows
-              without it, with the community's name in the text colour on top. It
-              reads from the draft colours below, so the pickers answer here
-              rather than somewhere else on the page. */}
-          <div
-            className={`relative flex aspect-[4/1] w-full items-center overflow-hidden rounded-lg border ${
-              draft.text_align === BannerTextAlign.left ? "justify-start" : "justify-center"
-            }`}
-          >
-            {/* The ground and the fade on it, under the name rather than over
-                it — the same arrangement the real banner uses, so what the
-                fade does to the picture is visible and what it does to the
-                words (nothing) is too. */}
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundColor: draft.color,
-                maskImage: PREVIEW_FADE[draft.fade],
-                WebkitMaskImage: PREVIEW_FADE[draft.fade],
-              }}
-            >
-              {bannerUrl ? (
-                <img
-                  src={bannerUrl}
-                  alt={t("communities:settings.artwork.bannerPreviewAlt")}
-                  className="h-full w-full object-cover"
-                />
-              ) : null}
-            </div>
-            <span
-              className="relative truncate px-4 font-black text-lg sm:text-2xl"
-              style={{ color: draft.text_color, textShadow: readableTextShadow(draft.text_color) }}
-            >
-              {community.name}
-            </span>
-          </div>
-          {mayUploadBanner ? (
-            <>
-              <ImagePicker
-                id="community-banner"
-                accept="image/*"
-                disabled={busy !== null}
-                onSelect={pickBanner}
-              />
-              <p className="text-muted-foreground text-sm">
-                {t("communities:settings.artwork.bannerHint")}
-              </p>
-            </>
+    <SettingsSection title={t("communities:settings.artwork.title")} contentClassName="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="community-icon">{t("communities:settings.iconLabel")}</Label>
+        <div className="flex items-center gap-4">
+          {iconUrl ? (
+            <img
+              src={iconUrl}
+              alt={t("communities:settings.iconPreviewAlt")}
+              className="h-16 w-16 rounded-lg border object-cover"
+            />
           ) : (
-            <p className="text-muted-foreground text-sm">
-              {t("communities:settings.artwork.bannerColorOnly")}
-            </p>
+            <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed text-muted-foreground text-xs">
+              {t("communities:settings.artwork.none")}
+            </div>
           )}
-          {bannerUrl ? (
+          {iconUrl ? (
             <Button
               type="button"
               variant="outline"
               disabled={busy !== null}
-              onClick={() => void run("banner", () => clearCommunityBanner(community.id))}
+              onClick={() => void run("icon", () => clearCommunityIcon(community.id))}
             >
-              {t("communities:settings.artwork.removeBanner")}
+              {t("communities:settings.removeIcon")}
             </Button>
           ) : null}
         </div>
+        <ImagePicker
+          id="community-icon"
+          accept="image/*"
+          disabled={busy !== null}
+          onSelect={pickIcon}
+        />
+        <p className="text-muted-foreground text-sm">
+          {t("communities:settings.artwork.iconHint")}
+        </p>
+      </div>
 
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-end gap-6">
-            <Field label={t("communities:settings.artwork.bannerColorLabel")}>
-              <ColorPickerPopover
-                value={draft.color}
-                disabled={busy !== null}
-                onChange={(next) => draftLook(withReadableText(next))}
-                onChangeComplete={(next) => commitLook(withReadableText(next))}
-                triggerLabel={t("communities:settings.artwork.bannerColorLabel")}
+      <div className="space-y-2">
+        <Label htmlFor="community-banner">{t("communities:settings.artwork.bannerLabel")}</Label>
+        {/* The banner as it will be: the artwork over the fill that shows
+              without it, with the community's name in the text colour on top. It
+              reads from the draft colours below, so the pickers answer here
+              rather than somewhere else on the page. */}
+        <div
+          className={`relative flex aspect-[4/1] w-full items-center overflow-hidden rounded-lg border ${
+            draft.text_align === BannerTextAlign.left ? "justify-start" : "justify-center"
+          }`}
+        >
+          {/* The ground and the fade on it, under the name rather than over
+                it — the same arrangement the real banner uses, so what the
+                fade does to the picture is visible and what it does to the
+                words (nothing) is too. */}
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundColor: draft.color,
+              maskImage: PREVIEW_FADE[draft.fade],
+              WebkitMaskImage: PREVIEW_FADE[draft.fade],
+            }}
+          >
+            {bannerUrl ? (
+              <img
+                src={bannerUrl}
+                alt={t("communities:settings.artwork.bannerPreviewAlt")}
+                className="h-full w-full object-cover"
               />
-            </Field>
-            <fieldset className="space-y-2" disabled={busy !== null}>
-              <legend className="pb-2 font-medium text-sm">
-                {t("communities:settings.artwork.bannerTextColorLabel")}
-              </legend>
-              <div className="flex gap-2">
-                {[
-                  { value: LIGHT_TEXT, label: t("communities:settings.artwork.textLight") },
-                  { value: DARK_TEXT, label: t("communities:settings.artwork.textDark") },
-                ].map((option) => (
-                  <Button
-                    key={option.value}
-                    type="button"
-                    size="sm"
-                    variant={draft.text_color === option.value ? "default" : "outline"}
-                    aria-pressed={draft.text_color === option.value}
-                    onClick={() => commitLook({ text_color: option.value })}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
-              </div>
-            </fieldset>
-            <fieldset className="space-y-2" disabled={busy !== null}>
-              <legend className="pb-2 font-medium text-sm">
-                {t("communities:settings.artwork.bannerAlignLabel")}
-              </legend>
-              <div className="flex gap-2">
-                {[
-                  {
-                    value: BannerTextAlign.center,
-                    label: t("communities:settings.artwork.alignCenter"),
-                  },
-                  {
-                    value: BannerTextAlign.left,
-                    label: t("communities:settings.artwork.alignLeft"),
-                  },
-                ].map((option) => (
-                  <Button
-                    key={option.value}
-                    type="button"
-                    size="sm"
-                    variant={draft.text_align === option.value ? "default" : "outline"}
-                    aria-pressed={draft.text_align === option.value}
-                    onClick={() => commitLook({ text_align: option.value })}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
-              </div>
-            </fieldset>
-            <fieldset className="space-y-2" disabled={busy !== null}>
-              <legend className="pb-2 font-medium text-sm">
-                {t("communities:settings.artwork.bannerFadeLabel")}
-              </legend>
-              <div className="flex gap-2">
-                {[
-                  { value: BannerFade.none, label: t("communities:settings.artwork.fadeNone") },
-                  { value: BannerFade.weak, label: t("communities:settings.artwork.fadeWeak") },
-                  { value: BannerFade.strong, label: t("communities:settings.artwork.fadeStrong") },
-                ].map((option) => (
-                  <Button
-                    key={option.value}
-                    type="button"
-                    size="sm"
-                    variant={draft.fade === option.value ? "default" : "outline"}
-                    aria-pressed={draft.fade === option.value}
-                    onClick={() => commitLook({ fade: option.value })}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
-              </div>
-            </fieldset>
+            ) : null}
           </div>
+          <span
+            className="relative truncate px-4 font-black text-lg sm:text-2xl"
+            style={{ color: draft.text_color, textShadow: readableTextShadow(draft.text_color) }}
+          >
+            {community.name}
+          </span>
+        </div>
+        {mayUploadBanner ? (
+          <>
+            <ImagePicker
+              id="community-banner"
+              accept="image/*"
+              disabled={busy !== null}
+              onSelect={pickBanner}
+            />
+            <p className="text-muted-foreground text-sm">
+              {t("communities:settings.artwork.bannerHint")}
+            </p>
+          </>
+        ) : (
           <p className="text-muted-foreground text-sm">
-            {t("communities:settings.artwork.bannerFadeHint")}
+            {t("communities:settings.artwork.bannerColorOnly")}
           </p>
+        )}
+        {bannerUrl ? (
           <Button
             type="button"
-            variant="ghost"
-            size="sm"
+            variant="outline"
             disabled={busy !== null}
-            onClick={() => commitLook(null)}
+            onClick={() => void run("banner", () => clearCommunityBanner(community.id))}
           >
-            {t("communities:settings.artwork.resetColor")}
+            {t("communities:settings.artwork.removeBanner")}
           </Button>
-          <p className="text-muted-foreground text-sm">
-            {t("communities:settings.artwork.bannerColorHint")}
-          </p>
+        ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-end gap-6">
+          <Field label={t("communities:settings.artwork.bannerColorLabel")}>
+            <ColorPickerPopover
+              value={draft.color}
+              disabled={busy !== null}
+              onChange={(next) => draftLook(withReadableText(next))}
+              onChangeComplete={(next) => commitLook(withReadableText(next))}
+              triggerLabel={t("communities:settings.artwork.bannerColorLabel")}
+            />
+          </Field>
+          <fieldset className="space-y-2" disabled={busy !== null}>
+            <legend className="pb-2 font-medium text-sm">
+              {t("communities:settings.artwork.bannerTextColorLabel")}
+            </legend>
+            <div className="flex gap-2">
+              {[
+                { value: LIGHT_TEXT, label: t("communities:settings.artwork.textLight") },
+                { value: DARK_TEXT, label: t("communities:settings.artwork.textDark") },
+              ].map((option) => (
+                <Button
+                  key={option.value}
+                  type="button"
+                  size="sm"
+                  variant={draft.text_color === option.value ? "default" : "outline"}
+                  aria-pressed={draft.text_color === option.value}
+                  onClick={() => commitLook({ text_color: option.value })}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset className="space-y-2" disabled={busy !== null}>
+            <legend className="pb-2 font-medium text-sm">
+              {t("communities:settings.artwork.bannerAlignLabel")}
+            </legend>
+            <div className="flex gap-2">
+              {[
+                {
+                  value: BannerTextAlign.center,
+                  label: t("communities:settings.artwork.alignCenter"),
+                },
+                {
+                  value: BannerTextAlign.left,
+                  label: t("communities:settings.artwork.alignLeft"),
+                },
+              ].map((option) => (
+                <Button
+                  key={option.value}
+                  type="button"
+                  size="sm"
+                  variant={draft.text_align === option.value ? "default" : "outline"}
+                  aria-pressed={draft.text_align === option.value}
+                  onClick={() => commitLook({ text_align: option.value })}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset className="space-y-2" disabled={busy !== null}>
+            <legend className="pb-2 font-medium text-sm">
+              {t("communities:settings.artwork.bannerFadeLabel")}
+            </legend>
+            <div className="flex gap-2">
+              {[
+                { value: BannerFade.none, label: t("communities:settings.artwork.fadeNone") },
+                { value: BannerFade.weak, label: t("communities:settings.artwork.fadeWeak") },
+                { value: BannerFade.strong, label: t("communities:settings.artwork.fadeStrong") },
+              ].map((option) => (
+                <Button
+                  key={option.value}
+                  type="button"
+                  size="sm"
+                  variant={draft.fade === option.value ? "default" : "outline"}
+                  aria-pressed={draft.fade === option.value}
+                  onClick={() => commitLook({ fade: option.value })}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+          </fieldset>
         </div>
-      </CardContent>
-    </Card>
+        <p className="text-muted-foreground text-sm">
+          {t("communities:settings.artwork.bannerFadeHint")}
+        </p>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={busy !== null}
+          onClick={() => commitLook(null)}
+        >
+          {t("communities:settings.artwork.resetColor")}
+        </Button>
+        <p className="text-muted-foreground text-sm">
+          {t("communities:settings.artwork.bannerColorHint")}
+        </p>
+      </div>
+    </SettingsSection>
   );
 };

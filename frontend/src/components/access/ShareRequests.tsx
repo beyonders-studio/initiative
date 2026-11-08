@@ -18,6 +18,7 @@ import type {
   ShareRequestScope,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import {
   type ShareRequestReply,
   useAnswerShareRequests,
@@ -250,22 +251,22 @@ export const ShareRequestsCard = ({ tool, entityId }: { tool: Tool; entityId: nu
   });
   if (requests.length === 0) return null;
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex flex-wrap items-center gap-2">
+    <SettingsSection
+      title={
+        <span className="flex flex-wrap items-center gap-2">
           {t("answer.title")}
           <Badge variant="secondary">{requests.length}</Badge>
-        </CardTitle>
-        <CardDescription>{t("answer.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
-        <ul className="divide-y">
-          {requests.map((request) => (
-            <RequestRow key={request.id} request={request} />
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
+        </span>
+      }
+      description={t("answer.description")}
+      contentClassName="p-0"
+    >
+      <ul className="divide-y">
+        {requests.map((request) => (
+          <RequestRow key={request.id} request={request} />
+        ))}
+      </ul>
+    </SettingsSection>
   );
 };
 

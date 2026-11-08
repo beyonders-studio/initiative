@@ -319,10 +319,8 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
         <SettingsRow
           label={t("interface.recentTabsLimit")}
           description={t("interface.recentTabsLimitDescription")}
-          htmlFor="recent-tabs-limit"
         >
           <Input
-            id="recent-tabs-limit"
             type="number"
             min={RECENT_TABS_LIMIT_MIN}
             max={RECENT_TABS_LIMIT_MAX}
@@ -350,7 +348,7 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
             onValueChange={(next) => savePrefs({ locale: next })}
             disabled={pending}
           >
-            <SelectTrigger className="sm:w-52" aria-label={t("interface.language")}>
+            <SelectTrigger className="sm:w-52">
               <SelectValue>
                 {LANGUAGE_OPTIONS.find((l) => l.value === prefs.locale)?.label ?? "English"}
               </SelectValue>
@@ -386,7 +384,7 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
             onValueChange={(next) => savePrefs({ week_starts_on: Number(next) })}
             disabled={pending}
           >
-            <SelectTrigger className="sm:w-52" aria-label={t("interface.weekStartsOn")}>
+            <SelectTrigger className="sm:w-52">
               <SelectValue>
                 {t(
                   (WEEK_START_OPTIONS.find((option) => option.value === prefs.week_starts_on)
@@ -413,7 +411,7 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
             onValueChange={(next) => savePrefs({ time_format: parseTimeFormat(next) })}
             disabled={pending}
           >
-            <SelectTrigger className="sm:w-52" aria-label={t("interface.timeFormat.label")}>
+            <SelectTrigger className="sm:w-52">
               <SelectValue>
                 {t(`interface.timeFormat.options.${prefs.time_format}` as never)}
               </SelectValue>
@@ -441,7 +439,6 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
             checked={prefs.smart_task_titles}
             onCheckedChange={(next) => savePrefs({ smart_task_titles: next })}
             disabled={pending}
-            aria-label={t("interface.smartTaskTitles.label")}
           />
         </SettingsRow>
       </SettingsSection>
@@ -461,10 +458,7 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
             }
             disabled={pending}
           >
-            <SelectTrigger
-              className="sm:w-52"
-              aria-label={t("interface.taskCompletionVisualFeedback.label")}
-            >
+            <SelectTrigger className="sm:w-52">
               <SelectValue>
                 {t(
                   `interface.taskCompletionVisualFeedback.options.${prefs.task_completion_visual_feedback}` as never
@@ -508,7 +502,6 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
             checked={prefs.task_completion_audio_feedback}
             onCheckedChange={(next) => savePrefs({ task_completion_audio_feedback: next })}
             disabled={pending}
-            aria-label={t("interface.taskCompletionAudioFeedback.label")}
           />
         </SettingsRow>
 
@@ -528,7 +521,6 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
             checked={prefs.task_completion_haptic_feedback}
             onCheckedChange={(next) => savePrefs({ task_completion_haptic_feedback: next })}
             disabled={pending}
-            aria-label={t("interface.taskCompletionHapticFeedback.label")}
           />
         </SettingsRow>
       </SettingsSection>
@@ -550,7 +542,6 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
             checked={keepAwake}
             onCheckedChange={setKeepAwake}
             disabled={!keepAwakeSupported}
-            aria-label={t("interface.keepScreenAwake.label")}
           />
         </SettingsRow>
 
@@ -565,7 +556,6 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
                 setAutoUpdate(next);
                 setAutoUpdateConsent(next);
               }}
-              aria-label={t("interface.desktopAutoUpdate.label")}
             />
           </SettingsRow>
         ) : null}
@@ -581,7 +571,6 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
                 setDesktopShell({ ...desktopShell, keepRunning: enabled });
                 saveDesktopShell(Desktop.setKeepRunning({ enabled }));
               }}
-              aria-label={t("interface.desktopKeepRunning.label")}
             />
           </SettingsRow>
         ) : null}
@@ -597,7 +586,6 @@ export const UserSettingsInterfacePage = ({ user, acceptUser }: UserSettingsInte
                 setDesktopShell({ ...desktopShell, openAtLogin: enabled });
                 saveDesktopShell(Desktop.setOpenAtLogin({ enabled }));
               }}
-              aria-label={t("interface.desktopOpenAtLogin.label")}
             />
           </SettingsRow>
         ) : null}

@@ -17,6 +17,7 @@ import { CommunityInitiativeDefaultsCard } from "@/components/initiatives/Commun
 import { DeleteInitiativeDialog } from "@/components/initiatives/DeleteInitiativeDialog";
 import { POLICY_LABEL_KEY } from "@/components/initiatives/JoinPolicySection";
 import { type MemberLike, useSeenMembers } from "@/components/members/MemberSearchSelect";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { useArchiveEntity, useUnarchiveEntity } from "@/hooks/useArchive";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -39,7 +40,6 @@ import { isAdminRole } from "@/lib/permissions";
 import { initiativeRoute } from "@/lib/tools";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader } from "@/ui/card";
 import { Combobox } from "@/ui/combobox";
 import { DataTable } from "@/ui/data-table";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
@@ -375,39 +375,34 @@ export const SettingsInitiativesPage = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardDescription>{t("manage.description")}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <ToggleGroup
-            type="single"
-            value={view}
-            // Radix clears a single-select group when its item is clicked
-            // again; the table always shows one of the two.
-            onValueChange={(next) => next && setView(next as "active" | "archived")}
-            aria-label={t("common:toolViewFilter.label")}
-            className="justify-start"
-          >
-            {(["active", "archived"] as const).map((option) => (
-              <ToggleGroupItem key={option} value={option} className="h-9 gap-2 px-3">
-                {option === "archived" && <Archive className="h-4 w-4" />}
-                {t(`common:toolViewFilter.${option}`)}
-                <span className="text-muted-foreground text-xs tabular-nums">{counts[option]}</span>
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-          <DataTable
-            columns={columns}
-            data={view === "active" ? live : archived}
-            enableFilterInput
-            filterInputColumnKey="name"
-            filterInputPlaceholder={t("manage.filterByName")}
-            enableResetSorting
-            enablePagination
-          />
-        </CardContent>
-      </Card>
+      <SettingsSection description={t("manage.description")}>
+        <ToggleGroup
+          type="single"
+          value={view}
+          // Radix clears a single-select group when its item is clicked
+          // again; the table always shows one of the two.
+          onValueChange={(next) => next && setView(next as "active" | "archived")}
+          aria-label={t("common:toolViewFilter.label")}
+          className="justify-start"
+        >
+          {(["active", "archived"] as const).map((option) => (
+            <ToggleGroupItem key={option} value={option} className="h-9 gap-2 px-3">
+              {option === "archived" && <Archive className="h-4 w-4" />}
+              {t(`common:toolViewFilter.${option}`)}
+              <span className="text-muted-foreground text-xs tabular-nums">{counts[option]}</span>
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <DataTable
+          columns={columns}
+          data={view === "active" ? live : archived}
+          enableFilterInput
+          filterInputColumnKey="name"
+          filterInputPlaceholder={t("manage.filterByName")}
+          enableResetSorting
+          enablePagination
+        />
+      </SettingsSection>
 
       {isCommunityAdmin && <CommunityInitiativeDefaultsCard initiatives={live} />}
 

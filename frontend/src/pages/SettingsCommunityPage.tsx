@@ -6,10 +6,10 @@ import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { CommunityArtworkPanel } from "@/components/communities/CommunityArtworkPanel";
 import { CommunityDiscoveryPanel } from "@/components/communities/CommunityDiscoveryPanel";
 import { CommunityLocationPanel } from "@/components/communities/CommunityLocationPanel";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useCommunities } from "@/hooks/useCommunities";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { Button } from "@/ui/button";
-import { Card, CardContent } from "@/ui/card";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Textarea } from "@/ui/textarea";
@@ -65,32 +65,30 @@ export const SettingsCommunityPage = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardContent className="pt-6">
-          <form className="space-y-4" onSubmit={handleSave}>
-            <Field label={t("settings.nameLabel")}>
-              <Input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                maxLength={255}
-                required
-              />
-            </Field>
-            <Field label={t("settings.descriptionLabel")}>
-              <Textarea
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                rows={3}
-              />
-            </Field>
-            {saveError ? <p className="text-destructive text-sm">{saveError}</p> : null}
-            {saveMessage ? <p className="text-primary text-sm">{saveMessage}</p> : null}
-            <Button type="submit" disabled={saving}>
-              {saving ? t("settings.saving") : t("settings.saveChanges")}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      <SettingsSection>
+        <form className="space-y-4" onSubmit={handleSave}>
+          <Field label={t("settings.nameLabel")}>
+            <Input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              maxLength={255}
+              required
+            />
+          </Field>
+          <Field label={t("settings.descriptionLabel")}>
+            <Textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              rows={3}
+            />
+          </Field>
+          {saveError ? <p className="text-destructive text-sm">{saveError}</p> : null}
+          {saveMessage ? <p className="text-primary text-sm">{saveMessage}</p> : null}
+          <Button type="submit" disabled={saving}>
+            {saving ? t("settings.saving") : t("settings.saveChanges")}
+          </Button>
+        </form>
+      </SettingsSection>
       <CommunityLocationPanel />
       <CommunityArtworkPanel community={activeCommunity} />
       <CommunityDiscoveryPanel />

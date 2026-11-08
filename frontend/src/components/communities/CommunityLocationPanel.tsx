@@ -12,13 +12,13 @@ import { useTranslation } from "react-i18next";
 import { updateCommunity } from "@/api/generated/communities/communities";
 import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { PlacePicker } from "@/components/communities/PlacePicker";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useCommunities } from "@/hooks/useCommunities";
 import type { CommunityLocation } from "@/lib/communityLocation";
 import { type Place, placeFrom } from "@/lib/directoryNear";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 
@@ -81,48 +81,42 @@ export const CommunityLocationPanel = () => {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("location.title")}</CardTitle>
-        <CardDescription>{t("location.description")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <Field label={t("location.fieldLabel")}>
-            <PlacePicker value={draft} onChange={setDraft} disabled={saving} />
-          </Field>
+    <SettingsSection title={t("location.title")} description={t("location.description")}>
+      <form className="space-y-4" onSubmit={handleSubmit}>
+        <Field label={t("location.fieldLabel")}>
+          <PlacePicker value={draft} onChange={setDraft} disabled={saving} />
+        </Field>
 
-          <Field label={t("location.labelLabel")} hint={t("location.labelHint")}>
-            <Input
-              value={label}
-              onChange={(event) => setLabel(event.target.value)}
-              maxLength={LABEL_MAX}
-              placeholder={t("location.labelPlaceholder")}
+        <Field label={t("location.labelLabel")} hint={t("location.labelHint")}>
+          <Input
+            value={label}
+            onChange={(event) => setLabel(event.target.value)}
+            maxLength={LABEL_MAX}
+            placeholder={t("location.labelPlaceholder")}
+            disabled={saving}
+          />
+        </Field>
+
+        {activeCommunity.is_community && location ? (
+          <p className="text-muted-foreground text-xs">{t("location.listedNote")}</p>
+        ) : null}
+
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" disabled={saving || !location}>
+            {saving ? t("settings.saving") : t("location.save")}
+          </Button>
+          {stored ? (
+            <Button
+              type="button"
+              variant="outline"
               disabled={saving}
-            />
-          </Field>
-
-          {activeCommunity.is_community && location ? (
-            <p className="text-muted-foreground text-xs">{t("location.listedNote")}</p>
-          ) : null}
-
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={saving || !location}>
-              {saving ? t("settings.saving") : t("location.save")}
+              onClick={() => void save(null, t("location.removed"))}
+            >
+              {t("location.remove")}
             </Button>
-            {stored ? (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={saving}
-                onClick={() => void save(null, t("location.removed"))}
-              >
-                {t("location.remove")}
-              </Button>
-            ) : null}
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+          ) : null}
+        </div>
+      </form>
+    </SettingsSection>
   );
 };

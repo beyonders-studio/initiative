@@ -7,10 +7,10 @@ import type {
   PluginSummaryReturn,
 } from "@/api/generated/initiativeAPI.schemas";
 import { useListPluginSummaries, useReadPluginSummary } from "@/api/generated/plugins/plugins";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { parseDateValue } from "@/lib/formatDate";
 import { localized } from "@/lib/widgets/widgetMeta";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
 import { dateTimeFormat, numberFormat } from "@/ui/lib/intl";
 import { Progress } from "@/ui/progress";
 
@@ -114,14 +114,9 @@ const PluginSummaryCard = ({ summary }: { summary: PluginSummaryRead }) => {
   const communityId = useActiveCommunityId();
   const { data, isError } = useReadPluginSummary(communityId, summary.plugin_id);
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{summary.name}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <PluginSummaryFigures summary={summary} data={data} isError={isError} />
-      </CardContent>
-    </Card>
+    <SettingsSection title={summary.name} contentClassName="space-y-6">
+      <PluginSummaryFigures summary={summary} data={data} isError={isError} />
+    </SettingsSection>
   );
 };
 

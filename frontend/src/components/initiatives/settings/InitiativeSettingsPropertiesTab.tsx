@@ -20,6 +20,7 @@ import { CurrencySelect, useDefaultCurrency } from "@/components/properties/Curr
 import { PROPERTY_TYPES } from "@/components/properties/NewPropertyForm";
 import { normalizeOptionList, typeRequiresOptions } from "@/components/properties/propertyHelpers";
 import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import {
   type MetadataOwner,
   ownerColumns,
@@ -34,7 +35,6 @@ import {
 import { toast } from "@/lib/mascotToast";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { Checkbox } from "@/ui/checkbox";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -855,19 +855,20 @@ const OwnerProperties = ({
   );
   if (!placement) {
     return (
-      <Card>
-        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
-          <CardDescription>{t(words.description)}</CardDescription>
-          {canManage ? (
+      <SettingsSection
+        description={t(words.description)}
+        action={
+          canManage ? (
             <Button onClick={() => setEditing({})}>
               <Plus className="h-4 w-4" />
               {t(words.create)}
             </Button>
-          ) : null}
-        </CardHeader>
-        <CardContent>{list}</CardContent>
+          ) : null
+        }
+      >
+        {list}
         {dialogs}
-      </Card>
+      </SettingsSection>
     );
   }
   return (
@@ -1011,53 +1012,50 @@ const InitiativeMetadata = ({ initiativeId }: { initiativeId: number }) => {
       ) : null}
 
       {metadataGroup ? (
-        <Card>
-          <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
-            <CardDescription>{t("properties:manager.description")}</CardDescription>
-            {metadataGroup.can_edit ? (
+        <SettingsSection
+          description={t("properties:manager.description")}
+          action={
+            metadataGroup.can_edit ? (
               <Button onClick={() => setEditing({})}>
                 <Plus className="h-4 w-4" />
                 {t("properties:manager.newDefinition")}
               </Button>
-            ) : null}
-          </CardHeader>
-          <CardContent>
-            {metadataGroup.definitions.length === 0 ? (
-              <p className="text-muted-foreground text-sm">{t("properties:noMetadata")}</p>
-            ) : (
-              table(metadataGroup)
-            )}
-          </CardContent>
-        </Card>
+            ) : null
+          }
+        >
+          {metadataGroup.definitions.length === 0 ? (
+            <p className="text-muted-foreground text-sm">{t("properties:noMetadata")}</p>
+          ) : (
+            table(metadataGroup)
+          )}
+        </SettingsSection>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("properties:manager.toolsTitle")}</CardTitle>
-          <CardDescription>{t("properties:manager.toolsDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {toolGroups.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t("properties:manager.noTools")}</p>
-          ) : (
-            toolGroups.map((group) => (
-              <section
-                key={`${group.owner}:${group.owner_id}`}
-                aria-label={group.name ?? undefined}
-                className="space-y-2"
-              >
-                <h3 className="flex flex-wrap items-center gap-2 font-medium text-sm">
-                  {group.name}
-                  <Badge variant="secondary">
-                    {t(`properties:manager.owner.${group.owner as "project" | "collection"}`)}
-                  </Badge>
-                </h3>
-                {table(group)}
-              </section>
-            ))
-          )}
-        </CardContent>
-      </Card>
+      <SettingsSection
+        title={t("properties:manager.toolsTitle")}
+        description={t("properties:manager.toolsDescription")}
+        contentClassName="space-y-6"
+      >
+        {toolGroups.length === 0 ? (
+          <p className="text-muted-foreground text-sm">{t("properties:manager.noTools")}</p>
+        ) : (
+          toolGroups.map((group) => (
+            <section
+              key={`${group.owner}:${group.owner_id}`}
+              aria-label={group.name ?? undefined}
+              className="space-y-2"
+            >
+              <h3 className="flex flex-wrap items-center gap-2 font-medium text-sm">
+                {group.name}
+                <Badge variant="secondary">
+                  {t(`properties:manager.owner.${group.owner as "project" | "collection"}`)}
+                </Badge>
+              </h3>
+              {table(group)}
+            </section>
+          ))
+        )}
+      </SettingsSection>
 
       <PropertyDialog
         open={editing !== null}

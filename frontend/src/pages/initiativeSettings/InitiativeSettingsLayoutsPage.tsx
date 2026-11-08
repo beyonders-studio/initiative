@@ -13,6 +13,7 @@ import { type InitiativeToolLayoutsRead, Tool } from "@/api/generated/initiative
 import { SHARED_LAYOUTS } from "@/components/layouts/details";
 import { LayoutList } from "@/components/layouts/LayoutList";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
 import {
   INSTANCE_LAYOUT_TOOLS,
@@ -30,7 +31,6 @@ import {
   toolNavLabelKey,
 } from "@/lib/tools";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 
 export const InitiativeSettingsLayoutsPage = () => {
@@ -70,28 +70,26 @@ const InitiativeLayouts = ({
     ));
   };
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("settings.layouts.heading")}</CardTitle>
-        <CardDescription>{t("settings.layouts.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {isError ? (
-          <p className="text-destructive text-sm">{t("settings.layouts.loadError")}</p>
-        ) : null}
-        {TOOLS_WITH_LAYOUTS.map((tool) =>
-          tool in SHARED_LAYOUTS ? (
-            enabled(tool) ? (
-              <SharedLayouts key={tool} tool={tool} initiativeId={initiativeId} />
-            ) : null
-          ) : (
-            <div key={tool} className="space-y-3">
-              {instances(tool)}
-            </div>
-          )
-        )}
-      </CardContent>
-    </Card>
+    <SettingsSection
+      title={t("settings.layouts.heading")}
+      description={t("settings.layouts.description")}
+      contentClassName="space-y-3"
+    >
+      {isError ? (
+        <p className="text-destructive text-sm">{t("settings.layouts.loadError")}</p>
+      ) : null}
+      {TOOLS_WITH_LAYOUTS.map((tool) =>
+        tool in SHARED_LAYOUTS ? (
+          enabled(tool) ? (
+            <SharedLayouts key={tool} tool={tool} initiativeId={initiativeId} />
+          ) : null
+        ) : (
+          <div key={tool} className="space-y-3">
+            {instances(tool)}
+          </div>
+        )
+      )}
+    </SettingsSection>
   );
 };
 

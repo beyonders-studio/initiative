@@ -5,6 +5,7 @@ import type {
   CommunityBillingChargeRead,
   CommunityBillingSummaryRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityBillingSummary } from "@/hooks/useCommunityBillingSummary";
@@ -12,7 +13,6 @@ import { holdsBillingSeat, trialDaysLeft } from "@/lib/billingSummary";
 import { parseDateValue } from "@/lib/formatDate";
 import { Badge, type BadgeProps } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
 import { dateTimeFormat, numberFormat } from "@/ui/lib/intl";
 import { Separator } from "@/ui/separator";
 
@@ -138,65 +138,57 @@ export const CommunityBillingPanel = () => {
     t("usagePanel.selfHosted");
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("billingPanel.title")}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm">
-              <span className="text-muted-foreground">{t("usagePanel.currentPlan")} </span>
-              <span className="font-semibold">{tierLabel}</span>
-            </p>
-            {status?.badge && <Badge variant={status.variant}>{status.badge}</Badge>}
-          </div>
-          {status?.detail && <p className="text-muted-foreground text-sm">{status.detail}</p>}
-          {unavailable && (
-            <p className="text-muted-foreground text-sm">{t("billingPanel.unavailable")}</p>
-          )}
+    <SettingsSection title={t("billingPanel.title")}>
+      <div className="space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm">
+            <span className="text-muted-foreground">{t("usagePanel.currentPlan")} </span>
+            <span className="font-semibold">{tierLabel}</span>
+          </p>
+          {status?.badge && <Badge variant={status.variant}>{status.badge}</Badge>}
         </div>
+        {status?.detail && <p className="text-muted-foreground text-sm">{status.detail}</p>}
+        {unavailable && (
+          <p className="text-muted-foreground text-sm">{t("billingPanel.unavailable")}</p>
+        )}
+      </div>
 
-        {canSell ? (
-          <>
-            <div className="flex flex-wrap gap-2">
-              {summary?.payment_failed ? (
-                <Button size="sm" onClick={() => void openPortal(activeCommunity.id, "manage")}>
-                  {t("billingPanel.updatePaymentMethod")}
-                </Button>
-              ) : (
-                <>
-                  {canUpgrade && (
-                    <Button
-                      size="sm"
-                      onClick={() => void openPortal(activeCommunity.id, "upgrade")}
-                    >
-                      {t("usagePanel.upgrade")}
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant={canUpgrade ? "outline" : "default"}
-                    onClick={() => void openPortal(activeCommunity.id, "manage")}
-                  >
-                    {t("usagePanel.manageBilling")}
-                  </Button>
-                </>
-              )}
-            </div>
-            <p className="text-muted-foreground text-sm">{t("billingPanel.changeInPortal")}</p>
-
-            {canCancel && (
+      {canSell ? (
+        <>
+          <div className="flex flex-wrap gap-2">
+            {summary?.payment_failed ? (
+              <Button size="sm" onClick={() => void openPortal(activeCommunity.id, "manage")}>
+                {t("billingPanel.updatePaymentMethod")}
+              </Button>
+            ) : (
               <>
-                <Separator />
-                <p className="text-muted-foreground text-sm">{t("billingPanel.cancelAnytime")}</p>
+                {canUpgrade && (
+                  <Button size="sm" onClick={() => void openPortal(activeCommunity.id, "upgrade")}>
+                    {t("usagePanel.upgrade")}
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant={canUpgrade ? "outline" : "default"}
+                  onClick={() => void openPortal(activeCommunity.id, "manage")}
+                >
+                  {t("usagePanel.manageBilling")}
+                </Button>
               </>
             )}
-          </>
-        ) : (
-          <p className="text-muted-foreground text-sm">{t("billingPanel.notInApp")}</p>
-        )}
-      </CardContent>
-    </Card>
+          </div>
+          <p className="text-muted-foreground text-sm">{t("billingPanel.changeInPortal")}</p>
+
+          {canCancel && (
+            <>
+              <Separator />
+              <p className="text-muted-foreground text-sm">{t("billingPanel.cancelAnytime")}</p>
+            </>
+          )}
+        </>
+      ) : (
+        <p className="text-muted-foreground text-sm">{t("billingPanel.notInApp")}</p>
+      )}
+    </SettingsSection>
   );
 };

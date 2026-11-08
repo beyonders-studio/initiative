@@ -32,13 +32,12 @@ import {
   type CommunityRead,
   SupportTopic,
 } from "@/api/generated/initiativeAPI.schemas";
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { HelpLink } from "@/components/support/HelpLink";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
 import { COMMUNITY_CATEGORIES, communityCategoryLabel } from "@/lib/communityCategories";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
-import { Label } from "@/ui/label";
 import { cn } from "@/ui/lib/utils";
 import { Switch } from "@/ui/switch";
 
@@ -117,80 +116,75 @@ export const CommunityDiscoveryPanel = () => {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("communities:settings.discoveryTitle")}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-muted-foreground text-sm">
-            {t("communities:settings.discoveryDescription")}
-          </p>
+      <SettingsSection
+        title={t("communities:settings.discoveryTitle")}
+        description={t("communities:settings.discoveryDescription")}
+      >
+        <SettingsRow
+          label={t("communities:settings.discoveryToggleLabel")}
+          below={
+            <>
+              {/* Why the toggle is unavailable, rather than an inert control. */}
+              {!listed && seatLimited ? (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <p className="text-muted-foreground text-sm">
+                    {t("communities:settings.discoveryCapacityBlocked")}
+                  </p>
+                  <HelpLink topic={SupportTopic.community} communityId={activeCommunity.id} />
+                </div>
+              ) : null}
 
-          <div className="flex items-center gap-3">
-            <Switch
-              id="community-is-community"
-              checked={listed}
-              disabled={saving || (!listed && seatLimited)}
-              onCheckedChange={handleToggle}
-            />
-            <Label htmlFor="community-is-community">
-              {t("communities:settings.discoveryToggleLabel")}
-            </Label>
-          </div>
+              {/* A listing is a front door; this is about the room behind it. Shown
+                  only while the community is listed, and only until it has one. */}
+              {listed ? <CommunityAutoJoinPrompt /> : null}
 
-          {/* Why the toggle is unavailable, rather than an inert control. */}
-          {!listed && seatLimited ? (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <p className="text-muted-foreground text-sm">
-                {t("communities:settings.discoveryCapacityBlocked")}
-              </p>
-              <HelpLink topic={SupportTopic.community} communityId={activeCommunity.id} />
-            </div>
-          ) : null}
+              {/* The shelves only matter once the community is on one. They are editable
+                  here afterwards; the dialog is only for the first publication. */}
+              {listed ? (
+                <fieldset className="space-y-2">
+                  <legend className="font-medium text-sm">
+                    {t("communities:settings.discoveryCategoriesLabel")}
+                  </legend>
+                  <p className="text-muted-foreground text-sm">
+                    {t("communities:settings.discoveryCategoriesHint")}
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {COMMUNITY_CATEGORIES.map((category) => {
+                      const selected = activeCommunity.categories.includes(category);
+                      return (
+                        <button
+                          key={category}
+                          type="button"
+                          onClick={() => toggleCategory(category)}
+                          aria-pressed={selected}
+                          disabled={saving}
+                          className={cn(
+                            "rounded-full border px-3 py-1 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
+                            selected
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-input text-muted-foreground hover:bg-muted hover:text-foreground"
+                          )}
+                        >
+                          {communityCategoryLabel(category, t)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              ) : null}
+            </>
+          }
+        >
+          <Switch
+            checked={listed}
+            disabled={saving || (!listed && seatLimited)}
+            onCheckedChange={handleToggle}
+          />
+        </SettingsRow>
 
-          {/* A listing is a front door; this is about the room behind it. Shown
-              only while the community is listed, and only until it has one. */}
-          {listed ? <CommunityAutoJoinPrompt /> : null}
-
-          {/* The shelves only matter once the community is on one. They are editable
-              here afterwards; the dialog is only for the first publication. */}
-          {listed ? (
-            <fieldset className="space-y-2">
-              <legend className="font-medium text-sm">
-                {t("communities:settings.discoveryCategoriesLabel")}
-              </legend>
-              <p className="text-muted-foreground text-sm">
-                {t("communities:settings.discoveryCategoriesHint")}
-              </p>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {COMMUNITY_CATEGORIES.map((category) => {
-                  const selected = activeCommunity.categories.includes(category);
-                  return (
-                    <button
-                      key={category}
-                      type="button"
-                      onClick={() => toggleCategory(category)}
-                      aria-pressed={selected}
-                      disabled={saving}
-                      className={cn(
-                        "rounded-full border px-3 py-1 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
-                        selected
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-input text-muted-foreground hover:bg-muted hover:text-foreground"
-                      )}
-                    >
-                      {communityCategoryLabel(category, t)}
-                    </button>
-                  );
-                })}
-              </div>
-            </fieldset>
-          ) : null}
-
-          {error ? <p className="text-destructive text-sm">{error}</p> : null}
-          {message ? <p className="text-primary text-sm">{message}</p> : null}
-        </CardContent>
-      </Card>
+        {error ? <p className="text-destructive text-sm">{error}</p> : null}
+        {message ? <p className="text-primary text-sm">{message}</p> : null}
+      </SettingsSection>
 
       <PublishCommunityDialog
         open={publishing}

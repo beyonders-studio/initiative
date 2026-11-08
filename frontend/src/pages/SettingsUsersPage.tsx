@@ -9,6 +9,7 @@ import { MemberDisplayNameDialog } from "@/components/communities/MemberDisplayN
 import { RemoveCommunityMemberDialog } from "@/components/communities/RemoveCommunityMemberDialog";
 import { TransferContentOwnershipDialog } from "@/components/communities/TransferContentOwnershipDialog";
 import { UnownedContentCard } from "@/components/communities/UnownedContentCard";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { UserHandle } from "@/components/UserHandle";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -32,7 +33,6 @@ import { toast } from "@/lib/mascotToast";
 import { assignableCommunityRoles, isAdminRole } from "@/lib/permissions";
 import { getUrlHandle, getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { DataTable } from "@/ui/data-table";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
 import type { AppColumnDef } from "@/ui/lib/table";
@@ -413,30 +413,25 @@ export const SettingsUsersPage = () => {
   return (
     <div className="space-y-6">
       {managesInvites ? (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>{t("users.invitesTitle")}</CardTitle>
-              <p className="text-muted-foreground text-sm">{t("users.invitesDescription")}</p>
-            </div>
+        <SettingsSection
+          title={t("users.invitesTitle")}
+          description={t("users.invitesDescription")}
+          action={
             <Button variant="ghost" size="icon" onClick={invites.refresh}>
               <RefreshCcw className="h-4 w-4" />
               <span className="sr-only">{t("users.refreshInvites")}</span>
             </Button>
-          </CardHeader>
-          <CardContent>
-            <MemberInvites invites={invites} />
-          </CardContent>
-        </Card>
+          }
+        >
+          <MemberInvites invites={invites} />
+        </SettingsSection>
       ) : null}
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div>
-            {/* Named only beside the invites card; alone, the tab names it. */}
-            {managesInvites ? <CardTitle>{t("users.usersTitle")}</CardTitle> : null}
-            <CardDescription>{t("users.usersDescription")}</CardDescription>
-          </div>
-          {managesMembers ? (
+      <SettingsSection
+        // Named only beside the invites card; alone, the tab names it.
+        title={managesInvites ? t("users.usersTitle") : undefined}
+        description={t("users.usersDescription")}
+        action={
+          managesMembers ? (
             <Button
               type="button"
               variant="outline"
@@ -447,20 +442,19 @@ export const SettingsUsersPage = () => {
               <Download className="h-4 w-4" />
               {t("users.exportAll")}
             </Button>
-          ) : null}
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <DataTable
-            columns={userColumns}
-            data={rows}
-            getRowId={(row) => String(row.id)}
-            enableFilterInput
-            filterInputPlaceholder={t("users.filterByHandle")}
-            enablePagination
-            {...table.tableProps(totalCount)}
-          />
-        </CardContent>
-      </Card>
+          ) : null
+        }
+      >
+        <DataTable
+          columns={userColumns}
+          data={rows}
+          getRowId={(row) => String(row.id)}
+          enableFilterInput
+          filterInputPlaceholder={t("users.filterByHandle")}
+          enablePagination
+          {...table.tableProps(totalCount)}
+        />
+      </SettingsSection>
 
       {managesMembers ? (
         <UnownedContentCard onClaim={() => setTransferTarget({ member: null })} />

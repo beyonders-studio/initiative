@@ -51,6 +51,7 @@ import { PluginPlacementPanel } from "@/components/plugins/PluginPlacementPanel"
 import { PluginScopesPanel } from "@/components/plugins/PluginScopesPanel";
 import { PluginSettingsPanel } from "@/components/plugins/PluginSettingsPanel";
 import { PluginPendingUpdate, PluginUpdatesPanel } from "@/components/plugins/PluginUpdatesPanel";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityPluginDetail } from "@/hooks/useCommunityPluginDetail";
@@ -68,7 +69,6 @@ import { hasInitiativeSurfaces } from "@/lib/pluginSurfaces";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { Checkbox } from "@/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -94,45 +94,43 @@ export function SettingsCommunityPluginsPage() {
   const plugins = pluginsQuery.data?.items ?? [];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("plugins:manage.title")}</CardTitle>
-        <CardDescription>{t("plugins:manage.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {closed && (
-          <Alert>
-            <AlertDescription>{t("plugins:manage.closed")}</AlertDescription>
-          </Alert>
-        )}
-        {pluginsQuery.isLoading ? (
-          <Skeleton className="h-20 w-full" />
-        ) : plugins.length ? (
-          plugins.map((plugin) => (
-            <PluginRow
-              key={plugin.id}
-              plugin={plugin}
-              canManage={Boolean(holdsTheSeat)}
-              canErase={holdsTheSeat && administers}
-              closed={closed}
-              initiallyOpen={plugin.id === openId}
-            />
-          ))
-        ) : (
-          <div className="space-y-3 rounded-lg border border-dashed p-6 text-center">
-            <p className="text-muted-foreground text-sm">{t("plugins:manage.empty")}</p>
-            {holdsTheSeat && !closed && (
-              <Button variant="outline" asChild>
-                <Link to={gp("/marketplace")} search={{ kind: ListingKind.plugin }}>
-                  <Store className="h-4 w-4" />
-                  {t("plugins:manage.browse")}
-                </Link>
-              </Button>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <SettingsSection
+      title={t("plugins:manage.title")}
+      description={t("plugins:manage.description")}
+      contentClassName="space-y-3"
+    >
+      {closed && (
+        <Alert>
+          <AlertDescription>{t("plugins:manage.closed")}</AlertDescription>
+        </Alert>
+      )}
+      {pluginsQuery.isLoading ? (
+        <Skeleton className="h-20 w-full" />
+      ) : plugins.length ? (
+        plugins.map((plugin) => (
+          <PluginRow
+            key={plugin.id}
+            plugin={plugin}
+            canManage={Boolean(holdsTheSeat)}
+            canErase={holdsTheSeat && administers}
+            closed={closed}
+            initiallyOpen={plugin.id === openId}
+          />
+        ))
+      ) : (
+        <div className="space-y-3 rounded-lg border border-dashed p-6 text-center">
+          <p className="text-muted-foreground text-sm">{t("plugins:manage.empty")}</p>
+          {holdsTheSeat && !closed && (
+            <Button variant="outline" asChild>
+              <Link to={gp("/marketplace")} search={{ kind: ListingKind.plugin }}>
+                <Store className="h-4 w-4" />
+                {t("plugins:manage.browse")}
+              </Link>
+            </Button>
+          )}
+        </div>
+      )}
+    </SettingsSection>
   );
 }
 

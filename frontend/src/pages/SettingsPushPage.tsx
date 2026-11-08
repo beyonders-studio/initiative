@@ -11,7 +11,7 @@ import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { PushSettingsUpdate } from "@/api/generated/initiativeAPI.schemas";
-import { SettingsSection } from "@/components/settings/SettingsSection";
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { useAuth } from "@/hooks/useAuth";
 import { useServerForm } from "@/hooks/useServerForm";
 import { usePushSettings, useUpdatePushSettings } from "@/hooks/useSettings";
@@ -105,19 +105,12 @@ export const SettingsPushPage = () => {
   return (
     <SettingsSection title={t("push.title")} description={t("push.description")}>
       <form className="space-y-6" onSubmit={handleSubmit}>
-        <div className="flex items-start justify-between gap-4 rounded-md border px-4 py-3">
-          <div className="space-y-1">
-            <Label htmlFor="push-enabled" className="font-medium">
-              {t("push.enabledLabel")}
-            </Label>
-            <p className="text-muted-foreground text-sm">{t("push.enabledHelp")}</p>
-          </div>
+        <SettingsRow label={t("push.enabledLabel")} description={t("push.enabledHelp")}>
           <Switch
-            id="push-enabled"
             checked={form.values.enabled}
             onCheckedChange={(checked) => form.set({ enabled: Boolean(checked) })}
           />
-        </div>
+        </SettingsRow>
 
         <div className="grid grid-cols-pair gap-4">
           {TEXT_FIELDS.map((field) => (

@@ -10,6 +10,7 @@ import type {
 import { JoinPolicySection } from "@/components/initiatives/JoinPolicySection";
 import { InitiativeJoinRequestQueue } from "@/components/initiatives/settings/InitiativeJoinRequestQueue";
 import { useSeenMembers } from "@/components/members/MemberSearchSelect";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { UserHandle } from "@/components/UserHandle";
 import {
   useAddInitiativeMember,
@@ -30,7 +31,6 @@ import { isAdminRole } from "@/lib/permissions";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { Combobox } from "@/ui/combobox";
 import { DataTable } from "@/ui/data-table";
 import type { AppColumnDef } from "@/ui/lib/table";
@@ -339,79 +339,76 @@ export const InitiativeSettingsMembersTab = ({
         // field from them, so the control is not offered rather than shown inert.
         onChangeAutoJoin={canManageAutoJoin ? onChangeAutoJoin : undefined}
       />
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("settings.membersTitle")}</CardTitle>
-          <CardDescription>{t("settings.membersDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <DataTable
-            columns={memberColumns}
-            data={members}
-            getRowId={(row) => String(row.user.id)}
-            enableFilterInput
-            filterInputPlaceholder={t("settings.filterByName")}
-            enablePagination
-            // The page the server answered with: a page emptied by a removal
-            // comes back as page 1.
-            {...table.tableProps(totalCount, rosterQuery.data?.page)}
-          />
-          {canManageMembers ? (
-            <>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                <Combobox
-                  items={availableUsers.map((candidate) => ({
-                    value: String(candidate.id),
-                    label: getUserDisplayName(candidate),
-                  }))}
-                  value={selectedUserId}
-                  onValueChange={(value) => {
-                    setPicked(availableUsers.find((c) => String(c.id) === value) ?? null);
-                    setSelectedUserId(value);
-                  }}
-                  onSearchChange={setSearch}
-                  onOpenChange={setPickerOpen}
-                  selectedLabel={pickedUser ? getUserDisplayName(pickedUser) : null}
-                  loading={candidatesQuery.isFetching && availableUsers.length === 0}
-                  placeholder={t("settings.selectUser")}
-                  emptyMessage={t("settings.noOneToAdd")}
-                  aria-label={t("settings.selectUser")}
-                />
-                {roles && (
-                  <Select
-                    value={effectiveRoleId}
-                    onValueChange={setSelectedRoleId}
-                    disabled={addingAdmin}
-                  >
-                    <SelectTrigger className="w-44">
-                      <SelectValue placeholder={t("settings.selectRole")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {roles.map((role) => (
-                        <SelectItem key={role.id} value={String(role.id)}>
-                          {role.display_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleAddMember}
-                  disabled={!selectedUserId || !effectiveRoleId}
-                  pending={addMember.isPending}
+      <SettingsSection
+        title={t("settings.membersTitle")}
+        description={t("settings.membersDescription")}
+      >
+        <DataTable
+          columns={memberColumns}
+          data={members}
+          getRowId={(row) => String(row.user.id)}
+          enableFilterInput
+          filterInputPlaceholder={t("settings.filterByName")}
+          enablePagination
+          // The page the server answered with: a page emptied by a removal
+          // comes back as page 1.
+          {...table.tableProps(totalCount, rosterQuery.data?.page)}
+        />
+        {canManageMembers ? (
+          <>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <Combobox
+                items={availableUsers.map((candidate) => ({
+                  value: String(candidate.id),
+                  label: getUserDisplayName(candidate),
+                }))}
+                value={selectedUserId}
+                onValueChange={(value) => {
+                  setPicked(availableUsers.find((c) => String(c.id) === value) ?? null);
+                  setSelectedUserId(value);
+                }}
+                onSearchChange={setSearch}
+                onOpenChange={setPickerOpen}
+                selectedLabel={pickedUser ? getUserDisplayName(pickedUser) : null}
+                loading={candidatesQuery.isFetching && availableUsers.length === 0}
+                placeholder={t("settings.selectUser")}
+                emptyMessage={t("settings.noOneToAdd")}
+                aria-label={t("settings.selectUser")}
+              />
+              {roles && (
+                <Select
+                  value={effectiveRoleId}
+                  onValueChange={setSelectedRoleId}
+                  disabled={addingAdmin}
                 >
-                  {addMember.isPending ? t("settings.adding") : t("settings.addMember")}
-                </Button>
-              </div>
-              {candidatesQuery.isError ? (
-                <p className="text-destructive text-xs">{t("settings.unableToLoadMembers")}</p>
-              ) : null}
-            </>
-          ) : null}
-        </CardContent>
-      </Card>
+                  <SelectTrigger className="w-44">
+                    <SelectValue placeholder={t("settings.selectRole")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((role) => (
+                      <SelectItem key={role.id} value={String(role.id)}>
+                        {role.display_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleAddMember}
+                disabled={!selectedUserId || !effectiveRoleId}
+                pending={addMember.isPending}
+              >
+                {addMember.isPending ? t("settings.adding") : t("settings.addMember")}
+              </Button>
+            </div>
+            {candidatesQuery.isError ? (
+              <p className="text-destructive text-xs">{t("settings.unableToLoadMembers")}</p>
+            ) : null}
+          </>
+        ) : null}
+      </SettingsSection>
     </div>
   );
 };

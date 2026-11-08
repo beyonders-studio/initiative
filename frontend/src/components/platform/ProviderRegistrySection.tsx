@@ -9,11 +9,11 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { ProviderMark } from "@/components/auth/ProviderMark";
 import { ConnectProviderWizard, ProbeReport } from "@/components/platform/ConnectProviderWizard";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { CopyButton } from "@/ui/copy-button";
 import {
@@ -103,89 +103,86 @@ export const ProviderRegistrySection = ({
   const rows = providers ?? [];
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-        <div>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </div>
+    <SettingsSection
+      title={title}
+      description={description}
+      action={
         <Button type="button" onClick={() => setWizardOpen(true)}>
           {t("authProviders.addProvider")}
         </Button>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("authProviders.loading")}</p>
-        ) : rows.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("authProviders.empty")}</p>
-        ) : (
-          <ul className="divide-y rounded-md border">
-            {rows.map((provider) => (
-              <li key={provider.id} className="flex items-center justify-between gap-4 px-3 py-3">
-                <div className="flex min-w-0 items-start gap-3">
-                  <ProviderMark icon={provider.icon} className="mt-0.5" />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{provider.display_name}</span>
-                      <code className="rounded bg-muted px-1 py-0.5 text-xs">{provider.slug}</code>
-                      {!provider.enabled && (
-                        <Badge variant="outline">{t("authProviders.disabledBadge")}</Badge>
-                      )}
-                    </div>
-                    <p className="truncate text-muted-foreground text-sm">{provider.issuer}</p>
-                    {/* The address this provider's IdP has to send the browser
+      }
+    >
+      {isLoading ? (
+        <p className="text-muted-foreground text-sm">{t("authProviders.loading")}</p>
+      ) : rows.length === 0 ? (
+        <p className="text-muted-foreground text-sm">{t("authProviders.empty")}</p>
+      ) : (
+        <ul className="divide-y rounded-md border">
+          {rows.map((provider) => (
+            <li key={provider.id} className="flex items-center justify-between gap-4 px-3 py-3">
+              <div className="flex min-w-0 items-start gap-3">
+                <ProviderMark icon={provider.icon} className="mt-0.5" />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{provider.display_name}</span>
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs">{provider.slug}</code>
+                    {!provider.enabled && (
+                      <Badge variant="outline">{t("authProviders.disabledBadge")}</Badge>
+                    )}
+                  </div>
+                  <p className="truncate text-muted-foreground text-sm">{provider.issuer}</p>
+                  {/* The address this provider's IdP has to send the browser
                         back to. It follows the slug, and a slug never changes,
                         so it is good for as long as the provider is. */}
-                    <div className="mt-1 flex items-center gap-1 text-muted-foreground text-xs">
-                      <span className="shrink-0">{t("authProviders.callbackLabel")}</span>
-                      <code className="min-w-0 truncate rounded bg-muted px-1 py-0.5">
-                        {provider.callback_url}
-                      </code>
-                      <CopyButton
-                        value={provider.callback_url}
-                        variant="ghost"
-                        className="h-6 w-6 p-0"
-                        copiedMessage={t("authProviders.callbackCopied")}
-                      />
-                    </div>
+                  <div className="mt-1 flex items-center gap-1 text-muted-foreground text-xs">
+                    <span className="shrink-0">{t("authProviders.callbackLabel")}</span>
+                    <code className="min-w-0 truncate rounded bg-muted px-1 py-0.5">
+                      {provider.callback_url}
+                    </code>
+                    <CopyButton
+                      value={provider.callback_url}
+                      variant="ghost"
+                      className="h-6 w-6 p-0"
+                      copiedMessage={t("authProviders.callbackCopied")}
+                    />
                   </div>
                 </div>
-                <div className="flex shrink-0 gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => test(provider)}
-                    disabled={testProvider.isPending}
-                    pending={testProvider.isPending && testProvider.variables === provider.id}
-                  >
-                    {testProvider.isPending && testProvider.variables === provider.id
-                      ? t("authProviders.testing")
-                      : t("authProviders.test")}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openEdit(provider)}
-                  >
-                    {t("authProviders.edit")}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="text-destructive"
-                    onClick={() => setDeleting(provider)}
-                  >
-                    {t("authProviders.delete")}
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => test(provider)}
+                  disabled={testProvider.isPending}
+                  pending={testProvider.isPending && testProvider.variables === provider.id}
+                >
+                  {testProvider.isPending && testProvider.variables === provider.id
+                    ? t("authProviders.testing")
+                    : t("authProviders.test")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openEdit(provider)}
+                >
+                  {t("authProviders.edit")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive"
+                  onClick={() => setDeleting(provider)}
+                >
+                  {t("authProviders.delete")}
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
@@ -231,7 +228,7 @@ export const ProviderRegistrySection = ({
           }
         }}
       />
-    </Card>
+    </SettingsSection>
   );
 };
 

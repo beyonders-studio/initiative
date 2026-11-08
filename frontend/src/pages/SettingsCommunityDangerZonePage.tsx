@@ -3,11 +3,11 @@ import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
 import { deleteCommunity } from "@/api/generated/communities/communities";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
@@ -100,33 +100,31 @@ export const SettingsCommunityDangerZonePage = () => {
 
   return (
     <div className="space-y-6">
-      <Card className="border-destructive/50">
-        <CardHeader>
-          <CardTitle>{t("settings.deleteCommunityTitle")}</CardTitle>
-          <CardDescription>{t("settings.dangerDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm">
-            <Trans
-              i18nKey="settings.deleteCommunityIntro"
-              ns="communities"
-              values={{ name: activeCommunity.name }}
-              components={{ bold: <strong /> }}
-            />
-          </p>
-          {deletionList}
-          <Button
-            variant="destructive"
-            onClick={() => {
-              resetDialog();
-              setShowDeleteConfirm(true);
-            }}
-            disabled={deleting}
-          >
-            {deleting ? t("settings.deleting") : t("settings.deleteCommunity")}
-          </Button>
-        </CardContent>
-      </Card>
+      <SettingsSection
+        title={t("settings.deleteCommunityTitle")}
+        description={t("settings.dangerDescription")}
+        className="border-destructive/50"
+      >
+        <p className="text-sm">
+          <Trans
+            i18nKey="settings.deleteCommunityIntro"
+            ns="communities"
+            values={{ name: activeCommunity.name }}
+            components={{ bold: <strong /> }}
+          />
+        </p>
+        {deletionList}
+        <Button
+          variant="destructive"
+          onClick={() => {
+            resetDialog();
+            setShowDeleteConfirm(true);
+          }}
+          disabled={deleting}
+        >
+          {deleting ? t("settings.deleting") : t("settings.deleteCommunity")}
+        </Button>
+      </SettingsSection>
 
       <ConfirmDialog
         open={showDeleteConfirm}

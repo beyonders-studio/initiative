@@ -152,14 +152,8 @@ export const CommunityPrivacySection = ({
             <Badge variant="secondary">{t("communityAuth.setByServer")}</Badge>
           </SettingsRow>
         ) : (
-          <SettingsRow
-            key={row.key}
-            label={row.label}
-            description={row.help}
-            htmlFor={`community-${row.key}`}
-          >
+          <SettingsRow key={row.key} label={row.label} description={row.help}>
             <Switch
-              id={`community-${row.key}`}
               checked={row.on}
               onCheckedChange={(next) => save(row.key, next)}
               disabled={update.isPending}

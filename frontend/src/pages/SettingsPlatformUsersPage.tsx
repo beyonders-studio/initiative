@@ -11,6 +11,7 @@ import {
   sheetOffersSomething,
   UserOperatorSettingsSheet,
 } from "@/components/platform/UserOperatorSettingsSheet";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { UserHandle } from "@/components/UserHandle";
 import { useAuth } from "@/hooks/useAuth";
 import { useExportPlatformUsersCsv, usePlatformUsers } from "@/hooks/useOperatorUsers";
@@ -22,7 +23,6 @@ import { Capability, hasCapability } from "@/lib/permissions";
 import { getUserHandle } from "@/lib/userDisplay";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardHeader } from "@/ui/card";
 import { DataTable } from "@/ui/data-table";
 import { DropdownMenuItem } from "@/ui/dropdown-menu";
 import type { AppColumnDef } from "@/ui/lib/table";
@@ -239,8 +239,8 @@ export const SettingsPlatformUsersPage = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader className="flex flex-row justify-end">
+      <SettingsSection
+        action={
           <Button
             type="button"
             variant="outline"
@@ -251,19 +251,18 @@ export const SettingsPlatformUsersPage = () => {
             <Download className="h-4 w-4" />
             {t("platformUsers.exportAll")}
           </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <DataTable
-            columns={userColumns}
-            data={rows}
-            getRowId={(row) => String(row.id)}
-            enableFilterInput
-            filterInputPlaceholder={t("platformUsers.filterPlaceholder")}
-            enableResetSorting
-            enablePagination
-            {...table.tableProps(totalCount)}
-          />
-        </CardContent>
+        }
+      >
+        <DataTable
+          columns={userColumns}
+          data={rows}
+          getRowId={(row) => String(row.id)}
+          enableFilterInput
+          filterInputPlaceholder={t("platformUsers.filterPlaceholder")}
+          enableResetSorting
+          enablePagination
+          {...table.tableProps(totalCount)}
+        />
 
         <UserOperatorSettingsSheet
           user={managing}
@@ -273,7 +272,7 @@ export const SettingsPlatformUsersPage = () => {
           }}
           actorRole={actorRole}
         />
-      </Card>
+      </SettingsSection>
     </div>
   );
 };

@@ -18,6 +18,7 @@ import {
 } from "@/components/communities/CommunityInvites";
 import { RemoveCommunityMemberDialog } from "@/components/communities/RemoveCommunityMemberDialog";
 import { EntityPicker } from "@/components/entities/EntityPicker";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { UserHandle } from "@/components/UserHandle";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -31,7 +32,6 @@ import { toast } from "@/lib/mascotToast";
 import { TOOLS } from "@/lib/tools";
 import { getUrlHandle, getUserDisplayName } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { Combobox } from "@/ui/combobox";
 import { DataTable } from "@/ui/data-table";
 import {
@@ -268,147 +268,136 @@ export const SettingsCommunityGuestsPage = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>{t("guests.invitesTitle")}</CardTitle>
-            <CardDescription>{t("guests.invitesDescription")}</CardDescription>
-          </div>
+      <SettingsSection
+        title={t("guests.invitesTitle")}
+        description={t("guests.invitesDescription")}
+        action={
           <Button variant="ghost" size="icon" onClick={invites.refresh}>
             <RefreshCcw className="h-4 w-4" />
             <span className="sr-only">{t("users.refreshInvites")}</span>
           </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <form className="space-y-4" onSubmit={createInvite}>
-            <div className="grid grid-cols-fill-48/3 gap-4">
-              <Field label={t("guests.guestDaysLabel")}>
-                <Input
-                  type="number"
-                  min={1}
-                  value={guestDays}
-                  onChange={(event) => setGuestDays(Number(event.target.value))}
-                />
-              </Field>
-              <InviteLimitFields
-                idPrefix="guest-invite"
-                value={inviteLimits}
-                onChange={setInviteLimits}
-              />
-            </div>
-            <Field label={t("guests.initiativesLabel")}>
-              <Combobox
-                multiple
-                value={initiativeIds}
-                items={(initiativesQuery.data ?? []).map((row) => ({
-                  value: String(row.id),
-                  label: row.name,
-                }))}
-                onValueChange={setInitiativeIds}
-                placeholder={t("guests.initiativesPlaceholder")}
-                className="w-full max-w-72"
+        }
+      >
+        <form className="space-y-4" onSubmit={createInvite}>
+          <div className="grid grid-cols-fill-48/3 gap-4">
+            <Field label={t("guests.guestDaysLabel")}>
+              <Input
+                type="number"
+                min={1}
+                value={guestDays}
+                onChange={(event) => setGuestDays(Number(event.target.value))}
               />
             </Field>
-            <div className="space-y-2">
-              <p className="font-medium text-sm">{t("guests.itemsLabel")}</p>
-              <p className="text-muted-foreground text-sm">{t("guests.itemsHelp")}</p>
-              <EntityPicker initiativeId={null} types={TOOLS} value={null} onChange={addItem} />
-              {items.map(({ suggestion, level }) => (
-                <div
-                  key={itemKey(suggestion)}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded border px-3 py-2 text-sm"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium">{suggestion.title}</p>
-                    {suggestion.initiative_name ? (
-                      <p className="text-muted-foreground text-xs">{suggestion.initiative_name}</p>
-                    ) : null}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Select
-                      value={level}
-                      onValueChange={(next) =>
-                        setItems(
-                          items.map((item) =>
-                            item.suggestion === suggestion
-                              ? { ...item, level: next as ChosenItem["level"] }
-                              : item
-                          )
-                        )
-                      }
-                    >
-                      <SelectTrigger
-                        className="w-32"
-                        aria-label={t("guests.itemLevel", { title: suggestion.title })}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="read">{t("access:share.viewer")}</SelectItem>
-                        <SelectItem value="write">{t("access:share.editor")}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() =>
-                        setItems(items.filter((item) => item.suggestion !== suggestion))
-                      }
-                    >
-                      <X className="h-4 w-4" />
-                      <span className="sr-only">
-                        {t("guests.removeItem", { title: suggestion.title })}
-                      </span>
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <Button type="submit" disabled={invites.submitting || guestDays < 1}>
-              {invites.submitting ? t("users.generatingInvite") : t("guests.generateInvite")}
-            </Button>
-          </form>
-          {invites.newInviteCode ? <NewInviteLink code={invites.newInviteCode} /> : null}
-          <div className="h-px bg-border" />
-          <CommunityInviteList
-            invites={guestInvites}
-            isLoading={invites.isLoading}
-            error={invites.error}
-            emptyText={t("guests.noActiveInvites")}
-            onDelete={(inviteId) => void invites.remove(inviteId)}
-            detail={inviteGives}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("guests.listTitle")}</CardTitle>
-          <CardDescription>{t("guests.listDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {guestsQuery.isLoading ? (
-            <SkeletonRegion label={t("guests.loading")}>
-              <TableSkeleton rows={3} columns={3} />
-            </SkeletonRegion>
-          ) : guestsQuery.isError ? (
-            <p className="text-destructive text-sm">{t("guests.unableToLoad")}</p>
-          ) : guests.length === 0 && !table.params.search ? (
-            <p className="text-muted-foreground text-sm">{t("guests.noGuests")}</p>
-          ) : (
-            <DataTable
-              columns={columns}
-              data={guests}
-              getRowId={(row) => String(row.id)}
-              enableFilterInput
-              filterInputPlaceholder={t("users.filterByHandle")}
-              enablePagination
-              {...table.tableProps(guestsQuery.data?.total_count ?? 0)}
+            <InviteLimitFields
+              idPrefix="guest-invite"
+              value={inviteLimits}
+              onChange={setInviteLimits}
             />
-          )}
-        </CardContent>
-      </Card>
+          </div>
+          <Field label={t("guests.initiativesLabel")}>
+            <Combobox
+              multiple
+              value={initiativeIds}
+              items={(initiativesQuery.data ?? []).map((row) => ({
+                value: String(row.id),
+                label: row.name,
+              }))}
+              onValueChange={setInitiativeIds}
+              placeholder={t("guests.initiativesPlaceholder")}
+              className="w-full max-w-72"
+            />
+          </Field>
+          <div className="space-y-2">
+            <p className="font-medium text-sm">{t("guests.itemsLabel")}</p>
+            <p className="text-muted-foreground text-sm">{t("guests.itemsHelp")}</p>
+            <EntityPicker initiativeId={null} types={TOOLS} value={null} onChange={addItem} />
+            {items.map(({ suggestion, level }) => (
+              <div
+                key={itemKey(suggestion)}
+                className="flex flex-wrap items-center justify-between gap-2 rounded border px-3 py-2 text-sm"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium">{suggestion.title}</p>
+                  {suggestion.initiative_name ? (
+                    <p className="text-muted-foreground text-xs">{suggestion.initiative_name}</p>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={level}
+                    onValueChange={(next) =>
+                      setItems(
+                        items.map((item) =>
+                          item.suggestion === suggestion
+                            ? { ...item, level: next as ChosenItem["level"] }
+                            : item
+                        )
+                      )
+                    }
+                  >
+                    <SelectTrigger
+                      className="w-32"
+                      aria-label={t("guests.itemLevel", { title: suggestion.title })}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="read">{t("access:share.viewer")}</SelectItem>
+                      <SelectItem value="write">{t("access:share.editor")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setItems(items.filter((item) => item.suggestion !== suggestion))}
+                  >
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">
+                      {t("guests.removeItem", { title: suggestion.title })}
+                    </span>
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <Button type="submit" disabled={invites.submitting || guestDays < 1}>
+            {invites.submitting ? t("users.generatingInvite") : t("guests.generateInvite")}
+          </Button>
+        </form>
+        {invites.newInviteCode ? <NewInviteLink code={invites.newInviteCode} /> : null}
+        <div className="h-px bg-border" />
+        <CommunityInviteList
+          invites={guestInvites}
+          isLoading={invites.isLoading}
+          error={invites.error}
+          emptyText={t("guests.noActiveInvites")}
+          onDelete={(inviteId) => void invites.remove(inviteId)}
+          detail={inviteGives}
+        />
+      </SettingsSection>
+
+      <SettingsSection title={t("guests.listTitle")} description={t("guests.listDescription")}>
+        {guestsQuery.isLoading ? (
+          <SkeletonRegion label={t("guests.loading")}>
+            <TableSkeleton rows={3} columns={3} />
+          </SkeletonRegion>
+        ) : guestsQuery.isError ? (
+          <p className="text-destructive text-sm">{t("guests.unableToLoad")}</p>
+        ) : guests.length === 0 && !table.params.search ? (
+          <p className="text-muted-foreground text-sm">{t("guests.noGuests")}</p>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={guests}
+            getRowId={(row) => String(row.id)}
+            enableFilterInput
+            filterInputPlaceholder={t("users.filterByHandle")}
+            enablePagination
+            {...table.tableProps(guestsQuery.data?.total_count ?? 0)}
+          />
+        )}
+      </SettingsSection>
 
       <ExtendGuestDialog
         communityId={communityId}
