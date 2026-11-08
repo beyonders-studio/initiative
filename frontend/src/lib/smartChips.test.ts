@@ -7,7 +7,6 @@ import {
   type SmartChipState,
   SmartChipTone,
 } from "@/api/generated/initiativeAPI.schemas";
-import { CHIP_TONE_CLASSES } from "@/components/editor/editor-ui/chip-tones";
 import { nextAsk } from "@/hooks/useSmartChips";
 import {
   CHIP_ENTITY_TYPES,
@@ -19,6 +18,7 @@ import {
   isSmartChipKind,
   SMART_CHIP_KINDS,
 } from "@/lib/smartChips";
+import { CHIP_TONE_CLASSES } from "@/ui/editor/editor-ui/chip-tones";
 
 const iso = (date: string) => new Date(date).toISOString();
 const formatDate = () => "formatted";

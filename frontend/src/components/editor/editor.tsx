@@ -1,187 +1,184 @@
-"use client";
-
-import { LexicalCollaboration } from "@lexical/react/LexicalCollaborationContext";
-import { CollaborationPlugin } from "@lexical/react/LexicalCollaborationPlugin";
-import { LexicalExtensionComposer } from "@lexical/react/LexicalExtensionComposer";
-import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
-import type { Provider } from "@lexical/yjs";
-import type { AnyLexicalExtension, EditorState, SerializedEditorState } from "lexical";
-import { Loader2 } from "lucide-react";
-import { type ComponentProps, useMemo, useRef } from "react";
+import { PanelTop, RectangleEllipsis } from "lucide-react";
+import { useRef } from "react";
+import { useTranslation } from "react-i18next";
 import type * as Y from "yjs";
 
-import { DocumentOutlineTracker } from "@/components/editor/DocumentOutline";
-import { COLLAB_EXCLUDED_PROPERTIES } from "@/components/editor/nodes/image-node";
-import type { EditorVariant } from "@/components/editor/variant";
-import { cn } from "@/ui/lib/utils";
-import { ImageLightboxScope } from "@/ui/lightbox";
-import { TooltipProvider } from "@/ui/tooltip";
-
-import { documentExtension } from "./document-extension";
-import { Plugins } from "./plugins";
-
-/** A document shared live through Yjs, which then owns its history and its
- *  content. */
-export interface EditorCollaboration {
-  providerFactory: (id: string, yjsDocMap: Map<string, Y.Doc>) => Provider;
-  /** Who is writing, as the others see their caret. */
-  username: string;
-  cursorColor: string;
-  /** Whether this body has synced with its room at least once. The syncing
-   *  cover waits for that and no longer: a reconnect after it leaves the
-   *  document in place. */
-  hasSynced: boolean;
-}
+import { writeWithAi } from "@/api/generated/ai/ai";
+import { FileType, type SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
+import { EditorInitiativeContext } from "@/components/editor/context/editor-initiative-context";
+import { InitiativeExtension } from "@/components/editor/initiative-extension";
+import { AIWritingMenu, AIWritingPlugin } from "@/components/editor/plugins/ai-writing-plugin";
+import { EntityMentionsPlugin } from "@/components/editor/plugins/entity-mentions-plugin";
+import { LazyEmbedDialog } from "@/components/editor/plugins/lazy-embed-dialog";
+import { MentionsPlugin } from "@/components/editor/plugins/mentions-plugin";
+import { ContinueWritingPickerPlugin } from "@/components/editor/plugins/picker/continue-writing-picker-plugin";
+import {
+  EmbedPickerPlugin,
+  SmartChipPickerPlugins,
+} from "@/components/editor/plugins/picker/smart-chip-picker-plugin";
+import { SmartChipInsertDialog } from "@/components/editor/plugins/smart-chip-insert-dialog";
+import { WikilinksPlugin } from "@/components/editor/plugins/wikilinks-plugin";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useAIEnabled } from "@/hooks/useAIEnabled";
+import { useSelfInCommunity } from "@/hooks/useCommunities";
+import { getUserDisplayName } from "@/lib/userDisplay";
+import type { CollaborationProvider } from "@/lib/yjs/CollaborationProvider";
+import { Editor as CoreEditor, type EditorProps as CoreEditorProps } from "@/ui/editor/editor";
+import type { InsertAction } from "@/ui/editor/plugins/toolbar/toolbar-actions";
+import { getUserColorHsl } from "@/ui/lib/userColor";
 
 export interface EditorProps
-  extends Pick<
-    ComponentProps<typeof Plugins>,
-    "plugins" | "pickerOptions" | "insertActions" | "selectionActions"
+  extends Omit<
+    CoreEditorProps,
+    | "collaboration"
+    | "extension"
+    | "plugins"
+    | "pickerOptions"
+    | "insertActions"
+    | "selectionActions"
+    | "readImport"
   > {
-  editorState?: EditorState;
-  editorSerializedState?: SerializedEditorState;
-  onChange?: (editorState: EditorState) => void;
-  onSerializedChange?: (editorSerializedState: SerializedEditorState) => void;
-  readOnly?: boolean;
-  showToolbar?: boolean;
-  className?: string;
-  collaboration?: EditorCollaboration | null;
-  trackChanges?: boolean;
-  /** Which surface this editor is on. `post` narrows the toolbar to what
-   *  writing a notice needs — see `EditorVariant`. */
-  variant?: EditorVariant;
-  /** Characters the body may hold, shown as a remaining count. */
-  maxLength?: number;
-  /** The container already supplies the horizontal gutter — see `Plugins.compact`. */
-  compact?: boolean;
-  /** The host's own nodes and behaviours, read when the editor is made. */
-  extension?: AnyLexicalExtension;
+  collaborative?: boolean;
+  providerFactory?: ((id: string, yjsDocMap: Map<string, Y.Doc>) => CollaborationProvider) | null;
+  /** Whether this body has synced with its room at least once — see
+   *  `EditorCollaboration.hasSynced`. */
+  hasSynced?: boolean;
+  initiativeId?: number | null;
+  /** What is being written, as a reference (`file:12`). Neither trigger
+   *  offers it: a page does not point at itself, and a link to it would open
+   *  the page the words are already on. Absent while it does not exist yet,
+   *  which is a thing nothing can point at anyway. */
+  subject?: string | null;
+  /** Whether this is a standard document — prose with a caret. `#` is offered
+   *  only here: a whiteboard and a spreadsheet are not written into, and a file
+   *  or a linked page has no body of its own to write in. */
+  supportsEntityMentions?: boolean;
+  onWikilinkNavigate?: (fileId: number) => void;
+  onCreateReferencedThing?: (
+    name: string,
+    onCreated: (entityType: SearchEntityType, entityId: number, name: string) => void
+  ) => void;
 }
 
+/**
+ * The editor state in a file Initiative exported: the `initiative-file`
+ * envelope (discriminated by `type`, or `kind`, the field's name in early
+ * exports), and the same envelope under its earlier `initiative-document` name.
+ */
+const readExport = (file: Record<string, unknown>): unknown => {
+  const isEnvelope = (name: string): boolean => file.type === name || file.kind === name;
+  const lexical =
+    (isEnvelope("initiative-file") && file.file_type === FileType.lexical) ||
+    (isEnvelope("initiative-document") && file.document_type === "native");
+  return lexical ? file.content : null;
+};
+
+/**
+ * Initiative's document editor: the core with Initiative's extension, and
+ * what goes with it on the page — references, chips and embeds from the
+ * page's initiative, @-mentions, writing help and live collaboration.
+ */
 export function Editor({
-  editorState,
-  editorSerializedState,
-  onChange,
-  onSerializedChange,
   readOnly = false,
-  showToolbar = true,
-  className,
-  collaboration = null,
-  trackChanges,
-  variant = "document",
-  maxLength,
-  compact = false,
-  extension,
-  plugins,
-  pickerOptions,
-  insertActions,
-  selectionActions,
+  collaborative = false,
+  providerFactory,
+  hasSynced = true,
+  initiativeId = null,
+  subject,
+  supportsEntityMentions = false,
+  onWikilinkNavigate,
+  onCreateReferencedThing,
+  ...props
 }: EditorProps) {
-  const cursorsContainerRef = useRef<HTMLDivElement>(null!);
+  const { t } = useTranslation("editor");
+  const user = useSelfInCommunity();
+  const cursorColor = useRef(user ? getUserColorHsl(user.id) : "hsl(0, 0%, 70%)");
+  const communityId = useActiveCommunityId();
+  const { isEnabled: aiEnabled } = useAIEnabled();
+  // Writing help is for writing: offered where AI is on and the body is editable.
+  const aiWriting = aiEnabled && !readOnly && communityId > 0;
 
-  const useCollaborativeMode = collaboration !== null;
-
-  const showSyncingOverlay = collaboration !== null && !collaboration.hasSynced;
-
-  // Capture initial editor configuration at first mount. LexicalExtensionComposer
-  // recreates (and disposes) the editor whenever the `extension` prop reference
-  // changes, so the AppExtension must be stable across re-renders. Subsequent
-  // changes to readOnly are applied via editor.setEditable() inside Plugins;
-  // editorState / editorSerializedState are only consulted by $initialEditorState
-  // which runs once at editor creation, so refs are sufficient.
-  const initialReadOnlyRef = useRef(readOnly);
-  const initialCollabRef = useRef(useCollaborativeMode);
-  const initialEditorStateRef = useRef(editorState);
-  const initialEditorSerializedStateRef = useRef(editorSerializedState);
-  const initialExtensionRef = useRef(extension);
-
-  const appExtension = useMemo(
-    () =>
-      documentExtension({
-        collaborative: initialCollabRef.current,
-        editable: !initialReadOnlyRef.current,
-        initialEditorState:
-          initialEditorStateRef.current ??
-          (initialEditorSerializedStateRef.current
-            ? JSON.stringify(initialEditorSerializedStateRef.current)
-            : null),
-        extension: initialExtensionRef.current,
-      }),
-    []
-  );
+  const insertActions: InsertAction[] = supportsEntityMentions
+    ? [
+        {
+          id: "smart-chip",
+          label: t("smartChips.insert"),
+          icon: <RectangleEllipsis className="size-4" />,
+          run: (editor, showModal) =>
+            showModal(t("smartChips.insert"), (onClose) => (
+              <SmartChipInsertDialog
+                initiativeId={initiativeId}
+                activeEditor={editor}
+                onClose={onClose}
+              />
+            )),
+        },
+        // A thing shown in full, or the tasks a filter matches — what `![[ ]]`
+        // and the `/` menu's Embed make, for whoever reaches for the toolbar.
+        {
+          id: "reference-embed",
+          label: t("embeds.insert"),
+          icon: <PanelTop className="size-4" />,
+          run: (editor, showModal) =>
+            showModal(t("embeds.insert"), (onClose) => (
+              <LazyEmbedDialog activeEditor={editor} onClose={onClose} />
+            )),
+        },
+      ]
+    : [];
 
   return (
-    <div
-      className={cn(
-        "relative scroll-pb-14 overflow-y-auto",
-        // A document is a page: it draws itself a sheet to sit on. A post is
-        // already inside a card, and a second framed, filled box within one
-        // reads as a card inside a card.
-        variant === "document" && "rounded-lg border bg-background shadow",
-        className
-      )}
-    >
-      {showSyncingOverlay && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span>Syncing document...</span>
-          </div>
-        </div>
-      )}
-      {/* Above the composer, which portals its decorators in itself, so that
-          every picture is inside it: being read, they open full size and page
-          through the document's others. */}
-      <ImageLightboxScope>
-        <LexicalExtensionComposer extension={appExtension} contentEditable={null}>
-          <TooltipProvider>
-            <Plugins
-              showToolbar={showToolbar}
-              readOnly={readOnly}
-              collaborative={useCollaborativeMode}
-              cursorsContainerRef={cursorsContainerRef}
-              variant={variant}
-              maxLength={maxLength}
-              compact={compact}
-              plugins={plugins}
-              pickerOptions={pickerOptions}
-              insertActions={insertActions}
-              selectionActions={selectionActions}
-            />
-
-            {/* Publishes the headings to a `DocumentOutlineScope`, where the
-              page's contents list reads them. Inert without one. */}
-            <DocumentOutlineTracker />
-
-            {collaboration && (
-              <LexicalCollaboration>
-                {/* The server makes a document's Yjs state from its saved
-                    content before anyone joins, so the room always arrives
-                    holding the document and no tab fills it. */}
-                <CollaborationPlugin
-                  id="main"
-                  providerFactory={collaboration.providerFactory}
-                  shouldBootstrap={false}
-                  username={collaboration.username}
-                  cursorColor={collaboration.cursorColor}
-                  cursorsContainerRef={cursorsContainerRef}
-                  excludedProperties={COLLAB_EXCLUDED_PROPERTIES}
-                />
-              </LexicalCollaboration>
+    // Outside the composer on purpose: embeds render as Lexical decorators,
+    // which the composer portals in itself. Only something above it is an
+    // ancestor of all of them.
+    <EditorInitiativeContext.Provider value={initiativeId}>
+      <CoreEditor
+        {...props}
+        readOnly={readOnly}
+        extension={InitiativeExtension}
+        collaboration={
+          collaborative && providerFactory
+            ? {
+                providerFactory,
+                username: getUserDisplayName(user, "Anonymous"),
+                cursorColor: cursorColor.current,
+                hasSynced,
+              }
+            : null
+        }
+        plugins={(anchorElem) => (
+          <>
+            {!readOnly && <MentionsPlugin initiativeId={initiativeId ?? undefined} />}
+            {supportsEntityMentions && !readOnly && (
+              <EntityMentionsPlugin initiativeId={initiativeId} subject={subject} />
             )}
-
-            {!readOnly && (trackChanges ?? !useCollaborativeMode) && (
-              <OnChangePlugin
-                ignoreSelectionChange={true}
-                onChange={(editorState) => {
-                  onChange?.(editorState);
-                  onSerializedChange?.(editorState.toJSON());
-                }}
+            <WikilinksPlugin
+              initiativeId={initiativeId}
+              subject={subject}
+              onNavigate={onWikilinkNavigate}
+              onCreateThing={onCreateReferencedThing}
+            />
+            {aiWriting && (
+              <AIWritingPlugin
+                anchorElem={anchorElem}
+                write={(body) => (options, signal) =>
+                  writeWithAi(communityId, body, options, signal)
+                }
               />
             )}
-          </TooltipProvider>
-        </LexicalExtensionComposer>
-      </ImageLightboxScope>
-    </div>
+          </>
+        )}
+        pickerOptions={[
+          // Live chips, offered where `#` is: prose only.
+          ...(supportsEntityMentions
+            ? [...SmartChipPickerPlugins(t, initiativeId), EmbedPickerPlugin(t)]
+            : []),
+          ...(aiWriting ? [ContinueWritingPickerPlugin(t)] : []),
+        ]}
+        insertActions={insertActions}
+        selectionActions={aiWriting ? <AIWritingMenu /> : null}
+        readImport={readExport}
+      />
+    </EditorInitiativeContext.Provider>
   );
 }

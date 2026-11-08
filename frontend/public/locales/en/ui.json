@@ -60,6 +60,8 @@
     "failed": "That photo could not be read. Try again."
   },
   "lightbox": {
+    "open": "View this picture full size",
+    "openNamed": "View {{name}} full size",
     "title": "Picture",
     "description": "Use the arrow keys or swipe to move between pictures. Pinch, double-tap or scroll with Ctrl to zoom.",
     "position": "{{current}} / {{total}}",

@@ -33,7 +33,7 @@ interface ProseImageProps {
  * width, capped at the column's, rather than being stretched to fill it.
  */
 export const ProseImage = ({ src, alt = "", title, className, fill = false }: ProseImageProps) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("ui");
   const scope = useImageLightbox();
   const inLink = useContext(InLinkContext);
   const buttonRef = useRef<HTMLButtonElement | null>(null);

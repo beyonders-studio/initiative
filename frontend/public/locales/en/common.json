@@ -215,10 +215,6 @@
     "namesAndMore_other": "{{names}} and {{count}} others",
     "error": "Could not save your reaction."
   },
-  "lightbox": {
-    "open": "View this picture full size",
-    "openNamed": "View {{name}} full size"
-  },
   "timeline": {
     "label": "Jump to a month",
     "jumpedTo": "Showing from {{period}}",

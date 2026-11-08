@@ -52,7 +52,7 @@ import { filledBy } from "./detailLayout";
 import { POST_LAYOUT, postFields } from "./posts";
 
 const Editor = lazy(() =>
-  import("@/components/editor/initiative/editor").then((m) => ({ default: m.Editor }))
+  import("@/components/editor/editor").then((m) => ({ default: m.Editor }))
 );
 
 /** What a notice's detail shares with its parts, beside the notice itself. */

@@ -215,10 +215,6 @@
     "namesAndMore_other": "{{names}} y {{count}} personas más",
     "error": "No se pudo guardar tu reacción."
   },
-  "lightbox": {
-    "open": "Ver esta imagen a tamaño completo",
-    "openNamed": "Ver {{name}} a tamaño completo"
-  },
   "timeline": {
     "label": "Ir a un mes",
     "jumpedTo": "Desde {{period}}",

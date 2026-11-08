@@ -7,7 +7,6 @@ import {
   SearchEntityType,
   type SmartChipState,
 } from "@/api/generated/initiativeAPI.schemas";
-import { CHIP_TONE_CLASSES } from "@/components/editor/editor-ui/chip-tones";
 import { MemberAvatar } from "@/components/members/MemberSearchSelect";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { entityRefTypeFor } from "@/lib/entityResolver";
@@ -18,6 +17,7 @@ import { entityRefRoute } from "@/lib/tools";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
 import { Button } from "@/ui/button";
 import { cardVariants } from "@/ui/card";
+import { CHIP_TONE_CLASSES } from "@/ui/editor/editor-ui/chip-tones";
 import { LazyImage } from "@/ui/lazy-image";
 import { useRelativeTime } from "@/ui/lib/useRelativeTime";
 import { cn } from "@/ui/lib/utils";

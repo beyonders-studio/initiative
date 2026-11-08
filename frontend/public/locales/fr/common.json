@@ -215,10 +215,6 @@
     "namesAndMore_other": "{{names}} et {{count}} autres",
     "error": "Votre réaction n'a pas pu être enregistrée."
   },
-  "lightbox": {
-    "open": "Voir cette image en taille réelle",
-    "openNamed": "Voir {{name}} en taille réelle"
-  },
   "timeline": {
     "label": "Aller à un mois",
     "jumpedTo": "À partir de {{period}}",

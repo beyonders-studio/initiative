@@ -432,7 +432,7 @@ def test_app_url_scheme_decides_https():
 
 def test_csp_allows_the_origins_the_spa_fetches():
     # The spell checker fetches its English dictionary from jsDelivr
-    # (frontend/src/components/editor/utils/spell-check.ts) and the Help panel its search index
+    # (frontend/src/lib/kitHost.ts) and the Help panel its search index
     # from the published help center (frontend/src/hooks/useHelpIndex.ts).
     connect_src = _directive(_csp(_settings()), "connect-src").split()
     assert "https://cdn.jsdelivr.net" in connect_src

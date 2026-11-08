@@ -9,13 +9,7 @@ import { generateSummary, notifyMentions } from "@/api/generated/files/files";
 import { FileKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { type AISummary, SummarySheet, useSummarySheet } from "@/components/ai/SummarySheet";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
-import { FeaturedImageProvider } from "@/components/editor/context/featured-image-context";
-import {
-  DocumentOutlinePanel,
-  DocumentOutlineScope,
-  useDocumentOutline,
-} from "@/components/editor/DocumentOutline";
-import { CollaborationStatusBadge } from "@/components/editor/initiative/CollaborationStatusBadge";
+import { CollaborationStatusBadge } from "@/components/editor/CollaborationStatusBadge";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
 import { FileCollections } from "@/components/files/collections/FileCollections";
 import { fileBody } from "@/components/files/detail/fileBodies";
@@ -43,6 +37,12 @@ import { toolListRoute, toolRouteSegment, toolSettingsRoute } from "@/lib/tools"
 import { CollaborationError } from "@/lib/yjs/CollaborationProvider";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
+import { FeaturedImageProvider } from "@/ui/editor/context/featured-image-context";
+import {
+  DocumentOutlinePanel,
+  DocumentOutlineScope,
+  useDocumentOutline,
+} from "@/ui/editor/DocumentOutline";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { useRelativeTime } from "@/ui/lib/useRelativeTime";

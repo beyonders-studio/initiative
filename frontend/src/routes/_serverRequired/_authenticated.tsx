@@ -21,7 +21,6 @@ import { CommandCenter } from "@/components/CommandCenter";
 import { ConfirmBirthdate } from "@/components/ConfirmBirthdate";
 import { CommunityAccessBanner } from "@/components/communities/CommunityAccessBanner";
 import { DemoBannerOrTabs } from "@/components/demo/DemoBanner";
-import { DocumentOutlineScope } from "@/components/editor/DocumentOutline";
 import { DeviceVerificationDialog } from "@/components/messages/DeviceVerificationDialog";
 import { ReportHost } from "@/components/moderation/ReportButton";
 import { BottomNav } from "@/components/navigation/BottomNav";
@@ -59,6 +58,7 @@ import { canAccessPlatformAreas } from "@/lib/permissions";
 import { activityScope, getActiveRecentKey } from "@/lib/recentRoute";
 import { returnPath } from "@/lib/returnPath";
 import { Button } from "@/ui/button";
+import { DocumentOutlineScope } from "@/ui/editor/DocumentOutline";
 import {
   Empty,
   EmptyContent,
