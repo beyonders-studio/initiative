@@ -8,6 +8,7 @@ import { renderWithProviders } from "@/__tests__/helpers/render";
 const fileMutate = vi.fn();
 const fileOptions = vi.hoisted(() => ({
   current: undefined as { onSuccess?: () => void } | undefined,
+  pending: false,
 }));
 
 vi.mock("@tanstack/react-router", async () => ({
@@ -30,7 +31,7 @@ vi.mock("@/hooks/useTickets", async () => ({
   }),
   useFileTicket: (options: { onSuccess?: () => void }) => {
     fileOptions.current = options;
-    return { mutate: fileMutate, isPending: false };
+    return { mutate: fileMutate, isPending: fileOptions.pending };
   },
 }));
 
@@ -46,17 +47,20 @@ describe("routeTemplate", () => {
 });
 
 describe("FeedbackSheet", () => {
-  beforeEach(() => fileMutate.mockClear());
+  beforeEach(() => {
+    fileMutate.mockClear();
+    fileOptions.pending = false;
+  });
 
-  // The draft outlives the sheet, so each test leaves it empty: sent or discarded.
-  const open = () => {
-    renderWithProviders(<FeedbackHost />, { auth: { user: buildUser() } });
+  // Each test signs in somebody new, whose draft starts empty.
+  const open = (user = buildUser()) => {
+    const view = renderWithProviders(<FeedbackHost />, { auth: { user } });
     act(() => openFeedback());
-    return userEvent.setup();
+    return { ...view, user: userEvent.setup() };
   };
 
   it("starts on an idea and sends what was written, the contact choice and where the app was", async () => {
-    const user = open();
+    const { user } = open();
     const box = await screen.findByLabelText("What would you like Initiative to do?");
     expect(box).toHaveFocus();
     expect(screen.getByRole("radio", { name: "Suggest an idea" })).toBeChecked();
@@ -86,7 +90,7 @@ describe("FeedbackSheet", () => {
   });
 
   it("keeps the kind and the draft when closed, and leaves the app's details out when asked", async () => {
-    const user = open();
+    const { user } = open();
     await user.click(await screen.findByRole("radio", { name: "Something's not right" }));
     expect(
       screen.getByRole("button", { name: "Need somebody to sort it out for you? Ask for help" })
@@ -114,5 +118,28 @@ describe("FeedbackSheet", () => {
     );
     await user.click(screen.getByRole("button", { name: "Discard" }));
     expect(screen.getByLabelText("What would you like Initiative to do?")).toHaveValue("");
+  });
+
+  it("opens a draft again only for the account that wrote it, and stays open while sending", async () => {
+    const writer = buildUser();
+    const first = open(writer);
+    await first.user.type(
+      await screen.findByLabelText("What would you like Initiative to do?"),
+      "Dark print."
+    );
+    first.unmount();
+
+    fileOptions.pending = true;
+    const again = open(writer);
+    expect(await screen.findByLabelText("What would you like Initiative to do?")).toHaveValue(
+      "Dark print."
+    );
+    await again.user.keyboard("{Escape}");
+    expect(screen.getByLabelText("What would you like Initiative to do?")).toBeInTheDocument();
+    again.unmount();
+
+    fileOptions.pending = false;
+    open(buildUser());
+    expect(await screen.findByLabelText("What would you like Initiative to do?")).toHaveValue("");
   });
 });

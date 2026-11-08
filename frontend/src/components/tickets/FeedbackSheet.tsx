@@ -19,7 +19,6 @@
  */
 
 import { Capacitor } from "@capacitor/core";
-import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
 import { useMatches } from "@tanstack/react-router";
 import { CircleAlert, Heart, Lightbulb, type LucideIcon } from "lucide-react";
 import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -36,6 +35,8 @@ import { HelpLink } from "@/components/support/HelpLink";
 import { ContactDialog } from "@/components/tickets/ContactDialog";
 import { EvidencePicker } from "@/components/tickets/Evidence";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useAuth } from "@/hooks/useAuth";
+import { useServer } from "@/hooks/useServer";
 import { useTheme } from "@/hooks/useTheme";
 import { useFileTicket, useTicketAvailability } from "@/hooks/useTickets";
 import { getErrorMessage } from "@/lib/errorMessage";
@@ -48,6 +49,7 @@ import { cn } from "@/ui/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/ui/sheet";
 import { Switch } from "@/ui/switch";
 import { Textarea } from "@/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 /** Match the column behind it, so the box stops where the server would. */
 const BODY_MAX = 5000;
@@ -80,9 +82,10 @@ const EMPTY_DRAFT: Draft = {
 
 // Whether the sheet is open, and what is written in it, kept outside React so
 // a menu item and the command palette can open the one drawn by the shell and
-// closing it keeps the draft.
+// closing it keeps the draft. The draft is its writer's: it opens again only
+// for the same account on the same server.
 let sheetOpen = false;
-let draft = EMPTY_DRAFT;
+let draft: { owner: string; form: Draft } | null = null;
 const listeners = new Set<() => void>();
 const setSheetOpen = (open: boolean) => {
   sheetOpen = open;
@@ -143,15 +146,18 @@ const FeedbackSheet = () => {
   const context = useFeedbackContext();
   const { data } = useTicketAvailability(communityId);
   const wide = atLeast(useWidthClass(), "sm");
-  const [form, setForm] = useState(draft);
+  const { user } = useAuth();
+  const { serverUrl } = useServer();
+  const owner = `${serverUrl ?? ""} ${user?.id ?? ""}`;
+  const [form, setForm] = useState(draft?.owner === owner ? draft.form : EMPTY_DRAFT);
   const [seeing, setSeeing] = useState(false);
   const [sent, setSent] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
   const thanks = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
-    draft = form;
-  }, [form]);
+    draft = { owner, form };
+  }, [owner, form]);
   useEffect(() => {
     if (sent) thanks.current?.focus();
   }, [sent]);
@@ -188,16 +194,18 @@ const FeedbackSheet = () => {
   };
 
   return (
-    <Sheet open onOpenChange={setSheetOpen} modal={!wide}>
+    // Open until the send settles, so what is being sent is not sent twice.
+    <Sheet
+      open
+      onOpenChange={(open) => {
+        if (!pending) setSheetOpen(open);
+      }}
+      modal={!wide}
+    >
       <SheetContent
-        side={wide ? null : "bottom"}
+        side={wide ? "bottom-right" : "bottom"}
         aria-describedby={undefined}
-        className={cn(
-          "flex flex-col gap-0 p-0",
-          wide
-            ? "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-4 right-4 bottom-4 max-h-[calc(100dvh-2rem)] w-96 rounded-2xl border"
-            : "max-h-[85dvh] rounded-t-2xl"
-        )}
+        className={cn("flex flex-col gap-0 p-0", !wide && "max-h-[85dvh] rounded-t-2xl")}
         style={wide ? undefined : { paddingBottom: "var(--safe-area-inset-bottom)" }}
         // Docked beside the page, it stays open while the page is used.
         onInteractOutside={wide ? (event) => event.preventDefault() : undefined}
@@ -239,26 +247,24 @@ const FeedbackSheet = () => {
               <SheetTitle className="text-base leading-snug">{t("feedback.title")}</SheetTitle>
             </div>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-4">
-              {/* The kit's radio item draws a dot; a kind is drawn as a tile. */}
-              <RadioGroupPrimitive.Root
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                size="tile"
                 aria-label={t("feedback.kindLabel")}
-                orientation="horizontal"
                 className="grid grid-cols-3 gap-1.5"
                 value={form.kind}
-                onValueChange={(kind) => change({ kind: kind as FeedbackTopic })}
+                // A kind is always chosen: choosing it again keeps it.
+                onValueChange={(kind) => kind && change({ kind: kind as FeedbackTopic })}
                 disabled={pending}
               >
                 {KINDS.map(([kind, Icon]) => (
-                  <RadioGroupPrimitive.Item
-                    key={kind}
-                    value={kind}
-                    className="flex flex-col items-center gap-1 rounded-lg border bg-card px-1.5 py-2.5 text-center text-xs leading-tight hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=checked]:border-primary data-[state=checked]:ring-1 data-[state=checked]:ring-primary"
-                  >
-                    <Icon aria-hidden className="size-[1.125rem] text-muted-foreground" />
+                  <ToggleGroupItem key={kind} value={kind}>
+                    <Icon aria-hidden />
                     {t(`feedback.kinds.${kind}.label`)}
-                  </RadioGroupPrimitive.Item>
+                  </ToggleGroupItem>
                 ))}
-              </RadioGroupPrimitive.Root>
+              </ToggleGroup>
               <div className="space-y-1.5">
                 <Label htmlFor="feedback-body">{t(`feedback.kinds.${form.kind}.question`)}</Label>
                 <Textarea
