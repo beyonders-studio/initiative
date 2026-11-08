@@ -67,6 +67,14 @@ class IntakeSettingsRead(SanitizedBaseModel):
     #: Each stream's own contact address, for the streams that have one. A
     #: stream absent here falls back to the general address.
     contact_emails: Dict[IntakeStream, str] = Field(default_factory=dict)
+    #: Whether people here may send feedback to the Initiative team.
+    feedback_enabled: bool
+
+
+class FeedbackSwitchUpdate(SanitizedBaseModel):
+    """Let people here send feedback to the Initiative team, or stop."""
+
+    enabled: bool
 
 
 class IntakeContactUpdate(SanitizedBaseModel):

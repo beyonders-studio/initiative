@@ -6579,6 +6579,13 @@ export const FeedView = {
 } as const;
 
 /**
+ * Let people here send feedback to the Initiative team, or stop.
+ */
+export interface FeedbackSwitchUpdate {
+  enabled: boolean;
+}
+
+/**
  * One field a client may offer for filtering.
  */
 export interface FieldDescription {
@@ -7804,6 +7811,7 @@ export interface IntakeSettingsRead {
   bindings: IntakeBindingRead[];
   general_contact_email?: string | null;
   contact_emails?: Partial<Record<IntakeStream, string>>;
+  feedback_enabled: boolean;
 }
 
 export interface InterfaceSettingsResponse {
@@ -11284,6 +11292,7 @@ export type TicketMode = (typeof TicketMode)[keyof typeof TicketMode];
 export const TicketMode = {
   form: "form",
   email: "email",
+  cloud: "cloud",
   none: "none",
 } as const;
 

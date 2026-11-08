@@ -6,7 +6,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsDemoServer } from "@/hooks/useDemoCopy";
 import { normalizeServerUrl, useServer } from "@/hooks/useServer";
-import { CLOUD_OPEN, CLOUD_ORIGIN, CLOUD_SERVER_URL } from "@/lib/cloud";
+import { CLOUD_OPEN, CLOUD_SERVER_URL, isCloudOrigin } from "@/lib/cloud";
 import { getSelfHostedAddress, setSelfHostedAddress } from "@/lib/serverStorage";
 import { clearStart } from "@/lib/startFlow";
 import AppEnvironment from "@/plugins/appEnvironment";
@@ -23,8 +23,7 @@ import { cn } from "@/ui/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** Whether the server a sign-in goes to is Initiative Cloud, once it is open. */
-const useIsCloudServer = (): boolean =>
-  useServer().getServerOrigin() === CLOUD_ORIGIN && CLOUD_OPEN;
+const useIsCloudServer = (): boolean => isCloudOrigin(useServer().getServerOrigin()) && CLOUD_OPEN;
 
 /**
  * Leaving a server: a sign-up begun on it stays there, and leaving signs out

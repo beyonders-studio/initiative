@@ -50,6 +50,13 @@ import {
   BreadcrumbSeparator,
 } from "@/ui/breadcrumb";
 import { Button } from "@/ui/button";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/ui/carousel";
 import { Skeleton } from "@/ui/skeleton";
 import { StatusMessage } from "@/ui/status-message";
 
@@ -280,18 +287,23 @@ export function MarketplaceListingPage() {
       )}
 
       {listing?.images?.length ? (
-        <div className="flex gap-3 overflow-x-auto pb-2">
-          {listing.images.map((image) => (
-            <img
-              key={image}
-              src={resolveArtworkUrl(image) ?? undefined}
-              alt=""
-              aria-hidden
-              className="h-48 shrink-0 rounded-lg border object-cover"
-              loading="lazy"
-            />
-          ))}
-        </div>
+        <Carousel>
+          <CarouselContent className="-ml-3">
+            {listing.images.map((image) => (
+              <CarouselItem key={image} className="max-w-full basis-auto pl-3">
+                <img
+                  src={resolveArtworkUrl(image) ?? undefined}
+                  alt=""
+                  aria-hidden
+                  className="h-48 rounded-lg border object-cover"
+                  loading="lazy"
+                />
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+          <CarouselPrevious />
+          <CarouselNext />
+        </Carousel>
       ) : null}
 
       {/* Each tool previews its own way: a project as its board, a dashboard on

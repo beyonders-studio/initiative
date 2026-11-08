@@ -2,6 +2,13 @@ import { useTranslation } from "react-i18next";
 
 import { CollectionCard } from "@/components/files/collections/CollectionCard";
 import { useCollections } from "@/hooks/useCollections";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/ui/carousel";
 
 /**
  * The initiative's collections, a strip of cards above its files. Nothing at
@@ -18,15 +25,20 @@ export const CollectionsStrip = ({ initiativeId }: { initiativeId: number }) => 
       <h2 id="files-collections-heading" className="font-semibold text-lg">
         {t("collections.heading")}
       </h2>
-      {/* Scrolls sideways rather than wrapping: the files are what the page
-          is for, and a row of cards keeps them close. */}
-      <ul className="-mx-1 flex snap-x gap-4 overflow-x-auto px-1 pb-2">
-        {collections.map((collection) => (
-          <li key={collection.id} className="w-56 shrink-0 snap-start">
-            <CollectionCard collection={collection} />
-          </li>
-        ))}
-      </ul>
+      {/* A shelf rather than a grid that wraps: the files are what the page
+          is for, and one row of cards keeps them close. The space under the
+          cards is for their shadows, which the shelf's edge would cut off. */}
+      <Carousel>
+        <CarouselContent className="pb-2">
+          {collections.map((collection) => (
+            <CarouselItem key={collection.id} className="basis-60">
+              <CollectionCard collection={collection} />
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+        <CarouselPrevious />
+        <CarouselNext />
+      </Carousel>
     </section>
   );
 };

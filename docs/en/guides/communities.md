@@ -269,7 +269,7 @@ Whoever keeps the member list can set or clear a member's from that person's men
 
 ## Reporting something
 
-Something here that shouldn't be? Comments, notices, pictures, wiki pages, events, profiles and directory listings all carry a small flag: **Report**. Pick what's wrong, add a line if you like, and **Send report**. The report opens beside the page, so what you're reporting stays in view. It isn't offered on your own things, because you can already edit or delete those. **Illegal** and **Other** need a line saying what's wrong.
+Something here that shouldn't be? Comments, notices, pictures, wiki pages, events, profiles and directory listings all carry a small flag: **Report**. Pick what's wrong, add a line if you like, and **Send report**. As the report opens it takes a picture of what you're reporting and attaches it, with the people on it left showing, since a report is usually about someone. Click the picture to hide parts of it or mark them, or remove it. It isn't offered on your own things, because you can already edit or delete those. **Illegal** and **Other** need a line saying what's wrong.
 
 | What you report | Who looks at it |
 |---|---|
@@ -282,7 +282,7 @@ Reporting something **illegal** asks which law it breaks, and goes to the commun
 
 ## Asking for help
 
-The question mark at the foot of the sidebar, and in the desktop app's title bar, is **Help**. It searches these pages first, from inside the app, and before you type it shows answers for the page you're on. Where your server takes help requests, **Ask the team** sits under the results and starts a request with whatever you searched. Say what happened, pick what it's about, and add a screenshot if it helps: the paperclip in the box attaches one, or paste or drop it on the box. The request goes to the people who run the server, not to the community's own admins.
+The question mark at the foot of the sidebar, and in the desktop app's title bar, is **Help**. It searches these pages first, from inside the app, and before you type it shows answers for the page you're on. Where your server takes help requests, **Ask the team** sits under the results and starts a request with whatever you searched. Say what happened, pick what it's about, and add a picture if it helps: the camera in the box takes one of the page you're on, the paperclip attaches a file, or paste or drop one on the box. A picture opens in an editor first. The people on it are already swapped out (names become Person 1, Person 2, you show as You, and avatars, emails and phone numbers are hidden), and you can point at any part of the page to hide it, or mark it with a number your message can mention. The request goes to the people who run the server, not to the community's own admins.
 
 Each request carries this device's details: the app's version, the platform, your language and theme, the page you were on (without anything that names what was on it) and the window's size. The line above **Send** shows them, and its switch leaves them out. Close Help halfway through and your draft waits for you as a **Help request draft** button in the corner.
 
@@ -296,9 +296,9 @@ Notices that used to say "contact whoever runs this server" — the age question
 
 Where the server takes no requests but has said who to write to, that address sits under the results instead. Where there's neither, the search is all there is, with these pages one click away.
 
-**Send feedback**, in your account menu and the command palette, is where an idea goes, or something that got in your way, or something you love. Pick which it is and write it; a screenshot pasted into the box comes along too. **See what** shows exactly what else gets sent (the app's version, platform, language, theme, the page without anything that names what was on it, and the window's size), and the switch beside it leaves all that out.
+**Send feedback**, in your account menu and the command palette, is where an idea goes, or something that got in your way, or something you love, straight to the team that makes Initiative. Pick which it is and write it; a screenshot pasted into the box comes along too. On any server but Initiative Cloud, it opens Cloud's feedback page in your browser, and sending it takes an Initiative Cloud account. Your own server sends nothing along the way. **See what** shows exactly what else gets sent (the app's version, platform, language, theme, the page without anything that names what was on it, and the window's size), and the switch beside it leaves all that out.
 
-Feedback goes one way unless you tick **You can contact me with questions about this**. Then the team can write to you about it, and it shows up in **My Tickets** when they do. Anything you need sorted out for you belongs in **Ask for help**, which **Something's not right** points you to.
+Feedback goes one way unless you tick **You can contact me with questions about this**. Then the team can write to you about it, and it shows up in **My Tickets** on Initiative Cloud when they do. Anything you need sorted out for you belongs in **Ask for help**, which **Something's not right** points you to.
 
 Every request you send lands in **My Tickets**, in the sidebar: where each one stands (**Received**, **In progress**, **Waiting on you**, **Closed**), what the team said, and your replies. You get a notification when it moves, so there's no need to keep checking. A report is listed there too, though the team looks into reports without replying to them.
 

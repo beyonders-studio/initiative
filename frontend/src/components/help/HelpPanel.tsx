@@ -368,6 +368,7 @@ const AskView = ({
           policy={policy}
           files={draft.files}
           onFilesChange={(files) => setHelpDraft({ files })}
+          pagePicture={{ hidePeople: true }}
           disabled={file.isPending}
         />
         {offered.length > 1 ? (

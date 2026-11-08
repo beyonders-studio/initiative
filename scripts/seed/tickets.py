@@ -2,7 +2,7 @@
 on them on a fresh dev database.
 
 Somebody who isn't staff files a ticket in each stream they can file in
-(support, security and feedback), reports a comment to a community's
+(support and security, and feedback on Initiative Cloud), reports a comment to a community's
 moderators, and reports another as illegal, which reaches the platform too
 and is the moderation case they follow. A community's moderator then holds a
 third comment for the platform, which opens a case of its own.
@@ -17,7 +17,13 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import establish_guild_access
-from app.core.intake import FeedbackTopic, SecurityTopic, SupportTopic
+from app.core.intake import (
+    FeedbackTopic,
+    IntakeStream,
+    SecurityTopic,
+    SupportTopic,
+    offered_streams,
+)
 from app.core.moderation import HoldReason, LegalBasis, ReportReason
 from app.core.search import SearchEntityType
 from app.db import cohorts
@@ -74,13 +80,16 @@ async def seed(session: AsyncSession, users: dict[str, User], primary: Guild) ->
         subject="A shared link shows more than it should",
         body="Opening a shared file's link while signed out shows its comments.",
     )
-    await feedback.send(
-        sender=filer,
-        topic=FeedbackTopic.idea,
-        body="It would help to pin a comment to the top of a task.",
-        contactable=True,
-    )
-    opened += 3
+    opened += 2
+    # Feedback lands only on Initiative Cloud.
+    if IntakeStream.feedback in offered_streams():
+        await feedback.send(
+            sender=filer,
+            topic=FeedbackTopic.idea,
+            body="It would help to pin a comment to the top of a task.",
+            contactable=True,
+        )
+        opened += 1
 
     targets = await _comments_seen_by(filer, primary.id, skip={moderator.id})
     if len(targets) < 3:

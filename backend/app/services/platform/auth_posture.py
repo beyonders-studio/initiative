@@ -798,6 +798,7 @@ PLATFORM_RULES: dict[str, Rule] = {
         ),
         _platform("marketplace_members_publish_directly", "marketplace"),
         _platform("marketplace_registry_enabled", "marketplace_registry"),
+        _platform("feedback_enabled", "feedback"),
         _platform("public_registration_enabled", "community"),
         _platform(
             "community_creation_enabled",

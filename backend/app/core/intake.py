@@ -22,6 +22,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Mapping, Optional
 
+from app.core.cloud import is_cloud
+
 
 class IntakeStream(str, Enum):
     """The kinds of operations work a deployment can route into a project."""
@@ -177,6 +179,9 @@ class IntakeStreamMeta:
     #: Whether staff may name one of the stream's cases as the reason for an
     #: access grant, which then reports what the grant did on the case.
     grant_linkable: bool = False
+    #: Whether only Initiative Cloud takes the stream. Every other server sets
+    #: it up nowhere and sends its people to Cloud.
+    cloud_only: bool = False
     #: Whether the community a grant for one of the stream's cases reaches has
     #: its superadmins told of it.
     community_notice: CommunityNoticeRule = CommunityNoticeRule.never
@@ -270,6 +275,8 @@ STREAMS: dict[IntakeStream, IntakeStreamMeta] = {
         max_open_per_filer=None,
         evidence=EvidencePolicy(3, 10 * _MB, IMAGE_TYPES),
         retention_days=30,
+        # Feedback is about the product, so it goes to the team that makes it.
+        cloud_only=True,
     ),
 }
 
@@ -277,6 +284,13 @@ STREAMS: dict[IntakeStream, IntakeStreamMeta] = {
 def meta(stream: IntakeStream) -> IntakeStreamMeta:
     """What feeds ``stream``. Raises for a stream with no declaration."""
     return STREAMS[stream]
+
+
+def offered_streams() -> tuple[IntakeStream, ...]:
+    """The streams this server sets up and takes: all of them on Initiative
+    Cloud, and everywhere else all but the Cloud-only ones."""
+    cloud = is_cloud()
+    return tuple(s for s in IntakeStream if cloud or not STREAMS[s].cloud_only)
 
 
 def conversation_for(stream: IntakeStream, topic: Optional[str]) -> Conversation:

@@ -24,6 +24,7 @@ const SheetOverlay = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Overlay>
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
+    data-slot="sheet-overlay"
     className={cn(
       // The overlay fades for as long as the sheet slides, so it never goes
       // before the sheet drawn inside it has finished leaving.

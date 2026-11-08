@@ -242,7 +242,8 @@ async def test_without_a_form_the_streams_address_is_offered(
 ):
     """Where nothing is set up to receive a stream, its address is the way to
     reach the people who run the deployment — the stream's own, else the
-    general one, never another stream's."""
+    general one, never another stream's. Feedback goes to Initiative Cloud
+    instead, from any other server."""
     member = await acting_user(guild_role=CommunityRole.member)
     await _set_contacts(
         session, general="ops@example.org", security="security@example.org"
@@ -254,10 +255,7 @@ async def test_without_a_form_the_streams_address_is_offered(
         "contact": "security@example.org",
     }
     assert _offer(offered["support"]) == {"mode": "email", "contact": "ops@example.org"}
-    assert _offer(offered["feedback"]) == {
-        "mode": "email",
-        "contact": "ops@example.org",
-    }
+    assert _offer(offered["feedback"]) == {"mode": "cloud", "contact": None}
 
 
 async def test_a_report_is_always_a_form(client, session, acting_user):
