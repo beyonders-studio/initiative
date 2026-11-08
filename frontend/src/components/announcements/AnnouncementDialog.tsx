@@ -66,15 +66,25 @@ interface AnnouncementDialogProps {
  * Sections marked `starts_page` turn it into a pager, which is the whole of
  * the wizard shape: several beats, one at a time, in order.
  */
-export const AnnouncementDialog = ({
-  open,
+export const AnnouncementDialog = ({ open, onOpenChange, ...props }: AnnouncementDialogProps) => (
+  <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="flex max-h-[85vh] flex-col gap-0 sm:max-w-2xl">
+      {/* A dialog opening is a fresh read, and so is a different announcement
+          arriving in the same dialog: both start at page one. The title
+          stands in for "which announcement": the pages themselves are a fresh
+          array each render, so they cannot be what tells them apart. */}
+      <AnnouncementPages key={props.title} {...props} />
+    </DialogContent>
+  </Dialog>
+);
+
+const AnnouncementPages = ({
   title,
   category,
   sections,
   footer,
   meta,
-  onOpenChange,
-}: AnnouncementDialogProps) => {
+}: Omit<AnnouncementDialogProps, "open" | "onOpenChange">) => {
   const { t } = useTranslation("announcements");
   const Icon = CATEGORY_ICON[category] ?? Megaphone;
 
@@ -82,16 +92,6 @@ export const AnnouncementDialog = ({
   const [pageIndex, setPageIndex] = useState(0);
   const [zoomed, setZoomed] = useState<{ src: string; alt: string } | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
-
-  // A dialog opening is a fresh read, and so is a different announcement
-  // arriving in the same dialog — both start at page one. The title stands in
-  // for "which announcement": the pages themselves are a fresh array each
-  // render, so they cannot be what is compared.
-  const [prev, setPrev] = useState({ open, title });
-  if (prev.open !== open || prev.title !== title) {
-    setPrev({ open, title });
-    setPageIndex(0);
-  }
 
   const safeIndex = Math.min(pageIndex, Math.max(pages.length - 1, 0));
   const isLastPage = safeIndex >= pages.length - 1;
@@ -104,70 +104,68 @@ export const AnnouncementDialog = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col gap-0 sm:max-w-2xl">
-        <DialogHeader className="shrink-0 space-y-2">
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="gap-1.5">
-              <Icon className="h-3.5 w-3.5" />
-              {t(`category.${category}`)}
-            </Badge>
-            {meta ? <span className="text-muted-foreground text-xs">{meta}</span> : null}
-          </div>
-          <DialogTitle>{title}</DialogTitle>
-          {/* Radix wants every dialog described; the category is what the
+    <>
+      <DialogHeader className="shrink-0 space-y-2">
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="gap-1.5">
+            <Icon className="h-3.5 w-3.5" />
+            {t(`category.${category}`)}
+          </Badge>
+          {meta ? <span className="text-muted-foreground text-xs">{meta}</span> : null}
+        </div>
+        <DialogTitle>{title}</DialogTitle>
+        {/* Radix wants every dialog described; the category is what the
               badge says visually, so a screen reader gets the same. */}
-          <DialogDescription className="sr-only">{t(`category.${category}`)}</DialogDescription>
-        </DialogHeader>
+        <DialogDescription className="sr-only">{t(`category.${category}`)}</DialogDescription>
+      </DialogHeader>
 
-        {/* A plain overflow container rather than ScrollArea: the dialog is
+      {/* A plain overflow container rather than ScrollArea: the dialog is
             bounded by max-height, and Radix's viewport sizes itself with
             ``h-full``, which resolves to nothing against an indefinite height
             — the content would be clipped instead of scrolled. */}
-        <div ref={bodyRef} className="-mr-2 min-h-0 flex-1 overflow-y-auto pr-2">
-          <div className="space-y-6 py-4">
-            {(pages[safeIndex] ?? []).map((section, index) => (
-              <AnnouncementSectionView
-                // Sections have no identity of their own — they are an ordered
-                // list edited and saved whole — so position is the key.
-                // biome-ignore lint/suspicious/noArrayIndexKey: positional by nature
-                key={index}
-                section={section}
-                onZoom={setZoomed}
-              />
-            ))}
-          </div>
+      <div ref={bodyRef} className="-mr-2 min-h-0 flex-1 overflow-y-auto pr-2">
+        <div className="space-y-6 py-4">
+          {(pages[safeIndex] ?? []).map((section, index) => (
+            <AnnouncementSectionView
+              // Sections have no identity of their own — they are an ordered
+              // list edited and saved whole — so position is the key.
+              // biome-ignore lint/suspicious/noArrayIndexKey: positional by nature
+              key={index}
+              section={section}
+              onZoom={setZoomed}
+            />
+          ))}
         </div>
+      </div>
 
-        {pages.length > 1 || footer ? (
-          <DialogFooter className="shrink-0 border-t pt-4 sm:items-center">
-            {pages.length > 1 ? (
-              <div className="flex items-center gap-2 sm:mr-auto">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={safeIndex === 0}
-                  onClick={() => goTo(safeIndex - 1)}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  {t("dialog.back")}
-                </Button>
-                <span className="text-muted-foreground text-xs">
-                  {t("dialog.pageOf", { current: safeIndex + 1, total: pages.length })}
-                </span>
-              </div>
-            ) : null}
-            {isLastPage ? (
-              footer
-            ) : (
-              <Button onClick={() => goTo(safeIndex + 1)}>
-                {t("dialog.continue")}
-                <ChevronRight className="h-4 w-4" />
+      {pages.length > 1 || footer ? (
+        <DialogFooter className="shrink-0 border-t pt-4 sm:items-center">
+          {pages.length > 1 ? (
+            <div className="flex items-center gap-2 sm:mr-auto">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={safeIndex === 0}
+                onClick={() => goTo(safeIndex - 1)}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                {t("dialog.back")}
               </Button>
-            )}
-          </DialogFooter>
-        ) : null}
-      </DialogContent>
+              <span className="text-muted-foreground text-xs">
+                {t("dialog.pageOf", { current: safeIndex + 1, total: pages.length })}
+              </span>
+            </div>
+          ) : null}
+          {isLastPage ? (
+            footer
+          ) : (
+            <Button onClick={() => goTo(safeIndex + 1)}>
+              {t("dialog.continue")}
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          )}
+        </DialogFooter>
+      ) : null}
 
       {/* Nested on purpose: Escape and a click outside close the picture and
           leave the announcement where it was, rather than dismissing it. */}
@@ -178,7 +176,7 @@ export const AnnouncementDialog = ({
         index={0}
         onIndexChange={() => {}}
       />
-    </Dialog>
+    </>
   );
 };
 

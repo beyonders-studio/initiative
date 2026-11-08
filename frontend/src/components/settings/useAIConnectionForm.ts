@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -47,7 +47,6 @@ const toFormState = (connection: AIConnectionResponse): AIConnectionFormState =>
 });
 
 interface UseAIConnectionFormArgs {
-  open: boolean;
   scope: ConnectionScope;
   connection: AIConnectionResponse | null;
   mutations: ConnectionMutations;
@@ -61,7 +60,6 @@ interface UseAIConnectionFormArgs {
  * visibility, model fetching, and submit wiring. The dialog stays presentational.
  */
 export const useAIConnectionForm = ({
-  open,
   scope,
   connection,
   mutations,
@@ -73,15 +71,11 @@ export const useAIConnectionForm = ({
   const serverForm = useServerForm(
     connection ?? undefined,
     (loaded) => (loaded ? toFormState(loaded) : emptyForm),
-    [open, connection?.id]
+    connection?.id
   );
   const form = serverForm.values;
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
-
   // The models a connection offers belong to the connection, not to the form.
-  useEffect(() => {
-    if (open) setAvailableModels([]);
-  }, [open]);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
 
   const setField = <K extends keyof AIConnectionFormState>(
     key: K,
