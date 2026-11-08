@@ -58,6 +58,9 @@ type ToolIndexTableProps = {
   /** Opens a row followed by its name here instead of on its page; a click
    *  that asks for a new tab or window still goes there. */
   onOpen?: (row: ToolIndexRow) => void;
+  /** Mounts only the rows near the view, for a list that keeps loading as
+   *  it is scrolled. */
+  virtualize?: boolean;
   selection: TableSelection;
   sorting: SortingState;
   onSortingChange: (sorting: SortingState) => void;
@@ -78,6 +81,7 @@ export const ToolIndexTable = ({
   useColumns = useNoColumns,
   laidOut,
   onOpen,
+  virtualize,
   selection,
   sorting,
   onSortingChange,
@@ -143,6 +147,10 @@ export const ToolIndexTable = ({
       ),
       enableSorting: true,
       enableHiding: false,
+      // For a virtualized table's fixed layout, which shares out spare width
+      // by size: the widest column, and wide enough for the name's minimum on
+      // a narrow screen.
+      size: 240,
     };
     return [
       ...(active
@@ -169,6 +177,7 @@ export const ToolIndexTable = ({
               ),
               enableSorting: false,
               enableHiding: false,
+              size: 40,
             } satisfies AppColumnDef<ToolIndexRow>,
           ]
         : []),
@@ -239,6 +248,7 @@ export const ToolIndexTable = ({
       onSortingChange={onSortingChange}
       enableResetSorting
       getRowId={(row) => String(row.id)}
+      enableVirtualization={virtualize}
     />
   );
 };

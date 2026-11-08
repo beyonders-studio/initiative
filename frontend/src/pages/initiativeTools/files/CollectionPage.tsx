@@ -143,7 +143,7 @@ const collectionViewSpec = (
  * masonry, grid and timeline are the gallery's walls, kept as they were: the
  * list is fetched a page at a time as the reader nears the bottom, and every
  * wall keeps only the files near the viewport in the DOM. The table is the
- * Files table.
+ * Files table, which does the same.
  *
  * Every file keeps its own sharing: the list holds only the files the reader
  * can open, and what they may do to each is the file's own answer. Changing
@@ -683,6 +683,7 @@ export function CollectionPage() {
                 rows={rows}
                 laidOut={columns}
                 onOpen={hasMetadata ? openRow : undefined}
+                virtualize
                 selection={selection}
                 sorting={view.sorting}
                 onSortingChange={setSorting}

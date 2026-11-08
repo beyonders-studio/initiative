@@ -37,7 +37,7 @@ describe("the posts board's virtual list", () => {
   it("virtualizes from the first render rather than at a threshold", () => {
     // `enabled` is how a threshold would be expressed, and the mode switch it
     // implies is the bug.
-    expect(SOURCE).toContain("useVirtualizer");
+    expect(SOURCE).toContain("useVirtualRows");
     expect(SOURCE).not.toMatch(/enabled:\s*virtualize/);
     expect(SOURCE).not.toMatch(/VIRTUALIZE_THRESHOLD/);
   });
