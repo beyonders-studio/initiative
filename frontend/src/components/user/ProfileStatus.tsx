@@ -4,8 +4,6 @@ import { useTranslation } from "react-i18next";
 
 import type { CustomStatusOutput, UserSelfUpdate } from "@/api/generated/initiativeAPI.schemas";
 import { useUpdateCurrentUser } from "@/hooks/useUsers";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { EmojiField } from "@/ui/emoji-picker";
 import { Input } from "@/ui/input";
@@ -101,13 +99,15 @@ export const StatusEditor = ({
     setText(status.text ?? "");
   }
 
-  const save = useUpdateCurrentUser({
-    onSuccess: async () => {
-      onDone?.();
-      await onSaved?.();
+  const save = useUpdateCurrentUser(
+    {
+      onSuccess: async () => {
+        onDone?.();
+        await onSaved?.();
+      },
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error, "profiles:status.failed")),
-  });
+    "profiles:status.failed"
+  );
 
   const commit = (next: { emoji: string | null; text: string | null }) =>
     save.mutate({ custom_status: next } as UserSelfUpdate);

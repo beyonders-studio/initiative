@@ -7,7 +7,6 @@ import { ConfirmPhraseField, EligibilityStep } from "@/components/account/Deleti
 import { useMyDeletionEligibility } from "@/hooks/useOperatorUsers";
 import { useDeleteOwnAccount } from "@/hooks/useUsers";
 import { useWizard } from "@/hooks/useWizard";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import type { DialogWithSuccessProps } from "@/types/dialog";
 import { Alert, AlertDescription } from "@/ui/alert";
@@ -91,9 +90,6 @@ export function DeleteAccountDialog({
           : t("deleteAccount.softDeleteSuccess")
       );
       onSuccess();
-    },
-    onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, "settings:deleteAccount.deleteError"));
     },
   });
 

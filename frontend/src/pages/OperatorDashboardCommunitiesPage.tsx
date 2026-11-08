@@ -20,7 +20,6 @@ import {
   useSetCommunitySuspension,
   useUpdateCommunityStorage,
 } from "@/hooks/useSettings";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { Badge } from "@/ui/badge";
@@ -80,17 +79,17 @@ const CommunityStatusCell = ({ community }: { community: PlatformCommunityStorag
   // so each is confirmed before it is applied.
   const [pending, setPending] = useState<CommunityStatus | null>(null);
 
-  const update = useUpdateCommunityStorage({
-    onSuccess: (row) => {
-      toast.success(t("communities.statusSaved", { name: row.name }));
+  const update = useUpdateCommunityStorage(
+    {
+      onSuccess: (row) => {
+        toast.success(t("communities.statusSaved", { name: row.name }));
+      },
+      // Close the confirm dialog only once the mutation settles, so its in-flight
+      // state is actually observable (the dialog shows "please wait" while saving).
+      onSettled: () => setPending(null),
     },
-    onError: (err) => {
-      toast.error(getErrorMessage(err, "settings:communities.statusSaveError"));
-    },
-    // Close the confirm dialog only once the mutation settles, so its in-flight
-    // state is actually observable (the dialog shows "please wait" while saving).
-    onSettled: () => setPending(null),
-  });
+    "settings:communities.statusSaveError"
+  );
 
   const apply = (status: CommunityStatus) => {
     update.mutate({ communityId: community.id, data: { status } });
@@ -188,9 +187,6 @@ const CommunitySuspensionButton = ({ community }: { community: PlatformCommunity
           ? t("communities.suspension.lifted", { name: row.name })
           : t("communities.suspension.suspended", { name: row.name })
       );
-    },
-    onError: (err) => {
-      toast.error(getErrorMessage(err, "settings:communities.statusSaveError"));
     },
     onSettled: () => setConfirming(false),
   });

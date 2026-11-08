@@ -18,7 +18,7 @@ import {
   useUpdateRegistrySettings,
   useUploadRegistryBundle,
 } from "@/hooks/useMarketplaceRegistry";
-import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
+import { messageForCode } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { FileDropArea } from "@/ui/file-drop";
@@ -47,19 +47,15 @@ export const MarketplaceRegistrySection = () => {
           ? t("marketplaceRegistry.enabledToast")
           : t("marketplaceRegistry.disabledToast")
       ),
-    onError: (err) => toast.error(getErrorMessage(err, "settings:marketplaceRegistry.saveError")),
   });
   const refresh = useRefreshRegistry({
     onSuccess: (result) => reportApplied(result, "refreshed"),
-    onError: (err) =>
-      toast.error(getErrorMessage(err, "settings:marketplaceRegistry.refreshError")),
   });
   const upload = useUploadRegistryBundle({
     onSuccess: (result) => {
       reportApplied(result, "bundleApplied");
       setBundle(null);
     },
-    onError: (err) => toast.error(getErrorMessage(err, "settings:marketplaceRegistry.bundleError")),
   });
 
   const state = status.data;

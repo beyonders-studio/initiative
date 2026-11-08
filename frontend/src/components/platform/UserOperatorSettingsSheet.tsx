@@ -62,7 +62,6 @@ import {
   useOperatorUpdatePlatformRole,
 } from "@/hooks/useOperatorUsers";
 import { useServerForm } from "@/hooks/useServerForm";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasAnyCapability } from "@/lib/permissions";
 import { getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
@@ -214,10 +213,7 @@ export const UserOperatorSettingsSheet = ({
   }
 
   const setUsername = useOperatorSetUsername(
-    {
-      onSuccess: () => toast.success(t("platformUsers.usernameChanged")),
-      onError: (err) => toast.error(getErrorMessage(err, "settings:platformUsers.actionError")),
-    },
+    { onSuccess: () => toast.success(t("platformUsers.usernameChanged")) },
     caseTaskId
   );
 
@@ -227,67 +223,43 @@ export const UserOperatorSettingsSheet = ({
         setSuspendOpen(false);
         setSuspendReason("");
       },
-      onError: (err) => toast.error(getErrorMessage(err, "settings:platformUsers.actionError")),
     },
     caseTaskId
   );
 
   const updateRole = useOperatorUpdatePlatformRole(
     {
-      onSuccess: (_data, variables) => {
+      onSuccess: (_data, variables) =>
         toast.success(
           t("platformUsers.roleChangeSuccess", {
             role: platformRoleLabel(variables.role, t as TranslateFn),
           })
-        );
-        setRoleConfirm(null);
-      },
-      onError: (err) => {
-        toast.error(getErrorMessage(err, "settings:platformUsers.roleChangeError"));
-        setRoleConfirm(null);
-      },
+        ),
+      onSettled: () => setRoleConfirm(null),
     },
     caseTaskId
   );
 
   const removeAvatar = useOperatorRemoveAvatar(
     {
-      onSuccess: () => {
-        toast.success(t("platformUsers.sheet.avatarRemoved"));
-        setAvatarConfirm(false);
-      },
-      onError: (err) => {
-        toast.error(getErrorMessage(err, "settings:platformUsers.actionError"));
-        setAvatarConfirm(false);
-      },
+      onSuccess: () => toast.success(t("platformUsers.sheet.avatarRemoved")),
+      onSettled: () => setAvatarConfirm(false),
     },
     caseTaskId
   );
 
   const revokeApiKeys = useOperatorRevokeApiKeys(
     {
-      onSuccess: () => {
-        toast.success(t("platformUsers.sheet.apiKeysRevoked"));
-        setApiKeysConfirm(false);
-      },
-      onError: (err) => {
-        toast.error(getErrorMessage(err, "settings:platformUsers.actionError"));
-        setApiKeysConfirm(false);
-      },
+      onSuccess: () => toast.success(t("platformUsers.sheet.apiKeysRevoked")),
+      onSettled: () => setApiKeysConfirm(false),
     },
     caseTaskId
   );
 
   const signOut = useOperatorSignOutEverywhere(
     {
-      onSuccess: () => {
-        toast.success(t("platformUsers.sheet.signOutDone"));
-        setSignOutConfirm(false);
-      },
-      onError: (err) => {
-        toast.error(getErrorMessage(err, "settings:platformUsers.actionError"));
-        setSignOutConfirm(false);
-      },
+      onSuccess: () => toast.success(t("platformUsers.sheet.signOutDone")),
+      onSettled: () => setSignOutConfirm(false),
     },
     caseTaskId
   );
@@ -297,78 +269,46 @@ export const UserOperatorSettingsSheet = ({
       onSuccess: (_data, variables) => {
         const entry = PROFILE_FIELDS.find((item) => item.field === variables.field);
         if (entry) toast.success(t(`platformUsers.sheet.clear.${entry.key}.done`));
-        setClearing(null);
       },
-      onError: (err) => {
-        toast.error(getErrorMessage(err, "settings:platformUsers.actionError"));
-        setClearing(null);
-      },
+      onSettled: () => setClearing(null),
     },
     caseTaskId
   );
 
-  const actionError = (err: unknown) =>
-    toast.error(getErrorMessage(err, "settings:platformUsers.actionError"));
   const handle = user ? getUserHandle(user) : "";
 
   const resetPassword = useOperatorTriggerPasswordReset(
     {
-      onSuccess: () => {
-        toast.success(t("platformUsers.resetSuccess", { handle }));
-        setResetConfirm(false);
-      },
-      onError: (err) => {
-        toast.error(getErrorMessage(err, "settings:platformUsers.resetError"));
-        setResetConfirm(false);
-      },
+      onSuccess: () => toast.success(t("platformUsers.resetSuccess", { handle })),
+      onSettled: () => setResetConfirm(false),
     },
     caseTaskId
   );
   // Sends nothing new and changes nothing, so no case hears of it.
   const resendVerification = useOperatorResendVerification({
     onSuccess: () => toast.success(t("platformUsers.resendVerificationSuccess", { handle })),
-    onError: (err) =>
-      toast.error(getErrorMessage(err, "settings:platformUsers.resendVerificationError")),
   });
   const liftSignInLock = useOperatorLiftSignInLock(
-    {
-      onSuccess: () => toast.success(t("platformUsers.signInLockLifted")),
-      onError: actionError,
-    },
+    { onSuccess: () => toast.success(t("platformUsers.signInLockLifted")) },
     caseTaskId
   );
   const clearSecondFactor = useOperatorClearSecondFactor(
     {
-      onSuccess: () => {
-        toast.success(t("platformUsers.secondFactorCleared"));
-        setSecondFactorConfirm(false);
-      },
-      onError: (err) => {
-        actionError(err);
-        setSecondFactorConfirm(false);
-      },
+      onSuccess: () => toast.success(t("platformUsers.secondFactorCleared")),
+      onSettled: () => setSecondFactorConfirm(false),
     },
     caseTaskId
   );
   const clearAgeBlock = useOperatorClearAgeBlock(
-    {
-      onSuccess: () => toast.success(t("platformUsers.ageBlockCleared")),
-      onError: actionError,
-    },
+    { onSuccess: () => toast.success(t("platformUsers.ageBlockCleared")) },
     caseTaskId
   );
   const reactivate = useOperatorReactivateUser(
-    {
-      onSuccess: () => toast.success(t("platformUsers.reactivateSuccess", { handle })),
-      onError: (err) => toast.error(getErrorMessage(err, "settings:platformUsers.reactivateError")),
-    },
+    { onSuccess: () => toast.success(t("platformUsers.reactivateSuccess", { handle })) },
     caseTaskId
   );
   const restore = useOperatorRestoreUser(
-    {
-      onSuccess: () => toast.success(t("platformUsers.restoreSuccess", { handle })),
-      onError: (err) => toast.error(getErrorMessage(err, "settings:platformUsers.restoreError")),
-    },
+    { onSuccess: () => toast.success(t("platformUsers.restoreSuccess", { handle })) },
     caseTaskId
   );
 

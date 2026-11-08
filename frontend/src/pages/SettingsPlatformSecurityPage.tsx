@@ -243,16 +243,10 @@ const ProvidersThatCount = () => {
               checked={provider.asserts_second_factor ?? false}
               disabled={updateProvider.isPending}
               onCheckedChange={(checked) =>
-                updateProvider.mutate(
-                  {
-                    providerId: provider.id,
-                    data: { asserts_second_factor: Boolean(checked) },
-                  },
-                  {
-                    onError: (err: unknown) =>
-                      toast.error(getErrorMessage(err, "settings:authProviders.saveError")),
-                  }
-                )
+                updateProvider.mutate({
+                  providerId: provider.id,
+                  data: { asserts_second_factor: Boolean(checked) },
+                })
               }
             />
             <Label htmlFor={`provider-counts-${provider.id}`} className="font-normal">
@@ -286,13 +280,15 @@ const FactorMethodsDialog = ({
     }),
     open
   );
-  const update = useUpdatePlatformAuthSettings({
-    onSuccess: () => {
-      toast.success(t("auth.factorMethods.saved"));
-      onOpenChange(false);
+  const update = useUpdatePlatformAuthSettings(
+    {
+      onSuccess: () => {
+        toast.success(t("auth.factorMethods.saved"));
+        onOpenChange(false);
+      },
     },
-    onError: (err) => toast.error(getErrorMessage(err, "settings:auth.factorMethods.saveError")),
-  });
+    "settings:auth.factorMethods.saveError"
+  );
 
   const choose = (method: LoginMethod, checked: boolean) =>
     form.set((previous) => ({
@@ -378,13 +374,15 @@ const SessionLengthDialog = ({
     }),
     open
   );
-  const update = useUpdatePlatformAuthSettings({
-    onSuccess: () => {
-      toast.success(t("auth.sessionLifetime.saved"));
-      onOpenChange(false);
+  const update = useUpdatePlatformAuthSettings(
+    {
+      onSuccess: () => {
+        toast.success(t("auth.sessionLifetime.saved"));
+        onOpenChange(false);
+      },
     },
-    onError: (err) => toast.error(getErrorMessage(err, "settings:auth.sessionLifetime.error")),
-  });
+    "settings:auth.sessionLifetime.error"
+  );
 
   const maxHours = readOptionalWholeNumber(form.values.hours, 1);
   const idleLimit = readOptionalWholeNumber(form.values.idle, 1);
@@ -467,7 +465,6 @@ const CaptchaDialog = ({
       toast.success(t("captcha.saved"));
       onOpenChange(false);
     },
-    onError: (err) => toast.error(getErrorMessage(err, "settings:captcha.error")),
   });
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -549,18 +546,19 @@ export const SettingsPlatformSecurityPage = () => {
   const closeDialog = (open: boolean) => {
     if (!open) setChanging(null);
   };
-  const updateBreachedCheck = useUpdatePlatformAuthSettings({
-    onSuccess: (result) => {
-      toast.success(
-        result.breached_password_check_enabled
-          ? t("auth.breachedPasswordCheck.enabledToast")
-          : t("auth.breachedPasswordCheck.disabledToast")
-      );
-      setChanging(null);
+  const updateBreachedCheck = useUpdatePlatformAuthSettings(
+    {
+      onSuccess: (result) => {
+        toast.success(
+          result.breached_password_check_enabled
+            ? t("auth.breachedPasswordCheck.enabledToast")
+            : t("auth.breachedPasswordCheck.disabledToast")
+        );
+        setChanging(null);
+      },
     },
-    onError: (err) =>
-      toast.error(getErrorMessage(err, "settings:auth.breachedPasswordCheck.error")),
-  });
+    "settings:auth.breachedPasswordCheck.error"
+  );
 
   if (!allowed) {
     return <p className="text-muted-foreground text-sm">{t("auth.platformOnly")}</p>;

@@ -2,7 +2,6 @@ import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useSetMemberDisplayName } from "@/hooks/useUsers";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import type { DialogProps } from "@/types/dialog";
 import {
@@ -45,7 +44,6 @@ export const MemberDisplayNameDialog = ({
       toast.success(t("displayName.saved"));
       onOpenChange(false);
     },
-    onError: (error) => toast.error(getErrorMessage(error, "communities:displayName.saveFailed")),
   });
 
   const [prev, setPrev] = useState({ open, current });

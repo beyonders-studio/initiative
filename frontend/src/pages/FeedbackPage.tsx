@@ -28,8 +28,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useServer } from "@/hooks/useServer";
 import { useFileTicket, useTicketAvailability } from "@/hooks/useTickets";
 import { isCloudOrigin } from "@/lib/cloud";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
 import { getItem, removeItem, setItem } from "@/lib/storage";
 import { Card } from "@/ui/card";
 
@@ -86,13 +84,15 @@ export const FeedbackPage = () => {
     if (sent) thanks.current?.focus();
   }, [sent]);
 
-  const file = useFileTicket({
-    onSuccess: () => {
-      setSent(true);
-      setForm(EMPTY_DRAFT);
+  const file = useFileTicket(
+    {
+      onSuccess: () => {
+        setSent(true);
+        setForm(EMPTY_DRAFT);
+      },
     },
-    onError: (err) => toast.error(getErrorMessage(err, "intake:feedback.error")),
-  });
+    "intake:feedback.error"
+  );
 
   if (!isCloudOrigin(getServerOrigin())) return <Navigate to="/" replace />;
 

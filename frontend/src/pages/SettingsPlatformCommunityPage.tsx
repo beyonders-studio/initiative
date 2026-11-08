@@ -21,7 +21,6 @@ import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useServerForm } from "@/hooks/useServerForm";
 import { useCommunitySettings, useUpdateCommunitySettings } from "@/hooks/useSettings";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { readOptionalWholeNumber } from "@/lib/text";
@@ -279,9 +278,6 @@ export const SettingsPlatformCommunityPage = () => {
           ? t("community.enabledToast")
           : t("community.disabledToast")
       );
-    },
-    onError: (err) => {
-      toast.error(getErrorMessage(err, "settings:community.saveError"));
     },
   });
 

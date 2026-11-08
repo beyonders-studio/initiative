@@ -6,7 +6,6 @@ import type { DecorationPack, OwnedDecoration } from "@/api/generated/initiative
 import { DecorationSwatch } from "@/components/user/DecorationSwatch";
 import { PackContentsDialog, packPieces } from "@/components/user/PackContents";
 import { useDecorationPacks, useRemoveDecorationPack } from "@/hooks/useUsers";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { type Decoration, resolveDecoration } from "@/lib/profileDecorations";
 import { Button } from "@/ui/button";
@@ -99,14 +98,8 @@ export const MyDecorationPacks = () => {
   const [pending, setPending] = useState<DecorationPack | null>(null);
 
   const remove = useRemoveDecorationPack({
-    onSuccess: () => {
-      setPending(null);
-      toast.success(t("profiles:myPacks.removed"));
-    },
-    onError: (error: unknown) => {
-      setPending(null);
-      toast.error(getErrorMessage(error, "profiles:store.failed"));
-    },
+    onSuccess: () => toast.success(t("profiles:myPacks.removed")),
+    onSettled: () => setPending(null),
   });
 
   const owned = useMemo(

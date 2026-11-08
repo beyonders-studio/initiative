@@ -70,6 +70,7 @@ export const useVoteForIdea = (options?: MutationOpts<IdeaRead, { taskId: number
     {
       mutationFn: ({ taskId, on }) => (on ? voteForIdea(taskId) : takeVoteBack(taskId)),
       invalidate: refreshIdeas,
+      errorKey: "intake:ideas.voteError",
     },
     options
   );

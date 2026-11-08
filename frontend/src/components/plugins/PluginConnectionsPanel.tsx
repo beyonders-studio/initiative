@@ -36,7 +36,6 @@ import {
   useDisconnectPlugin,
   useUpdatePluginConfig,
 } from "@/hooks/useCommunityPluginDetail";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { openExternal } from "@/lib/openExternal";
 import { localized } from "@/lib/widgets/widgetMeta";
@@ -201,7 +200,6 @@ function CommunityConnection({
         }
         toast.error(t("plugins:connections.connectUnavailable"));
       },
-      onError: (error) => toast.error(getErrorMessage(error, "plugins:error")),
     });
 
   const submit = () => {
@@ -212,7 +210,6 @@ function CommunityConnection({
           setDraft({});
           toast.success(t("plugins:connections.saved"));
         },
-        onError: (error) => toast.error(getErrorMessage(error, "plugins:error")),
       }
     );
   };
@@ -281,7 +278,6 @@ function CommunityConnection({
                 onClick={() =>
                   clear.mutate(connection.id, {
                     onSuccess: () => toast.success(t("plugins:connections.cleared")),
-                    onError: (error) => toast.error(getErrorMessage(error, "plugins:error")),
                   })
                 }
               >
@@ -416,7 +412,6 @@ function PersonalConnection({
         }
         toast.error(t("plugins:connections.connectUnavailable"));
       },
-      onError: (error) => toast.error(getErrorMessage(error, "plugins:error")),
     });
 
   return (
@@ -466,7 +461,6 @@ function PersonalConnection({
               onClick={() =>
                 disconnect.mutate(connection.id, {
                   onSuccess: () => toast.success(t("plugins:connections.disconnected")),
-                  onError: (error) => toast.error(getErrorMessage(error, "plugins:error")),
                 })
               }
             >

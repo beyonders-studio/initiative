@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { type ApiKeyMetadata, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { useListMyApiKeys } from "@/api/generated/users/users";
 import { useCreateApiKey } from "@/hooks/useSecurity";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { buildApiUrl } from "@/lib/wsUrl";
 import { Button } from "@/ui/button";
@@ -92,14 +91,16 @@ export const CalendarSubscribeDialog = ({
  */
 export const useSubscriptionLink = (communityId: number, calendarId: number) => {
   const [link, setLink] = useState<string | null>(null);
-  const createLink = useCreateApiKey({
-    onSuccess: (data) => {
-      const url = buildApiUrl(`c/${communityId}/calendars/${calendarId}/feed.ics`);
-      url.searchParams.set("token", data.secret);
-      setLink(url.toString());
+  const createLink = useCreateApiKey(
+    {
+      onSuccess: (data) => {
+        const url = buildApiUrl(`c/${communityId}/calendars/${calendarId}/feed.ics`);
+        url.searchParams.set("token", data.secret);
+        setLink(url.toString());
+      },
     },
-    onError: (error) => toast.error(getErrorMessage(error, "calendars:subscribe.error")),
-  });
+    "calendars:subscribe.error"
+  );
   const create = (name: string) =>
     createLink.mutate({
       name: name.slice(0, KEY_NAME_MAX),

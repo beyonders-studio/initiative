@@ -4,20 +4,28 @@
  * the server refuses says why in the reader's language.
  */
 import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { communityHttp } from "@/__tests__/helpers/communityHttp";
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { CommunityPluginSettingRead } from "@/api/generated/initiativeAPI.schemas";
 import { toast } from "@/lib/mascotToast";
 
 import { PluginSettingsPanel } from "./PluginSettingsPanel";
 
-const save = vi.fn();
-
-vi.mock("@/hooks/useCommunityPluginDetail", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/hooks/useCommunityPluginDetail")>()),
-  useUpdatePluginSetting: () => ({ mutate: save, isPending: false }),
-}));
+/** Answers the setting's save with `reply`, recording what was sent. */
+const answerSave = (reply: () => Response) => {
+  const sent = vi.fn();
+  server.use(
+    communityHttp.put("/plugins/:pluginId/settings/:key", async ({ params, request }) => {
+      sent(params.key, await request.json());
+      return reply();
+    })
+  );
+  return sent;
+};
 
 vi.mock("@/lib/mascotToast", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -40,7 +48,6 @@ const rename = async (value: string) => {
 };
 
 beforeEach(() => {
-  save.mockReset();
   vi.mocked(toast.error).mockReset();
 });
 
@@ -56,21 +63,17 @@ describe("PluginSettingsPanel", () => {
   });
 
   it("saves the new value", async () => {
+    const sent = answerSave(() => HttpResponse.json({}));
     render();
 
     await rename("acmeco");
 
-    await waitFor(() =>
-      expect(save).toHaveBeenCalledWith({ key: "task_prefix", value: "acmeco" }, expect.anything())
-    );
+    await waitFor(() => expect(sent).toHaveBeenCalledWith("task_prefix", { value: "acmeco" }));
   });
 
   it("says why a value was refused", async () => {
-    save.mockImplementation((_value, options) =>
-      options.onError({
-        isAxiosError: true,
-        response: { status: 409, data: { detail: "COMMUNITY_PLUGIN_SETTING_UNAVAILABLE" } },
-      })
+    answerSave(() =>
+      HttpResponse.json({ detail: "COMMUNITY_PLUGIN_SETTING_UNAVAILABLE" }, { status: 409 })
     );
     render();
 

@@ -39,7 +39,6 @@ import {
 } from "@/hooks/useModeration";
 import { communityPath } from "@/lib/communityUrl";
 import { entityRefTypeFor, isSearchEntityType } from "@/lib/entityResolver";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { searchHitPath } from "@/lib/searchResults";
 import { getUserDisplayName } from "@/lib/userDisplay";
@@ -173,7 +172,6 @@ const ReportCard = ({ report, communityId, initiativeId }: ReportCardProps) => {
 
   const settle = useSettleReport(communityId, initiativeId, {
     onSuccess: () => toast.success(t("settledToast")),
-    onError: (err) => toast.error(getErrorMessage(err, "moderation:settleError")),
   });
 
   // Bound once: the schema makes it optional as well as nullable, and the

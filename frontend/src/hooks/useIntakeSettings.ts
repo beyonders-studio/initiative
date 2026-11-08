@@ -55,6 +55,7 @@ export const useUpdateOperationsCommunity = (
     {
       mutationFn: (data) => updateOperationsCommunity(data),
       invalidate: refreshIntake,
+      errorKey: "intake:community.saveError",
     },
     options
   );
@@ -66,6 +67,7 @@ export const useUpsertIntakeBinding = (
     {
       mutationFn: ({ stream, body }) => upsertBinding(stream, body),
       invalidate: refreshIntake,
+      errorKey: "intake:stream.saveError",
     },
     options
   );
@@ -80,6 +82,7 @@ export const useImportIntakeBlueprint = (
           initiative_id: initiativeId,
         }),
       invalidate: refreshIntake,
+      errorKey: "intake:stream.saveError",
     },
     options
   );
@@ -89,6 +92,7 @@ export const useDeleteIntakeBinding = (options?: MutationOpts<void, IntakeStream
     {
       mutationFn: (stream) => deleteBinding(stream),
       invalidate: refreshIntake,
+      errorKey: "intake:stream.saveError",
     },
     options
   );
@@ -102,6 +106,7 @@ export const useUpdateFeedbackSwitch = (
     {
       mutationFn: (data) => updateFeedbackSwitch(data),
       invalidate: refreshIntake,
+      errorKey: "intake:feedbackSwitch.error",
     },
     options
   );

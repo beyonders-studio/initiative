@@ -10,8 +10,6 @@ import { useTranslation } from "react-i18next";
 import type { IdeaRead, IdeaStatusRead } from "@/api/generated/initiativeAPI.schemas";
 import { useAuth } from "@/hooks/useAuth";
 import { useVoteForIdea } from "@/hooks/useIdeas";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
 import { Toggle } from "@/ui/toggle";
 
 export const IdeaStatusBadge = ({ status }: { status: IdeaStatusRead }) => (
@@ -45,9 +43,7 @@ export const VoteButton = ({
   const { t } = useTranslation("intake");
   const { user } = useAuth();
   const navigate = useNavigate();
-  const vote = useVoteForIdea({
-    onError: (err) => toast.error(getErrorMessage(err, "intake:ideas.voteError")),
-  });
+  const vote = useVoteForIdea();
   return (
     <Toggle
       variant="outline"

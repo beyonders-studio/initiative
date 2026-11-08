@@ -31,12 +31,15 @@ export const useMySessions = () => useListMySessions();
 // ── Mutations ───────────────────────────────────────────────────────────────
 
 export const useCreateApiKey = (
-  options?: MutationOpts<ApiKeyCreateResponse, ApiKeyCreateRequest>
+  options?: MutationOpts<ApiKeyCreateResponse, ApiKeyCreateRequest>,
+  /** What a failure says. Omit where the caller reports it itself. */
+  errorKey?: string
 ) =>
   useApiMutation<ApiKeyCreateResponse, ApiKeyCreateRequest>(
     {
       mutationFn: (data) => createMyApiKey(data),
       invalidate: () => queryClient.invalidateQueries({ queryKey: API_KEYS_QUERY_KEY }),
+      errorKey,
     },
     options
   );

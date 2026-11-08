@@ -80,7 +80,7 @@ export function InstallListingDialog({
   const [name, setName] = useState(listing.name);
   const [startFrom, setStartFrom] = useState<ListingStartFrom>(ListingStartFrom.blank);
   const [startsOn, setStartsOn] = useState(() => format(new Date(), "yyyy-MM-dd"));
-  const createDashboard = useCreateDashboard();
+  const createDashboard = useCreateDashboard(undefined, "marketplace:install.failed");
   const installCopy = useInstallMarketplaceListing();
   const isPending = createDashboard.isPending || installCopy.isPending;
 
@@ -106,9 +106,6 @@ export function InstallListingDialog({
       navigate({ to: gp(toolDetailRoute(tool, Number(initiativeId), createdId)) });
     }
   };
-  const failed = (error: unknown) => {
-    toast.error(getErrorMessage(error, "marketplace:install.failed"));
-  };
 
   const submit = () => {
     if (!initiativeId) return;
@@ -119,7 +116,7 @@ export function InstallListingDialog({
           initiative_id: Number(initiativeId),
           listing_uid: listing.uid,
         },
-        { onSuccess: (dashboard) => installed(dashboard.name, dashboard.id), onError: failed }
+        { onSuccess: (dashboard) => installed(dashboard.name, dashboard.id) }
       );
       return;
     }
@@ -138,7 +135,7 @@ export function InstallListingDialog({
           void invalidate(q.toolList(tool));
           installed(result.entity_title || listing.name, result.entity_id);
         },
-        onError: failed,
+        onError: (error) => toast.error(getErrorMessage(error, "marketplace:install.failed")),
       }
     );
   };

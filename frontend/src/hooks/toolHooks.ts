@@ -255,12 +255,12 @@ const createHook = <TRead, TCreate>(
   },
   errorKey: string
 ) => {
-  return (options?: MutationOpts<TRead, TCreate>) =>
+  return (options?: MutationOpts<TRead, TCreate>, failureKey = errorKey) =>
     useCommunityMutation<TRead, TCreate>(
       {
         mutationFn: (communityId, data) => endpoints.create(communityId, data),
         invalidate: () => invalidate(q.toolList(endpoints.tool)),
-        errorKey,
+        errorKey: failureKey,
       },
       options
     );

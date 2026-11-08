@@ -23,7 +23,6 @@ import {
   useReorderTaskStatuses,
   useUpdateTaskStatus,
 } from "@/hooks/useProjects";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { defaultsForCategory, maybeSwapDefaultsOnCategoryChange } from "@/lib/taskStatusDefaults";
 import { Button } from "@/ui/button";
@@ -78,9 +77,6 @@ export const ProjectTaskStatusesManager = ({
       setNewName("");
       toast.success(t("statuses.created"));
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "projects:statuses.createError"));
-    },
   });
 
   const deleteStatusMutation = useDeleteTaskStatus(projectId, {
@@ -88,9 +84,6 @@ export const ProjectTaskStatusesManager = ({
       toast.success(t("statuses.deleted"));
       setFallbackId(FALLBACK_AUTO);
       setDeleteTarget(null);
-    },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "projects:statuses.deleteError"));
     },
   });
 

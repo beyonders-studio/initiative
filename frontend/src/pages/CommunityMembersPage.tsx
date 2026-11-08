@@ -35,8 +35,6 @@ import {
   useUpdateCommunityMembership,
   useUserSearch,
 } from "@/hooks/useUsers";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
 import { assignableCommunityRoles, isAdminRole } from "@/lib/permissions";
 import { getUrlHandle, getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
 import { Badge } from "@/ui/badge";
@@ -126,10 +124,7 @@ export const CommunityMembersPage = () => {
     [roleHolders]
   );
   const { mutate: assignRole } = useAssignCustomRole();
-  const { mutate: changeRung } = useUpdateCommunityMembership({
-    onError: (error: unknown) =>
-      toast.error(getErrorMessage(error, "communities:users.failedToUpdateRole")),
-  });
+  const { mutate: changeRung } = useUpdateCommunityMembership();
   const members = useUserSearch({
     search: q || undefined,
     page,

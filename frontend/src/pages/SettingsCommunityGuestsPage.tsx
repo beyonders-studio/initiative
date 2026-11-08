@@ -27,7 +27,6 @@ import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { useCommunityInitiatives } from "@/hooks/useInitiatives";
 import { useServerTableState } from "@/hooks/useServerTableState";
 import { useExtendGuest, useMakeGuestAMember, useUsers } from "@/hooks/useUsers";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { TOOLS } from "@/lib/tools";
 import { getUrlHandle, getUserDisplayName } from "@/lib/userDisplay";
@@ -76,7 +75,6 @@ const ExtendGuestDialog = ({
       toast.success(t("guests.extended"));
       onOpenChange(false);
     },
-    onError: (error) => toast.error(getErrorMessage(error, "communities:guests.extendError")),
   });
 
   const [prevGuest, setPrevGuest] = useState(guest);
@@ -163,7 +161,6 @@ export const SettingsCommunityGuestsPage = () => {
   const [removing, setRemoving] = useState<{ userId: number; name: string } | null>(null);
   const makeMember = useMakeGuestAMember({
     onSuccess: () => toast.success(t("guests.madeMember")),
-    onError: (error) => toast.error(getErrorMessage(error, "communities:guests.makeMemberError")),
   });
 
   if (!managesGuests || communityId === null) {

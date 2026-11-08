@@ -63,6 +63,7 @@ export const useSettleReport = (
       // Settling may also have taken the reported thing down, wherever it
       // was shown, and written the log.
       invalidate: refreshAfterHolding,
+      errorKey: "moderation:settleError",
     },
     options
   );

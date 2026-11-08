@@ -41,7 +41,6 @@ import {
 } from "@/hooks/useProjects";
 import { useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { toolDetailRoute } from "@/lib/tools";
 import { Button } from "@/ui/button";
@@ -98,28 +97,23 @@ export const ProjectTaskTypesManager = ({
         void placeFields(created);
       }
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "projects:taskTypes.createError"));
-    },
   });
 
-  const saveStartsWith = useUpdateTaskType(projectId, {
-    onSuccess: () => {
-      setStartsWithTarget(null);
-      toast.success(t("taskTypes.startsWith.saved"));
+  const saveStartsWith = useUpdateTaskType(
+    projectId,
+    {
+      onSuccess: () => {
+        setStartsWithTarget(null);
+        toast.success(t("taskTypes.startsWith.saved"));
+      },
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "projects:taskTypes.updateError"));
-    },
-  });
+    "projects:taskTypes.updateError"
+  );
 
   const copyTypes = useCopyTaskTypes(projectId, {
     onSuccess: (copied) => {
       setCopyOpen(false);
       toast.success(t("taskTypes.copy.copied", { count: copied.length }));
-    },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "projects:taskTypes.copy.error"));
     },
   });
 

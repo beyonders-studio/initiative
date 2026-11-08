@@ -35,7 +35,6 @@ import { ListingProvenance } from "@/components/marketplace/ListingProvenance";
 import { useInstallCommunityPlugin } from "@/hooks/useCommunityPlugins";
 import { useCommunityInitiatives } from "@/hooks/useInitiatives";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { listingShownHere } from "@/lib/marketplaceCuration";
 import { toast } from "@/lib/mascotToast";
 import { STANDING_SCOPES, scopeSentence, toggleScope } from "@/lib/pluginScopes";
@@ -111,9 +110,6 @@ export function InstallPluginDialog({ listing, open, onOpenChange }: InstallPlug
           // Straight to what it created, when it created something reachable.
           const path = communityPluginPath(plugin);
           if (path) navigate({ to: gp(path) });
-        },
-        onError: (error) => {
-          toast.error(getErrorMessage(error, "plugins:error"));
         },
       }
     );

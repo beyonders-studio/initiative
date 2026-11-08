@@ -33,7 +33,6 @@ import {
 } from "@/hooks/useInitiatives";
 import { type MemberSearchScope, useUserSearch } from "@/hooks/useUsers";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { InitiativeColorDot } from "@/lib/initiativeColors";
 import { toast } from "@/lib/mascotToast";
 import { isAdminRole } from "@/lib/permissions";
@@ -117,15 +116,13 @@ const InitiativeManagersCell = ({ initiative }: { initiative: InitiativeRead }) 
     [managers, knownManagers, results, managerIds]
   );
 
-  const onError = (error: unknown) => {
-    toast.error(getErrorMessage(error, "initiatives:manage.managersError"));
-  };
   const onSuccess = () => {
     toast.success(t("manage.managersUpdated"));
   };
-  const addMember = useAddInitiativeMember({ onSuccess, onError });
-  const updateMember = useUpdateInitiativeMember({ onSuccess, onError });
-  const removeMember = useRemoveInitiativeMember({ onSuccess, onError });
+  const managersError = "initiatives:manage.managersError";
+  const addMember = useAddInitiativeMember({ onSuccess }, managersError);
+  const updateMember = useUpdateInitiativeMember({ onSuccess }, managersError);
+  const removeMember = useRemoveInitiativeMember({ onSuccess }, managersError);
   const pending = addMember.isPending || updateMember.isPending || removeMember.isPending;
 
   const toggle = (userId: number) => {

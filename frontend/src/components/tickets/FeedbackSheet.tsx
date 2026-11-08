@@ -35,8 +35,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useServer } from "@/hooks/useServer";
 import { useFileTicket, useTicketAvailability } from "@/hooks/useTickets";
 import { CLOUD_OPEN, CLOUD_ORIGIN } from "@/lib/cloud";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
 import { openExternal } from "@/lib/openExternal";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import { cn } from "@/ui/lib/utils";
@@ -118,13 +116,15 @@ const FeedbackSheet = () => {
     if (sent) thanks.current?.focus();
   }, [sent]);
 
-  const file = useFileTicket({
-    onSuccess: () => {
-      setSent(true);
-      setForm(EMPTY_DRAFT);
+  const file = useFileTicket(
+    {
+      onSuccess: () => {
+        setSent(true);
+        setForm(EMPTY_DRAFT);
+      },
     },
-    onError: (err) => toast.error(getErrorMessage(err, "intake:feedback.error")),
-  });
+    "intake:feedback.error"
+  );
   const pending = file.isPending;
 
   const feedback = data?.feedback;

@@ -40,7 +40,6 @@ import {
   useCommunityNarrowings,
   useUpdateCommunityStorage,
 } from "@/hooks/useSettings";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -118,7 +117,6 @@ export const CommunityOperatorSettingsSheet = ({
 
   const update = useUpdateCommunityStorage({
     onSuccess: (row) => toast.success(t("communities.saved", { name: row.name })),
-    onError: (err) => toast.error(getErrorMessage(err, "settings:communities.saveError")),
   });
 
   if (!community) return null;
@@ -418,10 +416,7 @@ const NarrowingsSection = ({
 }) => {
   const { t } = useTranslation("settings");
   const narrowings = useCommunityNarrowings(communityId);
-  const agree = useAgreeCommunityNarrowing(communityId, {
-    onError: (err: unknown) =>
-      toast.error(getErrorMessage(err, "settings:communities.sheet.narrowings.error")),
-  });
+  const agree = useAgreeCommunityNarrowing(communityId);
 
   const rows = narrowings.data ?? [];
   if (narrowings.isLoading || rows.length === 0) return null;

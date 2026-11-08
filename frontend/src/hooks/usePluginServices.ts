@@ -31,6 +31,7 @@ export const useCreatePluginService = (
     {
       mutationFn: (data) => createPluginService(data),
       invalidate: () => invalidate(q.pluginServices()),
+      errorKey: "settings:pluginServices.saveError",
     },
     options
   );
@@ -56,6 +57,7 @@ export const useDeletePluginService = (options?: MutationOpts<void, number>) =>
     {
       mutationFn: (registrationId) => deletePluginService(registrationId),
       invalidate: () => invalidate(q.pluginServices()),
+      errorKey: "settings:pluginServices.deleteError",
     },
     options
   );

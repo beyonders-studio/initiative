@@ -108,6 +108,7 @@ export const useCreateAccessRequest = (
     {
       mutationFn: (payload) => createAccessRequest(payload),
       invalidate: () => invalidate(),
+      errorKey: "settings:accessGrants.requestError",
     },
     options
   );
@@ -121,6 +122,7 @@ export const useApproveAccessGrant = (
     {
       mutationFn: ({ grantId, payload }) => approveAccessGrant(grantId, payload ?? {}),
       invalidate: () => invalidate(),
+      errorKey: "settings:accessGrants.actionError",
     },
     options
   );
@@ -132,6 +134,7 @@ export const useDenyAccessGrant = (options?: MutationOpts<AccessGrantRead, numbe
     {
       mutationFn: (grantId) => denyAccessGrant(grantId),
       invalidate: () => invalidate(),
+      errorKey: "settings:accessGrants.actionError",
     },
     options
   );
@@ -143,6 +146,7 @@ export const useRevokeAccessGrant = (options?: MutationOpts<AccessGrantRead, num
     {
       mutationFn: (grantId) => revokeAccessGrant(grantId),
       invalidate: () => invalidate(),
+      errorKey: "settings:accessGrants.actionError",
     },
     options
   );
@@ -187,6 +191,7 @@ export const useCancelAccessRequest = (options?: MutationOpts<void, number>) => 
     {
       mutationFn: (grantId) => cancelAccessRequest(grantId),
       invalidate: () => invalidate(),
+      errorKey: "settings:accessGrants.cancelError",
     },
     options
   );

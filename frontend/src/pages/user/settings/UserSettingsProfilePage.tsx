@@ -8,7 +8,6 @@ import { SlotPicker, TrophyPicker } from "@/components/user/DecorationPicker";
 import { MyDecorationPacks } from "@/components/user/MyDecorationPacks";
 import { ProfilePreview } from "@/components/user/ProfilePreview";
 import { useMyDecorations, useUpdateCurrentUser } from "@/hooks/useUsers";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { currentYear, DATED_DECORATIONS } from "@/lib/gradArtwork";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
@@ -62,13 +61,15 @@ export const UserSettingsProfilePage = ({ user, refreshUser }: UserSettingsProfi
     setGradYear(user.profile_decorations.grad_year ?? null);
   }
 
-  const saveLook = useUpdateCurrentUser({
-    onSuccess: async () => {
-      await refreshUser();
-      toast.success(t("profiles:look.saved"));
+  const saveLook = useUpdateCurrentUser(
+    {
+      onSuccess: async () => {
+        await refreshUser();
+        toast.success(t("profiles:look.saved"));
+      },
     },
-    onError: (error: unknown) => toast.error(getErrorMessage(error, "profiles:look.failed")),
-  });
+    "profiles:look.failed"
+  );
 
   // Giving a pack back takes its pieces out of the library, and off the saved
   // look — but a piece picked here and not yet saved is in neither, so nothing

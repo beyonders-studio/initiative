@@ -540,11 +540,8 @@ const RequestSection = () => {
       setNotice("none");
       setDuration(null);
     },
-    onError: (err) => toast.error(getErrorMessage(err, "settings:accessGrants.requestError")),
   });
-  const cancelRequest = useCancelAccessRequest({
-    onError: (err) => toast.error(getErrorMessage(err, "settings:accessGrants.cancelError")),
-  });
+  const cancelRequest = useCancelAccessRequest();
 
   // A request must name at least one authority.
   const asksForSomething = level !== "none" || settingsLevel !== "none";
@@ -726,15 +723,12 @@ const ApprovalQueue = () => {
 
   const approve = useApproveAccessGrant({
     onSuccess: () => toast.success(t("accessGrants.approved")),
-    onError: (err) => toast.error(getErrorMessage(err, "settings:accessGrants.actionError")),
   });
   const deny = useDenyAccessGrant({
     onSuccess: () => toast.success(t("accessGrants.denied")),
-    onError: (err) => toast.error(getErrorMessage(err, "settings:accessGrants.actionError")),
   });
   const revoke = useRevokeAccessGrant({
     onSuccess: () => toast.success(t("accessGrants.revoked")),
-    onError: (err) => toast.error(getErrorMessage(err, "settings:accessGrants.actionError")),
   });
 
   return (

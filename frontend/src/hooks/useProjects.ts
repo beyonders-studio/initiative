@@ -235,6 +235,7 @@ export const useCreateTaskStatus = (
     {
       mutationFn: (communityId, data) => createTaskStatus(communityId, projectId, data),
       invalidate: () => invalidateStatusesAndTasks(projectId),
+      errorKey: "projects:statuses.createError",
     },
     options
   );
@@ -261,6 +262,7 @@ export const useDeleteTaskStatus = (
       mutationFn: (communityId, { statusId, data }) =>
         deleteTaskStatus(communityId, projectId, statusId, data),
       invalidate: () => invalidateStatusesAndTasks(projectId),
+      errorKey: "projects:statuses.deleteError",
     },
     options
   );
@@ -293,6 +295,7 @@ export const useCreateTaskType = (
     {
       mutationFn: (communityId, data) => createTaskType(communityId, projectId, data),
       invalidate: () => invalidateTaskTypes(projectId, q.layouts()),
+      errorKey: "projects:taskTypes.createError",
     },
     options
   );
@@ -328,6 +331,7 @@ export const useCopyTaskTypes = (
     {
       mutationFn: (communityId, data) => copyTaskTypes(communityId, projectId, data),
       invalidate: () => invalidateTaskTypes(projectId, q.layouts()),
+      errorKey: "projects:taskTypes.copy.error",
     },
     options
   );
@@ -336,13 +340,16 @@ export const useCopyTaskTypes = (
  *  the tasks read anew too. */
 export const useUpdateTaskType = (
   projectId: number,
-  options?: MutationOpts<TaskTypeRead, { typeId: number; data: TaskTypeUpdate }>
+  options?: MutationOpts<TaskTypeRead, { typeId: number; data: TaskTypeUpdate }>,
+  /** What a failure says. Omit where the caller reports it itself. */
+  errorKey?: string
 ) =>
   useCommunityMutation<TaskTypeRead, { typeId: number; data: TaskTypeUpdate }>(
     {
       mutationFn: (communityId, { typeId, data }) =>
         updateTaskType(communityId, projectId, typeId, data),
       invalidate: () => invalidateTaskTypes(projectId, q.allTasks()),
+      errorKey,
     },
     options
   );
@@ -357,6 +364,7 @@ export const useDeleteTaskType = (
       mutationFn: (communityId, { typeId, data }) =>
         deleteTaskType(communityId, projectId, typeId, data),
       invalidate: () => invalidateTaskTypes(projectId, q.allTasks(), q.layouts()),
+      errorKey: "projects:taskTypes.deleteError",
     },
     options
   );

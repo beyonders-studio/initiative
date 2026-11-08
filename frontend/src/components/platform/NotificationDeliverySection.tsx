@@ -15,7 +15,6 @@ import { useTranslation } from "react-i18next";
 
 import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { useNotificationSettings, useUpdateNotificationSettings } from "@/hooks/useSettings";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Switch } from "@/ui/switch";
 
@@ -24,7 +23,6 @@ export const NotificationDeliverySection = () => {
   const query = useNotificationSettings();
   const update = useUpdateNotificationSettings({
     onSuccess: () => toast.success(t("notificationDelivery.saved")),
-    onError: (err) => toast.error(getErrorMessage(err, "settings:notificationDelivery.error")),
   });
 
   const saved = query.data;

@@ -38,6 +38,7 @@ import {
 } from "@/api/generated/plugins/plugins";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useCommunityMutation } from "@/hooks/useApiMutation";
 
 export const useCommunityPluginDetail = (pluginId: number) =>
   useGetCommunityPlugin(useActiveCommunityId(), pluginId);
@@ -61,13 +62,13 @@ export const useCommunityPluginMembers = (pluginId: number, page: number, enable
 
 /** Values keyed by connection, then field. A key sent as `null` clears it; a
  *  key left out is untouched. */
-export const useUpdatePluginConfig = (pluginId: number) => {
-  const communityId = useActiveCommunityId();
-  return useMutation<CommunityPluginDetail, unknown, CommunityPluginConfigUpdateValues>({
-    mutationFn: (values) => updateCommunityPluginConfig(communityId, pluginId, { values }),
-    onSuccess: () => invalidate(q.plugins()),
+export const useUpdatePluginConfig = (pluginId: number) =>
+  useCommunityMutation<CommunityPluginDetail, CommunityPluginConfigUpdateValues>({
+    mutationFn: (communityId, values) =>
+      updateCommunityPluginConfig(communityId, pluginId, { values }),
+    invalidate: () => invalidate(q.plugins()),
+    errorKey: "plugins:error",
   });
-};
 
 export interface PluginSettingValue {
   key: string;
@@ -76,25 +77,27 @@ export interface PluginSettingValue {
 }
 
 /** One of the install's settings. */
-export const useUpdatePluginSetting = (pluginId: number) => {
-  const communityId = useActiveCommunityId();
-  return useMutation<CommunityPluginDetail, unknown, PluginSettingValue>({
-    mutationFn: ({ key, value }) =>
+export const useUpdatePluginSetting = (pluginId: number) =>
+  useCommunityMutation<CommunityPluginDetail, PluginSettingValue>({
+    mutationFn: (communityId, { key, value }) =>
       updateCommunityPluginSetting(communityId, pluginId, key, { value }),
-    onSuccess: () => invalidate(q.plugins()),
+    invalidate: () => invalidate(q.plugins()),
+    errorKey: "plugins:error",
   });
-};
 
-/** Apply the offered version; pass the seat's consent when it asks for more. */
-export const useUpgradePlugin = (pluginId: number) => {
-  const communityId = useActiveCommunityId();
-  return useMutation<CommunityPluginDetail, unknown, CommunityPluginUpgrade | undefined>({
-    mutationFn: (consent) => upgradeCommunityPlugin(communityId, pluginId, consent),
+/** Apply the offered version; pass the seat's consent when it asks for more.
+ *  `errorKey` is what a failure says; omit it where the caller reads the
+ *  refusal itself. */
+export const useUpgradePlugin = (pluginId: number, errorKey?: string) =>
+  useCommunityMutation<CommunityPluginDetail, CommunityPluginUpgrade | undefined>(
+    {
+      mutationFn: (communityId, consent) => upgradeCommunityPlugin(communityId, pluginId, consent),
+      errorKey,
+    },
     // Refreshed on failure too: a refusal means the offer moved, and the panel
     // should show what is offered now.
-    onSettled: () => invalidate(q.plugins()),
-  });
-};
+    { onSettled: () => invalidate(q.plugins()) }
+  );
 
 /** Keep the pinned version and stop being asked about this one. */
 export const useDeclinePluginUpgrade = (pluginId: number) => {
@@ -105,77 +108,72 @@ export const useDeclinePluginUpgrade = (pluginId: number) => {
   });
 };
 
-export const useConnectPlugin = (pluginId: number) => {
-  const communityId = useActiveCommunityId();
-  return useMutation<CommunityPluginConnectStart, unknown, string>({
-    mutationFn: (connectionId) => connectCommunityPlugin(communityId, pluginId, connectionId),
-    onSuccess: () => invalidate(q.plugins()),
+export const useConnectPlugin = (pluginId: number) =>
+  useCommunityMutation<CommunityPluginConnectStart, string>({
+    mutationFn: (communityId, connectionId) =>
+      connectCommunityPlugin(communityId, pluginId, connectionId),
+    invalidate: () => invalidate(q.plugins()),
+    errorKey: "plugins:error",
   });
-};
 
-export const useDisconnectPlugin = (pluginId: number) => {
-  const communityId = useActiveCommunityId();
-  return useMutation<void, unknown, string>({
-    mutationFn: (connectionId) => disconnectCommunityPlugin(communityId, pluginId, connectionId),
-    onSuccess: () => invalidate(q.plugins()),
+export const useDisconnectPlugin = (pluginId: number) =>
+  useCommunityMutation<void, string>({
+    mutationFn: (communityId, connectionId) =>
+      disconnectCommunityPlugin(communityId, pluginId, connectionId),
+    invalidate: () => invalidate(q.plugins()),
+    errorKey: "plugins:error",
   });
-};
 
 export interface MemberConnectionTarget {
   userId: number;
   connectionId: string;
 }
 
-export const useRevokeMemberConnection = (pluginId: number) => {
-  const communityId = useActiveCommunityId();
-  return useMutation<void, unknown, MemberConnectionTarget>({
-    mutationFn: ({ userId, connectionId }) =>
+export const useRevokeMemberConnection = (pluginId: number) =>
+  useCommunityMutation<void, MemberConnectionTarget>({
+    mutationFn: (communityId, { userId, connectionId }) =>
       revokeMemberConnection(communityId, pluginId, userId, connectionId),
-    onSuccess: () => invalidate(q.plugins()),
+    invalidate: () => invalidate(q.plugins()),
+    errorKey: "plugins:error",
   });
-};
 
-export const useBlockMemberConnection = (pluginId: number) => {
-  const communityId = useActiveCommunityId();
-  return useMutation<void, unknown, MemberConnectionTarget & { blocked: boolean }>({
+export const useBlockMemberConnection = (pluginId: number) =>
+  useCommunityMutation<void, MemberConnectionTarget & { blocked: boolean }>({
     // One mutation for both directions: the button is a toggle, and splitting
     // it would mean two hooks that must stay in step about what "blocked" means.
-    mutationFn: ({ userId, connectionId, blocked }) =>
+    mutationFn: (communityId, { userId, connectionId, blocked }) =>
       blocked
         ? unblockMemberConnection(communityId, pluginId, userId, connectionId)
         : blockMemberConnection(communityId, pluginId, userId, connectionId),
-    onSuccess: () => invalidate(q.plugins()),
+    invalidate: () => invalidate(q.plugins()),
+    errorKey: "plugins:error",
   });
-};
 
-export const useRevokeAllConnections = (pluginId: number) => {
-  const communityId = useActiveCommunityId();
-  return useMutation<void, unknown, void>({
-    mutationFn: () => revokeAllMemberConnections(communityId, pluginId),
-    onSuccess: () => invalidate(q.plugins()),
+export const useRevokeAllConnections = (pluginId: number) =>
+  useCommunityMutation<void>({
+    mutationFn: (communityId) => revokeAllMemberConnections(communityId, pluginId),
+    invalidate: () => invalidate(q.plugins()),
+    errorKey: "plugins:error",
   });
-};
 
 // --- acting as a member ------------------------------------------------------
 
 /** A community admin ending every answer one member gave. There is deliberately
  *  no counterpart that gives one — governance runs one way here. */
-export const useRevokeMemberConsents = (pluginId: number) => {
-  const communityId = useActiveCommunityId();
-  return useMutation<void, unknown, number>({
-    mutationFn: (userId) => revokeMemberConsents(communityId, pluginId, userId),
-    onSuccess: () => invalidate(q.plugins()),
+export const useRevokeMemberConsents = (pluginId: number) =>
+  useCommunityMutation<void, number>({
+    mutationFn: (communityId, userId) => revokeMemberConsents(communityId, pluginId, userId),
+    invalidate: () => invalidate(q.plugins()),
+    errorKey: "plugins:error",
   });
-};
 
 /** Stop the plug-in acting as anybody, without uninstalling it. */
-export const useRevokeAllConsents = (pluginId: number) => {
-  const communityId = useActiveCommunityId();
-  return useMutation<void, unknown, void>({
-    mutationFn: () => revokeAllMemberConsents(communityId, pluginId),
-    onSuccess: () => invalidate(q.plugins()),
+export const useRevokeAllConsents = (pluginId: number) =>
+  useCommunityMutation<void>({
+    mutationFn: (communityId) => revokeAllMemberConsents(communityId, pluginId),
+    invalidate: () => invalidate(q.plugins()),
+    errorKey: "plugins:error",
   });
-};
 
 export interface ConsentAnswer {
   consentId: number;

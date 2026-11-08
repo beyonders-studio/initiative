@@ -226,10 +226,10 @@ describe("second factor", () => {
 
       await user.click(screen.getByLabelText("Corp SSO"));
 
-      expect(providerMutate).toHaveBeenCalledWith(
-        { providerId: 1, data: { asserts_second_factor: true } },
-        expect.anything()
-      );
+      expect(providerMutate).toHaveBeenCalledWith({
+        providerId: 1,
+        data: { asserts_second_factor: true },
+      });
     });
 
     it("says nothing where the deployment has registered none", () => {

@@ -34,7 +34,11 @@ export const useAnnounceHeld = () => {
 
 export const useCancelHeldChange = (options?: MutationOpts<void, number>) =>
   useApiMutation<void, number>(
-    { mutationFn: (id) => cancelHeldChange(id), invalidate: refresh },
+    {
+      mutationFn: (id) => cancelHeldChange(id),
+      invalidate: refresh,
+      errorKey: "settings:heldChange.cancelFailed",
+    },
     options
   );
 
@@ -48,6 +52,7 @@ export const useApplyHeldChange = (options?: MutationOpts<void, number>) =>
     {
       mutationFn: (id) => applyHeldChange(id),
       invalidate: () => queryClient.invalidateQueries(),
+      errorKey: "settings:heldChange.applyFailed",
     },
     options
   );
