@@ -67,7 +67,7 @@ The gear in a wiki's header opens what that wiki is *for*. None of it is require
 | **New pages start from** | Nominate a page and every new one begins as a copy of it. This is how two hundred entries stay the same shape. |
 | **Page width** | Full width for tables and screenshots; reading width for prose. |
 | **Contents depth** | How many heading levels the list under the page shows. |
-| **Accent colour** | Marks the wiki, so two open at once are told apart. |
+| **Accent color** | Marks the wiki, so two open at once are told apart. |
 | **Show what links to a page** | Turn off the **Connections** list for a wiki nobody cross-references. |
 
 ## Sharing

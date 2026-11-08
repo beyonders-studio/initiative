@@ -1,7 +1,7 @@
 {
   "title": "Mes messages",
   "backToNav": "Retour à la navigation",
-  "encryptedNotice": "Chiffré de bout en bout. Seuls toi et l'autre personne pouvez les lire.",
+  "encryptedNotice": "Chiffré de bout en bout. Seules les personnes de cette conversation peuvent les lire.",
   "empty": {
     "title": "Choisissez une conversation"
   },

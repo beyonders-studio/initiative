@@ -54,7 +54,7 @@ import { catalogEntry, type DefinitionWidget, isPluginWidgetType } from "@/lib/w
 import { withParamAnswer } from "@/lib/widgets/pluginParams";
 import { canDraw, resolveMapping } from "@/lib/widgets/shape";
 import { shapeFor } from "@/lib/widgets/shapes";
-import { paramsFor, sourceDescriptor } from "@/lib/widgets/sources";
+import { paramsFor } from "@/lib/widgets/sources";
 import { localized } from "@/lib/widgets/widgetMeta";
 import { Button } from "@/ui/button";
 import {
@@ -150,7 +150,6 @@ export function WidgetConfigDialog({
 
   const entry = catalogEntry(catalog, widget?.type ?? "");
   const source = binding.source;
-  const descriptor = sourceDescriptor(source);
 
   /**
    * Which of the plug-in's reads this widget may be pointed at.
@@ -288,15 +287,6 @@ export function WidgetConfigDialog({
 
             <section className="space-y-2">
               <h3 className="font-medium text-sm">{t("dashboards:config.sectionBinding")}</h3>
-              {descriptor && (
-                <p className="text-muted-foreground text-xs">
-                  {t("dashboards:config.rowNoun", {
-                    noun: t(`dashboards:provenance.rows_${descriptor.rowNoun}` as const, {
-                      count: 1,
-                    }).replace(/^1\s*/, ""),
-                  })}
-                </p>
-              )}
             </section>
 
             {/* A plug-in widget's own controls replace these. The registry's two
