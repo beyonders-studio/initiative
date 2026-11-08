@@ -11,7 +11,6 @@
  * them would trade a real interaction for a fiddly one.
  */
 
-import { Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   type Layout,
@@ -38,6 +37,7 @@ import { DashboardWidget } from "./DashboardWidget";
 // v2 folds the resize-handle styles into its own stylesheet; the separate
 // react-resizable CSS the v1 docs pair this with no longer exists.
 import "react-grid-layout/css/styles.css";
+import { CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 // v2 replaced the WidthProvider HOC with a hook, so the measured element is
 // ours and the grid is told the width explicitly.
@@ -177,10 +177,9 @@ export function DashboardCanvas({
         style={showGrid ? dotGrid : undefined}
       >
         {isLoading ? (
-          <CanvasNotice>
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            {t("loadingDashboard")}
-          </CanvasNotice>
+          <SkeletonRegion>
+            <CardGridSkeleton count={4} />
+          </SkeletonRegion>
         ) : !definition.widgets.length ? (
           <CanvasNotice>
             <span className="space-y-1">

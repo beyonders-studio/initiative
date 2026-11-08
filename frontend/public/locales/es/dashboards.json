@@ -12,8 +12,6 @@
     "noMatchingDashboards": "Ningún panel coincide con tus filtros."
   },
   "loading": "Cargando paneles...",
-  "loadError": "No se pudieron cargar los paneles.",
-  "loadingDashboard": "Cargando panel...",
   "creating": "Creando...",
   "notFound": "Panel no encontrado",
   "notFoundDescription": "El panel que buscas no existe o ha sido eliminado.",
@@ -197,7 +195,6 @@
     "absolute": "En una fecha",
     "relativeDays": "Días desde hoy",
     "relativeHint": "Cuenta desde el momento en que se abre el panel, así que nunca se queda obsoleta.",
-    "loading": "Cargando filtros…",
     "noFields": "Aquí todavía no hay nada por lo que filtrar.",
     "matchPrefix": "Cumplir",
     "match": "Cumplir todos o alguno",

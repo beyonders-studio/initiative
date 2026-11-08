@@ -107,7 +107,7 @@ describe("CustomRoleClaimRulesSection", () => {
     rulesState = { data: undefined, isLoading: false, isError: true };
     render();
 
-    expect(screen.getByText("Couldn't load the rules.")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.queryByText("No group gives a custom role yet.")).not.toBeInTheDocument();
   });
 });

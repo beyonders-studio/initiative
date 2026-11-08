@@ -36,6 +36,8 @@ import {
 } from "@/ui/dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 import { WizardDialog } from "@/ui/wizard-dialog";
 
 /** The form, then the wait for the browser's own prompt. */
@@ -252,9 +254,11 @@ export const PasskeysSection = () => {
   return (
     <div className="space-y-4">
       {list.isLoading ? (
-        <p className="text-muted-foreground text-sm">{t("passkeys.loading")}</p>
+        <SkeletonRegion>
+          <ListSkeleton rows={2} avatar={false} />
+        </SkeletonRegion>
       ) : list.isError ? (
-        <p className="text-destructive text-sm">{t("passkeys.listError")}</p>
+        <StatusMessage onRetry={list.refetch} />
       ) : (
         <div className="space-y-4">
           {passkeys.length === 0 ? (

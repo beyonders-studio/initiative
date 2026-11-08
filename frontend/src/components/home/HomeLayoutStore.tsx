@@ -18,6 +18,7 @@ import { resolveArtworkUrl } from "@/lib/uploadUrl";
 import { Button } from "@/ui/button";
 import { Card, CardContent } from "@/ui/card";
 import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 
 const LayoutCard = ({
   listing,
@@ -93,7 +94,7 @@ export function HomeLayoutStore() {
           ))}
         </div>
       ) : listings.isError ? (
-        <p className="text-destructive text-sm">{t("marketplace.loadError")}</p>
+        <StatusMessage onRetry={listings.refetch} />
       ) : (listings.data ?? []).length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("marketplace.empty")}</p>
       ) : (

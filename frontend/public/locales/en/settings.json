@@ -73,8 +73,6 @@
   "addresses": {
     "title": "Email addresses",
     "description": "Any confirmed address signs you in, and account mail reaches all of them.",
-    "loadFailed": "Your addresses could not be loaded.",
-    "retry": "Try again",
     "primary": "Primary",
     "unverified": "Unconfirmed",
     "makePrimary": "Make primary",
@@ -118,8 +116,6 @@
     "waits": "This change waits until {{date}}. Every address on your account has been emailed about it."
   },
   "security": {
-    "loadingDevices": "Loading devices…",
-    "devicesError": "Unable to load devices.",
     "unknownDevice": "Unknown device",
     "revoking": "Revoking…",
     "revokeError": "Unable to revoke device access",
@@ -143,8 +139,6 @@
     "nameRequired": "Name is required",
     "createSuccess": "API key created",
     "createError": "Unable to create API key",
-    "loadingKeys": "Loading API keys…",
-    "keysError": "Unable to load API keys.",
     "noKeys": "No API keys yet.",
     "statusExpired": "Expired",
     "statusDisabled": "Disabled",
@@ -194,7 +188,6 @@
   },
   "ai": {
     "loading": "Loading AI settings…",
-    "loadError": "Unable to load AI settings.",
     "providerFieldLabel": "Provider",
     "providerPlaceholder": "Select a provider",
     "modelLabel": "Model",
@@ -540,7 +533,6 @@
     "colorsTitle": "Brand colors",
     "colorsDescription": "Customize the accent colors for light and dark mode.",
     "loadingInterface": "Loading interface settings…",
-    "interfaceError": "Unable to load interface settings.",
     "lightModeLabel": "Light mode accent",
     "lightModeHelp": "Buttons, highlights, and focus states use this color while the app is in light mode.",
     "darkModeLabel": "Dark mode accent",
@@ -615,8 +607,6 @@
   "email": {
     "platformOnly": "Only the platform owner can manage email settings.",
     "title": "SMTP email",
-    "loading": "Loading email settings…",
-    "loadError": "Unable to load email settings.",
     "hostLabel": "Host",
     "hostPlaceholder": "smtp.mailprovider.com",
     "portLabel": "Port",
@@ -645,7 +635,6 @@
   "push": {
     "platformOnly": "Only the platform owner can manage push notification settings.",
     "loading": "Loading push notification settings…",
-    "loadError": "Unable to load push notification settings.",
     "title": "Firebase Cloud Messaging",
     "description": "Optional. Without a service account key, push notifications go through BeyondersStudio's push relay and these fields can stay empty. With one, Android pushes go through your own Firebase project; iPhone pushes always use the relay.",
     "enabledLabel": "Send push notifications",
@@ -702,7 +691,6 @@
   "auth": {
     "platformOnly": "Only the platform owner can manage authentication settings.",
     "loading": "Loading auth settings…",
-    "loadError": "Unable to load auth settings.",
     "postLoginRedirect": "Post-login redirect:",
     "mobileCallback": "Mobile app callback:",
     "deploymentTitle": "This deployment",
@@ -803,7 +791,6 @@
   },
   "platformUsers": {
     "loading": "Loading users…",
-    "loadError": "Unable to load users.",
     "filterPlaceholder": "Filter by handle…",
     "columnId": "User ID",
     "columnHandle": "Handle",
@@ -926,8 +913,6 @@
         "title": "Cases",
         "count_one": "{{count}} open case they filed or that is about them.",
         "count_other": "{{count}} open cases they filed or that are about them.",
-        "loading": "Loading cases…",
-        "loadError": "Could not load their cases.",
         "filed": "Filed by them",
         "about": "About them",
         "help": "Opening a case needs access to the project it is kept in."
@@ -1109,7 +1094,6 @@
   "pluginServices": {
     "platformOnly": "Only platform owners can manage plug-in services.",
     "loading": "Loading plug-in services…",
-    "loadError": "Unable to load plug-in services.",
     "title": "Plug-in services",
     "description": "The plug-ins this deployment runs. A plug-in's listing says what it is and may do; here you give where it answers and the keys it signs with.",
     "empty": "No plug-in services yet. A plug-in appears here when its listing arrives, or once you add it.",
@@ -1230,7 +1214,6 @@
     "description": "Set per-community caps on storage and on the number of users. Lowering a limit below current usage blocks new uploads or members, but never removes existing files or members.",
     "platformOnly": "You need a platform staff role to see communities.",
     "loading": "Loading communities…",
-    "loadError": "Could not load communities. Please try again.",
     "filterByName": "Filter communities by name",
     "unlimitedPlaceholder": "Unlimited",
     "helpText": "Storage limits are in GB; user limits are a member count. Both save automatically — leave a field blank for unlimited.",
@@ -1310,7 +1293,6 @@
       "storageLabel": "Storage limit",
       "decidesForItself": "What it decides for itself",
       "deleted": "Deleted",
-      "pluginSummariesUnavailable": "Plug-in usage could not be loaded.",
       "narrowings": {
         "title": "Who it counts as its own",
         "help": "This community says which arrivals on a provider are its people. It names the values itself, so agreeing is what lets them join on arrival — until then the connection works only for the people already in it.",
@@ -1374,7 +1356,6 @@
   "providerPlacement": {
     "description": "Place the people a sign-in provider signs in — by the group or directory it reports — in a community, and in an initiative there if you name one.",
     "loading": "Loading placement rules…",
-    "loadError": "Could not load placement rules. Please try again.",
     "platformOnly": "Sign-in placement is managed by platform operators and owners.",
     "everywhere": {
       "label": "Apply placement rules to every community",
@@ -1442,7 +1423,6 @@
   "storage": {
     "platformOnly": "Only platform owners can configure storage.",
     "loading": "Loading storage settings…",
-    "loadError": "Failed to load storage settings.",
     "title": "Object storage",
     "description": "Choose where uploaded files and attachments are stored. Defaults to the local filesystem; switch to an S3-compatible store for scalable or shared deployments.",
     "backendLabel": "Storage backend",
@@ -1726,7 +1706,6 @@
     "title": "Identity providers",
     "description": "The single sign-on providers people sign in with. Each one gets its own button on the sign-in page.",
     "addProvider": "Add provider",
-    "loading": "Loading providers…",
     "empty": "No providers configured yet.",
     "disabledBadge": "Disabled",
     "editTitle": "Edit sign-in provider",
@@ -1820,8 +1799,6 @@
     "add": "Add connection",
     "toggleLabel": "Use {{label}}",
     "empty": "No connections yet. Add one to enable AI features.",
-    "loading": "Loading connections…",
-    "loadError": "Unable to load connections.",
     "defaultBadge": "Default",
     "keySet": "Shared key set",
     "noKey": "No shared key",
@@ -2049,7 +2026,6 @@
   "twoFactor": {
     "title": "Two-factor authentication",
     "description": "Ask for a code from an authenticator app after a password or emailed code, and whenever a community or this server asks for a second factor.",
-    "loading": "Checking…",
     "on": "On",
     "notSetUp": "Signing in doesn't ask for a code from an app.",
     "setUp": "Set up two-factor authentication",
@@ -2085,7 +2061,6 @@
     "regenerateError": "Could not make new codes.",
     "disableError": "Could not turn that off.",
     "codePlaceholder": "123456",
-    "statusError": "Couldn't check whether two-factor is on. Reload the page to try again.",
     "copyUnavailable": "Couldn't copy — write the codes down instead.",
     "notOffered": "This deployment does not offer the authenticator app.",
     "passwordlessCodes": "Your account signs in without a password. These codes are how you set one again if you lose your passkey."
@@ -2093,8 +2068,6 @@
   "passkeys": {
     "title": "Passkeys",
     "description": "Sign in with your device's fingerprint, face or screen lock instead of your password.",
-    "loading": "Checking…",
-    "listError": "Couldn't check which passkeys this account holds. Reload the page to try again.",
     "empty": "No passkeys yet.",
     "emptyHint": "A passkey lives on your phone, your laptop or your password manager, and works only on this site.",
     "add": "Add a passkey",
@@ -2267,7 +2240,6 @@
     "holdsNothing": "Holds nothing yet.",
     "builtIn": "Built-in",
     "loading": "Loading roles",
-    "loadError": "Couldn't load the roles.",
     "closed": "Whoever runs this server has closed custom roles for this community. The roles it has keep applying.",
     "deleteTitle": "Delete {{name}}?",
     "deleteDescription": "People holding it go back to their plain role.",
@@ -2348,9 +2320,6 @@
     "orderError": "Couldn't reorder the rules",
     "removeError": "Couldn't remove the rule",
     "closed": "Your server has switched custom roles off for this community. These rules keep applying; nobody here can change them.",
-    "loading": "Loading rules…",
-    "loadError": "Couldn't load the rules.",
-    "retry": "Try again",
     "editTitle": "Edit role rule",
     "saved": "Rule saved",
     "saveError": "Couldn't save the rule"

@@ -16,6 +16,7 @@ import { Button } from "@/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/ui/dialog";
 import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { RelativeTime } from "@/ui/relative-time";
+import { StatusMessage } from "@/ui/status-message";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
 
 const ACTIVE = new Set(["staged", "fetching", "queued", "running"]);
@@ -74,7 +75,7 @@ export function DataJobsTable() {
     );
   }
   if (jobsQuery.isError) {
-    return <p className="py-4 text-destructive text-sm">{t("exports:table.loadFailed")}</p>;
+    return <StatusMessage onRetry={jobsQuery.refetch} />;
   }
   if (jobs.length === 0) {
     return <p className="py-4 text-muted-foreground text-sm">{t("exports:table.empty")}</p>;

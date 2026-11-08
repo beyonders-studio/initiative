@@ -1,7 +1,6 @@
 {
   "addProject": "Agregar proyecto",
   "loading": "Cargando proyectos…",
-  "loadError": "No se pudieron cargar los proyectos.",
   "error": "Algo salió mal",
   "noProjects": "Aún no hay proyectos",
   "noProjectsDescription": "Un proyecto reúne tareas y las sigue en un tablero o en una tabla hasta que estén terminadas.",

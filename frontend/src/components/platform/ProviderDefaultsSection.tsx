@@ -30,6 +30,7 @@ import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 const ProviderDefaultRow = ({ provider }: { provider: AuthProviderOwnerRead }) => {
   const { t } = useTranslation("settings");
@@ -149,7 +150,9 @@ export const ProviderDefaultsSection = () => {
       </CardHeader>
       <CardContent>
         {providersQuery.isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("authProviders.loading")}</p>
+          <SkeletonRegion>
+            <ListSkeleton rows={3} />
+          </SkeletonRegion>
         ) : providers.length === 0 ? (
           <p className="text-muted-foreground text-sm">{t("providerDefaults.noProviders")}</p>
         ) : (

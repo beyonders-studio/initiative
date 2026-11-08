@@ -31,6 +31,7 @@ import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
 
 /** The rule dialog's subject: a provider, and the rule on it being edited. */
@@ -96,7 +97,7 @@ export const OperatorDashboardPlacementPage = () => {
   }
 
   if (placementQuery.isError || !placementQuery.data) {
-    return <p className="text-destructive text-sm">{t("providerPlacement.loadError")}</p>;
+    return <StatusMessage onRetry={placementQuery.refetch} />;
   }
 
   const { placement_everywhere: everywhere, providers, rules } = placementQuery.data;

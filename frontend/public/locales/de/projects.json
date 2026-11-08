@@ -1,7 +1,6 @@
 {
   "addProject": "Projekt hinzufügen",
   "loading": "Projekte werden geladen…",
-  "loadError": "Projekte konnten nicht geladen werden.",
   "error": "Etwas ist schiefgelaufen",
   "noProjects": "Noch keine Projekte",
   "noProjectsDescription": "Ein Projekt sammelt Aufgaben und verfolgt sie auf einem Board oder in einer Tabelle, bis sie erledigt sind.",

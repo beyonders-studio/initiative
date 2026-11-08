@@ -83,11 +83,6 @@
     "sharesIsolated": "Another stream lands in this initiative too. Security and moderation cases should have an initiative of their own, so only the people working them can read them.",
     "sharesWithIsolated": "This initiative also holds security or moderation cases, which should have an initiative of their own. Point one of them somewhere else."
   },
-  "loadFailed": {
-    "title": "Could not load these settings",
-    "description": "Nothing has been changed. Try again, and if it keeps failing the server log will say why.",
-    "retry": "Try again"
-  },
   "help": {
     "action": "Ask for help",
     "panel": {
@@ -157,8 +152,7 @@
     "replyError": "Could not send your reply. Try again in a moment.",
     "closedNote": "This ticket is closed. If something else comes up, ask for help again.",
     "noConversation": "Thanks for the report. The team looks into every one, but they don't reply to reports here.",
-    "empty": "You haven't filed any tickets. When you ask for help, it shows up here so you can follow it.",
-    "loadError": "Could not load your tickets."
+    "empty": "You haven't filed any tickets. When you ask for help, it shows up here so you can follow it."
   },
   "case": {
     "filedBy": "Filed by",

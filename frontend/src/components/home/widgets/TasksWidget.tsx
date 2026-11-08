@@ -29,6 +29,7 @@ import { Combobox } from "@/ui/combobox";
 import { DataTable } from "@/ui/data-table";
 import { Label } from "@/ui/label";
 import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 import { QuickAddTask } from "./QuickAddTask";
 import type { HomeWidgetProps, HomeWidgetSettingsProps } from "./types";
@@ -212,7 +213,7 @@ export const TasksWidget = ({ options, onOptionsChange, onConfigure }: HomeWidge
               <TableSkeleton rows={8} columns={6} pagination />
             </SkeletonRegion>
           ) : table.hasError ? (
-            <p className="py-8 text-center text-destructive text-sm">{t("myTasks.loadError")}</p>
+            <StatusMessage />
           ) : nothingYet ? (
             <HomeWidgetNotice
               icon={Inbox}

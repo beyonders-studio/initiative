@@ -1,7 +1,6 @@
 {
   "addProject": "Ajouter un projet",
   "loading": "Chargement des projets…",
-  "loadError": "Impossible de charger les projets.",
   "error": "Une erreur s'est produite",
   "noProjects": "Aucun projet pour l'instant",
   "noProjectsDescription": "Un projet regroupe des tâches et les suit sur un tableau ou dans une table jusqu'à ce qu'elles soient terminées.",

@@ -1,5 +1,5 @@
 import { useRouter } from "@tanstack/react-router";
-import { Bell, CheckCheck, Loader2 } from "lucide-react";
+import { Bell, CheckCheck } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -16,6 +16,7 @@ import { useStoreSellingAnswer } from "@/lib/storeSelling";
 import type { TranslateFn } from "@/types/i18n";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { RelativeTime } from "@/ui/relative-time";
 
@@ -107,10 +108,9 @@ export const NotificationBell = () => {
   const renderContent = () => {
     if (notificationsQuery.isLoading) {
       return (
-        <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          {t("notifications.loadingNotifications")}
-        </div>
+        <SkeletonRegion className="p-4">
+          <ListSkeleton rows={3} />
+        </SkeletonRegion>
       );
     }
     if (!hasNotifications) {
