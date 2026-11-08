@@ -29,6 +29,7 @@ import { describes, type Spec } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import type { FieldSave, FieldSaveState } from "@/lib/layouts/editing";
+import type { ItemSaves } from "@/lib/layouts/fieldEditors";
 import { toast } from "@/lib/mascotToast";
 import { currentServerKey } from "@/lib/offlineSession";
 
@@ -397,3 +398,27 @@ export const useItemFieldSave = <I, P>(
     },
   };
 };
+
+/** One holder per read of a row's properties, so a copy passed again is the
+ *  same copy ({@link useHeldItem}). */
+const holders = new WeakMap<PropertySummary[], { properties: PropertySummary[] }>();
+const holderOf = (properties: PropertySummary[]) => {
+  let holder = holders.get(properties);
+  if (!holder) {
+    holder = { properties };
+    holders.set(properties, holder);
+  }
+  return holder;
+};
+
+/** How the property editors save item `id` of `kind`: each field through
+ *  {@link useItemFieldSave}, its properties held by {@link useHeldItem}. */
+export const itemSaves = <I, P>(kind: FieldSaveKind<I, P>, id: number): ItemSaves<I, P> => ({
+  useSave: (label) => useItemFieldSave(kind, id, label),
+  useShown: (properties) =>
+    useHeldItem(
+      kind as unknown as FieldSaveKind<{ properties: PropertySummary[] }, P>,
+      id,
+      holderOf(properties)
+    ).properties,
+});
