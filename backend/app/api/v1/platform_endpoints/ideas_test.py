@@ -256,6 +256,7 @@ async def test_erasing_a_voter_takes_their_vote(client, session, acting_user, bo
     task.archived_at = task.created_at
     session.add(task)
     await session.commit()
+    await set_rls_context(session, Unattributed())
 
     await user_service.hard_delete_user(session, voter.user.id)
 
