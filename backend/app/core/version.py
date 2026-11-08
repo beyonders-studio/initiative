@@ -3,15 +3,20 @@
 from pathlib import Path
 
 
-def _read_root_file(name: str) -> str:
-    """A version file at the project root, or ``"0.0.0"`` when there is none."""
+def root_file(name: str) -> Path:
+    """A file at the project root, which the image copies beside the app."""
     # Docker: /app/app/core/version.py -> /app/<name>
     path = Path(__file__).parent.parent.parent / name
     if not path.exists():
         # Development: backend/app/core/version.py -> repo_root/<name>
         path = Path(__file__).parent.parent.parent.parent / name
+    return path
+
+
+def _read_root_file(name: str) -> str:
+    """A version file at the project root, or ``"0.0.0"`` when there is none."""
     try:
-        return path.read_text().strip()
+        return root_file(name).read_text().strip()
     except FileNotFoundError:
         return "0.0.0"
 

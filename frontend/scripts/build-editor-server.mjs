@@ -22,6 +22,7 @@ const VIEWS_ONLY = [
   "katex",
 ];
 const VERSION = readFileSync(join(ROOT, "../VERSION"), "utf8").trim();
+const CLOUD_ORIGIN = readFileSync(join(ROOT, "../CLOUD_ORIGIN"), "utf8").trim();
 
 await build({
   entryPoints: [join(ROOT, "src/lib/yjs/serverEditor.ts")],
@@ -50,6 +51,7 @@ await build({
     "process.env.NODE_ENV": '"production"',
     "import.meta.env": JSON.stringify({ MODE: "production", PROD: true, DEV: false }),
     __APP_VERSION__: JSON.stringify(VERSION),
+    __CLOUD_ORIGIN__: JSON.stringify(CLOUD_ORIGIN),
     __IS_CAPACITOR__: "false",
     __EMOJIBASE_URL__: '""',
     __PDFJS_WORKER_URL__: '""',

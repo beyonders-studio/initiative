@@ -1,5 +1,8 @@
-/** Initiative Cloud, the hosted service. */
-export const CLOUD_ORIGIN = "https://initiativetasks.com";
+/**
+ * Initiative Cloud, the hosted service. Its address is the CLOUD_ORIGIN file
+ * at the project root, which the build bakes in and the backend reads.
+ */
+export const CLOUD_ORIGIN = __CLOUD_ORIGIN__;
 export const CLOUD_SERVER_URL = `${CLOUD_ORIGIN}/api/v1`;
 
 /**
