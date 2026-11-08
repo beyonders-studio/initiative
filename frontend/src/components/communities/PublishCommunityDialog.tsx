@@ -17,7 +17,6 @@ import { useTranslation } from "react-i18next";
 
 import type { CommunityCategory } from "@/api/generated/initiativeAPI.schemas";
 import { COMMUNITY_CATEGORIES, communityCategoryLabel } from "@/lib/communityCategories";
-import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import {
   Dialog,
@@ -142,18 +141,13 @@ export const PublishCommunityDialog = ({
           <p className="font-medium text-sm">{t("communities:community.publish.certifyDuty")}</p>
         </div>
 
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            type="button"
-            onClick={() => void onConfirm(categories)}
-            disabled={!ready || saving}
-          >
-            {saving ? t("communities:settings.saving") : t("communities:community.publish.confirm")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("communities:community.publish.confirm")}
+          pendingLabel={t("communities:settings.saving")}
+          pending={saving}
+          disabled={!ready}
+          onSubmit={() => void onConfirm(categories)}
+        />
       </DialogContent>
     </Dialog>
   );

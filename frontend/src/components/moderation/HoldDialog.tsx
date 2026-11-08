@@ -20,7 +20,6 @@ import {
 } from "@/components/moderation/HoldFields";
 import { usePlaceHold } from "@/hooks/useHolds";
 import { toast } from "@/lib/mascotToast";
-import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -75,25 +74,20 @@ export const HoldDialog = ({
           <p className="font-medium text-destructive text-sm">{t("hold.communityWarning")}</p>
         )}
         <HoldFields value={why} onChange={setWhy} />
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            variant="destructive"
-            disabled={!holdWhyReady(why) || place.isPending}
-            onClick={() =>
-              place.mutate({
-                target_type: targetType,
-                target_id: targetId,
-                ...holdWhyBody(why),
-                case_task_id: caseTaskId ?? null,
-              })
-            }
-          >
-            {t("hold.submit")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("hold.submit")}
+          onSubmit={() =>
+            place.mutate({
+              target_type: targetType,
+              target_id: targetId,
+              ...holdWhyBody(why),
+              case_task_id: caseTaskId ?? null,
+            })
+          }
+          pending={place.isPending}
+          disabled={!holdWhyReady(why)}
+          destructive
+        />
       </DialogContent>
     </Dialog>
   );

@@ -173,23 +173,13 @@ function RenameViewDialog({
     <Dialog open={view !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent aria-describedby={undefined}>
         {/* Keyed by the view, so each opening starts from its current name. */}
-        {view ? (
-          <RenameViewForm key={view.id} view={view} onClose={onClose} onSave={onSave} />
-        ) : null}
+        {view ? <RenameViewForm key={view.id} view={view} onSave={onSave} /> : null}
       </DialogContent>
     </Dialog>
   );
 }
 
-function RenameViewForm({
-  view,
-  onClose,
-  onSave,
-}: {
-  view: HomeViewEntry;
-  onClose: () => void;
-  onSave: (name: string) => void;
-}) {
+function RenameViewForm({ view, onSave }: { view: HomeViewEntry; onSave: (name: string) => void }) {
   const { t } = useTranslation(["home", "common"]);
   const [name, setName] = useState(view.name);
   const clean = cleanViewName(name);
@@ -214,14 +204,7 @@ function RenameViewForm({
           autoFocus
         />
       </div>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>
-          {t("common:cancel")}
-        </Button>
-        <Button type="submit" disabled={!clean}>
-          {t("common:save")}
-        </Button>
-      </DialogFooter>
+      <DialogFooter submitLabel={t("common:save")} disabled={!clean} />
     </form>
   );
 }

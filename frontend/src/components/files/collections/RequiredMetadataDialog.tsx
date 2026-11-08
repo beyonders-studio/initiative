@@ -1,4 +1,3 @@
-import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -10,7 +9,6 @@ import {
   valuesOf,
 } from "@/components/layouts/RequiredValues";
 import type { DialogProps } from "@/types/dialog";
-import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -71,19 +69,12 @@ export const RequiredMetadataDialog = ({
             idPrefix="collection-required"
           />
         </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            type="button"
-            disabled={missing.length > 0 || pending}
-            onClick={() => onConfirm(valuesOf(draft))}
-          >
-            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {t("collections.required.confirm")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("collections.required.confirm")}
+          onSubmit={() => onConfirm(valuesOf(draft))}
+          pending={pending}
+          disabled={missing.length > 0}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -10,7 +10,7 @@
  * A dashboard authored here has no listing and renders nothing at all.
  */
 
-import { ArrowUpCircle, Loader2 } from "lucide-react";
+import { ArrowUpCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { DashboardRead } from "@/api/generated/initiativeAPI.schemas";
@@ -65,12 +65,8 @@ export function DashboardUpdateBadge({ dashboard, canEdit }: DashboardUpdateBadg
   }
 
   return (
-    <Button size="sm" variant="outline" onClick={apply} disabled={upgrade.isPending}>
-      {upgrade.isPending ? (
-        <Loader2 className="h-4 w-4 animate-spin" />
-      ) : (
-        <ArrowUpCircle className="h-4 w-4" />
-      )}
+    <Button size="sm" variant="outline" onClick={apply} pending={upgrade.isPending}>
+      <ArrowUpCircle className="h-4 w-4" />
       {t("update.available", { version: latest.version })}
     </Button>
   );

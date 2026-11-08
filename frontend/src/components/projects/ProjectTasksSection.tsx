@@ -1204,7 +1204,6 @@ export const ProjectTasksSection = ({
                   changes: changes as Parameters<typeof bulkUpdateTasks.mutate>[0]["changes"],
                 });
               }}
-              onCancel={() => setIsBulkEditDialogOpen(false)}
             />
           </Dialog>
 

@@ -1,14 +1,6 @@
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import type { SortingState } from "@tanstack/react-table";
-import {
-  ExternalLink,
-  LayoutList as LayoutsIcon,
-  Loader2,
-  Plus,
-  Tags,
-  Trash2,
-  Upload,
-} from "lucide-react";
+import { ExternalLink, LayoutList as LayoutsIcon, Plus, Tags, Trash2, Upload } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -595,14 +587,11 @@ export function CollectionPage() {
             <Button
               variant="outline"
               size="sm"
-              disabled={selection.selectedItems.length === 0 || remove.isPending}
+              disabled={selection.selectedItems.length === 0}
+              pending={remove.isPending}
               onClick={() => remove.mutate(selection.selectedItems.map((row) => row.id))}
             >
-              {remove.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
+              <Trash2 className="h-4 w-4" />
               {t("collections.removeFrom")}
             </Button>
           ) : null

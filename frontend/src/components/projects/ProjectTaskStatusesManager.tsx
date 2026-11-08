@@ -446,9 +446,9 @@ export const ProjectTaskStatusesManager = ({
                   icon: newIcon,
                 });
               }}
-              disabled={!canManage || createStatus.isPending}
+              disabled={!canManage}
+              pending={createStatus.isPending}
             >
-              {createStatus.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {t("statuses.add")}
             </Button>
           </div>
@@ -556,19 +556,13 @@ export const ProjectTaskStatusesManager = ({
               </Select>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>
-              {t("common:cancel")}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteConfirm}
-              disabled={deleteStatusMutation.isPending || isOnlyStatus}
-            >
-              {deleteStatusMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {t("common:delete")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("common:delete")}
+            onSubmit={handleDeleteConfirm}
+            pending={deleteStatusMutation.isPending}
+            disabled={isOnlyStatus}
+            destructive
+          />
         </DialogContent>
       </Dialog>
     </Card>

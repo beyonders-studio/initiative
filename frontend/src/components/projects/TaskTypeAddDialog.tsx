@@ -4,7 +4,6 @@
  * one brings its look, what a new task of it starts with, and its fields.
  */
 
-import { Loader2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -12,7 +11,6 @@ import type { TaskTypeCreate, TaskTypeRead } from "@/api/generated/initiativeAPI
 import { ReadyMadeGallery } from "@/components/shared/ReadyMadeGallery";
 import { TaskTypeIcon, TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { useTaskTypeGallery } from "@/hooks/useProjects";
-import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -168,15 +166,11 @@ export const TaskTypeAddDialog = ({
             ) : null}
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              {t("common:cancel")}
-            </Button>
-            <Button type="submit" disabled={!trimmed || nameTaken || saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {t("taskTypes.add")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter
+            submitLabel={t("taskTypes.add")}
+            pending={saving}
+            disabled={!trimmed || nameTaken}
+          />
         </form>
       </DialogContent>
     </Dialog>

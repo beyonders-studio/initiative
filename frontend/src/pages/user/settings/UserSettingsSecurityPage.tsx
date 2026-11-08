@@ -199,14 +199,11 @@ const NewApiKeyDialog = ({
                 <p className="text-muted-foreground text-xs">{t("security.readOnlyHelp")}</p>
               </div>
             </div>
-            <DialogFooter className="gap-2">
-              <Button type="button" variant="outline" onClick={close}>
-                {t("common:cancel")}
-              </Button>
-              <Button type="submit" disabled={createKey.isPending}>
-                {createKey.isPending ? t("security.generating") : t("security.generateButton")}
-              </Button>
-            </DialogFooter>
+            <DialogFooter
+              submitLabel={t("security.generateButton")}
+              pendingLabel={t("security.generating")}
+              pending={createKey.isPending}
+            />
           </form>
         )}
       </DialogContent>

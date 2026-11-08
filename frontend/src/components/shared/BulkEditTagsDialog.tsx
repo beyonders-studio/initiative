@@ -1,4 +1,3 @@
-import { Loader2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -8,7 +7,6 @@ import { TagPicker } from "@/components/tags/TagPicker";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import type { DialogWithSuccessProps } from "@/types/dialog";
-import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -165,21 +163,13 @@ export function BulkEditTagsDialog<T extends TaggableItem>({
           </TabsContent>
         </Tabs>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isPending}>
-            {t("cancel")}
-          </Button>
-          <Button onClick={() => void handleApply()} disabled={isPending || !canApply}>
-            {isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("bulkTags.applying")}
-              </>
-            ) : (
-              t("bulkTags.apply")
-            )}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("bulkTags.apply")}
+          onSubmit={() => void handleApply()}
+          pending={isPending}
+          pendingLabel={t("bulkTags.applying")}
+          disabled={!canApply}
+        />
       </DialogContent>
     </Dialog>
   );

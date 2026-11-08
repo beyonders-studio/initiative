@@ -1,5 +1,4 @@
 import { useQueries } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -27,7 +26,6 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
 import type { DialogWithSuccessProps } from "@/types/dialog";
-import { Button } from "@/ui/button";
 import { Combobox, type ComboboxItem } from "@/ui/combobox";
 import {
   Dialog,
@@ -761,63 +759,45 @@ export function BulkEditAccessDialog({
           </TabsContent>
         </Tabs>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isPending}>
-            {t("common:cancel")}
-          </Button>
-          {tab === "roles" ? (
-            <Button
-              onClick={() => void handleApplyRoles()}
-              disabled={isPending || !canApplyRoles}
-              variant={roleMode === "revoke" ? "destructive" : "default"}
-            >
-              {isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("bulkAccess.applying")}
-                </>
-              ) : roleMode === "grant" ? (
-                t("bulkAccess.grantRoles", { count: selectedRoleCount })
-              ) : (
-                t("bulkAccess.revokeRoles", { count: selectedRoleCount })
-              )}
-            </Button>
-          ) : tab === "people" ? (
-            <Button
-              onClick={() => void handleApply()}
-              disabled={isPending || !canApplyUsers}
-              variant={userMode === "revoke" ? "destructive" : "default"}
-            >
-              {isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("bulkAccess.applying")}
-                </>
-              ) : userMode === "grant" ? (
-                t("bulkAccess.grantPeople", { count: selectedUserCount })
-              ) : (
-                t("bulkAccess.revokePeople", { count: selectedUserCount })
-              )}
-            </Button>
-          ) : (
-            <Button
-              onClick={() => void handleApplyAllMembers()}
-              disabled={isPending}
-              variant={allMode === "remove" ? "destructive" : "default"}
-            >
-              {isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("bulkAccess.applying")}
-                </>
-              ) : allMode === "share" ? (
-                t("bulkAccess.shareAllMembers")
-              ) : (
-                t("bulkAccess.removeAllMembersAccess")
-              )}
-            </Button>
-          )}
-        </DialogFooter>
+        {tab === "roles" ? (
+          <DialogFooter
+            submitLabel={
+              roleMode === "grant"
+                ? t("bulkAccess.grantRoles", { count: selectedRoleCount })
+                : t("bulkAccess.revokeRoles", { count: selectedRoleCount })
+            }
+            pendingLabel={t("bulkAccess.applying")}
+            pending={isPending}
+            disabled={!canApplyRoles}
+            destructive={roleMode === "revoke"}
+            onSubmit={() => void handleApplyRoles()}
+          />
+        ) : tab === "people" ? (
+          <DialogFooter
+            submitLabel={
+              userMode === "grant"
+                ? t("bulkAccess.grantPeople", { count: selectedUserCount })
+                : t("bulkAccess.revokePeople", { count: selectedUserCount })
+            }
+            pendingLabel={t("bulkAccess.applying")}
+            pending={isPending}
+            disabled={!canApplyUsers}
+            destructive={userMode === "revoke"}
+            onSubmit={() => void handleApply()}
+          />
+        ) : (
+          <DialogFooter
+            submitLabel={
+              allMode === "share"
+                ? t("bulkAccess.shareAllMembers")
+                : t("bulkAccess.removeAllMembersAccess")
+            }
+            pendingLabel={t("bulkAccess.applying")}
+            pending={isPending}
+            destructive={allMode === "remove"}
+            onSubmit={() => void handleApplyAllMembers()}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

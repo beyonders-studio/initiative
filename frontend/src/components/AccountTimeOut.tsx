@@ -78,22 +78,17 @@ const AppealDialog = ({
             maxLength={BODY_MAX}
           />
         </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            disabled={!body.trim() || file.isPending}
-            onClick={() =>
-              file.mutate({
-                ticket: { stream: "moderation", type: "appeal", body: body.trim() },
-                files: [],
-              })
-            }
-          >
-            {t("timeOut.appealSubmit")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("timeOut.appealSubmit")}
+          pending={file.isPending}
+          disabled={!body.trim()}
+          onSubmit={() =>
+            file.mutate({
+              ticket: { stream: "moderation", type: "appeal", body: body.trim() },
+              files: [],
+            })
+          }
+        />
       </DialogContent>
     </Dialog>
   );

@@ -41,7 +41,6 @@ import { toast } from "@/lib/mascotToast";
 import { STANDING_SCOPES, scopeSentence, toggleScope } from "@/lib/pluginScopes";
 import { communityPluginPath, declaredPages } from "@/lib/pluginSurfaces";
 import type { DialogProps } from "@/types/dialog";
-import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import {
   Dialog,
@@ -283,19 +282,16 @@ export function InstallPluginDialog({ listing, open, onOpenChange }: InstallPlug
           </section>
         )}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button onClick={submit} disabled={install.isPending}>
-            {install.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
+        <DialogFooter
+          submitLabel={
+            <>
               <Download className="h-4 w-4" />
-            )}
-            {t("plugins:install.action")}
-          </Button>
-        </DialogFooter>
+              {t("plugins:install.action")}
+            </>
+          }
+          onSubmit={submit}
+          pending={install.isPending}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -7,7 +7,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -59,14 +58,12 @@ export const WarnDialog = ({ open, onOpenChange, pending = false, onConfirm }: W
             onChange={(e) => setMessage(e.target.value)}
           />
         </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button disabled={!said || pending} onClick={() => onConfirm(said)}>
-            {t("warn.submit")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("warn.submit")}
+          onSubmit={() => onConfirm(said)}
+          pending={pending}
+          disabled={!said}
+        />
       </DialogContent>
     </Dialog>
   );

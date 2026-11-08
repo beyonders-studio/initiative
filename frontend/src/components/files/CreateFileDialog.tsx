@@ -4,7 +4,6 @@ import {
   FileText,
   ImageIcon,
   Link as LinkIcon,
-  Loader2,
   Plus,
   Presentation,
   Upload,
@@ -442,16 +441,10 @@ export const CreateFileDialog = ({
                   grants,
                 });
               }}
+              pending={createFile.isPending}
               disabled={!canSubmitNew}
             >
-              {createFile.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("create.creating")}
-                </>
-              ) : (
-                t("create.createFile")
-              )}
+              {createFile.isPending ? t("create.creating") : t("create.createFile")}
             </Button>
           ) : createDialogTab === "upload" ? (
             <Button
@@ -471,16 +464,12 @@ export const CreateFileDialog = ({
                   onProgress: (arrived, total) => setSent(total ? arrived / total : 1),
                 });
               }}
+              pending={uploadFile.isPending}
               disabled={!canSubmitUpload}
             >
-              {uploadFile.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("create.uploadingProgress", { percent: percent.format(sent) })}
-                </>
-              ) : (
-                t("create.uploadFile")
-              )}
+              {uploadFile.isPending
+                ? t("create.uploadingProgress", { percent: percent.format(sent) })
+                : t("create.uploadFile")}
             </Button>
           ) : (
             <Button
@@ -497,16 +486,10 @@ export const CreateFileDialog = ({
                   grants,
                 });
               }}
+              pending={createFile.isPending}
               disabled={!canSubmitSmartLink}
             >
-              {createFile.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("create.creating")}
-                </>
-              ) : (
-                t("create.createSmartLink")
-              )}
+              {createFile.isPending ? t("create.creating") : t("create.createSmartLink")}
             </Button>
           )}
         </DialogFooter>

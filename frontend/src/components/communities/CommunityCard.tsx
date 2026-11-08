@@ -14,7 +14,6 @@
  */
 
 import { useNavigate } from "@tanstack/react-router";
-import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -110,15 +109,10 @@ export const CommunityCard = ({ community }: { community: DirectoryCommunityRead
               {t("communities:community.open")}
             </Button>
           ) : (
-            <Button className="w-full" onClick={handleJoin} disabled={join.isPending}>
-              {join.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                  {t("communities:community.joining")}
-                </>
-              ) : (
-                t("communities:community.join")
-              )}
+            <Button className="w-full" onClick={handleJoin} pending={join.isPending}>
+              {join.isPending
+                ? t("communities:community.joining")
+                : t("communities:community.join")}
             </Button>
           )}
         </div>

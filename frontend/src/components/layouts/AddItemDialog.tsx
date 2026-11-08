@@ -1,4 +1,3 @@
-import { Loader2 } from "lucide-react";
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -302,15 +301,14 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
           type="button"
           onClick={() => void add()}
           disabled={
-            adding ||
             holding.size > 0 ||
             !ready(item) ||
             // Until its layout is read, what it requires is not known.
             laidOut.isLoading ||
             missing.length > 0
           }
+          pending={adding}
         >
-          {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {adding ? t("adding") : title}
         </Button>
       </DialogFooter>

@@ -17,7 +17,7 @@
 
 import { useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { Download, Loader2 } from "lucide-react";
+import { Download } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -39,7 +39,6 @@ import { toast } from "@/lib/mascotToast";
 import { projectEnvelopeHasDates, readProjectEnvelope } from "@/lib/projectListing";
 import { toolDetailRoute } from "@/lib/tools";
 import type { DialogProps } from "@/types/dialog";
-import { Button } from "@/ui/button";
 import { DateTimePicker } from "@/ui/date-time-picker";
 import {
   Dialog,
@@ -232,19 +231,17 @@ export function InstallListingDialog({
           </div>
         )}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button onClick={submit} disabled={nowhereToInstall || !initiativeId || isPending}>
-            {isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
+        <DialogFooter
+          submitLabel={
+            <>
               <Download className="h-4 w-4" />
-            )}
-            {t("marketplace:install.action")}
-          </Button>
-        </DialogFooter>
+              {t("marketplace:install.action")}
+            </>
+          }
+          onSubmit={submit}
+          pending={isPending}
+          disabled={nowhereToInstall || !initiativeId}
+        />
       </DialogContent>
     </Dialog>
   );

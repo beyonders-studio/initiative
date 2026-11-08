@@ -423,14 +423,7 @@ export function WidgetConfigDialog({
           />
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t("common:cancel")}
-          </Button>
-          <Button onClick={save} disabled={unsaveable}>
-            {t("common:save")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter submitLabel={t("common:save")} onSubmit={save} disabled={unsaveable} />
       </DialogContent>
     </Dialog>
   );

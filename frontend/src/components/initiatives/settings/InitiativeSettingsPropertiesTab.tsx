@@ -431,18 +431,13 @@ const PropertyDialog = ({
           ) : null}
         </div>
 
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            type="button"
-            onClick={() => void handleSubmit()}
-            disabled={!canSubmit || submitting}
-          >
-            {submitting ? t("common:submitting") : t("common:save")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("common:save")}
+          pendingLabel={t("common:submitting")}
+          onSubmit={() => void handleSubmit()}
+          pending={submitting}
+          disabled={!canSubmit}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -568,18 +563,13 @@ const PromoteDialog = ({
             </p>
           ) : null}
         </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
-            {t("common:cancel")}
-          </Button>
-          <Button
-            type="button"
-            onClick={() => void handleSubmit()}
-            disabled={!trimmed || !fits || promote.isPending}
-          >
-            {promote.isPending ? t("common:submitting") : t("properties:manager.promote")}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t("properties:manager.promote")}
+          pendingLabel={t("common:submitting")}
+          onSubmit={() => void handleSubmit()}
+          pending={promote.isPending}
+          disabled={!trimmed || !fits}
+        />
       </DialogContent>
     </Dialog>
   );

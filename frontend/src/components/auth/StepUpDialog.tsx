@@ -7,7 +7,6 @@ import type { ProviderMarkProps } from "@/components/auth/ProviderMark";
 import { useAuthChallenge } from "@/hooks/useAuthChallenge";
 import { useCommunityLoginProviders, useLoginProviders } from "@/hooks/useCommunityAuthPolicy";
 import { providerSignInHref } from "@/lib/returnPath";
-import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -76,17 +75,18 @@ export const StepUpDialog = () => {
           <DialogTitle>{t("stepUp.title")}</DialogTitle>
           <DialogDescription>{t("stepUp.description", { providerName })}</DialogDescription>
         </DialogHeader>
-        <DialogFooter>
-          <Button variant="outline" onClick={clear}>
-            {t("stepUp.dismiss")}
-          </Button>
-          <Button onClick={beginStepUp}>
-            <Suspense fallback={null}>
-              <ProviderMark icon={provider?.icon} className="h-4 w-4" />
-            </Suspense>
-            {t("stepUp.continue", { providerName })}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          cancel={t("stepUp.dismiss")}
+          submitLabel={
+            <>
+              <Suspense fallback={null}>
+                <ProviderMark icon={provider?.icon} className="h-4 w-4" />
+              </Suspense>
+              {t("stepUp.continue", { providerName })}
+            </>
+          }
+          onSubmit={beginStepUp}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -1,4 +1,3 @@
-import { Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -400,16 +399,10 @@ export const InitiativeSettingsMembersTab = ({
                   type="button"
                   variant="outline"
                   onClick={handleAddMember}
-                  disabled={!selectedUserId || !effectiveRoleId || addMember.isPending}
+                  disabled={!selectedUserId || !effectiveRoleId}
+                  pending={addMember.isPending}
                 >
-                  {addMember.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {t("settings.adding")}
-                    </>
-                  ) : (
-                    t("settings.addMember")
-                  )}
+                  {addMember.isPending ? t("settings.adding") : t("settings.addMember")}
                 </Button>
               </div>
               {candidatesQuery.isError ? (

@@ -255,14 +255,10 @@ export const AddressManager = () => {
               </div>
             ) : null}
             {changeError ? <p className="text-destructive text-sm">{changeError}</p> : null}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={closeChange}>
-                {t("common:cancel")}
-              </Button>
-              <Button type="submit" disabled={confirming}>
-                {change ? t(`settings:addresses.${change.kind}Confirm`) : null}
-              </Button>
-            </DialogFooter>
+            <DialogFooter
+              submitLabel={change ? t(`settings:addresses.${change.kind}Confirm`) : null}
+              pending={confirming}
+            />
           </form>
         </DialogContent>
       </Dialog>

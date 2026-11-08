@@ -5,7 +5,6 @@ import { useSetMemberDisplayName } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import type { DialogProps } from "@/types/dialog";
-import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -88,14 +87,7 @@ export const MemberDisplayNameDialog = ({
               autoFocus
             />
           </div>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              {t("common:cancel")}
-            </Button>
-            <Button type="submit" disabled={setDisplayName.isPending}>
-              {t("common:save")}
-            </Button>
-          </DialogFooter>
+          <DialogFooter submitLabel={t("common:save")} pending={setDisplayName.isPending} />
         </form>
       </DialogContent>
     </Dialog>

@@ -29,7 +29,6 @@
  * regardless.
  */
 
-import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -91,6 +90,7 @@ interface NextAction {
   label: string;
   onClick?: () => void;
   disabled?: boolean;
+  pending?: boolean;
   /** Submits the enclosing form (so Enter in a field advances) instead of
    *  calling `onClick`. */
   submit?: boolean;
@@ -220,6 +220,7 @@ export const CreateInitiativeWizard = ({
         type={next.submit ? "submit" : "button"}
         onClick={next.onClick}
         disabled={next.disabled}
+        pending={next.pending}
       >
         {next.label}
       </Button>
@@ -370,9 +371,8 @@ export const CreateInitiativeWizard = ({
           {footer({
             label: busy ? t("createDialog.creating") : t("createWizard.create"),
             onClick: handleSubmit,
-            disabled: busy,
+            pending: busy,
           })}
-          {busy ? <Loader2 className="sr-only h-4 w-4 animate-spin" /> : null}
         </div>
       ) : null}
     </WizardDialog>
