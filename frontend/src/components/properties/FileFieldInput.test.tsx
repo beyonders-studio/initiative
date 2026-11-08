@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -28,5 +28,26 @@ describe("FileFieldInput", () => {
 
     expect(find).toHaveBeenCalledWith("bud");
     expect(onChange).toHaveBeenCalledWith(7);
+  });
+
+  it("asks again when the window comes back while it is open", async () => {
+    const user = userEvent.setup();
+    let latest = "Notes";
+    const find = vi.fn(async () => [{ id: 3, label: latest }]);
+    const files: FileFieldFiles = {
+      find,
+      href: (fileId) => `/files/${fileId}`,
+      preview: () => null,
+      newFile: () => null,
+    };
+    render(<FileFieldInput value={null} shown={null} onChange={vi.fn()} files={files} />);
+
+    await user.click(screen.getByRole("combobox", { name: "Thing" }));
+    expect(await screen.findByText("Notes")).toBeInTheDocument();
+
+    latest = "Notes, renamed";
+    fireEvent.focus(window);
+
+    expect(await screen.findByText("Notes, renamed")).toBeInTheDocument();
   });
 });

@@ -54,15 +54,26 @@ export const FileFieldInput = ({
   const [found, setFound] = useState<FileChoice[] | null>(null);
 
   const { find } = files;
+  // Asked when the picker opens or the search changes, and again when the
+  // window comes back to the front while it is open, so files added or renamed
+  // meanwhile show.
   useEffect(() => {
     if (!open) return;
     let current = true;
     const answer = (choices: FileChoice[]) => {
       if (current) setFound(choices);
     };
-    void find(query).then(answer, () => answer([]));
+    const ask = () => void find(query).then(answer, () => answer([]));
+    const askAgain = () => {
+      if (document.visibilityState === "visible") ask();
+    };
+    ask();
+    window.addEventListener("focus", askAgain);
+    document.addEventListener("visibilitychange", askAgain);
     return () => {
       current = false;
+      window.removeEventListener("focus", askAgain);
+      document.removeEventListener("visibilitychange", askAgain);
     };
   }, [find, open, query]);
 
