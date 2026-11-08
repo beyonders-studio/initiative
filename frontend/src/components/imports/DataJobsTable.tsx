@@ -3,13 +3,12 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getListDataJobsQueryKey, useListDataJobs } from "@/api/generated/data-jobs/data-jobs";
-import { useCancelImportJob } from "@/api/generated/imports/imports";
+import { cancelImportJob } from "@/api/generated/imports/imports";
 import type { DataJobRead } from "@/api/generated/initiativeAPI.schemas";
 import { ImportReport } from "@/components/imports/ImportReport";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { getErrorMessage } from "@/lib/errorMessage";
+import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { downloadExportArtifact } from "@/lib/exportDownload";
-import { toast } from "@/lib/mascotToast";
 import { queryClient } from "@/lib/queryClient";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -64,7 +63,18 @@ export function DataJobsTable() {
         (query.state.data ?? []).some((job) => ACTIVE.has(job.status)) ? POLL_MS : false,
     },
   });
-  const cancelMutation = useCancelImportJob();
+  const cancel = useCommunityMutation(
+    {
+      mutationFn: (communityId, jobId: number) => cancelImportJob(communityId, jobId),
+      // Most often a 409: the job started running between render and click.
+      // Surfaced instead of the row silently flipping to "running".
+      errorKey: "imports:job.failed",
+    },
+    {
+      onSettled: () =>
+        void queryClient.invalidateQueries({ queryKey: getListDataJobsQueryKey(communityId) }),
+    }
+  );
   const jobs = jobsQuery.data ?? [];
 
   if (jobsQuery.isLoading) {
@@ -80,20 +90,6 @@ export function DataJobsTable() {
   if (jobs.length === 0) {
     return <p className="py-4 text-muted-foreground text-sm">{t("exports:table.empty")}</p>;
   }
-
-  const handleCancel = async (job: DataJobRead) => {
-    try {
-      await cancelMutation.mutateAsync({ communityId: communityId, jobId: job.id });
-    } catch (err) {
-      // Most often a 409: the job started running between render and click.
-      // Surface it instead of the row silently flipping to "running".
-      toast.error(getErrorMessage(err, "imports:job.failed"));
-    } finally {
-      void queryClient.invalidateQueries({
-        queryKey: getListDataJobsQueryKey(communityId),
-      });
-    }
-  };
 
   const rowLabel = (job: DataJobRead): string =>
     t(`${job.direction === "export" ? "exports" : "imports"}:table.source.${job.source}` as never, {
@@ -167,7 +163,7 @@ export function DataJobsTable() {
                       size="sm"
                       disabled={job.status === "running"}
                       aria-label={t("imports:table.cancel")}
-                      onClick={() => void handleCancel(job)}
+                      onClick={() => cancel.mutate(job.id)}
                     >
                       <X className="h-4 w-4" />
                       <span className="hidden sm:inline">{t("imports:table.cancel")}</span>

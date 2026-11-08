@@ -45,7 +45,6 @@ const personQuery = (communityId: number, userId: number) => ({
   queryKey: [...getSearchUsersQueryKey(communityId), { mentioned: userId }],
   queryFn: () => loadPerson(communityId, userId),
   enabled: communityId > 0,
-  staleTime: 30_000,
 });
 
 /**

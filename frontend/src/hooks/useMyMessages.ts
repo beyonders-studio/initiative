@@ -124,7 +124,6 @@ export function useConversations() {
     queryKey: messageKeys.conversations,
     queryFn: () => listConversations(),
     enabled: useDirectMessagesEnabled(),
-    staleTime: 30_000,
   });
 }
 
