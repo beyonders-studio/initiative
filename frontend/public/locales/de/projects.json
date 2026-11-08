@@ -86,12 +86,15 @@
     "loadingRecent": "Aktuelle Elemente werden geladen…",
     "closeItem": "{{name}} schließen",
     "closeOthers": "Andere schließen",
-    "closeAll": "Alle schließen"
+    "closeAll": "Alle schließen",
+    "closeError": "Der Tab konnte nicht geschlossen werden.",
+    "closeSomeError": "Einige Tabs konnten nicht geschlossen werden."
   },
   "pin": {
     "pinned": "Angeheftetes Projekt",
     "unpin": "Projekt lösen",
-    "pin": "Projekt anheften"
+    "pin": "Projekt anheften",
+    "error": "Das Projekt konnte nicht angeheftet oder gelöst werden."
   },
   "taskComposer": {
     "createTask": "Aufgabe erstellen"
@@ -400,7 +403,8 @@
     "updated": "Aktualisiert {{date}}",
     "tasksDone": "{{completed}}/{{total}} erledigt",
     "archivedOn": "Archiviert am {{date}}",
-    "reorder": "Projekt neu anordnen"
+    "reorder": "Projekt neu anordnen",
+    "reorderError": "Das Projekt konnte nicht verschoben werden."
   },
   "presets": {
     "label": "Vorlagen",

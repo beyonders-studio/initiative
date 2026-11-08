@@ -40,7 +40,6 @@ import {
 } from "@/hooks/useCommunityAuthPolicy";
 import { useInitiativeRoles } from "@/hooks/useInitiativeRoles";
 import { useInitiativesForCommunity } from "@/hooks/useInitiatives";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -144,15 +143,6 @@ export const CommunityClaimRulesSection = ({ communityId }: { communityId: numbe
         toast.success(adding ? t("communityAuth.rules.added") : t("communityAuth.rules.saved"));
         setDialogOpen(false);
       },
-      onError: (error: unknown) =>
-        toast.error(
-          getErrorMessage(
-            error,
-            adding
-              ? "settings:communityAuth.rules.addError"
-              : "settings:communityAuth.rules.saveError"
-          )
-        ),
     };
     if (draft.ruleId === null) {
       createRule.mutate({ provider_id: Number(draft.providerId), ...fields }, callbacks);
@@ -405,10 +395,7 @@ export const CommunityClaimRulesSection = ({ communityId }: { communityId: numbe
               toast.success(t("communityAuth.rules.removed"));
               setRemoving(null);
             },
-            onError: (error) => {
-              toast.error(getErrorMessage(error, "settings:communityAuth.rules.removeError"));
-              setRemoving(null);
-            },
+            onError: () => setRemoving(null),
           });
         }}
       />

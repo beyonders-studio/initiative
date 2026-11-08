@@ -3,8 +3,8 @@ import { Trans, useTranslation } from "react-i18next";
 
 import { updateCommunity } from "@/api/generated/communities/communities";
 import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
+import { useApiMutation } from "@/hooks/useApiMutation";
 import { useCommunities } from "@/hooks/useCommunities";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { readOptionalWholeNumber } from "@/lib/text";
 import { Button } from "@/ui/button";
@@ -45,23 +45,23 @@ const RetentionForm = ({
   const stored = community.retention_days;
   const [autoPurge, setAutoPurge] = useState(stored !== null);
   const [days, setDays] = useState(String(stored ?? DEFAULT_DAYS));
-  const [saving, setSaving] = useState(false);
+  const save = useApiMutation(
+    {
+      mutationFn: (retention_days: number | null) =>
+        updateCommunity(community.id, { retention_days }),
+      errorKey: "communities:settings.unableToUpdate",
+    },
+    {
+      onSuccess: (updated) => {
+        onSaved(updated);
+        toast.success(t("settings.retentionUpdatedSuccessfully"));
+      },
+    }
+  );
 
   const { value: parsed, valid } = readOptionalWholeNumber(days, MIN_DAYS, MAX_DAYS);
   const next = autoPurge ? parsed : null;
   const ready = !autoPurge || (valid && parsed !== null);
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      onSaved(await updateCommunity(community.id, { retention_days: next }));
-      toast.success(t("settings.retentionUpdatedSuccessfully"));
-    } catch (err) {
-      toast.error(getErrorMessage(err, "communities:settings.unableToUpdate"));
-    } finally {
-      setSaving(false);
-    }
-  };
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b pb-4">
@@ -91,8 +91,12 @@ const RetentionForm = ({
           }}
         />
       </span>
-      <Button size="sm" onClick={save} disabled={saving || !ready || next === stored}>
-        {saving ? t("settings.saving") : t("common:save")}
+      <Button
+        size="sm"
+        onClick={() => save.mutate(next)}
+        disabled={save.isPending || !ready || next === stored}
+      >
+        {save.isPending ? t("settings.saving") : t("common:save")}
       </Button>
     </div>
   );

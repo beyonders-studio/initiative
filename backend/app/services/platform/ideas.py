@@ -1,12 +1,12 @@
 """The published ideas: what anybody reads of the Ideas board, and the votes.
 
-An idea is a task on the board bound to the ``ideas`` stream that the team
-published: its ``ideas`` case, a row in ``intake_cases`` the team opens and
-takes away from the task's Idea panel. Reading goes through the ideas
-role (``app.db.operations_schema``), signed in or not: a published idea's
-title, description and status, and how many voted. A vote is written on the
-writer's own session once a read through that role has shown the idea is
-published and open, as a filer's answer is.
+An idea is a task on the board bound to the ``ideas`` stream, of the type that
+binding names: the team publishes one by giving it that type, and takes it
+back by giving it another. Reading goes through the ideas role
+(``app.db.operations_schema``), signed in or not: a published idea's title,
+description and status, and how many voted. A vote is written on the system
+session once a read through that role has shown the idea is published and
+open.
 
 Only Initiative Cloud has the board (``app.core.intake.offered_streams``).
 """
@@ -32,7 +32,7 @@ from app.db.request_context import SystemGuild
 from app.db.session import routed_guild_id, set_rls_context
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
-from app.models.tenant.intake import IdeaVote, IntakeBinding, IntakeCase
+from app.models.tenant.intake import IdeaVote, IntakeBinding
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.services.platform import notice_outbox
 from app.services.platform.intake import configured_operations_guild_id
@@ -80,7 +80,7 @@ class IdeaRead:
     votes: int
     #: Whether the reader voted for it; False for somebody signed out.
     voted: bool
-    published_at: datetime
+    created_at: datetime
     updated_at: Optional[datetime]
     #: Only on one idea's own page.
     description: Optional[str] = None
@@ -132,21 +132,16 @@ def _status(row: Any) -> IdeaStatus:
 
 
 def _public(query):
-    """``query`` over ``Task``, kept to what anybody may read: a published
-    idea still on the board bound to ``ideas``, not archived, trashed or held."""
+    """``query`` over ``Task``, kept to what anybody may read: a task on the
+    board bound to ``ideas``, of the type that binding names, and not archived,
+    trashed or held. The ideas role's row policies say the same."""
     return (
         query.join(
-            IntakeCase,
-            and_(
-                IntakeCase.task_id == Task.id,
-                IntakeCase.stream == IntakeStream.ideas.value,
-            ),
-        )
-        .join(
             IntakeBinding,
             and_(
                 IntakeBinding.stream == IntakeStream.ideas.value,
                 IntakeBinding.project_id == Task.project_id,
+                IntakeBinding.task_type_id == Task.task_type_id,
             ),
         )
         .where(Task.archived_at.is_(None))  # type: ignore[union-attr]
@@ -178,7 +173,7 @@ def _ideas_query(user: Optional[User], *, with_description: bool = False):
     columns = [
         Task.id.label("task_id"),
         Task.title,
-        IntakeCase.opened_at.label("published_at"),
+        Task.created_at,
         Task.updated_at,
         TaskStatus.id.label("status_id"),
         TaskStatus.name.label("status_name"),
@@ -203,7 +198,7 @@ def _read(row: Any) -> IdeaRead:
         status=_status(row),
         votes=row.votes,
         voted=bool(row.voted),
-        published_at=row.published_at,
+        created_at=row.created_at,
         updated_at=row.updated_at,
         description=row.description,
     )
@@ -242,9 +237,9 @@ async def list_ideas(
             await session.exec(select(func.count()).select_from(query.subquery()))
         ).one()
         order = (
-            (votes.desc(), IntakeCase.opened_at.desc(), Task.id.desc())  # type: ignore[union-attr]
+            (votes.desc(), Task.created_at.desc(), Task.id.desc())  # type: ignore[union-attr]
             if sort is IdeaSort.votes
-            else (IntakeCase.opened_at.desc(), Task.id.desc())  # type: ignore[union-attr]
+            else (Task.created_at.desc(), Task.id.desc())  # type: ignore[union-attr]
         )
         rows = (
             await session.exec(
@@ -286,7 +281,7 @@ async def vote(user: User, task_id: int, *, on: bool) -> IdeaRead:
     """Vote for an open published idea, or take the vote back.
 
     Read through the ideas role first, which is what says the idea is
-    published; written on the writer's own session. A vote starts at the
+    published; written on the system session. A vote starts at the
     status it was cast on, so the vote sweep tells its voter nothing they
     already knew.
     """
@@ -340,91 +335,26 @@ async def vote(user: User, task_id: int, *, on: bool) -> IdeaRead:
 # ── The team's side ──────────────────────────────────────────────────────────
 
 
-@dataclass(frozen=True)
-class IdeaPanel:
-    """What the team sees of an Ideas-board task: whether it is published, and
-    how many voted."""
-
-    published_at: Optional[datetime]
-    votes: int
-
-
-async def on_the_board(session: AsyncSession, task: Task) -> bool:
-    """Whether ``task`` is the team's to publish: on the board bound to the
-    ``ideas`` stream and no other stream's case, read on the team's own
-    session. False on a server with no board."""
+async def published(session: AsyncSession, task_id: int) -> Optional[Any]:
+    """When ``task_id`` was written and how many voted for it, as
+    ``(created_at, votes)``, where it is a published idea; ``None`` for any
+    other task. Read on the team's own session, for its case panel."""
     if not board_open():
-        return False
-    bound = (
-        await session.exec(
-            select(IntakeBinding.project_id).where(
-                IntakeBinding.stream == IntakeStream.ideas.value
-            )
-        )
-    ).first()
-    if bound is None or bound != task.project_id:
-        return False
-    # Another stream's case moved onto the board says what its filer wrote:
-    # it is not the team's to publish.
-    other = (
-        await session.exec(
-            select(IntakeCase.id)
-            .where(IntakeCase.task_id == task.id)
-            .where(IntakeCase.stream != IntakeStream.ideas.value)
-        )
-    ).first()
-    return other is None
-
-
-async def panel(session: AsyncSession, task: Task) -> IdeaPanel:
-    """``task``'s Idea panel, read on the team's own session."""
-    published = (
-        await session.exec(
-            select(IntakeCase.opened_at)
-            .where(IntakeCase.task_id == task.id)
-            .where(IntakeCase.stream == IntakeStream.ideas.value)
-        )
-    ).first()
+        return None
     votes = (
+        select(func.count())
+        .select_from(IdeaVote)
+        .where(IdeaVote.task_id == Task.id)
+        .correlate(Task)
+        .scalar_subquery()
+    )
+    return (
         await session.exec(
-            select(func.count(IdeaVote.id)).where(IdeaVote.task_id == task.id)
-        )
-    ).one()
-    return IdeaPanel(published_at=published, votes=int(votes))
-
-
-async def publish(session: AsyncSession, task: Task, *, on: bool) -> None:
-    """Publish ``task`` as an idea, or take it back, on the team's own
-    session: its row policies are what say the reader may change the task.
-
-    Publishing opens the task's ``ideas`` case; :func:`on_the_board` has
-    already refused a task that is another stream's case.
-    """
-    published = (
-        await session.exec(
-            select(IntakeCase.id)
-            .where(IntakeCase.task_id == task.id)
-            .where(IntakeCase.stream == IntakeStream.ideas.value)
-        )
-    ).first()
-    if on and published is None:
-        now = datetime.now(timezone.utc)
-        session.add(
-            IntakeCase(
-                stream=IntakeStream.ideas,
-                task_id=task.id,
-                opened_at=now,
-                last_seen_at=now,
-                noted_at=now,
+            _public(select(Task.created_at, votes).select_from(Task)).where(
+                Task.id == task_id
             )
         )
-    elif not on:
-        await session.exec(
-            delete(IntakeCase)
-            .where(IntakeCase.task_id == task.id)  # type: ignore[arg-type]
-            .where(IntakeCase.stream == IntakeStream.ideas.value)  # type: ignore[arg-type]
-        )
-    await session.commit()
+    ).first()
 
 
 async def voter_notices(session: AsyncSession) -> list[dict[str, Any]]:

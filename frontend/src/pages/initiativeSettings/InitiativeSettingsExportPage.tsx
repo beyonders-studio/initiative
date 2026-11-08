@@ -13,7 +13,6 @@ import { InitiativeSettingsExportTab } from "@/components/initiatives/settings/I
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
 import { useUpdateInitiative } from "@/hooks/useInitiatives";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 
 export const InitiativeSettingsExportPage = () => {
@@ -21,7 +20,6 @@ export const InitiativeSettingsExportPage = () => {
   const { initiativeId, initiative, canManageMembers } = useInitiativeSettings();
   const updateInitiative = useUpdateInitiative({
     onSuccess: () => toast.success(t("settings.updated")),
-    onError: (error) => toast.error(getErrorMessage(error, "initiatives:settings.updateError")),
   });
 
   if (!canManageMembers) {

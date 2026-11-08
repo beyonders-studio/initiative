@@ -8,7 +8,7 @@
   "project": {
     "name": "Ideas",
     "icon": "💡",
-    "description": "The ideas everybody signed in can see and vote for. Each task is one idea, written for the people who asked for it. Its status is the one they see, so name statuses the way you'd say them out loud.",
+    "description": "The ideas everybody can read and vote for on the Ideas page, signed in or not. A task here is a draft until its type is Published. Its status is the one people see, so name statuses the way you'd say them out loud.",
     "is_template": false,
     "archived_at": null,
     "start_date": null,
@@ -57,11 +57,29 @@
       "is_default": false
     }
   ],
+  "task_types": [
+    {
+      "name": "Draft",
+      "position": 0,
+      "is_default": true,
+      "color": "#94A3B8",
+      "icon": "square-pen",
+      "layout_preset": "plain"
+    },
+    {
+      "name": "Published",
+      "position": 1,
+      "is_default": false,
+      "color": "#FBBF24",
+      "icon": "lightbulb",
+      "layout_preset": "discussion"
+    }
+  ],
   "property_definitions": [],
   "tasks": [
     {
       "title": "How this board works",
-      "description": "Every task on this board can become an idea people see on the Ideas page, signed in or not, and vote for.\n\n**Publishing.** A new idea starts unpublished, so the wording can be right before anybody reads it. Turn on **Publish** in the task's Idea panel when it is ready. People see its title, its description and its status, and how many voted. They never see its comments, assignees, properties or tags, so talk about it in the comments.\n\n**Statuses.** People see each status by its name. Everybody who voted hears when an idea moves.\n\nThis task stays unpublished: it is here for the team.",
+      "description": "A task on this board is a draft, which only the team sees, until its type is **Published**. Change its type to Published when the wording is right, and it shows on the Ideas page, where everybody can read it and vote for it, signed in or not. Change the type back to take it down. Its votes stay with it.\n\nPeople see an idea's title, its description and its status, and how many voted. They never see its comments, assignees, properties or tags, so talk about it in the comments.\n\n**Statuses.** People see each status by its name. Everybody who voted hears when an idea moves.\n\nThis task stays a draft: it is here for the team.",
       "priority": "medium",
       "start_date": null,
       "due_date": null,

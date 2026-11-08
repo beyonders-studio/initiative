@@ -10,12 +10,11 @@ import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { updateCommunity } from "@/api/generated/communities/communities";
-import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { PlacePicker } from "@/components/communities/PlacePicker";
+import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { useCommunities } from "@/hooks/useCommunities";
 import type { CommunityLocation } from "@/lib/communityLocation";
 import { type Place, placeFrom } from "@/lib/directoryNear";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
@@ -42,7 +41,19 @@ export const CommunityLocationPanel = () => {
   const { t } = useTranslation(["communities", "common"]);
   const [draft, setDraft] = useState<Place>(() => placeFrom(activeCommunity?.location));
   const [label, setLabel] = useState(() => activeCommunity?.location?.label ?? "");
-  const [saving, setSaving] = useState(false);
+  const save = useCommunityMutation(
+    {
+      mutationFn: async (communityId, location: CommunityLocation | null) => {
+        updateCommunityInState(await updateCommunity(communityId, { location }));
+        await refreshCommunities();
+      },
+      errorKey: "communities:settings.unableToUpdate",
+    },
+    {
+      onSuccess: (_data, location) =>
+        toast.success(location ? t("location.saved") : t("location.removed")),
+    }
+  );
 
   const stored = activeCommunity?.location;
   // Compared by value: the community list is refetched on focus, and a fresh copy
@@ -57,27 +68,11 @@ export const CommunityLocationPanel = () => {
 
   if (!activeCommunity) return null;
 
-  const save = async (location: CommunityLocation | null, done: string) => {
-    setSaving(true);
-    try {
-      const result = (await updateCommunity(activeCommunity.id, {
-        location,
-      } as Parameters<typeof updateCommunity>[1])) as unknown as CommunityRead;
-      updateCommunityInState(result);
-      await refreshCommunities();
-      toast.success(done);
-    } catch (err) {
-      toast.error(getErrorMessage(err, "communities:settings.unableToUpdate"));
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const location = locationOf(draft, label);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    void save(location, t("location.saved"));
+    save.mutate(location);
   };
 
   return (
@@ -89,7 +84,7 @@ export const CommunityLocationPanel = () => {
       <CardContent>
         <form className="space-y-4" onSubmit={handleSubmit}>
           <Field label={t("location.fieldLabel")}>
-            <PlacePicker value={draft} onChange={setDraft} disabled={saving} />
+            <PlacePicker value={draft} onChange={setDraft} disabled={save.isPending} />
           </Field>
 
           <Field label={t("location.labelLabel")} hint={t("location.labelHint")}>
@@ -98,7 +93,7 @@ export const CommunityLocationPanel = () => {
               onChange={(event) => setLabel(event.target.value)}
               maxLength={LABEL_MAX}
               placeholder={t("location.labelPlaceholder")}
-              disabled={saving}
+              disabled={save.isPending}
             />
           </Field>
 
@@ -107,15 +102,15 @@ export const CommunityLocationPanel = () => {
           ) : null}
 
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={saving || !location}>
-              {saving ? t("settings.saving") : t("location.save")}
+            <Button type="submit" disabled={save.isPending || !location}>
+              {save.isPending ? t("settings.saving") : t("location.save")}
             </Button>
             {stored ? (
               <Button
                 type="button"
                 variant="outline"
-                disabled={saving}
-                onClick={() => void save(null, t("location.removed"))}
+                disabled={save.isPending}
+                onClick={() => save.mutate(null)}
               >
                 {t("location.remove")}
               </Button>

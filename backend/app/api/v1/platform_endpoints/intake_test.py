@@ -174,6 +174,25 @@ async def test_clearing_the_pointer_stops_every_stream(client, session, owner):
 
 
 @pytest.mark.usefixtures("cloud")
+async def test_setting_the_ideas_board_up_names_its_published_type(client, owner):
+    """The type is what publishes an idea, so a board set up from its
+    blueprint publishes its Published tasks and keeps every other type a
+    draft."""
+    await client.put(
+        "/api/v1/settings/intake/community",
+        json={"community_id": owner["guild_id"]},
+        headers=owner["actor"].headers,
+    )
+    response = await client.post(
+        "/api/v1/settings/intake/ideas/blueprint",
+        json={"initiative_id": owner["initiative_id"]},
+        headers=owner["actor"].headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["task_type_name"] == "Published"
+
+
+@pytest.mark.usefixtures("cloud")
 async def test_unbinding_keeps_the_project(client, session, owner):
     await client.put(
         "/api/v1/settings/intake/community",

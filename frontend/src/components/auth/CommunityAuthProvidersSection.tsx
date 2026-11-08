@@ -37,7 +37,6 @@ import {
   useUpdateProviderConnection,
 } from "@/hooks/useCommunityAuthPolicy";
 import { useServer } from "@/hooks/useServer";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -89,13 +88,7 @@ export const CommunityAuthProvidersSection = ({
   );
 
   const change = (row: CommunityProviderConnectionRead, data: CommunityProviderConnectionUpdate) =>
-    updateConnection.mutate(
-      { connectionId: row.id as number, data },
-      {
-        onError: (error) =>
-          toast.error(getErrorMessage(error, "settings:communityAuth.connections.connectError")),
-      }
-    );
+    updateConnection.mutate({ connectionId: row.id as number, data });
 
   // The community's shareable sign-in URL, built on the server's origin (which
   // is the app's own origin on web, or the configured server on native).
@@ -273,10 +266,6 @@ export const CommunityAuthProvidersSection = ({
               toast.success(t("communityAuth.connections.disconnected"));
               setRemoving(null);
             },
-            onError: (error) =>
-              toast.error(
-                getErrorMessage(error, "settings:communityAuth.connections.connectError")
-              ),
           });
         }}
       />

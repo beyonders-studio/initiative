@@ -33,6 +33,7 @@ import { invalidate, q } from "@/api/query-keys";
 import { relate } from "@/api/relationships";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { getErrorMessage } from "@/lib/errorMessage";
 import type { EditorFileType } from "@/lib/fileTypes";
 import { toast } from "@/lib/mascotToast";
@@ -131,74 +132,63 @@ type CreateFileInput = {
 
 export const useCreateFile = (options?: MutationOpts<FileRead, CreateFileInput>) => {
   const { t } = useTranslation("files");
-  const communityId = useActiveCommunityId();
-  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
-
-  return useMutation({
-    ...rest,
-    mutationFn: async (data: CreateFileInput) => {
-      const {
-        name,
-        initiative_id,
-        is_template,
-        template_id,
-        project_id,
-        file_type,
-        content,
-        grants = [],
-      } = data;
-
-      let newFile: FileRead;
-
-      if (template_id) {
-        // Copy from template
-        newFile = await duplicateFile(communityId, template_id, {
-          target_initiative_id: initiative_id,
-          name,
-        });
-        // Template copy can't carry grants in payload — apply separately
-        const failures = await applyFileGrants(communityId, newFile.id, grants);
-        if (failures > 0) {
-          toast.warning(t("create.somePermissionsFailed"));
-        }
-      } else {
-        // Direct create — pass grants in the payload (backend handles them)
-        const payload: FileCreate = {
+  return useCommunityMutation<FileRead, CreateFileInput>(
+    {
+      mutationFn: async (communityId, data) => {
+        const {
           name,
           initiative_id,
-          is_template: is_template ?? false,
-          ...(file_type ? { file_type } : {}),
-          ...(content ? { content } : {}),
-          ...(grants.length > 0 ? { grants } : {}),
-        };
-        newFile = await createFile(communityId, payload);
-      }
+          is_template,
+          template_id,
+          project_id,
+          file_type,
+          content,
+          grants = [],
+        } = data;
 
-      // Auto-attach to project if specified
-      if (project_id) {
-        await relate(
-          communityId,
-          { type: SearchEntityType.project, id: project_id },
-          { type: SearchEntityType.file, id: newFile.id }
-        );
-      }
+        let newFile: FileRead;
 
-      return newFile;
+        if (template_id) {
+          // Copy from template
+          newFile = await duplicateFile(communityId, template_id, {
+            target_initiative_id: initiative_id,
+            name,
+          });
+          // Template copy can't carry grants in payload — apply separately
+          const failures = await applyFileGrants(communityId, newFile.id, grants);
+          if (failures > 0) {
+            toast.warning(t("create.somePermissionsFailed"));
+          }
+        } else {
+          // Direct create — pass grants in the payload (backend handles them)
+          const payload: FileCreate = {
+            name,
+            initiative_id,
+            is_template: is_template ?? false,
+            ...(file_type ? { file_type } : {}),
+            ...(content ? { content } : {}),
+            ...(grants.length > 0 ? { grants } : {}),
+          };
+          newFile = await createFile(communityId, payload);
+        }
+
+        // Auto-attach to project if specified
+        if (project_id) {
+          await relate(
+            communityId,
+            { type: SearchEntityType.project, id: project_id },
+            { type: SearchEntityType.file, id: newFile.id }
+          );
+        }
+
+        return newFile;
+      },
+      invalidate: (_file, { project_id }) =>
+        invalidate(q.allFiles(), ...(project_id ? [q.project(project_id)] : [])),
+      errorKey: "files:create.createError",
     },
-    onSuccess: (...args) => {
-      void invalidate(q.allFiles());
-      const projectId = args[1].project_id;
-      if (projectId) {
-        void invalidate(q.project(projectId));
-      }
-      onSuccess?.(...args);
-    },
-    onError: (...args) => {
-      toast.error(getErrorMessage(args[0], "files:create.createError"));
-      onError?.(...args);
-    },
-    onSettled,
-  });
+    options
+  );
 };
 
 type UploadFileInput = {
@@ -316,24 +306,17 @@ export const useUploadFileVersion = (
  *  spreadsheet the app keeps, and its uploaded versions go. */
 export const useConvertFile = (options?: MutationOpts<FileRead, number>) => {
   const { t } = useTranslation("files");
-  const communityId = useActiveCommunityId();
-  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
-
-  return useMutation({
-    ...rest,
-    mutationFn: (fileId: number) => convertFile(communityId, fileId),
-    onSuccess: (...args) => {
-      const fileId = args[1];
-      void invalidate(q.file(fileId), q.fileVersions(fileId), q.allFiles());
-      toast.success(t("convert.success"));
-      onSuccess?.(...args);
+  return useCommunityMutation<FileRead, number>(
+    {
+      mutationFn: (communityId, fileId) => convertFile(communityId, fileId),
+      invalidate: (_file, fileId) => {
+        toast.success(t("convert.success"));
+        return invalidate(q.file(fileId), q.fileVersions(fileId), q.allFiles());
+      },
+      errorKey: "files:convert.error",
     },
-    onError: (...args) => {
-      toast.error(getErrorMessage(args[0], "files:convert.error"));
-      onError?.(...args);
-    },
-    onSettled,
-  });
+    options
+  );
 };
 
 /** Give a video version the frame the browser drew of it. Quiet: nobody asked
@@ -360,24 +343,17 @@ export const useDeleteFileVersion = (
   options?: MutationOpts<void, { fileId: number; versionId: number }>
 ) => {
   const { t } = useTranslation("files");
-  const communityId = useActiveCommunityId();
-  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
-
-  return useMutation({
-    ...rest,
-    mutationFn: async ({ fileId, versionId }: { fileId: number; versionId: number }) => {
-      await deleteFileVersion(communityId, fileId, versionId);
+  return useCommunityMutation<void, { fileId: number; versionId: number }>(
+    {
+      mutationFn: async (communityId, { fileId, versionId }) => {
+        await deleteFileVersion(communityId, fileId, versionId);
+      },
+      invalidate: (_none, { fileId }) => {
+        toast.success(t("versions.deleteSuccess"));
+        return invalidate(q.fileVersions(fileId), q.file(fileId), q.allFiles());
+      },
+      errorKey: "files:versions.deleteError",
     },
-    onSuccess: (...args) => {
-      const fileId = args[1].fileId;
-      void invalidate(q.fileVersions(fileId), q.file(fileId), q.allFiles());
-      toast.success(t("versions.deleteSuccess"));
-      onSuccess?.(...args);
-    },
-    onError: (...args) => {
-      toast.error(getErrorMessage(args[0], "files:versions.deleteError"));
-      onError?.(...args);
-    },
-    onSettled,
-  });
+    options
+  );
 };

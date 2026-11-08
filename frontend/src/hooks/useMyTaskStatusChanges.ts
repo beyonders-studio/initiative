@@ -21,7 +21,6 @@ import { listTaskStatuses } from "@/api/generated/task-statuses/task-statuses";
 import { getListMyTasksQueryKey } from "@/api/generated/tasks/tasks";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useUpdateTaskInCommunity } from "@/hooks/useTasks";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 
 /**
@@ -222,7 +221,6 @@ export function useMyTaskStatusChanges() {
       } catch (error) {
         rollback?.();
         console.error(error);
-        toast.error(getErrorMessage(error, "tasks:errors.statusUpdate"));
       } finally {
         inFlight.keys.delete(key);
         notify(inFlight);

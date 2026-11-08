@@ -432,6 +432,8 @@ class TaskCaseRead(SanitizedBaseModel):
     #: The access grants asked for this case, newest first: who holds each,
     #: on which community, at what level, and where it stands.
     grants: List[AccessGrantRead] = Field(default_factory=list)
+    #: How many voted for it, on a published idea; absent on any other case.
+    votes: Optional[int] = None
     #: What the case is about, as it was opened with: the community, and the
     #: kind and id of the thing in it, where it names them.
     subject_community_id: Optional[int] = None

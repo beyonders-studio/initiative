@@ -88,10 +88,7 @@ describe("AIConnectionManager", () => {
 
     await userEvent.click(screen.getByRole("switch", { name: "Use Team" }));
 
-    expect(given.update.mutate).toHaveBeenCalledWith(
-      { connectionId: 1, data: { enabled: false } },
-      expect.anything()
-    );
+    expect(given.update.mutate).toHaveBeenCalledWith({ connectionId: 1, data: { enabled: false } });
   });
 
   it("keeps every connection off while AI is off, and says where to turn it on", () => {

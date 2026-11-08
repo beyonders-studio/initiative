@@ -7207,7 +7207,7 @@ export interface IdeaRead {
   votes: number;
   voted: boolean;
   closed: boolean;
-  published_at: string;
+  created_at: string;
   updated_at?: string | null;
   description?: string | null;
 }
@@ -7219,14 +7219,6 @@ export interface IdeaListRead {
   items: IdeaRead[];
   total: number;
   statuses: IdeaStatusRead[];
-}
-
-/**
- * What the team sees of an Ideas-board task.
- */
-export interface IdeaPanelRead {
-  published_at?: string | null;
-  votes: number;
 }
 
 /**
@@ -11554,6 +11546,7 @@ export interface TaskCaseRead {
   messages?: CaseMessageRead[];
   evidence?: CaseEvidenceRead[];
   grants?: AccessGrantRead[];
+  votes?: number | null;
   subject_community_id?: number | null;
   resource_type?: string | null;
   resource_id?: number | null;

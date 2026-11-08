@@ -62,6 +62,8 @@
     "landingStatusDefault": "Le statut par défaut du projet",
     "caseTypeLabel": "Les nouveaux cas sont de type",
     "caseTypeDefault": "Le type par défaut du projet",
+    "ideaTypeLabel": "Le type qui met une tâche sur la page Idées",
+    "ideaTypeNone": "Aucun : rien n'est publié",
     "enabledLabel": "Reçoit les nouveaux cas",
     "lastCase": "Dernier cas ouvert le {{when}}.",
     "noCasesYet": "Aucun cas pour l'instant.",
@@ -157,6 +159,8 @@
   "case": {
     "filedBy": "Envoyé par",
     "noFiler": "Ouvert automatiquement",
+    "votes_one": "{{count}} vote",
+    "votes_other": "{{count}} votes",
     "noContact": "Ne souhaite pas être contacté",
     "theyCalledIt": "Son objet :",
     "noConversation": "Ce type de dossier n'ouvre pas de conversation avec la personne qui l'a envoyé.",
@@ -317,15 +321,6 @@
   },
   "moderationTopics": {
     "appeal": "Recours contre votre suspension"
-  },
-  "idea": {
-    "title": "Idée",
-    "publish": "Publiée sur la page des idées",
-    "publishedHelp": "Tout le monde voit son titre, sa description et son statut, et peut voter pour elle.",
-    "draftHelp": "Non publiée : seule l'équipe la voit. Ses votes restent avec elle.",
-    "votes_one": "{{count}} vote",
-    "votes_other": "{{count}} votes",
-    "error": "Impossible de modifier ce réglage. Réessayez dans un instant."
   },
   "ideas": {
     "title": "Idées",

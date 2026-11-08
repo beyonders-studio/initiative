@@ -1,5 +1,3 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-
 import type {
   PlacementCommunityRead,
   PlacementInitiativeRead,
@@ -20,6 +18,8 @@ import {
   agreeCommunityNarrowing,
   getReadCommunityNarrowingsQueryKey,
 } from "@/api/generated/settings/settings";
+import { useApiMutation } from "@/hooks/useApiMutation";
+import { queryClient } from "@/lib/queryClient";
 import type { QueryOpts } from "@/types/query";
 
 /** Communities a rule for this provider may name, searched by name. */
@@ -50,62 +50,49 @@ export const usePlacementTargets = (
   });
 };
 
-const useInvalidatePlacement = () => {
-  const queryClient = useQueryClient();
-  return () => {
-    void queryClient.invalidateQueries({
-      queryKey: getListProviderPlacementQueryKey(),
-    });
-  };
-};
+const invalidatePlacement = () =>
+  queryClient.invalidateQueries({ queryKey: getListProviderPlacementQueryKey() });
 
 /** Apply the rules to every community they name, or only where accepted. */
-export const useSetPlacementEverywhere = () => {
-  const invalidate = useInvalidatePlacement();
-  return useMutation({
+export const useSetPlacementEverywhere = () =>
+  useApiMutation({
     mutationFn: (enabled: boolean) => setProviderPlacementEverywhere({ enabled }),
-    onSuccess: invalidate,
+    invalidate: invalidatePlacement,
+    errorKey: "settings:providerPlacement.everywhere.error",
   });
-};
 
-export const useCreatePlacementRule = () => {
-  const invalidate = useInvalidatePlacement();
-  return useMutation({
+export const useCreatePlacementRule = () =>
+  useApiMutation({
     mutationFn: (data: ProviderPlacementRuleCreate) => createProviderPlacementRule(data),
-    onSuccess: invalidate,
+    invalidate: invalidatePlacement,
+    errorKey: "settings:providerPlacement.addError",
   });
-};
 
-export const useUpdatePlacementRule = () => {
-  const invalidate = useInvalidatePlacement();
-  return useMutation({
+export const useUpdatePlacementRule = () =>
+  useApiMutation({
     mutationFn: ({ ruleId, data }: { ruleId: number; data: ProviderPlacementRuleUpdate }) =>
       updateProviderPlacementRule(ruleId, data),
-    onSuccess: invalidate,
+    invalidate: invalidatePlacement,
+    errorKey: "settings:providerPlacement.saveError",
   });
-};
 
-export const useDeletePlacementRule = () => {
-  const invalidate = useInvalidatePlacement();
-  return useMutation({
+export const useDeletePlacementRule = () =>
+  useApiMutation({
     mutationFn: (ruleId: number) => deleteProviderPlacementRule(ruleId),
-    onSuccess: invalidate,
+    invalidate: invalidatePlacement,
+    errorKey: "settings:providerPlacement.removeError",
   });
-};
 
 /** Agree that a community's claim is its own, from the list of those waiting. */
-export const useAgreePlacementRequest = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
+export const useAgreePlacementRequest = () =>
+  useApiMutation({
     mutationFn: ({ communityId, connectionId }: { communityId: number; connectionId: number }) =>
       agreeCommunityNarrowing(communityId, connectionId, { agreed: true }),
-    onSuccess: (_data, { communityId }) => {
-      void queryClient.invalidateQueries({
-        queryKey: getListPlacementRequestsQueryKey(),
-      });
+    invalidate: (_data, { communityId }) => {
+      void queryClient.invalidateQueries({ queryKey: getListPlacementRequestsQueryKey() });
       void queryClient.invalidateQueries({
         queryKey: getReadCommunityNarrowingsQueryKey(communityId),
       });
     },
+    errorKey: "settings:communities.sheet.narrowings.error",
   });
-};

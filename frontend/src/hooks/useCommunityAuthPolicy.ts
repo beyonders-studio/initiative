@@ -46,6 +46,8 @@ import type {
   CustomRoleClaimRuleUpdate,
   LoginProvidersResponse,
 } from "@/api/generated/initiativeAPI.schemas";
+import { useApiMutation } from "@/hooks/useApiMutation";
+import { queryClient } from "@/lib/queryClient";
 import type { QueryOpts } from "@/types/query";
 
 /** The sign-in providers the login page offers (non-secret metadata). */
@@ -123,47 +125,36 @@ export const useConnectableProviders = (
   });
 };
 
-const useInvalidateConnections = (communityId: number) => {
-  const queryClient = useQueryClient();
-  // Three consumers read this: the list, the picker (a provider already
-  // connected is still offered, so it has to know), and the public login
-  // listing — which feeds the policy page's "sign in with it first" prompt
-  // and the step-up dialog. Without the last one a freshly connected provider
-  // cannot be required until the cache expires. The rules list reads it too:
-  // whether the deployment's rules for a provider apply here follows the
-  // connection's acceptance. And the seat's settings count, per connected
-  // provider, who has never signed in through it.
-  return () => {
-    void queryClient.invalidateQueries({
-      queryKey: getGetCommunityAuthSettingsQueryKey(communityId),
-    });
-    void queryClient.invalidateQueries({
-      queryKey: getListCommunityClaimRulesQueryKey(communityId),
-    });
-    void queryClient.invalidateQueries({
-      queryKey: getListCommunityProviderConnectionsQueryKey(communityId),
-    });
-    void queryClient.invalidateQueries({
-      queryKey: getListConnectableProvidersQueryKey(communityId),
-    });
-    void queryClient.invalidateQueries({
-      queryKey: getListCommunityLoginProvidersQueryKey(communityId),
-    });
-  };
+// Three consumers read this: the list, the picker (a provider already
+// connected is still offered, so it has to know), and the public login
+// listing — which feeds the policy page's "sign in with it first" prompt
+// and the step-up dialog. Without the last one a freshly connected provider
+// cannot be required until the cache expires. The rules list reads it too:
+// whether the deployment's rules for a provider apply here follows the
+// connection's acceptance. And the seat's settings count, per connected
+// provider, who has never signed in through it.
+const invalidateConnections = (communityId: number) => {
+  for (const queryKey of [
+    getGetCommunityAuthSettingsQueryKey(communityId),
+    getListCommunityClaimRulesQueryKey(communityId),
+    getListCommunityProviderConnectionsQueryKey(communityId),
+    getListConnectableProvidersQueryKey(communityId),
+    getListCommunityLoginProvidersQueryKey(communityId),
+  ]) {
+    void queryClient.invalidateQueries({ queryKey });
+  }
 };
 
-export const useConnectProvider = (communityId: number) => {
-  const invalidate = useInvalidateConnections(communityId);
-  return useMutation({
+export const useConnectProvider = (communityId: number) =>
+  useApiMutation({
     mutationFn: (data: CommunityProviderConnectionCreate) =>
       createCommunityProviderConnection(communityId, data),
-    onSuccess: invalidate,
+    invalidate: () => invalidateConnections(communityId),
+    errorKey: "settings:communityAuth.connections.connectError",
   });
-};
 
-export const useUpdateProviderConnection = (communityId: number) => {
-  const invalidate = useInvalidateConnections(communityId);
-  return useMutation({
+export const useUpdateProviderConnection = (communityId: number) =>
+  useApiMutation({
     mutationFn: ({
       connectionId,
       data,
@@ -171,18 +162,17 @@ export const useUpdateProviderConnection = (communityId: number) => {
       connectionId: number;
       data: CommunityProviderConnectionUpdate;
     }) => updateCommunityProviderConnection(communityId, connectionId, data),
-    onSuccess: invalidate,
+    invalidate: () => invalidateConnections(communityId),
+    errorKey: "settings:communityAuth.connections.connectError",
   });
-};
 
-export const useDisconnectProvider = (communityId: number) => {
-  const invalidate = useInvalidateConnections(communityId);
-  return useMutation({
+export const useDisconnectProvider = (communityId: number) =>
+  useApiMutation({
     mutationFn: (connectionId: number) =>
       deleteCommunityProviderConnection(communityId, connectionId),
-    onSuccess: invalidate,
+    invalidate: () => invalidateConnections(communityId),
+    errorKey: "settings:communityAuth.connections.connectError",
   });
-};
 
 /** Where this community places the people its providers vouch for. */
 export const useCommunityClaimRules = (
@@ -194,39 +184,30 @@ export const useCommunityClaimRules = (
   });
 };
 
-const useInvalidateClaimRules = (communityId: number) => {
-  const queryClient = useQueryClient();
-  return () => {
-    void queryClient.invalidateQueries({
-      queryKey: getListCommunityClaimRulesQueryKey(communityId),
-    });
-  };
-};
+const invalidateClaimRules = (communityId: number) =>
+  queryClient.invalidateQueries({ queryKey: getListCommunityClaimRulesQueryKey(communityId) });
 
-export const useCreateClaimRule = (communityId: number) => {
-  const invalidate = useInvalidateClaimRules(communityId);
-  return useMutation({
+export const useCreateClaimRule = (communityId: number) =>
+  useApiMutation({
     mutationFn: (data: CommunityClaimRuleCreate) => createCommunityClaimRule(communityId, data),
-    onSuccess: invalidate,
+    invalidate: () => invalidateClaimRules(communityId),
+    errorKey: "settings:communityAuth.rules.addError",
   });
-};
 
-export const useUpdateClaimRule = (communityId: number) => {
-  const invalidate = useInvalidateClaimRules(communityId);
-  return useMutation({
+export const useUpdateClaimRule = (communityId: number) =>
+  useApiMutation({
     mutationFn: ({ ruleId, data }: { ruleId: number; data: CommunityClaimRuleUpdate }) =>
       updateCommunityClaimRule(communityId, ruleId, data),
-    onSuccess: invalidate,
+    invalidate: () => invalidateClaimRules(communityId),
+    errorKey: "settings:communityAuth.rules.saveError",
   });
-};
 
-export const useDeleteClaimRule = (communityId: number) => {
-  const invalidate = useInvalidateClaimRules(communityId);
-  return useMutation({
+export const useDeleteClaimRule = (communityId: number) =>
+  useApiMutation({
     mutationFn: (ruleId: number) => deleteCommunityClaimRule(communityId, ruleId),
-    onSuccess: invalidate,
+    invalidate: () => invalidateClaimRules(communityId),
+    errorKey: "settings:communityAuth.rules.removeError",
   });
-};
 
 /** Which custom role each group gives, in the order a sign-in reads them. */
 export const useCustomRoleClaimRules = (
@@ -238,47 +219,46 @@ export const useCustomRoleClaimRules = (
   });
 };
 
-/** Refetch the rules. Returned, so a mutation stays pending until the new
- *  order is in and the next move is built from it. */
-const useInvalidateCustomRoleClaimRules = (communityId: number) => {
-  const queryClient = useQueryClient();
-  return () =>
-    queryClient.invalidateQueries({
-      queryKey: getListCustomRoleClaimRulesQueryKey(communityId),
-    });
-};
+/** Refetch the rules. Run as a mutation's `onSuccess`, which it waits on, so
+ *  it stays pending until the new order is in and the next move is built from it. */
+const refetchCustomRoleClaimRules = (communityId: number) =>
+  queryClient.invalidateQueries({ queryKey: getListCustomRoleClaimRulesQueryKey(communityId) });
 
-export const useCreateCustomRoleClaimRule = (communityId: number) => {
-  const invalidate = useInvalidateCustomRoleClaimRules(communityId);
-  return useMutation({
-    mutationFn: (data: CustomRoleClaimRuleCreate) => createCustomRoleClaimRule(communityId, data),
-    onSuccess: invalidate,
-  });
-};
+export const useCreateCustomRoleClaimRule = (communityId: number) =>
+  useApiMutation(
+    {
+      mutationFn: (data: CustomRoleClaimRuleCreate) => createCustomRoleClaimRule(communityId, data),
+      errorKey: "settings:customRoleRules.addError",
+    },
+    { onSuccess: () => refetchCustomRoleClaimRules(communityId) }
+  );
 
-export const useUpdateCustomRoleClaimRule = (communityId: number) => {
-  const invalidate = useInvalidateCustomRoleClaimRules(communityId);
-  return useMutation({
-    mutationFn: ({ ruleId, data }: { ruleId: number; data: CustomRoleClaimRuleUpdate }) =>
-      updateCustomRoleClaimRule(communityId, ruleId, data),
-    onSuccess: invalidate,
-  });
-};
+export const useUpdateCustomRoleClaimRule = (communityId: number) =>
+  useApiMutation(
+    {
+      mutationFn: ({ ruleId, data }: { ruleId: number; data: CustomRoleClaimRuleUpdate }) =>
+        updateCustomRoleClaimRule(communityId, ruleId, data),
+      errorKey: "settings:customRoleRules.saveError",
+    },
+    { onSuccess: () => refetchCustomRoleClaimRules(communityId) }
+  );
 
 /** Put the rules in a new order: every rule's id, once. */
-export const useOrderCustomRoleClaimRules = (communityId: number) => {
-  const invalidate = useInvalidateCustomRoleClaimRules(communityId);
-  return useMutation({
-    mutationFn: (ruleIds: number[]) =>
-      orderCustomRoleClaimRules(communityId, { rule_ids: ruleIds }),
-    onSuccess: invalidate,
-  });
-};
+export const useOrderCustomRoleClaimRules = (communityId: number) =>
+  useApiMutation(
+    {
+      mutationFn: (ruleIds: number[]) =>
+        orderCustomRoleClaimRules(communityId, { rule_ids: ruleIds }),
+      errorKey: "settings:customRoleRules.orderError",
+    },
+    { onSuccess: () => refetchCustomRoleClaimRules(communityId) }
+  );
 
-export const useDeleteCustomRoleClaimRule = (communityId: number) => {
-  const invalidate = useInvalidateCustomRoleClaimRules(communityId);
-  return useMutation({
-    mutationFn: (ruleId: number) => deleteCustomRoleClaimRule(communityId, ruleId),
-    onSuccess: invalidate,
-  });
-};
+export const useDeleteCustomRoleClaimRule = (communityId: number) =>
+  useApiMutation(
+    {
+      mutationFn: (ruleId: number) => deleteCustomRoleClaimRule(communityId, ruleId),
+      errorKey: "settings:customRoleRules.removeError",
+    },
+    { onSuccess: () => refetchCustomRoleClaimRules(communityId) }
+  );

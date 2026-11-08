@@ -1,4 +1,3 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -20,8 +19,9 @@ import {
 } from "@/api/generated/initiatives/initiatives";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { getErrorMessage } from "@/lib/errorMessage";
+import { useApiMutation, useCommunityMutation } from "@/hooks/useApiMutation";
 import { toast } from "@/lib/mascotToast";
+import { queryClient } from "@/lib/queryClient";
 import { TOOLS, toolCreatePermission, toolPascalPlural, toolViewPermission } from "@/lib/tools";
 
 export const useInitiativeRoles = (initiativeId: number | null) => {
@@ -31,37 +31,29 @@ export const useInitiativeRoles = (initiativeId: number | null) => {
 
 export const useCreateRole = (initiativeId: number) => {
   const { t } = useTranslation("initiatives");
-  const communityId = useActiveCommunityId();
-
-  return useMutation({
-    mutationFn: async (data: InitiativeRoleCreate) => {
-      return createInitiativeRole(communityId, initiativeId, data);
-    },
-    onSuccess: () => {
+  return useCommunityMutation({
+    mutationFn: (communityId: number, data: InitiativeRoleCreate) =>
+      createInitiativeRole(communityId, initiativeId, data),
+    invalidate: () => {
       toast.success(t("settings.roleCreated"));
-      void invalidate(q.initiativeRoles(initiativeId));
+      return invalidate(q.initiativeRoles(initiativeId));
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "initiatives:settings.roleCreateError"));
-    },
+    errorKey: "initiatives:settings.roleCreateError",
   });
 };
 
 export const useUpdateRole = (initiativeId: number) => {
   const { t } = useTranslation("initiatives");
-  const communityId = useActiveCommunityId();
-
-  return useMutation({
-    mutationFn: async ({ roleId, data }: { roleId: number; data: InitiativeRoleUpdate }) => {
-      return updateInitiativeRole(communityId, initiativeId, roleId, data);
-    },
-    onSuccess: () => {
+  return useCommunityMutation({
+    mutationFn: (
+      communityId: number,
+      { roleId, data }: { roleId: number; data: InitiativeRoleUpdate }
+    ) => updateInitiativeRole(communityId, initiativeId, roleId, data),
+    invalidate: () => {
       toast.success(t("settings.roleUpdated"));
-      void invalidate(q.initiativeRoles(initiativeId), q.allInitiatives());
+      return invalidate(q.initiativeRoles(initiativeId), q.allInitiatives());
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "initiatives:settings.roleUpdateError"));
-    },
+    errorKey: "initiatives:settings.roleUpdateError",
   });
 };
 
@@ -88,30 +80,34 @@ export const useUpdateRole = (initiativeId: number) => {
  *   the error is raised after the others have been tried, so a retry has less
  *   to do and the audience line already reflects who really has it.
  */
-export const useGrantToolToRoles = (initiativeId: number) => {
-  const communityId = useActiveCommunityId();
-
-  return useMutation({
-    mutationFn: async ({ tool }: { tool: Tool }) => {
-      const key = toolViewPermission(tool);
-      const roles = await listInitiativeRoles(communityId, initiativeId);
-      const needsGrant = roles.filter(
-        (role) => !role.is_manager && !(role.permissions[key] ?? false)
-      );
-      const results = await Promise.allSettled(
-        needsGrant.map((role) =>
-          updateInitiativeRole(communityId, initiativeId, role.id, { permissions: { [key]: true } })
-        )
-      );
-      const failed = results.find((r) => r.status === "rejected");
-      if (failed) throw failed.reason;
-      return needsGrant.length;
+export const useGrantToolToRoles = (initiativeId: number) =>
+  useCommunityMutation(
+    {
+      mutationFn: async (communityId: number, { tool }: { tool: Tool }) => {
+        const key = toolViewPermission(tool);
+        const roles = await listInitiativeRoles(communityId, initiativeId);
+        const needsGrant = roles.filter(
+          (role) => !role.is_manager && !(role.permissions[key] ?? false)
+        );
+        const results = await Promise.allSettled(
+          needsGrant.map((role) =>
+            updateInitiativeRole(communityId, initiativeId, role.id, {
+              permissions: { [key]: true },
+            })
+          )
+        );
+        const failed = results.find((r) => r.status === "rejected");
+        if (failed) throw failed.reason;
+        return needsGrant.length;
+      },
+      errorKey: "initiatives:settings.roleUpdateError",
     },
-    onSettled: () => {
-      void invalidate(q.initiativeRoles(initiativeId), q.allInitiatives());
-    },
-  });
-};
+    {
+      onSettled: () => {
+        void invalidate(q.initiativeRoles(initiativeId), q.allInitiatives());
+      },
+    }
+  );
 
 /**
  * What the ordinary roles may do with a set of tools — the question a brand-new
@@ -127,65 +123,66 @@ export const useGrantToolToRoles = (initiativeId: number) => {
  * "managers" writes nothing, which is that default. Manager roles are skipped
  * because they hold every permission by construction.
  */
-export const useGrantToolsToMembers = () => {
-  const communityId = useActiveCommunityId();
-
-  return useMutation({
-    mutationFn: async ({
-      initiativeId,
-      tools,
-      audience,
-    }: {
-      /** Passed per call, not bound to the hook: the caller is the create
-       *  wizard, and the initiative does not exist at the render that set this
-       *  mutation up. Closing over an id from state would send the writes to
-       *  whatever that state held a render ago — which is nothing. */
-      initiativeId: number;
-      tools: Tool[];
-      audience: "create" | "view" | "managers";
-    }) => {
-      if (tools.length === 0) return 0;
-      // Written for every chosen tool, in all three answers. "Managers only"
-      // is a revoke, not a no-op: the built-in member role arrives holding
-      // projects and files, so leaving it alone would answer "managers
-      // only" with members who can still see both.
-      const permissions: Record<string, boolean> = {};
-      for (const tool of tools) {
-        permissions[toolViewPermission(tool)] = audience !== "managers";
-        permissions[toolCreatePermission(tool)] = audience === "create";
-      }
-      const roles = await listInitiativeRoles(communityId, initiativeId);
-      const ordinary = roles.filter((role) => !role.is_manager);
-      const results = await Promise.allSettled(
-        ordinary.map((role) =>
-          updateInitiativeRole(communityId, initiativeId, role.id, { permissions })
-        )
-      );
-      const failed = results.find((r) => r.status === "rejected");
-      if (failed) throw failed.reason;
-      return ordinary.length;
+export const useGrantToolsToMembers = () =>
+  useCommunityMutation(
+    {
+      mutationFn: async (
+        communityId: number,
+        {
+          initiativeId,
+          tools,
+          audience,
+        }: {
+          /** Passed per call, not bound to the hook: the caller is the create
+           *  wizard, and the initiative does not exist at the render that set this
+           *  mutation up. Closing over an id from state would send the writes to
+           *  whatever that state held a render ago — which is nothing. */
+          initiativeId: number;
+          tools: Tool[];
+          audience: "create" | "view" | "managers";
+        }
+      ) => {
+        if (tools.length === 0) return 0;
+        // Written for every chosen tool, in all three answers. "Managers only"
+        // is a revoke, not a no-op: the built-in member role arrives holding
+        // projects and files, so leaving it alone would answer "managers
+        // only" with members who can still see both.
+        const permissions: Record<string, boolean> = {};
+        for (const tool of tools) {
+          permissions[toolViewPermission(tool)] = audience !== "managers";
+          permissions[toolCreatePermission(tool)] = audience === "create";
+        }
+        const roles = await listInitiativeRoles(communityId, initiativeId);
+        const ordinary = roles.filter((role) => !role.is_manager);
+        const results = await Promise.allSettled(
+          ordinary.map((role) =>
+            updateInitiativeRole(communityId, initiativeId, role.id, { permissions })
+          )
+        );
+        const failed = results.find((r) => r.status === "rejected");
+        if (failed) throw failed.reason;
+        return ordinary.length;
+      },
+      errorKey: "initiatives:createWizard.memberGrantFailed",
     },
-    onSettled: (_data, _error, variables) => {
-      void invalidate(q.initiativeRoles(variables.initiativeId), q.allInitiatives());
-    },
-  });
-};
+    {
+      onSettled: (_data, _error, variables) => {
+        void invalidate(q.initiativeRoles(variables.initiativeId), q.allInitiatives());
+      },
+    }
+  );
 
 export const useDeleteRole = (initiativeId: number) => {
   const { t } = useTranslation("initiatives");
-  const communityId = useActiveCommunityId();
-
-  return useMutation({
-    mutationFn: async (roleId: number) => {
+  return useCommunityMutation({
+    mutationFn: async (communityId: number, roleId: number) => {
       await deleteInitiativeRole(communityId, initiativeId, roleId);
     },
-    onSuccess: () => {
+    invalidate: () => {
       toast.success(t("settings.roleDeleted"));
-      void invalidate(q.initiativeRoles(initiativeId));
+      return invalidate(q.initiativeRoles(initiativeId));
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "initiatives:settings.roleDeleteError"));
-    },
+    errorKey: "initiatives:settings.roleDeleteError",
   });
 };
 
@@ -218,10 +215,9 @@ export const useInitiativeDefaults = () => {
 export const useSetInitiativeDefaults = () => {
   const { t } = useTranslation("initiatives");
   const communityId = useActiveCommunityId();
-  const queryClient = useQueryClient();
-  return useMutation({
+  return useApiMutation({
     mutationFn: (data: InitiativeDefaultsUpdate) => updateInitiativeDefaults(communityId, data),
-    onSuccess: () => {
+    invalidate: () => {
       void queryClient.invalidateQueries({
         queryKey: getGetInitiativeDefaultsQueryKey(communityId),
       });
@@ -229,8 +225,6 @@ export const useSetInitiativeDefaults = () => {
       void invalidate(q.allInitiatives());
       toast.success(t("communityDefaults.saved"));
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "initiatives:communityDefaults.error"));
-    },
+    errorKey: "initiatives:communityDefaults.error",
   });
 };

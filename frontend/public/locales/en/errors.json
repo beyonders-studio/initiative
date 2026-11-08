@@ -115,7 +115,6 @@
   "PROJECT_INVALID_TEMPLATE": "Selected template is invalid",
   "PROJECT_INITIATIVE_REQUIRED": "Initiative is required",
   "TASK_NOT_A_CASE": "This task wasn't filed as a ticket",
-  "TASK_NOT_AN_IDEA": "This task isn't on the Ideas board",
   "IDEA_NOT_FOUND": "That idea isn't here anymore",
   "IDEA_CLOSED": "This idea is closed, so its votes stay as they are",
   "TASK_STATUS_AT_LIMIT": "That column is full. Move a task out of it first.",

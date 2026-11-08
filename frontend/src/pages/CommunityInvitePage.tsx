@@ -1,10 +1,10 @@
 import { Link, useParams } from "@tanstack/react-router";
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { acceptInvite, useGetInviteStatus } from "@/api/generated/communities/communities";
 import { ServerChip } from "@/components/auth/ServerChoice";
 import { SignInFrame } from "@/components/auth/SignInFrame";
+import { useApiMutation } from "@/hooks/useApiMutation";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
 import { getErrorMessage } from "@/lib/errorMessage";
@@ -33,30 +33,16 @@ export const CommunityInvitePage = () => {
       : status && !status.is_valid
         ? (status.reason ?? t("invite.noLongerValid"))
         : null;
-  const [accepting, setAccepting] = useState(false);
-  const [acceptError, setAcceptError] = useState<string | null>(null);
-  const [accepted, setAccepted] = useState(false);
-
-  const handleAccept = async () => {
-    if (!normalizedCode || !user) {
-      return;
-    }
-    setAccepting(true);
-    setAcceptError(null);
-    try {
-      await acceptInvite({ code: normalizedCode });
-      setAccepted(true);
+  const accept = useApiMutation(
+    { mutationFn: acceptInvite },
+    {
       // Refresh both explicitly: joining changes the user's community list, and the
       // switcher only reloads when asked to. (It deliberately does not key off
       // the user object's identity — refreshUser() always returns a fresh one,
       // which would refetch every community on any profile change.)
-      await Promise.all([refreshUser(), refreshCommunities()]);
-    } catch (err) {
-      setAcceptError(getErrorMessage(err, "communities:invite.unableToAccept"));
-    } finally {
-      setAccepting(false);
+      onSuccess: () => Promise.all([refreshUser(), refreshCommunities()]),
     }
-  };
+  );
 
   const inviteValid = Boolean(status?.is_valid);
   const inviteTitle = inviteValid
@@ -121,20 +107,26 @@ export const CommunityInvitePage = () => {
                   </p>
                 </div>
               ) : null}
-              {acceptError ? <p className="text-destructive text-sm">{acceptError}</p> : null}
-              {accepted ? <p className="text-primary text-sm">{t("invite.accepted")}</p> : null}
+              {accept.error ? (
+                <p className="text-destructive text-sm">
+                  {getErrorMessage(accept.error, "communities:invite.unableToAccept")}
+                </p>
+              ) : null}
+              {accept.isSuccess ? (
+                <p className="text-primary text-sm">{t("invite.accepted")}</p>
+              ) : null}
               <div className="flex flex-col gap-2">
-                {accepted ? (
+                {accept.isSuccess ? (
                   <Button asChild className="w-full">
                     <Link to="/">{t("invite.continueToApp")}</Link>
                   </Button>
                 ) : (
                   <Button
-                    onClick={handleAccept}
-                    disabled={!user || !inviteValid || accepting || accepted}
+                    onClick={() => accept.mutate({ code: normalizedCode })}
+                    disabled={!user || !inviteValid || accept.isPending}
                     className="w-full"
                   >
-                    {accepting ? t("invite.accepting") : t("invite.acceptInvite")}
+                    {accept.isPending ? t("invite.accepting") : t("invite.acceptInvite")}
                   </Button>
                 )}
 

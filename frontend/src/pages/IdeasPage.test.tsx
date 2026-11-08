@@ -22,7 +22,7 @@ const listed = vi.hoisted(() => ({
           votes: 2,
           voted: false,
           closed: false,
-          published_at: "2026-11-08T00:00:00Z",
+          created_at: "2026-11-08T00:00:00Z",
         },
       ],
     },

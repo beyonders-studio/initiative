@@ -1,4 +1,3 @@
-import { useMutation } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -206,14 +205,11 @@ export const usePromoteProperties = (
  */
 export const useAppendPropertyOption = () => {
   const { t } = useTranslation("properties");
-  const communityId = useActiveCommunityId();
-
-  const mutation = useMutation({
-    mutationFn: async (vars: {
-      definition: PropertyDefinitionRead;
-      label: string;
-      color?: string | null;
-    }) => {
+  const mutation = useCommunityMutation({
+    mutationFn: async (
+      communityId: number,
+      vars: { definition: PropertyDefinitionRead; label: string; color?: string | null }
+    ) => {
       const label = vars.label.trim();
       if (!label) {
         throw new Error("Option label cannot be empty");
@@ -242,15 +238,13 @@ export const useAppendPropertyOption = () => {
       }
       return { option: stored, created: true as const };
     },
-    onSuccess: (result) => {
+    invalidate: (result) => {
       void invalidate(q.allProperties(), q.allPropertyHolders());
       if (result.created) {
         toast.success(t("input.optionAdded"));
       }
     },
-    onError: () => {
-      toast.error(t("input.optionAddFailed"));
-    },
+    errorKey: "properties:input.optionAddFailed",
   });
 
   return {

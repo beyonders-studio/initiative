@@ -86,12 +86,15 @@
     "loadingRecent": "Cargando elementos recientes…",
     "closeItem": "Cerrar {{name}}",
     "closeOthers": "Cerrar las demás",
-    "closeAll": "Cerrar todas"
+    "closeAll": "Cerrar todas",
+    "closeError": "No se pudo cerrar la pestaña.",
+    "closeSomeError": "No se pudieron cerrar algunas pestañas."
   },
   "pin": {
     "pinned": "Proyecto fijado",
     "unpin": "Desfijar proyecto",
-    "pin": "Fijar proyecto"
+    "pin": "Fijar proyecto",
+    "error": "No se pudo fijar ni desfijar el proyecto."
   },
   "taskComposer": {
     "createTask": "Crear tarea"
@@ -400,7 +403,8 @@
     "updated": "Actualizado {{date}}",
     "tasksDone": "{{completed}}/{{total}} completadas",
     "archivedOn": "Archivado el {{date}}",
-    "reorder": "Reordenar proyecto"
+    "reorder": "Reordenar proyecto",
+    "reorderError": "No se pudo mover el proyecto."
   },
   "presets": {
     "label": "Ajustes predefinidos",

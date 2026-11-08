@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 
 import type {
   EntityType,
@@ -17,6 +17,8 @@ import {
 } from "@/api/generated/trash/trash";
 import { invalidate, q, type Spec } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useApiMutation } from "@/hooks/useApiMutation";
+import { queryClient } from "@/lib/queryClient";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
@@ -78,39 +80,27 @@ export type RestoreTrashVars = {
   entityId: number;
 };
 
-export const useRestoreTrashEntity = (
-  options?: MutationOpts<RestoreResponse, RestoreTrashVars>
-) => {
-  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    ...rest,
-    mutationFn: async ({
-      communityId,
-      entityType,
-      entityId,
-    }: RestoreTrashVars): Promise<RestoreResponse> =>
-      restoreTrashEntity(communityId, entityType, entityId),
-    onSuccess: (...args) => {
-      const [, variables] = args;
-      // Invalidate both trash views (personal /me and the item's community), every
-      // page of each (the keys without params are prefixes), so the restored
-      // row disappears from both.
-      void queryClient.invalidateQueries({ queryKey: getListMyTrashQueryKey() });
-      void queryClient.invalidateQueries({
-        queryKey: getListCommunityTrashQueryKey(variables.communityId),
-      });
-      const restored = RESTORED[variables.entityType];
-      if (restored) void invalidate(restored());
-      onSuccess?.(...args);
-    },
-    onError: (...args) => {
-      onError?.(...args);
-    },
-    onSettled,
-  });
+// Both trash views (personal /me and the item's community), every page of each
+// (the keys without params are prefixes), so the row disappears from both.
+const invalidateTrash = (communityId: number) => {
+  void queryClient.invalidateQueries({ queryKey: getListMyTrashQueryKey() });
+  void queryClient.invalidateQueries({ queryKey: getListCommunityTrashQueryKey(communityId) });
 };
+
+export const useRestoreTrashEntity = (options?: MutationOpts<RestoreResponse, RestoreTrashVars>) =>
+  useApiMutation<RestoreResponse, RestoreTrashVars>(
+    {
+      mutationFn: ({ communityId, entityType, entityId }) =>
+        restoreTrashEntity(communityId, entityType, entityId),
+      invalidate: (_restored, { communityId, entityType }) => {
+        invalidateTrash(communityId);
+        const restored = RESTORED[entityType];
+        if (restored) void invalidate(restored());
+      },
+      errorKey: "trash:restoreError",
+    },
+    options
+  );
 
 export type PurgeTrashVars = {
   // Purge is community-scoped + admin-only; only reachable from the community view,
@@ -120,26 +110,14 @@ export type PurgeTrashVars = {
   entityId: number;
 };
 
-export const usePurgeTrashEntity = (options?: MutationOpts<void, PurgeTrashVars>) => {
-  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    ...rest,
-    mutationFn: async ({ communityId, entityType, entityId }: PurgeTrashVars) => {
-      await purgeTrashEntity(communityId, entityType, entityId);
+export const usePurgeTrashEntity = (options?: MutationOpts<void, PurgeTrashVars>) =>
+  useApiMutation<void, PurgeTrashVars>(
+    {
+      mutationFn: async ({ communityId, entityType, entityId }) => {
+        await purgeTrashEntity(communityId, entityType, entityId);
+      },
+      invalidate: (_none, { communityId }) => invalidateTrash(communityId),
+      errorKey: "trash:purgeError",
     },
-    onSuccess: (...args) => {
-      const [, variables] = args;
-      void queryClient.invalidateQueries({ queryKey: getListMyTrashQueryKey() });
-      void queryClient.invalidateQueries({
-        queryKey: getListCommunityTrashQueryKey(variables.communityId),
-      });
-      onSuccess?.(...args);
-    },
-    onError: (...args) => {
-      onError?.(...args);
-    },
-    onSettled,
-  });
-};
+    options
+  );
