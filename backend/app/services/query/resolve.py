@@ -51,6 +51,7 @@ from pglast.parser import ParseError, scan
 from pglast.stream import RawStream
 from pglast.visitors import Visitor
 from sqlalchemy import column as sql_column
+from sqlalchemy.dialects import postgresql
 
 from app.core.errors import CodedError
 from app.core.messages import QueryMessages
@@ -515,7 +516,20 @@ def _physical_table(dataset_name: str) -> tuple[str | None, str]:
     return table.schema, table.name
 
 
-def _physical_column(source: Dataset, field_name: str) -> str:
+def _derived(source: Dataset, spec: Any) -> bool:
+    """Whether a field is read through an expression over its table's columns
+    rather than as one of them: the author, a person only where its kind is
+    ``member``."""
+    return (
+        not isinstance(source, Recordset)
+        and spec.column is not None
+        and not hasattr(spec.column, "property")
+    )
+
+
+def _physical_column(source: Dataset, field_name: str, handle: str) -> Any:
+    """The column a field names, or for a derived field its expression as a
+    statement node, its columns read from ``handle``."""
     spec = source.by_name.get(field_name)
     if spec is None:
         raise QueryError(QueryMessages.UNKNOWN_FIELD, f"{source.name}.{field_name}")
@@ -525,7 +539,19 @@ def _physical_column(source: Dataset, field_name: str) -> str:
         )
     if isinstance(source, Recordset):
         return spec.column.name
-    return spec.column.property.columns[0].name
+    if not _derived(source, spec):
+        return spec.column.property.columns[0].name
+    compiled = spec.column.compile(
+        dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+    )
+    expression = parse_sql(f"SELECT {compiled}")[0].stmt.targetList[0].val
+
+    class Qualify(Visitor):
+        def visit_ColumnRef(self, ancestors: Any, ref: ast.ColumnRef) -> None:
+            ref.fields = (ast.String(sval=handle), *(ref.fields or ())[-1:])
+
+    Qualify()(expression)
+    return expression
 
 
 def _parse(sql: str) -> ast.SelectStmt:
@@ -1063,7 +1089,10 @@ def _field_named(scope: dict[str, Dataset], node: Any) -> Any:
     return source.by_name.get(field_name) if source is not None else None
 
 
-def _resolve_columns(select: ast.SelectStmt, scope: dict[str, Dataset]) -> None:
+def _resolve_columns(select: ast.SelectStmt, scope: dict[str, Dataset]) -> set[int]:
+    """Name every field by its column, and return the constants of the
+    expressions a derived field was replaced with: the surface wrote them,
+    so they are not bound as the reader's."""
     ordinals = _alias_ordinals(select, scope)
     for target in select.targetList or ():
         # A recordset's column is read as ``c1``, so an output that is one
@@ -1075,8 +1104,16 @@ def _resolve_columns(select: ast.SelectStmt, scope: dict[str, Dataset]) -> None:
         if len(names) == 1:
             handle = _holder(scope, names[0])
         spec = _field_named(scope, target.val)
-        if spec is not None and isinstance(scope.get(handle or ""), Recordset):
+        source = scope.get(handle or "")
+        # A derived field is read as an expression, which would otherwise
+        # name the output after itself.
+        if spec is not None and (
+            isinstance(source, Recordset)
+            or (source is not None and _derived(source, spec))
+        ):
             target.name = spec.name
+
+    written: set[int] = set()
 
     class Resolve(Visitor):
         def visit_ColumnRef(self, ancestors: Any, node: ast.ColumnRef) -> Any:
@@ -1089,7 +1126,10 @@ def _resolve_columns(select: ast.SelectStmt, scope: dict[str, Dataset]) -> None:
                 source = scope.get(names[0])
                 if source is None:
                     raise QueryError(QueryMessages.UNKNOWN_RELATION, names[0])
-                column = _physical_column(source, names[1])
+                column = _physical_column(source, names[1], names[0])
+                if not isinstance(column, str):
+                    written.update(_constants_in(column))
+                    return column
                 node.fields = (ast.String(sval=names[0]), ast.String(sval=column))
                 return
             if names[0] == VIEWER:
@@ -1111,7 +1151,10 @@ def _resolve_columns(select: ast.SelectStmt, scope: dict[str, Dataset]) -> None:
                     else QueryMessages.UNKNOWN_FIELD,
                     names[0],
                 )
-            column = _physical_column(scope[holder], names[0])
+            column = _physical_column(scope[holder], names[0], holder)
+            if not isinstance(column, str):
+                written.update(_constants_in(column))
+                return column
             # A recordset's columns are all named ``c<n>``, so one is always
             # written with the handle it is read under.
             node.fields = tuple(
@@ -1124,6 +1167,7 @@ def _resolve_columns(select: ast.SelectStmt, scope: dict[str, Dataset]) -> None:
             )
 
     Resolve()(select)
+    return written
 
 
 def _is_viewer(node: Any) -> bool:
@@ -1350,8 +1394,8 @@ def _literal_positions(select: ast.SelectStmt) -> set[int]:
     return marked
 
 
-def _bind_literals(select: ast.SelectStmt) -> tuple[Any, ...]:
-    ordinals = _literal_positions(select)
+def _bind_literals(select: ast.SelectStmt, written: set[int]) -> tuple[Any, ...]:
+    ordinals = _literal_positions(select) | written
     values: list[Any] = []
 
     class Bind(Visitor):
@@ -1398,8 +1442,8 @@ def resolve(
     column_types = _output_types(select, scope)
     column_grains = _output_grains(select)
     _check_viewer(select, scope)
-    _resolve_columns(select, scope)
-    parameters = list(_bind_literals(select))
+    written = _resolve_columns(select, scope)
+    parameters = list(_bind_literals(select, written))
     names_the_reader = _resolve_viewer(select)
     # A read recordset is its rows, bound as one parameter and read as a
     # recordset of ``c1``, ``c2``, … typed as its columns. An empty one is one
