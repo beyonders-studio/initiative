@@ -114,6 +114,8 @@
   },
   "cancel": "Abbrechen",
   "close": "Schließen",
+  "done": "Fertig",
+  "save": "Speichern",
   "breadcrumb": "Brotkrumennavigation",
   "confirm": {
     "continue": "Weiter",

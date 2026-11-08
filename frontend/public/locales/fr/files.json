@@ -435,9 +435,7 @@
     "newestFirst": "Plus récents d’abord",
     "oldestFirst": "Plus anciens d’abord",
     "views": {
-      "label": "Vue",
-      "masonry": "Mosaïque",
-      "timeline": "Chronologie"
+      "label": "Vue"
     },
     "groups": {
       "untagged": "Sans étiquette",

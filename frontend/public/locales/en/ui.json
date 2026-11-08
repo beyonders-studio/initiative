@@ -114,6 +114,8 @@
   },
   "cancel": "Cancel",
   "close": "Close",
+  "done": "Done",
+  "save": "Save",
   "breadcrumb": "Breadcrumb",
   "confirm": {
     "continue": "Continue",

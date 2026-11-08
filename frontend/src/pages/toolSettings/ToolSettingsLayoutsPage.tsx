@@ -12,7 +12,7 @@
 import { useTranslation } from "react-i18next";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { LayoutsOverview } from "@/components/layouts/LayoutList";
+import { detailLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { TaskTypeDeleteDialog } from "@/components/projects/TaskTypeDeleteDialog";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { useToolSettings } from "@/components/tools/settings/ToolSettingsContext";
@@ -20,6 +20,7 @@ import { instanceTarget, useInstanceLayouts, useSaveLayouts } from "@/hooks/useT
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolDetailRoute } from "@/lib/tools";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { LayoutsOverview } from "@/ui/layouts/LayoutList";
 
 export const ToolSettingsLayoutsPage = () => {
   const { tool, entity } = useToolSettings();
@@ -41,6 +42,7 @@ export const ToolSettingsLayoutsPage = () => {
       <CardContent>
         <LayoutsOverview
           layouts={set.layouts}
+          pageLooks={detailLayoutLooks}
           save={save.mutateAsync}
           typeDelete={
             tool === Tool.project

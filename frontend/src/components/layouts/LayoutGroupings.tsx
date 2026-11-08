@@ -26,10 +26,9 @@ import {
   MAX_HIDDEN_GROUPS,
   type OfferedGrouping,
 } from "@/ui/layouts/grouping";
+import type { LayoutEdits } from "@/ui/layouts/LayoutEditor";
 import { cn } from "@/ui/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
-
-import type { LayoutEdits } from "./LayoutEditor";
 
 const NOT_GROUPED = "__none__";
 

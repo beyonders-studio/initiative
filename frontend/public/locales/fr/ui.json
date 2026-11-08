@@ -114,6 +114,8 @@
   },
   "cancel": "Annuler",
   "close": "Fermer",
+  "done": "Terminé",
+  "save": "Enregistrer",
   "breadcrumb": "Fil d'Ariane",
   "confirm": {
     "continue": "Continuer",

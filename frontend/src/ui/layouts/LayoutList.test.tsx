@@ -19,9 +19,10 @@ import {
   type TaskTypeDeleteRequest,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { LayoutList } from "@/components/layouts/LayoutList";
+import { detailLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { TaskTypeDeleteDialog } from "@/components/projects/TaskTypeDeleteDialog";
 import { instanceTarget, useSaveLayouts } from "@/hooks/useToolLayouts";
+import { LayoutList } from "@/ui/layouts/LayoutList";
 
 const bugPage: DetailLayoutRead = {
   kind: "task",
@@ -40,6 +41,7 @@ const ProjectLayouts = ({ editable, extra }: { editable: boolean; extra: DetailL
       layouts={
         buildToolLayoutSet({ hidden: ["table", "gantt", "calendar"], layouts: extra }).layouts
       }
+      pageLooks={detailLayoutLooks}
       save={editable ? save.mutateAsync : undefined}
       typeDelete={
         editable
@@ -63,6 +65,7 @@ const CollectionLayouts = () => {
   return (
     <LayoutList
       layouts={buildToolLayoutSet({ tool: "collection", hidden: ["timeline"] }).layouts}
+      pageLooks={detailLayoutLooks}
       save={save.mutateAsync}
       editor="/c/1/i/1/files/collections/5/layouts"
     />

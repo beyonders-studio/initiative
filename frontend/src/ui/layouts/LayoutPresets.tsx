@@ -1,10 +1,7 @@
 import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { useTranslation } from "react-i18next";
 
 import type { ListLayoutReadKind, SortField } from "@/api/generated/initiativeAPI.schemas";
-import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
-import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import {
   Dialog,
@@ -17,7 +14,7 @@ import {
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import type { ListLayout } from "@/ui/layouts/draft";
-import type { FieldDef } from "@/ui/layouts/fields";
+import type { FieldDef, LayoutEnv } from "@/ui/layouts/fields";
 import {
   MAX_PRESETS,
   type Preset,
@@ -64,18 +61,20 @@ export const editablePresets = <F,>(presets: {
  * saved with it.
  */
 export const LayoutPresets = ({
+  t,
   layout,
   of,
   fields,
   edits,
 }: {
+  /** Reads the words of the kind it lists, its shipped presets' names among
+   *  them. */
+  t: LayoutEnv["t"];
   layout: ListLayout;
   of: EditablePresets;
   fields: ReadonlyMap<string, FieldDef>;
   edits: LayoutEdits;
 }) => {
-  const { t } = useTranslation(LAYOUT_NAMESPACES);
-  const translate = t as TranslateFn;
   const presets = presetsOf(layout.definition, of.kind);
   // The preset open in the dialog, by its place; null adds one.
   const [open, setOpen] = useState<{ index: number | null } | null>(null);
@@ -92,15 +91,15 @@ export const LayoutPresets = ({
   return (
     <div className="space-y-3">
       <div className="space-y-1">
-        <h3 className="font-medium text-sm">{translate("layouts:presets.heading")}</h3>
-        <p className="text-muted-foreground text-xs">{translate("layouts:presets.help")}</p>
+        <h3 className="font-medium text-sm">{t("layouts:presets.heading")}</h3>
+        <p className="text-muted-foreground text-xs">{t("layouts:presets.help")}</p>
       </div>
       {presets.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{translate("layouts:presets.none")}</p>
+        <p className="text-muted-foreground text-sm">{t("layouts:presets.none")}</p>
       ) : (
         <ul className="space-y-1">
           {presets.map((preset, index) => {
-            const name = presetName(preset, translate);
+            const name = presetName(preset, t);
             return (
               <li key={preset.slug} className="flex items-center gap-1">
                 <span className="min-w-0 flex-1 truncate text-sm">{name}</span>
@@ -109,7 +108,7 @@ export const LayoutPresets = ({
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7"
-                  aria-label={translate("layouts:presets.edit", { name })}
+                  aria-label={t("layouts:presets.edit", { name })}
                   onClick={() => setOpen({ index })}
                 >
                   <Pencil className="h-3.5 w-3.5" />
@@ -119,7 +118,7 @@ export const LayoutPresets = ({
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7"
-                  aria-label={translate("layouts:presets.moveUp", { name })}
+                  aria-label={t("layouts:presets.moveUp", { name })}
                   disabled={index === 0}
                   onClick={() => move(index, -1)}
                 >
@@ -130,7 +129,7 @@ export const LayoutPresets = ({
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7"
-                  aria-label={translate("layouts:presets.moveDown", { name })}
+                  aria-label={t("layouts:presets.moveDown", { name })}
                   disabled={index === presets.length - 1}
                   onClick={() => move(index, 1)}
                 >
@@ -141,7 +140,7 @@ export const LayoutPresets = ({
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7"
-                  aria-label={translate("layouts:presets.remove", { name })}
+                  aria-label={t("layouts:presets.remove", { name })}
                   onClick={() => change(presets.filter((_, each) => each !== index))}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -159,15 +158,16 @@ export const LayoutPresets = ({
         onClick={() => setOpen({ index: null })}
       >
         <Plus className="h-4 w-4" />
-        {translate("layouts:presets.add")}
+        {t("layouts:presets.add")}
       </Button>
       {presets.length >= MAX_PRESETS ? (
         <p className="text-muted-foreground text-xs">
-          {translate("layouts:presets.full", { count: MAX_PRESETS })}
+          {t("layouts:presets.full", { count: MAX_PRESETS })}
         </p>
       ) : null}
       {open ? (
         <PresetDialog
+          t={t}
           preset={open.index === null ? null : presets[open.index]}
           list={layout.kind}
           of={of}
@@ -185,7 +185,7 @@ export const LayoutPresets = ({
               // A rename keeps the slug, so links to it still open it. A shipped
               // one keeps being named in each reader's words until renamed.
               const was = next[open.index];
-              const renamed = name !== presetName(was, translate);
+              const renamed = name !== presetName(was, t);
               next[open.index] = {
                 ...was,
                 name,
@@ -205,6 +205,7 @@ export const LayoutPresets = ({
 
 /** A preset's name, filters and, on a table, sort, changed together. */
 const PresetDialog = ({
+  t,
   preset,
   list,
   of,
@@ -212,6 +213,7 @@ const PresetDialog = ({
   onClose,
   onSubmit,
 }: {
+  t: LayoutEnv["t"];
   /** The preset changed, or null for a new one. */
   preset: Preset<unknown> | null;
   /** The list it is offered on. */
@@ -221,9 +223,7 @@ const PresetDialog = ({
   onClose: () => void;
   onSubmit: (name: string, filters: unknown, sorting: Preset<unknown>["sorting"]) => void;
 }) => {
-  const { t } = useTranslation([...LAYOUT_NAMESPACES, "common"]);
-  const translate = t as TranslateFn;
-  const [name, setName] = useState(preset ? presetName(preset, translate) : "");
+  const [name, setName] = useState(preset ? presetName(preset, t) : "");
   const [filters, setFilters] = useState(preset ? preset.filters : of.empty);
   const [sort, setSort] = useState<SortField | null>(
     of.kind.sorting?.stored(preset?.sorting ?? [])[0] ?? null
@@ -243,11 +243,11 @@ const PresetDialog = ({
         >
           <DialogHeader>
             <DialogTitle>
-              {translate(preset ? "layouts:presets.editTitle" : "layouts:presets.addTitle")}
+              {t(preset ? "layouts:presets.editTitle" : "layouts:presets.addTitle")}
             </DialogTitle>
-            <DialogDescription>{translate("layouts:presets.dialogHelp")}</DialogDescription>
+            <DialogDescription>{t("layouts:presets.dialogHelp")}</DialogDescription>
           </DialogHeader>
-          <Field label={translate("layouts:presets.name")}>
+          <Field label={t("layouts:presets.name")}>
             <Input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -257,7 +257,7 @@ const PresetDialog = ({
           </Field>
           {of.controls(filters, setFilters)}
           {of.sortControls?.(list, sort, setSort, fields)}
-          <DialogFooter submitLabel={translate("common:done")} disabled={!trimmed} />
+          <DialogFooter submitLabel={t("ui:done")} disabled={!trimmed} />
         </form>
       </DialogContent>
     </Dialog>

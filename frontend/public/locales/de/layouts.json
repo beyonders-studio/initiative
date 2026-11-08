@@ -119,6 +119,15 @@
     "gantt": "Die Aufgaben des Projekts auf einer Zeitleiste, nach ihren Daten, verbunden mit dem, wovon jede abhängt.",
     "calendar": "Die Aufgaben des Projekts in einem Kalender, nach ihren Daten."
   },
+  "lists": {
+    "table": "Tabelle",
+    "board": "Board",
+    "gantt": "Gantt",
+    "calendar": "Kalender",
+    "masonry": "Mauerwerk",
+    "grid": "Raster",
+    "timeline": "Zeitleiste"
+  },
   "noEvents": "Diese Initiative hat dieses Jahr keine Termine. Füge einen hinzu, um sein Detail hier zu sehen.",
   "eventDetail": {
     "name": "Termindetail",

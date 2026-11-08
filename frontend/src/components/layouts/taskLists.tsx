@@ -29,10 +29,10 @@ import type { TranslateFn } from "@/types/i18n";
 import { Label } from "@/ui/label";
 import { cardOf, columnsOf, indexPaths, type ListLayout } from "@/ui/layouts/draft";
 import { viewGrouping, withGroupShown } from "@/ui/layouts/grouping";
+import type { EditableLists, LayoutEdits, ListPreview } from "@/ui/layouts/LayoutEditor";
+import { CommittedInput } from "@/ui/layouts/LayoutSettingsPanel";
 
-import type { EditableLists, LayoutEdits, ListPreview } from "./LayoutEditor";
 import { CanvasGrouping, LayoutGroupings } from "./LayoutGroupings";
-import { CommittedInput } from "./LayoutSettingsPanel";
 
 /** The project whose layouts are open. */
 export type LayoutProject = {

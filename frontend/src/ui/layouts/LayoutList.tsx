@@ -7,10 +7,10 @@ import type {
   ListLayoutDefinitionInput,
   ListLayoutRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { layoutLook } from "@/components/projects/projectTasksConfig";
 import { Button } from "@/ui/button";
 import { host } from "@/ui/host";
 import { isListLayout, type LayoutChange } from "@/ui/layouts/layoutSet";
+import { type LayoutLook, listLayoutLooks } from "@/ui/layouts/looks";
 import { formatDateTime } from "@/ui/lib/formatDate";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import { Switch } from "@/ui/switch";
@@ -23,6 +23,9 @@ type SaveLayouts = (changes: LayoutChange[]) => Promise<unknown>;
 /** Asks whether to delete the task type `typeId` with its page, while it is
  *  set; `onClose` puts it away. */
 type TypeDelete = (typeId: number | null, onClose: () => void) => ReactNode;
+
+/** Each kind of page's icon and name. */
+type PageLooks = Record<DetailLayoutRead["kind"], LayoutLook>;
 
 const noop = () => {};
 
@@ -57,18 +60,20 @@ const setOf = (definition: ListLayoutRead["definition"]) =>
  */
 export const LayoutList = ({
   layouts,
+  pageLooks,
   save,
   typeDelete,
   editor,
 }: {
   layouts: Layout[];
+  pageLooks: PageLooks;
   /** Saves a view shown or hidden; left out, the list only reads. */
   save?: SaveLayouts;
   typeDelete?: TypeDelete;
   /** The layout editor's address. */
   editor?: string;
 }) => {
-  const { t } = useTranslation(["projects", "layouts", "common"]);
+  const { t } = useTranslation("layouts");
   const [deleting, setDeleting] = useState<number | null>(null);
   const views = layouts.filter(isListLayout);
   const pages = layouts.filter((layout) => !isListLayout(layout));
@@ -76,11 +81,13 @@ export const LayoutList = ({
   const typed = pages.filter((page) => "task_type_id" in page && page.task_type_id).length;
 
   const row = (layout: Layout) => {
-    const { icon: Icon, labelKey } = layoutLook(layout.kind);
+    const { icon: Icon, labelKey } = isListLayout(layout)
+      ? listLayoutLooks[layout.kind]
+      : pageLooks[layout.kind];
     const typeId = "task_type_id" in layout ? layout.task_type_id : null;
     const name =
       typeId && "task_type_name" in layout
-        ? t("layouts:typedTaskLayout", { name: layout.task_type_name })
+        ? t("typedTaskLayout", { name: layout.task_type_name })
         : t(labelKey as never);
     const view = isListLayout(layout) ? layout : null;
     // What the editor's `?layout=` names it by.
@@ -95,7 +102,7 @@ export const LayoutList = ({
               to={editor}
               search={{ layout: key }}
               className={`${nameClass} hover:underline`}
-              aria-label={t("layouts:editLayout", { name })}
+              aria-label={t("editLayout", { name })}
             >
               {name}
             </host.Link>
@@ -105,25 +112,21 @@ export const LayoutList = ({
           {view?.is_default ? (
             <Star
               className="h-3 w-3 shrink-0 fill-current text-muted-foreground"
-              aria-label={t("layouts:opensFirst")}
+              aria-label={t("opensFirst")}
               role="img"
             />
           ) : view && save && !view.hidden ? (
-            <OpensFirstButton
-              save={save}
-              view={view}
-              label={t("layouts:makeOpensFirst", { name })}
-            />
+            <OpensFirstButton save={save} view={view} label={t("makeOpensFirst", { name })} />
           ) : null}
           {view?.hidden && !save ? (
-            <span className="shrink-0 text-muted-foreground text-xs">{t("layouts:hidden")}</span>
+            <span className="shrink-0 text-muted-foreground text-xs">{t("hidden")}</span>
           ) : null}
         </span>
         <span className="flex shrink-0 items-center gap-3 text-muted-foreground text-xs">
           {layout.updated_at ? (
             <time dateTime={layout.updated_at}>{formatDateTime(layout.updated_at)}</time>
           ) : (
-            <span role="img" aria-label={t("layouts:asShipped")}>
+            <span role="img" aria-label={t("asShipped")}>
               —
             </span>
           )}
@@ -133,7 +136,7 @@ export const LayoutList = ({
               view={view}
               // The last view shown stays shown.
               last={!view.hidden && shown.length <= 1}
-              label={t("layouts:showView", { name })}
+              label={t("showView", { name })}
             />
           ) : null}
           {typeId && typeDelete ? (
@@ -144,7 +147,7 @@ export const LayoutList = ({
               // A project keeps at least one task type.
               disabled={typed <= 1}
               onClick={() => setDeleting(typeId)}
-              aria-label={t("layouts:deleteTaskType", {
+              aria-label={t("deleteTaskType", {
                 name: "task_type_name" in layout ? layout.task_type_name : "",
               })}
             >
@@ -170,8 +173,8 @@ export const LayoutList = ({
         <ul className="divide-y rounded-md border text-sm">{layouts.map(row)}</ul>
       ) : (
         <div className="space-y-4">
-          {group(t("layouts:views"), views)}
-          {group(t(typed > 0 ? "layouts:taskPages" : "layouts:pages"), pages)}
+          {group(t("views"), views)}
+          {group(t(typed > 0 ? "taskPages" : "pages"), pages)}
         </div>
       )}
       {typeDelete && typed > 0 ? typeDelete(deleting, () => setDeleting(null)) : null}
@@ -186,11 +189,13 @@ export const LayoutList = ({
  */
 export const LayoutsOverview = ({
   layouts,
+  pageLooks,
   save,
   typeDelete,
   editor,
 }: {
   layouts: Layout[];
+  pageLooks: PageLooks;
   save: SaveLayouts;
   typeDelete?: TypeDelete;
   /** The layout editor's address. */
@@ -202,6 +207,7 @@ export const LayoutsOverview = ({
     <div className="space-y-4">
       <LayoutList
         layouts={layouts}
+        pageLooks={pageLooks}
         save={save}
         typeDelete={typeDelete}
         editor={wide ? editor : undefined}

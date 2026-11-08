@@ -22,12 +22,12 @@ import {
 } from "@/components/files/collections/collectionLists";
 import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
 import { fileDetail } from "@/components/layouts/details";
-import { type EditableLists, LayoutEditor } from "@/components/layouts/LayoutEditor";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import type { ToolIndexRow } from "@/components/tools/ToolIndexPage";
 import { ToolIndexTable } from "@/components/tools/ToolIndexTable";
 import { useCollection, useCollectionFilesFeed } from "@/hooks/useCollections";
 import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
+import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 import { useRouteId } from "@/hooks/useRouteId";
 import { instanceTarget, useInstanceLayouts, useSaveLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -35,6 +35,7 @@ import { collectionFileFields, FILE_LIST_SHAPE } from "@/lib/layouts/files";
 import { collectionRoute, initiativeRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
 import { withDisplays } from "@/ui/layouts/fields";
+import { type EditableLists, LayoutEditor } from "@/ui/layouts/LayoutEditor";
 
 const noop = () => {};
 const NO_SELECTION = {
@@ -59,6 +60,10 @@ export const CollectionLayoutEditorPage = () => {
   const set = useInstanceLayouts("collection", id).data;
   const save = useSaveLayouts(instanceTarget("collection", id ?? 0));
   const feed = useCollectionFilesFeed(id, NEWEST_ADDED);
+  const propertyEnv = usePropertyEnv({
+    initiativeId: collection?.initiative_id ?? null,
+    enabled: true,
+  });
   const files = useMemo(() => feed.data?.pages[0]?.items ?? [], [feed.data]);
   const rows = useMemo(
     () => files.map((file) => ({ ...file, card: null }) as ToolIndexRow),
@@ -116,6 +121,7 @@ export const CollectionLayoutEditorPage = () => {
       initiativeId={collection.initiative_id}
       lists={lists}
       details={details}
+      propertyEnv={propertyEnv}
       layouts={set}
       save={save.mutateAsync}
       properties={(placement) => (

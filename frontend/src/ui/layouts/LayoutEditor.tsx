@@ -1,4 +1,3 @@
-import { useBlocker } from "@tanstack/react-router";
 import { Laptop, Redo2, Smartphone, Tablet, Undo2, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
@@ -12,8 +11,6 @@ import type {
   PropertyDefinitionRead,
   ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
-import { NO_DEFINITIONS, useCreateProperty, useOwnedDefinitions } from "@/hooks/useProperties";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { host } from "@/ui/host";
@@ -49,8 +46,10 @@ import {
   startHistory,
   withCard,
 } from "@/ui/layouts/draft";
+import type { PropertyEnv } from "@/ui/layouts/fieldEditors";
 import { type FieldDef, type LayoutEnv, propertyFieldId } from "@/ui/layouts/fields";
 import { detailLayoutOf, type LayoutChange, listLayouts } from "@/ui/layouts/layoutSet";
+import { listLayoutLooks } from "@/ui/layouts/looks";
 import type { LayoutNode } from "@/ui/layouts/tree";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import type { FieldDisplay, MetadataOwner } from "@/ui/properties/propertyHelpers";
@@ -79,6 +78,8 @@ import type { EditablePresets } from "./LayoutPresets";
 import { DetailLayoutSettings, LayoutProperties, ListLayoutSettings } from "./LayoutSettingsPanel";
 
 const noop = () => {};
+
+const NO_DEFINITIONS: PropertyDefinitionRead[] = [];
 
 /** No fields: those of a list with nothing of its own to draw here. Where a
  *  list shows a property is its own card or columns, or its shape's, whatever
@@ -314,6 +315,7 @@ export const LayoutEditor = ({
   details,
   presets,
   plugins = NO_PLUGINS,
+  propertyEnv,
   layouts,
   save,
   initialKind,
@@ -333,6 +335,9 @@ export const LayoutEditor = ({
   presets?: EditablePresets;
   /** The plug-ins that draw on its items. */
   plugins?: LayoutPlugins;
+  /** The initiative's properties, which its fields may show, and how a new
+   *  one is made. */
+  propertyEnv: Pick<PropertyEnv, "definitions" | "createProperty">;
   /** The target's layouts, read by someone who may change them. */
   layouts: ToolLayoutSetRead;
   /** Stores `changes`, in order, answering with the layouts as stored. One
@@ -403,8 +408,7 @@ export const LayoutEditor = ({
   // The owner whose metadata its fields may be: a project's tasks', or a
   // collection's files'.
   const owner = lists?.owner;
-  const { data: definitions = NO_DEFINITIONS } = useOwnedDefinitions({ initiativeId });
-  const createProperty = useCreateProperty();
+  const definitions = propertyEnv.definitions.data ?? NO_DEFINITIONS;
   // A detail's fields are its own; a list's are its target's.
   const fields = useMemo(
     () => (openDetail ?? lists)?.fields(definitions, plugins.fields) ?? NO_FIELDS,
@@ -575,7 +579,7 @@ export const LayoutEditor = ({
   const choices =
     current?.kind === "calendar" || current?.kind === "gantt" || (!current && !detail)
       ? listed
-      : { ...listed, newField: { initiativeId, owner, create: createProperty.mutateAsync } };
+      : { ...listed, newField: { initiativeId, owner, create: propertyEnv.createProperty } };
   const addersAt = (place?: Place): Adders =>
     current?.kind === "table"
       ? { onField: (id) => edits.addColumn(id, place?.index), onPart: noop, onNode: noop }
@@ -682,11 +686,7 @@ export const LayoutEditor = ({
       setSaving(false);
     }
   };
-  const blocker = useBlocker({
-    shouldBlockFn: () => (dirty || saving) && !leaving.current,
-    enableBeforeUnload: () => (dirty || saving) && !leaving.current,
-    withResolver: true,
-  });
+  const blocker = host.useBlocker(() => (dirty || saving) && !leaving.current);
   const [asking, setAsking] = useState(false);
   const close = () => {
     if (dirty || saving) setAsking(true);
@@ -805,7 +805,7 @@ export const LayoutEditor = ({
           {t("layouts:discard")}
         </Button>
         <Button type="button" size="sm" disabled={!dirty || saving} onClick={() => void commit()}>
-          {saving ? t("layouts:saving") : t("common:save")}
+          {saving ? t("layouts:saving") : t("ui:save")}
         </Button>
       </header>
       {/* A screen too narrow to edit on keeps the draft, and says so. */}
@@ -926,11 +926,11 @@ export const LayoutEditor = ({
         </div>
       ) : null}
       <ConfirmDialog
-        open={asking || blocker.status === "blocked"}
+        open={asking || blocker.blocked}
         onOpenChange={(open) => {
           if (open) return;
           setAsking(false);
-          blocker.reset?.();
+          blocker.reset();
         }}
         title={t("layouts:unsavedTitle")}
         description={t(saving ? "layouts:savingBody" : "layouts:unsavedBody")}
@@ -939,7 +939,7 @@ export const LayoutEditor = ({
         onConfirm={() => {
           leaving.current = true;
           setAsking(false);
-          if (blocker.status === "blocked") blocker.proceed?.();
+          if (blocker.blocked) blocker.proceed();
           else onClose();
         }}
         destructive

@@ -33,7 +33,6 @@ import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateAc
 import { ProjectTasksGanttView } from "@/components/projects/ProjectTasksGanttView";
 import { ProjectTasksKanbanView } from "@/components/projects/ProjectTasksKanbanView";
 import { ProjectTasksTableView } from "@/components/projects/ProjectTasksTableView";
-import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import {
   computeMidpoint,
   isDraggingDown,
@@ -90,6 +89,7 @@ import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Dialog } from "@/ui/dialog";
 import { useWeekStart } from "@/ui/host";
 import { activeGrouping, catalogChoices } from "@/ui/layouts/grouping";
+import { listLayoutLooks } from "@/ui/layouts/looks";
 import { presetName } from "@/ui/layouts/presets";
 import type { LayoutNode } from "@/ui/layouts/tree";
 import { useDragSensors } from "@/ui/lib/useDragSensors";
@@ -125,7 +125,7 @@ export const ProjectTasksSection = ({
   initialComposerOpen,
   onComposerOpenChange,
 }: ProjectTasksSectionProps) => {
-  const { t } = useTranslation(["projects", "common", "errors"]);
+  const { t } = useTranslation(["projects", "common", "errors", "layouts"]);
   // Nothing is exported from an initiative that keeps its content in.
   const keepsContentIn = Boolean(useInitiative(initiativeId).data?.keep_content_in);
   const communityId = useActiveCommunityId();

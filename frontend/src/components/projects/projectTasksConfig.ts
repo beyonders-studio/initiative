@@ -1,24 +1,7 @@
-import {
-  Calendar,
-  CalendarDays,
-  ChartGantt,
-  Clock,
-  FileImage,
-  FileText,
-  Hash,
-  Kanban,
-  LayoutGrid,
-  type LucideIcon,
-  Megaphone,
-  Table,
-} from "lucide-react";
+import { CalendarDays, FileImage, FileText, Hash, Megaphone } from "lucide-react";
 
-import type {
-  DetailLayoutRead,
-  ListLayoutReadKind,
-  TaskPriority,
-} from "@/api/generated/initiativeAPI.schemas";
-import { MasonryIcon } from "@/components/files/collections/MasonryIcon";
+import type { DetailLayoutRead, TaskPriority } from "@/api/generated/initiativeAPI.schemas";
+import type { LayoutLook } from "@/ui/layouts/looks";
 
 export type DueFilterOption = "all" | "today" | "7_days" | "30_days" | "overdue";
 
@@ -41,31 +24,11 @@ export const priorityDotClass: Record<TaskPriority, string> = {
   urgent: "bg-destructive",
 };
 
-type Look = { icon: LucideIcon; labelKey: string };
-
-/** Each list layout's icon, and its name, by a key that names its
- *  namespace: a project's lists are in `projects`, a collection's in `files`. */
-export const listLayoutLooks: Record<ListLayoutReadKind, Look> = {
-  table: { icon: Table, labelKey: "projects:tasks.viewTable" },
-  board: { icon: Kanban, labelKey: "projects:tasks.viewBoard" },
-  gantt: { icon: ChartGantt, labelKey: "projects:tasks.viewGantt" },
-  calendar: { icon: Calendar, labelKey: "projects:tasks.viewCalendar" },
-  masonry: { icon: MasonryIcon, labelKey: "files:collections.views.masonry" },
-  grid: { icon: LayoutGrid, labelKey: "common:toolbar.viewGrid" },
-  timeline: { icon: Clock, labelKey: "files:collections.views.timeline" },
-};
-
 /** Each detail layout's icon, and its name in `layouts`. */
-export const detailLayoutLooks: Record<DetailLayoutRead["kind"], Look> = {
+export const detailLayoutLooks: Record<DetailLayoutRead["kind"], LayoutLook> = {
   task: { icon: FileText, labelKey: "layouts:taskLayout" },
   calendar_event: { icon: CalendarDays, labelKey: "layouts:eventDetail.name" },
   counter: { icon: Hash, labelKey: "layouts:counterDetail.name" },
   post: { icon: Megaphone, labelKey: "layouts:postDetail.name" },
   file: { icon: FileImage, labelKey: "layouts:fileDetail.name" },
 };
-
-/** Any layout's icon and name. */
-export const layoutLook = (kind: ListLayoutReadKind | DetailLayoutRead["kind"]): Look =>
-  kind in listLayoutLooks
-    ? listLayoutLooks[kind as ListLayoutReadKind]
-    : detailLayoutLooks[kind as DetailLayoutRead["kind"]];
