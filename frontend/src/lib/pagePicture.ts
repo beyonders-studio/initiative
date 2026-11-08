@@ -24,29 +24,53 @@ export interface PagePicture {
   height: number;
 }
 
+const draw = async (
+  node: Node,
+  width: number,
+  height: number,
+  filter?: (node: Node) => boolean
+): Promise<PagePicture> => {
+  const { domToForeignObjectSvg } = await import("modern-screenshot");
+  const svg = (await domToForeignObjectSvg(node, {
+    width,
+    height,
+    backgroundColor: getComputedStyle(document.body).backgroundColor,
+    filter,
+    features: { restoreScrollPosition: true },
+  })) as SVGSVGElement;
+  return { svg, width, height };
+};
+
 /**
  * Draw what is on screen, leaving out `leaveOut` (the panel or dialog the
  * picture is taken from), the overlays dialogs and sheets lay over the page,
  * and any toasts.
  */
-export const pictureThePage = async (leaveOut: Element | null): Promise<PagePicture> => {
-  const { domToForeignObjectSvg } = await import("modern-screenshot");
-  const width = window.innerWidth;
-  const height = window.innerHeight;
-  const svg = (await domToForeignObjectSvg(document.body, {
-    width,
-    height,
-    backgroundColor: getComputedStyle(document.body).backgroundColor,
-    filter: (node) =>
+export const pictureThePage = (leaveOut: Element | null): Promise<PagePicture> =>
+  draw(
+    document.body,
+    window.innerWidth,
+    window.innerHeight,
+    (node) =>
       !(node instanceof Element) ||
       (node !== leaveOut &&
         !node.matches(
           '[data-slot="dialog-overlay"], [data-slot="sheet-overlay"], [data-sonner-toaster]'
-        )),
-    features: { restoreScrollPosition: true },
-  })) as SVGSVGElement;
-  return { svg, width, height };
+        ))
+  );
+
+/** The tallest a picture of one thing is drawn: past it, the rest is cut off. */
+const TALLEST = 4000;
+
+/** Draw ``element`` whole, the parts of it scrolled out of view included. */
+export const pictureOf = (element: Element): Promise<PagePicture> => {
+  const box = element.getBoundingClientRect();
+  return draw(element, Math.ceil(box.width), Math.ceil(Math.min(box.height, TALLEST)));
 };
+
+/** What an avatar's stand-in is filled with: the page's muted colour. */
+export const blankAvatar = () =>
+  getComputedStyle(document.documentElement).getPropertyValue("--muted").trim() || "#8b919c";
 
 /** Draw `svg` as an image, as it is now. */
 export const svgImage = (svg: SVGSVGElement): Promise<HTMLImageElement> =>

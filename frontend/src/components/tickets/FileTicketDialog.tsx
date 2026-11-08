@@ -98,6 +98,9 @@ export type TicketKind =
       /** A `SearchEntityType` or a `PlatformReportTarget` value. */
       targetType: string;
       targetId: number;
+      /** Where the thing is drawn, pictured as the report opens; the page
+       *  where none is marked. */
+      thing?: Element | null;
     };
 
 export interface FileTicketDialogProps {
@@ -347,7 +350,7 @@ export const FileTicketDialog = ({
                       files={files}
                       onFilesChange={setFiles}
                       // A report is usually about a person: who it was stays in view.
-                      pagePicture={{ hidePeople: false }}
+                      pagePicture={{ hidePeople: false, takenOf: ticket.thing ?? null }}
                       disabled={pending}
                     />
                   </div>

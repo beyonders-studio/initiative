@@ -15,6 +15,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  blankAvatar,
   PART_SELECTOR,
   type PagePicture,
   type PartKind,
@@ -153,6 +154,42 @@ const loadImage = (url: string): Promise<HTMLImageElement> =>
     image.src = url;
   });
 
+/** The most pixels a picture is painted with, which every browser's canvas
+ *  holds. */
+const MOST_PIXELS = 16_000_000;
+
+/**
+ * The picture a session makes, painted with its covers and marks. The page
+ * becomes a PNG, at the screen's sharpness where the canvas has room; a photo
+ * stays the type it was, and anything else becomes a PNG.
+ */
+export const makePicture = async (
+  session: PictureSession,
+  size: { w: number; h: number },
+  pageName: string
+): Promise<File> => {
+  const { source, shapes } = session;
+  if (source.kind === "page") {
+    const ratio = Math.min(
+      window.devicePixelRatio || 1,
+      2,
+      Math.sqrt(MOST_PIXELS / (size.w * size.h))
+    );
+    const blob = await paint(await svgImage(source.picture.svg), size, shapes, ratio, "image/png");
+    return new File([blob], `${pageName}.png`, { type: "image/png" });
+  }
+  const url = URL.createObjectURL(source.file);
+  try {
+    const photo = ["image/jpeg", "image/webp"].includes(source.file.type);
+    const type = photo ? source.file.type : "image/png";
+    const blob = await paint(await loadImage(url), size, shapes, 1, type);
+    const name = photo ? source.file.name : `${source.file.name.replace(/\.[^.]+$/, "")}.png`;
+    return new File([blob], name, { type });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+};
+
 export const PictureEditor = ({ session, attached, onDone, onCancel }: PictureEditorProps) => {
   const { t } = useTranslation(["intake", "common"]);
   const { source } = session;
@@ -180,10 +217,7 @@ export const PictureEditor = ({ session, attached, onDone, onCancel }: PictureEd
     moved: boolean;
   } | null>(null);
   const stepped = useRef(-1);
-  const blank = useMemo(
-    () => getComputedStyle(document.documentElement).getPropertyValue("--muted").trim() || HIDE,
-    []
-  );
+  const blank = useMemo(blankAvatar, []);
 
   // A picture from elsewhere: shown from its own bytes, at its own size.
   useEffect(() => {
@@ -390,20 +424,12 @@ export const PictureEditor = ({ session, attached, onDone, onCancel }: PictureEd
     if (!size) return;
     setSaving(true);
     try {
-      const base = page ? await svgImage(page.picture.svg) : await loadImage(fileUrl ?? "");
-      // A photo stays a photo; anything else, the page included, becomes a PNG.
-      const photo =
-        source.kind === "file" && ["image/jpeg", "image/webp"].includes(source.file.type);
-      const type = photo ? source.file.type : "image/png";
-      const name =
-        source.kind === "page"
-          ? `${t("picture.title")}.png`
-          : photo
-            ? source.file.name
-            : `${source.file.name.replace(/\.[^.]+$/, "")}.png`;
-      const ratio = page ? Math.min(window.devicePixelRatio || 1, 2) : 1;
-      const blob = await paint(base, size, shapes, ratio, type);
-      setFailed(onDone(new File([blob], name, { type }), { shapes, peopleHidden }));
+      const made = await makePicture(
+        { ...session, shapes, peopleHidden },
+        size,
+        t("picture.title")
+      );
+      setFailed(onDone(made, { shapes, peopleHidden }));
     } catch {
       setFailed(t("picture.failed"));
     } finally {

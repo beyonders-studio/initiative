@@ -2,23 +2,37 @@
  * The box tickets are written in: the camera that takes a picture of the
  * page behind it, and the editor a picture opens in.
  */
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { buildUser } from "@/__tests__/factories";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 
+const drawn = () => ({
+  svg: document.createElementNS("http://www.w3.org/2000/svg", "svg"),
+  width: 800,
+  height: 600,
+});
+const pictureOf = vi.hoisted(() => vi.fn());
+
 vi.mock("@/lib/pagePicture", async () => {
   const actual = await vi.importActual<typeof import("@/lib/pagePicture")>("@/lib/pagePicture");
   return {
     ...actual,
     loadedPeople: () => new Map(),
-    pictureThePage: async () => ({
-      svg: document.createElementNS("http://www.w3.org/2000/svg", "svg"),
-      width: 800,
-      height: 600,
-    }),
+    pictureThePage: async () => drawn(),
+    pictureOf,
+  };
+});
+
+// jsdom has no canvas to paint on: the picture made is a stand-in file.
+vi.mock("@/components/tickets/PictureEditor", async () => {
+  const actual = await vi.importActual<typeof import("./PictureEditor")>("./PictureEditor");
+  return {
+    ...actual,
+    makePicture: async (_session: unknown, _size: unknown, name: string) =>
+      new File(["png"], `${name}.png`, { type: "image/png" }),
   };
 });
 
@@ -76,6 +90,23 @@ describe("TicketComposer", () => {
     await user.keyboard("{Control>}{Enter}{/Control}");
 
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ key: "Enter" }));
+  });
+
+  it("takes a picture of the thing as it opens, when asked, and attaches it", async () => {
+    pictureOf.mockResolvedValue(drawn());
+    const thing = document.createElement("article");
+    document.body.append(thing);
+    const onFilesChange = vi.fn();
+    box({ pagePicture: { hidePeople: false, takenOf: thing }, onFilesChange });
+
+    await waitFor(() => expect(onFilesChange).toHaveBeenCalledTimes(1));
+    expect(pictureOf).toHaveBeenCalledWith(thing);
+    expect(onFilesChange.mock.calls[0][0].map((file: File) => file.name)).toEqual([
+      "Picture of this page.png",
+    ]);
+    // Attached as it is: the editor opens only when asked.
+    expect(screen.queryByRole("dialog")).toBeNull();
+    thing.remove();
   });
 
   it("leaves the people showing where the box says so", async () => {

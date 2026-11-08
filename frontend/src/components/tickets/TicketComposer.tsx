@@ -22,9 +22,21 @@ import { useTranslation } from "react-i18next";
 
 import type { EvidencePolicyRead } from "@/api/generated/initiativeAPI.schemas";
 import { isPicture } from "@/components/tickets/Evidence";
-import { newSession, PictureEditor, type PictureSession } from "@/components/tickets/PictureEditor";
+import {
+  makePicture,
+  newSession,
+  PictureEditor,
+  type PictureSession,
+} from "@/components/tickets/PictureEditor";
 import { useAuth } from "@/hooks/useAuth";
-import { findPeople, loadedPeople, pictureThePage } from "@/lib/pagePicture";
+import {
+  blankAvatar,
+  findPeople,
+  loadedPeople,
+  pictureOf,
+  pictureThePage,
+  showPeople,
+} from "@/lib/pagePicture";
 import { Button } from "@/ui/button";
 import { DropOverlay } from "@/ui/file-drop";
 import { formatBytes } from "@/ui/lib/fileUtils";
@@ -61,8 +73,10 @@ type TicketComposerProps = Omit<ComponentProps<typeof Textarea>, "className"> & 
   files: File[];
   onFilesChange: (files: File[]) => void;
   /** Offer a picture of the page behind the panel the box is in, with the
-   *  people on it hidden to start with or not. */
-  pagePicture?: { hidePeople: boolean };
+   *  people on it hidden to start with or not. With ``takenOf`` the picture
+   *  is taken and attached as the box opens: of that element, drawn whole,
+   *  or of the page where it is null. */
+  pagePicture?: { hidePeople: boolean; takenOf?: Element | null };
 };
 
 /** Write, and attach files, in one box. */
@@ -115,28 +129,68 @@ export const TicketComposer = ({
     if (input.current) input.current.value = "";
   };
 
+  /** A picture of ``of``, drawn whole, or of the page behind the panel the
+   *  box is in, which is left out. */
+  const picture = async (of: Element | null) => {
+    const drawn = of?.isConnected
+      ? await pictureOf(of)
+      : await pictureThePage(box.current?.closest('[role="dialog"]') ?? null);
+    const people = findPeople(drawn.svg, loadedPeople(user ? [user] : []), user?.id ?? null, {
+      you: t("picture.you"),
+      person: (number) => t("picture.person", { number }),
+      email: t("picture.emailHidden"),
+      phone: t("picture.phoneHidden"),
+    });
+    return newSession({ kind: "page", picture: drawn, people }, pagePicture?.hidePeople);
+  };
+
   const takePicture = async () => {
     setPicturing(true);
     setRefusal(null);
     try {
-      // The panel the box is in is left out: the picture is of the page.
-      const picture = await pictureThePage(box.current?.closest('[role="dialog"]') ?? null);
-      const people = findPeople(picture.svg, loadedPeople(user ? [user] : []), user?.id ?? null, {
-        you: t("picture.you"),
-        person: (number) => t("picture.person", { number }),
-        email: t("picture.emailHidden"),
-        phone: t("picture.phoneHidden"),
-      });
-      setEditing({
-        session: newSession({ kind: "page", picture, people }, pagePicture?.hidePeople),
-        target: null,
-      });
+      setEditing({ session: await picture(null), target: null });
     } catch {
       setRefusal(t("picture.failed"));
     } finally {
       setPicturing(false);
     }
   };
+
+  // Taken as the box opens: attached as it is, after whatever is attached by
+  // then, and only while the stream still takes pictures.
+  const latest = useRef({ files, policy });
+  latest.current = { files, policy };
+  const taken = useRef(false);
+  const takenOf = pagePicture?.takenOf;
+  const takesPictures = takes && Boolean(policy?.types.includes("image/png"));
+  // biome-ignore lint/correctness/useExhaustiveDependencies: taken once, when the stream's policy says it may be
+  useEffect(() => {
+    if (takenOf === undefined || !takesPictures || taken.current) return;
+    taken.current = true;
+    setPicturing(true);
+    picture(takenOf)
+      .then(async (session) => {
+        if (session.source.kind !== "page") return;
+        const { picture: drawn, people } = session.source;
+        showPeople(people, session.peopleHidden, blankAvatar());
+        const made = await makePicture(
+          session,
+          { w: drawn.width, h: drawn.height },
+          t("picture.title")
+        );
+        const now = latest.current;
+        if (!now.policy || now.policy.max_files <= 0) return;
+        const refused = refusalFor(made, now.files.length);
+        if (refused) {
+          setRefusal(refused);
+          return;
+        }
+        sessions.set(made, session);
+        onFilesChange([...now.files, made]);
+      })
+      .catch(() => setRefusal(t("picture.failed")))
+      .finally(() => setPicturing(false));
+  }, [takenOf, takesPictures]);
 
   /** Attach what the editor made, in place of the picture it was made from;
    *  or say why the stream will not take it, and the editor stays open with

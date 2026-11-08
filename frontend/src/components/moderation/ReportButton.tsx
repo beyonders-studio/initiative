@@ -37,6 +37,9 @@ interface Report {
   targetType: string;
   targetId: number;
   communityId: number | null;
+  /** The element the thing is drawn in: the nearest marked
+   *  `data-report-target` around the button, pictured with the report. */
+  thing: Element | null;
 }
 
 // The report being written, kept outside React so one dialog, drawn by the app
@@ -66,7 +69,12 @@ export const ReportHost = () => {
         onOpenChange={(open) => {
           if (!open) setReport(null);
         }}
-        ticket={{ stream: "moderation", targetType: report.targetType, targetId: report.targetId }}
+        ticket={{
+          stream: "moderation",
+          targetType: report.targetType,
+          targetId: report.targetId,
+          thing: report.thing,
+        }}
         communityId={report.communityId}
       />
     </Suspense>
@@ -100,11 +108,12 @@ export const ReportButton = ({
             size={size}
             className={className}
             aria-label={t("report.action")}
-            onClick={() =>
+            onClick={(event) =>
               setReport({
                 targetType,
                 targetId,
                 communityId: (communityId === undefined ? activeCommunityId : communityId) ?? null,
+                thing: event.currentTarget.closest("[data-report-target]"),
               })
             }
           >

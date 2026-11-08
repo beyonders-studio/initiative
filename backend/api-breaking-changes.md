@@ -20,6 +20,17 @@ notification's type may hold it.
 - POST /api/v1/notifications/{notification_id}/read added the new `announcement` enum value to the `type` response property for the response status `200`
 - POST /api/v1/notifications/{notification_id}/unread added the new `announcement` enum value to the `type` response property for the response status `200`
 
+### Feedback to Initiative Cloud
+
+`TicketMode` takes `cloud`: Initiative Cloud takes the stream, and people
+send it there, signed in to Cloud, as feedback is from any server. Every
+stream's `mode` in the ticket availability may hold it.
+
+- GET /api/v1/me/tickets/availability added the new `cloud` enum value to the `feedback/mode` response property for the response status `200`
+- GET /api/v1/me/tickets/availability added the new `cloud` enum value to the `moderation/mode` response property for the response status `200`
+- GET /api/v1/me/tickets/availability added the new `cloud` enum value to the `security/mode` response property for the response status `200`
+- GET /api/v1/me/tickets/availability added the new `cloud` enum value to the `support/mode` response property for the response status `200`
+
 ## After 0.77.1
 
 ### Signature fields
