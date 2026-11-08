@@ -88,6 +88,19 @@ describe("ColorPickerPopover", () => {
     expect(screen.getAllByRole("slider")).toHaveLength(1);
   });
 
+  it("puts the cursor where the field paints the colour", async () => {
+    // #FF8080 is half saturated at full brightness: halfway across the top.
+    const user = userEvent.setup();
+    render(<ColorPickerPopover value="#FF8080" triggerLabel="Fill" />);
+
+    await user.click(screen.getByRole("button", { name: "Fill" }));
+    await screen.findByDisplayValue("#FF8080");
+
+    const cursor = document.querySelector(".cursor-crosshair > div") as HTMLElement;
+    expect(Number.parseFloat(cursor.style.left)).toBeCloseTo(49.8, 0);
+    expect(Number.parseFloat(cursor.style.top)).toBeCloseTo(0, 0);
+  });
+
   it("commits nothing when the colour was left alone", async () => {
     render(<LivePreview />);
 

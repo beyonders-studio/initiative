@@ -146,11 +146,11 @@ const ColorPickerSelection = memo(({ className, ...props }: ColorPickerSelection
   const [isDragging, setIsDragging] = useState(false);
   const { hue, saturation, lightness, update } = useColorPicker();
 
-  // Where the colour sits in the field, read from the colour itself, so the
-  // cursor starts on the colour the picker opened with.
-  const x = saturation / 100;
-  const topLightness = x < 0.01 ? 100 : 50 + 50 * (1 - x);
-  const y = topLightness > 0 ? Math.max(0, Math.min(1, 1 - lightness / topLightness)) : 0;
+  // The field paints saturation across and brightness down (HSV), so the
+  // cursor is the colour read the same way: it starts on the colour shown.
+  const [, fieldSaturation, brightness] = Color.hsl(hue, saturation, lightness).hsv().array();
+  const x = fieldSaturation / 100;
+  const y = 1 - brightness / 100;
 
   const handlePointerMove = useCallback(
     (event: PointerEvent) => {
@@ -160,10 +160,13 @@ const ColorPickerSelection = memo(({ className, ...props }: ColorPickerSelection
       const rect = containerRef.current.getBoundingClientRect();
       const nextX = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
       const nextY = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
-      const top = nextX < 0.01 ? 100 : 50 + 50 * (1 - nextX);
-      update({ saturation: nextX * 100, lightness: top * (1 - nextY) });
+      // The colour painted under the pointer, in the picker's HSL.
+      const [, nextSaturation, nextLightness] = Color.hsv(hue, nextX * 100, (1 - nextY) * 100)
+        .hsl()
+        .array();
+      update({ saturation: nextSaturation, lightness: nextLightness });
     },
-    [update]
+    [hue, update]
   );
 
   useEffect(() => {
