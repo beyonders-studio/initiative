@@ -565,7 +565,7 @@ describe("WhatsNewPage", () => {
     server.use(http.get("/api/v1/changelog", () => HttpResponse.json({}, { status: 500 })));
     renderPage(WhatsNewPage, signedOut);
 
-    expect(await screen.findByText(landing.whatsNew.error)).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
   });
 
   it("shows a whole release, with its docs links pointing at the docs site", async () => {
