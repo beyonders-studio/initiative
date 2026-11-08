@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A project's task table scrolls with the page,** not in a box of its own, and its column headings stay at the top as you scroll. A collection's table draws only the files near the view, so a long collection keeps up as you scroll through it.
 - **Confirmations look like every other dialog.** They have the same lighter, blurred backdrop (side panels too), rounded corners at every width and a margin on phones. Deleting several tasks or tools at once asks in the app instead of in the browser's prompt.
 - **Every dialog's buttons behave the same.** Save, Create and Delete show a spinner while they work and can't be pressed twice, and Cancel is the same outlined button everywhere, waiting while the work is under way.
+- **Rows that scroll sideways work the same everywhere.** The collections above a list of files, a marketplace listing's pictures, the pictures under a release note and an item's links drag with the mouse, swipe, scroll with a trackpad, settle on an item and have arrow buttons, which hide when everything fits.
 - **One colour picker everywhere.** A spreadsheet's text, fill and border colours and a profile decoration's colours open the same picker as the rest of the app, rather than the system's. The picker opens with its cursor on the current colour, and a single click in its field picks.
 
 ### Fixed

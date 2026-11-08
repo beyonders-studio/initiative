@@ -409,13 +409,13 @@ export const RelationsSection = ({
           /* One shelf rather than a heading per kind of link: a carousel is
              pushed along, and stopping it at every heading would make it four
              short shelves. What each link says rides on its own card. */
-          <Carousel className="relative">
-            <CarouselContent className="-ml-4">
+          <Carousel>
+            <CarouselContent>
               {visible.map((edge) => {
                 const group = groupOf(edge, shown);
                 if (!group) return null;
                 return (
-                  <CarouselItem key={edge.id} className="basis-40 pl-4 sm:basis-44 md:basis-48">
+                  <CarouselItem key={edge.id} className="basis-40 sm:basis-44 md:basis-48">
                     <EntityCard
                       end={edge.other}
                       badge={t(`groups.${group.key}.title` as const)}
@@ -433,8 +433,8 @@ export const RelationsSection = ({
                 );
               })}
             </CarouselContent>
-            <CarouselPrevious className="left-0 -translate-x-1/2" />
-            <CarouselNext className="right-0 translate-x-1/2" />
+            <CarouselPrevious />
+            <CarouselNext />
           </Carousel>
         ) : (
           shown.map((group) => {
