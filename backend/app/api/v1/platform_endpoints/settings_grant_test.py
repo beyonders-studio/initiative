@@ -199,6 +199,22 @@ async def test_the_superadmin_grantee_reads_the_auth_controls(
     assert response.status_code == 200, response.text
     assert response.json() == {
         "auth_options": ["providers", "restrictions"],
+        # The owner who made it, holding no second factor, no passkey and no
+        # provider link; no guests.
+        "member_figures": {
+            "total": 1,
+            "without_factor": 1,
+            "without_passkey": 1,
+            "never_through_any": 1,
+            "never_through": [],
+        },
+        "guest_figures": {
+            "total": 0,
+            "without_factor": 0,
+            "without_passkey": 0,
+            "never_through_any": 0,
+            "never_through": [],
+        },
         "auth_policy": {
             "policy": "open",
             "provider_id": None,

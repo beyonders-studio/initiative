@@ -3,13 +3,11 @@ import { createContext, type JSX, useContext } from "react";
 
 const Context = createContext<{
   activeEditor: LexicalEditor;
-  $updateToolbar: () => void;
   blockType: string;
   setBlockType: (blockType: string) => void;
   showModal: (title: string, showModal: (onClose: () => void) => JSX.Element) => void;
 }>({
   activeEditor: {} as LexicalEditor,
-  $updateToolbar: () => {},
   blockType: "paragraph",
   setBlockType: () => {},
   showModal: () => {},
@@ -17,14 +15,12 @@ const Context = createContext<{
 
 export function ToolbarContext({
   activeEditor,
-  $updateToolbar,
   blockType,
   setBlockType,
   showModal,
   children,
 }: {
   activeEditor: LexicalEditor;
-  $updateToolbar: () => void;
   blockType: string;
   setBlockType: (blockType: string) => void;
   showModal: (title: string, showModal: (onClose: () => void) => JSX.Element) => void;
@@ -34,7 +30,6 @@ export function ToolbarContext({
     <Context.Provider
       value={{
         activeEditor,
-        $updateToolbar,
         blockType,
         setBlockType,
         showModal,

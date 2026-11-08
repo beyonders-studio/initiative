@@ -1,6 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 
-import { ProjectSettingsPage } from "@/pages/initiativeTools/projects/ProjectSettingsPage";
+import { Tool } from "@/api/generated/initiativeAPI.schemas";
+import { ProjectDetailsFields } from "@/components/projects/settings/ProjectDetailsFields";
+import { useProject } from "@/hooks/useProjects";
+import { useProjectTaskExportView } from "@/hooks/useProjectTaskView";
+import { useRouteId } from "@/hooks/useRouteId";
+import { ToolSettingsPage } from "@/pages/toolSettings/ToolSettingsPage";
 
 /**
  * Layout for one project's settings: the header, the tab bar, and whichever
@@ -10,5 +16,30 @@ import { ProjectSettingsPage } from "@/pages/initiativeTools/projects/ProjectSet
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/projects/$projectId/settings"
 )({
-  component: ProjectSettingsPage,
+  component: ProjectSettings,
 });
+
+function ProjectSettings() {
+  const { t } = useTranslation("projects");
+  const projectId = useRouteId("projectId");
+  const project = useProject(projectId).data;
+  // An export from here lists the tasks this person's view of the project
+  // does. Its reads wait for a finite id, so an address naming no project
+  // reads nothing.
+  const exportContent = useProjectTaskExportView(projectId ?? Number.NaN);
+
+  return (
+    <ToolSettingsPage
+      tool={Tool.project}
+      detailsInline={project && <ProjectDetailsFields project={project} />}
+      exportOptions={{ content: exportContent }}
+      // Settings too large for a card. Each is served by its own route beside
+      // the shared sections, so the value doubles as the URL segment.
+      extraTabs={[
+        { value: "task-statuses", label: t("settings.tabTaskStatuses") },
+        { value: "task-types", label: t("settings.tabTaskTypes") },
+        { value: "properties", label: t("settings.tabProperties") },
+      ]}
+    />
+  );
+}

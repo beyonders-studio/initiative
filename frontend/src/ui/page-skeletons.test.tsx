@@ -27,15 +27,6 @@ describe("SkeletonRegion", () => {
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
-
-  it("announces a page's own label when given one", () => {
-    render(
-      <SkeletonRegion label="Loading initiative…">
-        <div />
-      </SkeletonRegion>
-    );
-    expect(screen.getByRole("status")).toHaveTextContent("Loading initiative…");
-  });
 });
 
 describe("TableSkeleton", () => {
@@ -56,12 +47,7 @@ describe("CardGridSkeleton", () => {
 });
 
 describe("page skeletons", () => {
-  it("wrap their layout in a labelled status region", () => {
-    render(<PageSkeleton label="Loading the page…" />);
-    expect(screen.getByRole("status")).toHaveTextContent("Loading the page…");
-  });
-
-  it("fall back to the shared label", () => {
+  it("wrap their layout in a status region announcing the shared label", () => {
     render(<PageSkeleton />);
     expect(screen.getByRole("status")).toHaveTextContent("Loading…");
   });

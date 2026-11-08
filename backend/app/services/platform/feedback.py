@@ -40,10 +40,13 @@ async def send(
     context: Optional["DeviceContext"] = None,
     evidence: Sequence["PreparedEvidence"] = (),
     now: Optional[datetime] = None,
+    idea_task_id: Optional[int] = None,
 ) -> None:
     """File feedback as a case on the team's board, titled by its kind and how
     what they wrote begins. Their words open the conversation with a
-    contactable sender and go into the description for any other."""
+    contactable sender and go into the description for any other. Sent with
+    the published idea they voted for while writing it, it is joined to that
+    idea."""
     moment = now or datetime.now(timezone.utc)
     first = body.strip().splitlines()[0].strip()
     if len(first) > TITLE_LENGTH:
@@ -78,3 +81,7 @@ async def send(
     )
     if outcome is None:
         raise NowhereToSend
+    if idea_task_id is not None:
+        from app.services.platform import ideas
+
+        await ideas.join_sent(outcome.task_id, idea_task_id, sender)

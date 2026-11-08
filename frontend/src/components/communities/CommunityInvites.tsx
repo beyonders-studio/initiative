@@ -114,7 +114,7 @@ export const CommunityInviteList = ({
   return (
     <>
       {isLoading ? (
-        <SkeletonRegion label={t("users.loadingInvites")}>
+        <SkeletonRegion>
           <ListSkeleton rows={2} avatar={false} />
         </SkeletonRegion>
       ) : null}

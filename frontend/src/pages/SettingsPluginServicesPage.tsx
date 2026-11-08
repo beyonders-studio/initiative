@@ -158,7 +158,7 @@ export const SettingsPluginServicesPage = () => {
   }
   if (servicesQuery.isLoading) {
     return (
-      <SkeletonRegion label={t("pluginServices.loading")}>
+      <SkeletonRegion>
         <ListSkeleton rows={3} avatar={false} rowClassName="rounded-lg border bg-card p-4" />
       </SkeletonRegion>
     );

@@ -46,7 +46,6 @@
   "updating": "Wird aktualisiert…",
   "projectFallback": "Projekt #{{id}}",
   "edit": {
-    "loadingTask": "Aufgabe wird geladen…",
     "notFound": "Aufgabe nicht gefunden",
     "notFoundDescription": "Diese Aufgabe wurde möglicherweise gelöscht oder du bist einem ungültigen Link gefolgt.",
     "noAccess": "Zugriff verweigert",

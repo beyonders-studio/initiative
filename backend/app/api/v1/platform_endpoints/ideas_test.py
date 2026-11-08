@@ -1,7 +1,10 @@
 """The published ideas: what anybody reads, voting, publishing by type, the
-team's case panel, and telling voters when an idea moves."""
+team's case panel, telling voters when an idea moves, the ideas like what
+somebody is writing, and joining feedback and ideas to ideas."""
 
 from __future__ import annotations
+
+import json
 
 import pytest
 from sqlmodel import select
@@ -18,7 +21,14 @@ from app.models.tenant.intake import IdeaVote, IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory, TaskType
 from app.services.platform import ticket_notices
 from app.services.platform import users as user_service
-from app.testing import create_project, create_task, get_auth_headers
+from app.testing import (
+    create_guild,
+    create_initiative,
+    create_project,
+    create_task,
+    create_user,
+    get_auth_headers,
+)
 
 IDEAS = "/api/v1/ideas"
 
@@ -295,3 +305,232 @@ async def test_erasing_a_voter_takes_their_vote(client, session, acting_user, bo
     await set_rls_context(session, SystemGuild(board["guild"].id))
     assert (await session.exec(select(IdeaVote))).all() == []
     await set_rls_context(session, Unattributed())
+
+
+@pytest.fixture
+async def desk(client, session, acting_user, cloud):  # noqa: F811
+    """Initiative Cloud, its Feedback and Ideas boards set up from their
+    blueprints in one initiative, with two published ideas, and the
+    community's owner to work them. Ids rather than rows: the settings routes
+    run on this session and route it."""
+    platform_owner = await acting_user("owner")
+    owner = await create_user(session)
+    guild = await create_guild(session, creator=owner)
+    initiative = await create_initiative(session, guild, owner)
+    team = get_auth_headers(owner)
+    guild_id, initiative_id = guild.id, initiative.id
+    await set_rls_context(session, Unattributed())
+    await client.put(
+        "/api/v1/settings/intake/community",
+        json={"community_id": guild_id},
+        headers=platform_owner.headers,
+    )
+    boards = {}
+    for stream in ("feedback", "ideas"):
+        made = await client.post(
+            f"/api/v1/settings/intake/{stream}/blueprint",
+            json={"initiative_id": initiative_id},
+            headers=platform_owner.headers,
+        )
+        assert made.status_code == 200, made.text
+        boards[stream] = made.json()
+    tasks = f"/api/v1/c/{guild_id}/tasks"
+    ideas = []
+    for title in (
+        "Recurring events skip holidays",
+        "Holiday calendars to subscribe to",
+    ):
+        made = await client.post(
+            f"{tasks}/",
+            json={
+                "project_id": boards["ideas"]["project_id"],
+                "title": title,
+                "task_type_id": boards["ideas"]["task_type_id"],
+            },
+            headers=team,
+        )
+        assert made.status_code in (200, 201), made.text
+        ideas.append(made.json()["id"])
+    return {
+        "guild_id": guild_id,
+        "team": team,
+        "tasks": tasks,
+        "boards": boards,
+        "ideas": ideas,
+    }
+
+
+async def _send(client, actor, **body) -> None:
+    payload = {"stream": "feedback", "type": "idea", "body": "Skip holidays, please."}
+    payload.update(body)
+    sent = await client.post(
+        tickets_test.TICKETS,
+        data={"payload": json.dumps(payload)},
+        headers=actor.headers,
+    )
+    assert sent.status_code == 202, sent.text
+
+
+async def _last_case(session, desk) -> int:
+    await set_rls_context(session, SystemGuild(desk["guild_id"]))
+    task_id = (
+        await session.exec(
+            select(IntakeCase.task_id).order_by(IntakeCase.id.desc())  # type: ignore[union-attr]
+        )
+    ).first()
+    await set_rls_context(session, Unattributed())
+    assert task_id is not None
+    return task_id
+
+
+async def _case(client, desk, task_id: int) -> dict:
+    read = await client.get(f"{desk['tasks']}/{task_id}/case", headers=desk["team"])
+    assert read.status_code == 200, read.text
+    return read.json()
+
+
+async def test_writing_feedback_finds_the_ideas_like_it(client, session, desk):
+    """Close either way round: a long draft finds a short title, and a few
+    words find a longer one. A closed idea is not offered."""
+    recurring, calendars = desk["ideas"]
+
+    async def similar(text: str) -> list[int]:
+        found = await client.get(f"{IDEAS}/similar", params={"text": text})
+        assert found.status_code == 200, found.text
+        return [idea["task_id"] for idea in found.json()]
+
+    assert (await similar("Could recurring events skip the public holidays?"))[0] == (
+        recurring
+    )
+    assert calendars in await similar("holiday calendars")
+    assert await similar("Dark mode for printing") == []
+
+    await set_rls_context(session, SystemGuild(desk["guild_id"]))
+    done = (
+        await session.exec(
+            select(TaskStatus.id)
+            .where(TaskStatus.project_id == desk["boards"]["ideas"]["project_id"])
+            .where(TaskStatus.category == TaskStatusCategory.done)
+        )
+    ).first()
+    await set_rls_context(session, Unattributed())
+    await client.patch(
+        f"{desk['tasks']}/{calendars}",
+        json={"task_status_id": done},
+        headers=desk["team"],
+    )
+    assert calendars not in await similar("holiday calendars")
+
+
+async def test_feedback_sent_for_an_idea_joins_it(client, session, acting_user, desk):
+    """Its sender's vote counts once, whether or not they offered to be
+    contacted, and the team sees the idea on the case."""
+    recurring, _ = desk["ideas"]
+    sender = await acting_user()
+    voted = await client.put(f"{IDEAS}/{recurring}/vote", headers=sender.headers)
+    assert voted.status_code == 200, voted.text
+    await _send(client, sender, idea_task_id=recurring)
+
+    case = await _case(client, desk, await _last_case(session, desk))
+    assert case["joined_idea"]["task_id"] == recurring
+    assert case["ideas_board_id"] == desk["boards"]["ideas"]["project_id"]
+    idea = (await client.get(f"{IDEAS}/{recurring}", headers=sender.headers)).json()
+    assert (idea["votes"], idea["voted"]) == (1, True)
+
+
+async def test_the_team_joins_feedback_to_an_idea_and_takes_it_off(
+    client, session, acting_user, desk
+):
+    """Joining gives its sender a vote; taking it off leaves the vote, which
+    is theirs to take back. Only feedback joins, and only to the board."""
+    recurring, calendars = desk["ideas"]
+    sender = await acting_user()
+    await _send(client, sender)
+    case_id = await _last_case(session, desk)
+    path = f"{desk['tasks']}/{case_id}/idea"
+
+    joined = await client.put(
+        path, json={"idea_task_id": calendars}, headers=desk["team"]
+    )
+    assert joined.status_code == 204, joined.text
+    assert (await _case(client, desk, case_id))["joined_idea"] == {
+        "task_id": calendars,
+        "title": "Holiday calendars to subscribe to",
+    }
+    moved = await client.put(
+        path, json={"idea_task_id": recurring}, headers=desk["team"]
+    )
+    assert moved.status_code == 204, moved.text
+    assert (await _case(client, desk, case_id))["joined_idea"]["task_id"] == recurring
+    for idea_id in (calendars, recurring):
+        idea = (await client.get(f"{IDEAS}/{idea_id}", headers=sender.headers)).json()
+        assert idea["voted"] is True, idea_id
+
+    assert (await client.delete(path, headers=desk["team"])).status_code == 204
+    assert (await _case(client, desk, case_id))["joined_idea"] is None
+    idea = (await client.get(f"{IDEAS}/{recurring}", headers=sender.headers)).json()
+    assert idea["voted"] is True
+
+    for refused in (
+        # An idea is not feedback.
+        (f"{desk['tasks']}/{recurring}/idea", calendars),
+        # Feedback is not an idea.
+        (path, case_id),
+    ):
+        response = await client.put(
+            refused[0], json={"idea_task_id": refused[1]}, headers=desk["team"]
+        )
+        assert response.status_code == 404, refused
+        assert response.json()["detail"] == IdeaMessages.NOT_FOUND
+
+
+async def test_an_idea_joins_another(client, session, acting_user, desk):
+    """Its votes move, each voter's once, and so does the feedback joined to
+    it. It leaves the Ideas page, and its page opens the other."""
+    recurring, calendars = desk["ideas"]
+    both, one = await acting_user(), await acting_user()
+    for voter, idea_ids in ((both, (recurring, calendars)), (one, (recurring,))):
+        for idea_id in idea_ids:
+            await client.put(f"{IDEAS}/{idea_id}/vote", headers=voter.headers)
+    await _send(client, one, idea_task_id=recurring)
+    case_id = await _last_case(session, desk)
+
+    response = await client.post(
+        f"{desk['tasks']}/{recurring}/idea/join-into",
+        json={"idea_task_id": calendars},
+        headers=desk["team"],
+    )
+    assert response.status_code == 204, response.text
+
+    listed = (await client.get(IDEAS)).json()["items"]
+    assert [(i["task_id"], i["votes"]) for i in listed] == [(calendars, 2)]
+    opened = await client.get(f"{IDEAS}/{recurring}")
+    assert opened.status_code == 200, opened.text
+    assert opened.json()["task_id"] == calendars
+    assert (await _case(client, desk, case_id))["joined_idea"]["task_id"] == calendars
+
+    # Joined again, the first page follows both joins.
+    made = await client.post(
+        f"{desk['tasks']}/",
+        json={
+            "project_id": desk["boards"]["ideas"]["project_id"],
+            "title": "Holidays everywhere",
+            "task_type_id": desk["boards"]["ideas"]["task_type_id"],
+        },
+        headers=desk["team"],
+    )
+    holidays = made.json()["id"]
+    again = await client.post(
+        f"{desk['tasks']}/{calendars}/idea/join-into",
+        json={"idea_task_id": holidays},
+        headers=desk["team"],
+    )
+    assert again.status_code == 204, again.text
+    assert (await client.get(f"{IDEAS}/{recurring}")).json()["task_id"] == holidays
+    # Nothing joins an idea that was joined into another.
+    refused = await client.post(
+        f"{desk['tasks']}/{holidays}/idea/join-into",
+        json={"idea_task_id": recurring},
+        headers=desk["team"],
+    )
+    assert refused.status_code == 404

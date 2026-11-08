@@ -32,7 +32,7 @@ export const SettingsAuthPage = () => {
 
   if (oidcQuery.isLoading) {
     return (
-      <SkeletonRegion label={t("auth.loading")}>
+      <SkeletonRegion>
         <FormSkeleton fields={5} />
       </SkeletonRegion>
     );

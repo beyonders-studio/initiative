@@ -1,10 +1,11 @@
-import { Navigate, useNavigate, useParams, useRouter, useSearch } from "@tanstack/react-router";
+import { Navigate, useNavigate, useRouter, useSearch } from "@tanstack/react-router";
 import { SearchX, Settings, TagIcon, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TagToolTab, toolTabCount } from "@/components/tags/TagToolTab";
+import { useRouteId } from "@/hooks/useRouteId";
 import { useDeleteTag, useTag, useTagCounts, useUpdateTag } from "@/hooks/useTags";
 import {
   TOOL_ICONS,
@@ -23,10 +24,7 @@ import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/ui/tabs";
 
 export const TagDetailPage = () => {
   const { t } = useTranslation(["tags", "common", "nav"]);
-  const { tagId: tagIdParam } = useParams({ strict: false }) as { tagId: string };
-  const parsedTagId = Number(tagIdParam);
-  const hasValidTagId = Number.isFinite(parsedTagId) && parsedTagId > 0;
-  const tagId = hasValidTagId ? parsedTagId : null;
+  const tagId = useRouteId("tagId");
 
   const router = useRouter();
   const navigate = useNavigate();
@@ -51,7 +49,7 @@ export const TagDetailPage = () => {
     setEditColor("");
   }
 
-  if (!hasValidTagId) {
+  if (tagId === null) {
     return <Navigate to="/" replace />;
   }
 

@@ -404,7 +404,7 @@ export const OperatorDashboardCommunitiesPage = () => {
 
   if (communitiesQuery.isLoading) {
     return (
-      <SkeletonRegion label={t("communities.loading")}>
+      <SkeletonRegion>
         <TableSkeleton rows={6} columns={5} />
       </SkeletonRegion>
     );

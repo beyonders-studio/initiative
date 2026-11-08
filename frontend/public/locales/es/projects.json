@@ -1,6 +1,5 @@
 {
   "addProject": "Agregar proyecto",
-  "loading": "Cargando proyectos…",
   "error": "Algo salió mal",
   "noProjects": "Aún no hay proyectos",
   "noProjectsDescription": "Un proyecto reúne tareas y las sigue en un tablero o en una tabla hasta que estén terminadas.",
@@ -9,7 +8,6 @@
   "filters": {
     "searchLabel": "Nombre o descripción",
     "searchProjects": "Buscar proyectos",
-    "selectedInitiative": "Iniciativa seleccionada",
     "filterByTag": "Filtrar por etiqueta",
     "allTags": "Todas las etiquetas",
     "filterByAssignee": "Filtrar por asignado",
@@ -43,14 +41,15 @@
     "label": "Diseño",
     "loadError": "No se pudieron cargar los diseños de este proyecto."
   },
+  "namePlaceholder": "Renovación de base",
+  "description": "Descripción (Markdown soportado)",
+  "descriptionPlaceholder": "Comparte contexto para ayudar a la iniciativa a priorizar.",
+  "initiative": "Iniciativa",
+  "selectInitiative": "Seleccionar iniciativa",
+  "creating": "Creando…",
   "createDialog": {
-    "title": "Crear proyecto",
     "description": "Dale al proyecto un nombre, descripción opcional e iniciativa propietaria.",
     "iconLabel": "Ícono (opcional)",
-    "namePlaceholder": "Renovación de base",
-    "descriptionLabel": "Descripción (Markdown soportado)",
-    "descriptionPlaceholder": "Comparte contexto para ayudar a la iniciativa a priorizar.",
-    "initiativeLabel": "Iniciativa",
     "templateLabel": "Plantilla (opcional)",
     "loadingTemplates": "Cargando plantillas…",
     "templateLoadError": "No se pudieron cargar las plantillas.",
@@ -58,13 +57,10 @@
     "disableTemplateHint": "Desactiva “Guardar como plantilla” para elegir una plantilla.",
     "saveAsTemplate": "Guardar como plantilla",
     "saveAsTemplateHint": "Los proyectos de plantilla se encuentran en la pestaña Plantillas y se pueden reutilizar para iniciar nuevo trabajo.",
-    "createError": "No se pudo crear el proyecto.",
-    "creating": "Creando…",
     "createProject": "Crear proyecto"
   },
   "detail": {
     "backToProjects": "← Volver a proyectos",
-    "loading": "Cargando proyecto…",
     "notFound": "Proyecto no encontrado",
     "notFoundDescription": "Este proyecto puede haber sido eliminado o el enlace está roto.",
     "noAccess": "Acceso denegado",
@@ -85,7 +81,6 @@
     "endLabel": "Fecha de finalización"
   },
   "tabsBar": {
-    "loadingRecent": "Cargando elementos recientes…",
     "closeItem": "Cerrar {{name}}",
     "closeOthers": "Cerrar las demás",
     "closeAll": "Cerrar todas",

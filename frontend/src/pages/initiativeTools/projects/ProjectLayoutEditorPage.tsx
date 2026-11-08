@@ -8,7 +8,7 @@
  * screen is too narrow to edit on, and keeps its draft while it is.
  */
 
-import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useMemo } from "react";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
@@ -16,15 +16,14 @@ import { taskDetails, taskPresets } from "@/components/layouts/details";
 import { LayoutEditor } from "@/components/layouts/LayoutEditor";
 import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { useProject, useProjectTaskStatuses, useProjectTaskTypes } from "@/hooks/useProjects";
+import { useRouteId } from "@/hooks/useRouteId";
 import { instanceTarget, useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolSettingsRoute } from "@/lib/tools";
 
 export const ProjectLayoutEditorPage = () => {
-  const { projectId } = useParams({ strict: false }) as { projectId?: string };
   const { layout } = useSearch({ strict: false }) as { layout?: string };
-  const parsedId = projectId ? Number(projectId) : Number.NaN;
-  const id = Number.isFinite(parsedId) ? parsedId : null;
+  const id = useRouteId("projectId");
   const navigate = useNavigate();
   const gp = useCommunityPath();
 

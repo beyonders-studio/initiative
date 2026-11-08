@@ -97,7 +97,7 @@
       "noMatchAsk": "Prueba con otras palabras o pregunta al equipo abajo. Tu búsqueda pasa a la solicitud.",
       "noMatchWrite": "Prueba con otras palabras o escribe a la dirección de abajo.",
       "noMatchBrowse": "Prueba con otras palabras o recorre la guía de uso.",
-      "unavailable": "La búsqueda no está configurada en este servidor. El enlace a la guía de uso de arriba lo tiene todo.",
+      "unavailable": "La búsqueda no pudo conectar con la guía de uso. El enlace de arriba la abre.",
       "noAnswer": "¿No está la respuesta?",
       "openRequests_one": "{{count}} solicitud abierta",
       "openRequests_other": "{{count}} solicitudes abiertas",
@@ -229,7 +229,23 @@
     },
     "take": "Tomar este caso",
     "taken": "Estás en este caso",
-    "takeFailed": "No se pudo tomar este caso."
+    "takeFailed": "No se pudo tomar este caso.",
+    "idea": {
+      "title": "Idea",
+      "join": "Unir a una idea",
+      "search": "Buscar en el tablero de Ideas",
+      "none": "Ninguna idea coincide.",
+      "create": "Nueva idea: {{title}}",
+      "unjoin": "Quitar de esta idea",
+      "notJoined": "No está unido a ninguna idea.",
+      "help": "Quien lo envió recibe un voto para la idea y se entera cada vez que avanza.",
+      "joinInto": "Unir a otra idea",
+      "joinIntoHelp": "Para un duplicado: sus votos y los comentarios unidos a ella pasan a la otra idea.",
+      "joinIntoTitle": "¿Unir a «{{title}}»?",
+      "joinIntoBody": "Sus votos y los comentarios unidos a ella pasan a «{{title}}». Sale de la página de Ideas y se archiva, y su página abre «{{title}}» en su lugar.",
+      "joinIntoConfirm": "Unir",
+      "failed": "No se pudo cambiar. Inténtalo de nuevo en un momento."
+    }
   },
   "evidence": {
     "attach": "Adjuntar archivos",
@@ -288,6 +304,8 @@
     },
     "contactable": "Pueden contactarme si tienen preguntas sobre esto",
     "seeIdeas": "Mira lo que otros han pedido",
+    "matches": "Ideas como la tuya",
+    "joins": "Al enviarlo, lo que escribiste se suma a «{{title}}».",
     "stuck": "¿Necesitas que alguien lo resuelva por ti? Pedir ayuda",
     "context": {
       "on": "Incluye la versión de la app y la página en la que estás.",

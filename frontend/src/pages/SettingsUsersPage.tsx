@@ -158,7 +158,7 @@ export const SettingsUsersPage = () => {
 
   if (usersQuery.isLoading) {
     return (
-      <SkeletonRegion label={t("users.loadingSettings")} className="space-y-6">
+      <SkeletonRegion className="space-y-6">
         <FormSkeleton fields={2} />
         <TableSkeleton rows={6} columns={6} />
       </SkeletonRegion>

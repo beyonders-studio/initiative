@@ -12,16 +12,13 @@ one entry per English page or heading down to level 3:
   (``en/faq/#my-invite-link-doesnt-work``).
 - ``snippet``: the start of its text, as plain text, cut at a word.
 
-The image builds it (the Dockerfile's ``help-index`` stage) and the API serves
-it at ``/api/v1/help/index``. To try it in a checkout, from the repository
-root::
-
-    zensical build
-    python backend/scripts/build_help_index.py site/search.json backend/help-index.json
+The docs workflow (``.github/workflows/docs.yml``) publishes it beside the
+pages as ``help-index.json``, and the app's Help panel reads it from there on
+every server and every version since, so these four fields keep their names.
 
 An input that is not the shape this reads stops with an error and a non-zero
-exit, so a change to Zensical's format fails the image build rather than
-shipping an empty index. Standard library only: the stage that runs it has
+exit, so a change to Zensical's format fails the deploy rather than publishing
+an empty index. Standard library only: the workflow that runs it installs
 Zensical and nothing of the backend's.
 """
 

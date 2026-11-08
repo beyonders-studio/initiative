@@ -333,7 +333,7 @@ export const PostsView = ({ fixedInitiativeId, canCreate }: PostsViewProps) => {
         />
 
         {postsQuery.isLoading ? (
-          <SkeletonRegion label={t("loading")}>
+          <SkeletonRegion>
             <CardGridSkeleton count={3} className="space-y-4" />
           </SkeletonRegion>
         ) : postsQuery.isError ? (

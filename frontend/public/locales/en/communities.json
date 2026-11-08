@@ -169,7 +169,6 @@
       "superadmin": "All that, plus how people get in: sign-in, AI and plug-ins. Only a superadmin can appoint another.",
       "guest": "Here for a set number of days, and sees only what their invite gave them."
     },
-    "loadingSettings": "Loading settings…",
     "invitesTitle": "Community invites",
     "invitesDescription": "Generate links to invite new members.",
     "refreshInvites": "Refresh invites",
@@ -177,7 +176,6 @@
     "expiresDaysLabel": "Expires in (days)",
     "generateInvite": "Generate invite",
     "generatingInvite": "Creating…",
-    "loadingInvites": "Loading invites…",
     "noActiveInvites": "No active invites.",
     "unableToLoadInvites": "Unable to load invites.",
     "unableToCreateInvite": "Unable to create invite.",
@@ -665,7 +663,6 @@
     "givesItems_other": "{{count}} items",
     "listTitle": "Guests",
     "listDescription": "People here for a set number of days. A guest takes no seat and sees only what their invite gave them.",
-    "loading": "Loading guests…",
     "noGuests": "No guests right now.",
     "endsColumn": "Time ends",
     "extend": "Extend",

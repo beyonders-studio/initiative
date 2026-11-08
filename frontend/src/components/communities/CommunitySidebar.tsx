@@ -151,7 +151,7 @@ const CreateCommunityButton = ({ expanded = false }: { expanded?: boolean }) => 
   return (
     <Dialog open={open} onOpenChange={(next) => !submitting && setOpen(next)}>
       {trigger}
-      <DialogContent className="bg-card">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("createCommunityTitle")}</DialogTitle>
           <DialogDescription>{t("createCommunityDescription")}</DialogDescription>

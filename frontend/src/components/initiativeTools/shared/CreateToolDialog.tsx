@@ -11,7 +11,6 @@ import { useInitiatives } from "@/hooks/useInitiatives";
 import type { DialogProps } from "@/types/dialog";
 import type { TranslateFn } from "@/types/i18n";
 import type { MutationOpts } from "@/types/mutation";
-import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +33,8 @@ export type CreateToolText = {
   createDescription?: string;
   /** For a namespace whose `descriptionPlaceholder` already says something else. */
   descriptionPlaceholder?: string;
+  /** Interpolated into `createDescription`: the organization a person is added at. */
+  values?: Record<string, unknown>;
 };
 
 /** What this dialog sends, whichever tool it makes. */
@@ -63,19 +64,31 @@ export type CreateToolDialogProps = DialogProps & {
   /** Create one belonging to the community rather than to any initiative, the way
    * the calendar plug-in's own calendars do. There is no initiative to pick. */
   communityScope?: boolean;
+  /** False for a tool that carries no description: a contact. */
+  hasDescription?: boolean;
+  /** False starts the access section closed, under a long form of the tool's own. */
+  accessDefaultOpen?: boolean;
   /** Fields only this tool asks for, shown under the description, and what
    * they add to what is sent. */
-  extra?: { field: ReactNode; payload: Record<string, unknown> };
+  extra?: {
+    field: ReactNode;
+    payload: Record<string, unknown>;
+    /** Fills the description each time what it comes from changes, such as
+     *  the chosen template: `from` names it, so a refetch of the same one
+     *  leaves an edited description be. */
+    description?: { from: string; text: string };
+    /** Holds the submit back while the fields hold something unsendable. */
+    invalid?: boolean;
+  };
   /** Called after successful creation. */
   onSuccess?: (created: { id: number }) => void;
 };
 
 /**
- * Naming a new, empty tool: its name, a description, the initiative it goes
- * in, and who else may reach it. Every tool made by naming an empty container
- * is made here, and what differs between them is their strings and the odd
- * field of their own. Files, posts and projects start from content or a
- * template, and keep dialogs of their own.
+ * Naming a new tool: its name, a description, the initiative it goes in, and
+ * who else may reach it. What differs between tools is their strings and the
+ * fields of their own, such as a project's template or how to reach a contact.
+ * Files and posts start from content, and keep dialogs of their own.
  */
 export const CreateToolDialog = ({
   open,
@@ -85,6 +98,8 @@ export const CreateToolDialog = ({
   initiativeId,
   defaultInitiativeId,
   communityScope = false,
+  hasDescription = true,
+  accessDefaultOpen = true,
   extra,
   onSuccess,
 }: CreateToolDialogProps) => {
@@ -99,6 +114,12 @@ export const CreateToolDialog = ({
     defaultInitiativeId ? String(defaultInitiativeId) : ""
   );
   const [grants, setGrants] = useState<ResourceGrantSchema[]>([...DEFAULT_GRANTS]);
+
+  const [filledFrom, setFilledFrom] = useState(extra?.description?.from);
+  if (filledFrom !== extra?.description?.from) {
+    setFilledFrom(extra?.description?.from);
+    if (extra?.description) setDescription(extra.description.text);
+  }
 
   const initiativesQuery = useInitiatives();
   const initiatives = initiativesQuery.data ?? [];
@@ -145,14 +166,13 @@ export const CreateToolDialog = ({
 
   const isCreating = createTool.isPending;
   const hasTarget = communityScope || !!effectiveInitiativeId;
-  const canSubmit = !!name.trim() && hasTarget && !isCreating;
+  const canSubmit = !!name.trim() && hasTarget && !isCreating && !extra?.invalid;
 
   const handleSubmit = () => {
-    const trimmedName = name.trim();
-    if (!trimmedName || !hasTarget) return;
+    if (!canSubmit) return;
     createTool.mutate({
       ...extra?.payload,
-      name: trimmedName,
+      name: name.trim(),
       description: description.trim() || undefined,
       // Omitted for a community-level one: no initiative is what makes it one.
       ...(effectiveInitiativeId ? { initiative_id: effectiveInitiativeId } : {}),
@@ -162,11 +182,11 @@ export const CreateToolDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full rounded-2xl border bg-card shadow-2xl sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t(text.create)}</DialogTitle>
           {text.createDescription ? (
-            <DialogDescription>{t(text.createDescription)}</DialogDescription>
+            <DialogDescription>{t(text.createDescription, text.values)}</DialogDescription>
           ) : null}
         </DialogHeader>
 
@@ -176,6 +196,7 @@ export const CreateToolDialog = ({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("namePlaceholder")}
+              maxLength={255}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && canSubmit) {
                   e.preventDefault();
@@ -186,14 +207,16 @@ export const CreateToolDialog = ({
             />
           </Field>
 
-          <Field label={t("description")}>
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={t(text.descriptionPlaceholder ?? "descriptionPlaceholder")}
-              rows={3}
-            />
-          </Field>
+          {hasDescription ? (
+            <Field label={t("description")}>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={t(text.descriptionPlaceholder ?? "descriptionPlaceholder")}
+                rows={3}
+              />
+            </Field>
+          ) : null}
 
           {extra?.field}
 
@@ -232,14 +255,17 @@ export const CreateToolDialog = ({
             initiativeId={effectiveInitiativeId}
             grants={grants}
             onChange={setGrants}
+            defaultOpen={accessDefaultOpen}
           />
         </div>
 
-        <DialogFooter>
-          <Button type="button" onClick={handleSubmit} pending={isCreating} disabled={!canSubmit}>
-            {isCreating ? t("creating") : t(text.create)}
-          </Button>
-        </DialogFooter>
+        <DialogFooter
+          submitLabel={t(text.create)}
+          pendingLabel={t("creating")}
+          pending={isCreating}
+          disabled={!canSubmit}
+          onSubmit={handleSubmit}
+        />
       </DialogContent>
     </Dialog>
   );

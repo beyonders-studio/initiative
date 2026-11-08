@@ -71,7 +71,7 @@ export const SettingsAIPage = () => {
 
   if (modeQuery.isLoading) {
     return (
-      <SkeletonRegion label={t("ai.loading")}>
+      <SkeletonRegion>
         <FormSkeleton fields={2} />
       </SkeletonRegion>
     );

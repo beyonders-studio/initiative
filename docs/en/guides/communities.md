@@ -302,6 +302,8 @@ Feedback goes one way unless you tick **You can contact me with questions about 
 
 The ideas the team hears most end up on the **Ideas** page on Initiative Cloud, written up by the team, and anybody can read it, signed in or not. **See what others have asked for**, under the box, opens it. Vote for the ones you want, and you'll hear each time one moves along: planned, being built, shipped.
 
+Your idea may already be there. Once you've written a few words, the ideas like yours show up under the box. Vote for one and send, and what you wrote reaches the team attached to that idea, next to the eleven other people who asked for the same thing.
+
 Every request you send lands in **My Tickets**, in the sidebar: where each one stands (**Received**, **In progress**, **Waiting on you**, **Closed**), what the team said, and your replies. You get a notification when it moves, so there's no need to keep checking. A report is listed there too, though the team looks into reports without replying to them.
 
 Whoever runs the server decides which communities take help requests. See [Platform roles](../running-a-server/platform-roles.md#what-you-decide-per-community).

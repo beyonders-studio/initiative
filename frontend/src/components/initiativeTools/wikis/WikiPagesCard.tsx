@@ -37,10 +37,9 @@ const Setting = ({
 
 export const WikiPagesCard = ({ wikiId }: { wikiId: number }) => {
   const { t } = useTranslation(["wikis", "common"]);
-  const isValidId = Number.isFinite(wikiId);
 
-  const wikiQuery = useWiki(isValidId ? wikiId : null);
-  const pagesQuery = useWikiPages(isValidId ? wikiId : null);
+  const wikiQuery = useWiki(wikiId);
+  const pagesQuery = useWikiPages(wikiId);
   const update = useUpdateWiki(wikiId);
 
   const wiki = wikiQuery.data;

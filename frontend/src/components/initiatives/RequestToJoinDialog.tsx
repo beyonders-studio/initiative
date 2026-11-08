@@ -73,7 +73,7 @@ export const RequestToJoinDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>
             {t("joinRequests.dialogTitle", { name: initiative?.name ?? "" })}

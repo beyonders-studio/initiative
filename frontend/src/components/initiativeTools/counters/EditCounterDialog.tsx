@@ -88,7 +88,7 @@ export const EditCounterDialog = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-full rounded-2xl border bg-card shadow-2xl sm:max-w-3xl">
+        <DialogContent className="sm:max-w-3xl">
           <DialogTitle className="sr-only">{t("editCounter")}</DialogTitle>
           <DialogDescription className="sr-only">{counter.name}</DialogDescription>
           <DetailLayoutView

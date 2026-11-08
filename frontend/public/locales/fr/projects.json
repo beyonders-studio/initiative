@@ -1,6 +1,5 @@
 {
   "addProject": "Ajouter un projet",
-  "loading": "Chargement des projets…",
   "error": "Une erreur s'est produite",
   "noProjects": "Aucun projet pour l'instant",
   "noProjectsDescription": "Un projet regroupe des tâches et les suit sur un tableau ou dans une table jusqu'à ce qu'elles soient terminées.",
@@ -9,7 +8,6 @@
   "filters": {
     "searchLabel": "Nom ou description",
     "searchProjects": "Rechercher des projets",
-    "selectedInitiative": "Initiative sélectionnée",
     "filterByTag": "Filtrer par étiquette",
     "allTags": "Toutes les étiquettes",
     "filterByAssignee": "Filtrer par personne assignée",
@@ -43,14 +41,15 @@
     "label": "Disposition",
     "loadError": "Impossible de charger les dispositions de ce projet."
   },
+  "namePlaceholder": "Refonte des fondations",
+  "description": "Description (Markdown pris en charge)",
+  "descriptionPlaceholder": "Donnez du contexte pour aider l'initiative à fixer ses priorités.",
+  "initiative": "Initiative",
+  "selectInitiative": "Sélectionner une initiative",
+  "creating": "Création en cours…",
   "createDialog": {
-    "title": "Créer un projet",
     "description": "Donnez au projet un nom, une description facultative et une initiative de rattachement.",
     "iconLabel": "Icône (facultative)",
-    "namePlaceholder": "Refonte des fondations",
-    "descriptionLabel": "Description (Markdown pris en charge)",
-    "descriptionPlaceholder": "Donnez du contexte pour aider l'initiative à fixer ses priorités.",
-    "initiativeLabel": "Initiative",
     "templateLabel": "Modèle (facultatif)",
     "loadingTemplates": "Chargement des modèles…",
     "templateLoadError": "Impossible de charger les modèles.",
@@ -58,13 +57,10 @@
     "disableTemplateHint": "Désactivez « Enregistrer comme modèle » pour choisir un modèle.",
     "saveAsTemplate": "Enregistrer comme modèle",
     "saveAsTemplateHint": "Les projets modèles se trouvent dans l'onglet Modèles et peuvent être réutilisés pour lancer de nouveaux travaux.",
-    "createError": "Impossible de créer le projet.",
-    "creating": "Création en cours…",
     "createProject": "Créer le projet"
   },
   "detail": {
     "backToProjects": "← Retour aux projets",
-    "loading": "Chargement du projet…",
     "notFound": "Projet introuvable",
     "notFoundDescription": "Ce projet a peut-être été supprimé, ou le lien que vous avez suivi est rompu.",
     "noAccess": "Accès refusé",
@@ -85,7 +81,6 @@
     "endLabel": "Date de fin"
   },
   "tabsBar": {
-    "loadingRecent": "Chargement des éléments récents…",
     "closeItem": "Fermer {{name}}",
     "closeOthers": "Fermer les autres",
     "closeAll": "Fermer tout",

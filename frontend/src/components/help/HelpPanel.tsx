@@ -18,8 +18,7 @@ import { ArrowLeft, Check, ExternalLink } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useReadHelpIndex } from "@/api/generated/help/help";
-import type { HelpIndexEntry, SupportTopic } from "@/api/generated/initiativeAPI.schemas";
+import type { SupportTopic } from "@/api/generated/initiativeAPI.schemas";
 import {
   currentHelp,
   discardHelpDraft,
@@ -39,6 +38,7 @@ import {
 import { TicketComposer } from "@/components/tickets/TicketComposer";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
+import { useHelpIndex } from "@/hooks/useHelpIndex";
 import {
   COMMUNITY_TOPICS,
   firstLine,
@@ -47,7 +47,7 @@ import {
   useTicketAvailability,
 } from "@/hooks/useTickets";
 import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
-import { forPage } from "@/lib/helpSearch";
+import { forPage, type HelpIndexEntry } from "@/lib/helpSearch";
 import { DOCS_SITE_URL, docsUrl } from "@/lib/links";
 import { toast } from "@/lib/mascotToast";
 import { openExternal } from "@/lib/openExternal";
@@ -95,7 +95,7 @@ export const HelpPanel = ({ help }: { help: HelpState }) => {
       <DialogContent
         aria-describedby={undefined}
         // One height for every view, so moving between them does not resize it.
-        className="flex h-[min(36rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0"
+        className="h-[min(36rem,calc(100dvh-2rem))] gap-0 p-0"
       >
         {view === "search" ? (
           <SearchView
@@ -173,9 +173,8 @@ const SearchView = ({
   signedIn: boolean;
 }) => {
   const { t } = useTranslation(["intake", "common"]);
-  // The index changes only with the server's version, which a reload brings.
-  const { data } = useReadHelpIndex({ query: { staleTime: Number.POSITIVE_INFINITY } });
-  const entries = useMemo(() => data?.items ?? [], [data]);
+  const index = useHelpIndex();
+  const entries = useMemo(() => index.data ?? [], [index.data]);
   const route = useRouteTemplate();
   const pageEntries = useMemo(() => forPage(entries, route), [entries, route]);
   const typed = query.trim();
@@ -222,7 +221,7 @@ const SearchView = ({
           placeholder={t("help.panel.search")}
         />
         <CommandList className="max-h-none flex-1 p-2">
-          {entries.length === 0 ? (
+          {index.isPending ? null : entries.length === 0 ? (
             <p className="px-2 py-6 text-center text-muted-foreground text-sm">
               {t("help.panel.unavailable")}
             </p>

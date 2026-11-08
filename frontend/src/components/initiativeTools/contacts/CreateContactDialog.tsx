@@ -1,33 +1,18 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  EndpointKind,
-  RelationshipType,
-  type ResourceGrantSchema,
-} from "@/api/generated/initiativeAPI.schemas";
-import { CreateAccessSection } from "@/components/access/CreateAccessSection";
-import { DEFAULT_GRANTS } from "@/components/access/grants";
+import { EndpointKind, RelationshipType, Tool } from "@/api/generated/initiativeAPI.schemas";
 import {
   ContactDetailsFields,
   ContactKindToggle,
 } from "@/components/initiativeTools/contacts/ContactDetailsFields";
-import { useContactsList, useCreateContact } from "@/hooks/useContacts";
+import { CreateToolDialog } from "@/components/initiativeTools/shared/CreateToolDialog";
+import { useContactsList } from "@/hooks/useContacts";
 import { useRelate } from "@/hooks/useRelationships";
 import { type ContactDetails, filledDetails, NO_DETAILS } from "@/lib/contacts";
 import type { DialogProps } from "@/types/dialog";
-import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/ui/dialog";
 import { Field } from "@/ui/field";
-import { Input } from "@/ui/input";
 
 /** An organization a person can be part of. */
 type Organization = { id: number; name: string };
@@ -107,110 +92,76 @@ export const CreateContactDialog = ({
   organization: fixedOrganization,
   onSuccess,
 }: CreateContactDialogProps) => {
-  const { t } = useTranslation(["contacts", "common"]);
-  const [name, setName] = useState("");
+  const { t } = useTranslation("contacts");
   const [isOrganization, setIsOrganization] = useState(false);
   const [details, setDetails] = useState<ContactDetails>(NO_DETAILS);
   const [organization, setOrganization] = useState<Organization | null>(null);
-  const [grants, setGrants] = useState<ResourceGrantSchema[]>([...DEFAULT_GRANTS]);
 
   const [wasOpen, setWasOpen] = useState(open);
   if (wasOpen !== open) {
     setWasOpen(open);
     if (!open) {
-      setName("");
       setIsOrganization(false);
       setDetails(NO_DETAILS);
       setOrganization(null);
-      setGrants([...DEFAULT_GRANTS]);
     }
   }
 
   const partOf = fixedOrganization ?? (isOrganization ? null : organization);
   const relate = useRelate();
-  const create = useCreateContact({
-    onSuccess: (created) => {
-      // The contact is made whether or not the link lands; a refused link says
-      // so on its own.
-      if (partOf) {
-        relate.mutate({
-          source: { type: EndpointKind.contact, id: created.id },
-          relationship_type: RelationshipType.part_of,
-          target: { type: EndpointKind.contact, id: partOf.id },
-        });
-      }
-      onOpenChange(false);
-      onSuccess?.(created);
-    },
-  });
-
-  const pending = create.isPending;
-  const canSubmit = name.trim() !== "" && !pending;
-  const submit = () => {
-    if (!canSubmit) return;
-    create.mutate({
-      name: name.trim(),
-      is_organization: fixedOrganization ? false : isOrganization,
-      ...filledDetails(details),
-      // Left out for one of the community's own: no initiative is what makes it one.
-      ...(initiativeId !== undefined ? { initiative_id: initiativeId } : {}),
-      grants,
-    });
-  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto bg-card sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{t("newContact")}</DialogTitle>
-          <DialogDescription>
-            {fixedOrganization
-              ? t("addPersonDescription", { name: fixedOrganization.name })
-              : t("createDescription")}
-          </DialogDescription>
-        </DialogHeader>
+    <CreateToolDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      tool={Tool.contact}
+      text={{
+        ns: "contacts",
+        create: "newContact",
+        createDescription: fixedOrganization ? "addPersonDescription" : "createDescription",
+        values: { name: fixedOrganization?.name },
+      }}
+      initiativeId={initiativeId}
+      communityScope={initiativeId === undefined}
+      hasDescription={false}
+      accessDefaultOpen={false}
+      onSuccess={(created) => {
+        // The contact is made whether or not the link lands; a refused link
+        // says so on its own.
+        if (partOf) {
+          relate.mutate({
+            source: { type: EndpointKind.contact, id: created.id },
+            relationship_type: RelationshipType.part_of,
+            target: { type: EndpointKind.contact, id: partOf.id },
+          });
+        }
+        onSuccess?.(created);
+      }}
+      extra={{
+        payload: {
+          is_organization: fixedOrganization ? false : isOrganization,
+          ...filledDetails(details),
+        },
+        field: (
+          <>
+            {fixedOrganization ? null : (
+              <ContactKindToggle isOrganization={isOrganization} onChange={setIsOrganization} />
+            )}
 
-        <div className="space-y-4">
-          <Field label={t("name")}>
-            <Input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder={t("namePlaceholder")}
-              maxLength={255}
-              autoFocus
-            />
-          </Field>
+            <ContactDetailsFields value={details} onChange={setDetails} />
 
-          {fixedOrganization ? null : (
-            <ContactKindToggle isOrganization={isOrganization} onChange={setIsOrganization} />
-          )}
-
-          <ContactDetailsFields value={details} onChange={setDetails} />
-
-          {fixedOrganization || isOrganization ? null : (
-            <Field label={t("partOf")}>
-              <OrganizationPicker
-                initiativeId={initiativeId}
-                value={organization}
-                onChange={setOrganization}
-              />
-            </Field>
-          )}
-
-          <CreateAccessSection
-            initiativeId={initiativeId ?? null}
-            grants={grants}
-            onChange={setGrants}
-            defaultOpen={false}
-          />
-        </div>
-
-        <DialogFooter>
-          <Button type="button" onClick={submit} pending={pending} disabled={!canSubmit}>
-            {pending ? t("creating") : t("newContact")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            {fixedOrganization || isOrganization ? null : (
+              <Field label={t("partOf")}>
+                <OrganizationPicker
+                  initiativeId={initiativeId}
+                  value={organization}
+                  onChange={setOrganization}
+                />
+              </Field>
+            )}
+          </>
+        ),
+      }}
+    />
   );
 };

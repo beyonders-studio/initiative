@@ -73,7 +73,6 @@
     "noInitiatives": "Keine Initiativen hier, zu denen du Dateien hinzufügen kannst."
   },
   "detail": {
-    "loading": "Datei wird geladen…",
     "notFound": "Datei nicht gefunden",
     "notFoundDescription": "Diese Datei wurde möglicherweise gelöscht oder du bist einem fehlerhaften Link gefolgt.",
     "noAccess": "Zugriff verweigert",
@@ -368,7 +367,6 @@
   "createFirst": "Mit dem Schreiben beginnen",
   "dropToUpload": "Zum Hochladen als Datei ablegen",
   "error": "Etwas ist schiefgelaufen",
-  "loading": "Dateien werden geladen…",
   "newFile": "Neue Datei",
   "noFiles": "Noch keine Dateien",
   "noFilesDescription": "Erstelle deine erste Initiative-Datei, um Briefings, Entscheidungen oder Anleitungen zu teilen.",
@@ -429,7 +427,6 @@
     "trashed": "Sammlung in den Papierkorb gelegt",
     "noFiles": "Noch keine Dateien in dieser Sammlung",
     "noFilesDescription": "Füge Dateien aus dieser Initiative hinzu oder lege Dateien irgendwo auf dieser Seite ab, um sie hochzuladen.",
-    "loadingFiles": "Dateien werden geladen...",
     "openFile": "Datei öffnen",
     "filter": "Sammlung",
     "anyCollection": "Jede Sammlung",

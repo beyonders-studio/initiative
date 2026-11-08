@@ -73,7 +73,7 @@ export const SettingsPushPage = () => {
 
   if (query.isLoading) {
     return (
-      <SkeletonRegion label={t("push.loading")}>
+      <SkeletonRegion>
         <FormSkeleton fields={5} />
       </SkeletonRegion>
     );

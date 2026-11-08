@@ -97,7 +97,7 @@
       "noMatchAsk": "Versuch es mit anderen Wörtern, oder frag unten das Team. Deine Suche kommt in die Anfrage.",
       "noMatchWrite": "Versuch es mit anderen Wörtern, oder schreib an die Adresse unten.",
       "noMatchBrowse": "Versuch es mit anderen Wörtern, oder stöbere im Benutzerhandbuch.",
-      "unavailable": "Die Suche ist auf diesem Server nicht eingerichtet. Über den Link zum Benutzerhandbuch oben findest du alles.",
+      "unavailable": "Die Suche konnte das Benutzerhandbuch nicht erreichen. Der Link oben öffnet es.",
       "noAnswer": "Keine Antwort dabei?",
       "openRequests_one": "{{count}} offene Anfrage",
       "openRequests_other": "{{count}} offene Anfragen",
@@ -229,7 +229,23 @@
     },
     "take": "Fall übernehmen",
     "taken": "Du bearbeitest diesen Fall",
-    "takeFailed": "Der Fall konnte nicht übernommen werden."
+    "takeFailed": "Der Fall konnte nicht übernommen werden.",
+    "idea": {
+      "title": "Idee",
+      "join": "Einer Idee zuordnen",
+      "search": "Board „Ideen“ durchsuchen",
+      "none": "Keine passende Idee.",
+      "create": "Neue Idee: {{title}}",
+      "unjoin": "Von dieser Idee lösen",
+      "notJoined": "Keiner Idee zugeordnet.",
+      "help": "Wer es geschickt hat, erhält eine Stimme für die Idee und erfährt jedes Mal, wenn sie weiterkommt.",
+      "joinInto": "In eine andere Idee zusammenführen",
+      "joinIntoHelp": "Für ein Duplikat: Seine Stimmen und das zugeordnete Feedback gehen auf die andere Idee über.",
+      "joinIntoTitle": "In „{{title}}“ zusammenführen?",
+      "joinIntoBody": "Seine Stimmen und das zugeordnete Feedback gehen auf „{{title}}“ über. Es verschwindet von der Seite „Ideen“ und wird archiviert, und seine Seite öffnet stattdessen „{{title}}“.",
+      "joinIntoConfirm": "Zusammenführen",
+      "failed": "Das ließ sich nicht ändern. Versuch es gleich noch einmal."
+    }
   },
   "evidence": {
     "attach": "Dateien anhängen",
@@ -288,6 +304,8 @@
     },
     "contactable": "Ihr dürft mich bei Fragen dazu kontaktieren",
     "seeIdeas": "Sieh dir an, was sich andere gewünscht haben",
+    "matches": "Ideen wie deine",
+    "joins": "Beim Senden wird das, was du geschrieben hast, „{{title}}“ zugeordnet.",
     "stuck": "Soll sich jemand darum kümmern? Hilfe anfordern",
     "context": {
       "on": "Enthält deine App-Version und die Seite, auf der du bist.",

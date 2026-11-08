@@ -302,7 +302,7 @@ export const SettingsCommunityRolesPage = () => {
           ))}
         </ul>
         {rolesQuery.isLoading ? (
-          <SkeletonRegion label={t("customRoles.loading")}>
+          <SkeletonRegion>
             <ListSkeleton rows={2} avatar={false} />
           </SkeletonRegion>
         ) : rolesQuery.isError ? (

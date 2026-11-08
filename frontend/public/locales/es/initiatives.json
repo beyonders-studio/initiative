@@ -69,7 +69,6 @@
     "createError": "No se pudo crear la iniciativa en este momento."
   },
   "detail": {
-    "loadingInitiative": "Cargando iniciativa...",
     "backToInitiatives": "← Volver a Mis iniciativas",
     "notFound": "Iniciativa no encontrada",
     "notFoundDescription": "La iniciativa que buscas no existe o ya no tienes acceso.",
@@ -92,7 +91,6 @@
   "settings": {
     "title": "Configuración de la iniciativa",
     "breadcrumbSettings": "Configuración",
-    "loadingInitiative": "Cargando iniciativa...",
     "backToInitiatives": "← Volver a Mis iniciativas",
     "backToInitiative": "← Volver a la iniciativa",
     "notFound": "Iniciativa no encontrada",

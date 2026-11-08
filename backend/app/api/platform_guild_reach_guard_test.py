@@ -205,6 +205,14 @@ _ALLOWED: dict[tuple[str, str], str] = {
         "intake: settles the community a case is about, as an access grant for "
         "it is asked for"
     ),
+    (f"{_SERVICES}/ideas.py", "joined_into"): (
+        "ideas: reads which published idea a joined idea now is, so its old "
+        "page opens it"
+    ),
+    (f"{_SERVICES}/ideas.py", "join_sent"): (
+        "ideas: joins feedback just filed to the published idea its sender "
+        "voted for, once a read through the ideas role has shown it published"
+    ),
     (f"{_SERVICES}/ideas.py", "vote"): (
         "ideas: writes a vote into the operations community once a read "
         "through the ideas role has shown the idea is published and open"

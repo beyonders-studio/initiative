@@ -65,7 +65,7 @@ export const TaskTypeDeleteDialog = ({
 
   return (
     <Dialog open={typeId !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="bg-card">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("taskTypes.deleteTitle")}</DialogTitle>
           <DialogDescription>

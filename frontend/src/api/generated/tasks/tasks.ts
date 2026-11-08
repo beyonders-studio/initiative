@@ -31,6 +31,7 @@ import type {
   GenerateDescriptionResponse,
   GroupsResponse,
   HTTPValidationError,
+  IdeaJoin,
   ListColumnLimitsParams,
   ListMyTasksParams,
   ListTaskGroupsParams,
@@ -1070,6 +1071,280 @@ export const useTakeTaskCase = <TError = ErrorType<HTTPValidationError>, TContex
   TContext
 > => {
   return useMutation(getTakeTaskCaseMutationOptions(options), queryClient);
+};
+/**
+ * Join a feedback case to an idea on the Ideas board, in place of any
+ * other: whoever sent it gets a vote, and hears when the idea moves. 404 for
+ * a task that is no feedback case, or an idea not on the board.
+ * @summary Join Case To Idea
+ */
+export const joinCaseToIdea = (
+  communityId: number,
+  taskId: number,
+  ideaJoin: BodyType<IdeaJoin>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    {
+      url: `/api/v1/c/${communityId}/tasks/${taskId}/idea`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: ideaJoin,
+      signal,
+    },
+    options
+  );
+};
+
+export const getJoinCaseToIdeaMutationKey = () => ["joinCaseToIdea"] as const;
+
+export const getJoinCaseToIdeaMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof joinCaseToIdea>>,
+    TError,
+    JoinCaseToIdeaMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof joinCaseToIdea>>,
+  TError,
+  JoinCaseToIdeaMutationVariables,
+  TContext
+> => {
+  const mutationKey = getJoinCaseToIdeaMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof joinCaseToIdea>>,
+    JoinCaseToIdeaMutationVariables
+  > = (props) => {
+    const { communityId, taskId, data } = props ?? {};
+
+    return joinCaseToIdea(communityId, taskId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type JoinCaseToIdeaMutationResult = NonNullable<Awaited<ReturnType<typeof joinCaseToIdea>>>;
+export type JoinCaseToIdeaMutationBody = BodyType<IdeaJoin>;
+export type JoinCaseToIdeaMutationError = ErrorType<HTTPValidationError>;
+export type JoinCaseToIdeaMutationVariables = {
+  communityId: number;
+  taskId: number;
+  data: BodyType<IdeaJoin>;
+};
+
+/**
+ * @summary Join Case To Idea
+ */
+export const useJoinCaseToIdea = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof joinCaseToIdea>>,
+      TError,
+      JoinCaseToIdeaMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof joinCaseToIdea>>,
+  TError,
+  JoinCaseToIdeaMutationVariables,
+  TContext
+> => {
+  return useMutation(getJoinCaseToIdeaMutationOptions(options), queryClient);
+};
+/**
+ * Take a feedback case off the idea it is joined to. Its sender's vote
+ * stays.
+ * @summary Unjoin Case From Idea
+ */
+export const unjoinCaseFromIdea = (
+  communityId: number,
+  taskId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/tasks/${taskId}/idea`, method: "DELETE", signal },
+    options
+  );
+};
+
+export const getUnjoinCaseFromIdeaMutationKey = () => ["unjoinCaseFromIdea"] as const;
+
+export const getUnjoinCaseFromIdeaMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof unjoinCaseFromIdea>>,
+    TError,
+    UnjoinCaseFromIdeaMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof unjoinCaseFromIdea>>,
+  TError,
+  UnjoinCaseFromIdeaMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUnjoinCaseFromIdeaMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof unjoinCaseFromIdea>>,
+    UnjoinCaseFromIdeaMutationVariables
+  > = (props) => {
+    const { communityId, taskId } = props ?? {};
+
+    return unjoinCaseFromIdea(communityId, taskId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UnjoinCaseFromIdeaMutationResult = NonNullable<
+  Awaited<ReturnType<typeof unjoinCaseFromIdea>>
+>;
+
+export type UnjoinCaseFromIdeaMutationError = ErrorType<HTTPValidationError>;
+export type UnjoinCaseFromIdeaMutationVariables = { communityId: number; taskId: number };
+
+/**
+ * @summary Unjoin Case From Idea
+ */
+export const useUnjoinCaseFromIdea = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof unjoinCaseFromIdea>>,
+      TError,
+      UnjoinCaseFromIdeaMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof unjoinCaseFromIdea>>,
+  TError,
+  UnjoinCaseFromIdeaMutationVariables,
+  TContext
+> => {
+  return useMutation(getUnjoinCaseFromIdeaMutationOptions(options), queryClient);
+};
+/**
+ * Join an idea into another on the Ideas board: its votes and the
+ * feedback joined to it move there, and it is archived, its page opening
+ * the other. 404 for a task that is not on the board.
+ * @summary Join Idea Into Another
+ */
+export const joinIdeaIntoAnother = (
+  communityId: number,
+  taskId: number,
+  ideaJoin: BodyType<IdeaJoin>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    {
+      url: `/api/v1/c/${communityId}/tasks/${taskId}/idea/join-into`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: ideaJoin,
+      signal,
+    },
+    options
+  );
+};
+
+export const getJoinIdeaIntoAnotherMutationKey = () => ["joinIdeaIntoAnother"] as const;
+
+export const getJoinIdeaIntoAnotherMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof joinIdeaIntoAnother>>,
+    TError,
+    JoinIdeaIntoAnotherMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof joinIdeaIntoAnother>>,
+  TError,
+  JoinIdeaIntoAnotherMutationVariables,
+  TContext
+> => {
+  const mutationKey = getJoinIdeaIntoAnotherMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof joinIdeaIntoAnother>>,
+    JoinIdeaIntoAnotherMutationVariables
+  > = (props) => {
+    const { communityId, taskId, data } = props ?? {};
+
+    return joinIdeaIntoAnother(communityId, taskId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type JoinIdeaIntoAnotherMutationResult = NonNullable<
+  Awaited<ReturnType<typeof joinIdeaIntoAnother>>
+>;
+export type JoinIdeaIntoAnotherMutationBody = BodyType<IdeaJoin>;
+export type JoinIdeaIntoAnotherMutationError = ErrorType<HTTPValidationError>;
+export type JoinIdeaIntoAnotherMutationVariables = {
+  communityId: number;
+  taskId: number;
+  data: BodyType<IdeaJoin>;
+};
+
+/**
+ * @summary Join Idea Into Another
+ */
+export const useJoinIdeaIntoAnother = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof joinIdeaIntoAnother>>,
+      TError,
+      JoinIdeaIntoAnotherMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof joinIdeaIntoAnother>>,
+  TError,
+  JoinIdeaIntoAnotherMutationVariables,
+  TContext
+> => {
+  return useMutation(getJoinIdeaIntoAnotherMutationOptions(options), queryClient);
 };
 /**
  * @summary Move Task

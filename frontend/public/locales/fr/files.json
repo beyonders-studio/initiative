@@ -73,7 +73,6 @@
     "noInitiatives": "Aucune initiative ici à laquelle vous pouvez ajouter des fichiers."
   },
   "detail": {
-    "loading": "Chargement du fichier…",
     "notFound": "Fichier introuvable",
     "notFoundDescription": "Ce fichier a peut-être été supprimé ou vous avez suivi un lien invalide.",
     "noAccess": "Accès refusé",
@@ -368,7 +367,6 @@
   "createFirst": "Commencer à écrire",
   "dropToUpload": "Dépose pour envoyer un fichier",
   "error": "Un problème est survenu",
-  "loading": "Chargement des fichiers…",
   "newFile": "Nouveau fichier",
   "noFiles": "Aucun fichier pour l'instant",
   "noFilesDescription": "Créez votre premier fichier d'initiative pour partager des briefs, des décisions ou des guides.",
@@ -429,7 +427,6 @@
     "trashed": "Collection mise à la corbeille",
     "noFiles": "Aucun fichier dans cette collection pour l’instant",
     "noFilesDescription": "Ajoutez des fichiers de cette initiative, ou déposez des fichiers n’importe où sur cette page pour les envoyer.",
-    "loadingFiles": "Chargement des fichiers...",
     "openFile": "Ouvrir le fichier",
     "filter": "Collection",
     "anyCollection": "Toutes les collections",

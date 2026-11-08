@@ -1,4 +1,4 @@
-import { Link, Navigate, useParams } from "@tanstack/react-router";
+import { Link, Navigate } from "@tanstack/react-router";
 import { Info, SearchX, Settings } from "lucide-react";
 import { type ComponentType, type CSSProperties, Suspense, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -8,6 +8,7 @@ import { InitiativeMembersPeek } from "@/components/initiatives/InitiativeMember
 import { Markdown } from "@/components/Markdown";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useInitiative } from "@/hooks/useInitiatives";
+import { useRouteId } from "@/hooks/useRouteId";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { resolveInitiativeColor } from "@/lib/initiativeColors";
 import { initiativeRoute, TOOLS, toolCamelPlural, toolListRoute } from "@/lib/tools";
@@ -57,15 +58,8 @@ export interface InitiativeDetailPageProps {
 }
 
 export const InitiativeDetailPage = ({ tool }: InitiativeDetailPageProps = {}) => {
-  const { initiativeId: initiativeIdParam } = useParams({
-    strict: false,
-  }) as {
-    initiativeId: string;
-  };
+  const initiativeId = useRouteId("initiativeId");
   const gp = useCommunityPath();
-  const parsedInitiativeId = Number(initiativeIdParam);
-  const hasValidInitiativeId = Number.isFinite(parsedInitiativeId);
-  const initiativeId = hasValidInitiativeId ? parsedInitiativeId : 0;
   const { t } = useTranslation(["initiatives", "common"]);
   const { activeCommunity } = useCommunities();
   const communityAdminLabel = t("settings.communityAdminRole");
@@ -73,7 +67,7 @@ export const InitiativeDetailPage = ({ tool }: InitiativeDetailPageProps = {}) =
   // Addressed by id, not picked out of the caller's own list: a community admin
   // reaches every initiative in their community whether or not they have joined it,
   // and the endpoint answers 404 to anyone the row is not visible to.
-  const initiativeQuery = useInitiative(hasValidInitiativeId ? initiativeId : null);
+  const initiativeQuery = useInitiative(initiativeId);
   const initiative = initiativeQuery.data ?? null;
   const isCommunityAdmin = Boolean(activeCommunity?.can.administer_content);
   const canManageInitiative = Boolean(initiative?.can.manage);
@@ -103,14 +97,14 @@ export const InitiativeDetailPage = ({ tool }: InitiativeDetailPageProps = {}) =
   const roleBadgeLabel =
     initiative?.role_display_name ?? (isCommunityAdmin ? communityAdminLabel : null);
 
-  if (!hasValidInitiativeId) {
+  if (initiativeId === null) {
     return <Navigate to={gp("/")} replace />;
   }
 
   if (initiativeQuery.isLoading) {
     // Its header, the tool tabs, and the first tab's list.
     return (
-      <SkeletonRegion label={t("detail.loadingInitiative")} className="space-y-4 sm:space-y-6">
+      <SkeletonRegion className="space-y-4 sm:space-y-6">
         <PageHeaderSkeleton dot description meta action tabs={TOOLS.length} />
         <ToolListSkeleton className="pt-2" />
       </SkeletonRegion>

@@ -92,8 +92,8 @@ export const VersionDialog = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {children ? <DialogTrigger asChild>{children}</DialogTrigger> : null}
-      <DialogContent className="flex h-[80vh] flex-col gap-0 sm:max-w-2xl">
-        <DialogHeader className="shrink-0">
+      <DialogContent className="h-[80vh] sm:max-w-2xl">
+        <DialogHeader>
           <DialogTitle>{t("version.versionInformation")}</DialogTitle>
           <DialogDescription className="sr-only">
             {t("version.currentVersionAndChangelog")}

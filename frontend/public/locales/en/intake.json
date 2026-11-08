@@ -97,7 +97,7 @@
       "noMatchAsk": "Try other words, or ask the team below. Your search goes into the request.",
       "noMatchWrite": "Try other words, or write to the address below.",
       "noMatchBrowse": "Try other words, or browse the user guide.",
-      "unavailable": "Search isn't set up on this server. The user guide link above has everything.",
+      "unavailable": "Search couldn't reach the user guide. The link above opens it.",
       "noAnswer": "No answer here?",
       "openRequests_one": "{{count}} open request",
       "openRequests_other": "{{count}} open requests",
@@ -229,7 +229,23 @@
     },
     "take": "Take this case",
     "taken": "You're on this case",
-    "takeFailed": "Couldn't take this case."
+    "takeFailed": "Couldn't take this case.",
+    "idea": {
+      "title": "Idea",
+      "join": "Join to an idea",
+      "search": "Search the Ideas board",
+      "none": "No idea matches.",
+      "create": "New idea: {{title}}",
+      "unjoin": "Take off this idea",
+      "notJoined": "Not joined to an idea.",
+      "help": "Whoever sent it gets a vote for the idea, and hears each time it moves.",
+      "joinInto": "Join into another idea",
+      "joinIntoHelp": "For a duplicate: its votes and the feedback joined to it move to the other idea.",
+      "joinIntoTitle": "Join into “{{title}}”?",
+      "joinIntoBody": "Its votes and the feedback joined to it move to “{{title}}”. It leaves the Ideas page and is archived, and its page opens “{{title}}” instead.",
+      "joinIntoConfirm": "Join",
+      "failed": "Could not change that. Try again in a moment."
+    }
   },
   "evidence": {
     "attach": "Attach files",
@@ -288,6 +304,8 @@
     },
     "contactable": "You can contact me with questions about this",
     "seeIdeas": "See what others have asked for",
+    "matches": "Ideas like yours",
+    "joins": "Sending adds what you wrote to “{{title}}”.",
     "stuck": "Need somebody to sort it out for you? Ask for help",
     "context": {
       "on": "Includes your app version and which page you're on.",

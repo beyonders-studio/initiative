@@ -624,6 +624,52 @@ describe("the project index page", () => {
     );
   });
 
+  it("starts a project from the template picked, with the template's description", async () => {
+    stubList(Tool.project, [
+      buildProject({ id: 4, name: "Sprint", description: "Two weeks of work", is_template: true }),
+    ]);
+    let sent: unknown;
+    server.use(
+      communityHttp.post("/projects/", async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json(buildProject({ id: 9, name: "Fresh" }));
+      })
+    );
+
+    renderIndex(Tool.project);
+    await userEvent.click(
+      await screen.findByRole("button", { name: translate("projects:addProject") })
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(
+      await within(dialog).findByRole("combobox", {
+        name: translate("projects:createDialog.templateLabel"),
+      })
+    );
+    await userEvent.click(await screen.findByRole("option", { name: "Sprint" }));
+    expect(within(dialog).getByLabelText(translate("projects:description"))).toHaveValue(
+      "Two weeks of work"
+    );
+
+    await userEvent.type(within(dialog).getByLabelText(translate("common:name")), "Fresh");
+    await userEvent.click(
+      within(dialog).getByRole("button", {
+        name: translate("projects:createDialog.createProject"),
+      })
+    );
+
+    await waitFor(() =>
+      expect(sent).toMatchObject({
+        name: "Fresh",
+        description: "Two weeks of work",
+        template_id: 4,
+        is_template: false,
+        initiative_id: INITIATIVE_ID,
+      })
+    );
+  });
+
   it("drags nothing once the reader picks an order in the table", async () => {
     setItem(
       toolTableStorageKey(Tool.project, "order"),
@@ -637,5 +683,41 @@ describe("the project index page", () => {
     // The order this device kept carries over into the reader's view.
     await waitFor(() => expect(requests.at(-1)?.get("sort_by")).toBe("name"));
     expect(handles()).toHaveLength(0);
+  });
+});
+
+describe("the contact index page", () => {
+  it("makes a contact from a dialog of its own, which asks for no description", async () => {
+    stubList(Tool.contact, []);
+    let sent: Record<string, unknown> | undefined;
+    server.use(
+      communityHttp.post("/contacts/", async ({ request }) => {
+        sent = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(buildContact({ id: 9, name: "Priya Shah" }));
+      })
+    );
+
+    renderIndex(Tool.contact);
+    await userEvent.click(
+      await screen.findByRole("button", { name: copy(Tool.contact, "create") })
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).queryByLabelText(translate("common:description"))
+    ).not.toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText(translate("contacts:name")), "Priya Shah");
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: copy(Tool.contact, "create") })
+    );
+
+    await waitFor(() =>
+      expect(sent).toMatchObject({
+        name: "Priya Shah",
+        is_organization: false,
+        initiative_id: INITIATIVE_ID,
+      })
+    );
+    expect(sent).not.toHaveProperty("description");
   });
 });

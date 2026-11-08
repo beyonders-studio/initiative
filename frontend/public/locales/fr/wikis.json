@@ -10,7 +10,6 @@
   "noWikis": "Pas encore de wiki",
   "noWikisDescription": "Un wiki, ce sont des pages qui se renvoient les unes aux autres. Écrivez-en une, reliez la suivante, et la forme de ce que vous savez apparaît d’elle-même.",
   "createFirst": "Créer le premier wiki",
-  "loading": "Chargement des wikis...",
   "error": "Un problème est survenu",
   "notFound": "Wiki introuvable",
   "notFoundDescription": "Le wiki que vous cherchez n’existe pas ou a été supprimé.",

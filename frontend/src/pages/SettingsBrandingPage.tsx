@@ -67,7 +67,7 @@ export const SettingsBrandingPage = () => {
         description={t("branding.colorsDescription")}
       >
         {interfaceQuery.isLoading ? (
-          <SkeletonRegion label={t("branding.loadingInterface")}>
+          <SkeletonRegion>
             <FormSkeleton card={false} fields={2} />
           </SkeletonRegion>
         ) : interfaceQuery.isError ? (

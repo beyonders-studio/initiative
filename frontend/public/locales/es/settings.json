@@ -187,7 +187,6 @@
     "deleteDialogDescription": "Todo lo que use {{name}} dejará de funcionar de inmediato."
   },
   "ai": {
-    "loading": "Cargando la configuración de IA…",
     "providerFieldLabel": "Proveedor",
     "providerPlaceholder": "Selecciona un proveedor",
     "modelLabel": "Modelo",
@@ -532,7 +531,6 @@
     "platformOnly": "Solo el propietario de la plataforma puede gestionar la configuración de personalización.",
     "colorsTitle": "Colores de marca",
     "colorsDescription": "Personaliza los colores de acento para el modo claro y oscuro.",
-    "loadingInterface": "Cargando configuración de interfaz…",
     "lightModeLabel": "Acento del modo claro",
     "lightModeHelp": "Los botones, resaltados y estados de enfoque usan este color mientras la aplicación está en modo claro.",
     "darkModeLabel": "Acento del modo oscuro",
@@ -634,7 +632,6 @@
   },
   "push": {
     "platformOnly": "Solo el propietario de la plataforma puede gestionar los ajustes de notificaciones push.",
-    "loading": "Cargando ajustes de notificaciones push…",
     "title": "Firebase Cloud Messaging",
     "description": "Opcional. Sin una clave de cuenta de servicio, las notificaciones push pasan por el relé de push de BeyondersStudio y estos campos pueden quedar vacíos. Con una, las notificaciones de Android pasan por tu propio proyecto de Firebase; las de iPhone siempre usan el relé.",
     "enabledLabel": "Enviar notificaciones push",
@@ -690,7 +687,6 @@
   },
   "auth": {
     "platformOnly": "Solo el propietario de la plataforma puede gestionar la configuración de autenticación.",
-    "loading": "Cargando configuración de autenticación…",
     "postLoginRedirect": "Redirección después de inicio de sesión:",
     "mobileCallback": "Callback de app móvil:",
     "deploymentTitle": "Esta instalación",
@@ -790,7 +786,6 @@
     }
   },
   "platformUsers": {
-    "loading": "Cargando usuarios…",
     "filterPlaceholder": "Filtrar por identificador…",
     "columnId": "ID de usuario",
     "columnHandle": "Identificador",
@@ -1093,7 +1088,6 @@
   },
   "pluginServices": {
     "platformOnly": "Solo los propietarios de la plataforma pueden gestionar los servicios de complementos.",
-    "loading": "Cargando servicios de complementos…",
     "title": "Servicios de complementos",
     "description": "Los complementos que ejecuta esta instancia. La ficha de un complemento dice qué es y qué puede hacer; aquí indicas dónde responde y las claves con las que firma.",
     "empty": "Todavía no hay servicios de complementos. Un complemento aparece aquí cuando llega su ficha o cuando lo añades.",
@@ -1222,7 +1216,6 @@
   },
   "providerPlacement": {
     "description": "Asigna a las personas que inicia sesión un proveedor —según el grupo o el directorio que indique— a una comunidad, y a una iniciativa de ella si nombras una.",
-    "loading": "Cargando reglas de asignación…",
     "platformOnly": "La asignación al iniciar sesión la gestionan los operadores y propietarios de la plataforma.",
     "everywhere": {
       "label": "Aplicar las reglas de asignación a todas las comunidades",
@@ -1291,7 +1284,6 @@
     "title": "Límites por comunidad",
     "description": "Establece límites por comunidad para el almacenamiento y el número de usuarios. Bajar un límite por debajo del uso actual bloquea las nuevas subidas o miembros, pero nunca elimina los archivos ni los miembros existentes.",
     "platformOnly": "Necesitas un rol de personal de la plataforma para ver las comunidades.",
-    "loading": "Cargando comunidades…",
     "filterByName": "Filtrar comunidades por nombre",
     "unlimitedPlaceholder": "Ilimitado",
     "helpText": "Los límites de almacenamiento están en GB; los límites de usuarios son un recuento de miembros. Ambos se guardan automáticamente: deja un campo en blanco para ilimitado.",
@@ -1422,7 +1414,6 @@
   },
   "storage": {
     "platformOnly": "Solo los propietarios de la plataforma pueden configurar el almacenamiento.",
-    "loading": "Cargando la configuración de almacenamiento…",
     "title": "Almacenamiento de objetos",
     "description": "Elige dónde se guardan los archivos subidos y los adjuntos. De forma predeterminada usa el sistema de archivos local; cambia a un almacén compatible con S3 para despliegues escalables o compartidos.",
     "backendLabel": "Backend de almacenamiento",
@@ -2239,7 +2230,6 @@
     "notYours": "No tienes esto tú mismo, así que no puedes darlo.",
     "holdsNothing": "Aún no incluye nada.",
     "builtIn": "Integrado",
-    "loading": "Cargando roles",
     "closed": "Quien administra este servidor ha desactivado los roles personalizados para esta comunidad. Los roles que tiene siguen aplicándose.",
     "deleteTitle": "¿Eliminar {{name}}?",
     "deleteDescription": "Quienes lo tienen vuelven a su rol normal.",

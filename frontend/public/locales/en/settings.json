@@ -187,7 +187,6 @@
     "deleteDialogDescription": "Anything that uses {{name}} stops working straight away."
   },
   "ai": {
-    "loading": "Loading AI settings…",
     "providerFieldLabel": "Provider",
     "providerPlaceholder": "Select a provider",
     "modelLabel": "Model",
@@ -532,7 +531,6 @@
     "platformOnly": "Only the platform owner can manage branding settings.",
     "colorsTitle": "Brand colors",
     "colorsDescription": "Customize the accent colors for light and dark mode.",
-    "loadingInterface": "Loading interface settings…",
     "lightModeLabel": "Light mode accent",
     "lightModeHelp": "Buttons, highlights, and focus states use this color while the app is in light mode.",
     "darkModeLabel": "Dark mode accent",
@@ -634,7 +632,6 @@
   },
   "push": {
     "platformOnly": "Only the platform owner can manage push notification settings.",
-    "loading": "Loading push notification settings…",
     "title": "Firebase Cloud Messaging",
     "description": "Optional. Without a service account key, push notifications go through BeyondersStudio's push relay and these fields can stay empty. With one, Android pushes go through your own Firebase project; iPhone pushes always use the relay.",
     "enabledLabel": "Send push notifications",
@@ -690,7 +687,6 @@
   },
   "auth": {
     "platformOnly": "Only the platform owner can manage authentication settings.",
-    "loading": "Loading auth settings…",
     "postLoginRedirect": "Post-login redirect:",
     "mobileCallback": "Mobile app callback:",
     "deploymentTitle": "This deployment",
@@ -790,7 +786,6 @@
     }
   },
   "platformUsers": {
-    "loading": "Loading users…",
     "filterPlaceholder": "Filter by handle…",
     "columnId": "User ID",
     "columnHandle": "Handle",
@@ -1093,7 +1088,6 @@
   },
   "pluginServices": {
     "platformOnly": "Only platform owners can manage plug-in services.",
-    "loading": "Loading plug-in services…",
     "title": "Plug-in services",
     "description": "The plug-ins this deployment runs. A plug-in's listing says what it is and may do; here you give where it answers and the keys it signs with.",
     "empty": "No plug-in services yet. A plug-in appears here when its listing arrives, or once you add it.",
@@ -1213,7 +1207,6 @@
     "title": "Community limits",
     "description": "Set per-community caps on storage and on the number of users. Lowering a limit below current usage blocks new uploads or members, but never removes existing files or members.",
     "platformOnly": "You need a platform staff role to see communities.",
-    "loading": "Loading communities…",
     "filterByName": "Filter communities by name",
     "unlimitedPlaceholder": "Unlimited",
     "helpText": "Storage limits are in GB; user limits are a member count. Both save automatically — leave a field blank for unlimited.",
@@ -1355,7 +1348,6 @@
   },
   "providerPlacement": {
     "description": "Place the people a sign-in provider signs in — by the group or directory it reports — in a community, and in an initiative there if you name one.",
-    "loading": "Loading placement rules…",
     "platformOnly": "Sign-in placement is managed by platform operators and owners.",
     "everywhere": {
       "label": "Apply placement rules to every community",
@@ -1422,7 +1414,6 @@
   },
   "storage": {
     "platformOnly": "Only platform owners can configure storage.",
-    "loading": "Loading storage settings…",
     "title": "Object storage",
     "description": "Choose where uploaded files and attachments are stored. Defaults to the local filesystem; switch to an S3-compatible store for scalable or shared deployments.",
     "backendLabel": "Storage backend",
@@ -2239,7 +2230,6 @@
     "notYours": "You don't hold this yourself, so you can't give it.",
     "holdsNothing": "Holds nothing yet.",
     "builtIn": "Built-in",
-    "loading": "Loading roles",
     "closed": "Whoever runs this server has closed custom roles for this community. The roles it has keep applying.",
     "deleteTitle": "Delete {{name}}?",
     "deleteDescription": "People holding it go back to their plain role.",

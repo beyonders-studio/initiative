@@ -153,7 +153,7 @@ export const TaskBulkEditDialog = ({
     startDate || dueDate || assigneeIds.length > 0 || statusId || typeId || priority || recurrence;
 
   return (
-    <DialogContent className="bg-card">
+    <DialogContent>
       <DialogHeader>
         <DialogTitle>{t("bulkEdit.title")}</DialogTitle>
         <DialogDescription>

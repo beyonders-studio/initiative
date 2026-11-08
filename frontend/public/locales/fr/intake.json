@@ -97,7 +97,7 @@
       "noMatchAsk": "Essayez d'autres mots, ou demandez à l'équipe ci-dessous. Votre recherche est reprise dans la demande.",
       "noMatchWrite": "Essayez d'autres mots, ou écrivez à l'adresse ci-dessous.",
       "noMatchBrowse": "Essayez d'autres mots, ou parcourez le guide d'utilisation.",
-      "unavailable": "La recherche n'est pas configurée sur ce serveur. Le lien vers le guide d'utilisation ci-dessus donne accès à tout.",
+      "unavailable": "La recherche n'a pas pu joindre le guide d'utilisation. Le lien ci-dessus l'ouvre.",
       "noAnswer": "Pas de réponse ici ?",
       "openRequests_one": "{{count}} demande ouverte",
       "openRequests_other": "{{count}} demandes ouvertes",
@@ -229,7 +229,23 @@
     },
     "take": "Prendre ce dossier",
     "taken": "Vous suivez ce dossier",
-    "takeFailed": "Impossible de prendre ce dossier."
+    "takeFailed": "Impossible de prendre ce dossier.",
+    "idea": {
+      "title": "Idée",
+      "join": "Rattacher à une idée",
+      "search": "Rechercher dans le tableau Idées",
+      "none": "Aucune idée ne correspond.",
+      "create": "Nouvelle idée : {{title}}",
+      "unjoin": "Détacher de cette idée",
+      "notJoined": "Rattaché à aucune idée.",
+      "help": "La personne qui l'a envoyé reçoit un vote pour l'idée, et est prévenue chaque fois qu'elle avance.",
+      "joinInto": "Fusionner dans une autre idée",
+      "joinIntoHelp": "Pour un doublon : ses votes et les retours qui y sont rattachés passent à l'autre idée.",
+      "joinIntoTitle": "Fusionner dans « {{title}} » ?",
+      "joinIntoBody": "Ses votes et les retours qui y sont rattachés passent à « {{title}} ». Elle quitte la page Idées et est archivée, et sa page ouvre « {{title}} » à la place.",
+      "joinIntoConfirm": "Fusionner",
+      "failed": "Impossible de modifier cela. Réessayez dans un instant."
+    }
   },
   "evidence": {
     "attach": "Joindre des fichiers",
@@ -288,6 +304,8 @@
     },
     "contactable": "Vous pouvez me contacter si vous avez des questions à ce sujet",
     "seeIdeas": "Voir ce que d'autres ont demandé",
+    "matches": "Des idées comme la vôtre",
+    "joins": "En l'envoyant, ce que vous avez écrit s'ajoute à « {{title}} ».",
     "stuck": "Besoin que quelqu'un s'en occupe ? Demander de l'aide",
     "context": {
       "on": "Inclut la version de l'application et la page où vous êtes.",

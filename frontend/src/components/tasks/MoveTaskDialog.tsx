@@ -82,7 +82,7 @@ export const MoveTaskDialog = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
-      <DialogContent className="bg-card">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("move.title")}</DialogTitle>
           <DialogDescription>{t("move.description")}</DialogDescription>

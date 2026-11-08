@@ -299,7 +299,7 @@ export const TaskEditPage = () => {
     taskStatusesQuery.isLoading ||
     layoutsQuery.isLoading
   ) {
-    return <TaskEditSkeleton label={t("edit.loadingTask")} />;
+    return <TaskEditSkeleton />;
   }
 
   if (taskQuery.isError || taskStatusesQuery.isError || !task) {

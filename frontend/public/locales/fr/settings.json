@@ -187,7 +187,6 @@
     "deleteDialogDescription": "Tout ce qui utilise {{name}} cesse de fonctionner immédiatement."
   },
   "ai": {
-    "loading": "Chargement des paramètres d'IA…",
     "providerFieldLabel": "Fournisseur",
     "providerPlaceholder": "Sélectionnez un fournisseur",
     "modelLabel": "Modèle",
@@ -532,7 +531,6 @@
     "platformOnly": "Seul le propriétaire de la plateforme peut gérer les paramètres d'image de marque.",
     "colorsTitle": "Couleurs de la marque",
     "colorsDescription": "Personnalisez les couleurs d'accent des modes clair et sombre.",
-    "loadingInterface": "Chargement des paramètres d'interface…",
     "lightModeLabel": "Accent du mode clair",
     "lightModeHelp": "Les boutons, les surbrillances et les états de focus utilisent cette couleur lorsque l'application est en mode clair.",
     "darkModeLabel": "Accent du mode sombre",
@@ -634,7 +632,6 @@
   },
   "push": {
     "platformOnly": "Seul le propriétaire de la plateforme peut gérer les paramètres des notifications push.",
-    "loading": "Chargement des paramètres des notifications push…",
     "title": "Firebase Cloud Messaging",
     "description": "Facultatif. Sans clé de compte de service, les notifications push passent par le relais push de BeyondersStudio et ces champs peuvent rester vides. Avec une clé, les notifications Android passent par votre propre projet Firebase ; celles de l'iPhone passent toujours par le relais.",
     "enabledLabel": "Envoyer des notifications push",
@@ -690,7 +687,6 @@
   },
   "auth": {
     "platformOnly": "Seul le propriétaire de la plateforme peut gérer les paramètres d'authentification.",
-    "loading": "Chargement des paramètres d'authentification…",
     "postLoginRedirect": "Redirection après connexion :",
     "mobileCallback": "Rappel de l'application mobile :",
     "deploymentTitle": "Cette installation",
@@ -790,7 +786,6 @@
     }
   },
   "platformUsers": {
-    "loading": "Chargement des utilisateurs…",
     "filterPlaceholder": "Filtrer par identifiant…",
     "columnId": "ID utilisateur",
     "columnHandle": "Identifiant",
@@ -1093,7 +1088,6 @@
   },
   "pluginServices": {
     "platformOnly": "Seuls les propriétaires de la plateforme peuvent gérer les services de plug-in.",
-    "loading": "Chargement des services de plug-in…",
     "title": "Services de plug-in",
     "description": "Les plug-ins que cette instance exécute. La fiche d'un plug-in dit ce qu'il est et ce qu'il peut faire ; ici, vous indiquez où il répond et les clés avec lesquelles il signe.",
     "empty": "Aucun service de plug-in pour l'instant. Un plug-in apparaît ici quand sa fiche arrive, ou quand vous l'ajoutez.",
@@ -1222,7 +1216,6 @@
   },
   "providerPlacement": {
     "description": "Affectez les personnes qu'un fournisseur de connexion connecte — selon le groupe ou l'annuaire qu'il indique — à une communauté, et à une initiative de celle-ci si vous en nommez une.",
-    "loading": "Chargement des règles d'affectation…",
     "platformOnly": "L'affectation à la connexion est gérée par les opérateurs et propriétaires de la plateforme.",
     "everywhere": {
       "label": "Appliquer les règles d'affectation à toutes les communautés",
@@ -1291,7 +1284,6 @@
     "title": "Limites par communauté",
     "description": "Définissez des limites par communauté pour le stockage et le nombre d'utilisateurs. Abaisser une limite en dessous de l'utilisation actuelle bloque les nouveaux téléversements ou membres, mais ne supprime jamais les fichiers ni les membres existants.",
     "platformOnly": "Vous devez avoir un rôle d’équipe de la plateforme pour voir les communautés.",
-    "loading": "Chargement des communautés…",
     "filterByName": "Filtrer les communautés par nom",
     "unlimitedPlaceholder": "Illimité",
     "helpText": "Les limites de stockage sont en Go ; les limites d'utilisateurs correspondent à un nombre de membres. Les deux sont enregistrées automatiquement — laissez un champ vide pour illimité.",
@@ -1422,7 +1414,6 @@
   },
   "storage": {
     "platformOnly": "Seuls les propriétaires de la plateforme peuvent configurer le stockage.",
-    "loading": "Chargement des paramètres de stockage…",
     "title": "Stockage d'objets",
     "description": "Choisissez où sont stockés les fichiers téléversés et les pièces jointes. Par défaut, le système de fichiers local ; passez à un stockage compatible S3 pour des déploiements évolutifs ou partagés.",
     "backendLabel": "Backend de stockage",
@@ -2239,7 +2230,6 @@
     "notYours": "Vous ne l'avez pas vous-même, vous ne pouvez donc pas le donner.",
     "holdsNothing": "Ne comprend encore rien.",
     "builtIn": "Intégré",
-    "loading": "Chargement des rôles",
     "closed": "La personne qui gère ce serveur a désactivé les rôles personnalisés pour cette communauté. Les rôles qu'elle a continuent de s'appliquer.",
     "deleteTitle": "Supprimer {{name}} ?",
     "deleteDescription": "Les personnes qui l'ont reviennent à leur rôle de base.",

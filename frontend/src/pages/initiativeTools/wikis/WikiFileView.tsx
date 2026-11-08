@@ -1,4 +1,4 @@
-import { Link, useLocation, useParams } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -18,6 +18,7 @@ import {
 } from "@/components/initiativeTools/wikis/WikiPageConnections";
 import { WikiPageNav } from "@/components/initiativeTools/wikis/WikiPageNav";
 import { useFile } from "@/hooks/useFiles";
+import { useRouteId } from "@/hooks/useRouteId";
 import { useWiki } from "@/hooks/useWikis";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolDetailRoute } from "@/lib/tools";
@@ -44,24 +45,12 @@ import { Skeleton } from "@/ui/skeleton";
 export const WikiFileView = () => {
   const { t } = useTranslation(["wikis", "common"]);
   const gp = useCommunityPath();
-  const {
-    wikiId: wikiIdParam,
-    fileId: fileIdParam,
-    initiativeId: initiativeIdParam,
-  } = useParams({ strict: false }) as {
-    wikiId?: string;
-    fileId?: string;
-    initiativeId?: string;
-  };
+  const wikiId = useRouteId("wikiId");
+  const fileId = useRouteId("fileId");
+  const initiativeId = useRouteId("initiativeId");
 
-  const wikiId = Number(wikiIdParam);
-  const fileId = Number(fileIdParam);
-  const initiativeId = Number(initiativeIdParam);
-  const validIds = Number.isFinite(wikiId) && Number.isFinite(fileId);
-  const fileRef = { type: SearchEntityType.file, id: fileId };
-
-  const wikiQuery = useWiki(validIds ? wikiId : null);
-  const fileQuery = useFile(validIds ? fileId : null);
+  const wikiQuery = useWiki(wikiId);
+  const fileQuery = useFile(fileId);
 
   const wiki = wikiQuery.data;
   const file = fileQuery.data;
@@ -89,11 +78,11 @@ export const WikiFileView = () => {
     };
   }, [hash, file]);
 
-  if (!validIds || fileQuery.isError) {
+  if (wikiId === null || fileId === null || initiativeId === null || fileQuery.isError) {
     return (
       <NeedAccessOr
         error={fileQuery.error}
-        entity={validIds ? { kind: "file", id: fileId } : undefined}
+        entity={fileId === null ? undefined : { kind: "file", id: fileId }}
       >
         <Card className="mx-auto mt-10 max-w-md">
           <CardHeader>
@@ -111,6 +100,8 @@ export const WikiFileView = () => {
       </SkeletonRegion>
     );
   }
+
+  const fileRef = { type: SearchEntityType.file, id: fileId };
 
   // Prose keeps the wiki's reading width; a file, a canvas or a grid needs
   // the room.

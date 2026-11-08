@@ -1,6 +1,6 @@
 import { $isTableSelection } from "@lexical/table";
 import { $isRangeSelection, type BaseSelection, type TextFormatType } from "lexical";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 
 import { useUpdateToolbarHandler } from "@/components/editor/editor-hooks/use-update-toolbar";
 import {
@@ -13,7 +13,7 @@ export function FontFormatToolbarPlugin() {
   const [activeFormats, setActiveFormats] = useState<string[]>([]);
   const actions = useTextFormatActions(activeFormats);
 
-  const $updateToolbar = useCallback((selection: BaseSelection) => {
+  const $updateToolbar = (selection: BaseSelection) => {
     if (!($isRangeSelection(selection) || $isTableSelection(selection))) return;
 
     const formats = TEXT_FORMAT_IDS.filter((format) =>
@@ -22,7 +22,7 @@ export function FontFormatToolbarPlugin() {
     setActiveFormats((prev) =>
       prev.length === formats.length && formats.every((f) => prev.includes(f)) ? prev : formats
     );
-  }, []);
+  };
 
   useUpdateToolbarHandler($updateToolbar);
 

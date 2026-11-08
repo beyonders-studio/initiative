@@ -27,10 +27,21 @@ export const IdeaStatusBadge = ({ status }: { status: IdeaStatusRead }) => (
 
 /**
  * Vote for an idea, or take the vote back. Somebody signed out is sent to
- * sign in and comes back to `next`. A closed idea keeps its votes as they
- * are.
+ * sign in and comes back to `next`, or `onSignIn` does it where there is
+ * something to keep first. A closed idea keeps its votes as they are.
  */
-export const VoteButton = ({ idea, next }: { idea: IdeaRead; next: string }) => {
+export const VoteButton = ({
+  idea,
+  next,
+  onSignIn,
+  onVoted,
+}: {
+  idea: IdeaRead;
+  next: string;
+  onSignIn?: () => void;
+  /** Told once the vote is cast or taken back. */
+  onVoted?: (on: boolean) => void;
+}) => {
   const { t } = useTranslation("intake");
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -46,10 +57,11 @@ export const VoteButton = ({ idea, next }: { idea: IdeaRead; next: string }) => 
       aria-label={t("ideas.voteFor", { title: idea.title })}
       onPressedChange={(on) => {
         if (!user) {
-          void navigate({ to: "/login", search: { next } });
+          if (onSignIn) onSignIn();
+          else void navigate({ to: "/login", search: { next } });
           return;
         }
-        vote.mutate({ taskId: idea.task_id, on });
+        vote.mutate({ taskId: idea.task_id, on }, { onSuccess: () => onVoted?.(on) });
       }}
     >
       {idea.voted ? <Check aria-hidden /> : null}

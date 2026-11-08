@@ -261,7 +261,7 @@ describe("switching files", () => {
 
     // The page stays mounted across the switch: an editor still open on the
     // last file would report its body as the next one's edit.
-    expect(await screen.findByText("Loading file…")).toBeInTheDocument();
+    expect(await screen.findByText("Loading…")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "edit the body" })).not.toBeInTheDocument();
 
     arrive();

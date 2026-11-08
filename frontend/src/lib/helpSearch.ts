@@ -1,5 +1,15 @@
-import type { HelpIndexEntry } from "@/api/generated/initiativeAPI.schemas";
 import { commandFilter } from "@/ui/lib/fuzzyMatch";
+
+/** One page or heading of the user guide, as plain text. */
+export interface HelpIndexEntry {
+  title: string;
+  /** Where it sits, the last two steps of its breadcrumb: `FAQ › Getting in`. */
+  section: string;
+  /** Its address from the docs site's root, with its anchor: `en/faq/#…`. */
+  location: string;
+  /** The start of its text, cut at a word. */
+  snippet: string;
+}
 
 /**
  * What a page is about, from its route template: the last thing it names, a

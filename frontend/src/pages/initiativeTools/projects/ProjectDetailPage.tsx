@@ -1,4 +1,4 @@
-import { useParams, useRouter, useSearch } from "@tanstack/react-router";
+import { useRouter, useSearch } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -15,6 +15,7 @@ import { useToolCreateAccess } from "@/hooks/useInitiativeAccess";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
 import { useProject, useProjectTaskStatuses } from "@/hooks/useProjects";
+import { useRouteId } from "@/hooks/useRouteId";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { getHttpStatus } from "@/lib/errorMessage";
 import { taskRoute, toolListRoute } from "@/lib/tools";
@@ -23,11 +24,10 @@ import { PullToRefresh } from "@/ui/pull-to-refresh";
 
 export const ProjectDetailPage = () => {
   const { t } = useTranslation("projects");
-  const { projectId } = useParams({ strict: false }) as { projectId: string };
+  const projectId = useRouteId("projectId");
   const router = useRouter();
   const gp = useCommunityPath();
   const searchParams = useSearch({ strict: false }) as { create?: string };
-  const parsedProjectId = Number(projectId);
 
   // Clear ?create from URL when the task composer closes
   const handleComposerOpenChange = useCallback(
@@ -45,20 +45,18 @@ export const ProjectDetailPage = () => {
 
   const handleRefresh = useCallback(async () => {
     await invalidate(
-      q.project(parsedProjectId),
+      q.project(projectId ?? 0),
       q.allTasks(),
-      q.projectTaskStatuses(parsedProjectId),
+      q.projectTaskStatuses(projectId ?? 0),
       q.layouts()
     );
-  }, [parsedProjectId]);
+  }, [projectId]);
 
-  const projectQuery = useProject(Number.isFinite(parsedProjectId) ? parsedProjectId : null);
+  const projectQuery = useProject(projectId);
 
   // Tasks query is now inside ProjectTasksSection to support server-side filtering
 
-  const taskStatusesQuery = useProjectTaskStatuses(
-    Number.isFinite(parsedProjectId) ? parsedProjectId : null
-  );
+  const taskStatusesQuery = useProjectTaskStatuses(projectId);
 
   const viewedProjectId = projectQuery.data?.id;
   useReadOnOpen(Tool.project, viewedProjectId);
@@ -78,19 +76,19 @@ export const ProjectDetailPage = () => {
   // cells both key off this. Declared with the other hooks, above the early
   // returns below.
   const taskHref = useCallback(
-    (taskId: number) => gp(taskRoute(initiativeId, parsedProjectId, taskId)),
-    [gp, initiativeId, parsedProjectId]
+    (taskId: number) => gp(taskRoute(initiativeId, projectId ?? 0, taskId)),
+    [gp, initiativeId, projectId]
   );
 
   if (projectQuery.isLoading || taskStatusesQuery.isLoading) {
-    return <ProjectDetailSkeleton label={t("detail.loading")} />;
+    return <ProjectDetailSkeleton />;
   }
 
   if (projectQuery.isError || taskStatusesQuery.isError || !project) {
     const error = projectQuery.error ?? taskStatusesQuery.error;
     const status = getHttpStatus(error);
-    if (status === 404 || status === 403) {
-      clearLastUsedProject(parsedProjectId);
+    if (projectId !== null && (status === 404 || status === 403)) {
+      clearLastUsedProject(projectId);
     }
     return (
       <ToolAccessStatus
@@ -98,7 +96,7 @@ export const ProjectDetailPage = () => {
         keys="projects:detail."
         backTo={gp(toolListRoute(Tool.project, initiativeId))}
         backLabel={t("detail.backToProjects")}
-        entity={{ kind: "project", id: parsedProjectId }}
+        entity={projectId === null ? undefined : { kind: "project", id: projectId }}
       />
     );
   }

@@ -21,6 +21,10 @@ export const IdeaPage = () => {
   const { data: idea, isError } = useIdea(Number(taskId));
 
   if (isError) return <Navigate to="/ideas" replace />;
+  // An idea joined into another answers with the one it joined.
+  if (idea && String(idea.task_id) !== taskId) {
+    return <Navigate to="/ideas/$taskId" params={{ taskId: String(idea.task_id) }} replace />;
+  }
 
   return (
     <SignInFrame fillPhone>

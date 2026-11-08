@@ -11,7 +11,6 @@
     "searchDashboards": "Buscar paneles...",
     "noMatchingDashboards": "Ningún panel coincide con tus filtros."
   },
-  "loading": "Cargando paneles...",
   "creating": "Creando...",
   "notFound": "Panel no encontrado",
   "notFoundDescription": "El panel que buscas no existe o ha sido eliminado.",

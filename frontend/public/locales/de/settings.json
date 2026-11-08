@@ -187,7 +187,6 @@
     "deleteDialogDescription": "Alles, was {{name}} verwendet, funktioniert sofort nicht mehr."
   },
   "ai": {
-    "loading": "KI-Einstellungen werden geladen…",
     "providerFieldLabel": "Anbieter",
     "providerPlaceholder": "Anbieter auswählen",
     "modelLabel": "Modell",
@@ -532,7 +531,6 @@
     "platformOnly": "Nur der Plattform-Eigentümer kann die Branding-Einstellungen verwalten.",
     "colorsTitle": "Markenfarben",
     "colorsDescription": "Passe die Akzentfarben für den hellen und dunklen Modus an.",
-    "loadingInterface": "Oberflächeneinstellungen werden geladen…",
     "lightModeLabel": "Akzent im hellen Modus",
     "lightModeHelp": "Schaltflächen, Hervorhebungen und Fokuszustände verwenden diese Farbe, während sich die App im hellen Modus befindet.",
     "darkModeLabel": "Akzent im dunklen Modus",
@@ -634,7 +632,6 @@
   },
   "push": {
     "platformOnly": "Nur der Plattform-Eigentümer kann die Einstellungen für Push-Benachrichtigungen verwalten.",
-    "loading": "Einstellungen für Push-Benachrichtigungen werden geladen…",
     "title": "Firebase Cloud Messaging",
     "description": "Optional. Ohne Dienstkontoschlüssel laufen Push-Benachrichtigungen über das Push-Relay von BeyondersStudio, und diese Felder können leer bleiben. Mit einem laufen Android-Pushes über dein eigenes Firebase-Projekt; iPhone-Pushes nutzen immer das Relay.",
     "enabledLabel": "Push-Benachrichtigungen senden",
@@ -690,7 +687,6 @@
   },
   "auth": {
     "platformOnly": "Nur der Plattform-Eigentümer kann die Authentifizierungseinstellungen verwalten.",
-    "loading": "Authentifizierungseinstellungen werden geladen…",
     "postLoginRedirect": "Weiterleitung nach Anmeldung:",
     "mobileCallback": "Callback der mobilen App:",
     "deploymentTitle": "Diese Installation",
@@ -790,7 +786,6 @@
     }
   },
   "platformUsers": {
-    "loading": "Benutzer werden geladen…",
     "filterPlaceholder": "Nach Handle filtern…",
     "columnId": "Benutzer-ID",
     "columnHandle": "Handle",
@@ -1093,7 +1088,6 @@
   },
   "pluginServices": {
     "platformOnly": "Nur Plattform-Eigentümer können Plug-in-Dienste verwalten.",
-    "loading": "Plug-in-Dienste werden geladen…",
     "title": "Plug-in-Dienste",
     "description": "Die Plug-ins, die diese Instanz ausführt. Das Listing eines Plug-ins sagt, was es ist und darf; hier gibst du an, wo es antwortet und mit welchen Schlüsseln es signiert.",
     "empty": "Noch keine Plug-in-Dienste. Ein Plug-in erscheint hier, sobald sein Listing eintrifft oder du es hinzufügst.",
@@ -1222,7 +1216,6 @@
   },
   "providerPlacement": {
     "description": "Ordne die Leute, die ein Anmeldeanbieter anmeldet – nach der Gruppe oder dem Verzeichnis, das er meldet –, einer Community zu, und dort einer Initiative, wenn du eine nennst.",
-    "loading": "Zuordnungsregeln werden geladen…",
     "platformOnly": "Die Zuordnung bei Anmeldung verwalten Plattform-Operatoren und -Owner.",
     "everywhere": {
       "label": "Zuordnungsregeln auf jede Community anwenden",
@@ -1291,7 +1284,6 @@
     "title": "Community-Limits",
     "description": "Lege pro Community Obergrenzen für Speicher und Benutzeranzahl fest. Ein Limit unter die aktuelle Nutzung zu senken, blockiert neue Uploads oder Mitglieder, entfernt aber nie vorhandene Dateien oder Mitglieder.",
     "platformOnly": "Du benötigst eine Plattform-Mitarbeiterrolle, um Communities zu sehen.",
-    "loading": "Communitys werden geladen…",
     "filterByName": "Communitys nach Namen filtern",
     "unlimitedPlaceholder": "Unbegrenzt",
     "helpText": "Speicherlimits sind in GB; Benutzerlimits sind eine Mitgliederzahl. Beide werden automatisch gespeichert – lass ein Feld leer für unbegrenzt.",
@@ -1422,7 +1414,6 @@
   },
   "storage": {
     "platformOnly": "Nur Plattform-Eigentümer können den Speicher konfigurieren.",
-    "loading": "Speichereinstellungen werden geladen…",
     "title": "Objektspeicher",
     "description": "Lege fest, wo hochgeladene Dateien und Anhänge gespeichert werden. Standard ist das lokale Dateisystem; wechsle zu einem S3-kompatiblen Speicher für skalierbare oder geteilte Deployments.",
     "backendLabel": "Speicher-Backend",
@@ -2239,7 +2230,6 @@
     "notYours": "Das hast du selbst nicht, also kannst du es nicht vergeben.",
     "holdsNothing": "Umfasst noch nichts.",
     "builtIn": "Integriert",
-    "loading": "Rollen werden geladen",
     "closed": "Wer diesen Server betreibt, hat eigene Rollen für diese Community geschlossen. Die vorhandenen Rollen gelten weiter.",
     "deleteTitle": "{{name}} löschen?",
     "deleteDescription": "Wer sie hat, kehrt zu seiner einfachen Rolle zurück.",

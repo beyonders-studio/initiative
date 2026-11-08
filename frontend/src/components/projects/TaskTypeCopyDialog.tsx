@@ -15,6 +15,7 @@ import { toolViewParams } from "@/lib/tools";
 import { Checkbox } from "@/ui/checkbox";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -38,7 +39,7 @@ interface TaskTypeCopyDialogProps {
 
 export const TaskTypeCopyDialog = ({ open, onOpenChange, ...props }: TaskTypeCopyDialogProps) => (
   <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="flex max-h-[90dvh] flex-col bg-card">
+    <DialogContent>
       <TaskTypeCopyForm {...props} />
     </DialogContent>
   </Dialog>
@@ -96,7 +97,7 @@ const TaskTypeCopyForm = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex min-h-0 flex-col gap-4">
+    <form onSubmit={handleSubmit} className="contents">
       <DialogHeader>
         <DialogTitle>{t("taskTypes.copy.title")}</DialogTitle>
         <DialogDescription>{t("taskTypes.copy.description")}</DialogDescription>
@@ -117,42 +118,42 @@ const TaskTypeCopyForm = ({
         </Select>
       </Field>
 
-      {/* Positioned, so the hidden inputs Radix adds to form controls
-              scroll with the list instead of stretching the dialog. */}
       {sourceId !== null ? (
-        <fieldset className="relative min-h-0 flex-1 space-y-2 overflow-y-auto">
-          <legend className="font-medium text-sm">{t("taskTypes.copy.typesLabel")}</legend>
-          {sourceTypes.isLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-          ) : null}
-          {(sourceTypes.data ?? []).map((type) => {
-            const already = isHere(type);
-            const checked = chosen.has(type.id);
-            const full = !checked && chosen.size >= room;
-            const id = `copy-type-${type.id}`;
-            return (
-              <div key={type.id} className="flex items-center gap-2">
-                <Checkbox
-                  id={id}
-                  checked={checked}
-                  disabled={already || full}
-                  onCheckedChange={(value) => toggle(type.id, value === true)}
-                />
-                <Label htmlFor={id} className="flex items-center gap-2 font-normal">
-                  <TaskTypeOption type={type} />
-                  {already ? (
-                    <span className="text-muted-foreground text-xs">
-                      {t("taskTypes.copy.alreadyHere")}
-                    </span>
-                  ) : null}
-                </Label>
-              </div>
-            );
-          })}
-          {room === 0 ? (
-            <p className="text-muted-foreground text-sm">{t("taskTypes.copy.noRoom")}</p>
-          ) : null}
-        </fieldset>
+        <DialogBody>
+          <fieldset className="space-y-2">
+            <legend className="font-medium text-sm">{t("taskTypes.copy.typesLabel")}</legend>
+            {sourceTypes.isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            ) : null}
+            {(sourceTypes.data ?? []).map((type) => {
+              const already = isHere(type);
+              const checked = chosen.has(type.id);
+              const full = !checked && chosen.size >= room;
+              const id = `copy-type-${type.id}`;
+              return (
+                <div key={type.id} className="flex items-center gap-2">
+                  <Checkbox
+                    id={id}
+                    checked={checked}
+                    disabled={already || full}
+                    onCheckedChange={(value) => toggle(type.id, value === true)}
+                  />
+                  <Label htmlFor={id} className="flex items-center gap-2 font-normal">
+                    <TaskTypeOption type={type} />
+                    {already ? (
+                      <span className="text-muted-foreground text-xs">
+                        {t("taskTypes.copy.alreadyHere")}
+                      </span>
+                    ) : null}
+                  </Label>
+                </div>
+              );
+            })}
+            {room === 0 ? (
+              <p className="text-muted-foreground text-sm">{t("taskTypes.copy.noRoom")}</p>
+            ) : null}
+          </fieldset>
+        </DialogBody>
       ) : null}
 
       <DialogFooter

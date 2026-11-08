@@ -118,7 +118,7 @@ export const SettingsStoragePage = () => {
 
   if (storageQuery.isLoading) {
     return (
-      <SkeletonRegion label={t("storage.loading")}>
+      <SkeletonRegion>
         <FormSkeleton fields={3} />
       </SkeletonRegion>
     );

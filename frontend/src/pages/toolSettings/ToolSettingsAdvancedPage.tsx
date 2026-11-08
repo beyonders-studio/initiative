@@ -33,17 +33,13 @@ export const ToolSettingsAdvancedPage = () => {
   const { t } = useTranslation("common");
   const router = useRouter();
   const gp = useCommunityPath();
-  const { tool, entity, remove, advancedExtra } = useToolSettings();
+  const { tool, entity, remove } = useToolSettings();
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const canArchive = canUseArchiveCard(entity);
   const hasAnything =
-    Boolean(advancedExtra) ||
-    entity.can.export ||
-    entity.can.delete ||
-    canArchive ||
-    canUseDuplicateCard(tool, entity);
+    entity.can.export || entity.can.delete || canArchive || canUseDuplicateCard(tool, entity);
 
   const handleDelete = () => {
     remove.mutate(entity.id, {
@@ -63,8 +59,6 @@ export const ToolSettingsAdvancedPage = () => {
 
   return (
     <div className="space-y-6">
-      {advancedExtra}
-
       <ToolDuplicateCard />
 
       <ToolExportCard />
