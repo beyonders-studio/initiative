@@ -161,7 +161,7 @@ const IconPicker = React.forwardRef<React.ComponentRef<typeof PopoverTrigger>, I
       return Array.from(categories.entries())
         .map(([name, icons]) => ({ name, icons }))
         .sort((a, b) => a.name.localeCompare(b.name));
-    }, [filteredIcons, categorized, search]);
+    }, [filteredIcons, categorized, search, t]);
 
     const virtualItems = useMemo(() => {
       const items: Array<{
@@ -367,7 +367,7 @@ const IconPicker = React.forwardRef<React.ComponentRef<typeof PopoverTrigger>, I
           })}
         </div>
       );
-    }, [virtualizer, virtualItems, categorizedIcons, filteredIcons, renderIcon]);
+    }, [virtualizer, virtualItems, categorizedIcons, filteredIcons, renderIcon, t]);
 
     React.useEffect(() => {
       if (isPopoverVisible) {
