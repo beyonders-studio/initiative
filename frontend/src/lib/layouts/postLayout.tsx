@@ -1,4 +1,3 @@
-import { useBlocker } from "@tanstack/react-router";
 import type { SerializedEditorState } from "lexical";
 import { CalendarClock, Vote } from "lucide-react";
 import {
@@ -43,6 +42,7 @@ import { referenceRef } from "@/lib/smartChips";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { DateTimePicker } from "@/ui/date-time-picker";
+import { host } from "@/ui/host";
 import { Label } from "@/ui/label";
 import { useItemContext } from "@/ui/layouts/DetailLayoutView";
 import { filledBy } from "@/ui/layouts/detailLayout";
@@ -89,22 +89,18 @@ const useDrafts = (): PostDrafts => {
 /** Leaving with unsaved words is asked about first, for a reload too. */
 const useUnsavedGuard = (dirty: boolean) => {
   const { t } = useTranslation("posts");
-  const blocker = useBlocker({
-    shouldBlockFn: () => dirty,
-    enableBeforeUnload: () => dirty,
-    withResolver: true,
-  });
+  const blocker = host.useBlocker(() => dirty);
   return (
     <ConfirmDialog
-      open={blocker.status === "blocked"}
+      open={blocker.blocked}
       onOpenChange={(open) => {
-        if (!open) blocker.reset?.();
+        if (!open) blocker.reset();
       }}
       title={t("unsaved.title")}
       description={t("unsaved.body")}
       confirmLabel={t("unsaved.leave")}
       cancelLabel={t("unsaved.stay")}
-      onConfirm={() => blocker.proceed?.()}
+      onConfirm={() => blocker.proceed()}
       destructive
     />
   );
