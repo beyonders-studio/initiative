@@ -27,22 +27,16 @@ import { describes, type Spec } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import { currentServerKey } from "@/lib/offlineSession";
 import {
   type FieldSave,
   type FieldSaveState,
   ItemDraftContext,
   type ItemEdit,
-} from "@/lib/layouts/editing";
-import type { ItemSaves } from "@/lib/layouts/fieldEditors";
-import { toast } from "@/lib/mascotToast";
-import { currentServerKey } from "@/lib/offlineSession";
-
-/** One field's save, as {@link useItemFieldSave} answers it. */
-export type ItemFieldSave<I, P> = FieldSave & {
-  save: (edit: ItemEdit<I, P>, undo?: ItemEdit<I, P>) => Promise<boolean>;
-  error: unknown;
-  reset: () => void;
-};
+  type ItemFieldSave,
+} from "@/ui/layouts/editing";
+import type { ItemSaves } from "@/ui/layouts/fieldEditors";
 
 /** How one kind of item is saved field by field. */
 export interface FieldSaveKind<I, P> {
@@ -216,7 +210,7 @@ export const useItemFieldSave = <I, P>(
   id: number,
   label: string,
   options: FieldSaveOptions<I, P> = {}
-): ItemFieldSave<I, P> => {
+): ItemFieldSave<I, P> & { error: unknown; reset: () => void } => {
   const { t } = useTranslation("common");
   const drafting = useContext(ItemDraftContext);
   const communityId = useActiveCommunityId();

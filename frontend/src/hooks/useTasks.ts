@@ -62,13 +62,13 @@ import {
 } from "@/hooks/useFieldSave";
 import { chipKey } from "@/hooks/useSmartChips";
 import { fetchAllPages } from "@/lib/fetchAllPages";
-import type { ItemEdit } from "@/lib/layouts/editing";
 import type { GroupMove } from "@/lib/layouts/taskGroupings";
 import { withZone } from "@/lib/recurrence";
 import { chipRef } from "@/lib/smartChips";
 import { fireTaskCompletionFeedback } from "@/lib/taskCompletionFeedback";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
+import type { ItemEdit } from "@/ui/layouts/editing";
 
 // ── Queries ─────────────────────────────────────────────────────────────────
 

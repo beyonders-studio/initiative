@@ -132,5 +132,11 @@
     "placeholder": "Symbol auswählen",
     "empty": "Kein Symbol gefunden",
     "other": "Sonstiges"
+  },
+  "fieldSave": {
+    "saving": "Wird gespeichert…",
+    "saved": "Gespeichert",
+    "failed": "Nicht gespeichert",
+    "changed": "Das wurde geändert, während du es bearbeitet hast"
   }
 }

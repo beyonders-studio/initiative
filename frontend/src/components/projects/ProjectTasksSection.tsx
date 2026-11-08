@@ -79,11 +79,8 @@ import {
   taskFilterCount,
 } from "@/lib/filters/taskFilters";
 import { isGanttScale } from "@/lib/gantt";
-import { activeGrouping, catalogChoices } from "@/lib/layouts/grouping";
-import { presetName } from "@/lib/layouts/presets";
 import { BOARD_COLUMNS } from "@/lib/layouts/taskGroupings";
 import { blankTask, TASK_DETAIL } from "@/lib/layouts/taskLayout";
-import type { LayoutNode } from "@/lib/layouts/tree";
 import { toast } from "@/lib/mascotToast";
 import { getProjectColor } from "@/lib/projectColor";
 import { getItem, setItem } from "@/lib/storage";
@@ -93,6 +90,9 @@ import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Dialog } from "@/ui/dialog";
 import { useWeekStart } from "@/ui/host";
+import { activeGrouping, catalogChoices } from "@/ui/layouts/grouping";
+import { presetName } from "@/ui/layouts/presets";
+import type { LayoutNode } from "@/ui/layouts/tree";
 import { StatusMessage } from "@/ui/status-message";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 

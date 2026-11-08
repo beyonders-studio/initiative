@@ -46,7 +46,6 @@
   "actions": "Acciones",
   "adding": "Añadiendo…",
   "more": "Más",
-  "moreOptions": "Más opciones",
   "less": "Menos",
   "noResults": "No se encontraron resultados",
   "tryAgain": "Intentar de nuevo",
@@ -302,10 +301,6 @@
     "template": "Plantilla"
   },
   "fieldSave": {
-    "saving": "Guardando…",
-    "saved": "Guardado",
-    "failed": "No se pudo guardar",
-    "changed": "Esto cambió mientras lo editabas",
     "overwrite": "Sobrescribir",
     "keepEditing": "Seguir editando",
     "discard": "Descartar",

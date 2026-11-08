@@ -20,12 +20,12 @@ import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 import { useServerForm } from "@/hooks/useServerForm";
 import { useSetToolComments } from "@/hooks/useToolComments";
 import { useSetToolTags } from "@/hooks/useToolTags";
-import { PropertiesField } from "@/lib/layouts/fieldEditors";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { PropertiesField } from "@/ui/layouts/fieldEditors";
 import { Switch } from "@/ui/switch";
 import { Textarea } from "@/ui/textarea";
 

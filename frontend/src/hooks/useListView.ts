@@ -27,9 +27,9 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import type { UserViewPreferencesMap } from "@/api/generated/initiativeAPI.schemas";
 import { useViewPreference, useViewPreferenceMap } from "@/hooks/useViewPreference";
-import type { Preset } from "@/lib/layouts/presets";
 import { getItem } from "@/lib/storage";
 import { VIEW_PREFERENCES_QUERY_KEY, viewPreferencesQueryKey } from "@/lib/viewPreferences";
+import type { Preset } from "@/ui/layouts/presets";
 
 /** What this device kept under `key` before views followed a person, read
  *  for a carry-over; null where nothing, or nothing readable, is kept. */

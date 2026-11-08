@@ -13,9 +13,9 @@ import { TagPicker } from "@/components/tags";
 import { useAppendPropertyOption } from "@/hooks/useProperties";
 import { detailLayoutOf, useToolLayouts } from "@/hooks/useToolLayouts";
 import { useSearchMembers } from "@/hooks/useUsers";
-import { missingRequired, requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
-import { PROPERTY_FIELD_PREFIX } from "@/lib/layouts/fields";
 import { Label } from "@/ui/label";
+import { missingRequired, requiredKeys, type StoredRegions } from "@/ui/layouts/detailLayout";
+import { PROPERTY_FIELD_PREFIX } from "@/ui/layouts/fields";
 import { PropertyInput } from "@/ui/properties/PropertyInput";
 import { isEmptyPropertyValue } from "@/ui/properties/propertyHelpers";
 

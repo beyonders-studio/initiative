@@ -26,7 +26,7 @@ export type Preset<F> = {
   sorting: SortingState;
 };
 
-/** A shipped preset: its slug, its name as a key in `projects`, and its
+/** A shipped preset: its slug, its name as a key in its tool's words, and its
  *  filters as kept. */
 type ShippedPreset = { slug: string; nameKey: string; filters: Record<string, unknown> };
 

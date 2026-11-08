@@ -49,8 +49,6 @@ import {
 import { detailLayoutOf, useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { getErrorMessage, getHttpStatus, requiredKeysIn } from "@/lib/errorMessage";
-import { DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
-import type { StoredRegions } from "@/lib/layouts/detailLayout";
 import { usePluginMenuActions } from "@/lib/layouts/plugins";
 import { TASK_DETAIL, taskChanges, taskFillContext, withoutValues } from "@/lib/layouts/taskLayout";
 import { toast } from "@/lib/mascotToast";
@@ -65,6 +63,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
+import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
+import type { StoredRegions } from "@/ui/layouts/detailLayout";
 import { TaskEditSkeleton } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
 

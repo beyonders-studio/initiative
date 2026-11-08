@@ -17,10 +17,10 @@ import type {
   CollectionRead,
   PropertyValuesSetRequest,
 } from "@/api/generated/initiativeAPI.schemas";
+import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
+import type { StoredRegions } from "@/ui/layouts/detailLayout";
 import { formatBytes } from "@/ui/lib/fileUtils";
 
-import { DetailLayoutView } from "./DetailLayoutView";
-import type { StoredRegions } from "./detailLayout";
 import { FILE_DETAIL } from "./fileLayout";
 
 const caption = buildPropertyDefinition({ id: 21, name: "Caption", collection_id: 5 });

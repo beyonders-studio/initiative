@@ -5,13 +5,13 @@ import { useFillRequired } from "@/hooks/useFillRequired";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
 import { useReadTaskNow } from "@/hooks/useTasks";
 import { detailLayoutOf, instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
-import { requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
 import {
   TASK_DETAIL,
   taskChanges,
   taskFillContext,
   useMissingAsType,
 } from "@/lib/layouts/taskLayout";
+import { requiredKeys, type StoredRegions } from "@/ui/layouts/detailLayout";
 
 /**
  * A task of `projectId` given another type from a list, as a drop into

@@ -525,7 +525,12 @@ def _physical_column(source: Dataset, field_name: str) -> str:
         )
     if isinstance(source, Recordset):
         return spec.column.name
-    return spec.column.property.columns[0].name
+    # A field that is an expression over the row's own column (the member-only
+    # author) is read as that column.
+    mapped = getattr(spec.column, "property", None)
+    if mapped is None:
+        return source.model.__table__.c[field_name].name
+    return mapped.columns[0].name
 
 
 def _parse(sql: str) -> ast.SelectStmt:

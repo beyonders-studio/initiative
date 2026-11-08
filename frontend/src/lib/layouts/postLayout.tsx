@@ -33,6 +33,7 @@ import { PostByline } from "@/components/initiativeTools/posts/PostByline";
 import { PostPoll } from "@/components/initiativeTools/posts/PostPoll";
 import { ReactionBar } from "@/components/reactions/ReactionBar";
 import { TagBadge } from "@/components/tags/TagBadge";
+import { itemSaves } from "@/hooks/useFieldSave";
 import { POST_SAVES, useDeletePostPoll, useSetPostPoll, useUpdatePost } from "@/hooks/usePosts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { normalizeEditorState } from "@/lib/editorState";
@@ -43,12 +44,12 @@ import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { DateTimePicker } from "@/ui/date-time-picker";
 import { Label } from "@/ui/label";
+import { useItemContext } from "@/ui/layouts/DetailLayoutView";
+import { filledBy } from "@/ui/layouts/detailLayout";
 import { formatDateTime, fromLocalDateTimeInput, toLocalDateTimeInput } from "@/ui/lib/formatDate";
 import { cn } from "@/ui/lib/utils";
 import { Skeleton } from "@/ui/skeleton";
 
-import { useItemContext } from "./DetailLayoutView";
-import { filledBy } from "./detailLayout";
 import { type InitiativeDetail, useInitiativeExtension } from "./initiativeExtension";
 import { POST_LAYOUT, postFields } from "./posts";
 
@@ -337,7 +338,7 @@ export const POST_DETAIL: InitiativeDetail<PostRead, PostLayoutContext, PostUpda
     comments: (_node, post) => <ToolCommentsPanel tool={Tool.post} entity={post} />,
   },
   home: (post, context) => ({
-    saves: POST_SAVES,
+    saves: itemSaves(POST_SAVES, post.id),
     readOnly: !context.canEdit || Boolean(context.preview),
     initiativeId: post.initiative_id,
     canOpen: { tool: Tool.post, id: post.id },

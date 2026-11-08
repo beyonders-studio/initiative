@@ -132,5 +132,11 @@
     "placeholder": "Sélectionner une icône",
     "empty": "Aucune icône trouvée",
     "other": "Autre"
+  },
+  "fieldSave": {
+    "saving": "Enregistrement…",
+    "saved": "Enregistré",
+    "failed": "Échec de l'enregistrement",
+    "changed": "Cela a changé pendant que vous le modifiiez"
   }
 }

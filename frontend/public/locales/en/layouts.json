@@ -192,7 +192,10 @@
     },
     "weekOf": "Week of {{date}}",
     "quarter": "Q{{quarter}} {{year}}",
-    "bucket": "How {{name}} is grouped"
+    "bucket": "How {{name}} is grouped",
+    "noValue": "No {{name}}",
+    "checked": "{{name}}: yes",
+    "unchecked": "{{name}}: no"
   },
   "limits": {
     "heading": "Column limits",
@@ -305,5 +308,6 @@
     "confirm": "Continue",
     "retypeTitle": "What the {{type}} page asks for",
     "moveTitle": "What {{project}} asks for"
-  }
+  },
+  "moreOptions": "More options"
 }

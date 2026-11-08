@@ -10,7 +10,7 @@ import {
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 import { collectionFileFields } from "@/lib/layouts/files";
-import type { LayoutNode } from "@/lib/layouts/tree";
+import type { LayoutNode } from "@/ui/layouts/tree";
 
 import { useCollectionCard } from "./collectionLists";
 

@@ -25,7 +25,6 @@ import { detailLayoutOf, instanceTarget, useReadToolLayouts } from "@/hooks/useT
 import { COLLECTION_ICON } from "@/lib/collections";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
 import { toast } from "@/lib/mascotToast";
 import { collectionRoute } from "@/lib/tools";
 import { Button } from "@/ui/button";
@@ -40,6 +39,7 @@ import {
 } from "@/ui/dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { requiredKeys, type StoredRegions } from "@/ui/layouts/detailLayout";
 import { listFormat } from "@/ui/lib/intl";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 

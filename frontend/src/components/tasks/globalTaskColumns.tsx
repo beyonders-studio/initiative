@@ -14,8 +14,7 @@ import { TaskPrioritySelector } from "@/components/tasks/TaskPrioritySelector";
 import { TaskStatusSelector } from "@/components/tasks/TaskStatusSelector";
 import { NO_TASK_COLUMN_LIMITS, type TaskColumnLimits } from "@/hooks/useColumnLimits";
 import { InitiativeColorDot } from "@/lib/initiativeColors";
-import { type FieldColumnOptions, fieldColumn } from "@/lib/layouts/columns";
-import type { FieldDef, LayoutEnv } from "@/lib/layouts/fields";
+import { taskColumnId } from "@/lib/layouts/tasks";
 import { summarizeStored } from "@/lib/recurrence";
 import {
   dateSortingFn,
@@ -30,6 +29,8 @@ import { getUserDisplayName } from "@/lib/userDisplay";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
+import { type FieldColumnOptions, fieldColumn } from "@/ui/layouts/columns";
+import type { FieldDef, LayoutEnv } from "@/ui/layouts/fields";
 import type { AppColumnDef } from "@/ui/lib/table";
 import { SortHeader } from "@/ui/sort-icon";
 
@@ -80,7 +81,7 @@ export function sharedTaskColumns<T extends TaskListRead>({
 }: SharedTaskColumnsOptions<T>) {
   // `taskFields` holds every built-in.
   const column = (id: string, options: FieldColumnOptions<T>) =>
-    fieldColumn<T>(fields.get(id) as FieldDef, env, options);
+    fieldColumn<T>(fields.get(id) as FieldDef, env, { id: taskColumnId(id), ...options });
   const dateGroup: AppColumnDef<T> = {
     id: "date group",
     accessorFn: (task) => getTaskDateStatus(task.start_date, task.due_date),

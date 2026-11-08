@@ -21,7 +21,18 @@ import {
   listLayouts,
   useSaveLayouts,
 } from "@/hooks/useToolLayouts";
-import { placedProperties, type StoredRegions, storedLayout } from "@/lib/layouts/detailLayout";
+import {
+  pluginFields,
+  pluginKindOf,
+  shippedPluginParts,
+  usePluginsOnItems,
+} from "@/lib/layouts/plugins";
+import { TASK_LIST_SHAPE, taskFields } from "@/lib/layouts/tasks";
+import { toast } from "@/lib/mascotToast";
+import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { placedProperties, type StoredRegions, storedLayout } from "@/ui/layouts/detailLayout";
 import {
   CARD_LISTS,
   cardOf,
@@ -47,20 +58,9 @@ import {
   type Selection,
   startHistory,
   withCard,
-} from "@/lib/layouts/draft";
-import { type FieldDef, propertyFieldId, withDisplays } from "@/lib/layouts/fields";
-import {
-  pluginFields,
-  pluginKindOf,
-  shippedPluginParts,
-  usePluginsOnItems,
-} from "@/lib/layouts/plugins";
-import { TASK_LIST_SHAPE, taskFields } from "@/lib/layouts/tasks";
-import type { LayoutNode } from "@/lib/layouts/tree";
-import { toast } from "@/lib/mascotToast";
-import type { TranslateFn } from "@/types/i18n";
-import { Button } from "@/ui/button";
-import { ConfirmDialog } from "@/ui/confirm-dialog";
+} from "@/ui/layouts/draft";
+import { type FieldDef, propertyFieldId, withDisplays } from "@/ui/layouts/fields";
+import type { LayoutNode } from "@/ui/layouts/tree";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import type { FieldDisplay, MetadataOwner } from "@/ui/properties/propertyHelpers";
 import {

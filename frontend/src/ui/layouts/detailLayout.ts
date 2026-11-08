@@ -158,8 +158,8 @@ export const storedLayout = (root: LayoutNode): DetailLayoutDefinitionInput => {
  * A detail's parts in the order a page reads them on one column: the header's,
  * then the columns' by where each falls (`order`, main ahead of side where
  * they fall together), each part's own parts inside it. A field is named by
- * its field, any other part by its kind. A plug-in's part, which only a browser
- * draws, is left out. What an export of the page draws, top to bottom.
+ * its field, any other part by its kind. What an export of the page draws, top
+ * to bottom, of the parts it can draw.
  */
 export const pageParts = (tree: LayoutNode): string[] => {
   const [header, main, side] = tree.children ?? [];
@@ -171,7 +171,6 @@ export const pageParts = (tree: LayoutNode): string[] => {
     )
     .map(({ node }) => node);
   const walk = (node: LayoutNode): string[] => {
-    if (node.type === "plugin") return [];
     if (node.type === "field") return [String(node.props?.field)];
     return node.children ? node.children.flatMap(walk) : [node.type];
   };
@@ -179,7 +178,7 @@ export const pageParts = (tree: LayoutNode): string[] => {
 };
 
 /** The parts any detail lays out with, as against its own. */
-const LAYOUT_PARTS = new Set(["section", "stack", "field", "properties", "plugin"]);
+const LAYOUT_PARTS = new Set(["section", "stack", "field", "properties"]);
 
 /** One kind of detail: as shipped, and as a stored layout draws it. */
 export interface DetailLayoutSpec {
@@ -199,7 +198,7 @@ export interface DetailLayoutSpec {
   requiredParts: ReadonlySet<string> | null;
   /** The detail as one tree to edit by path: the detail, holding its header,
    *  main and side in that order. `more` is what a shipped side draws after
-   *  its own: the placed plug-ins'. */
+   *  its own: its extension's. */
   root: (stored: StoredRegions | null | undefined, more?: LayoutNode[]) => LayoutNode;
   /**
    * The detail from a stored layout: each region as stored, or as shipped where

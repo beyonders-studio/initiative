@@ -132,5 +132,11 @@
     "placeholder": "Select an icon",
     "empty": "No icon found",
     "other": "Other"
+  },
+  "fieldSave": {
+    "saving": "Saving…",
+    "saved": "Saved",
+    "failed": "Couldn't save",
+    "changed": "This changed while you were editing"
   }
 }

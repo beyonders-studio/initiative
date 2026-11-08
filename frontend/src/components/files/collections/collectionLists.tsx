@@ -18,18 +18,14 @@ import { CollectionMasonryView } from "@/components/files/collections/Collection
 import { CollectionTimelineView } from "@/components/files/collections/CollectionTimelineView";
 import type { ToolIndexRow } from "@/components/tools/ToolIndexPage";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
+import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { fieldColumn } from "@/lib/layouts/columns";
-import { cardOf, columnsOf, indexPaths } from "@/lib/layouts/draft";
-import {
-  type FieldDef,
-  LAYOUT_NAMESPACES,
-  type LayoutEnv,
-  type LayoutItem,
-} from "@/lib/layouts/fields";
 import { cardLines, FILE_COLUMN_OF, FILE_LIST_SHAPE } from "@/lib/layouts/files";
-import { type LayoutContext, type LayoutNode, LayoutTree, namesField } from "@/lib/layouts/tree";
 import type { TranslateFn } from "@/types/i18n";
+import { fieldColumn } from "@/ui/layouts/columns";
+import { cardOf, columnsOf, indexPaths } from "@/ui/layouts/draft";
+import type { FieldDef, LayoutEnv, LayoutItem } from "@/ui/layouts/fields";
+import { type LayoutContext, type LayoutNode, LayoutTree, namesField } from "@/ui/layouts/tree";
 import type { AppColumnDef } from "@/ui/lib/table";
 
 /** A card under each file's picture, and how tall it stands for a file: what

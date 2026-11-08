@@ -99,7 +99,6 @@ import {
   EMPTY_CALENDAR_VIEW_FILTERS,
 } from "@/lib/filters/calendarFilters";
 import { CALENDAR_PRESETS } from "@/lib/layouts/events";
-import { type Preset, presetName, presetsOf } from "@/lib/layouts/presets";
 import { getProjectColor } from "@/lib/projectColor";
 import { browserTimezone } from "@/lib/timezones";
 import { eventRoute, taskRoute, toolListRoute, toolSettingsRoute } from "@/lib/tools";
@@ -113,6 +112,7 @@ import {
 import { DropdownMenuItem } from "@/ui/dropdown-menu";
 import { useWeekStart } from "@/ui/host";
 import { Label } from "@/ui/label";
+import { type Preset, presetName, presetsOf } from "@/ui/layouts/presets";
 import { CalendarPageSkeleton, CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { PropertyFilter, type PropertyFilterCondition } from "@/ui/properties/PropertyFilter";
 import { Switch } from "@/ui/switch";

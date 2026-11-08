@@ -20,10 +20,15 @@ import { useTranslation } from "react-i18next";
 import type { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { useDragSensors } from "@/hooks/useDragSensors";
-import { isRequired, LAYOUT_REGIONS, withRequired } from "@/lib/layouts/detailLayout";
+import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
+import { addablePluginParts, type PluginOnItems } from "@/lib/layouts/plugins";
+import { localized } from "@/lib/widgets/widgetMeta";
+import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { isRequired, LAYOUT_REGIONS, withRequired } from "@/ui/layouts/detailLayout";
 import {
   addableFields,
-  addablePluginParts,
   CARD_LISTS,
   canRequire,
   cardOf,
@@ -40,19 +45,9 @@ import {
   removable,
   type Selection,
   sameSelection,
-} from "@/lib/layouts/draft";
-import {
-  type FieldDef,
-  groupFields,
-  LAYOUT_NAMESPACES,
-  propertyFieldId,
-} from "@/lib/layouts/fields";
-import type { PluginOnItems } from "@/lib/layouts/plugins";
-import type { LayoutNode } from "@/lib/layouts/tree";
-import { localized } from "@/lib/widgets/widgetMeta";
-import type { TranslateFn } from "@/types/i18n";
-import { Button } from "@/ui/button";
-import { Input } from "@/ui/input";
+} from "@/ui/layouts/draft";
+import { type FieldDef, groupFields, propertyFieldId } from "@/ui/layouts/fields";
+import type { LayoutNode } from "@/ui/layouts/tree";
 import { cn } from "@/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import {
@@ -821,7 +816,7 @@ export const AddPicker = ({
     ...plugins,
     ...fields.flatMap((field) =>
       field.plugin && !plugins.some((each) => each.id === field.plugin?.install)
-        ? [{ id: field.plugin.install, name: field.plugin.on.name, parts: [] }]
+        ? [{ id: field.plugin.install, name: field.plugin.name, parts: [] }]
         : []
     ),
   ].filter((plugin, index, all) => all.findIndex((each) => each.id === plugin.id) === index);

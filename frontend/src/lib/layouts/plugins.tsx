@@ -2,6 +2,7 @@ import { Check, ExternalLink, Minus } from "lucide-react";
 import {
   createContext,
   Fragment,
+  memo,
   type ReactNode,
   useContext,
   useId,
@@ -35,22 +36,20 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { DropdownMenuItem } from "@/ui/dropdown-menu";
+import type { FieldDef, FieldRendererProps } from "@/ui/layouts/fields";
+import { Section } from "@/ui/layouts/section";
 import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
 import { numberFormat } from "@/ui/lib/intl";
 import { cn } from "@/ui/lib/utils";
 import type { PluginFilterField } from "@/ui/properties/PropertyFilter";
 import { PropertyValueCell, ScaleValue } from "@/ui/properties/PropertyValueCell";
 
-import type { FieldDef, FieldRendererProps } from "./fields";
-import { Section } from "./section";
-
 /** What a plug-in draws on an item from: the item, and the values it carries,
  *  a plug-in's among them by its install and key. */
 export type PluginItem = { id: number; properties?: PropertySummary[] };
 
+import type { LayoutNode } from "@/ui/layouts/tree";
 import { sanitizeUrl } from "@/ui/lib/safeUrl";
-
-import type { LayoutNode } from "./tree";
 
 // What an install's pinned definition declares for items, as the SDK's
 // contract writes it (`fields`, `parts`, `actions`). Publishing checked it.
@@ -302,6 +301,21 @@ const nodesOf = (node: LayoutNode): LayoutNode[] => [
   ...(node.children ?? []).flatMap(nodesOf),
 ];
 
+/** The parts of an install a tree can still place: each once, and none past
+ *  {@link MAX_PLUGIN_PARTS}. */
+export const addablePluginParts = <P extends { id: string }>(
+  tree: LayoutNode,
+  install: number,
+  parts: P[]
+): P[] => {
+  const placed = nodesOf(tree).flatMap((node) =>
+    node.type === "plugin" && Number(node.props?.plugin) === install
+      ? [String(node.props?.part)]
+      : []
+  );
+  return placed.length >= MAX_PLUGIN_PARTS ? [] : parts.filter((part) => !placed.includes(part.id));
+};
+
 /**
  * The plug-in fields an item's page already shows inside a part it draws, by
  * field id: a part the page places, the reader is offered, and whose tree
@@ -340,7 +354,8 @@ const pluginSummary = (values: PropertySummary[] | undefined, install: number, k
 const pluginValue = (values: PropertySummary[] | undefined, install: number, key: string) =>
   pluginSummary(values, install, key)?.value ?? null;
 
-/** Every field the installs show on a task, after the built-ins and properties. */
+/** Every field the installs show on a task, after the built-ins and properties,
+ *  each drawn as its install declares it. */
 export const pluginFields = (
   plugins: ReadonlyMap<number, PluginOnItems>,
   language: string
@@ -349,13 +364,15 @@ export const pluginFields = (
     [...plugin.fields.values()].map(
       (field): FieldDef => ({
         id: pluginFieldId(plugin.id, field.key),
-        kind: "plugin",
+        render: memo((props: FieldRendererProps) => (
+          <PluginField {...props} install={plugin.id} declared={field} />
+        )),
         source: "plugin",
         label: localized(field.name, language) ?? field.key,
         hideable: true,
         // What a plug-in fills is the plug-in's.
         requireable: false,
-        plugin: { install: plugin.id, field, on: plugin },
+        plugin: { install: plugin.id, name: plugin.name },
         value: (task) => {
           const value = pluginValue(task.properties, plugin.id, field.key);
           return draws(field, value) ? value : null;
@@ -662,9 +679,15 @@ const PluginValue = ({
 
 /** A plug-in field as a view draws it: its value in a cell, and its name
  *  beside its value on a card. */
-export const PluginField = ({ value, item, field, variant }: FieldRendererProps) => {
-  if (!field.plugin || value === null) return null;
-  const { install, field: declared } = field.plugin;
+const PluginField = ({
+  value,
+  item,
+  field,
+  variant,
+  install,
+  declared,
+}: FieldRendererProps & { install: number; declared: PluginFieldDecl }) => {
+  if (value === null) return null;
   const drawn = (
     <PluginValue field={declared} kept={pluginSummary(item.properties, install, declared.key)} />
   );
@@ -677,14 +700,25 @@ export const PluginField = ({ value, item, field, variant }: FieldRendererProps)
   );
 };
 
-/** A plug-in field on a detail: its name above its value, which the
- *  plug-in alone changes, and the actions a list offers on each element. */
-export const PluginFieldOnDetail = ({ field, item }: { field: FieldDef; item: PluginItem }) => {
+/** A plug-in field on a detail, as an install among `plugins` declares it: its
+ *  name above its value, which the plug-in alone changes, and the actions a
+ *  list offers on each element. */
+export const PluginFieldOnDetail = ({
+  plugins,
+  field,
+  item,
+}: {
+  plugins: ReadonlyMap<number, PluginOnItems>;
+  field: FieldDef;
+  item: PluginItem;
+}) => {
   const inParts = useContext(FieldsInParts);
-  const runner = useActionRunner(field.plugin?.on.kind ?? "task", item.id);
-  if (!field.plugin || inParts.has(field.id)) return null;
-  const { install, field: declared, on } = field.plugin;
-  const kept = pluginSummary(item.properties, install, declared.key);
+  const on = field.plugin ? plugins.get(field.plugin.install) : undefined;
+  const runner = useActionRunner(on?.kind ?? "task", item.id);
+  const declared =
+    on && [...on.fields.values()].find((each) => pluginFieldId(on.id, each.key) === field.id);
+  if (!on || !declared || inParts.has(field.id)) return null;
+  const kept = pluginSummary(item.properties, on.id, declared.key);
   if (!draws(declared, kept?.value ?? null)) return null;
   return (
     <div className="space-y-1">

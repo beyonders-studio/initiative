@@ -12,16 +12,16 @@ import {
 import { CounterView } from "@/components/initiativeTools/counters/views/CounterView";
 import { SubscribeButton } from "@/components/SubscribeButton";
 import { counterSaves, type SteppedCount, useCounterGroup, useSetCount } from "@/hooks/useCounters";
-import { type ItemFieldSave, useItemFieldSave } from "@/hooks/useFieldSave";
+import { itemSaves, useItemFieldSave } from "@/hooks/useFieldSave";
 import { isAtMax, isAtMin } from "@/lib/counter-math";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
+import { useItemContext } from "@/ui/layouts/DetailLayoutView";
+import { FieldFrame, type ItemFieldSave, ReadField, useFieldDraft } from "@/ui/layouts/editing";
+import { ColorField, TitleField } from "@/ui/layouts/fieldEditors";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 import { type COUNTER_FIELDS, COUNTER_LAYOUT, counterFields } from "./counters";
-import { useItemContext } from "./DetailLayoutView";
-import { FieldFrame, ReadField, useFieldDraft } from "./editing";
-import { ColorField, TitleField } from "./fieldEditors";
 import { type InitiativeDetail, useInitiativeExtension } from "./initiativeExtension";
 
 /** What a counter's detail shares with its parts, beside the counter itself. */
@@ -237,7 +237,7 @@ export const COUNTER_DETAIL: InitiativeDetail<CounterRead, CounterLayoutContext,
   } satisfies Record<keyof typeof COUNTER_FIELDS, ComponentType<EditorProps>>,
   parts: { count: (_node, counter) => <Count counter={counter} /> },
   home: (counter, context) => ({
-    saves: counterSaves(context.groupId),
+    saves: itemSaves(counterSaves(context.groupId), counter.id),
     readOnly: context.readOnly,
     initiativeId: context.initiativeId,
     canOpen: { tool: Tool.counter_group, id: context.groupId },

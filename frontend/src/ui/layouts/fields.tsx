@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 import { type ComponentType, memo, type ReactNode } from "react";
 
@@ -10,6 +9,7 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { Badge } from "@/ui/badge";
 import { DateCell } from "@/ui/date-cell";
+import { host } from "@/ui/host";
 import { formatDateTime } from "@/ui/lib/formatDate";
 import { cn } from "@/ui/lib/utils";
 import { PropertyValueCell } from "@/ui/properties/PropertyValueCell";
@@ -18,10 +18,9 @@ import type { FieldDisplay } from "@/ui/properties/propertyHelpers";
 import { iconForPropertyType } from "@/ui/properties/propertyTypeIcons";
 
 import type { PropertyEnv } from "./fieldEditors";
-import { PluginField, type PluginFieldDecl, type PluginOnItems } from "./plugins";
 
-/** What a view draws: tasks, and a collection's files, which its own fields
- *  (`lib/layouts/files.tsx`) read. */
+/** What a view draws, typed as a listed task: another kind's fields read its
+ *  own item off it. */
 export type LayoutItem = TaskListRead;
 
 /** Where a field is drawn. On a detail it is its editor, which the kind of
@@ -30,7 +29,7 @@ export type LayoutVariant = "card" | "cell" | "detail";
 
 /** The kinds of field drawn here. A kind of item draws its own fields
  *  ({@link FieldDef}'s `render`). */
-export type FieldKind = "title" | "excerpt" | "date" | "count" | "property" | "plugin";
+export type FieldKind = "title" | "excerpt" | "date" | "count" | "property";
 
 /** A property's field, by its definition id: what a view stores, so renaming
  *  the property keeps every view that shows it. */
@@ -73,10 +72,10 @@ export const groupFields = (fields: readonly FieldDef[]): FieldGroup[] => {
   const installs = new Map<number, FieldGroup>();
   for (const field of fields) {
     if (!field.plugin) continue;
-    const { install, on } = field.plugin;
+    const { install, name } = field.plugin;
     const group = installs.get(install) ?? {
       key: `plugin:${install}`,
-      heading: on.name,
+      heading: name,
       plugin: install,
       fields: [],
     };
@@ -102,8 +101,8 @@ export type FieldDef = {
   /** How the kind of item draws a field of its own, in place of its kind's. */
   render?: ComponentType<FieldRendererProps>;
   source: "builtin" | "property" | "plugin";
-  /** Built-in: an i18n key, in `projects` unless it names its namespace.
-   *  Property or plug-in field: its own name, untranslated. */
+  /** Built-in: an i18n key, in the words its kind reads with (`LayoutEnv`'s
+   *  `t`). Property or plug-in field: its own name, untranslated. */
   label: string;
   /** What the field holds for an item. Nothing (null, "", []) draws nothing on
    *  a card; a cell says so. */
@@ -114,9 +113,9 @@ export type FieldDef = {
    *  can be left empty. A title is always required; what is never empty, what
    *  a plug-in fills and what nobody fills cannot be. */
   requireable: boolean;
-  /** A plug-in field's install and declaration, and the install as the
-   *  reader meets it on this kind of item. */
-  plugin?: { install: number; field: PluginFieldDecl; on: PluginOnItems };
+  /** A plug-in field's install, and what the community calls it: a list of
+   *  fields groups the install's under that name. */
+  plugin?: { install: number; name: string };
   /** A property field's definition. */
   property?: PropertyDefinitionRead;
   /** How a scale or a counter is drawn where the list showing it says. */
@@ -140,7 +139,8 @@ export type FieldDef = {
  *  community and the item links, not with which fields are shown, so a renderer
  *  whose value is unchanged skips redrawing when the Fields menu changes. */
 export type LayoutEnv = {
-  /** Reads `projects`, and the other {@link LAYOUT_NAMESPACES} by prefix. */
+  /** Reads the kind's words: its fields' labels and phrases. What the kit
+   *  says it reads by prefix (`layouts:`), so it loads `layouts` beside them. */
   t: (key: string, options?: Record<string, unknown>) => string;
   /** A community-relative path, made absolute in the item's community. */
   communityPath: (path: string, item: LayoutItem) => string;
@@ -162,18 +162,6 @@ export type LayoutEnv = {
    *  out, its properties are read, not changed. */
   properties?: PropertyEnv;
 };
-
-// The namespaces a layout's names are in, loaded together so none shows as a
-// key: an event's fields are named in `calendars`, whether or not an event is
-// drawn beside them.
-export const LAYOUT_NAMESPACES = [
-  "projects",
-  "layouts",
-  "tasks",
-  "dates",
-  "relations",
-  "calendars",
-] as const;
 
 export type FieldRendererProps = {
   value: unknown;
@@ -222,14 +210,14 @@ export const TitleField = ({
 }: FieldRendererProps & { mark?: ReactNode }) => {
   const Actions = variant === "card" ? env.itemActions : undefined;
   const link = (
-    <Link
+    <host.Link
       to={env.itemHref(item)}
       draggable={false}
       className="wrap-break-word w-full min-w-0 rounded-sm font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-1 focus-visible:ring-ring"
     >
       {value as string}
       {mark}
-    </Link>
+    </host.Link>
   );
   if (!Actions) return link;
   return (
@@ -335,7 +323,6 @@ const FIELD_RENDERERS: Record<FieldKind, ComponentType<FieldRendererProps>> = {
   date: memo(DateField),
   count: memo(CountField),
   property: memo(PropertyField),
-  plugin: memo(PluginField),
 };
 
 const NOTHING = () => null;

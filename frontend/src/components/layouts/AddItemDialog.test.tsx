@@ -16,8 +16,8 @@ import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { TaskRead, TaskTypeRead, TaskUpdate } from "@/api/generated/initiativeAPI.schemas";
-import type { Written } from "@/lib/layouts/editing";
 import { blankTask, TASK_DETAIL } from "@/lib/layouts/taskLayout";
+import type { Written } from "@/ui/layouts/editing";
 
 import { AddItemDialog } from "./AddItemDialog";
 

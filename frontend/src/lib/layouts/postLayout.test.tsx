@@ -6,8 +6,8 @@ import { describe, expect, it } from "vitest";
 import { buildPost } from "@/__tests__/factories";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { PostRead } from "@/api/generated/initiativeAPI.schemas";
+import { DetailLayoutView } from "@/ui/layouts/DetailLayoutView";
 
-import { DetailLayoutView } from "./DetailLayoutView";
 import { POST_DETAIL } from "./postLayout";
 
 /** A notice whose layout a manager moves the poll in, while it is open. */

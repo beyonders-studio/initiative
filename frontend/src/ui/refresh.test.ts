@@ -56,6 +56,7 @@ describe("refreshing the kit", () => {
     expect(existsSync(at("public/locales/de/ui.json"))).toBe(true);
     expect(existsSync(at("public/locales/de/editor.json"))).toBe(true);
     expect(existsSync(at("public/locales/de/properties.json"))).toBe(true);
+    expect(existsSync(at("public/locales/de/layouts.json"))).toBe(true);
     expect(readFileSync(at("src/ui/.initiative-ref"), "utf8").trim()).toMatch(/^[0-9a-f]{40}$/);
   });
 
