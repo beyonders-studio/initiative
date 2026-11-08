@@ -6,7 +6,8 @@ mis-authorized — an absent row reads as its default — but the stored role no
 longer matches the role the code describes.
 
 The guard is the union of the ``_ROLE_PERMISSION_DEFAULTS`` maps across every
-migration that declares one: if a new tool's keys are in none of them, the tool
+migration that declares one, and the keys the baseline already allows (every
+role had those before it): if a new tool's keys are in none of them, the tool
 shipped without a backfill and this fails with the missing names.
 
 Each such migration states its own SQL rather than sharing a helper (a helper
@@ -19,6 +20,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import re
 from pathlib import Path
 from types import ModuleType
 
@@ -28,7 +30,20 @@ from app.models.tenant.initiative import PermissionKey
 from app.testing import create_guild, create_initiative, create_user
 
 VERSIONS_DIR = Path(__file__).resolve().parents[2] / "alembic" / "versions"
+BASELINE_DIR = VERSIONS_DIR.parent / "baseline"
 DEFAULTS_NAME = "_ROLE_PERMISSION_DEFAULTS"
+
+
+def _baseline_keys() -> set[str]:
+    """The keys the baseline's ``permission_key`` check allows."""
+    (snapshot,) = BASELINE_DIR.glob("*.sql")
+    check = re.search(
+        r"ck_initiative_role_permissions_permission_key CHECK (.*)$",
+        snapshot.read_text(),
+        re.MULTILINE,
+    )
+    assert check, "the baseline has no permission_key check"
+    return set(re.findall(r"'(\w+)'", check.group(1)))
 
 
 def _backfill_migrations() -> dict[Path, set[str]]:
@@ -70,7 +85,7 @@ def _load(path: Path) -> ModuleType:
 
 
 def test_every_permission_key_has_a_backfill_migration() -> None:
-    backfilled: set[str] = set()
+    backfilled = _baseline_keys()
     for keys in _backfill_migrations().values():
         backfilled |= keys
 
@@ -79,7 +94,7 @@ def test_every_permission_key_has_a_backfill_migration() -> None:
         "These permission keys were added without backfilling the roles that "
         f"predate them: {sorted(missing)}. Add a guild-scoped migration that "
         f"declares a {DEFAULTS_NAME} map naming them and runs its own INSERT — "
-        "see 20260907_0233, which is meant to be copied rather than imported."
+        "see 20261106_0583, which is meant to be copied rather than imported."
     )
 
 

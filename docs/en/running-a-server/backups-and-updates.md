@@ -95,7 +95,7 @@ Back up first. It's one command and the cheapest insurance you'll ever buy.
 
 Migrations run by themselves at start, before Initiative serves anything. Copies starting together take turns, so only one runs them. Migrations only go forward: going back to an older version means restoring the backup you took before updating.
 
-A database from a release older than 0.53.2 first needs one start on a 0.53.x image, such as `ghcr.io/beyonders-studio/initiative:0.53.5`, and then the new one. The start-up message says so if that's you.
+A database from a release older than 0.75.0 first needs one start on 0.75.0 or a later release older than the one you're updating to, such as `ghcr.io/beyonders-studio/initiative:0.75.2`, and then the new one. One older than 0.53.2 needs a start on `ghcr.io/beyonders-studio/initiative:0.53.5` before that. The start-up message says which if that's you.
 
 Initiative follows semantic versioning, and the [changelog](https://github.com/beyonders-studio/initiative/blob/main/CHANGELOG.md) lists what changed in each release. Which tag to follow (`latest`, `stable`, or a pinned version) is under [Docker images](installation.md#docker-images).
 
@@ -129,7 +129,7 @@ If the last thing it says is a message framed in lines of `=` telling you what t
 | Message | What to do |
 |---|---|
 | `This image is older than the database.` | Start the release that last upgraded the database, or a newer one. If it keeps starting the old image after a pull, look for a container left behind by an unfinished upgrade (Compose renames it to `<12 hex characters>_initiative`), remove it, and run `docker compose up -d` again. |
-| `Pre-v0.53.2 database detected` | Start once on a 0.53.x image first, as above. |
+| `This database is from before v0.75.0` | Start once on the release it names first, as above. |
 | `DATABASE_URL_ADMIN connects as …, which does not hold the BYPASSRLS attribute.` | Give Initiative its owner connection and restart, or run the `ALTER ROLE` it prints as a superuser. |
 
 A setting that stops it starting is named too, with the reason and without its value.

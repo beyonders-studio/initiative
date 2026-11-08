@@ -67,9 +67,13 @@ _TIMESTAMPS = ("timestamp with time zone", "timestamp without time zone", "date"
 
 
 def _git(*args: str) -> str:
-    return subprocess.run(
-        ["git", *args], cwd=REPO, check=True, capture_output=True, text=True
-    ).stdout
+    done = subprocess.run(
+        ["git", *args], cwd=REPO, capture_output=True, text=True, check=False
+    )
+    # git grep finding nothing is an answer, not a failure.
+    if done.returncode and not (args[0] == "grep" and done.returncode == 1):
+        raise subprocess.CalledProcessError(done.returncode, done.args, done.stderr)
+    return done.stdout
 
 
 def _revision_of(name: str) -> str:
@@ -592,7 +596,7 @@ def prune_test(path: Path, cut: str) -> str | None:
             child.id
             for node in kept
             for child in ast.walk(node)
-            if isinstance(child, ast.Name)
+            if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Load)
         } | {
             child.attr
             for node in kept
