@@ -19,13 +19,6 @@ import { useTranslation } from "react-i18next";
 
 import type { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
-import {
-  type CreateProperty,
-  NewPropertyForm,
-  PROPERTY_TYPES,
-} from "@/components/properties/NewPropertyForm";
-import type { MetadataOwner } from "@/components/properties/propertyHelpers";
-import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
 import { useDragSensors } from "@/hooks/useDragSensors";
 import { isRequired, LAYOUT_REGIONS, withRequired } from "@/lib/layouts/detailLayout";
 import {
@@ -62,6 +55,13 @@ import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { cn } from "@/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import {
+  type CreateProperty,
+  NewPropertyForm,
+  PROPERTY_TYPES,
+} from "@/ui/properties/NewPropertyForm";
+import type { MetadataOwner } from "@/ui/properties/propertyHelpers";
+import { iconForPropertyType } from "@/ui/properties/propertyTypeIcons";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 import type { EditableDetail } from "./details";

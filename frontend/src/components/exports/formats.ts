@@ -1,8 +1,8 @@
 import type { FileType } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import type { ExportFormatOption } from "@/components/exports/ExportButton";
-import { type EditorFileType, isStoredFileType } from "@/lib/fileTypes";
 import { NON_EXPORTABLE_TOOLS, SIDEBAR_TOOLS } from "@/lib/tools";
+import { type EditorFileType, isStoredFileType } from "@/ui/lib/fileTypes";
 
 // Engine formats per editor file type — mirrors the backend adapter's rules.
 const EDITOR_FILE_FORMATS: Record<EditorFileType, ExportFormatOption[]> = {

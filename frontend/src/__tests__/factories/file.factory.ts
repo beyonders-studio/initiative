@@ -1,5 +1,5 @@
 import { ActorKind, type FileSummary, FileType } from "@/api/generated/initiativeAPI.schemas";
-import { FILE_TYPE_KINDS } from "@/lib/fileTypes";
+import { FILE_TYPE_KINDS } from "@/ui/lib/fileTypes";
 
 import { ownerCan } from "./can";
 

@@ -3,11 +3,11 @@ import { useTranslation } from "react-i18next";
 import type { CollectionRead } from "@/api/generated/initiativeAPI.schemas";
 import { ToolCard } from "@/components/tools/ToolCard";
 import { COLLECTION_ICON } from "@/lib/collections";
-import { fileIcon } from "@/lib/fileIcon";
 import { collectionRoute } from "@/lib/tools";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
 import { Badge } from "@/ui/badge";
 import { LazyImage } from "@/ui/lazy-image";
+import { fileIcon } from "@/ui/lib/fileIcon";
 import { cn } from "@/ui/lib/utils";
 
 /**

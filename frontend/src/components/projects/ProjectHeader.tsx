@@ -12,8 +12,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLastVisit } from "@/hooks/useLastVisit";
 import { useUpdateProject } from "@/hooks/useProjects";
 import { activityLastVisitKey } from "@/lib/activityLastVisit";
-import { formatDate } from "@/lib/formatDate";
 import { toolSettingsRoute } from "@/lib/tools";
+import { formatDate } from "@/ui/lib/formatDate";
 import { Progress } from "@/ui/progress";
 
 type ProjectHeaderProps = {

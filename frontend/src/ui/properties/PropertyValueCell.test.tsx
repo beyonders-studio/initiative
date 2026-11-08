@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { buildPropertySummary } from "@/__tests__/factories/properties";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
-import { formatDateTime } from "@/lib/formatDate";
+import { formatDateTime } from "@/ui/lib/formatDate";
 import { numberFormat } from "@/ui/lib/intl";
 
 import { PropertyValueCell } from "./PropertyValueCell";

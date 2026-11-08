@@ -40,6 +40,10 @@
     "invalidDate": "Enter a valid calendar date.",
     "invalidLocalDateTime": "Choose a valid date and time. Times skipped or repeated when the clocks change need a time outside that interval."
   },
+  "days": {
+    "today": "Today",
+    "yesterday": "Yesterday"
+  },
   "emojiPicker": {
     "pick": "Pick an emoji",
     "searchPlaceholder": "Search emoji…",

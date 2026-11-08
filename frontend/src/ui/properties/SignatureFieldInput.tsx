@@ -42,7 +42,7 @@ export const SignatureFieldInput = ({
   updatedAt,
   disabled = false,
 }: SignatureFieldInputProps) => {
-  const { t } = useTranslation(["properties", "common"]);
+  const { t } = useTranslation("properties");
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const signature = signatureValue(value);

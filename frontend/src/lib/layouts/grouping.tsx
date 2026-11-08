@@ -30,8 +30,6 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { priorityVariant } from "@/components/projects/projectTasksConfig";
 import { TaskAssigneeList } from "@/components/projects/TaskAssigneeList";
-import { extractUser, PropertyValueCell } from "@/components/properties/PropertyValueCell";
-import { propertyStubFromDefinition } from "@/components/properties/propertyHelpers";
 import { TagBadge } from "@/components/tags/TagBadge";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
@@ -40,6 +38,8 @@ import { getTaskDateStatusLabel, TASK_DATE_STATUSES } from "@/lib/taskDateStatus
 import type { TranslateFn } from "@/types/i18n";
 import { Badge } from "@/ui/badge";
 import { dateTimeFormat } from "@/ui/lib/intl";
+import { extractUser, PropertyValueCell } from "@/ui/properties/PropertyValueCell";
+import { propertyStubFromDefinition } from "@/ui/properties/propertyHelpers";
 
 /** The key of the group a task with no value falls into. */
 export const NO_GROUP = "";

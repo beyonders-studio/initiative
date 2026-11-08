@@ -301,10 +301,6 @@
     "none": "Ninguna",
     "template": "Plantilla"
   },
-  "days": {
-    "today": "Hoy",
-    "yesterday": "Ayer"
-  },
   "fieldSave": {
     "saving": "Guardando…",
     "saved": "Guardado",

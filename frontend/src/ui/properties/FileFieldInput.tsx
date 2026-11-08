@@ -44,7 +44,7 @@ export const FileFieldInput = ({
   files,
   disabled = false,
 }: FileFieldInputProps) => {
-  const { t } = useTranslation(["relations", "search"]);
+  const { t } = useTranslation("properties");
   // What was picked here, drawn until the server reads it back: the picker
   // knows only the file's name.
   const [picked, setPicked] = useState<FileFieldValue | null>(null);
@@ -106,7 +106,7 @@ export const FileFieldInput = ({
               items={(found ?? []).map(({ id, ...row }) => ({
                 ...row,
                 value: String(id),
-                hint: t("search:types.file"),
+                hint: t("input.fileHint"),
               }))}
               value={null}
               onValueChange={(next) => {
@@ -116,10 +116,10 @@ export const FileFieldInput = ({
               onSearchChange={setQuery}
               onOpenChange={setOpen}
               loading={found === null}
-              placeholder={t("relations:dialog.entityPlaceholder")}
-              searchPlaceholder={t("relations:dialog.entityPlaceholder")}
-              emptyMessage={t("relations:dialog.noResults")}
-              aria-label={t("relations:dialog.entity")}
+              placeholder={t("input.fileSearch")}
+              searchPlaceholder={t("input.fileSearch")}
+              emptyMessage={t("input.fileNoResults")}
+              aria-label={t("input.filePicker")}
             />
           </div>
           {files.newFile(take)}

@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 
 import type { PostRead } from "@/api/generated/initiativeAPI.schemas";
 import { useSetPostPin } from "@/hooks/usePosts";
-import { formatDateTime, fromLocalDateTimeInput, toLocalDateTimeInput } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { DateTimePicker } from "@/ui/date-time-picker";
@@ -17,6 +16,7 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { Label } from "@/ui/label";
+import { formatDateTime, fromLocalDateTimeInput, toLocalDateTimeInput } from "@/ui/lib/formatDate";
 import { cn } from "@/ui/lib/utils";
 
 interface PinnedBannerProps {

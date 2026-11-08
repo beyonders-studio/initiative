@@ -1,5 +1,5 @@
-import { PropertyColumnHeader } from "@/components/properties/propertyColumns";
 import type { AppColumnDef } from "@/ui/lib/table";
+import { PropertyColumnHeader } from "@/ui/properties/propertyColumns";
 import { SortHeader } from "@/ui/sort-icon";
 
 import { FIELD_RENDERERS, type FieldDef, type LayoutEnv, type LayoutItem } from "./fields";

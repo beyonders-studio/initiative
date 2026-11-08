@@ -24,7 +24,6 @@ import {
   type Tool,
   type ToolCan,
 } from "@/api/generated/initiativeAPI.schemas";
-import { ownProperties } from "@/components/properties/propertyHelpers";
 import { TagBadge, TagPicker } from "@/components/tags";
 import { useArchiveEntity, useUnarchiveEntity } from "@/hooks/useArchive";
 import { propertySaves } from "@/hooks/useProperties";
@@ -33,6 +32,7 @@ import { useCommunityPath } from "@/lib/communityUrl";
 import { PropertiesField } from "@/lib/layouts/fieldEditors";
 import { toast } from "@/lib/mascotToast";
 import { cn } from "@/ui/lib/utils";
+import { ownProperties } from "@/ui/properties/propertyHelpers";
 import { ScrollArea, ScrollBar } from "@/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 

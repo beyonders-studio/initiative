@@ -35,11 +35,11 @@ import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { getErrorMessage } from "@/lib/errorMessage";
-import type { EditorFileType } from "@/lib/fileTypes";
 import { toast } from "@/lib/mascotToast";
 import { type ResumableOptions, uploadInPieces } from "@/lib/resumableUpload";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
+import type { EditorFileType } from "@/ui/lib/fileTypes";
 
 // ── The standard hooks ──────────────────────────────────────────────────────
 // Built in `toolHooks.ts` from the generated client; see there for the keys

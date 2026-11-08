@@ -14,7 +14,6 @@ import type {
   ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
-import type { FieldDisplay, MetadataOwner } from "@/components/properties/propertyHelpers";
 import { NO_DEFINITIONS, useCreateProperty, useOwnedDefinitions } from "@/hooks/useProperties";
 import {
   detailLayoutOf,
@@ -63,6 +62,7 @@ import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
+import type { FieldDisplay, MetadataOwner } from "@/ui/properties/propertyHelpers";
 import {
   Select,
   SelectContent,

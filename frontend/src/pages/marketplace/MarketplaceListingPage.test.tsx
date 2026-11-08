@@ -32,7 +32,7 @@ import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { MarketplaceListingDetail } from "@/api/generated/initiativeAPI.schemas";
-import { formatDate } from "@/lib/formatDate";
+import { formatDate } from "@/ui/lib/formatDate";
 
 import { MarketplaceListingPage } from "./MarketplaceListingPage";
 

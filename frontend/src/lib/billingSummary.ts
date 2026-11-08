@@ -3,7 +3,7 @@ import type {
   CommunityRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import type { CommunityEntry } from "@/hooks/useCommunities";
-import { parseDateValue } from "@/lib/formatDate";
+import { parseDateValue } from "@/ui/lib/formatDate";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

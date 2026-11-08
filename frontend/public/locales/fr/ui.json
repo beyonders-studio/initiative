@@ -40,6 +40,10 @@
     "invalidDate": "Saisissez une date valide.",
     "invalidLocalDateTime": "Saisissez une date et une heure valides. Lors du changement d’heure, choisissez une heure en dehors de l’intervalle sauté ou répété."
   },
+  "days": {
+    "today": "Aujourd'hui",
+    "yesterday": "Hier"
+  },
   "emojiPicker": {
     "pick": "Choisir un emoji",
     "searchPlaceholder": "Rechercher un emoji…",

@@ -1,4 +1,3 @@
-import type { TranslateFn } from "@/types/i18n";
 import { dateTimeFormat } from "@/ui/lib/intl";
 import { hour12Option } from "@/ui/lib/timeFormat";
 
@@ -72,15 +71,15 @@ export const localDayKey = (value: string | null | undefined): string => {
  * The two days somebody is most likely to be reading are named rather than
  * dated: "Wed, Jul 22" is a fact to work out, and "Today" is one to recognise.
  */
-export const formatDayHeading = (value: string, t: TranslateFn): string => {
+export const formatDayHeading = (value: string, t: (key: string) => string): string => {
   const date = parseDateValue(value);
   if (!date) return "";
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
   const key = dayKeyOf(date);
-  if (key === dayKeyOf(today)) return t("common:days.today");
-  if (key === dayKeyOf(yesterday)) return t("common:days.yesterday");
+  if (key === dayKeyOf(today)) return t("ui:days.today");
+  if (key === dayKeyOf(yesterday)) return t("ui:days.yesterday");
   return dateTimeFormat(undefined, {
     weekday: "short",
     year: "numeric",

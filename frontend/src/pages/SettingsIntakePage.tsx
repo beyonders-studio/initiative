@@ -42,7 +42,6 @@ import {
 import { useServerForm } from "@/hooks/useServerForm";
 import { usePlatformCommunities } from "@/hooks/useSettings";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { Badge } from "@/ui/badge";
@@ -53,6 +52,7 @@ import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { formatDateTime } from "@/ui/lib/formatDate";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";

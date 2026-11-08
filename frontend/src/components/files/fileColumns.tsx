@@ -2,10 +2,10 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { FileSummary } from "@/api/generated/initiativeAPI.schemas";
-import { fileIcon } from "@/lib/fileIcon";
-import { isStoredFileType } from "@/lib/fileTypes";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import { Badge } from "@/ui/badge";
+import { fileIcon } from "@/ui/lib/fileIcon";
+import { isStoredFileType } from "@/ui/lib/fileTypes";
 import { getFileTypeLabel } from "@/ui/lib/fileUtils";
 import type { AppColumnDef } from "@/ui/lib/table";
 

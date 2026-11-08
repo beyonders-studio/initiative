@@ -28,19 +28,6 @@ import {
 import { usePersonMention } from "@/components/comments/usePersonMention";
 import { useFileFieldFiles } from "@/components/files/useFileFieldFiles";
 import { MentionComposer } from "@/components/markdown/MentionComposer";
-import { AddPropertyButton } from "@/components/properties/AddPropertyButton";
-import { PropertyInput } from "@/components/properties/PropertyInput";
-import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
-import {
-  isEmptyPropertyValue,
-  type MetadataOwner,
-  normalizePropertyValue,
-  ownProperties,
-  propertyStubFromDefinition,
-  steppedCount,
-  userReferenceValue,
-} from "@/components/properties/propertyHelpers";
-import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
 import { SubscribeButton } from "@/components/SubscribeButton";
 import { TagPicker } from "@/components/tags";
 import { TagBadgeList } from "@/components/tags/TagBadge";
@@ -72,6 +59,19 @@ import { Button } from "@/ui/button";
 import { ColorPickerPopover } from "@/ui/color-picker-popover";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { cn } from "@/ui/lib/utils";
+import { AddPropertyButton } from "@/ui/properties/AddPropertyButton";
+import { PropertyInput } from "@/ui/properties/PropertyInput";
+import { PropertyValueCell } from "@/ui/properties/PropertyValueCell";
+import {
+  isEmptyPropertyValue,
+  type MetadataOwner,
+  normalizePropertyValue,
+  ownProperties,
+  propertyStubFromDefinition,
+  steppedCount,
+  userReferenceValue,
+} from "@/ui/properties/propertyHelpers";
+import { iconForPropertyType } from "@/ui/properties/propertyTypeIcons";
 import { Textarea } from "@/ui/textarea";
 
 import { FieldFrame, ReadField, sameJson, useFieldDraft } from "./editing";

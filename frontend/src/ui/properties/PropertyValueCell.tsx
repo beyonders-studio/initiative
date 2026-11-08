@@ -8,15 +8,15 @@ import {
   type PropertyOption,
   type PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
-import { fileIcon } from "@/lib/fileIcon";
-import { formatDate, formatDateTime } from "@/lib/formatDate";
-import { getAvatarSrc, getInitialsForUser, getUserDisplayName } from "@/lib/userDisplay";
 import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
 import { host } from "@/ui/host";
+import { fileIcon } from "@/ui/lib/fileIcon";
+import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
 import { numberFormat } from "@/ui/lib/intl";
 import { sanitizeUrl } from "@/ui/lib/safeUrl";
 import { cn } from "@/ui/lib/utils";
 
+import type { Member } from "./PropertyInput";
 import {
   counterCount,
   counterSettings,
@@ -29,6 +29,7 @@ import {
   scaleValue,
   signatureValue,
   steppedCount,
+  type UserValue,
 } from "./propertyHelpers";
 import { iconForPropertyType } from "./propertyTypeIcons";
 
@@ -157,7 +158,7 @@ export const CounterValue = ({
           {segments >= 2 && segments <= MAX_CLOCK_SEGMENTS ? (
             Array.from({ length: segments }, (_, index) => (
               <path
-                // biome-ignore lint/suspicious/noArrayIndexKey: a clock's segments are its places
+                // A clock's segments are its places.
                 key={index}
                 d={wedge(index / segments, (index + 1) / segments)}
                 className={cn(
@@ -322,14 +323,6 @@ const SelectChip = ({ option, slug, unknownLabel, dense }: SelectChipProps) => {
   );
 };
 
-export interface UserValue {
-  id: number;
-  username?: string | null;
-  discriminator?: number | null;
-  display_name?: string | null;
-  avatar_url?: string | null;
-}
-
 export const extractUser = (raw: unknown): UserValue | null => {
   if (raw && typeof raw === "object" && "id" in raw) {
     const id = (raw as { id: unknown }).id;
@@ -344,15 +337,12 @@ export const extractUser = (raw: unknown): UserValue | null => {
 };
 
 /** A person's avatar, at a cell's size. */
-const PersonAvatar = ({ user, name }: { user: UserValue; name: string }) => {
-  const src = getAvatarSrc(user);
-  return (
-    <Avatar className="h-5 w-5 text-3xs">
-      {src ? <AvatarImage src={src} alt={name} /> : null}
-      <AvatarFallback userId={user.id}>{getInitialsForUser(user)}</AvatarFallback>
-    </Avatar>
-  );
-};
+const PersonAvatar = ({ member, name }: { member: Member; name: string }) => (
+  <Avatar className="h-5 w-5 text-3xs">
+    {member.picture ? <AvatarImage src={member.picture} alt={name} /> : null}
+    <AvatarFallback userId={member.id}>{member.initials}</AvatarFallback>
+  </Avatar>
+);
 
 /** A signature: the signer's avatar, the name they typed and when. Given
  *  when the item last changed, on its own page, it says whether that was
@@ -369,7 +359,9 @@ export const SignatureName = ({
   return (
     <span className="inline-flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1">
       <span className="inline-flex min-w-0 max-w-full items-center gap-2">
-        {signature.user ? <PersonAvatar user={signature.user} name={signature.name} /> : null}
+        {signature.user ? (
+          <PersonAvatar member={host.member(signature.user)} name={signature.name} />
+        ) : null}
         <span className="truncate">
           {t("cell.signed", { name: signature.name, date: formatDateTime(signature.signed_at) })}
         </span>
@@ -433,7 +425,8 @@ export const PropertyValueCell = ({
         </>
       );
       body = nested ? (
-        // biome-ignore lint/a11y/useSemanticElements: a <button> is also invalid interactive content nested inside the wrapping card <a>; a role=button span avoids the nested-anchor while staying keyboard-accessible.
+        // A <button> can't sit inside the card's wrapping <a> either, so a span
+        // takes the button's role and keys.
         <span
           role="button"
           tabIndex={0}
@@ -556,11 +549,11 @@ export const PropertyValueCell = ({
       if (!user) {
         body = <span className="text-muted-foreground italic">{t("cell.emptyValue")}</span>;
       } else {
-        const name = getUserDisplayName(user, `#${user.id}`);
+        const member = host.member(user);
         body = (
           <span className="inline-flex max-w-full items-center gap-2 truncate">
-            <PersonAvatar user={user} name={name} />
-            <span className="truncate">{name}</span>
+            <PersonAvatar member={member} name={member.name} />
+            <span className="truncate">{member.name}</span>
           </span>
         );
       }

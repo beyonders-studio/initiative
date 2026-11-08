@@ -301,10 +301,6 @@
     "none": "None",
     "template": "Template"
   },
-  "days": {
-    "today": "Today",
-    "yesterday": "Yesterday"
-  },
   "fieldSave": {
     "saving": "Saving…",
     "saved": "Saved",

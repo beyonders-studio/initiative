@@ -40,6 +40,10 @@
     "invalidDate": "Geben Sie ein gültiges Kalenderdatum ein.",
     "invalidLocalDateTime": "Geben Sie ein gültiges Datum und eine gültige Uhrzeit ein. Wählen Sie bei einer Zeitumstellung eine Uhrzeit außerhalb des übersprungenen oder wiederholten Zeitraums."
   },
+  "days": {
+    "today": "Heute",
+    "yesterday": "Gestern"
+  },
   "emojiPicker": {
     "pick": "Emoji auswählen",
     "searchPlaceholder": "Emoji suchen…",

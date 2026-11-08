@@ -10,7 +10,6 @@ import {
 import { MemberAvatar } from "@/components/members/MemberSearchSelect";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { entityRefTypeFor } from "@/lib/entityResolver";
-import { fileIcon } from "@/lib/fileIcon";
 import { isItem, relatedTarget } from "@/lib/relationships";
 import { hitIcon, searchHitPath } from "@/lib/searchResults";
 import { entityRefRoute } from "@/lib/tools";
@@ -19,6 +18,7 @@ import { Button } from "@/ui/button";
 import { cardVariants } from "@/ui/card";
 import { CHIP_TONE_CLASSES } from "@/ui/editor/editor-ui/chip-tones";
 import { LazyImage } from "@/ui/lazy-image";
+import { fileIcon } from "@/ui/lib/fileIcon";
 import { useRelativeTime } from "@/ui/lib/useRelativeTime";
 import { cn } from "@/ui/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";

@@ -40,13 +40,13 @@ import {
 import { communityPath } from "@/lib/communityUrl";
 import { entityRefTypeFor, isSearchEntityType } from "@/lib/entityResolver";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { searchHitPath } from "@/lib/searchResults";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { formatDateTime } from "@/ui/lib/formatDate";
 import { CardGridSkeleton, ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { PaginationBar } from "@/ui/pagination-bar";
 import { StatusMessage } from "@/ui/status-message";

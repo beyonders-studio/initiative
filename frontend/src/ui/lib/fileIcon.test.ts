@@ -2,8 +2,8 @@ import { FileArchive, FileText, Palette, PenTool, ScrollText, Sheet } from "luci
 import { describe, expect, it } from "vitest";
 
 import { FileKind, FileType } from "@/api/generated/initiativeAPI.schemas";
-import { fileIcon } from "@/lib/fileIcon";
-import { FILE_TYPE_KINDS } from "@/lib/fileTypes";
+import { fileIcon } from "@/ui/lib/fileIcon";
+import { FILE_TYPE_KINDS } from "@/ui/lib/fileTypes";
 
 describe("fileIcon", () => {
   it("draws a spreadsheet as a sheet, not as prose", () => {

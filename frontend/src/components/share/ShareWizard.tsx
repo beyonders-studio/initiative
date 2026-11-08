@@ -8,7 +8,6 @@ import { ProjectPickerStep } from "@/components/tasks/ProjectPickerStep";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { useCommunityInitiativeSteps } from "@/hooks/useCommunityInitiativeSteps";
 import { useServer } from "@/hooks/useServer";
-import { fileIcon } from "@/lib/fileIcon";
 import { hasReservedSigil } from "@/lib/mentions";
 import {
   type LandShareInput,
@@ -26,6 +25,7 @@ import { TOOL_ICONS } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { fileIcon } from "@/ui/lib/fileIcon";
 import { cn } from "@/ui/lib/utils";
 import { Textarea } from "@/ui/textarea";
 import { WizardFrame, WizardOption } from "@/ui/wizard-dialog";

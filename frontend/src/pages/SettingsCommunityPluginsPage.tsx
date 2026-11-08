@@ -62,7 +62,6 @@ import {
   useUpdateCommunityPlugin,
 } from "@/hooks/useCommunityPlugins";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { formatDate } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { hasInitiativeSurfaces } from "@/lib/pluginSurfaces";
 import { Alert, AlertDescription } from "@/ui/alert";
@@ -73,6 +72,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collap
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { formatDate } from "@/ui/lib/formatDate";
 import { cn } from "@/ui/lib/utils";
 import { Skeleton } from "@/ui/skeleton";
 

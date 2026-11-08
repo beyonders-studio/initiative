@@ -6,16 +6,16 @@ import { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { whereItLives } from "@/components/entities/EntityPicker";
 import { CreateFileDialog } from "@/components/files/CreateFileDialog";
 import { ReadOnlyFileBody } from "@/components/files/detail/ReadOnlyFileBody";
-import type { FileFieldFiles } from "@/components/properties/FileFieldInput";
-import type { FileFieldValue } from "@/components/properties/propertyHelpers";
 import { useFile } from "@/hooks/useFiles";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { usePickerSuggestionsNow } from "@/hooks/useSearch";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { isStoredFileType } from "@/lib/fileTypes";
 import { hitIcon } from "@/lib/searchResults";
 import { entityRefRoute } from "@/lib/tools";
 import { Button } from "@/ui/button";
+import { isStoredFileType } from "@/ui/lib/fileTypes";
+import type { FileFieldFiles } from "@/ui/properties/FileFieldInput";
+import type { FileFieldValue } from "@/ui/properties/propertyHelpers";
 
 /** A file this app draws itself, as its own page draws it, read-only. A
  *  body loads its content once, so it waits for this visit's own fetch. */

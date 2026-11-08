@@ -35,7 +35,7 @@ const KIT = "src/ui";
 const SCHEMAS = "src/api/generated/initiativeAPI.schemas.ts";
 const LOCALES = "public/locales";
 // The namespaces the kit reads its words from.
-const NAMESPACES = ["ui", "editor"];
+const NAMESPACES = ["ui", "editor", "properties"];
 // Which Initiative revision the copy came from. Not part of the copy itself.
 const STAMP = `${KIT}/.initiative-ref`;
 

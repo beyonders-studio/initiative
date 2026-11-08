@@ -8,11 +8,11 @@ import { AnnouncementEditorDialog } from "@/components/announcements/Announcemen
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useDeleteAnnouncement } from "@/hooks/usePlatformAnnouncements";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { formatDateTime } from "@/ui/lib/formatDate";
 import { Skeleton } from "@/ui/skeleton";
 
 type Status = "draft" | "scheduled" | "live" | "expired";

@@ -1,6 +1,8 @@
 import { type ComponentType, createElement, type ReactNode, useSyncExternalStore } from "react";
 
 import { BLOCKED_URL, sanitizeUrl } from "@/ui/lib/safeUrl";
+import type { Member } from "@/ui/properties/PropertyInput";
+import type { UserValue } from "@/ui/properties/propertyHelpers";
 
 /**
  * What the app hands the kit.
@@ -10,7 +12,8 @@ import { BLOCKED_URL, sanitizeUrl } from "@/ui/lib/safeUrl";
  * while the app runs: the app writes them and components subscribe. The rest
  * is set once, at boot, with `setHost`: how to show a notice, take a picture,
  * link to a page, open another site, keep a preference, find the emoji data,
- * load the spelling dictionary and recognise the app's own origin.
+ * load the spelling dictionary, recognise the app's own origin and draw a
+ * person a field names.
  */
 
 export type TimeFormatPreference = "system" | "12" | "24";
@@ -72,6 +75,9 @@ export interface Host {
   spellCheckDictionary?: () => Promise<{ aff: string; dic: string }>;
   /** Whether an address is served from the app's own origin. */
   isOwnOrigin: (url: string) => boolean;
+  /** How a person a field's value names is drawn: their name, picture and
+   *  initials, from the person as the server reads them back. */
+  member: (person: UserValue) => Member;
 }
 
 const kept = new Map<string, string>();
@@ -95,6 +101,7 @@ export const host: Host = {
       return false;
     }
   },
+  member: ({ id }) => ({ id, name: `#${id}`, initials: "?" }),
 };
 
 /** Hand the kit what it needs from the app. Called at boot, before rendering. */

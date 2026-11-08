@@ -9,8 +9,8 @@ import type {
 import { useListPluginSummaries, useReadPluginSummary } from "@/api/generated/plugins/plugins";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { parseDateValue } from "@/lib/formatDate";
 import { localized } from "@/lib/widgets/widgetMeta";
+import { parseDateValue } from "@/ui/lib/formatDate";
 import { dateTimeFormat, numberFormat } from "@/ui/lib/intl";
 import { Progress } from "@/ui/progress";
 

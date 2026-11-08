@@ -5,7 +5,7 @@
  */
 
 import type { TaskPriority, TaskStatusCategory } from "@/api/generated/initiativeAPI.schemas";
-import type { PropertyFilterCondition } from "@/components/properties/PropertyFilter";
+import type { PropertyFilterCondition } from "@/ui/properties/PropertyFilter";
 
 export type CalendarFilters = {
   status_categories: TaskStatusCategory[];

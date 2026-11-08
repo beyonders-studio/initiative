@@ -41,11 +41,11 @@ import {
   useUpdateCommunityStorage,
 } from "@/hooks/useSettings";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { formatDate } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
+import { formatDate } from "@/ui/lib/formatDate";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui/sheet";
 import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";

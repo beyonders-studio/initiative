@@ -1,4 +1,4 @@
-import { parseDateValue } from "@/lib/formatDate";
+import { parseDateValue } from "@/ui/lib/formatDate";
 
 /** What a pair of start/end date pickers needs to constrain and validate itself. */
 export interface DateRangeBounds {

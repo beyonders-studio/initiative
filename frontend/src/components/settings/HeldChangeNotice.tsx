@@ -7,11 +7,11 @@ import { useReadHeldChange } from "@/api/generated/users/users";
 import { useAuth } from "@/hooks/useAuth";
 import { useApplyHeldChange, useCancelHeldChange } from "@/hooks/useHeldChange";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { describePasskeyPromptError, passkeysRunHere } from "@/lib/passkeys";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { Button } from "@/ui/button";
+import { formatDateTime } from "@/ui/lib/formatDate";
 
 /** What each waiting change will do, by the kind the server names. */
 const CHANGE_KEYS = {

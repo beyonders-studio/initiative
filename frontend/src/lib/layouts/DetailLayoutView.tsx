@@ -22,7 +22,6 @@ import type {
 import { EntityLinkField } from "@/components/entities/EntityLinkField";
 import type { RelationsLayout } from "@/components/entities/RelationsSection";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
-import { type MetadataOwner, ownProperties } from "@/components/properties/propertyHelpers";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { type FieldSaveKind, ItemDraftContext } from "@/hooks/useFieldSave";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -31,6 +30,7 @@ import type { ToolRelationEntity } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { cn } from "@/ui/lib/utils";
+import { type MetadataOwner, ownProperties } from "@/ui/properties/propertyHelpers";
 
 import {
   addingTree,

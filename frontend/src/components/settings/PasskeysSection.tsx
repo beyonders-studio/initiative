@@ -19,7 +19,6 @@ import { useAnnounceHeld } from "@/hooks/useHeldChange";
 import { useServer } from "@/hooks/useServer";
 import { useWizard } from "@/hooks/useWizard";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { hasReservedSigil } from "@/lib/mentions";
 import { createCredential } from "@/lib/passkeys";
@@ -36,6 +35,7 @@ import {
 } from "@/ui/dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { formatDateTime } from "@/ui/lib/formatDate";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { StatusMessage } from "@/ui/status-message";
 import { WizardDialog } from "@/ui/wizard-dialog";

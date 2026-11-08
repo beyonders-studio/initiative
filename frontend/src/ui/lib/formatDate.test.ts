@@ -10,7 +10,7 @@ import {
   minutesLeft,
   parseDateValue,
   toLocalDateTimeInput,
-} from "@/lib/formatDate";
+} from "@/ui/lib/formatDate";
 
 describe("parseDateValue", () => {
   it("resolves a date-only value to that local calendar day", () => {

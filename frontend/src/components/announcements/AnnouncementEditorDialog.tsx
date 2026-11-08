@@ -16,7 +16,6 @@ import {
 } from "@/hooks/usePlatformAnnouncements";
 import { validateTriggerRoute } from "@/lib/announcementPages";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { fromLocalDateTimeInput, toLocalDateTimeInput } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { browserTimezone } from "@/lib/timezones";
 import { resolveHeaderlessApiUrl } from "@/lib/uploadUrl";
@@ -35,6 +34,7 @@ import { Field } from "@/ui/field";
 import { ImagePicker } from "@/ui/image-picker";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { fromLocalDateTimeInput, toLocalDateTimeInput } from "@/ui/lib/formatDate";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Switch } from "@/ui/switch";
 import { Textarea } from "@/ui/textarea";

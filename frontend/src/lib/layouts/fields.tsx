@@ -23,8 +23,6 @@ import { TaskAssigneeList, TaskAssigneeStack } from "@/components/projects/TaskA
 import { TaskBlockersHoverCard } from "@/components/projects/TaskBlockersHoverCard";
 import { TaskDescriptionHoverCard } from "@/components/projects/TaskDescriptionHoverCard";
 import { TaskSubtasksHoverCard } from "@/components/projects/TaskSubtasksHoverCard";
-import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
-import type { FieldDisplay } from "@/components/properties/propertyHelpers";
 import { TagBadge } from "@/components/tags";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
@@ -34,14 +32,16 @@ import { MentionText } from "@/components/user/MentionText";
 import { useStepCounter } from "@/hooks/useProperties";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { formatDateTime } from "@/lib/formatDate";
 import { summarizeStored } from "@/lib/recurrence";
 import { truncateText } from "@/lib/text";
 import { entityRefRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
 import { Badge } from "@/ui/badge";
 import { formatBytes } from "@/ui/lib/fileUtils";
+import { formatDateTime } from "@/ui/lib/formatDate";
 import { cn } from "@/ui/lib/utils";
+import { PropertyValueCell } from "@/ui/properties/PropertyValueCell";
+import type { FieldDisplay } from "@/ui/properties/propertyHelpers";
 
 import { PluginField, type PluginFieldDecl, type PluginOnItems } from "./plugins";
 

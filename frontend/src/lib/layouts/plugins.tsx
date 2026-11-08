@@ -19,11 +19,8 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import type { PluginDataParam } from "@/api/pluginData";
 import { PluginParamControl } from "@/components/plugins/PluginParamControl";
-import type { PluginFilterField } from "@/components/properties/PropertyFilter";
-import { PropertyValueCell, ScaleValue } from "@/components/properties/PropertyValueCell";
 import contract from "@/contract/manifest.contract.json";
 import { useCommunityPlugins, useRunPluginAction } from "@/hooks/useCommunityPlugins";
-import { formatDate, formatDateTime } from "@/lib/formatDate";
 import { withParamAnswer } from "@/lib/widgets/pluginParams";
 import { type LocalizedText, localized } from "@/lib/widgets/widgetMeta";
 import { Badge } from "@/ui/badge";
@@ -38,8 +35,11 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { DropdownMenuItem } from "@/ui/dropdown-menu";
+import { formatDate, formatDateTime } from "@/ui/lib/formatDate";
 import { numberFormat } from "@/ui/lib/intl";
 import { cn } from "@/ui/lib/utils";
+import type { PluginFilterField } from "@/ui/properties/PropertyFilter";
+import { PropertyValueCell, ScaleValue } from "@/ui/properties/PropertyValueCell";
 
 import type { FieldDef, FieldRendererProps } from "./fields";
 import { Section } from "./section";

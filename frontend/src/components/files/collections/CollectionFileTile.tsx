@@ -4,9 +4,9 @@ import { type CSSProperties, memo } from "react";
 import { FileKind, type FileSummary } from "@/api/generated/initiativeAPI.schemas";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
 import { fileRatio } from "@/lib/collections";
-import { fileIcon } from "@/lib/fileIcon";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
 import { LazyImage } from "@/ui/lazy-image";
+import { fileIcon } from "@/ui/lib/fileIcon";
 import { filePicture } from "@/ui/lib/fileUtils";
 import { cn } from "@/ui/lib/utils";
 

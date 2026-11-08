@@ -37,13 +37,13 @@ import {
   useTakeCase,
   useTaskCase,
 } from "@/hooks/useTickets";
-import { minutesLeft } from "@/lib/formatDate";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
 import { Combobox } from "@/ui/combobox";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { minutesLeft } from "@/ui/lib/formatDate";
 import { useRelativeTime } from "@/ui/lib/useRelativeTime";
 import { cn } from "@/ui/lib/utils";
 import { Textarea } from "@/ui/textarea";

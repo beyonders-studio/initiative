@@ -52,10 +52,6 @@ import { ToolFilterPanel } from "@/components/initiativeTools/shared/ToolFilterP
 import { ToolListToolbar } from "@/components/initiativeTools/shared/ToolListToolbar";
 import { ToolPresetSelect } from "@/components/initiativeTools/shared/ToolPresetSelect";
 import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
-import {
-  PropertyFilter,
-  type PropertyFilterCondition,
-} from "@/components/properties/PropertyFilter";
 import { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { TaskStatusPriorityFilters } from "@/components/tasks/TaskStatusPriorityFilters";
@@ -117,6 +113,7 @@ import { DropdownMenuItem } from "@/ui/dropdown-menu";
 import { useWeekStart } from "@/ui/host";
 import { Label } from "@/ui/label";
 import { CalendarPageSkeleton, CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { PropertyFilter, type PropertyFilterCondition } from "@/ui/properties/PropertyFilter";
 import { Switch } from "@/ui/switch";
 
 /** Where a calendar page keeps one person's view: the initiative's calendar,
