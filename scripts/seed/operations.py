@@ -23,7 +23,7 @@ from typing import cast
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.intake import IntakeStream, meta
+from app.core.intake import IntakeStream, meta, offered_streams
 from app.db.schema_provisioning import provision_guild
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
@@ -109,7 +109,7 @@ async def seed(
     await set_rls_context(session, Unattributed())
     await intake_setup.set_operations_guild(session, guild.id)
     await session.commit()
-    for stream in IntakeStream:
+    for stream in offered_streams():
         await intake_setup.provision_from_blueprint(
             session,
             stream=stream,
