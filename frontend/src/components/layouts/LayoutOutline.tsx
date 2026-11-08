@@ -21,6 +21,7 @@ import type { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { NewPropertyForm, PROPERTY_TYPES } from "@/components/properties/NewPropertyForm";
 import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
+import { useDragSensors } from "@/hooks/useDragSensors";
 import type { MetadataOwner } from "@/hooks/useProperties";
 import { isRequired, LAYOUT_REGIONS, withRequired } from "@/lib/layouts/detailLayout";
 import {
@@ -55,7 +56,6 @@ import { localized } from "@/lib/widgets/widgetMeta";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
-import { useDragSensors } from "@/ui/lib/useDragSensors";
 import { cn } from "@/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";

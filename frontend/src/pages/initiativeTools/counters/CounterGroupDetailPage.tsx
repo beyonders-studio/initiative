@@ -36,6 +36,7 @@ import {
   useUpdateCounter,
   useUpdateCounterGroup,
 } from "@/hooks/useCounters";
+import { useDragSensors } from "@/hooks/useDragSensors";
 import { layoutViewSpec, useListView, viewKey } from "@/hooks/useListView";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
@@ -54,7 +55,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
-import { useDragSensors } from "@/ui/lib/useDragSensors";
 import { CardGridSkeleton, DetailPageSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 /** Where an older release kept a group's rows or grid. */

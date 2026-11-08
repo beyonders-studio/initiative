@@ -32,11 +32,11 @@ import type {
   TagSummary,
   TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { useDragSensors } from "@/hooks/useDragSensors";
 import { toast } from "@/lib/mascotToast";
 import { Button } from "@/ui/button";
 import { dateTimeFormat } from "@/ui/lib/intl";
 import { parseLocalCalendarDate, resolveLocalDateTime } from "@/ui/lib/localDateTime";
-import { useDragSensors } from "@/ui/lib/useDragSensors";
 import { cn } from "@/ui/lib/utils";
 import { Skeleton } from "@/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";

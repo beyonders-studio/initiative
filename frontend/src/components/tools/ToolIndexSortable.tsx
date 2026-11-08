@@ -20,7 +20,7 @@ import {
   useContext,
 } from "react";
 
-import { useDragSensors } from "@/ui/lib/useDragSensors";
+import { useDragSensors } from "@/hooks/useDragSensors";
 
 type DragHandleProps = HTMLAttributes<HTMLButtonElement> & { ref: Ref<HTMLButtonElement> };
 
