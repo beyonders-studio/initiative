@@ -33,6 +33,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { LoadMore } from "@/ui/load-more";
 import { CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 import { useVirtualRows } from "@/ui/virtual-rows";
 
 /**
@@ -336,7 +337,7 @@ export const PostsView = ({ fixedInitiativeId, canCreate }: PostsViewProps) => {
             <CardGridSkeleton count={3} className="space-y-4" />
           </SkeletonRegion>
         ) : postsQuery.isError ? (
-          <p className="text-destructive text-sm">{t("loadError")}</p>
+          <StatusMessage onRetry={postsQuery.refetch} />
         ) : posts.length > 0 ? (
           <>
             {/* No flex `gap` here: the spacing lives inside each measured

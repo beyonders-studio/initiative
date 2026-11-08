@@ -22,6 +22,7 @@ import { Card } from "@/ui/card";
 import { useRelativeTime } from "@/ui/lib/useRelativeTime";
 import { SkeletonRegion } from "@/ui/page-skeletons";
 import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 
 const TicketRow = ({ ticket }: { ticket: FiledTicketRead }) => {
   const { t } = useTranslation("intake");
@@ -47,7 +48,7 @@ const TicketRow = ({ ticket }: { ticket: FiledTicketRead }) => {
 
 export const MyTicketsPage = () => {
   const { t } = useTranslation(["intake", "nav"]);
-  const { data, isLoading, isError } = useFiledTickets();
+  const { data, isLoading, isError, refetch } = useFiledTickets();
   const items = data?.items ?? [];
   const { report } = useSearch({ strict: false }) as { report?: string };
   const navigate = useNavigate();
@@ -79,7 +80,7 @@ export const MyTicketsPage = () => {
           <Skeleton className="h-48 w-full" />
         </SkeletonRegion>
       ) : isError ? (
-        <p className="py-8 text-center text-destructive text-sm">{t("tickets.loadError")}</p>
+        <StatusMessage onRetry={refetch} />
       ) : items.length === 0 ? (
         <p className="py-8 text-center text-muted-foreground text-sm">{t("tickets.empty")}</p>
       ) : (

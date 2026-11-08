@@ -27,6 +27,7 @@ import { TOOL_ICONS, toolNavLabelKey, toolRouteSegment } from "@/lib/tools";
 import { Button } from "@/ui/button";
 import { RelativeTime } from "@/ui/relative-time";
 import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 import { ToolsSetting, toolsOf } from "./toolFilter";
@@ -201,7 +202,7 @@ function RowList({
       </div>
     );
   }
-  if (isError) return <p className="text-destructive text-sm">{t("widgets.recent.loadError")}</p>;
+  if (isError) return <StatusMessage />;
   if (rows.length === 0) {
     return (
       <HomeWidgetNotice

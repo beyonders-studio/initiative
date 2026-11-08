@@ -1,5 +1,5 @@
 import { useRouter } from "@tanstack/react-router";
-import { Check, CheckCheck, Loader2, Trash2, Undo2 } from "lucide-react";
+import { Check, CheckCheck, Trash2, Undo2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -19,6 +19,7 @@ import { useStoreSellingAnswer } from "@/lib/storeSelling";
 import type { TranslateFn } from "@/types/i18n";
 import { Button } from "@/ui/button";
 import { LoadMore } from "@/ui/load-more";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { RelativeTime } from "@/ui/relative-time";
 
 type Filter = "all" | "unread" | "personal";
@@ -135,10 +136,9 @@ export const NotificationsInboxPage = () => {
       </div>
 
       {history.isLoading ? (
-        <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          {t("notifications.loadingNotifications")}
-        </div>
+        <SkeletonRegion>
+          <ListSkeleton rows={6} />
+        </SkeletonRegion>
       ) : rows.length === 0 ? (
         <p className="py-12 text-center text-muted-foreground text-sm">
           {t("notifications.inbox.empty")}

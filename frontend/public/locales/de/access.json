@@ -156,8 +156,6 @@
     "batchTitle": "Zugriffsanfragen",
     "answered": "Schon beantwortet",
     "answeredDescription": "Hier gibt es nichts mehr zu beantworten.",
-    "loading": "Anfragen werden geladen…",
-    "loadError": "Diese Anfragen konnten nicht geladen werden.",
     "error": "Deine Antwort konnte nicht gesendet werden. Bitte versuch es noch einmal."
   }
 }

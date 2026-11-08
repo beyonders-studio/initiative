@@ -341,7 +341,6 @@
     "error": "No se pudo convertir este archivo."
   },
   "viewer": {
-    "loadError": "No se pudo cargar el archivo",
     "openNewTab": "Abrir en nueva pestaña",
     "download": "Descargar",
     "pageCount_one": "{{count}} página",
@@ -370,7 +369,6 @@
   "createFirst": "Comenzar a escribir",
   "dropToUpload": "Suelta para subir un archivo",
   "error": "Algo salió mal",
-  "loadError": "No se pudieron cargar los archivos en este momento.",
   "loading": "Cargando archivos…",
   "newFile": "Nuevo archivo",
   "noFiles": "Aún no hay archivos",

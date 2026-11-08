@@ -83,11 +83,6 @@
     "sharesIsolated": "Un autre canal arrive aussi dans cette initiative. Les dossiers de sécurité et de modération devraient avoir leur propre initiative, pour que seules les personnes qui les traitent puissent les lire.",
     "sharesWithIsolated": "Cette initiative reçoit aussi des dossiers de sécurité ou de modération, qui devraient avoir leur propre initiative. Dirigez l'un des canaux ailleurs."
   },
-  "loadFailed": {
-    "title": "Impossible de charger ces paramètres",
-    "description": "Rien n'a été modifié. Réessayez ; si l'échec persiste, le journal du serveur en donnera la raison.",
-    "retry": "Réessayer"
-  },
   "help": {
     "action": "Demander de l'aide",
     "panel": {
@@ -157,8 +152,7 @@
     "replyError": "Votre réponse n'a pas pu être envoyée. Réessayez dans un instant.",
     "closedNote": "Ce ticket est clôturé. Si autre chose se présente, demandez de l'aide à nouveau.",
     "noConversation": "Merci pour le signalement. L'équipe examine chacun d'eux, mais ne répond pas aux signalements ici.",
-    "empty": "Vous n'avez envoyé aucun ticket. Quand vous demandez de l'aide, elle apparaît ici pour que vous puissiez la suivre.",
-    "loadError": "Impossible de charger vos tickets."
+    "empty": "Vous n'avez envoyé aucun ticket. Quand vous demandez de l'aide, elle apparaît ici pour que vous puissiez la suivre."
   },
   "case": {
     "filedBy": "Envoyé par",

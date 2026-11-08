@@ -341,7 +341,6 @@
     "error": "Impossible de convertir ce fichier."
   },
   "viewer": {
-    "loadError": "Impossible de charger le fichier",
     "openNewTab": "Ouvrir dans un nouvel onglet",
     "download": "Télécharger",
     "pageCount_one": "{{count}} page",
@@ -370,7 +369,6 @@
   "createFirst": "Commencer à écrire",
   "dropToUpload": "Dépose pour envoyer un fichier",
   "error": "Un problème est survenu",
-  "loadError": "Impossible de charger les fichiers pour l'instant.",
   "loading": "Chargement des fichiers…",
   "newFile": "Nouveau fichier",
   "noFiles": "Aucun fichier pour l'instant",

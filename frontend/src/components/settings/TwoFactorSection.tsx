@@ -30,6 +30,8 @@ import {
 } from "@/ui/dialog";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { SkeletonLines, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 import { WizardDialog } from "@/ui/wizard-dialog";
 
 /** Below this, the set is worth replacing before it runs out. */
@@ -250,11 +252,13 @@ export const TwoFactorSection = () => {
   return (
     <div className="space-y-4">
       {status.isLoading ? (
-        <p className="text-muted-foreground text-sm">{t("twoFactor.loading")}</p>
+        <SkeletonRegion>
+          <SkeletonLines lines={2} />
+        </SkeletonRegion>
       ) : status.isError ? (
         // Unknown is not the same as off: offering setup here would send an
         // enrolled account to a dead end.
-        <p className="text-destructive text-sm">{t("twoFactor.statusError")}</p>
+        <StatusMessage onRetry={status.refetch} />
       ) : enrolled ? (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">

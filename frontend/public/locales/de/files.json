@@ -341,7 +341,6 @@
     "error": "Diese Datei konnte nicht umgewandelt werden."
   },
   "viewer": {
-    "loadError": "Datei kann nicht geladen werden",
     "openNewTab": "In neuem Tab öffnen",
     "download": "Herunterladen",
     "pageCount_one": "{{count}} Seite",
@@ -370,7 +369,6 @@
   "createFirst": "Mit dem Schreiben beginnen",
   "dropToUpload": "Zum Hochladen als Datei ablegen",
   "error": "Etwas ist schiefgelaufen",
-  "loadError": "Dateien können derzeit nicht geladen werden.",
   "loading": "Dateien werden geladen…",
   "newFile": "Neue Datei",
   "noFiles": "Noch keine Dateien",

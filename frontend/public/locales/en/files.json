@@ -341,7 +341,6 @@
     "error": "Couldn't convert this file."
   },
   "viewer": {
-    "loadError": "Unable to load file",
     "openNewTab": "Open in new tab",
     "download": "Download",
     "pageCount_one": "{{count}} page",
@@ -370,7 +369,6 @@
   "createFirst": "Start writing",
   "dropToUpload": "Drop to upload a file",
   "error": "Something went wrong",
-  "loadError": "Unable to load files right now.",
   "loading": "Loading files…",
   "newFile": "New file",
   "noFiles": "No files yet",

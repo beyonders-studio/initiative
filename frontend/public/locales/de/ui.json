@@ -1,5 +1,7 @@
 {
   "loading": "Wird geladen…",
+  "loadError": "Das konnte nicht geladen werden.",
+  "tryAgain": "Erneut versuchen",
   "loadMore": "Mehr anzeigen",
   "clear": "Leeren",
   "next": "Weiter",

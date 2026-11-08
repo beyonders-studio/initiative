@@ -380,10 +380,8 @@
     "readMoreAria": "Read the whole post about Initiative {{version}}",
     "older": "Show older posts",
     "back": "All posts",
-    "loading": "Loading…",
     "empty": "Nothing here yet.",
-    "notFound": "Couldn't find that release. It may not have shipped yet.",
-    "error": "Couldn't load what's new. Give it a minute and try again."
+    "notFound": "Couldn't find that release. It may not have shipped yet."
   },
   "meta": {
     "homeTitle": "Initiative: your group has a lot going on, and it's time to take the Initiative",

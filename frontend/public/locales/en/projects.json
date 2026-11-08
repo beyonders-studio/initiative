@@ -1,7 +1,6 @@
 {
   "addProject": "Add Project",
   "loading": "Loading projects…",
-  "loadError": "Unable to load projects.",
   "error": "Something went wrong",
   "noProjects": "No projects yet",
   "noProjectsDescription": "A project holds tasks and tracks them on a board or in a table until they are done.",

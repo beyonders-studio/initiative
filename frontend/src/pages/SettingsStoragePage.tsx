@@ -21,6 +21,7 @@ import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
 
 type Backend = "local" | "s3";
@@ -124,7 +125,7 @@ export const SettingsStoragePage = () => {
   }
 
   if (storageQuery.isError || !storageQuery.data) {
-    return <p className="text-destructive text-sm">{t("storage.loadError")}</p>;
+    return <StatusMessage onRetry={storageQuery.refetch} />;
   }
 
   const isS3 = form.values.backend === "s3";

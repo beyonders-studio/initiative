@@ -53,6 +53,7 @@ import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
 
 /** Sentinel for "no community", which a Select cannot express with "". */
@@ -105,23 +106,12 @@ export const SettingsIntakePage = () => {
   // current value is known.
   if (failed) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("loadFailed.title")}</CardTitle>
-          <CardDescription>{t("loadFailed.description")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button
-            variant="outline"
-            onClick={() => {
-              refetchSettings();
-              refetchOptions();
-            }}
-          >
-            {t("loadFailed.retry")}
-          </Button>
-        </CardContent>
-      </Card>
+      <StatusMessage
+        onRetry={() => {
+          refetchSettings();
+          refetchOptions();
+        }}
+      />
     );
   }
 

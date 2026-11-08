@@ -47,12 +47,12 @@ import {
   toolNavLabelKey,
 } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
-import { Button } from "@/ui/button";
 import { DataTable } from "@/ui/data-table";
 import type { AppColumnDef } from "@/ui/lib/table";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { TableSkeleton } from "@/ui/page-skeletons";
 import { RelativeTime } from "@/ui/relative-time";
+import { StatusMessage } from "@/ui/status-message";
 
 /** What a tool holds that can carry a tag, by tool: every child kind the
  *  bulk tag edit can address. Derived, so a newly taggable kind gets its
@@ -72,19 +72,6 @@ export const TAGGED_CHILDREN = Object.fromEntries(
  *  children's, from the tag's counts. */
 export const toolTabCount = (tool: Tool, counts: Record<string, number>): number =>
   (counts[tool] ?? 0) + TAGGED_CHILDREN[tool].reduce((sum, kind) => sum + (counts[kind] ?? 0), 0);
-
-/** A section or the page whose list could not be read, and the way to ask again. */
-export const TagLoadError = ({ onRetry }: { onRetry: () => void }) => {
-  const { t } = useTranslation(["tags", "common"]);
-  return (
-    <div className="flex items-center gap-2 text-muted-foreground text-sm">
-      <span>{t("detail.loadError")}</span>
-      <Button type="button" variant="ghost" size="sm" onClick={onRetry}>
-        {t("common:tryAgain")}
-      </Button>
-    </div>
-  );
-};
 
 const FIRST_PAGE_SIZE = 20;
 /** A child kind's table has no sort control of its own: rows come by name. */
@@ -159,7 +146,7 @@ const TagToolTable = ({
   );
 
   if (isLoading) return <TableSkeleton rows={4} columns={5} />;
-  if (isError && rows.length === 0) return <TagLoadError onRetry={refetch} />;
+  if (isError && rows.length === 0) return <StatusMessage onRetry={refetch} />;
 
   return (
     <ToolTable
@@ -307,7 +294,7 @@ const TagTasksTable = ({ tagId }: { tagId: number }) => {
   );
 
   if (isLoading) return <TableSkeleton rows={4} columns={6} />;
-  if (isError && !data) return <TagLoadError onRetry={() => void refetch()} />;
+  if (isError && !data) return <StatusMessage onRetry={refetch} />;
 
   return (
     <DataTable
@@ -445,7 +432,7 @@ const TagEntityTable = ({
   );
 
   if (isLoading) return <TableSkeleton rows={4} columns={4} />;
-  if (isError && !data) return <TagLoadError onRetry={() => void refetch()} />;
+  if (isError && !data) return <StatusMessage onRetry={refetch} />;
 
   return (
     <DataTable

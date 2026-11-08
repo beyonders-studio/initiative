@@ -45,8 +45,10 @@ import { DataTable } from "@/ui/data-table";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/ui/dropdown-menu";
 import { listFormat } from "@/ui/lib/intl";
 import type { AppColumnDef } from "@/ui/lib/table";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
 import { RowActionsMenu } from "@/ui/row-actions-menu";
 import { Skeleton } from "@/ui/skeleton";
+import { StatusMessage } from "@/ui/status-message";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
@@ -362,11 +364,15 @@ export const SettingsInitiativesPage = () => {
   }
 
   if (initiativesQuery.isLoading) {
-    return <p className="text-muted-foreground text-sm">{t("manage.loading")}</p>;
+    return (
+      <SkeletonRegion>
+        <TableSkeleton rows={5} columns={4} />
+      </SkeletonRegion>
+    );
   }
 
   if (initiativesQuery.isError || !initiativesQuery.data) {
-    return <p className="text-destructive text-sm">{t("manage.loadError")}</p>;
+    return <StatusMessage onRetry={initiativesQuery.refetch} />;
   }
 
   const live = initiativesQuery.data.filter((initiative) => initiative.archived_at === null);

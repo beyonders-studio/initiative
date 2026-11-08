@@ -22,8 +22,7 @@
     },
     "columns": {
       "in": "In"
-    },
-    "loadError": "Was diesen Tag trägt, konnte nicht geladen werden."
+    }
   },
   "manage": {
     "edit": "Tags bearbeiten",

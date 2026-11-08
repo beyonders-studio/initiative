@@ -22,6 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { Label } from "@/ui/label";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
 
 /** Whether a registration carries a key set, pasted or by address. */
@@ -163,7 +164,7 @@ export const SettingsPluginServicesPage = () => {
     );
   }
   if (servicesQuery.isError || !servicesQuery.data) {
-    return <p className="text-destructive text-sm">{t("pluginServices.loadError")}</p>;
+    return <StatusMessage onRetry={servicesQuery.refetch} />;
   }
 
   const registrations = servicesQuery.data;

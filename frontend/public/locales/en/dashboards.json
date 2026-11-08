@@ -12,8 +12,6 @@
     "noMatchingDashboards": "No dashboards match your filters."
   },
   "loading": "Loading dashboards...",
-  "loadError": "Failed to load dashboards.",
-  "loadingDashboard": "Loading dashboard...",
   "creating": "Creating...",
   "notFound": "Dashboard not found",
   "notFoundDescription": "The dashboard you're looking for does not exist or has been removed.",
@@ -187,7 +185,6 @@
     "absolute": "On a date",
     "relativeDays": "Days from today",
     "relativeHint": "Counts from whenever the dashboard is opened, so it never goes stale.",
-    "loading": "Loading filters…",
     "noFields": "Nothing to filter on here yet.",
     "matchPrefix": "Match",
     "match": "Match all or any",

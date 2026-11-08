@@ -10,6 +10,8 @@ import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
+import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
 
 interface EmailPayload {
@@ -74,11 +76,15 @@ export const SettingsEmailPage = () => {
   }
 
   if (emailQuery.isLoading) {
-    return <p className="text-muted-foreground text-sm">{t("email.loading")}</p>;
+    return (
+      <SkeletonRegion>
+        <FormSkeleton fields={5} />
+      </SkeletonRegion>
+    );
   }
 
   if (emailQuery.isError || !emailQuery.data) {
-    return <p className="text-destructive text-sm">{t("email.loadError")}</p>;
+    return <StatusMessage onRetry={emailQuery.refetch} />;
   }
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {

@@ -41,8 +41,6 @@
     "expand": "Expandir barra de actividad",
     "collapse": "Contraer barra de actividad"
   },
-  "loading": "Cargando…",
-  "loadError": "No se pudo cargar esta herramienta. Inténtalo de nuevo más tarde.",
   "communityWide": "Todo la comunidad",
   "searchPlaceholder": "Buscar por nombre…",
   "empty": {
@@ -81,8 +79,7 @@
       "open": "Abierta a todos los miembros de la comunidad",
       "request": "Unirse mediante solicitud",
       "private": "Solo por invitación"
-    },
-    "loadError": "No se pudo cargar lo que ofrece esta comunidad. Inténtalo de nuevo más tarde."
+    }
   },
   "columns": {
     "name": "Nombre",
@@ -128,7 +125,6 @@
   },
   "recentComments": {
     "noComments": "Aún no hay comentarios",
-    "loadError": "No se pudieron cargar los comentarios recientes. Inténtalo de nuevo más tarde.",
     "unknownAuthor": "Desconocido",
     "onEntity": "en {{entityName}}",
     "inProject": "en {{projectName}}",
@@ -139,7 +135,6 @@
     "title": "Próximamente",
     "description": "Todo lo de la comunidad con fecha en los próximos siete días.",
     "empty": "No hay nada previsto esta semana",
-    "loadError": "No se pudo cargar lo que viene. Inténtalo de nuevo más tarde.",
     "today": "Hoy",
     "tomorrow": "Mañana",
     "kind": {

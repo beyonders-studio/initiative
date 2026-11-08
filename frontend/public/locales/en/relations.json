@@ -3,7 +3,6 @@
   "description": "Everything this is connected to, and how.",
   "untitled": "Untitled",
   "empty": "Nothing linked yet.",
-  "loadFailed": "Links are not answering. Try again in a moment.",
   "add": "Add link",
   "graph": {
     "alt": "{{title}} and the {{count}} things it is connected to",
@@ -95,7 +94,6 @@
       "option": "is tagged"
     }
   },
-  "loading": "Loading…",
   "empty_task": "Nothing linked yet. Link the file that describes this task, or the task it's blocked by.",
   "empty_file": "Nothing linked yet. Link the project this explains, or the task it came out of.",
   "empty_project": "Nothing linked yet. Attach the files this project runs on.",

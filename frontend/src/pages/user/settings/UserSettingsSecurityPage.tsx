@@ -43,7 +43,9 @@ import {
 import { Field } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
+import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { StatusMessage } from "@/ui/status-message";
 
 const computeStatus = (key: ApiKeyMetadata) => {
   if (!key.is_active) {
@@ -266,9 +268,11 @@ export const UserSettingsSecurityPage = () => {
         }
       >
         {apiKeysQuery.isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("security.loadingKeys")}</p>
+          <SkeletonRegion>
+            <ListSkeleton rows={2} avatar={false} />
+          </SkeletonRegion>
         ) : apiKeysQuery.isError ? (
-          <p className="text-destructive text-sm">{t("security.keysError")}</p>
+          <StatusMessage onRetry={apiKeysQuery.refetch} />
         ) : apiKeys.length === 0 ? (
           <p className="text-muted-foreground text-sm">{t("security.noKeys")}</p>
         ) : (

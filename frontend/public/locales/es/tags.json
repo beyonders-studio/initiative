@@ -22,8 +22,7 @@
     },
     "columns": {
       "in": "En"
-    },
-    "loadError": "No se pudo cargar lo que lleva esta etiqueta."
+    }
   },
   "manage": {
     "edit": "Editar etiquetas",

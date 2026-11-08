@@ -29,6 +29,7 @@ import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { RelativeTime } from "@/ui/relative-time";
+import { StatusMessage } from "@/ui/status-message";
 
 export interface InitiativeJoinRequestQueueProps {
   initiativeId: number;
@@ -141,7 +142,7 @@ export const InitiativeJoinRequestQueue = ({ initiativeId }: InitiativeJoinReque
       </CardHeader>
       <CardContent className="p-0">
         {queueQuery.isError ? (
-          <p className="p-4 text-destructive text-sm">{t("joinRequests.queueLoadError")}</p>
+          <StatusMessage onRetry={queueQuery.refetch} />
         ) : (
           <ul className="divide-y">{requests.map(renderRequest)}</ul>
         )}
