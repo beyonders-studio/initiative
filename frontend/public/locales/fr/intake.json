@@ -40,6 +40,10 @@
     "feedback": {
       "title": "Retours",
       "description": "Ce que les gens nous ont dit vouloir."
+    },
+    "ideas": {
+      "title": "Idées",
+      "description": "Les idées que tout le monde peut lire et soutenir, sur Initiative Cloud."
     }
   },
   "stream": {
@@ -285,6 +289,7 @@
       }
     },
     "contactable": "Vous pouvez me contacter si vous avez des questions à ce sujet",
+    "seeIdeas": "Voir ce que d'autres ont demandé",
     "stuck": "Besoin que quelqu'un s'en occupe ? Demander de l'aide",
     "context": {
       "on": "Inclut la version de l'application et la page où vous êtes.",
@@ -318,5 +323,35 @@
   },
   "moderationTopics": {
     "appeal": "Recours contre votre suspension"
+  },
+  "idea": {
+    "title": "Idée",
+    "publish": "Publiée sur la page des idées",
+    "publishedHelp": "Tout le monde voit son titre, sa description et son statut, et peut voter pour elle.",
+    "draftHelp": "Non publiée : seule l'équipe la voit. Ses votes restent avec elle.",
+    "votes_one": "{{count}} vote",
+    "votes_other": "{{count}} votes",
+    "error": "Impossible de modifier ce réglage. Réessayez dans un instant."
+  },
+  "ideas": {
+    "title": "Idées",
+    "lede": "Ce que les gens ont demandé, et où en est chaque idée. Votez pour celles que vous voulez.",
+    "search": "Rechercher des idées",
+    "sortLabel": "Ordre",
+    "sort": {
+      "votes": "Les plus votées",
+      "newest": "Les plus récentes"
+    },
+    "statusLabel": "Statut",
+    "allStatuses": "Toutes",
+    "votedByMe": "Mes votes",
+    "none": "Aucune idée ne correspond.",
+    "votes_one": "{{count}} vote",
+    "votes_other": "{{count}} votes",
+    "vote": "Voter",
+    "voted": "Voté",
+    "voteFor": "Voter pour {{title}}",
+    "voteError": "Impossible d'enregistrer votre vote. Réessayez dans un instant.",
+    "all": "Toutes les idées"
   }
 }

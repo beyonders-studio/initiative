@@ -40,6 +40,10 @@
     "feedback": {
       "title": "Feedback",
       "description": "Was Menschen sich von uns wünschen."
+    },
+    "ideas": {
+      "title": "Ideen",
+      "description": "Die Ideen, die alle lesen und für die alle stimmen können, auf Initiative Cloud."
     }
   },
   "stream": {
@@ -285,6 +289,7 @@
       }
     },
     "contactable": "Ihr dürft mich bei Fragen dazu kontaktieren",
+    "seeIdeas": "Sieh dir an, was sich andere gewünscht haben",
     "stuck": "Soll sich jemand darum kümmern? Hilfe anfordern",
     "context": {
       "on": "Enthält deine App-Version und die Seite, auf der du bist.",
@@ -318,5 +323,35 @@
   },
   "moderationTopics": {
     "appeal": "Einspruch gegen deine Sperre"
+  },
+  "idea": {
+    "title": "Idee",
+    "publish": "Auf der Ideen-Seite veröffentlicht",
+    "publishedHelp": "Alle sehen Titel, Beschreibung und Status und können dafür stimmen.",
+    "draftHelp": "Nicht veröffentlicht: Nur das Team sieht sie. Ihre Stimmen bleiben bei ihr.",
+    "votes_one": "{{count}} Stimme",
+    "votes_other": "{{count}} Stimmen",
+    "error": "Das ließ sich nicht ändern. Versuch es gleich noch einmal."
+  },
+  "ideas": {
+    "title": "Ideen",
+    "lede": "Was sich Leute gewünscht haben und wie es darum steht. Stimm für die, die du willst.",
+    "search": "Ideen suchen",
+    "sortLabel": "Reihenfolge",
+    "sort": {
+      "votes": "Meiste Stimmen",
+      "newest": "Neueste"
+    },
+    "statusLabel": "Status",
+    "allStatuses": "Alle",
+    "votedByMe": "Von mir gewählt",
+    "none": "Keine Ideen passen.",
+    "votes_one": "{{count}} Stimme",
+    "votes_other": "{{count}} Stimmen",
+    "vote": "Abstimmen",
+    "voted": "Gewählt",
+    "voteFor": "Für {{title}} stimmen",
+    "voteError": "Deine Stimme konnte nicht gespeichert werden. Versuch es gleich noch einmal.",
+    "all": "Alle Ideen"
   }
 }

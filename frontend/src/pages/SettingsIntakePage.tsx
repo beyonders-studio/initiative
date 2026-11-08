@@ -238,7 +238,10 @@ const ContactsCard = ({
   settled: boolean;
 }) => {
   const { t } = useTranslation("intake");
-  const streams = settings.bindings.map((binding) => binding.stream as IntakeStream);
+  // A stream nobody files into has nobody to point at an address.
+  const streams = settings.bindings
+    .filter((binding) => binding.filed)
+    .map((binding) => binding.stream as IntakeStream);
   // One flat field per address: "general", then each stream by name.
   const contactsOf = (loaded: IntakeSettingsRead | undefined): Record<string, string> => ({
     general: loaded?.general_contact_email ?? "",

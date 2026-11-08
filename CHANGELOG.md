@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Ideas, on Initiative Cloud.** The ideas people send through feedback that the team publishes are on the **Ideas** page, which anybody can read. Vote for the ones you want, and you hear each time one moves along. The team keeps each idea as a task on an **Ideas** board, set up from **Settings → Platform → Intake**, and publishes it from the task's **Idea** panel.
 - **Dashboards read plug-ins in SQL.** `plugin('acme.shop', 'orders', range => '30d')` in a statement reads one of a plug-in's endpoints, so its rows join tasks, spreadsheets and other plug-ins. A tile's **Build** tab has **Plug-in data** beside **Spreadsheet**, the SQL box suggests plug-ins and their settings, and tiles that read a plug-in through a statement are rewritten to use it. Plug-in widgets and tiles follow **Run dashboard as**: on **Initiative** they use the community's connection.
 
 ### Changed

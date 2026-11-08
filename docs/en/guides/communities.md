@@ -300,6 +300,8 @@ Where the server takes no requests but has said who to write to, that address si
 
 Feedback goes one way unless you tick **You can contact me with questions about this**. Then the team can write to you about it, and it shows up in **My Tickets** on Initiative Cloud when they do. Anything you need sorted out for you belongs in **Ask for help**, which **Something's not right** points you to.
 
+The ideas the team hears most end up on the **Ideas** page on Initiative Cloud, written up by the team, and anybody can read it, signed in or not. **See what others have asked for**, under the box, opens it. Vote for the ones you want, and you'll hear each time one moves along: planned, being built, shipped.
+
 Every request you send lands in **My Tickets**, in the sidebar: where each one stands (**Received**, **In progress**, **Waiting on you**, **Closed**), what the team said, and your replies. You get a notification when it moves, so there's no need to keep checking. A report is listed there too, though the team looks into reports without replying to them.
 
 Whoever runs the server decides which communities take help requests. See [Platform roles](../running-a-server/platform-roles.md#what-you-decide-per-community).
