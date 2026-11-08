@@ -102,6 +102,7 @@
   },
   "detail": {
     "tasksDone": "{{completed}} de {{total}} tareas",
+    "projectProgress": "Progreso del proyecto",
     "fromMarketplace": "Mercado",
     "builtHere": "Creado aquí",
     "fileKind": {

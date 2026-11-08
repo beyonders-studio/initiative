@@ -27,7 +27,7 @@ import type {
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TOOLS, toolDetailRoute } from "@/lib/tools";
 import { Badge } from "@/ui/badge";
-import { ProgressCircle } from "@/ui/progress-circle";
+import { Progress } from "@/ui/progress";
 
 /** One row of a tool table, in terms every tool can answer. */
 export interface ToolRow {
@@ -145,7 +145,12 @@ export function buildToolRows(
           updatedAt: project.updated_at,
           detail: (
             <span className="flex items-center gap-2">
-              <ProgressCircle value={percent} className="h-6 w-6 shrink-0" />
+              <Progress
+                variant="ring"
+                value={percent}
+                className="size-6 shrink-0"
+                aria-label={t("detail.projectProgress")}
+              />
               {t("detail.tasksDone", { completed, total })}
             </span>
           ),
