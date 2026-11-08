@@ -24,7 +24,7 @@ import { cardLines, FILE_COLUMN_OF, FILE_LIST_SHAPE } from "@/lib/layouts/files"
 import type { TranslateFn } from "@/types/i18n";
 import { fieldColumn } from "@/ui/layouts/columns";
 import { cardOf, columnsOf, indexPaths } from "@/ui/layouts/draft";
-import type { FieldDef, LayoutEnv, LayoutItem } from "@/ui/layouts/fields";
+import type { FieldDef, LayoutEnv } from "@/ui/layouts/fields";
 import { type LayoutContext, type LayoutNode, LayoutTree, namesField } from "@/ui/layouts/tree";
 import type { AppColumnDef } from "@/ui/lib/table";
 
@@ -48,7 +48,9 @@ const NO_HREF = () => "";
 /** What a collection's fields are drawn with: the files namespace beside the
  *  layouts', and the community's paths. A file is opened from its picture or
  *  its name's own link, not through a title's. */
-const useCollectionEnv = (stepCounter?: LayoutEnv["stepCounter"]): LayoutEnv => {
+const useCollectionEnv = (
+  stepCounter?: LayoutEnv<CollectionFileSummary>["stepCounter"]
+): LayoutEnv<CollectionFileSummary> => {
   const { t } = useTranslation(["files", ...LAYOUT_NAMESPACES]);
   const communityPath = useCommunityPath();
   return useMemo(
@@ -64,14 +66,14 @@ const useCollectionEnv = (stepCounter?: LayoutEnv["stepCounter"]): LayoutEnv => 
  */
 export const useCollectionCard = (
   card: LayoutNode,
-  fields: ReadonlyMap<string, FieldDef>,
+  fields: ReadonlyMap<string, FieldDef<CollectionFileSummary>>,
   editing = false,
-  stepCounter?: LayoutEnv["stepCounter"]
+  stepCounter?: LayoutEnv<CollectionFileSummary>["stepCounter"]
 ): CollectionCard | undefined => {
   const env = useCollectionEnv(stepCounter);
   return useMemo(() => {
     if (!card.children?.length) return undefined;
-    const view: LayoutContext = {
+    const view: LayoutContext<CollectionFileSummary> = {
       fields,
       card,
       variant: "card",
@@ -79,8 +81,7 @@ export const useCollectionCard = (
       editing: editing ? indexPaths(card) : undefined,
       oneLine: true,
     };
-    const linesOf = (file: CollectionFileSummary) =>
-      cardLines(card, file as unknown as LayoutItem, fields);
+    const linesOf = (file: CollectionFileSummary) => cardLines(card, file, fields);
     const height = (file: CollectionFileSummary) => {
       const lines = linesOf(file);
       return lines === 0 ? 0 : ABOVE + lines * LINE + (lines - 1) * SPACE;
@@ -94,7 +95,7 @@ export const useCollectionCard = (
             className="space-y-1 overflow-hidden pt-1.5 text-xs leading-5"
             style={editing ? undefined : { height: height(file) }}
           >
-            <LayoutTree node={card} item={file as unknown as LayoutItem} view={view} />
+            <LayoutTree node={card} item={file} view={view} />
           </div>
         ) : null,
     };
@@ -109,9 +110,9 @@ export const useCollectionCard = (
  */
 export const useCollectionColumns = (
   ids: readonly string[],
-  fields: ReadonlyMap<string, FieldDef>,
+  fields: ReadonlyMap<string, FieldDef<CollectionFileSummary>>,
   editing = false,
-  stepCounter?: LayoutEnv["stepCounter"]
+  stepCounter?: LayoutEnv<CollectionFileSummary>["stepCounter"]
 ): AppColumnDef<ToolIndexRow>[] => {
   const env = useCollectionEnv(stepCounter);
   return useMemo(
@@ -120,7 +121,7 @@ export const useCollectionColumns = (
         const field = fields.get(id);
         if (!field) return [];
         const sorts = id === "name" || id in FILE_COLUMN_OF;
-        const column = fieldColumn<LayoutItem>(field, env, {
+        const column = fieldColumn(field, env, {
           id: FILE_COLUMN_OF[id] ?? id,
           ...(sorts ? { sortFn: "alphanumeric" as const } : {}),
         });
@@ -169,7 +170,7 @@ export const CollectionListView = ({
   kind: CollectionList;
   definition: ListLayoutDefinitionInput;
   /** Every field the list can show, its ratings drawn as it says. */
-  fields: ReadonlyMap<string, FieldDef>;
+  fields: ReadonlyMap<string, FieldDef<CollectionFileSummary>>;
   files: CollectionFileSummary[];
   groupByTags?: boolean;
   /** The months files were added in, which the timeline's rail is drawn from. */
@@ -181,7 +182,7 @@ export const CollectionListView = ({
   table: (columns: AppColumnDef<ToolIndexRow>[]) => ReactNode;
   editing?: boolean;
   /** How its counters are stepped, where its reader may change them. */
-  stepCounter?: LayoutEnv["stepCounter"];
+  stepCounter?: LayoutEnv<CollectionFileSummary>["stepCounter"];
 }) => {
   const card = useCollectionCard(
     cardOf(definition, fields, FILE_LIST_SHAPE),

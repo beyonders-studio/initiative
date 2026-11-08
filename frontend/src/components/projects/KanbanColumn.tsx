@@ -26,7 +26,7 @@ interface KanbanColumnProps {
   tasks: TaskListRead[];
   canWrite: boolean;
   /** What every card on the board shares, made once for the board. */
-  view: LayoutContext;
+  view: LayoutContext<TaskListRead>;
   collapsed: boolean;
   onToggleCollapse: (statusId: number) => void;
   taskCount: number;
@@ -124,7 +124,7 @@ export const KanbanCards = ({
   group?: string;
   tasks: TaskListRead[];
   canWrite: boolean;
-  view: LayoutContext;
+  view: LayoutContext<TaskListRead>;
   collapsed: boolean;
   className: string;
 }) => {
@@ -357,7 +357,7 @@ export const CollapsedHeader = ({
 
 interface KanbanTaskCardVirtualProps {
   task: TaskListRead;
-  view: LayoutContext;
+  view: LayoutContext<TaskListRead>;
   "data-index": number;
   group?: string;
 }
@@ -444,7 +444,7 @@ const KanbanTaskCardPlain = memo(
 interface KanbanTaskCardProps {
   task: TaskListRead;
   canWrite: boolean;
-  view: LayoutContext;
+  view: LayoutContext<TaskListRead>;
   /** The band the card is in, on a grouped board: a task in several bands
    *  has a card in each. */
   group?: string;

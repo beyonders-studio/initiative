@@ -1,11 +1,10 @@
 import type { LucideIcon } from "lucide-react";
-import { type ComponentType, memo, type ReactNode } from "react";
+import { type ComponentType, type FunctionComponent, memo, type ReactNode } from "react";
 
 import {
   MetadataType,
   type PropertyDefinitionRead,
   type PropertySummary,
-  type TaskListRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Badge } from "@/ui/badge";
 import { DateCell } from "@/ui/date-cell";
@@ -18,10 +17,6 @@ import type { FieldDisplay } from "@/ui/properties/propertyHelpers";
 import { iconForPropertyType } from "@/ui/properties/propertyTypeIcons";
 
 import type { PropertyEnv } from "./fieldEditors";
-
-/** What a view draws, typed as a listed task: another kind's fields read its
- *  own item off it. */
-export type LayoutItem = TaskListRead;
 
 /** Where a field is drawn. On a detail it is its editor, which the kind of
  *  item's detail parts draw. */
@@ -92,21 +87,26 @@ export const groupFields = (fields: readonly FieldDef[]): FieldGroup[] => {
   ].filter((group) => group.fields.length > 0);
 };
 
-/** Anything a view can show about an item. */
-export type FieldDef = {
+/**
+ * Anything a view can show about an item (`I`). What reads an item is a
+ * method, whose parameter TypeScript checks both ways: a field of anything
+ * holding properties (a plug-in's) is one of each kind's, and a kind's fields
+ * are listed where no item is read (`I` left as `unknown`).
+ */
+export type FieldDef<I = unknown> = {
   id: string;
   /** The kind of value it holds, drawn as {@link FIELD_RENDERERS} draws that
    *  kind. Left out where `render` draws it, or nothing does. */
   kind?: FieldKind;
   /** How the kind of item draws a field of its own, in place of its kind's. */
-  render?: ComponentType<FieldRendererProps>;
+  render?(props: FieldRendererProps<I>): ReactNode;
   source: "builtin" | "property" | "plugin";
   /** Built-in: an i18n key, in the words its kind reads with (`LayoutEnv`'s
    *  `t`). Property or plug-in field: its own name, untranslated. */
   label: string;
   /** What the field holds for an item. Nothing (null, "", []) draws nothing on
    *  a card; a cell says so. */
-  value: (item: LayoutItem) => unknown;
+  value(item: I): unknown;
   /** A title cannot be hidden: a card with no title is not a card. */
   hideable: boolean;
   /** Whether an item's page can require it: a value a person fills in that
@@ -132,43 +132,44 @@ export type FieldDef = {
    *  the item is `done`. */
   past?: "primary" | "destructive";
   /** Whether the item is done, past which none of its dates is overdue. */
-  done?: (item: LayoutItem) => boolean;
+  done?(item: I): boolean;
 };
 
 /** What renderers share across a view. It changes with the language, the
  *  community and the item links, not with which fields are shown, so a renderer
- *  whose value is unchanged skips redrawing when the Fields menu changes. */
-export type LayoutEnv = {
+ *  whose value is unchanged skips redrawing when the Fields menu changes. What
+ *  reads an item is a method, as on a field. */
+export type LayoutEnv<I = unknown> = {
   /** Reads the kind's words: its fields' labels and phrases. What the kit
    *  says it reads by prefix (`layouts:`), so it loads `layouts` beside them. */
   t: (key: string, options?: Record<string, unknown>) => string;
   /** A community-relative path, made absolute in the item's community. */
-  communityPath: (path: string, item: LayoutItem) => string;
+  communityPath(path: string, item: I): string;
   /** The page an item's title opens. */
-  itemHref: (item: LayoutItem) => string;
+  itemHref(item: I): string;
   /** What can be done with an item from where it is drawn, beside its title
    *  on a card: a board its reader may change. */
-  itemActions?: ComponentType<{ item: LayoutItem }>;
+  itemActions?(props: { item: I }): ReactNode;
   /** Steps a counter on an item where the list's reader may change it there,
    *  answering with the item's values as the server then holds them. Left
    *  out, or answering null for an item they may not change, a counter is
    *  drawn without its buttons. */
-  stepCounter?: (
-    item: LayoutItem,
+  stepCounter?(
+    item: I,
     definition: PropertyDefinitionRead
-  ) => ((up: boolean) => Promise<PropertySummary[]>) | null;
+  ): ((up: boolean) => Promise<PropertySummary[]>) | null;
 
   /** What its property editors read and change through: a detail's. Left
    *  out, its properties are read, not changed. */
   properties?: PropertyEnv;
 };
 
-export type FieldRendererProps = {
+export type FieldRendererProps<I = unknown> = {
   value: unknown;
-  item: LayoutItem;
-  field: FieldDef;
+  item: I;
+  field: FieldDef<I>;
   variant: LayoutVariant;
-  env: LayoutEnv;
+  env: LayoutEnv<I>;
   /** Drawn on one line ({@link LayoutContext}'s `oneLine`). */
   oneLine?: boolean;
 };
@@ -179,10 +180,10 @@ export const isEmptyValue = (value: unknown): boolean =>
 
 /** One field per property the initiative defines, two that share a name told
  *  apart in their labels; `read` reads one's value off an item. */
-export const propertyFields = (
+export const propertyFields = <I,>(
   definitions: PropertyDefinitionRead[],
-  read: (item: LayoutItem, definition: PropertyDefinitionRead) => unknown
-): FieldDef[] =>
+  read: (item: I, definition: PropertyDefinitionRead) => unknown
+): FieldDef<I>[] =>
   namePropertyColumns(definitions).map(({ definition, label }) => ({
     id: propertyFieldId(definition.id),
     kind: "property",
@@ -317,7 +318,7 @@ export const withDisplays = <F extends Pick<FieldDef, "display">>(
 
 /** One renderer per kind of field, each skipping a redraw its props don't call
  *  for. */
-const FIELD_RENDERERS: Record<FieldKind, ComponentType<FieldRendererProps>> = {
+const FIELD_RENDERERS: Record<FieldKind, FunctionComponent<FieldRendererProps>> = {
   title: memo(TitleField),
   excerpt: memo(ExcerptField),
   date: memo(DateField),
@@ -328,5 +329,5 @@ const FIELD_RENDERERS: Record<FieldKind, ComponentType<FieldRendererProps>> = {
 const NOTHING = () => null;
 
 /** What draws a field: its own renderer, else its kind's; nothing for neither. */
-export const fieldRenderer = (field: FieldDef): ComponentType<FieldRendererProps> =>
+export const fieldRenderer = <I,>(field: FieldDef<I>): ComponentType<FieldRendererProps<I>> =>
   field.render ?? (field.kind ? FIELD_RENDERERS[field.kind] : NOTHING);

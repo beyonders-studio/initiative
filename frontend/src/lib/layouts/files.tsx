@@ -18,16 +18,12 @@ import {
   type FieldDef,
   type FieldRendererProps,
   isEmptyValue,
-  type LayoutItem,
   propertyFields,
 } from "@/ui/layouts/fields";
 import type { LayoutNode } from "@/ui/layouts/tree";
 import { formatBytes } from "@/ui/lib/fileUtils";
 import { cn } from "@/ui/lib/utils";
 import { listedValue, nonEmptyPropertySummaries } from "@/ui/properties/propertyHelpers";
-
-/** The file a collection's list draws, which its fields are read from. */
-const fileOf = (item: LayoutItem) => item as unknown as CollectionFileSummary;
 
 // A file's own fields hold the file, or its size, as their value.
 const NameField = memo(function NameField({ value, variant }: FieldRendererProps) {
@@ -132,24 +128,23 @@ export const FILE_LAYOUT = detailLayoutSpec({
 export const collectionFileFields = (
   metadata: PropertyDefinitionRead[],
   properties: PropertyDefinitionRead[]
-): Map<string, FieldDef> => {
+): Map<string, FieldDef<CollectionFileSummary>> => {
   const own = new Set(metadata.map((definition) => definition.id));
-  const fields: FieldDef[] = [
+  const fields: FieldDef<CollectionFileSummary>[] = [
     ...Object.entries(FILE_FIELDS).map(
-      ([id, { read, ...field }]): FieldDef => ({
+      ([id, { read, ...field }]): FieldDef<CollectionFileSummary> => ({
         id,
         source: "builtin",
         hideable: true,
         // A file's own fields are its, and nobody fills them in here.
         requireable: false,
-        value: (item) => read(fileOf(item)),
+        value: read,
         ...field,
       })
     ),
-    ...propertyFields([...metadata, ...properties], (item, definition) => {
-      const file = fileOf(item);
-      return listedValue(own.has(definition.id) ? file.metadata : file.properties, definition);
-    }).map((field) => ({
+    ...propertyFields<CollectionFileSummary>([...metadata, ...properties], (file, definition) =>
+      listedValue(own.has(definition.id) ? file.metadata : file.properties, definition)
+    ).map((field) => ({
       ...field,
       plain: true,
       // A collection requires its own metadata, not what the file holds.
@@ -168,8 +163,8 @@ export const collectionFileFields = (
  */
 export const cardLines = (
   node: LayoutNode,
-  item: LayoutItem,
-  fields: ReadonlyMap<string, FieldDef>,
+  item: CollectionFileSummary,
+  fields: ReadonlyMap<string, FieldDef<CollectionFileSummary>>,
   inRow = false
 ): number => {
   switch (node.type) {
