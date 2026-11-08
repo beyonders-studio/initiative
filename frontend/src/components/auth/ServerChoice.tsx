@@ -6,12 +6,8 @@ import { Trans, useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsDemoServer } from "@/hooks/useDemoCopy";
 import { normalizeServerUrl, useServer } from "@/hooks/useServer";
-import {
-  CLOUD_ORIGIN,
-  CLOUD_SERVER_URL,
-  getSelfHostedAddress,
-  setSelfHostedAddress,
-} from "@/lib/serverStorage";
+import { CLOUD_OPEN, CLOUD_ORIGIN, CLOUD_SERVER_URL } from "@/lib/cloud";
+import { getSelfHostedAddress, setSelfHostedAddress } from "@/lib/serverStorage";
 import { clearStart } from "@/lib/startFlow";
 import AppEnvironment from "@/plugins/appEnvironment";
 import { Badge } from "@/ui/badge";
@@ -26,8 +22,9 @@ import { Input } from "@/ui/input";
 import { cn } from "@/ui/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
-/** Whether the server a sign-in goes to is Initiative Cloud. */
-const useIsCloudServer = (): boolean => useServer().getServerOrigin() === CLOUD_ORIGIN;
+/** Whether the server a sign-in goes to is Initiative Cloud, once it is open. */
+const useIsCloudServer = (): boolean =>
+  useServer().getServerOrigin() === CLOUD_ORIGIN && CLOUD_OPEN;
 
 /**
  * Leaving a server: a sign-up begun on it stays there, and leaving signs out
@@ -96,8 +93,10 @@ const AppServerPicker = ({ className }: { className?: string }) => {
   const { t } = useTranslation("auth");
   const { serverUrl } = useServer();
   const cloud = useIsCloudServer();
-  // An app with no server of its own starts on Initiative Cloud.
-  const [where, setWhere] = useState(serverUrl === null || cloud ? "cloud" : "selfHosted");
+  // An app with no server of its own starts on Initiative Cloud, once it is open.
+  const [where, setWhere] = useState(
+    (CLOUD_OPEN && serverUrl === null) || cloud ? "cloud" : "selfHosted"
+  );
   const { switchToCloud, switching, error } = useSwitchToCloud();
   // The choice holds while a server is being reached, so the one shown is the
   // one the app ends up on.
@@ -115,7 +114,9 @@ const AppServerPicker = ({ className }: { className?: string }) => {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="cloud">{t("server.cloud")}</SelectItem>
+          <SelectItem value="cloud" disabled={!CLOUD_OPEN}>
+            {CLOUD_OPEN ? t("server.cloud") : `${t("server.cloud")} · ${t("server.cloudSoon")}`}
+          </SelectItem>
           <SelectItem value="selfHosted">{t("server.selfHosted")}</SelectItem>
         </SelectContent>
       </Select>
@@ -211,8 +212,11 @@ const ServerMenu = ({
         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
-        <DropdownMenuItem onSelect={onChooseCloud}>
+        <DropdownMenuItem disabled={!CLOUD_OPEN} onSelect={onChooseCloud}>
           <span className="flex-1">{t("server.cloud")}</span>
+          {CLOUD_OPEN ? null : (
+            <span className="text-muted-foreground text-xs">{t("server.cloudSoon")}</span>
+          )}
           {cloud ? <Check aria-hidden /> : null}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onChooseOwn}>
@@ -236,11 +240,11 @@ const ServerAddressForm = ({
   const { t } = useTranslation("auth");
   const { serverUrl, setServerUrl, testServerConnection, getServerOrigin } = useServer();
   const leaveServer = useLeaveServer();
+  const cloud = useIsCloudServer();
   // Initiative Cloud's address is not one to fill in for your own server.
-  const [address, setAddress] = useState(() => {
-    const origin = getServerOrigin();
-    return getSelfHostedAddress() ?? (origin === CLOUD_ORIGIN ? null : origin) ?? "";
-  });
+  const [address, setAddress] = useState(
+    () => getSelfHostedAddress() ?? (cloud ? null : getServerOrigin()) ?? ""
+  );
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
 

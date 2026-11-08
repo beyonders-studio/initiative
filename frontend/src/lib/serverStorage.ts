@@ -1,3 +1,4 @@
+import { CLOUD_OPEN, CLOUD_SERVER_URL } from "@/lib/cloud";
 import { CREDENTIAL_KEYS, getItem, removeItem, setItem } from "@/lib/storage";
 
 const SERVER_URL_KEY = "initiative-server-url";
@@ -5,22 +6,19 @@ const SERVER_URL_KEY = "initiative-server-url";
 // so their server is already filled in when they come back to it.
 const SELF_HOSTED_ADDRESS_KEY = "initiative-self-hosted-address";
 
-/** Initiative Cloud, the server the app signs in to until it is given another. */
-export const CLOUD_ORIGIN = "https://initiativetasks.com";
-export const CLOUD_SERVER_URL = `${CLOUD_ORIGIN}/api/v1`;
-
 // Server URL storage
 export function getStoredServerUrl(): string | null {
   return getItem(SERVER_URL_KEY);
 }
 
 /**
- * The server the app talks to: the one it was given, or Initiative Cloud on a
- * fresh install. Kept, so everything keyed on the stored server agrees.
+ * The server the app talks to: the one it was given, or, on a fresh install,
+ * Initiative Cloud once it is open. Kept, so everything keyed on the stored
+ * server agrees.
  */
-export function adoptStoredServerUrl(): string {
+export function adoptStoredServerUrl(): string | null {
   const stored = getStoredServerUrl();
-  if (stored) return stored;
+  if (stored || !CLOUD_OPEN) return stored;
   setStoredServerUrl(CLOUD_SERVER_URL);
   return CLOUD_SERVER_URL;
 }

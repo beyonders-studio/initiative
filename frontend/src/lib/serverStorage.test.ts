@@ -1,15 +1,29 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  adoptStoredServerUrl,
-  CLOUD_SERVER_URL,
-  getStoredServerUrl,
-  setStoredServerUrl,
-} from "./serverStorage";
+import { CLOUD_SERVER_URL } from "./cloud";
+import { adoptStoredServerUrl, getStoredServerUrl, setStoredServerUrl } from "./serverStorage";
+
+const cloud = vi.hoisted(() => ({ open: false }));
+
+vi.mock("./cloud", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./cloud")>()),
+  get CLOUD_OPEN() {
+    return cloud.open;
+  },
+}));
 
 describe("adoptStoredServerUrl", () => {
-  it("starts a fresh install on Initiative Cloud, and keeps it", () => {
+  afterEach(() => {
+    cloud.open = false;
+  });
+
+  it("leaves a fresh install with no server until Initiative Cloud opens", () => {
+    expect(adoptStoredServerUrl()).toBeNull();
     expect(getStoredServerUrl()).toBeNull();
+  });
+
+  it("starts a fresh install on Initiative Cloud once it is open, and keeps it", () => {
+    cloud.open = true;
 
     expect(adoptStoredServerUrl()).toBe(CLOUD_SERVER_URL);
     expect(getStoredServerUrl()).toBe(CLOUD_SERVER_URL);

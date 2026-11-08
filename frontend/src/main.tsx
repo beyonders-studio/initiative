@@ -68,9 +68,8 @@ async function bootstrap() {
   // reach the real backend before React effects run (avoids race condition
   // where child provider effects fire before ServerProvider's useEffect).
   // Before the offline cache, which is kept per server.
-  if (Capacitor.isNativePlatform()) {
-    setApiBaseUrl(adoptStoredServerUrl());
-  }
+  const storedUrl = Capacitor.isNativePlatform() ? adoptStoredServerUrl() : null;
+  if (storedUrl) setApiBaseUrl(storedUrl);
 
   // What this device last loaded, if it is still ours and still fresh. Decided
   // before render so a launch with no signal has its content in hand rather

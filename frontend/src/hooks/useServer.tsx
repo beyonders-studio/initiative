@@ -4,12 +4,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useS
 import { setApiBaseUrl } from "@/api/client";
 import { releasePushForServerSwitch } from "@/lib/pushRegistration";
 import { queryClient } from "@/lib/queryClient";
-import {
-  adoptStoredServerUrl,
-  CLOUD_SERVER_URL,
-  clearAllStorage,
-  setStoredServerUrl,
-} from "@/lib/serverStorage";
+import { adoptStoredServerUrl, clearAllStorage, setStoredServerUrl } from "@/lib/serverStorage";
 
 interface ServerContextValue {
   /** The configured server URL (e.g., "https://myserver.com/api/v1") */
@@ -108,8 +103,10 @@ export const ServerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const stored = adoptStoredServerUrl();
-    setServerUrlState(stored);
-    setApiBaseUrl(stored);
+    if (stored) {
+      setServerUrlState(stored);
+      setApiBaseUrl(stored);
+    }
     setLoading(false);
   }, [isNativePlatform]);
 
@@ -168,10 +165,10 @@ export const ServerProvider = ({ children }: { children: ReactNode }) => {
     await releasePushForServerSwitch(null).catch(() => undefined);
     // Disconnecting goes back to where a fresh install starts.
     clearAllStorage();
-    setStoredServerUrl(CLOUD_SERVER_URL);
-    setApiBaseUrl(CLOUD_SERVER_URL);
+    const start = adoptStoredServerUrl();
+    if (start) setApiBaseUrl(start);
     queryClient.clear();
-    setServerUrlState(CLOUD_SERVER_URL);
+    setServerUrlState(start);
   }, []);
 
   const getServerHostname = useCallback((): string | null => {
