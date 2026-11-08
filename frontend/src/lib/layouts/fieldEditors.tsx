@@ -26,6 +26,7 @@ import {
   type UserSummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import { usePersonMention } from "@/components/comments/usePersonMention";
+import { useFileFieldFiles } from "@/components/files/useFileFieldFiles";
 import { MentionComposer } from "@/components/markdown/MentionComposer";
 import { AddPropertyButton } from "@/components/properties/AddPropertyButton";
 import { PropertyInput } from "@/components/properties/PropertyInput";
@@ -353,6 +354,7 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
   const { t } = useTranslation(["properties", "common"]);
   const save = useItemFieldSave(kind, id, property.name);
   const adding = useContext(ItemDraftContext) !== null;
+  const files = useFileFieldFiles(initiativeId);
   const saved = normalizePropertyValue(property);
   const edit = (value: unknown): ItemEdit<I, P> => ({
     properties: { values: [{ property_id: property.property_id, value }] },
@@ -424,6 +426,7 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
         canOpen={canOpen}
         selectedUser={userReferenceValue(property)}
         updatedAt={updatedAt}
+        files={files}
       />
     </FieldFrame>
   );

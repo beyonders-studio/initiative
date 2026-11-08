@@ -57,7 +57,10 @@ interface EntityPickerProps {
  * — inside a single initiative it is the same word on every row, which is
  * noise rather than context.
  */
-const whereItLives = (item: SearchSuggestion, initiativeId: number | null): string | undefined => {
+export const whereItLives = (
+  item: SearchSuggestion,
+  initiativeId: number | null
+): string | undefined => {
   const parts = [initiativeId == null ? item.initiative_name : null, item.tool_title].filter(
     (part): part is string => Boolean(part?.trim())
   );
