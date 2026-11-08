@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { OperatorDashboardBillingPage } from "@/pages/OperatorDashboardBillingPage";
+import { BillingPage } from "@/pages/operator/BillingPage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/settings/operator/billing")({
-  component: OperatorDashboardBillingPage,
+  component: BillingPage,
 });

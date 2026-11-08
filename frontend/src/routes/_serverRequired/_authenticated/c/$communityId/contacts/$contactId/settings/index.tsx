@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { ToolSettingsDetailsPage } from "@/pages/toolSettings/ToolSettingsDetailsPage";
+import { DetailsPage } from "@/pages/community/tools/settings/DetailsPage";
 
 // Details is what a contact's settings open on, so it is served at `/settings`
 // itself rather than redirecting to a `/settings/details` alias.
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/contacts/$contactId/settings/"
 )({
-  component: ToolSettingsDetailsPage,
+  component: DetailsPage,
 });

@@ -19,7 +19,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
+import { BetaBadge } from "@/components/icons/BetaBadge";
 import { Galaxy } from "@/components/icons/Galaxy";
+import { LogoIcon } from "@/components/icons/LogoIcon";
 import { useSidebar } from "@/components/sidebar/sidebar";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
@@ -49,8 +51,6 @@ import { cn } from "@/ui/lib/utils";
 import { Textarea } from "@/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
-import { BetaBadge } from "../BetaBadge";
-import { LogoIcon } from "../LogoIcon";
 import { CommunityCardFace } from "./CommunityCardFace";
 import { CommunityContextMenu } from "./CommunityContextMenu";
 

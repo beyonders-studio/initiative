@@ -1,8 +1,8 @@
 import { createFileRoute, Outlet, redirect, useLocation } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 
-import { NativeUpdateRequiredDialog } from "@/components/NativeUpdateRequiredDialog";
-import { UpdateReadyToast } from "@/components/UpdateReadyToast";
+import { NativeUpdateRequiredDialog } from "@/components/updates/NativeUpdateRequiredDialog";
+import { UpdateReadyToast } from "@/components/updates/UpdateReadyToast";
 import { useNativeUpdate } from "@/hooks/useNativeUpdate";
 import { useServer } from "@/hooks/useServer";
 

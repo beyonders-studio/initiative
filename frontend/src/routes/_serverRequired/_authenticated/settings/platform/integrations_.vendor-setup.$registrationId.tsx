@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { SettingsVendorSetupPage } from "@/pages/SettingsVendorSetupPage";
+import { VendorSetupPage } from "@/pages/platform/integrations/VendorSetupPage";
 
 export interface VendorSetupSearch {
   code?: string;
@@ -22,5 +22,5 @@ export const Route = createFileRoute(
     code: text(search.code),
     state: text(search.state),
   }),
-  component: SettingsVendorSetupPage,
+  component: VendorSetupPage,
 });

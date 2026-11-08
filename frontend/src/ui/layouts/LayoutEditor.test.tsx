@@ -35,7 +35,7 @@ import {
   Tool,
   type ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
+import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/InitiativeSettingsPropertiesTab";
 import {
   calendarPresets,
   eventDetail,
@@ -54,12 +54,12 @@ import {
 } from "@/hooks/useToolLayouts";
 import { useLayoutPlugins } from "@/lib/layouts/plugins";
 import { TASK_COLUMNS } from "@/lib/layouts/tasks";
-import { CollectionLayoutEditorPage } from "@/pages/initiativeTools/files/CollectionLayoutEditorPage";
+import { LayoutEditorPage } from "@/pages/community/tools/files/collection/LayoutEditorPage";
 import type { TranslateFn } from "@/types/i18n";
-import { MAX_PRESETS } from "@/ui/layouts/presets";
-import type { LayoutNode } from "@/ui/layouts/tree";
 
 import { LayoutEditor } from "./LayoutEditor";
+import { MAX_PRESETS } from "./presets";
+import type { LayoutNode } from "./tree";
 
 const STATUSES = buildDefaultTaskStatuses(1);
 const TASK_TYPE = {
@@ -1088,7 +1088,7 @@ describe("LayoutEditor", () => {
           )
         )
       );
-      renderPage(CollectionLayoutEditorPage, {
+      renderPage(LayoutEditorPage, {
         initialRoute: "/c/$communityId/i/$initiativeId/files/collections/$collectionId/layouts",
         routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
       });

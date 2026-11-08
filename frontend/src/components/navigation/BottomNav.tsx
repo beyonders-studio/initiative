@@ -3,8 +3,7 @@ import { FilePlus, Home, Menu, MessageSquare, Plus, Search, SquareCheckBig } fro
 import { useTranslation } from "react-i18next";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { getOpenCommandCenter } from "@/components/CommandCenter";
-import { usePrimaryCreateAction } from "@/components/navigation/CreateActionContext";
+import { getOpenCommandCenter } from "@/components/search/CommandCenter";
 import { useSidebar } from "@/components/sidebar/sidebar";
 import { getOpenCreateTaskWizard } from "@/components/tasks/CreateTaskWizard";
 import { getOpenCreateToolWizard } from "@/components/tools/CreateToolWizard";
@@ -23,6 +22,8 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
+
+import { usePrimaryCreateAction } from "./CreateActionContext";
 
 const pillClass =
   "pointer-events-auto flex items-center gap-1 rounded-full border bg-card/90 p-1 shadow-lg backdrop-blur supports-backdrop-filter:bg-card/70";

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { type PageSearch, validatePage } from "@/lib/routeSearch";
-import { HomePage } from "@/pages/user/HomePage";
+import { HomePage } from "@/pages/my/home/HomePage";
 
 /**
  * Home. There is deliberately no loader here.

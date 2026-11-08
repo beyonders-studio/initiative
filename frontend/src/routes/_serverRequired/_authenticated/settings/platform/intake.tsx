@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { SettingsIntakePage } from "@/pages/SettingsIntakePage";
+import { IntakePage } from "@/pages/platform/intake/IntakePage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/settings/platform/intake")({
-  component: SettingsIntakePage,
+  component: IntakePage,
 });

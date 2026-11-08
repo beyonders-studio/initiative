@@ -29,7 +29,7 @@ const read = (relative: string) => fs.readFileSync(path.resolve(__dirname, relat
 const LISTS = [
   {
     what: "the posts board",
-    source: read("../pages/initiativeTools/posts/PostsPage.tsx"),
+    source: read("../pages/community/tools/posts/PostsPage.tsx"),
     gap: "CARD_GAP",
   },
   {

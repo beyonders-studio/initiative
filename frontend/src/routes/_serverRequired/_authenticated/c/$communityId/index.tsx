@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { validateId } from "@/lib/routeSearch";
-import { CommunityHomePage } from "@/pages/CommunityHomePage";
+import { HomePage } from "@/pages/community/home/HomePage";
 import { CommunityHomeSkeleton } from "@/ui/page-skeletons";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communityId/")({
@@ -21,7 +21,7 @@ export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communi
     create: search.create === "true" ? "true" : undefined,
     plugin: validateId(search.plugin),
   }),
-  component: CommunityHomePage,
+  component: HomePage,
   // The front page draws its own outline while its code is on the way, rather
   // than the generic one the layout would otherwise show in its place.
   pendingComponent: CommunityHomeSkeleton,

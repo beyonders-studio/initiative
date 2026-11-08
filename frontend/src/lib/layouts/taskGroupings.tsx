@@ -12,11 +12,11 @@ import type {
   TaskTypeRead,
   TaskUpdate,
 } from "@/api/generated/initiativeAPI.schemas";
-import { priorityVariant } from "@/components/projects/projectTasksConfig";
-import { TaskAssigneeList } from "@/components/projects/TaskAssigneeList";
 import { TagBadge } from "@/components/tags/TagBadge";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
+import { priorityVariant } from "@/components/tools/projects/projectTasksConfig";
+import { TaskAssigneeList } from "@/components/tools/projects/TaskAssigneeList";
 import { getTaskDateStatusLabel, TASK_DATE_STATUSES } from "@/lib/taskDateStatus";
 import type { TranslateFn } from "@/types/i18n";
 import { Badge } from "@/ui/badge";

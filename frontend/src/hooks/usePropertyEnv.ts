@@ -1,14 +1,11 @@
 import { useMemo } from "react";
 
-import { useFileFieldFiles } from "@/components/files/useFileFieldFiles";
-import {
-  useAppendPropertyOption,
-  useCreateProperty,
-  useOwnedDefinitions,
-} from "@/hooks/useProperties";
-import { useSearchMembers } from "@/hooks/useUsers";
+import { useFileFieldFiles } from "@/components/tools/files/useFileFieldFiles";
 import type { PropertyEnv } from "@/ui/layouts/fieldEditors";
 import type { MetadataOwner } from "@/ui/properties/propertyHelpers";
+
+import { useAppendPropertyOption, useCreateProperty, useOwnedDefinitions } from "./useProperties";
+import { useSearchMembers } from "./useUsers";
 
 /**
  * What a page's property editors read and change through: the properties an

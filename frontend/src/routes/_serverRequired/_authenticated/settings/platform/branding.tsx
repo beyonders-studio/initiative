@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { SettingsBrandingPage } from "@/pages/SettingsBrandingPage";
+import { BrandingPage } from "@/pages/platform/BrandingPage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/settings/platform/branding")({
-  component: SettingsBrandingPage,
+  component: BrandingPage,
 });

@@ -1,16 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { useAuth } from "@/hooks/useAuth";
-import { UserMarketplacePage } from "@/pages/marketplace/UserMarketplacePage";
+import { MarketplacePage } from "@/pages/my/marketplace/MarketplacePage";
 
 // Outside the `/c/$communityId` tree: what is sold here installs to a person, not
 // to a community, and belongs to them in every community they are in.
 export const Route = createFileRoute("/_serverRequired/_authenticated/marketplace")({
-  component: MarketplacePage,
+  component: MarketplaceRoute,
 });
 
-function MarketplacePage() {
+function MarketplaceRoute() {
   const { user } = useAuth();
   if (!user) return null;
-  return <UserMarketplacePage user={user} />;
+  return <MarketplacePage user={user} />;
 }

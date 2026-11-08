@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { FileType, Tool } from "@/api/generated/initiativeAPI.schemas";
-import { useFileExportOptions } from "@/components/files/useFileExportOptions";
-import { loadWhiteboardSceneFromContent } from "@/components/files/whiteboardSceneCache";
+import { loadWhiteboardSceneFromContent } from "@/components/tools/files/whiteboardSceneCache";
 import { useFile } from "@/hooks/useFiles";
 import { useRouteId } from "@/hooks/useRouteId";
-import { ToolSettingsPage } from "@/pages/toolSettings/ToolSettingsPage";
+import { useFileExportOptions } from "@/pages/community/tools/files/useFileExportOptions";
+import { SettingsLayout } from "@/pages/community/tools/settings/SettingsLayout";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/files/$fileId/settings"
@@ -27,5 +27,5 @@ function FileSettings() {
 
   // A file's name is edited in the editor rather than here, and it carries no
   // description.
-  return <ToolSettingsPage tool={Tool.file} detailsForm={false} exportOptions={exportOptions} />;
+  return <SettingsLayout tool={Tool.file} detailsForm={false} exportOptions={exportOptions} />;
 }

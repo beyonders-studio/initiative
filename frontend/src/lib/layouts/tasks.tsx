@@ -14,15 +14,15 @@ import type {
   TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
-import { priorityVariant } from "@/components/projects/projectTasksConfig";
-import { TaskAssigneeList, TaskAssigneeStack } from "@/components/projects/TaskAssigneeList";
-import { TaskBlockersHoverCard } from "@/components/projects/TaskBlockersHoverCard";
-import { TaskDescriptionHoverCard } from "@/components/projects/TaskDescriptionHoverCard";
-import { TaskSubtasksHoverCard } from "@/components/projects/TaskSubtasksHoverCard";
 import { TagBadge } from "@/components/tags";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
 import { TaskTypeMark, TaskTypeOption } from "@/components/tasks/TaskTypeOption";
+import { priorityVariant } from "@/components/tools/projects/projectTasksConfig";
+import { TaskAssigneeList, TaskAssigneeStack } from "@/components/tools/projects/TaskAssigneeList";
+import { TaskBlockersHoverCard } from "@/components/tools/projects/TaskBlockersHoverCard";
+import { TaskDescriptionHoverCard } from "@/components/tools/projects/TaskDescriptionHoverCard";
+import { TaskSubtasksHoverCard } from "@/components/tools/projects/TaskSubtasksHoverCard";
 import { MentionText } from "@/components/user/MentionText";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import {

@@ -1,15 +1,16 @@
 import { useTranslation } from "react-i18next";
 
 import type { Presence, ProfileDecorationsOutput } from "@/api/generated/initiativeAPI.schemas";
-import { UserHandle } from "@/components/UserHandle";
-import { ProfileAvatar } from "@/components/user/ProfileAvatar";
-import { ProfileJoined } from "@/components/user/ProfileJoined";
-import { isStatusEmpty, StatusBubble } from "@/components/user/ProfileStatus";
 import { useUserProfile } from "@/hooks/useUsers";
 import { decorationSrc, resolveDecoration, resolveTrophies } from "@/lib/profileDecorations";
 import type { AvatarSourceUser, DisplayableUser } from "@/lib/userDisplay";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import { Skeleton } from "@/ui/skeleton";
+
+import { ProfileAvatar } from "./ProfileAvatar";
+import { ProfileJoined } from "./ProfileJoined";
+import { isStatusEmpty, StatusBubble } from "./ProfileStatus";
+import { UserHandle } from "./UserHandle";
 
 /**
  * As much of a person as a page already holds.

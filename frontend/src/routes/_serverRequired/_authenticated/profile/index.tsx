@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { useAuth } from "@/hooks/useAuth";
-import { UserSettingsProfilePage } from "@/pages/user/settings/UserSettingsProfilePage";
+import { ProfilePage } from "@/pages/my/settings/profile/ProfilePage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/profile/")({
   component: ProfileIndexPage,
@@ -10,5 +10,5 @@ export const Route = createFileRoute("/_serverRequired/_authenticated/profile/")
 function ProfileIndexPage() {
   const { user, refreshUser } = useAuth();
   if (!user) return null;
-  return <UserSettingsProfilePage user={user} refreshUser={refreshUser} />;
+  return <ProfilePage user={user} refreshUser={refreshUser} />;
 }

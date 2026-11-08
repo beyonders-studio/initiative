@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { EventDetailPage } from "@/pages/initiativeTools/events/EventDetailPage";
+import { EventPage } from "@/pages/community/tools/calendars/EventPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/calendars/$calendarId/events/$eventId/"
@@ -8,5 +8,5 @@ export const Route = createFileRoute(
   validateSearch: (search: Record<string, unknown>): { occurrence?: string } => ({
     occurrence: typeof search.occurrence === "string" ? search.occurrence : undefined,
   }),
-  component: EventDetailPage,
+  component: EventPage,
 });

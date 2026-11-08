@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { MyStatsPage } from "@/pages/user/MyStatsPage";
+import { StatsPage } from "@/pages/my/stats/StatsPage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/user-stats")({
-  component: MyStatsPage,
+  component: StatsPage,
 });

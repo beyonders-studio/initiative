@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 
-import { Markdown } from "@/components/Markdown";
+import { Markdown } from "@/components/markdown/Markdown";
 
 type CommentContentProps = Pick<
   ComponentProps<typeof Markdown>,

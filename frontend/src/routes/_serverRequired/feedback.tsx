@@ -8,6 +8,6 @@ export const Route = createFileRoute("/_serverRequired/feedback")({
   component: __IS_CAPACITOR__
     ? NotInApp
     : lazyRouteComponent(() =>
-        import("@/pages/FeedbackPage").then((m) => ({ default: m.FeedbackPage }))
+        import("@/pages/site/FeedbackPage").then((m) => ({ default: m.FeedbackPage }))
       ),
 });

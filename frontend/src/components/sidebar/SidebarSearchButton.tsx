@@ -2,7 +2,7 @@ import { Search } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { getOpenCommandCenter } from "@/components/CommandCenter";
+import { getOpenCommandCenter } from "@/components/search/CommandCenter";
 
 interface SidebarSearchButtonProps {
   /** Name of the community being searched; shown in the placeholder. */

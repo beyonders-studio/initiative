@@ -14,10 +14,10 @@ import type {
   TaskStatusRead,
   TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { ProjectTasksGanttView } from "@/components/projects/ProjectTasksGanttView";
-import { ProjectTasksKanbanView } from "@/components/projects/ProjectTasksKanbanView";
-import { ProjectTasksTableView } from "@/components/projects/ProjectTasksTableView";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
+import { ProjectTasksGanttView } from "@/components/tools/projects/ProjectTasksGanttView";
+import { ProjectTasksKanbanView } from "@/components/tools/projects/ProjectTasksKanbanView";
+import { ProjectTasksTableView } from "@/components/tools/projects/ProjectTasksTableView";
 import { columnLimitsOf, MAX_COLUMN_LIMIT } from "@/hooks/useColumnLimits";
 import { LAYOUT_NAMESPACES } from "@/hooks/useLayoutEnv";
 import type { ProjectTaskTableState } from "@/hooks/useProjectTaskView";

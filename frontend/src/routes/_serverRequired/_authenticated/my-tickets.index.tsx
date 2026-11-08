@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { MyTicketsPage } from "@/pages/user/MyTicketsPage";
+import { TicketsPage } from "@/pages/my/tickets/TicketsPage";
 
 export interface MyTicketsSearch {
   /** Open a filing form on arrival. ``security`` is what the server's
@@ -11,5 +11,5 @@ export interface MyTicketsSearch {
 export const Route = createFileRoute("/_serverRequired/_authenticated/my-tickets/")({
   validateSearch: (search: Record<string, unknown>): MyTicketsSearch =>
     search.report === "security" ? { report: "security" } : {},
-  component: MyTicketsPage,
+  component: TicketsPage,
 });

@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { ProjectSettingsPropertiesPage } from "@/pages/initiativeTools/projects/ProjectSettingsPropertiesPage";
+import { PropertiesPage } from "@/pages/community/tools/projects/settings/PropertiesPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/projects/$projectId/settings/properties"
 )({
-  component: ProjectSettingsPropertiesPage,
+  component: PropertiesPage,
 });

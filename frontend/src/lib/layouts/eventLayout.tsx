@@ -21,15 +21,15 @@ import {
   type UserPublic,
 } from "@/api/generated/initiativeAPI.schemas";
 import { isRepeating, utcDateKey } from "@/components/calendar/eventCalendarEntry";
+import type { OccurrenceScope } from "@/components/recurrence/OccurrenceScopeDialog";
+import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
+import { TagsField } from "@/components/tags/TagsField";
 import {
   EventDateTimeFields,
   type EventTiming,
   eventRange,
-} from "@/components/initiativeTools/events/EventDateTimeFields";
-import { toDateKey, toTimeSlot } from "@/components/initiativeTools/events/eventDateTime";
-import type { OccurrenceScope } from "@/components/recurrence/OccurrenceScopeDialog";
-import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
-import { TagsField } from "@/components/tags/TagsField";
+} from "@/components/tools/calendars/EventDateTimeFields";
+import { toDateKey, toTimeSlot } from "@/components/tools/calendars/eventDateTime";
 import { useAuth } from "@/hooks/useAuth";
 import {
   type EventPatch,

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { PluginConnectedPage } from "@/pages/plugins/PluginConnectedPage";
+import { ConnectedPage } from "@/pages/community/plugins/ConnectedPage";
 
 export const Route = createFileRoute("/plugins/connected")({
-  component: PluginConnectedPage,
+  component: ConnectedPage,
 });

@@ -11,7 +11,7 @@ import type {
   FileSummary,
   PropertyDefinitionRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { FileTypeBadge } from "@/components/files/fileColumns";
+import { FileTypeBadge } from "@/components/tools/files/fileColumns";
 import { at, detailLayoutSpec, type Region } from "@/ui/layouts/detailLayout";
 import type { ListShape } from "@/ui/layouts/draft";
 import {

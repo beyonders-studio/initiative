@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { SettingsCommunityRolesPage } from "@/pages/SettingsCommunityRolesPage";
+import { RolesPage } from "@/pages/community/settings/RolesPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/settings/roles"
 )({
-  component: SettingsCommunityRolesPage,
+  component: RolesPage,
 });

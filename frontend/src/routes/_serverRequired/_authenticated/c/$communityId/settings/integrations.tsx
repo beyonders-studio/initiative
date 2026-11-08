@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { validateId } from "@/lib/routeSearch";
-import { SettingsCommunityIntegrationsPage } from "@/pages/SettingsCommunityIntegrationsPage";
+import { IntegrationsPage } from "@/pages/community/settings/integrations/IntegrationsPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/settings/integrations"
@@ -11,5 +11,5 @@ export const Route = createFileRoute(
   validateSearch: (search: Record<string, unknown>): { plugin?: number } => ({
     plugin: validateId(search.plugin),
   }),
-  component: SettingsCommunityIntegrationsPage,
+  component: IntegrationsPage,
 });

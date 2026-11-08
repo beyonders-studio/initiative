@@ -14,8 +14,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import { type ChosenImage, ImageChooserDialog } from "@/components/files/ImageChooser";
-import { Markdown } from "@/components/Markdown";
+import { type ChosenImage, ImageChooserDialog } from "@/components/tools/files/ImageChooser";
 import { getErrorMessage } from "@/lib/errorMessage";
 import {
   continueList,
@@ -31,6 +30,7 @@ import { cn } from "@/ui/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 import { Textarea } from "@/ui/textarea";
 
+import { Markdown } from "./Markdown";
 import {
   MARKDOWN_SHORTCUTS,
   MarkdownToolbar,

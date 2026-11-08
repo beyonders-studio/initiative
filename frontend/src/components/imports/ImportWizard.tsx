@@ -20,18 +20,7 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
-import {
-  AtlassianChooseStep,
-  type AtlassianConnection,
-  AtlassianConnectStep,
-  AtlassianExportStep,
-  AtlassianFetchingStep,
-  AtlassianReviewSummary,
-} from "@/components/imports/AtlassianImportSteps";
-import { ContactColumnsStep } from "@/components/imports/ContactColumnsStep";
-import { ImportPeopleStep, type PlanPerson } from "@/components/imports/ImportPeopleStep";
-import { ImportReport } from "@/components/imports/ImportReport";
-import { LogoIcon } from "@/components/LogoIcon";
+import { LogoIcon } from "@/components/icons/LogoIcon";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useImportJob } from "@/hooks/useImportJob";
 import { liveInitiatives } from "@/hooks/useInitiativeAccess";
@@ -52,6 +41,18 @@ import { numberFormat } from "@/ui/lib/intl";
 import { Progress } from "@/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { WizardDialog, WizardOption } from "@/ui/wizard-dialog";
+
+import {
+  AtlassianChooseStep,
+  type AtlassianConnection,
+  AtlassianConnectStep,
+  AtlassianExportStep,
+  AtlassianFetchingStep,
+  AtlassianReviewSummary,
+} from "./AtlassianImportSteps";
+import { ContactColumnsStep } from "./ContactColumnsStep";
+import { ImportPeopleStep, type PlanPerson } from "./ImportPeopleStep";
+import { ImportReport } from "./ImportReport";
 
 // Mirrors the backend's IMPORT_MAX_BUNDLE_BYTES, the most a backup sent in
 // pieces may weigh — the UX layer; the server is the enforcement.

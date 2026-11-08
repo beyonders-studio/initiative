@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { InitiativeSettingsExportPage } from "@/pages/initiativeSettings/InitiativeSettingsExportPage";
+import { ExportPage } from "@/pages/community/initiatives/settings/ExportPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/settings/export"
 )({
-  component: InitiativeSettingsExportPage,
+  component: ExportPage,
 });

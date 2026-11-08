@@ -2,11 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { ProjectDetailsFields } from "@/components/projects/settings/ProjectDetailsFields";
 import { useProject } from "@/hooks/useProjects";
 import { useProjectTaskExportView } from "@/hooks/useProjectTaskView";
 import { useRouteId } from "@/hooks/useRouteId";
-import { ToolSettingsPage } from "@/pages/toolSettings/ToolSettingsPage";
+import { ProjectDetailsFields } from "@/pages/community/tools/projects/settings/ProjectDetailsFields";
+import { SettingsLayout } from "@/pages/community/tools/settings/SettingsLayout";
 
 /**
  * Layout for one project's settings: the header, the tab bar, and whichever
@@ -29,7 +29,7 @@ function ProjectSettings() {
   const exportContent = useProjectTaskExportView(projectId ?? Number.NaN);
 
   return (
-    <ToolSettingsPage
+    <SettingsLayout
       tool={Tool.project}
       detailsInline={project && <ProjectDetailsFields project={project} />}
       exportOptions={{ content: exportContent }}

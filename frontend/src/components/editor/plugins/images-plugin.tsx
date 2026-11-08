@@ -3,7 +3,7 @@ import { type JSX, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useEditorInitiative } from "@/components/editor/context/editor-initiative-context";
-import { ImageChooser } from "@/components/files/ImageChooser";
+import { ImageChooser } from "@/components/tools/files/ImageChooser";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { uploadAttachment } from "@/lib/attachmentUtils";
 import { Button } from "@/ui/button";

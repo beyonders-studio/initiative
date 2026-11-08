@@ -15,19 +15,18 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
-import { useTitleBarHeight } from "@/components/DesktopTitleBar";
 import { openHelp } from "@/components/help/helpStore";
 import { ThoughtBubble } from "@/components/icons/ThoughtBubble";
-import { AppearanceMenuItems, ThemeIcon } from "@/components/ModeToggle";
+import { useTitleBarHeight } from "@/components/navigation/DesktopTitleBar";
+import { AppearanceMenuItems, ThemeIcon } from "@/components/navigation/ModeToggle";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
-import { SidebarFooter } from "@/components/sidebar/sidebar";
 import { useFeedback } from "@/components/tickets/FeedbackSheet";
-import { UpdateButton } from "@/components/UpdateButton";
-import { UserHandle } from "@/components/UserHandle";
+import { UpdateButton } from "@/components/updates/UpdateButton";
 import { PresenceDot } from "@/components/user/PresenceDot";
 import { PresenceMenuItems } from "@/components/user/PresenceMenuItems";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { isStatusEmpty, StatusBubble, StatusEditor } from "@/components/user/ProfileStatus";
+import { UserHandle } from "@/components/user/UserHandle";
 import { presenceLabelKey } from "@/lib/presence";
 import { decorationSrc, resolveDecoration } from "@/lib/profileDecorations";
 import { getUrlHandle, getUserDisplayName } from "@/lib/userDisplay";
@@ -46,6 +45,8 @@ import {
 } from "@/ui/dropdown-menu";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import { Popover, PopoverAnchor, PopoverContent } from "@/ui/popover";
+
+import { SidebarFooter } from "./sidebar";
 
 export interface SidebarUserFooterProps {
   /** The signed-in account, or null while it is still being fetched. */

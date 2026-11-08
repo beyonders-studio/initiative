@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { ShareRequestsPage } from "@/pages/ShareRequestsPage";
+import { ShareRequestsPage } from "@/pages/community/ShareRequestsPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/share-requests_/$batchId"

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { StartPage } from "@/pages/StartPage";
+import { StartPage } from "@/pages/signIn/StartPage";
 
 export interface StartSearch {
   invite_code?: string;

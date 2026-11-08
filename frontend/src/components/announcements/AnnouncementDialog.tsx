@@ -15,7 +15,7 @@ import type {
   AnnouncementCategory,
   AnnouncementSection,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Markdown } from "@/components/Markdown";
+import { Markdown } from "@/components/markdown/Markdown";
 import { splitIntoPages } from "@/lib/announcementPages";
 import { resolveHeaderlessApiUrl } from "@/lib/uploadUrl";
 import { Badge } from "@/ui/badge";

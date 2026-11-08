@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { OperatorDashboardCommunitiesPage } from "@/pages/OperatorDashboardCommunitiesPage";
+import { CommunitiesPage } from "@/pages/operator/communities/CommunitiesPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/settings/operator/communities"
 )({
-  component: OperatorDashboardCommunitiesPage,
+  component: CommunitiesPage,
 });

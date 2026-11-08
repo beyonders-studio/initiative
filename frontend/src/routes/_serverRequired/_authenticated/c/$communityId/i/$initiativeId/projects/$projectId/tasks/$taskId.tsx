@@ -4,7 +4,7 @@ import { getReadProjectQueryOptions } from "@/api/generated/projects/projects";
 import { getListTaskStatusesQueryOptions } from "@/api/generated/task-statuses/task-statuses";
 import { getReadTaskQueryOptions } from "@/api/generated/tasks/tasks";
 import { commentThreadQueryOptions } from "@/hooks/useComments";
-import { TaskEditPage } from "@/pages/initiativeTools/projects/TaskEditPage";
+import { TaskPage } from "@/pages/community/tools/projects/task/TaskPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/projects/$projectId/tasks/$taskId"
@@ -32,5 +32,5 @@ export const Route = createFileRoute(
       ),
     ]).catch(() => {});
   },
-  component: TaskEditPage,
+  component: TaskPage,
 });

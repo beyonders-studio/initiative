@@ -20,7 +20,7 @@ import type {
   TaskStatusCategory,
 } from "@/api/generated/initiativeAPI.schemas";
 import { TaskPriority } from "@/api/generated/initiativeAPI.schemas";
-import type { DueFilterOption } from "@/components/projects/projectTasksConfig";
+import type { DueFilterOption } from "@/components/tools/projects/projectTasksConfig";
 import type {
   PluginFilterCondition,
   PropertyFilterCondition,

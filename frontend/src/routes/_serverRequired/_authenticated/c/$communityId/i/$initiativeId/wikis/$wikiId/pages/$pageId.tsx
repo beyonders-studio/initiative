@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { WikiPageView } from "@/pages/initiativeTools/wikis/WikiPageView";
+import { PageView } from "@/pages/community/tools/wikis/PageView";
 
 /**
  * One page of a wiki. A sibling route of the wiki's own index rather than a
@@ -23,5 +23,5 @@ export const Route = createFileRoute(
    */
   validateSearch: (search: Record<string, unknown>): { edit?: true } =>
     search.edit === true || search.edit === "true" ? { edit: true } : {},
-  component: WikiPageView,
+  component: PageView,
 });

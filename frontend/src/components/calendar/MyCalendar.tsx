@@ -22,12 +22,12 @@ import {
   type TaskEntryMeta,
   useCalendarVisibility,
 } from "@/components/calendar";
+import { TaskStatusPriorityFilters } from "@/components/tasks/TaskStatusPriorityFilters";
 import {
   CalendarPanelDropdown,
   type ProjectTaskCalendar,
-} from "@/components/initiativeTools/events/CalendarListPanel";
-import { ToolFilterPanel } from "@/components/initiativeTools/shared/ToolFilterPanel";
-import { TaskStatusPriorityFilters } from "@/components/tasks/TaskStatusPriorityFilters";
+} from "@/components/tools/calendars/CalendarListPanel";
+import { ToolFilterPanel } from "@/components/tools/ToolFilterPanel";
 import { useMyCalendarEntries } from "@/hooks/useCalendarEntries";
 import { useMyCalendars } from "@/hooks/useCalendars";
 import { useCommunities } from "@/hooks/useCommunities";
