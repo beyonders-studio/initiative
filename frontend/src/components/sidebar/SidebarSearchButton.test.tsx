@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 
 const openCommandCenter = vi.fn();
-vi.mock("@/components/CommandCenter", () => ({
+vi.mock("@/components/search/CommandCenter", () => ({
   getOpenCommandCenter: () => openCommandCenter,
 }));
 

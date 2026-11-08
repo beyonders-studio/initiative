@@ -9,8 +9,8 @@ import {
   SearchEntityType,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { CounterView } from "@/components/initiativeTools/counters/views/CounterView";
-import { SubscribeButton } from "@/components/SubscribeButton";
+import { CounterView } from "@/components/tools/counterGroups/views/CounterView";
+import { SubscribeButton } from "@/components/tools/SubscribeButton";
 import { counterSaves, type SteppedCount, useCounterGroup, useSetCount } from "@/hooks/useCounters";
 import { itemSaves, useItemFieldSave } from "@/hooks/useFieldSave";
 import { isAtMax, isAtMin } from "@/lib/counter-math";

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { LegalDocumentPage } from "@/pages/LegalDocumentPage";
+import { LegalPage } from "@/pages/site/LegalPage";
 
 export const Route = createFileRoute("/_serverRequired/legal/$slug")({
-  component: LegalDocumentPage,
+  component: LegalPage,
 });

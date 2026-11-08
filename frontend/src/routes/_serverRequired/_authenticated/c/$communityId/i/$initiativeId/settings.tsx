@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { InitiativeSettingsLayout } from "@/pages/InitiativeSettingsLayout";
+import { SettingsLayout } from "@/pages/community/initiatives/settings/SettingsLayout";
 
 /**
  * Layout for one initiative's settings: the header, the tab bar, and whichever
@@ -10,5 +10,5 @@ import { InitiativeSettingsLayout } from "@/pages/InitiativeSettingsLayout";
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/settings"
 )({
-  component: InitiativeSettingsLayout,
+  component: SettingsLayout,
 });

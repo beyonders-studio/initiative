@@ -20,6 +20,7 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
+import { LogoIcon } from "@/components/icons/LogoIcon";
 import {
   AtlassianChooseStep,
   type AtlassianConnection,
@@ -31,7 +32,6 @@ import {
 import { ContactColumnsStep } from "@/components/imports/ContactColumnsStep";
 import { ImportPeopleStep, type PlanPerson } from "@/components/imports/ImportPeopleStep";
 import { ImportReport } from "@/components/imports/ImportReport";
-import { LogoIcon } from "@/components/LogoIcon";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useImportJob } from "@/hooks/useImportJob";
 import { liveInitiatives } from "@/hooks/useInitiativeAccess";

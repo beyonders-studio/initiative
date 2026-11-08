@@ -19,7 +19,9 @@ import {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
-import { PinnedBanner } from "@/components/initiativeTools/posts/PinnedBanner";
+import { ReactionBar } from "@/components/reactions/ReactionBar";
+import { TagBadge } from "@/components/tags/TagBadge";
+import { PinnedBanner } from "@/components/tools/posts/PinnedBanner";
 import {
   emptyPollDraft,
   isPollDraftValid,
@@ -27,11 +29,9 @@ import {
   PollEditor,
   pollDraftFromRead,
   pollDraftToWrite,
-} from "@/components/initiativeTools/posts/PollEditor";
-import { PostByline } from "@/components/initiativeTools/posts/PostByline";
-import { PostPoll } from "@/components/initiativeTools/posts/PostPoll";
-import { ReactionBar } from "@/components/reactions/ReactionBar";
-import { TagBadge } from "@/components/tags/TagBadge";
+} from "@/components/tools/posts/PollEditor";
+import { PostByline } from "@/components/tools/posts/PostByline";
+import { PostPoll } from "@/components/tools/posts/PostPoll";
 import { itemSaves } from "@/hooks/useFieldSave";
 import { POST_SAVES, useDeletePostPoll, useSetPostPoll, useUpdatePost } from "@/hooks/usePosts";
 import { useCommunityPath } from "@/lib/communityUrl";

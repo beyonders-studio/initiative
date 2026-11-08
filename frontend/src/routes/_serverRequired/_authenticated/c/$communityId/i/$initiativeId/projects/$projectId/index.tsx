@@ -11,7 +11,7 @@ import { instanceTarget } from "@/hooks/useToolLayouts";
 import { parseListLayout, parsePreset } from "@/lib/filters/layoutSearch";
 import { buildTaskListParams } from "@/lib/filters/taskFilters";
 import { viewPreferencesQuery } from "@/lib/viewPreferences";
-import { ProjectDetailPage } from "@/pages/initiativeTools/projects/ProjectDetailPage";
+import { ProjectPage } from "@/pages/community/tools/projects/project/ProjectPage";
 import { listLayouts } from "@/ui/layouts/layoutSet";
 
 export const Route = createFileRoute(
@@ -73,5 +73,5 @@ export const Route = createFileRoute(
       }
     })();
   },
-  component: ProjectDetailPage,
+  component: ProjectPage,
 });

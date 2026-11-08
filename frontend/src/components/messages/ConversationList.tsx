@@ -12,8 +12,8 @@ import type {
 import { ConnectionActionsMenu } from "@/components/connections/ConnectionActionsMenu";
 import { PrivatePanel, unreachableReason } from "@/components/connections/UnreachableEmptyState";
 import { NewConversationDialog } from "@/components/messages/NewConversationDialog";
-import { UserHandle } from "@/components/UserHandle";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
+import { UserHandle } from "@/components/user/UserHandle";
 import {
   useAcceptConnection,
   useAcceptMessageRequest,

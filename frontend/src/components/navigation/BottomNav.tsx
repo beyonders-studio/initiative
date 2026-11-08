@@ -3,8 +3,8 @@ import { FilePlus, Home, Menu, MessageSquare, Plus, Search, SquareCheckBig } fro
 import { useTranslation } from "react-i18next";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { getOpenCommandCenter } from "@/components/CommandCenter";
 import { usePrimaryCreateAction } from "@/components/navigation/CreateActionContext";
+import { getOpenCommandCenter } from "@/components/search/CommandCenter";
 import { useSidebar } from "@/components/sidebar/sidebar";
 import { getOpenCreateTaskWizard } from "@/components/tasks/CreateTaskWizard";
 import { getOpenCreateToolWizard } from "@/components/tools/CreateToolWizard";

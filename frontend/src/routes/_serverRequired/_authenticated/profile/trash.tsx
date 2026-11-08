@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { UserTrashPage } from "@/pages/user/settings/UserTrashPage";
+import { TrashPage } from "@/pages/my/settings/TrashPage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/profile/trash")({
-  component: UserTrashPage,
+  component: TrashPage,
 });

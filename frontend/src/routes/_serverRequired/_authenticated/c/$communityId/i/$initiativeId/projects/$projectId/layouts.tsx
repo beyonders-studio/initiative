@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { parseLayoutKind } from "@/lib/filters/layoutSearch";
-import { ProjectLayoutEditorPage } from "@/pages/initiativeTools/projects/ProjectLayoutEditorPage";
+import { LayoutEditorPage } from "@/pages/community/tools/projects/project/LayoutEditorPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/projects/$projectId/layouts"
@@ -10,5 +10,5 @@ export const Route = createFileRoute(
   validateSearch: (search: Record<string, unknown>) => ({
     layout: parseLayoutKind(search.layout),
   }),
-  component: ProjectLayoutEditorPage,
+  component: LayoutEditorPage,
 });

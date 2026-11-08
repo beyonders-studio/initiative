@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { getReadFileQueryOptions } from "@/api/generated/files/files";
 import { commentThreadQueryOptions } from "@/hooks/useComments";
-import { FileDetailPage } from "@/pages/initiativeTools/files/FileDetailPage";
+import { FilePage } from "@/pages/community/tools/files/file/FilePage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/files/$fileId/"
@@ -23,5 +23,5 @@ export const Route = createFileRoute(
       }),
     ]).catch(() => {});
   },
-  component: FileDetailPage,
+  component: FilePage,
 });

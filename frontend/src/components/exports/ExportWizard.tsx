@@ -11,13 +11,10 @@ import {
   REPORT_FILE_FORMATS,
   REPORT_TOOL_FORMATS,
 } from "@/components/exports/formats";
-import { FilterCountBadge } from "@/components/initiativeTools/shared/ToolFilterPanel";
-import {
-  type ToolArchiveChoice,
-  ToolViewFilter,
-} from "@/components/initiativeTools/shared/ToolViewFilter";
 import { TaskFilters } from "@/components/tasks/TaskFilters";
 import { ToolFilterFields, type ToolListFilters } from "@/components/tools/ToolFilterFields";
+import { FilterCountBadge } from "@/components/tools/ToolFilterPanel";
+import { type ToolArchiveChoice, ToolViewFilter } from "@/components/tools/ToolViewFilter";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useExportJob } from "@/hooks/useExportJob";
 import { useWizard } from "@/hooks/useWizard";

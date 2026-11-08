@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { CommunityPluginRoute } from "@/pages/plugins/CommunityPluginRoute";
+import { PluginRoute } from "@/pages/community/plugins/PluginRoute";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/plugins_/$pluginId"
 )({
-  component: CommunityPluginRoute,
+  component: PluginRoute,
 });

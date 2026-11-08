@@ -1,8 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { priorityDotClass, priorityVariant } from "@/components/projects/projectTasksConfig";
 import { TaskPriorityOption } from "@/components/tasks/TaskPriorityOption";
+import { priorityDotClass, priorityVariant } from "@/components/tools/projects/projectTasksConfig";
 import { PRIORITY_ORDER } from "@/lib/sorting";
 
 describe("TaskPriorityOption", () => {

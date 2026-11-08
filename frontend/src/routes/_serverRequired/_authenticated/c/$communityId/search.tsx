@@ -6,7 +6,7 @@ import {
   isSearchCategory,
   type SearchCategory,
 } from "@/lib/searchResults";
-import { SearchPage } from "@/pages/SearchPage";
+import { SearchPage } from "@/pages/community/search/SearchPage";
 
 /** What the reader searched for, which slice they are reading, and how far in.
  *  All optional — `/search` with nothing on it is the empty search page. */

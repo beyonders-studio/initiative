@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { useFileFieldFiles } from "@/components/files/useFileFieldFiles";
+import { useFileFieldFiles } from "@/components/tools/files/useFileFieldFiles";
 import {
   useAppendPropertyOption,
   useCreateProperty,

@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { getReadContactQueryOptions } from "@/api/generated/contacts/contacts";
 import { commentThreadQueryOptions } from "@/hooks/useComments";
-import { ContactDetailPage } from "@/pages/initiativeTools/contacts/ContactDetailPage";
+import { ContactPage } from "@/pages/community/tools/contacts/ContactPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/contacts/$contactId/"
@@ -22,5 +22,5 @@ export const Route = createFileRoute(
       }),
     ]).catch(() => {});
   },
-  component: ContactDetailPage,
+  component: ContactPage,
 });

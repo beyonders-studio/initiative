@@ -8,8 +8,8 @@ import type {
   PropertyValueInput,
   TagSummary,
 } from "@/api/generated/initiativeAPI.schemas";
-import { useFileFieldFiles } from "@/components/files/useFileFieldFiles";
 import { TagPicker } from "@/components/tags";
+import { useFileFieldFiles } from "@/components/tools/files/useFileFieldFiles";
 import { useAppendPropertyOption } from "@/hooks/useProperties";
 import { useToolLayouts } from "@/hooks/useToolLayouts";
 import { useSearchMembers } from "@/hooks/useUsers";

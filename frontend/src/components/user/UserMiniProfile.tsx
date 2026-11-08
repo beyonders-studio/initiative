@@ -1,10 +1,10 @@
 import { useTranslation } from "react-i18next";
 
 import type { Presence, ProfileDecorationsOutput } from "@/api/generated/initiativeAPI.schemas";
-import { UserHandle } from "@/components/UserHandle";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { ProfileJoined } from "@/components/user/ProfileJoined";
 import { isStatusEmpty, StatusBubble } from "@/components/user/ProfileStatus";
+import { UserHandle } from "@/components/user/UserHandle";
 import { useUserProfile } from "@/hooks/useUsers";
 import { decorationSrc, resolveDecoration, resolveTrophies } from "@/lib/profileDecorations";
 import type { AvatarSourceUser, DisplayableUser } from "@/lib/userDisplay";

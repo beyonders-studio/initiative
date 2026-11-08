@@ -5,12 +5,9 @@ import { useTranslation } from "react-i18next";
 
 import { type TaskListRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { HomeWidgetCard, HomeWidgetNotice } from "@/components/home/HomeWidgetCard";
-import {
-  ToolFilterButton,
-  ToolFilterPanel,
-} from "@/components/initiativeTools/shared/ToolFilterPanel";
 import { globalTaskColumns } from "@/components/tasks/globalTaskColumns";
 import { TaskFilters } from "@/components/tasks/TaskFilters";
+import { ToolFilterButton, ToolFilterPanel } from "@/components/tools/ToolFilterPanel";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useFocusPreferences } from "@/hooks/useFocusSummary";
 import { MY_TASKS_VIEW, useGlobalTasksTable } from "@/hooks/useGlobalTasksTable";

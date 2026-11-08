@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { getReadCollectionQueryOptions } from "@/api/generated/files/files";
-import { CollectionPage } from "@/pages/initiativeTools/files/CollectionPage";
+import { CollectionPage } from "@/pages/community/tools/files/collection/CollectionPage";
 
 /**
  * A collection: in the initiative's Files, beside the files rather than inside

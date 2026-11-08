@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import type { ListingKind } from "@/api/generated/initiativeAPI.schemas";
 import { parseListingKind } from "@/lib/marketplace";
-import { MarketplaceListingPage } from "@/pages/marketplace/MarketplaceListingPage";
+import { ListingPage } from "@/pages/community/marketplace/ListingPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/marketplace_/$publicId"
@@ -12,5 +12,5 @@ export const Route = createFileRoute(
     const kind = parseListingKind(search.kind);
     return kind ? { kind } : {};
   },
-  component: MarketplaceListingPage,
+  component: ListingPage,
 });

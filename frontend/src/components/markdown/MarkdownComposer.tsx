@@ -14,8 +14,8 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import { type ChosenImage, ImageChooserDialog } from "@/components/files/ImageChooser";
-import { Markdown } from "@/components/Markdown";
+import { Markdown } from "@/components/markdown/Markdown";
+import { type ChosenImage, ImageChooserDialog } from "@/components/tools/files/ImageChooser";
 import { getErrorMessage } from "@/lib/errorMessage";
 import {
   continueList,

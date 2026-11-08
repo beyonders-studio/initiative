@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { CommunitySettingsLayout } from "@/pages/CommunitySettingsLayout";
+import { SettingsLayout } from "@/pages/community/settings/SettingsLayout";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communityId/settings")({
-  component: CommunitySettingsLayout,
+  component: SettingsLayout,
 });

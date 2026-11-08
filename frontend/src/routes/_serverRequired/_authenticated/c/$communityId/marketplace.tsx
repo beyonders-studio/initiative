@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { type CommunityShelf, parseCommunityShelf } from "@/lib/marketplace";
-import { MarketplaceBrowsePage } from "@/pages/marketplace/MarketplaceBrowsePage";
+import { BrowsePage } from "@/pages/community/marketplace/BrowsePage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communityId/marketplace")({
   /** Which shelf of this community's marketplace to show. The shelves a person
@@ -10,5 +10,5 @@ export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communi
   validateSearch: (search: Record<string, unknown>): { kind: CommunityShelf } => ({
     kind: parseCommunityShelf(search.kind),
   }),
-  component: MarketplaceBrowsePage,
+  component: BrowsePage,
 });

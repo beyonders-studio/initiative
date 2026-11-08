@@ -4,10 +4,10 @@ import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useSuggestUsernames } from "@/api/generated/auth/auth";
+import { type HandleCheck, UsernameField } from "@/components/account/UsernameField";
 import { BirthdateField } from "@/components/auth/BirthdateField";
 import type { useAgeConfirmation } from "@/components/auth/useAgeConfirmation";
 import { ContinueButton } from "@/components/start/stepParts";
-import { type HandleCheck, UsernameField } from "@/components/UsernameField";
 import { TIMEZONE_OPTIONS } from "@/lib/timezones";
 import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";

@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { PostDetailPage } from "@/pages/initiativeTools/posts/PostDetailPage";
+import { PostPage } from "@/pages/community/tools/posts/PostPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/posts/$postId/"
 )({
-  component: PostDetailPage,
+  component: PostPage,
 });

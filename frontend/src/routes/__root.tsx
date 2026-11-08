@@ -2,12 +2,12 @@ import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { Suspense } from "react";
 
+import { CookieConsent } from "@/components/account/CookieConsent";
 import { AgeGateDialog } from "@/components/auth/AgeGateDialog";
 import { SecondFactorStepUpDialog } from "@/components/auth/SecondFactorStepUpDialog";
 import { StepUpDialog } from "@/components/auth/StepUpDialog";
-import { CookieConsent } from "@/components/CookieConsent";
-import { DesktopTitleBar } from "@/components/DesktopTitleBar";
 import { HelpHost } from "@/components/help/HelpHost";
+import { DesktopTitleBar } from "@/components/navigation/DesktopTitleBar";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useClockSync } from "@/hooks/useClockSync";
 import { useColorTheme } from "@/hooks/useColorTheme";

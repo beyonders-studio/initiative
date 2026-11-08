@@ -8,6 +8,6 @@ export const Route = createFileRoute("/_serverRequired/download")({
   component: __IS_CAPACITOR__
     ? NotInApp
     : lazyRouteComponent(() =>
-        import("@/pages/landing/DownloadPage").then((m) => ({ default: m.DownloadPage }))
+        import("@/pages/site/DownloadPage").then((m) => ({ default: m.DownloadPage }))
       ),
 });

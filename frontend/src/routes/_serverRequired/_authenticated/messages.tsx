@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { MyMessagesPage } from "@/pages/user/MyMessagesPage";
+import { MessagesPage } from "@/pages/my/messages/MessagesPage";
 
 /**
  * Who the page should open a conversation with, as a URL handle —
@@ -30,5 +30,5 @@ export const Route = createFileRoute("/_serverRequired/_authenticated/messages")
   },
   // No loader: a thread is read out of this device's own store, which the page
   // itself unlocks. There is nothing for the router to prefetch.
-  component: MyMessagesPage,
+  component: MessagesPage,
 });

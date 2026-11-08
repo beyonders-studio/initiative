@@ -12,13 +12,6 @@ import { useTranslation } from "react-i18next";
 
 import { Tool, WikiPageKind, type WikiPageSummary } from "@/api/generated/initiativeAPI.schemas";
 import { HiddenFilesRequest } from "@/components/access/RequestAccess";
-import { FileChooserDialog } from "@/components/files/FileChooserDialog";
-import { WikiPageActions } from "@/components/initiativeTools/wikis/WikiPageActions";
-import {
-  useWikiTreeExpansion,
-  WikiPageTree,
-} from "@/components/initiativeTools/wikis/WikiPageTree";
-import { SubscribeButton } from "@/components/SubscribeButton";
 import {
   SidebarContent,
   SidebarGroup,
@@ -29,6 +22,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/sidebar/sidebar";
+import { FileChooserDialog } from "@/components/tools/files/FileChooserDialog";
+import { SubscribeButton } from "@/components/tools/SubscribeButton";
+import { WikiPageActions } from "@/components/tools/wikis/WikiPageActions";
+import { useWikiTreeExpansion, WikiPageTree } from "@/components/tools/wikis/WikiPageTree";
 import {
   useAddWikiFile,
   useAddWikiPage,

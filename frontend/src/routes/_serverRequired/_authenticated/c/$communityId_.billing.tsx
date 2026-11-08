@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import type { BillingPortalPage } from "@/hooks/useBillingPortal";
-import { BillingForwardPage } from "@/pages/BillingForwardPage";
+import { BillingForwardPage } from "@/pages/community/settings/usage/BillingForwardPage";
 
 /**
  * Forwards to the billing portal for one community, for links sent by email.

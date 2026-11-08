@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { SettingsCommunityUsagePage } from "@/pages/SettingsCommunityUsagePage";
+import { UsagePage } from "@/pages/community/settings/usage/UsagePage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/settings/usage"
 )({
-  component: SettingsCommunityUsagePage,
+  component: UsagePage,
 });

@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { TaskListRead, TaskPriority } from "@/api/generated/initiativeAPI.schemas";
-import { priorityVariant } from "@/components/projects/projectTasksConfig";
+import { priorityVariant } from "@/components/tools/projects/projectTasksConfig";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useUpdateTaskInCommunity } from "@/hooks/useTasks";
 import { toast } from "@/lib/mascotToast";

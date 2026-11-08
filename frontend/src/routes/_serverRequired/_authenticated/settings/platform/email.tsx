@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { SettingsEmailPage } from "@/pages/SettingsEmailPage";
+import { EmailPage } from "@/pages/platform/EmailPage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/settings/platform/email")({
-  component: SettingsEmailPage,
+  component: EmailPage,
 });

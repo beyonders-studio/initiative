@@ -24,10 +24,9 @@ import { CloudOff, SearchX } from "lucide-react";
 import { useMemo, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
+import { PageBanner } from "@/components/banners/PageBanner";
 import { CommunityCard } from "@/components/communities/CommunityCard";
 import { CommunitySearchField } from "@/components/communities/CommunitySearchField";
-import { DirectoryNearControl } from "@/components/communities/DirectoryNearControl";
-import { PageBanner } from "@/components/PageBanner";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useDirectoryCommunities } from "@/hooks/useCommunityDirectory";
@@ -43,6 +42,7 @@ import {
   subscribeSavedNear,
 } from "@/lib/directoryNear";
 import { getErrorCode } from "@/lib/errorMessage";
+import { DirectoryNearControl } from "@/pages/communities/DirectoryNearControl";
 import { LoadMore } from "@/ui/load-more";
 import { Skeleton } from "@/ui/skeleton";
 import { StatusMessage } from "@/ui/status-message";

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { CommunityInvitePage } from "@/pages/CommunityInvitePage";
+import { InvitePage } from "@/pages/signIn/InvitePage";
 
 export const Route = createFileRoute("/_serverRequired/invite/$code")({
-  component: CommunityInvitePage,
+  component: InvitePage,
 });

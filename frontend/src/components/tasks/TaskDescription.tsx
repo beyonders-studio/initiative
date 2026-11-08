@@ -1,7 +1,7 @@
 import { type ComponentProps, useMemo } from "react";
 
 import { CommentReferences } from "@/components/comments/CommentReferences";
-import { Markdown } from "@/components/Markdown";
+import { Markdown } from "@/components/markdown/Markdown";
 
 interface TaskDescriptionProps {
   content: string;

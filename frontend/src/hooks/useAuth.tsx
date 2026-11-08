@@ -32,7 +32,7 @@ import {
 } from "@/api/generated/auth/auth";
 import type { Token, UserCreate, UserRead } from "@/api/generated/initiativeAPI.schemas";
 import { readMe } from "@/api/generated/users/users";
-import { clearAllWhiteboardSceneCaches } from "@/components/files/whiteboardSceneCache";
+import { clearAllWhiteboardSceneCaches } from "@/components/tools/files/whiteboardSceneCache";
 import { forgetMessagesOnThisDevice, serveAccount } from "@/crypto/messaging";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { clearJustSignedIn, markJustSignedIn } from "@/lib/authTransition";

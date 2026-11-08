@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { BetaBadge } from "@/components/BetaBadge";
-import { LogoIcon } from "@/components/LogoIcon";
+import { BetaBadge } from "@/components/icons/BetaBadge";
+import { LogoIcon } from "@/components/icons/LogoIcon";
 import { cn } from "@/ui/lib/utils";
 
 /**

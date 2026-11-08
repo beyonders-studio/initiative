@@ -39,7 +39,7 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeJoinPolicy } from "@/api/generated/initiativeAPI.schemas";
 import { RequestToJoinDialog } from "@/components/initiatives/RequestToJoinDialog";
-import { Markdown } from "@/components/Markdown";
+import { Markdown } from "@/components/markdown/Markdown";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useInitiativeAccess } from "@/hooks/useInitiativeAccess";
 import { useInitiatives, useJoinInitiative } from "@/hooks/useInitiatives";

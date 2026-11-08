@@ -7,11 +7,11 @@ import {
   type TaskStatusRead,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { TaskBlockersHoverCard } from "@/components/projects/TaskBlockersHoverCard";
-import { TaskDescriptionHoverCard } from "@/components/projects/TaskDescriptionHoverCard";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
 import { TaskPrioritySelector } from "@/components/tasks/TaskPrioritySelector";
 import { TaskStatusSelector } from "@/components/tasks/TaskStatusSelector";
+import { TaskBlockersHoverCard } from "@/components/tools/projects/TaskBlockersHoverCard";
+import { TaskDescriptionHoverCard } from "@/components/tools/projects/TaskDescriptionHoverCard";
 import { NO_TASK_COLUMN_LIMITS, type TaskColumnLimits } from "@/hooks/useColumnLimits";
 import { InitiativeColorDot } from "@/lib/initiativeColors";
 import { taskColumnId } from "@/lib/layouts/tasks";

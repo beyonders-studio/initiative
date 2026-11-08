@@ -344,12 +344,9 @@ describe("tool surfaces", () => {
   // which can take over 30s on a slow machine while the full suite's workers
   // are all transforming concurrently.
   it("every tool has an initiative-detail tab view", { timeout: 60_000 }, async () => {
-    const { TOOL_TAB_VIEWS } = await import("@/pages/InitiativeDetailPage");
+    const { TOOL_TAB_VIEWS } = await import("@/pages/community/initiatives/InitiativePage");
     for (const tool of TOOLS) {
-      expect(
-        TOOL_TAB_VIEWS.get(tool),
-        `missing InitiativeDetailPage tab view for ${tool}`
-      ).toBeTruthy();
+      expect(TOOL_TAB_VIEWS.get(tool), `missing InitiativePage tab view for ${tool}`).toBeTruthy();
     }
   });
 });
@@ -401,7 +398,7 @@ describe("tool properties", () => {
     }
     // A tool's are on its settings page, which every tool shares.
     if (
-      componentSources["../pages/toolSettings/ToolSettingsDetailsPage.tsx"].includes(
+      componentSources["../pages/community/tools/settings/DetailsPage.tsx"].includes(
         "propertySaves[PropertyTarget[tool]]"
       )
     ) {

@@ -17,9 +17,9 @@ import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { AskToEdit } from "@/components/access/RequestAccess";
-import { BookmarkButton } from "@/components/BookmarkButton";
-import { useFullBleed } from "@/components/PageBanner";
-import { SubscribeButton } from "@/components/SubscribeButton";
+import { useFullBleed } from "@/components/banners/PageBanner";
+import { BookmarkButton } from "@/components/tools/BookmarkButton";
+import { SubscribeButton } from "@/components/tools/SubscribeButton";
 import { ToolBreadcrumb, type ToolBreadcrumbSegment } from "@/components/tools/ToolBreadcrumb";
 import { useListedInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPath } from "@/lib/communityUrl";

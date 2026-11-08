@@ -4,7 +4,7 @@
  * that points somebody at a guide.
  */
 
-import type { DesktopOs } from "@/pages/landing/platform";
+import type { DesktopOs } from "@/lib/platform";
 
 export const REPO_URL = "https://github.com/beyonders-studio/initiative";
 export const RELEASES_URL = `${REPO_URL}/releases`;

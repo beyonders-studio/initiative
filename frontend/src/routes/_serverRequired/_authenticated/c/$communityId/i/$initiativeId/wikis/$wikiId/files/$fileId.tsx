@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { WikiFileView } from "@/pages/initiativeTools/wikis/WikiFileView";
+import { FileView } from "@/pages/community/tools/wikis/FileView";
 
 /**
  * A file somebody put in this wiki, read as one of its pages.
@@ -14,5 +14,5 @@ export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/wikis/$wikiId/files/$fileId"
 )({
   staticData: { fullBleed: true },
-  component: WikiFileView,
+  component: FileView,
 });

@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
 import type { ProfileDecorationsOutput } from "@/api/generated/initiativeAPI.schemas";
-import { UserName } from "@/components/UserHandle";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
+import { UserName } from "@/components/user/UserHandle";
 
 interface PersonRowProps {
   /** Decorations travel on the person rather than as a prop of their own, so a

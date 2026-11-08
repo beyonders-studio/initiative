@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SearchHit } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { CommandCenter } from "@/components/CommandCenter";
+import { CommandCenter } from "@/components/search/CommandCenter";
 import { routeTree } from "@/routeTree.gen";
 
 import { buildSearchHit, buildSearchResults, buildSearchSuggestion } from "./factories";

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { getGetTagCountsQueryOptions, getGetTagQueryOptions } from "@/api/generated/tags/tags";
-import { TagDetailPage } from "@/pages/TagDetailPage";
+import { TagPage } from "@/pages/community/tags/TagPage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communityId/tags_/$tagId")(
   {
@@ -25,6 +25,6 @@ export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communi
         queryClient.ensureQueryData(getGetTagCountsQueryOptions(communityId, tagId)),
       ]).catch(() => {});
     },
-    component: TagDetailPage,
+    component: TagPage,
   }
 );

@@ -9,8 +9,8 @@ import type {
   PersonRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { ConnectionActionsMenu } from "@/components/connections/ConnectionActionsMenu";
-import { UserHandle } from "@/components/UserHandle";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
+import { UserHandle } from "@/components/user/UserHandle";
 import { parseHandle, useDmPermissions, useRequestConnection } from "@/hooks/useDirectMessages";
 import { useRosterCheck, useStartGroup } from "@/hooks/useMyMessages";
 import { useMoreCommunityPeople, usePeopleSections } from "@/hooks/usePeople";

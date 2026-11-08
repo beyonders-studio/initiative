@@ -1,0 +1,322 @@
+import { useNavigate } from "@tanstack/react-router";
+import { Plus } from "lucide-react";
+import { type FormEvent, useState } from "react";
+import { useTranslation } from "react-i18next";
+
+import type {
+  CollectionCreate,
+  CollectionRead,
+  CollectionShapeEntry,
+  CollectionShapeKey,
+} from "@/api/generated/initiativeAPI.schemas";
+import { ReadyMadeGallery } from "@/components/shared/ReadyMadeGallery";
+import {
+  asksForMetadata,
+  RequiredMetadataDialog,
+} from "@/components/tools/files/collections/RequiredMetadataDialog";
+import {
+  useAddCollectionFiles,
+  useCollectionShapes,
+  useCollections,
+  useCreateCollection,
+} from "@/hooks/useCollections";
+import { instanceTarget, useReadToolLayouts } from "@/hooks/useToolLayouts";
+import { COLLECTION_ICON } from "@/lib/collections";
+import { useCommunityPath } from "@/lib/communityUrl";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import { collectionRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Field } from "@/ui/field";
+import { Input } from "@/ui/input";
+import { requiredKeys, type StoredRegions } from "@/ui/layouts/detailLayout";
+import { detailLayoutOf } from "@/ui/layouts/layoutSet";
+import { listLayoutLooks } from "@/ui/layouts/looks";
+import { listFormat } from "@/ui/lib/intl";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+
+interface AddToCollectionDialogProps {
+  initiativeId: number;
+  /** The files to put in, all of the initiative. */
+  fileIds: number[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Called once they are in, before the dialog closes. */
+  onDone?: () => void;
+}
+
+/** Where a new collection starts: blank, a ready-made shape, or the shape of
+ *  another of the initiative's collections. */
+type Start =
+  | { kind: "blank" }
+  | { kind: "shape"; key: CollectionShapeKey }
+  | { kind: "copy"; id: number };
+
+/**
+ * Put files in a collection: one of the initiative's the reader may change,
+ * or a new one made of them. A collection is never made empty, so making one
+ * is always making it of these files. A new one is named, then started blank,
+ * as a ready-made shape (its lists and metadata), or with the shape of another
+ * collection in the initiative.
+ */
+export const AddToCollectionDialog = ({
+  initiativeId,
+  fileIds,
+  open,
+  onOpenChange,
+  onDone,
+}: AddToCollectionDialogProps) => {
+  const { t, i18n } = useTranslation(["files", "common", "layouts"]);
+  const gp = useCommunityPath();
+  const navigate = useNavigate();
+  const [name, setName] = useState("");
+  // Choosing how a new one starts, once it is named.
+  const [making, setMaking] = useState(false);
+  const [start, setStart] = useState<Start>({ kind: "blank" });
+  const collections = useCollections(open ? initiativeId : null);
+  const all = collections.data?.items ?? [];
+  const changeable = all.filter((collection) => collection.can.edit);
+  const shapes = useCollectionShapes(open && making);
+
+  const finish = () => {
+    setName("");
+    setMaking(false);
+    setStart({ kind: "blank" });
+    onDone?.();
+    onOpenChange(false);
+  };
+  const create = useCreateCollection({
+    onSuccess: (created) => {
+      toast.success(t("collections.created", { name: created.name }));
+      finish();
+      void navigate({ to: gp(collectionRoute(created.initiative_id, created.id)) });
+    },
+  });
+
+  const trimmed = name.trim();
+  const submitNew = (event: FormEvent) => {
+    event.preventDefault();
+    if (!trimmed) return;
+    if (!making) {
+      setMaking(true);
+      return;
+    }
+    const body: CollectionCreate = {
+      initiative_id: initiativeId,
+      name: trimmed,
+      file_ids: fileIds,
+    };
+    if (start.kind === "shape") body.shape = start.key;
+    if (start.kind === "copy") body.shape_from = start.id;
+    create.mutate(body);
+  };
+
+  /** A glimpse of what a shape brings: the lists it shows, then its metadata. */
+  const brings = (entry: CollectionShapeEntry) => {
+    const lists = entry.lists.map((kind) => t(listLayoutLooks[kind].labelKey as never));
+    const names = listFormat(i18n.language, { type: "conjunction" });
+    return (
+      <>
+        <span className="mt-1 flex items-center gap-1" aria-hidden>
+          {entry.lists.map((kind) => {
+            const Icon = listLayoutLooks[kind].icon;
+            return <Icon key={kind} className="h-3.5 w-3.5" />;
+          })}
+        </span>
+        <span className="sr-only">
+          {t("collections.shapes.lists", { lists: names.format(lists) })}
+        </span>
+        {entry.metadata.length > 0 ? (
+          <span className="block">
+            {t("collections.shapes.properties", {
+              properties: names.format(entry.metadata.map((each) => each.name)),
+            })}
+          </span>
+        ) : null}
+      </>
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{t("collections.addTo")}</DialogTitle>
+          <DialogDescription>
+            {t("collections.addToDescription", { count: fileIds.length })}
+          </DialogDescription>
+        </DialogHeader>
+
+        {making ? (
+          <form onSubmit={submitNew} className="contents">
+            <DialogBody className="space-y-4">
+              <Field label={t("collections.shapes.name")}>
+                <Input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  maxLength={255}
+                />
+              </Field>
+              <ReadyMadeGallery
+                blank={{
+                  name: t("collections.shapes.blank"),
+                  hint: t("collections.shapes.blankHint"),
+                }}
+                loading={shapes.isLoading}
+                groups={(shapes.data ?? []).map((group) => ({
+                  key: group.key,
+                  name: group.name,
+                  entries: group.entries.map((entry) => ({
+                    key: entry.key,
+                    name: entry.name,
+                    hint: entry.hint,
+                    brings: brings(entry),
+                  })),
+                }))}
+                chosen={
+                  start.kind === "blank" ? null : start.kind === "shape" ? start.key : undefined
+                }
+                onChoose={(entry) =>
+                  setStart(
+                    entry
+                      ? { kind: "shape", key: entry.key as CollectionShapeKey }
+                      : { kind: "blank" }
+                  )
+                }
+              />
+              {all.length > 0 ? (
+                <Field
+                  label={t("collections.shapes.copyLabel")}
+                  hint={t("collections.shapes.copyHint")}
+                >
+                  <Select
+                    value={start.kind === "copy" ? String(start.id) : ""}
+                    onValueChange={(value) => setStart({ kind: "copy", id: Number(value) })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("collections.shapes.copyPlaceholder")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {all.map((collection) => (
+                        <SelectItem key={collection.id} value={String(collection.id)}>
+                          {collection.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              ) : null}
+            </DialogBody>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setMaking(false)}>
+                {t("common:back")}
+              </Button>
+              <Button type="submit" pending={create.isPending} disabled={!trimmed}>
+                {t("collections.shapes.create")}
+              </Button>
+            </DialogFooter>
+          </form>
+        ) : (
+          <>
+            <DialogBody>
+              {changeable.length === 0 ? (
+                <p className="py-2 text-muted-foreground text-sm">{t("collections.noneToAddTo")}</p>
+              ) : (
+                <ul className="-mx-3 space-y-0.5">
+                  {changeable.map((collection) => (
+                    <li key={collection.id}>
+                      <AddToOne collection={collection} fileIds={fileIds} onAdded={finish} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </DialogBody>
+
+            <form onSubmit={submitNew} className="flex items-center gap-2">
+              <Input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder={t("collections.namePlaceholder")}
+                aria-label={t("collections.addToNew")}
+                maxLength={255}
+              />
+              <Button type="submit" disabled={!trimmed} className="shrink-0">
+                <Plus className="h-4 w-4" />
+                {t("collections.addToNew")}
+              </Button>
+            </form>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+/** One collection to put the files in, asking first for what its file page
+ *  requires of them. */
+const AddToOne = ({
+  collection,
+  fileIds,
+  onAdded,
+}: {
+  collection: CollectionRead;
+  fileIds: number[];
+  onAdded: () => void;
+}) => {
+  const { t } = useTranslation("files");
+  const readLayouts = useReadToolLayouts();
+  const [asking, setAsking] = useState<string[] | null>(null);
+  const [reading, setReading] = useState(false);
+  const add = useAddCollectionFiles(collection.id, {
+    onSuccess: () => {
+      toast.success(t("collections.added", { count: fileIds.length, name: collection.name }));
+      setAsking(null);
+      onAdded();
+    },
+  });
+  const choose = async () => {
+    setReading(true);
+    try {
+      const layouts = await readLayouts(instanceTarget("collection", collection.id));
+      const keys = requiredKeys(detailLayoutOf(layouts, "file") as StoredRegions | null);
+      if (asksForMetadata(collection, keys)) setAsking(keys);
+      else add.mutate({ fileIds });
+    } catch (error) {
+      toast.error(getErrorMessage(error, "files:collections.error"));
+    } finally {
+      setReading(false);
+    }
+  };
+  return (
+    <>
+      <Button
+        variant="ghost"
+        className="h-auto w-full justify-start px-3 py-2 text-left"
+        disabled={add.isPending || reading}
+        onClick={() => void choose()}
+      >
+        <COLLECTION_ICON className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        <span className="min-w-0 flex-1 truncate">{collection.name}</span>
+      </Button>
+      <RequiredMetadataDialog
+        collection={collection}
+        keys={asking ?? []}
+        open={asking !== null}
+        onOpenChange={(open) => {
+          if (!open) setAsking(null);
+        }}
+        pending={add.isPending}
+        onConfirm={(metadata) => add.mutate({ fileIds, metadata })}
+      />
+    </>
+  );
+};

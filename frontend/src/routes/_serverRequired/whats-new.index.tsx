@@ -8,6 +8,6 @@ export const Route = createFileRoute("/_serverRequired/whats-new/")({
   component: __IS_CAPACITOR__
     ? NotInApp
     : lazyRouteComponent(() =>
-        import("@/pages/landing/WhatsNewPage").then((m) => ({ default: m.WhatsNewPage }))
+        import("@/pages/site/WhatsNewPage").then((m) => ({ default: m.WhatsNewPage }))
       ),
 });
