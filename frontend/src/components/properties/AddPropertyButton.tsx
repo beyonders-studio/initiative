@@ -1,9 +1,8 @@
 import { Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { type ComponentProps, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
-import { type MetadataOwner, useOwnedDefinitions } from "@/hooks/useProperties";
 import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 
@@ -11,16 +10,16 @@ import { NewPropertyForm } from "./NewPropertyForm";
 import { iconForPropertyType } from "./propertyTypeIcons";
 
 export interface AddPropertyButtonProps {
-  /**
-   * Initiative the entity belongs to. Scopes both the candidate list (so the
-   * picker only surfaces definitions from this initiative) and the inline
-   * "create new property" submission (bakes ``initiative_id`` into the create
-   * payload).
-   */
+  /** What can be added: the initiative's properties, and the owner's
+   *  metadata where there is an owner. */
+  definitions: PropertyDefinitionRead[];
+  /** While the definitions are being read. */
+  loading?: boolean;
+  /** The initiative a property made from here is made in. */
   initiativeId: number;
   /** The project whose metadata the item may also hold (a task's), offered
    *  beside the properties and made from here as well. */
-  owner?: MetadataOwner;
+  owner?: ComponentProps<typeof NewPropertyForm>["owner"];
   currentPropertyIds: number[];
   onAdd: (definition: PropertyDefinitionRead) => void;
   disabled?: boolean;
@@ -32,6 +31,8 @@ const isOwned = (definition: PropertyDefinitionRead) =>
   definition.project_id !== null || definition.collection_id !== null;
 
 export const AddPropertyButton = ({
+  definitions,
+  loading = false,
   initiativeId,
   owner,
   currentPropertyIds,
@@ -43,16 +44,12 @@ export const AddPropertyButton = ({
   // The new property's name while it is being made, in place of the list.
   const [newName, setNewName] = useState<string | null>(null);
 
-  const propertiesQuery = useOwnedDefinitions({ initiativeId, owner });
-
   // The owner's metadata, then the initiative's properties, each under its
   // own heading where there are both.
   const candidates = useMemo(() => {
-    const all = (propertiesQuery.data ?? []).filter(
-      (definition) => !currentPropertyIds.includes(definition.id)
-    );
+    const all = definitions.filter((definition) => !currentPropertyIds.includes(definition.id));
     return [...all.filter(isOwned), ...all.filter((definition) => !isOwned(definition))];
-  }, [propertiesQuery.data, currentPropertyIds]);
+  }, [definitions, currentPropertyIds]);
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
@@ -83,7 +80,7 @@ export const AddPropertyButton = ({
       // Offered whatever was typed: a new property starts from the search.
       typedLabel={() => t("properties:picker.createHeading")}
       onCreate={setNewName}
-      loading={propertiesQuery.isLoading}
+      loading={loading}
       searchPlaceholder={t("properties:picker.placeholder")}
       emptyMessage={t("properties:picker.empty")}
       disabled={disabled}

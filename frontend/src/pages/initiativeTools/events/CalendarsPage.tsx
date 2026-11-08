@@ -82,6 +82,7 @@ import {
 } from "@/hooks/useListView";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
+import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import { useRouteId } from "@/hooks/useRouteId";
 import { useUpdateTask } from "@/hooks/useTasks";
 import { listLayouts, sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
@@ -303,6 +304,13 @@ export const CalendarsView = ({
     const end = until && until < visibleRange.end ? until : visibleRange.end;
     return start < end ? { start, end } : null;
   }, [dateRange, visibleRange]);
+
+  // What the property filters offer: the initiative's properties, or every
+  // initiative's where none is selected. Community surfaces have no filters.
+  const { data: propertyDefinitions = NO_DEFINITIONS } = useOwnedDefinitions({
+    initiativeId: initiativeId ?? undefined,
+    enabled: !communityOnly,
+  });
 
   // Serialize property filters into the query-param shape the backend
   // expects. Empty list drops the param entirely so the URL stays clean.
@@ -852,15 +860,13 @@ export const CalendarsView = ({
             />
 
             {/* Custom property filters — applied to both events and tasks
-                rendered on the calendar. Scoped to the active initiative
-                when one is selected, union across accessible initiatives
-                otherwise. Nested inside the same bordered filter container
-                so it lines up with the other controls. */}
+                rendered on the calendar. Nested inside the same bordered
+                filter container so it lines up with the other controls. */}
             <div className="w-full">
               <PropertyFilter
                 value={propertyFilters}
                 onChange={setPropertyFilters}
-                {...(initiativeId != null ? { initiativeId } : {})}
+                definitions={propertyDefinitions}
               />
             </div>
           </div>

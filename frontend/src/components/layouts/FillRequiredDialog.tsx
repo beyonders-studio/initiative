@@ -1,9 +1,10 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { PropertySummary } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  PropertyDefinitionRead,
+  PropertySummary,
+} from "@/api/generated/initiativeAPI.schemas";
 import { ItemDraftContext } from "@/hooks/useFieldSave";
-import { useOwnedDefinitions } from "@/hooks/useProperties";
 import { type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
 import { missingRequired, type StoredRegions } from "@/lib/layouts/detailLayout";
 import type { LayoutNode } from "@/lib/layouts/tree";
@@ -28,6 +29,10 @@ type FillProps<I extends Item, C, P> = {
    *  project. */
   item: I;
   context: C;
+  /** The properties and metadata its new place offers; undefined until they
+   *  are read. A required one among `keys` that is not among them was
+   *  deleted, and is not asked for. */
+  definitions: PropertyDefinitionRead[] | undefined;
   /** What its new page requires that it leaves empty, by `requiredKey`. */
   keys: readonly string[];
   /** What is being changed, as a heading. */
@@ -59,6 +64,7 @@ const Filling = <I extends Item, C, P>({
   detail,
   item: start,
   context,
+  definitions,
   keys,
   title,
   onConfirm,
@@ -68,17 +74,11 @@ const Filling = <I extends Item, C, P>({
   const { item, holding, latest, draft, written } = useItemDraft<I, P>(start, {
     onSubmit: () => confirm(),
   });
-  const home = detail.home(item, context);
-  const definitions = useOwnedDefinitions({
-    initiativeId: home.initiativeId ?? undefined,
-    owner: home.owner,
-    enabled: home.initiativeId !== null,
-  }).data;
   const missingOf = (it: I) =>
     missingRequired(
       keys,
       (key) => detail.filled?.(it, key, latest.current.fields) ?? true,
-      home.initiativeId === null ? [] : definitions
+      definitions
     );
   const missing = missingOf(item);
   const confirm = () => {
@@ -118,50 +118,4 @@ const Filling = <I extends Item, C, P>({
       </DialogFooter>
     </>
   );
-};
-
-/** A change waiting on what its item's new page requires. */
-export interface Asking<I, C, P> {
-  item: I;
-  context: C;
-  keys: readonly string[];
-  title: string;
-  /** Makes the change with what was filled in; a failure keeps the dialog. */
-  send: (written: Written<I, P>) => Promise<unknown>;
-}
-
-/**
- * Asks, for a change of an item of `detail`'s kind, for the fields its new
- * page requires that it leaves empty, then makes the change with them: `ask`
- * opens it, and `dialog` is drawn wherever the change is made from.
- */
-export const useFillRequired = <I extends Item, C, P>(detail: DetailKind<I, C, P>) => {
-  const [asking, setAsking] = useState<Asking<I, C, P> | null>(null);
-  const [pending, setPending] = useState(false);
-  const dialog = asking ? (
-    <FillRequiredDialog
-      detail={detail}
-      item={asking.item}
-      context={asking.context}
-      keys={asking.keys}
-      title={asking.title}
-      open
-      onOpenChange={(open) => {
-        if (!open) setAsking(null);
-      }}
-      pending={pending}
-      onConfirm={async (written) => {
-        setPending(true);
-        try {
-          await asking.send(written);
-          setAsking(null);
-        } catch {
-          // What failed has said so; what was filled in is still here.
-        } finally {
-          setPending(false);
-        }
-      }}
-    />
-  ) : null;
-  return { ask: setAsking, dialog };
 };

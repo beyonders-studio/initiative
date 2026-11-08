@@ -5,26 +5,25 @@ import { describe, expect, it, vi } from "vitest";
 
 import { buildPropertyDefinition } from "@/__tests__/factories/properties";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
-import { definitionsHandler } from "@/__tests__/helpers/handlers/property.handlers";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import type { MetadataType, PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
+import type { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 
 import { AddPropertyButton } from "./AddPropertyButton";
 
-const mockDefinitions = (defs: PropertyDefinitionRead[]) => {
-  server.use(communityHttp.get("/property-definitions/", () => HttpResponse.json(defs)));
-};
-
 describe("AddPropertyButton", () => {
   it("lists every definition the caller can see (no applies_to scope)", async () => {
-    mockDefinitions([
-      buildPropertyDefinition({ id: 1, name: "Alpha" }),
-      buildPropertyDefinition({ id: 2, name: "Beta" }),
-      buildPropertyDefinition({ id: 3, name: "Gamma" }),
-    ]);
     renderWithProviders(
-      <AddPropertyButton initiativeId={7} currentPropertyIds={[]} onAdd={vi.fn()} />
+      <AddPropertyButton
+        definitions={[
+          buildPropertyDefinition({ id: 1, name: "Alpha" }),
+          buildPropertyDefinition({ id: 2, name: "Beta" }),
+          buildPropertyDefinition({ id: 3, name: "Gamma" }),
+        ]}
+        initiativeId={7}
+        currentPropertyIds={[]}
+        onAdd={vi.fn()}
+      />
     );
     await userEvent.click(screen.getByRole("button", { name: /Add metadata/i }));
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
@@ -33,13 +32,12 @@ describe("AddPropertyButton", () => {
   });
 
   it("offers a task's project properties beside the metadata, each under its own heading", async () => {
-    server.use(
-      definitionsHandler([buildPropertyDefinition({ id: 1, name: "Budget" })], {
-        project: [buildPropertyDefinition({ id: 2, name: "Sprint", project_id: 4 })],
-      })
-    );
     renderWithProviders(
       <AddPropertyButton
+        definitions={[
+          buildPropertyDefinition({ id: 2, name: "Sprint", project_id: 4 }),
+          buildPropertyDefinition({ id: 1, name: "Budget" }),
+        ]}
         initiativeId={7}
         owner={{ kind: "project", id: 4 }}
         currentPropertyIds={[]}
@@ -56,12 +54,16 @@ describe("AddPropertyButton", () => {
   });
 
   it("filters out definitions whose id is in currentPropertyIds", async () => {
-    mockDefinitions([
-      buildPropertyDefinition({ id: 1, name: "Alpha" }),
-      buildPropertyDefinition({ id: 2, name: "Beta" }),
-    ]);
     renderWithProviders(
-      <AddPropertyButton initiativeId={7} currentPropertyIds={[1]} onAdd={vi.fn()} />
+      <AddPropertyButton
+        definitions={[
+          buildPropertyDefinition({ id: 1, name: "Alpha" }),
+          buildPropertyDefinition({ id: 2, name: "Beta" }),
+        ]}
+        initiativeId={7}
+        currentPropertyIds={[1]}
+        onAdd={vi.fn()}
+      />
     );
     await userEvent.click(screen.getByRole("button", { name: /Add metadata/i }));
     await waitFor(() => expect(screen.getByText("Beta")).toBeInTheDocument());
@@ -70,10 +72,14 @@ describe("AddPropertyButton", () => {
 
   it("calls onAdd(definition) when an existing definition is picked", async () => {
     const defs = [buildPropertyDefinition({ id: 7, name: "Priority" })];
-    mockDefinitions(defs);
     const onAdd = vi.fn();
     renderWithProviders(
-      <AddPropertyButton initiativeId={7} currentPropertyIds={[]} onAdd={onAdd} />
+      <AddPropertyButton
+        definitions={defs}
+        initiativeId={7}
+        currentPropertyIds={[]}
+        onAdd={onAdd}
+      />
     );
     await userEvent.click(screen.getByRole("button", { name: /Add metadata/i }));
     const item = await screen.findByText("Priority");
@@ -83,12 +89,16 @@ describe("AddPropertyButton", () => {
   });
 
   it("filters the list case-insensitively by the search input", async () => {
-    mockDefinitions([
-      buildPropertyDefinition({ id: 1, name: "Alpha" }),
-      buildPropertyDefinition({ id: 2, name: "Beta" }),
-    ]);
     renderWithProviders(
-      <AddPropertyButton initiativeId={7} currentPropertyIds={[]} onAdd={vi.fn()} />
+      <AddPropertyButton
+        definitions={[
+          buildPropertyDefinition({ id: 1, name: "Alpha" }),
+          buildPropertyDefinition({ id: 2, name: "Beta" }),
+        ]}
+        initiativeId={7}
+        currentPropertyIds={[]}
+        onAdd={vi.fn()}
+      />
     );
     await userEvent.click(screen.getByRole("button", { name: /Add metadata/i }));
     const searchInput = await screen.findByPlaceholderText(/Search/i);
@@ -100,8 +110,6 @@ describe("AddPropertyButton", () => {
   });
 
   it("creates a new property via the mutation and calls onAdd with the returned definition", async () => {
-    mockDefinitions([]);
-
     const bodies: unknown[] = [];
     server.use(
       communityHttp.post("/property-definitions/", async ({ request }) => {
@@ -119,7 +127,7 @@ describe("AddPropertyButton", () => {
 
     const onAdd = vi.fn();
     renderWithProviders(
-      <AddPropertyButton initiativeId={7} currentPropertyIds={[]} onAdd={onAdd} />
+      <AddPropertyButton definitions={[]} initiativeId={7} currentPropertyIds={[]} onAdd={onAdd} />
     );
 
     await userEvent.click(screen.getByRole("button", { name: /Add metadata/i }));
@@ -150,9 +158,14 @@ describe("AddPropertyButton", () => {
   });
 
   it("disables the trigger when disabled=true", () => {
-    mockDefinitions([]);
     renderWithProviders(
-      <AddPropertyButton initiativeId={7} currentPropertyIds={[]} onAdd={vi.fn()} disabled />
+      <AddPropertyButton
+        definitions={[]}
+        initiativeId={7}
+        currentPropertyIds={[]}
+        onAdd={vi.fn()}
+        disabled
+      />
     );
     expect(screen.getByRole("button", { name: /Add metadata/i })).toBeDisabled();
   });

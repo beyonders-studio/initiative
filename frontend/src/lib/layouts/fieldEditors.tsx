@@ -55,7 +55,7 @@ import {
   useItemFieldSave,
 } from "@/hooks/useFieldSave";
 import { usePastedImages } from "@/hooks/usePastedImages";
-import { type MetadataOwner, useOwnedDefinitions } from "@/hooks/useProperties";
+import { type MetadataOwner, NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import type { MemberSearchScope } from "@/hooks/useUsers";
 import { getHttpStatus } from "@/lib/errorMessage";
 import { currentServerKey } from "@/lib/offlineSession";
@@ -549,6 +549,12 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
     id,
     holderOf(props.properties)
   );
+  // What can be added, read only where something can be.
+  const definitions = useOwnedDefinitions({
+    initiativeId: initiativeId ?? undefined,
+    owner: props.owner,
+    enabled: initiativeId !== null && !readOnly,
+  });
   // Its own values: a collection's metadata is the collection's, and a
   // plug-in's values are drawn as its fields.
   const listed = ownProperties(properties).filter((each) => !except?.has(each.property_id));
@@ -616,6 +622,8 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
         ))
       )}
       <AddPropertyButton
+        definitions={definitions.data ?? NO_DEFINITIONS}
+        loading={definitions.isLoading}
         initiativeId={initiativeId ?? 0}
         owner={props.owner}
         currentPropertyIds={[...listed.map((p) => p.property_id), ...(except ?? [])]}

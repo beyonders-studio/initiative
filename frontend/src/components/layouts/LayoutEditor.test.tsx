@@ -59,7 +59,7 @@ const PROJECT = { id: 1, initiativeId: 1, statuses: STATUSES, types: [TASK_TYPE]
 const PROJECT_DETAILS = taskDetails(PROJECT);
 const CALENDAR_DETAILS = [eventDetail(1)];
 const PROJECT_PRESETS = taskPresets(PROJECT);
-const CALENDAR_PRESETS = calendarPresets(1);
+const CALENDAR_PRESETS = calendarPresets([]);
 
 type Write = ListLayoutWrite | DetailLayoutWrite;
 
