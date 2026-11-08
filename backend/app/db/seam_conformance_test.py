@@ -36,7 +36,7 @@ from dataclasses import dataclass
 from typing import get_args
 
 import pytest
-from fastapi.routing import APIWebSocketRoute
+from fastapi.routing import APIWebSocketRoute, iter_route_contexts
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -463,7 +463,11 @@ async def test_every_socket_admits_through_the_seam(
             f"{base}/collaboration/wiki-pages/{page.id}/collaborate"
         ),
     }
-    served = {r.path for r in app.routes if isinstance(r, APIWebSocketRoute)}
+    served = {
+        r.path
+        for r in iter_route_contexts(app.routes)
+        if isinstance(r.original_route, APIWebSocketRoute)
+    }
     stream = "/api/v1/notifications/stream"
     assert served == {*channels, stream}
 

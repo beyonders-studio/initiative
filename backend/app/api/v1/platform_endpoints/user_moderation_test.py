@@ -10,6 +10,7 @@ guild's content.
 from datetime import UTC
 
 import pytest
+from fastapi.routing import iter_route_contexts
 from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -435,9 +436,9 @@ class TestNothingElse:
     def test_the_operator_router_writes_only_what_it_should(self):
         writes = {
             (route.path, verb)
-            for route in app.routes
+            for route in iter_route_contexts(app.routes)
             if getattr(route, "path", "").startswith("/api/v1/operator/users")
-            for verb in getattr(route, "methods", set())
+            for verb in getattr(route, "methods", None) or set()
             if verb in {"POST", "PATCH", "PUT", "DELETE"}
         }
 

@@ -264,7 +264,7 @@ def _target(provider: AIProvider, **overrides) -> Target:
             AIProvider.anthropic,
             None,
             "https://api.anthropic.com/v1/messages",
-            ("x-api-key", "test-key"),
+            ("authorization", "Bearer test-key"),
             _anthropic_reply,
         ),
         (

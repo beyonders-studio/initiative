@@ -15,6 +15,7 @@ from contextlib import contextmanager
 from typing import Any
 
 import pytest
+from fastapi.routing import iter_route_contexts
 from sqlalchemy import event, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import DBAPIError
@@ -32,6 +33,7 @@ from app.main import app
 from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.platform.notification import Notification, NotificationType
 from app.models.platform.user_avatar import AVATAR_SPEC
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment
 from app.models.tenant.file import File
 from app.models.tenant.guild_plugin import GuildPlugin
@@ -162,6 +164,8 @@ async def test_what_it_creates_is_its_own_and_names_nobody(
     assert created.status_code == 201, created.text
     body = created.json()
     assert body["created_by"] is None
+    assert body["created_by_kind"] == "plugin"
+    assert body["created_by_install"] == installed.plugin.id
     assert isinstance(body["community_id"], str)
     assert body["can"]["delete"] is True
     assert_names_nobody(created.text, [installed.seat.user.id, installed.guild.id])
@@ -179,7 +183,11 @@ async def test_what_it_creates_is_its_own_and_names_nobody(
         (ResourceAccessLevel.owner, installed.plugin.id, None)
     ]
     file = await session.get(File, body["id"])
-    assert file is not None and file.created_by is None
+    assert file is not None
+    assert (file.created_by_kind, file.created_by) == (
+        ActorKind.plugin,
+        installed.plugin.id,
+    )
 
 
 async def test_a_file_a_person_made_names_them_by_reference(
@@ -492,7 +500,9 @@ async def test_an_unmarked_route_refuses_an_installation_token(
 
 
 def test_every_marked_route_names_scopes_in_the_vocabulary():
-    marked = [route for route in app.routes if route_plugin_scopes(route)]
+    marked = [
+        route for route in iter_route_contexts(app.routes) if route_plugin_scopes(route)
+    ]
     assert marked, "no route names a plug-in scope"
     unknown = {
         (getattr(route, "path", "?"), scope)
@@ -501,7 +511,7 @@ def test_every_marked_route_names_scopes_in_the_vocabulary():
         if scope not in ALL_SCOPES
     }
     assert not unknown, unknown
-    assert all(isinstance(route, ActorRoute) for route in marked)
+    assert all(isinstance(route.original_route, ActorRoute) for route in marked)
 
 
 # ---------------------------------------------------------------------------

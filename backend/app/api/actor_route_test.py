@@ -19,6 +19,7 @@ from typing import Annotated, Any
 import pytest
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
+from fastapi.routing import iter_route_contexts
 from pydantic import BaseModel
 from sqlalchemy import event, text
 from sqlalchemy.engine import Engine
@@ -222,8 +223,9 @@ def test_every_route_that_names_a_scope_is_an_actor_route():
     that admits one is served by it."""
     offenders = [
         f"{sorted(getattr(route, 'methods', ()))} {getattr(route, 'path', route)}"
-        for route in app.routes
-        if route_plugin_scope(route) is not None and not isinstance(route, ActorRoute)
+        for route in iter_route_contexts(app.routes)
+        if route_plugin_scope(route) is not None
+        and not isinstance(route.original_route, ActorRoute)
     ]
     assert offenders == []
 
