@@ -3,11 +3,11 @@
 import os
 import shutil
 import signal
-import subprocess
 import stat
+import subprocess
 import sys
-import time
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -156,6 +156,7 @@ class StateDirectoryOwnershipTest(unittest.TestCase):
     def as_service(self, code: str, *args: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [sys.executable, "-c", code, *(str(path) for path in args)],
+            check=False,
             user=self.uid,
             group=self.gid,
             extra_groups=[],
@@ -291,6 +292,7 @@ class StateDirectoryOwnershipTest(unittest.TestCase):
                 (state / "uploads").symlink_to(victim)
                 result = subprocess.run(
                     ["/bin/sh", str(script), "configure"],
+                    check=False,
                     env=env,
                     capture_output=True,
                     text=True,
@@ -352,7 +354,7 @@ class StandaloneApkTest(unittest.TestCase):
             )
             # A package signed with a new fixture key is rejected by default.
             rejected = subprocess.run(
-                ["apk", "verify", str(packages[0])], capture_output=True
+                ["apk", "verify", str(packages[0])], check=False, capture_output=True
             )
             self.assertNotEqual(rejected.returncode, 0)
             # Trust only this invocation's fixture key, without --allow-untrusted.
