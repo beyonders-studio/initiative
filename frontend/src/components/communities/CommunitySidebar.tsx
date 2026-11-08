@@ -26,22 +26,7 @@ import { useTranslation } from "react-i18next";
 
 import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { Galaxy } from "@/components/icons/Galaxy";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useSidebar } from "@/components/ui/sidebar";
-import { Textarea } from "@/components/ui/textarea";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useSidebar } from "@/components/sidebar/sidebar";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { type CommunityEntry, useCommunities } from "@/hooks/useCommunities";
@@ -52,7 +37,22 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { getInitials } from "@/lib/initials";
 import { toast } from "@/lib/mascotToast";
 import { resolveHeaderlessApiUrl } from "@/lib/uploadUrl";
-import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
+import { Textarea } from "@/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 import { LogoIcon } from "../LogoIcon";
 import { CommunityCardFace } from "./CommunityCardFace";

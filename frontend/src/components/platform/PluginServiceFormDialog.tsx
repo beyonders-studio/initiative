@@ -5,20 +5,6 @@ import type {
   PluginServicePublishedKey,
   PluginServiceRegistrationRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { CopyButton } from "@/components/ui/copy-button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import {
   useConnectPluginService,
   usePluginServiceKeys,
@@ -28,6 +14,20 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { parseAllowedOrigins, postToVendor } from "@/lib/pluginServices";
 import { localized } from "@/lib/widgets/widgetMeta";
+import { Button } from "@/ui/button";
+import { CopyButton } from "@/ui/copy-button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Switch } from "@/ui/switch";
+import { Textarea } from "@/ui/textarea";
 
 /** What the operator stated, before it is shaped into a create or a patch. */
 export interface PluginServiceFormValues {

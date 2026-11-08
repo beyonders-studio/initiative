@@ -17,9 +17,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CommunityPluginDetail } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { useSetPluginScopes } from "@/hooks/useCommunityPlugins";
 import { toast } from "@/lib/mascotToast";
 import {
@@ -30,6 +27,9 @@ import {
   scopeSentence,
   toggleScope,
 } from "@/lib/pluginScopes";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { Label } from "@/ui/label";
 
 export interface PluginScopesPanelProps {
   plugin: CommunityPluginDetail;

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { Tabs, TabsBar, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsBar, TabsTrigger } from "@/ui/tabs";
 
 export interface SettingsTab {
   value: string;

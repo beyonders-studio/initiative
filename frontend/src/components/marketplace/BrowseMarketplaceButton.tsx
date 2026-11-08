@@ -3,10 +3,10 @@ import { Store } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolListingKind } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { DropdownMenuItem } from "@/ui/dropdown-menu";
 
 type BrowseMarketplaceButtonProps = {
   /** Whose shelf to open. A tool with no listing kind renders nothing, so a

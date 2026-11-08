@@ -2,7 +2,7 @@ import { type ReactNode, useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CalendarEventUpdateScope } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -10,9 +10,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 
 export type OccurrenceScope = NonNullable<CalendarEventUpdateScope>;
 

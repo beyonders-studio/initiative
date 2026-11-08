@@ -2,7 +2,6 @@ import { Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { OwnedDecoration } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
 import { DecorationSwatch } from "@/components/user/DecorationSwatch";
 import { currentYear, MIN_GRAD_YEAR, maxGradYear } from "@/lib/gradArtwork";
 import {
@@ -11,7 +10,8 @@ import {
   type DecorationKind,
   resolveDecoration,
 } from "@/lib/profileDecorations";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
 
 /**
  * The decorations of one slot that this reader owns *and* this build can draw.

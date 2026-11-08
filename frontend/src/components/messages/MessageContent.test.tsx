@@ -10,7 +10,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { BLOCKED_URL } from "@/lib/safeUrl";
+import { BLOCKED_URL } from "@/ui/lib/safeUrl";
 
 import { MessageContent } from "./MessageContent";
 

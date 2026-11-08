@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { ProfileDecorationsOutput } from "@/api/generated/initiativeAPI.schemas";
 import { TRAY_SURFACE } from "@/components/toolBrowser/NodeRail";
 import { decorationSrc, resolveTrophies } from "@/lib/profileDecorations";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 /**
  * The trophies a profile is wearing, in the order they were put on.

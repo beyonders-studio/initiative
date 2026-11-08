@@ -3,8 +3,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { UserSummary } from "@/api/generated/initiativeAPI.schemas";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { type MemberSearchScope, USER_ID_LOOKUP_MAX, useMemberSearch } from "@/hooks/useUsers";
+import {
+  getAvatarSrc,
+  getInitialsForUser,
+  getUserDisplayName,
+  hasDisplayName,
+} from "@/lib/userDisplay";
+import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
+import { Button } from "@/ui/button";
 import {
   Command,
   CommandEmpty,
@@ -13,17 +20,10 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { type MemberSearchScope, USER_ID_LOOKUP_MAX, useMemberSearch } from "@/hooks/useUsers";
-import {
-  getAvatarSrc,
-  getInitialsForUser,
-  getUserDisplayName,
-  hasDisplayName,
-} from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+} from "@/ui/command";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { cn } from "@/ui/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 /** The slim user shape these pickers render (the search endpoints' `UserSummary`). */
 export type MemberSummary = Pick<

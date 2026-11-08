@@ -2,9 +2,9 @@ import { useEffect, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AnnouncementDialog } from "@/components/announcements/AnnouncementDialog";
-import { Button } from "@/components/ui/button";
 import { useAnnouncementArchive, useAnnouncements } from "@/hooks/useAnnouncements";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
 
 // The notice a bell line asked to show again, kept outside React so the line
 // opens the dialog this center draws.

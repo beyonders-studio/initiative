@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { UnreadDot } from "@/components/notifications/UnreadDot";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 import {
   buildEntriesByDate,

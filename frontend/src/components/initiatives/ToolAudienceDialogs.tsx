@@ -16,8 +16,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { toolCamelPlural } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -25,10 +26,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { toolCamelPlural } from "@/lib/tools";
+} from "@/ui/dialog";
+import { Label } from "@/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
 
 /** Who a tool is being turned on for. */
 export type ToolAudience = "everyone" | "managers";

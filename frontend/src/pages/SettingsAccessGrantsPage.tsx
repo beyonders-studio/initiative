@@ -12,18 +12,6 @@ import { AccessGrantStatusBadge } from "@/components/platform/AccessGrantStatusB
 import { CasePicker } from "@/components/platform/CasePicker";
 import { CommunityPicker, type PickedCommunity } from "@/components/platform/CommunityPicker";
 import { UserHandle } from "@/components/UserHandle";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import {
   flattenGrants,
   useAccessGrantLimits,
@@ -48,6 +36,12 @@ import { assertForBreakGlass, describePasskeyPromptError, passkeysRunHere } from
 import { Capability, hasCapability } from "@/lib/permissions";
 import { classifySecondFactorAnswer } from "@/lib/secondFactorAnswer";
 import { getUserDisplayName } from "@/lib/userDisplay";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Textarea } from "@/ui/textarea";
 
 // Always surface the community id alongside the name so approvers can
 // disambiguate similarly-named communities (and fall back cleanly when the name

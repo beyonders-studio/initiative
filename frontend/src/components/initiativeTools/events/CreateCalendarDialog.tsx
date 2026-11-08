@@ -7,8 +7,8 @@ import {
   CreateToolDialog,
   type CreateToolDialogProps,
 } from "@/components/initiativeTools/shared/CreateToolDialog";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { Label } from "@/components/ui/label";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { Label } from "@/ui/label";
 
 /**
  * The shared create dialog with the one thing a calendar asks for beside it:

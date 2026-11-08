@@ -11,16 +11,10 @@
 
 import { useTranslation } from "react-i18next";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { useUpdateWiki, useWiki, useWikiPages } from "@/hooks/useWikis";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Separator } from "@/ui/separator";
 
 /** A labelled row: the control on the right, what it does underneath. */
 const Setting = ({

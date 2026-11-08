@@ -11,19 +11,6 @@ import {
   useRegenerateRecoveryCodes,
 } from "@/api/generated/auth/auth";
 import { RecoveryCodesPanel } from "@/components/settings/RecoveryCodesPanel";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import { useAnnounceHeld } from "@/hooks/useHeldChange";
 import { useWizard } from "@/hooks/useWizard";
 import { getErrorMessage } from "@/lib/errorMessage";
@@ -31,6 +18,19 @@ import { formatDateTime } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { queryClient } from "@/lib/queryClient";
 import { classifySecondFactorAnswer } from "@/lib/secondFactorAnswer";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { WizardDialog } from "@/ui/wizard-dialog";
 
 /** Below this, the set is worth replacing before it runs out. */
 const LOW_ON_CODES = 3;

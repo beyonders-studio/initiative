@@ -12,8 +12,8 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
 import type { ProviderPlacementRuleRead } from "@/api/generated/initiativeAPI.schemas";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 type RuleMatch = Pick<ProviderPlacementRuleRead, "claim_value" | "scope_claim" | "scope_value">;
 

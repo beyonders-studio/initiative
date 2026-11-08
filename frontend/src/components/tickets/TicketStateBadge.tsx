@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { FilerState } from "@/api/generated/initiativeAPI.schemas";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/ui/badge";
 
 const VARIANT: Record<FilerState, "default" | "secondary" | "outline"> = {
   [FilerState.received]: "outline",

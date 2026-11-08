@@ -5,8 +5,6 @@ import { useTranslation } from "react-i18next";
 
 import type { NotificationRead } from "@/api/generated/initiativeAPI.schemas";
 import { notificationText, openNotification } from "@/components/notifications/notificationLine";
-import { Button } from "@/components/ui/button";
-import { RelativeTime } from "@/components/ui/relative-time";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
 import {
@@ -19,6 +17,8 @@ import {
 import { formatDayHeading, localDayKey } from "@/lib/formatDate";
 import { useStoreSellingAnswer } from "@/lib/storeSelling";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { RelativeTime } from "@/ui/relative-time";
 
 type Filter = "all" | "unread" | "personal";
 

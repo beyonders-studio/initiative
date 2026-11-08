@@ -2,9 +2,9 @@ import { useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { useResumeAfterSignIn } from "@/hooks/useResumeAfterSignIn";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 export const OidcCallbackPage = () => {
   const { t } = useTranslation(["auth", "errors"]);

@@ -15,8 +15,6 @@ import {
   type EndpointRef,
   type RelatedEnd,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { type GraphEdge, type GraphNode, MAX_HOPS } from "@/hooks/useRelationships";
 import { useTheme } from "@/hooks/useTheme";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -26,7 +24,9 @@ import { getInitials } from "@/lib/initials";
 import { groupOf, isItem, type RelationGroup, relatedTarget } from "@/lib/relationships";
 import { entityIcon, hitIcon, searchHitPath } from "@/lib/searchResults";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
-import { getUserColorStyle } from "@/lib/userColor";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { getUserColorStyle } from "@/ui/lib/userColor";
 
 /** How far out each ring of neighbours sits before the layout takes over. */
 const RING = 10;

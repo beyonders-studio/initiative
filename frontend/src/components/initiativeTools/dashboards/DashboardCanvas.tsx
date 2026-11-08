@@ -23,7 +23,6 @@ import {
 import { useTranslation } from "react-i18next";
 
 import type { WidgetCatalog } from "@/api/generated/initiativeAPI.schemas";
-import { cn } from "@/lib/utils";
 import {
   applyLayout,
   catalogEntry,
@@ -32,6 +31,7 @@ import {
   effectiveBinding,
   GRID_COLUMNS,
 } from "@/lib/widgets/definition";
+import { cn } from "@/ui/lib/utils";
 
 import { DashboardWidget } from "./DashboardWidget";
 

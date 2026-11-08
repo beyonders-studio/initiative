@@ -3,17 +3,11 @@ import { useTranslation } from "react-i18next";
 
 import type { PostReader } from "@/api/generated/initiativeAPI.schemas";
 import { PersonRow } from "@/components/connections/PersonRow";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { RelativeTime } from "@/components/ui/relative-time";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePostReaders } from "@/hooks/usePosts";
 import type { DialogProps } from "@/types/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { RelativeTime } from "@/ui/relative-time";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 
 type PostReadersDialogProps = DialogProps & {
   postId: number;

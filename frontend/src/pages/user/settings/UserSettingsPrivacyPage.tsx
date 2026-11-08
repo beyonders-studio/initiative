@@ -9,10 +9,10 @@ import { AgeConfirmationForm } from "@/components/connections/UnreachableEmptySt
 import { CookieChoicesSection } from "@/components/settings/CookieChoicesSection";
 import { EngagementRankingSection } from "@/components/settings/EngagementRankingSection";
 import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
-import { Switch } from "@/components/ui/switch";
 import { useDmSettings, useUpdateDmSettings } from "@/hooks/useDirectMessages";
 import { usePrivacySections } from "@/hooks/usePrivacySections";
 import { toast } from "@/lib/mascotToast";
+import { Switch } from "@/ui/switch";
 
 /**
  * What this account keeps to itself: who may reach it, whether its activity

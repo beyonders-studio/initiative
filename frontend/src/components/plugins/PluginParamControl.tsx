@@ -8,19 +8,13 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { PluginDataParam } from "@/api/pluginData";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { MultiSelect } from "@/components/ui/multi-select";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { usePluginParamOptions } from "@/hooks/usePluginData";
 import { asControlValue, asDeclaredList, asDeclaredType } from "@/lib/widgets/pluginParams";
 import { localized } from "@/lib/widgets/widgetMeta";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { MultiSelect } from "@/ui/multi-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /**
  * One value, typed, in the type its plug-in declared.

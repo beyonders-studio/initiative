@@ -4,6 +4,11 @@ import { createContext, memo, useCallback, useContext, useEffect, useMemo, useSt
 import { useTranslation } from "react-i18next";
 
 import type { TagSummary, TagRead as TagType } from "@/api/generated/initiativeAPI.schemas";
+import { useDeleteTag, useUpdateTag } from "@/hooks/useTags";
+import { communityPath } from "@/lib/communityUrl";
+import { toast } from "@/lib/mascotToast";
+import { getItem, setItem } from "@/lib/storage";
+import { buildTagTree, type TagTreeNode } from "@/lib/tagTree";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,26 +18,15 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useDeleteTag, useUpdateTag } from "@/hooks/useTags";
-import { communityPath } from "@/lib/communityUrl";
-import { toast } from "@/lib/mascotToast";
-import { getItem, setItem } from "@/lib/storage";
-import { buildTagTree, type TagTreeNode } from "@/lib/tagTree";
-import { cn } from "@/lib/utils";
+} from "@/ui/alert-dialog";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { cn } from "@/ui/lib/utils";
+import { Skeleton } from "@/ui/skeleton";
 
 // Maximum visual indentation depth (children still render, just don't indent further)
 const MAX_TAG_INDENT = 3;

@@ -15,16 +15,16 @@ import {
 import { useTranslation } from "react-i18next";
 
 import type { CounterRead } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
+import { getContrastingTextColor } from "@/lib/counter-color";
+import { isAtMax, isAtMin } from "@/lib/counter-math";
+import { Button } from "@/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { getContrastingTextColor } from "@/lib/counter-color";
-import { isAtMax, isAtMin } from "@/lib/counter-math";
-import { cn } from "@/lib/utils";
+} from "@/ui/dropdown-menu";
+import { cn } from "@/ui/lib/utils";
 
 import { CounterView } from "./views/CounterView";
 

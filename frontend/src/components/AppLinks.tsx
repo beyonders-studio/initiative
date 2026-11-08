@@ -2,10 +2,10 @@ import { Download } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { HelpButton } from "@/components/support/HelpButton";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePendingUpdate } from "@/lib/pendingUpdate";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 /**
  * The app's corner: the update it is waiting on, while it is behind, and Help.

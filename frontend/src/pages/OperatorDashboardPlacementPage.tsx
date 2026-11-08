@@ -14,11 +14,6 @@ import {
 } from "@/components/auth/ProviderPlacementRuleSummary";
 import { ProviderPlacementRuleDialog } from "@/components/platform/ProviderPlacementRuleDialog";
 import { SettingRow } from "@/components/platform/SettingRow";
-import { SkeletonRegion, TableSkeleton } from "@/components/skeletons/PageSkeletons";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useAgreePlacementRequest,
@@ -30,6 +25,11 @@ import {
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { SkeletonRegion, TableSkeleton } from "@/ui/page-skeletons";
+import { Switch } from "@/ui/switch";
 
 /** The rule dialog's subject: a provider, and the rule on it being edited. */
 type Editing = { provider: PlacementProviderRead; rule: ProviderPlacementRuleRead | null };

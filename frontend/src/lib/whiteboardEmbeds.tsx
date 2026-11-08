@@ -1,5 +1,5 @@
-import { EmbedFrame } from "@/components/ui/embed-frame";
 import { matchSmartLinkProvider, type SmartLinkProviderMatch } from "@/lib/smartLinkProviders";
+import { EmbedFrame } from "@/ui/embed-frame";
 
 /** Sites a whiteboard draws with the app's own post frame rather than Excalidraw's. */
 const POST_HOSTS = ["twitter.com", "x.com", "reddit.com"];

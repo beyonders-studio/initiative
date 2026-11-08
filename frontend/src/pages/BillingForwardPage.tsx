@@ -5,10 +5,10 @@ import { CreditCard, Loader2, ShieldAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { StatusMessage } from "@/components/StatusMessage";
 import { type BillingPortalPage, useBillingPortal } from "@/hooks/useBillingPortal";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { useStoreSellingAnswer } from "@/lib/storeSelling";
+import { StatusMessage } from "@/ui/status-message";
 
 /**
  * `/c/$communityId/billing?page=…`: mints a portal handoff for the community and

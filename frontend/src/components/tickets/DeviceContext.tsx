@@ -11,10 +11,10 @@ import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { DeviceContext } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/useTheme";
-import { useWidthClass } from "@/hooks/useWidthClass";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { useWidthClass } from "@/ui/lib/useWidthClass";
+import { cn } from "@/ui/lib/utils";
 
 /** The fields, in the order they are shown. */
 const FIELDS = ["app_version", "platform", "locale", "theme", "route", "viewport"] as const;

@@ -5,16 +5,9 @@ import { useTranslation } from "react-i18next";
 import { confirmVerification } from "@/api/generated/auth/auth";
 import { ServerChip } from "@/components/auth/ServerChoice";
 import { SignInFrame } from "@/components/auth/SignInFrame";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { useEmailLinkToken } from "@/hooks/useEmailLinkToken";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
 
 type VerificationStatus = "pending" | "success" | "error";
 

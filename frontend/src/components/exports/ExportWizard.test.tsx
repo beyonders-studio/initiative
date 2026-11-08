@@ -10,7 +10,6 @@ import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TOOL_EXPORT_FORMATS } from "@/components/exports/formats";
-import { dateRangeParams } from "@/components/ui/date-range-field";
 import { EMPTY_TASK_FILTERS, taskSpecConditions } from "@/lib/filters/taskFilters";
 
 import { ExportWizard } from "./ExportWizard";
@@ -20,6 +19,7 @@ vi.mock("@/lib/mascotToast", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+import { dateRangeParams } from "@/components/calendar/visibleRange";
 import { downloadBlob } from "@/lib/csv";
 
 const ESTIMATE = {

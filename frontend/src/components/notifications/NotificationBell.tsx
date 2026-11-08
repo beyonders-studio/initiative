@@ -5,10 +5,6 @@ import { useTranslation } from "react-i18next";
 
 import type { NotificationRead } from "@/api/generated/initiativeAPI.schemas";
 import { notificationText, openNotification } from "@/components/notifications/notificationLine";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { RelativeTime } from "@/components/ui/relative-time";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotificationStreamConnected } from "@/hooks/useNotificationStream";
 import {
@@ -18,6 +14,10 @@ import {
 } from "@/hooks/useNotifications";
 import { useStoreSellingAnswer } from "@/lib/storeSelling";
 import type { TranslateFn } from "@/types/i18n";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { RelativeTime } from "@/ui/relative-time";
 
 // How often the bell asks on its own, which is only ever when there is no
 // channel to ask for it.

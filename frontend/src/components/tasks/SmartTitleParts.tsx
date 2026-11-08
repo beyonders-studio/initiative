@@ -5,13 +5,13 @@ import { useTranslation } from "react-i18next";
 
 import { priorityDotClass } from "@/components/projects/projectTasksConfig";
 import { TaskTypeIcon } from "@/components/tasks/TaskTypeOption";
-import { useDateLocale } from "@/hooks/useDateLocale";
 import { summarizeRecurrence } from "@/lib/recurrence";
 import type { TitlePart, TitlePartType, TitleReading } from "@/lib/smartTitle";
-import { dateTimePattern } from "@/lib/timeFormat";
 import { getUserDisplayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
 import type { TranslateFn } from "@/types/i18n";
+import { dateTimePattern } from "@/ui/lib/timeFormat";
+import { useDateLocale } from "@/ui/lib/useDateLocale";
+import { cn } from "@/ui/lib/utils";
 
 /** The marks drawn behind what a title's parts say, by their type. */
 export const PART_MARK: Record<TitlePartType, string> = {

@@ -8,7 +8,7 @@ import { CircleQuestionMark } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { toggleHelp, useHelpOpen } from "@/components/help/helpStore";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 export const HelpButton = () => {
   const { t } = useTranslation("common");

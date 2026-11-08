@@ -14,7 +14,6 @@ pattern gap_control() {
     `DropdownMenuSubTrigger`,
     `CommandItem`,
     `SidebarMenuButton`,
-    `SidebarMenuSubButton`,
     `AlertDialogAction`,
     `AlertDialogCancel`,
     `ImagePicker`

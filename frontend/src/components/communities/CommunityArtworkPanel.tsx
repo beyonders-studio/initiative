@@ -47,11 +47,6 @@ import {
   type CommunityBannerWrite,
   type CommunityRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { ImagePicker } from "@/components/ui/image-picker";
-import { Label } from "@/components/ui/label";
 import { useCommunities } from "@/hooks/useCommunities";
 import { renderableBanner } from "@/lib/banner";
 import { DARK_TEXT, LIGHT_TEXT, readableTextColor, readableTextShadow } from "@/lib/contrastColor";
@@ -63,6 +58,11 @@ import {
 } from "@/lib/imageRenditions";
 import { toast } from "@/lib/mascotToast";
 import { resolveHeaderlessApiUrl } from "@/lib/uploadUrl";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { ImagePicker } from "@/ui/image-picker";
+import { Label } from "@/ui/label";
 
 type Busy = "icon" | "banner" | "look" | null;
 

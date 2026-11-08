@@ -18,21 +18,6 @@ import { CommunityEngagementRankingSection } from "@/components/auth/CommunityEn
 import { CommunityNotificationPolicySection } from "@/components/auth/CommunityNotificationPolicySection";
 import { ConnectSignInWizard } from "@/components/auth/ConnectSignInWizard";
 import { CustomRoleClaimRulesSection } from "@/components/auth/CustomRoleClaimRulesSection";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -48,6 +33,15 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { providerSignInHref } from "@/lib/returnPath";
 import { readOptionalWholeNumber } from "@/lib/text";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Checkbox } from "@/ui/checkbox";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 /**
  * Community sign-in configuration (Settings → Security), in two halves.

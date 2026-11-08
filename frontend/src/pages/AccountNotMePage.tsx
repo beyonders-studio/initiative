@@ -6,18 +6,11 @@ import { readAccountChange, signOutEverywhere, undoAccountChange } from "@/api/g
 import type { AccountChangeDone, AccountChangeRead } from "@/api/generated/initiativeAPI.schemas";
 import { ServerChip } from "@/components/auth/ServerChoice";
 import { SignInFrame } from "@/components/auth/SignInFrame";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { useEmailLinkToken } from "@/hooks/useEmailLinkToken";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
 
 type Step = "reading" | "ready" | "done" | "undone" | "invalid";
 

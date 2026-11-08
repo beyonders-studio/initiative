@@ -21,8 +21,8 @@ import { Archive, Layers, LayoutTemplate } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TOOL_ICONS, type ToolView, toolViews } from "@/lib/tools";
+import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 /** What an export takes: either archive state, or both ("all"). */
 export type ToolArchiveChoice = "all" | "active" | "archived";

@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 import { buildUser } from "@/__tests__/factories";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/ui/tooltip";
 
 import { SidebarUserFooter } from "./SidebarUserFooter";
 

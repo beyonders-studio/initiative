@@ -3,13 +3,13 @@ import { Suspense } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SettingsTabsNav } from "@/components/settings/SettingsTabsNav";
-import { SettingsPaneSkeleton } from "@/components/skeletons/PageSkeletons";
-import { Button } from "@/components/ui/button";
 import { VersionDialog } from "@/components/VersionDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { compareVersions, useLatestVersion } from "@/hooks/useLatestVersion";
 import { usePrivacySections } from "@/hooks/usePrivacySections";
 import { matchActiveTab } from "@/lib/tabs";
+import { Button } from "@/ui/button";
+import { SettingsPaneSkeleton } from "@/ui/page-skeletons";
 
 const userSettingsTabs = [
   { value: "profile", labelKey: "layout.tabs.profile", path: "/profile" },

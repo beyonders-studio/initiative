@@ -14,11 +14,11 @@ import { useTranslation } from "react-i18next";
 
 import { LogoIcon } from "@/components/LogoIcon";
 import { ModeToggle } from "@/components/ModeToggle";
-import { Button } from "@/components/ui/button";
 import { useLegalIndex } from "@/hooks/useLegalDocuments";
 import { reopenConsent } from "@/lib/consent";
 import { DOCS_URL, docsUrl, REPO_URL } from "@/lib/links";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
 
 import { LANDING_KEYFRAMES } from "./effects";
 import { useFrontDoor } from "./useFrontDoor";

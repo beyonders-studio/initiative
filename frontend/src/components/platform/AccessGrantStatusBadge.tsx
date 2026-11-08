@@ -5,7 +5,7 @@
 import { useTranslation } from "react-i18next";
 
 import type { AccessGrantRead, AccessGrantStatus } from "@/api/generated/initiativeAPI.schemas";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/ui/badge";
 
 const STATUS_VARIANT: Record<
   AccessGrantStatus,

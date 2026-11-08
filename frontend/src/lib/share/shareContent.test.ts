@@ -3,8 +3,8 @@ import { $isLinkNode } from "@lexical/link";
 import { $getRoot, $isElementNode, type LexicalNode } from "lexical";
 import { describe, expect, it } from "vitest";
 
-import { documentExtension } from "@/components/ui/editor/document-extension";
-import { $isImageNode } from "@/components/ui/editor/nodes/image-node";
+import { documentExtension } from "@/components/editor/document-extension";
+import { $isImageNode } from "@/components/editor/nodes/image-node";
 import type { ReceivedShare } from "@/lib/share/pendingShare";
 import { asTitle, shareBody, shareMarkdown, shareNote, shareTitle } from "@/lib/share/shareContent";
 

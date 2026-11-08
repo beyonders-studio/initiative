@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
 
 import { type TaskPriority, TaskStatusCategory } from "@/api/generated/initiativeAPI.schemas";
-import { Label } from "@/components/ui/label";
-import { MultiSelect } from "@/components/ui/multi-select";
 import { PRIORITY_ORDER } from "@/lib/sorting";
+import { Label } from "@/ui/label";
+import { MultiSelect } from "@/ui/multi-select";
 
 interface TaskStatusPriorityFiltersProps {
   statusFilters: TaskStatusCategory[];

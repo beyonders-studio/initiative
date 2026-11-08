@@ -1,4 +1,4 @@
-// The widths are Tailwind's sm: … xl:, set in styles.css. A media or
+// The widths are Tailwind's sm: … xl:, set in src/ui/styles.css. A media or
 // container query on a width is refused: use the variants.
 language css
 
@@ -6,7 +6,7 @@ CssAtRule() as $rule where {
   $rule <: r"(?s)@(?:media|container)[^{]*width.*",
   register_diagnostic(
     span=$rule,
-    message="Only sm:, md:, lg: and xl: set a width: use them (or canvas-sm: … for a region) instead of a width query. See the widths in styles.css.",
+    message="Only sm:, md:, lg: and xl: set a width: use them (or canvas-sm: … for a region) instead of a width query. See the widths in src/ui/styles.css.",
     severity="error"
   )
 }

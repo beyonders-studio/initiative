@@ -4,8 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import { LogoIcon } from "@/components/LogoIcon";
 import { Markdown } from "@/components/Markdown";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLegalDocument, useLegalIndex } from "@/hooks/useLegalDocuments";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
 
 /**
  * One of the deployment's legal documents, read in the app.

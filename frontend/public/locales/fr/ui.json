@@ -1,0 +1,108 @@
+{
+  "loading": "Chargement…",
+  "clear": "Effacer",
+  "next": "Suivant",
+  "previous": "Précédent",
+  "selectAll": "Tout sélectionner",
+  "combobox": {
+    "placeholder": "Sélectionner une option",
+    "search": "Rechercher",
+    "noResults": "Aucun résultat"
+  },
+  "copy": {
+    "label": "Copier",
+    "copied": "Copié !",
+    "unavailable": "Copie impossible — copiez-le à la main"
+  },
+  "dateRange": {
+    "any": "Toutes les dates",
+    "fromOnly": "À partir du {{date}}",
+    "untilOnly": "Jusqu’au {{date}}",
+    "thisMonth": "Ce mois-ci",
+    "lastMonth": "Le mois dernier",
+    "thisQuarter": "Ce trimestre",
+    "thisYear": "Cette année",
+    "fromLabel": "Du",
+    "untilLabel": "Au",
+    "open": "Ouvert",
+    "fromRemove": "Retirer la date de début",
+    "untilRemove": "Retirer la date de fin",
+    "clear": "Effacer les dates"
+  },
+  "datePicker": {
+    "pickDate": "Choisir une date",
+    "pickDateTime": "Choisir une date et une heure",
+    "typeDate": "Saisir ou choisir une date",
+    "time": "Heure",
+    "invalidDate": "Saisissez une date valide.",
+    "invalidLocalDateTime": "Saisissez une date et une heure valides. Lors du changement d’heure, choisissez une heure en dehors de l’intervalle sauté ou répété."
+  },
+  "emojiPicker": {
+    "pick": "Choisir un emoji",
+    "searchPlaceholder": "Rechercher un emoji…",
+    "empty": "Aucun emoji trouvé.",
+    "prompt": "Sélectionnez un emoji…"
+  },
+  "fileDrop": {
+    "release": "Dépose-le ici",
+    "unsupported": "Ce type de fichier ne peut pas être envoyé ici."
+  },
+  "imagePicker": {
+    "chooseImage": "Choisir une image",
+    "takePhoto": "Prendre une photo",
+    "chooseFromLibrary": "Choisir dans la galerie",
+    "chooseFile": "Choisir un fichier",
+    "permission": "Initiative a besoin d'accéder à votre appareil photo et à vos photos. Autorisez-le dans les réglages de l'appareil, puis réessayez.",
+    "unavailable": "Cet appareil n'a pas d'appareil photo pour prendre une photo.",
+    "failed": "Cette photo n'a pas pu être lue. Réessayez."
+  },
+  "lightbox": {
+    "title": "Image",
+    "description": "Utilisez les flèches ou faites glisser pour passer d’une image à l’autre.",
+    "position": "{{current}} / {{total}}",
+    "zoomIn": "Zoom avant",
+    "zoomOut": "Zoom arrière",
+    "close": "Fermer"
+  },
+  "multiSelect": {
+    "placeholder": "Sélectionner…",
+    "empty": "Aucune option disponible",
+    "allSelected": "Tout est sélectionné",
+    "countSelected": "{{count}} sélectionné",
+    "clearAll": "Tout effacer"
+  },
+  "pagination": {
+    "perPage": "Par page :",
+    "rangeOf": "{{start}}–{{end}} sur {{total}}"
+  },
+  "pullToRefresh": {
+    "pull": "Tirez pour actualiser",
+    "release": "Relâchez pour actualiser",
+    "refreshing": "Actualisation…"
+  },
+  "rowActions": {
+    "label": "Actions",
+    "labelFor": "Actions pour {{subject}}"
+  },
+  "table": {
+    "select": "Sélectionner",
+    "exitSelection": "Quitter la sélection",
+    "enableSelectionMode": "Activer le mode sélection",
+    "exitSelectionMode": "Quitter le mode sélection",
+    "resetSorting": "Réinitialiser le tri",
+    "groupBy": "Regrouper par",
+    "chooseGrouping": "Choisir un regroupement",
+    "none": "Aucun",
+    "columns": "Colonnes",
+    "options": "Options du tableau",
+    "selectRow": "Sélectionner la ligne",
+    "rowsSelected": "{{selected}} ligne(s) sélectionnée(s) sur {{total}}",
+    "rowsSelectedFiltered": "{{selected}} sélectionnée(s) ({{total}} correspondent au filtre)",
+    "noResults": "Aucun résultat.",
+    "rowsPerPage": "Lignes par page :",
+    "pageOf": "Page {{current}} sur {{total}}"
+  },
+  "wizard": {
+    "stepOf": "Étape {{current}} sur {{total}}"
+  }
+}

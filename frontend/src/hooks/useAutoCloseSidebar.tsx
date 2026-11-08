@@ -1,7 +1,7 @@
 import { useLocation } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 
-import { useSidebar } from "@/components/ui/sidebar";
+import { useSidebar } from "@/components/sidebar/sidebar";
 
 /**
  * Automatically closes the sidebar on mobile devices after navigation.

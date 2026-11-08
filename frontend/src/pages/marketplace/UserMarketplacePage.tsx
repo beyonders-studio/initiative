@@ -4,8 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
 import { HomeLayoutStore } from "@/components/home/HomeLayoutStore";
-import { Button } from "@/components/ui/button";
 import { DecorationStore } from "@/components/user/DecorationStore";
+import { Button } from "@/ui/button";
 
 /**
  * The marketplace a person gets things from for themselves.

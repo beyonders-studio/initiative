@@ -16,9 +16,9 @@ import { ImageLightboxScope, InLink, ProseImage } from "@/components/markdown/Pr
 import { ThemeContext } from "@/hooks/useTheme";
 import { releaseImageUrl } from "@/lib/releaseImages";
 import { isStoredUpload, remarkImageLinks, remarkLineBreaks } from "@/lib/remarkProse";
-import { sanitizeUrl } from "@/lib/safeUrl";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
-import { cn } from "@/lib/utils";
+import { sanitizeUrl } from "@/ui/lib/safeUrl";
+import { cn } from "@/ui/lib/utils";
 
 // react-markdown hands every custom component the hast `node`, which is not a
 // DOM attribute — it is dropped before the rest of the props reach the element.

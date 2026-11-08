@@ -2,8 +2,6 @@ import { ChevronRight } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { dateTimeFormat } from "@/lib/intl";
-import { cn } from "@/lib/utils";
 import { formatValue } from "@/lib/widgets/format";
 import type { SceneNode, TimelineSpan } from "@/lib/widgets/sceneSpec";
 import {
@@ -21,6 +19,8 @@ import {
   weekStartDay,
 } from "@/lib/widgets/timelineAxis";
 import { toneColor } from "@/lib/widgets/tone";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { cn } from "@/ui/lib/utils";
 
 type Node = Extract<SceneNode, { kind: "timeline" }>;
 

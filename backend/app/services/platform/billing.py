@@ -360,6 +360,14 @@ async def apply_community_sync(
     # Stamp the guild whichever row moved: "when did this guild last change"
     # stays a fact about the guild.
     await session.exec(update(Guild).where(Guild.id == guild_id).values(**guild_values))
+    # Here rather than at the top: the guilds module reads this one.
+    from app.services.platform import guilds as guilds_service
+
+    # The plan is on every member's community list: each one reads it again
+    # once the sync commits. The members are read on ``system``.
+    await guilds_service.signal_members_present(
+        session, guild_id=guild_id, reader=system
+    )
     return Synced(version=version, went_on_hold=went_on_hold)
 
 

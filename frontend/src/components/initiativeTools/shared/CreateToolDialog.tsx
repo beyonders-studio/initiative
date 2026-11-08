@@ -6,25 +6,6 @@ import { useTranslation } from "react-i18next";
 import type { ResourceGrantSchema, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { CreateAccessSection } from "@/components/access/CreateAccessSection";
 import { DEFAULT_GRANTS } from "@/components/access/grants";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useToolCreateAccess } from "@/hooks/useInitiativeAccess";
 import { useInitiatives } from "@/hooks/useInitiatives";
@@ -32,6 +13,19 @@ import { toolKebabSingular } from "@/lib/tools";
 import type { DialogProps } from "@/types/dialog";
 import type { TranslateFn } from "@/types/i18n";
 import type { MutationOpts } from "@/types/mutation";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Textarea } from "@/ui/textarea";
 
 /** The keys a tool spells its create dialog with, in its own namespace. */
 export type CreateToolText = {

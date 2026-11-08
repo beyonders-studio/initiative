@@ -6,17 +6,6 @@ import { useTranslation } from "react-i18next";
 
 import { AUTH_FACTOR_REQUIRED_EVENT, type FactorChallengeDetail } from "@/api/client";
 import { sendStepUpCode, useListPasskeys, useReadSecondFactor } from "@/api/generated/auth/auth";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthChallenge } from "@/hooks/useAuthChallenge";
@@ -26,6 +15,17 @@ import { describePasskeyPromptError } from "@/lib/passkeys";
 import { queryClient } from "@/lib/queryClient";
 import { returnPath } from "@/lib/returnPath";
 import { compactCode } from "@/lib/secondFactorAnswer";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 /**
  * Global handler for a community that requires a factor of the account's own.

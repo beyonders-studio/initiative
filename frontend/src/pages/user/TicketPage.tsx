@@ -10,14 +10,14 @@ import { ArrowLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { FilerState } from "@/api/generated/initiativeAPI.schemas";
-import { SkeletonRegion } from "@/components/skeletons/PageSkeletons";
 import { TicketConversation } from "@/components/tickets/TicketConversation";
 import { TicketStateBadge } from "@/components/tickets/TicketStateBadge";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { useFiledTicket } from "@/hooks/useTickets";
 import { ticketTitle } from "@/lib/ticketTitle";
+import { Button } from "@/ui/button";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { SkeletonRegion } from "@/ui/page-skeletons";
+import { Skeleton } from "@/ui/skeleton";
 
 export const TicketPage = () => {
   const { taskId: raw } = useParams({ strict: false }) as { taskId: string };

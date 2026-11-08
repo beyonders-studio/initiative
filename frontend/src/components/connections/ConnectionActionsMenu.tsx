@@ -4,15 +4,6 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { DirectMessagePermissionRead } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   useConnections,
   useDmPermission,
@@ -25,6 +16,15 @@ import {
 } from "@/hooks/useDirectMessages";
 import { toast } from "@/lib/mascotToast";
 import { getUrlHandle, getUserHandle } from "@/lib/userDisplay";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
 
 /**
  * The things this menu can offer that a surface might offer for itself.

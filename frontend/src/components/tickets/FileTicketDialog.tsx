@@ -43,26 +43,6 @@ import {
 import { ContactDialog } from "@/components/tickets/ContactDialog";
 import { DeviceContextPreview } from "@/components/tickets/DeviceContext";
 import { EvidencePicker, fitToPolicy } from "@/components/tickets/Evidence";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import {
   COMMUNITY_TOPICS,
   firstLine,
@@ -72,8 +52,22 @@ import {
   useTicketAvailability,
 } from "@/hooks/useTickets";
 import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
-import { listFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { listFormat } from "@/ui/lib/intl";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Textarea } from "@/ui/textarea";
 
 /** Match the columns behind them, so a field stops where the server would. */
 const BODY_MAX = 5000;

@@ -38,13 +38,8 @@ import {
   useRouteTemplate,
 } from "@/components/tickets/DeviceContext";
 import { EvidencePicker, fitToPolicy } from "@/components/tickets/Evidence";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
-import { useFileDrop } from "@/hooks/useFileDrop";
 import {
   COMMUNITY_TOPICS,
   firstLine,
@@ -54,10 +49,16 @@ import {
 } from "@/hooks/useTickets";
 import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
 import { helpSearch, pageTerms } from "@/lib/helpSearch";
-import { listFormat } from "@/lib/intl";
 import { docsUrl } from "@/lib/links";
 import { toast } from "@/lib/mascotToast";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { listFormat } from "@/ui/lib/intl";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { useFileDrop } from "@/ui/lib/useFileDrop";
+import { cn } from "@/ui/lib/utils";
+import { Switch } from "@/ui/switch";
+import { Textarea } from "@/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 /** Matches the column behind it. */
 const BODY_MAX = 5000;
@@ -223,9 +224,11 @@ const SearchView = ({
   const route = useRouteTemplate();
   const results = useRef<HTMLDivElement>(null);
   const typed = query.trim();
+  // Searched once typing pauses: forgiving typos costs more than a keystroke.
+  const settled = useDebouncedValue(typed, 150);
   const found = useMemo(
-    () => (search ? search(typed || pageTerms(route)) : []),
-    [search, typed, route]
+    () => (search ? search(settled || pageTerms(route)) : []),
+    [search, settled, route]
   );
   const filed = useFiledTickets({ enabled: signedIn && canAsk });
   const openRequests = (filed.data?.items ?? []).filter((item) => item.state !== "closed").length;

@@ -14,8 +14,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { dateTimeFormat } from "@/lib/intl";
 import type { BoardNode as BoardScene } from "@/lib/widgets/sceneSpec";
+import { dateTimeFormat } from "@/ui/lib/intl";
 
 import { BoardNode } from "./BoardNode";
 

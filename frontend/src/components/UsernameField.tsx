@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { checkUsernameAvailable } from "@/api/generated/auth/auth";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 /** What the check said about the name typed so far. */
 export interface HandleCheck {

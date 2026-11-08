@@ -25,8 +25,11 @@ import { ModerationAct } from "@/api/generated/initiativeAPI.schemas";
 import { HoldDialog } from "@/components/moderation/HoldDialog";
 import { RemovalDialog } from "@/components/moderation/RemovalDialog";
 import { WarnDialog } from "@/components/moderation/WarnDialog";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useModerate } from "@/hooks/useModeration";
+import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,10 +37,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useModerate } from "@/hooks/useModeration";
-import { toast } from "@/lib/mascotToast";
+} from "@/ui/dropdown-menu";
 
 export interface ModerationMenuProps {
   /** A `SearchEntityType` value, and which one. */

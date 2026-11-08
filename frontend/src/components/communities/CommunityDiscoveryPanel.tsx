@@ -33,14 +33,14 @@ import {
   SupportTopic,
 } from "@/api/generated/initiativeAPI.schemas";
 import { HelpLink } from "@/components/support/HelpLink";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
 import { COMMUNITY_CATEGORIES, communityCategoryLabel } from "@/lib/communityCategories";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { cn } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { Label } from "@/ui/label";
+import { cn } from "@/ui/lib/utils";
+import { Switch } from "@/ui/switch";
 
 import { CommunityAutoJoinPrompt } from "./CommunityAutoJoinPrompt";
 import { PublishCommunityDialog } from "./PublishCommunityDialog";

@@ -3,13 +3,13 @@ import { Trans, useTranslation } from "react-i18next";
 
 import { updateCommunity } from "@/api/generated/communities/communities";
 import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { useCommunities } from "@/hooks/useCommunities";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { readOptionalWholeNumber } from "@/lib/text";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Switch } from "@/ui/switch";
 
 const DEFAULT_DAYS = 90;
 const MIN_DAYS = 1;

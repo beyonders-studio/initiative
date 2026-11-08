@@ -5,11 +5,9 @@ import { useTranslation } from "react-i18next";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
-import { PullToRefresh } from "@/components/PullToRefresh";
 import { ProjectHeader } from "@/components/projects/ProjectHeader";
 import { ProjectRelationships } from "@/components/projects/ProjectRelationships";
 import { ProjectTasksSection } from "@/components/projects/ProjectTasksSection";
-import { ProjectDetailSkeleton } from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { clearLastUsedProject } from "@/components/tasks/CreateTaskWizard";
 import { useCanonicalInitiativeId } from "@/hooks/useCanonicalInitiativeId";
@@ -20,6 +18,8 @@ import { useProject, useProjectTaskStatuses } from "@/hooks/useProjects";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { getHttpStatus } from "@/lib/errorMessage";
 import { taskRoute, toolListRoute } from "@/lib/tools";
+import { ProjectDetailSkeleton } from "@/ui/page-skeletons";
+import { PullToRefresh } from "@/ui/pull-to-refresh";
 
 export const ProjectDetailPage = () => {
   const { t } = useTranslation("projects");

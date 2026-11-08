@@ -22,12 +22,7 @@ import { MessageContent } from "@/components/messages/MessageContent";
 import { NewDevicePrompt } from "@/components/messages/NewDevicePrompt";
 import { StartWithPerson } from "@/components/messages/StartWithPerson";
 import { ReactionPicker } from "@/components/reactions/ReactionPicker";
-import { StatusMessage } from "@/components/StatusMessage";
 import { UserHandle } from "@/components/UserHandle";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { ratchetSupported } from "@/crypto/client";
 import { RecipientHasNoDeviceError } from "@/crypto/messaging";
@@ -54,11 +49,16 @@ import {
 import { useUserProfile } from "@/hooks/useUsers";
 import { groupName, isGroup, roster } from "@/lib/conversationName";
 import { formatDateTime, formatDayHeading, localDayKey } from "@/lib/formatDate";
-import { dateTimeFormat } from "@/lib/intl";
-import { hour12Option } from "@/lib/timeFormat";
 import { getUserHandle } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { hour12Option } from "@/ui/lib/timeFormat";
+import { cn } from "@/ui/lib/utils";
+import { StatusMessage } from "@/ui/status-message";
+import { Textarea } from "@/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 /**
  * My Messages — the conversations this account has open, read on this device.

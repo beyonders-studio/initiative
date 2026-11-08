@@ -7,7 +7,6 @@ import { CatchUpButton } from "@/components/activity/CatchUpButton";
 import { Markdown } from "@/components/Markdown";
 import { ToolChest, ToolChestSegment } from "@/components/tools/ToolChest";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { Progress } from "@/components/ui/progress";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useLastVisit } from "@/hooks/useLastVisit";
@@ -15,6 +14,7 @@ import { useUpdateProject } from "@/hooks/useProjects";
 import { activityLastVisitKey } from "@/lib/activityLastVisit";
 import { formatDate } from "@/lib/formatDate";
 import { toolSettingsRoute } from "@/lib/tools";
+import { Progress } from "@/ui/progress";
 
 type ProjectHeaderProps = {
   project: ProjectRead;

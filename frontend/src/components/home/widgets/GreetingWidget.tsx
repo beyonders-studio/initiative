@@ -10,14 +10,14 @@ import { AlarmClock, CalendarCheck, PartyPopper } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { type YonderPose, YonderSays } from "@/components/start/YonderSays";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import { useOpenTaskCount } from "@/hooks/useOpenTaskCount";
-import { useLiveClockValue } from "@/hooks/useRelativeTime";
-import { dateTimeFormat } from "@/lib/intl";
 import { getUserDisplayName } from "@/lib/userDisplay";
+import { Badge } from "@/ui/badge";
+import { Label } from "@/ui/label";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { useLiveClockValue } from "@/ui/lib/useRelativeTime";
+import { Switch } from "@/ui/switch";
 
 import type { HomeWidgetProps, HomeWidgetSettingsProps } from "./types";
 

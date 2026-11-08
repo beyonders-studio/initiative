@@ -2,12 +2,12 @@ import { useTranslation } from "react-i18next";
 
 import { HandleField } from "@/components/connections/HandleField";
 import { PersonRow } from "@/components/connections/PersonRow";
-import { Button } from "@/components/ui/button";
 import {
   useIgnoreAccountByHandle,
   useIgnoredAccounts,
   useStopIgnoring,
 } from "@/hooks/useDirectMessages";
+import { Button } from "@/ui/button";
 
 /** The accounts this person has chosen not to hear from. */
 export const IgnoredAccountsSection = () => {

@@ -20,21 +20,10 @@ import { invalidate, q } from "@/api/query-keys";
 import { useFillRequired } from "@/components/layouts/FillRequiredDialog";
 import { ModerationMenu } from "@/components/moderation/ModerationMenu";
 import { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
-import { StatusMessage } from "@/components/StatusMessage";
 import { SubscribeButton } from "@/components/SubscribeButton";
-import { TaskEditSkeleton } from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { MoveTaskDialog } from "@/components/tasks/MoveTaskDialog";
 import { ToolBreadcrumb } from "@/components/tools/ToolBreadcrumb";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useArchiveEntity, useUnarchiveEntity } from "@/hooks/useArchive";
 import { useAuth } from "@/hooks/useAuth";
@@ -67,6 +56,17 @@ import { TASK_DETAIL, taskChanges, taskFillContext, withoutValues } from "@/lib/
 import { toast } from "@/lib/mascotToast";
 import { queryClient } from "@/lib/queryClient";
 import { taskRoute, toolDetailRoute, toolListRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdown-menu";
+import { TaskEditSkeleton } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 type MoveTaskVariables = {
   targetProjectId: number;

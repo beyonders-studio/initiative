@@ -4,11 +4,11 @@ import { useTranslation } from "react-i18next";
 
 import { type ContactSummary, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TagBadgeList } from "@/components/tags/TagBadge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { getInitials } from "@/lib/initials";
 import { toolDetailRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback } from "@/ui/avatar";
+import { cn } from "@/ui/lib/utils";
 
 type ContactKind = Pick<ContactSummary, "name" | "is_organization">;
 

@@ -8,10 +8,6 @@ import type {
   PermissionKey,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import {
   EXTRA_PERMISSION_KEYS,
   PERMISSION_LABEL_KEYS,
@@ -28,6 +24,10 @@ import {
   toolCreatePermission,
   toolViewPermission,
 } from "@/lib/tools";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { Switch } from "@/ui/switch";
 
 /**
  * The initiative's tools, split by whether it actually uses them.

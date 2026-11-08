@@ -1,16 +1,10 @@
 import { useTranslation } from "react-i18next";
 
 import { MemberInvites } from "@/components/communities/CommunityInvites";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityInvites } from "@/hooks/useCommunityInvites";
 import type { DialogProps } from "@/types/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
 
 /**
  * The active community's member invites, where its members are: its banner and

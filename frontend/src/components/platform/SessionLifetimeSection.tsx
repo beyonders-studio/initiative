@@ -11,13 +11,13 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { usePlatformAuthSettings, useUpdatePlatformAuthSettings } from "@/hooks/useSettings";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { readOptionalWholeNumber } from "@/lib/text";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 export const SessionLifetimeSection = () => {
   const query = usePlatformAuthSettings();

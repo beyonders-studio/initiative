@@ -41,8 +41,8 @@ import {
 } from "@/lib/layouts/draft";
 import { type FieldDef, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
 import { viewGrouping, withGroupShown } from "@/lib/layouts/grouping";
-import { cn } from "@/lib/utils";
 import type { TranslateFn } from "@/types/i18n";
+import { cn } from "@/ui/lib/utils";
 
 import { CanvasGrouping } from "./LayoutGroupings";
 

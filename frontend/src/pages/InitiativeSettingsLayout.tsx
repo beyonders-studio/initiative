@@ -19,24 +19,19 @@ import { useTranslation } from "react-i18next";
 
 import { InitiativeSettingsPermissionRequired } from "@/components/initiatives/settings/InitiativeSettingsGuard";
 import { SettingsTabsNav } from "@/components/settings/SettingsTabsNav";
+import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
+import { extractSubPath, isCommunityScopedPath, useCommunityPath } from "@/lib/communityUrl";
+import { matchActiveTab } from "@/lib/tabs";
+import { initiativeRoute } from "@/lib/tools";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from "@/ui/breadcrumb";
+import { Button } from "@/ui/button";
 import {
   DetailPageSkeleton,
   FormSkeleton,
   PageHeaderSkeleton,
   SettingsPaneSkeleton,
   SkeletonRegion,
-} from "@/components/skeletons/PageSkeletons";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-} from "@/components/ui/breadcrumb";
-import { Button } from "@/components/ui/button";
-import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
-import { extractSubPath, isCommunityScopedPath, useCommunityPath } from "@/lib/communityUrl";
-import { matchActiveTab } from "@/lib/tabs";
-import { initiativeRoute } from "@/lib/tools";
+} from "@/ui/page-skeletons";
 
 export const InitiativeSettingsLayout = () => {
   const { t } = useTranslation(["initiatives", "properties"]);

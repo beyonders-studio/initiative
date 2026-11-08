@@ -17,16 +17,16 @@ import { useTranslation } from "react-i18next";
 import { type ListCalendarEntriesParams, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { utcDateKey } from "@/components/calendar/eventCalendarEntry";
 import { ToolIconTile } from "@/components/initiatives/ToolSkeletons";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useCalendarEntries } from "@/hooks/useCalendarEntries";
 import { useInitiatives } from "@/hooks/useInitiatives";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { dateTimeFormat } from "@/lib/intl";
-import { formatCompactTime } from "@/lib/timeFormat";
 import { browserTimezone } from "@/lib/timezones";
 import { entityRefRoute, taskRoute, toolDetailRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { dateTimeFormat } from "@/ui/lib/intl";
+import { formatCompactTime } from "@/ui/lib/timeFormat";
+import { cn } from "@/ui/lib/utils";
+import { Skeleton } from "@/ui/skeleton";
 
 const DAYS_AHEAD = 7;
 

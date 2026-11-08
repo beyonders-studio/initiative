@@ -2,14 +2,14 @@ import { KeyRound } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import {
   useAnswerNewDevice,
   useOwnDeviceWaiting,
   useVerificationActions,
 } from "@/hooks/useMyMessages";
+import { Button } from "@/ui/button";
+import { Checkbox } from "@/ui/checkbox";
+import { Label } from "@/ui/label";
 
 /**
  * A device that signed in to this account after this browser did.

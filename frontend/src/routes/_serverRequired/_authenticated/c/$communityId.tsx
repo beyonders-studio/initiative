@@ -8,12 +8,12 @@ import {
   CommunityStatusNotice,
   communityStatusNoticeApplies,
 } from "@/components/communities/CommunityStatusNotice";
-import { StatusMessage } from "@/components/StatusMessage";
-import { CommunityHomeSkeleton, PageSkeleton } from "@/components/skeletons/PageSkeletons";
 import { HelpLink } from "@/components/support/HelpLink";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useToolPageTitle } from "@/hooks/useToolPageTitle";
 import { prefetchViewPreferences } from "@/lib/viewPreferences";
+import { CommunityHomeSkeleton, PageSkeleton } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communityId")({
   beforeLoad: async ({ context, params, cause }) => {

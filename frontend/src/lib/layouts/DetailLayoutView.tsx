@@ -23,15 +23,15 @@ import { EntityLinkField } from "@/components/entities/EntityLinkField";
 import type { RelationsLayout } from "@/components/entities/RelationsSection";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
 import { ownProperties } from "@/components/properties/propertyHelpers";
-import { Button } from "@/components/ui/button";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { type FieldSaveKind, ItemDraftContext } from "@/hooks/useFieldSave";
 import type { MetadataOwner } from "@/hooks/useProperties";
 import { useCommunityPath } from "@/lib/communityUrl";
 import type { LinkedRef } from "@/lib/relationships";
 import type { ToolRelationEntity } from "@/lib/tools";
-import { cn } from "@/lib/utils";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
 
 import {
   addingTree,

@@ -47,20 +47,6 @@ import {
   startsWithSomething,
   TaskTypeStartsWithDialog,
 } from "@/components/projects/TaskTypeStartsWithDialog";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { IconPicker } from "@/components/ui/icon-picker";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   useCopyTaskTypes,
   useCreateTaskType,
@@ -70,12 +56,19 @@ import {
   useUpdateTaskType,
 } from "@/hooks/useProjects";
 import { useInstanceLayouts } from "@/hooks/useToolLayouts";
-import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { toolDetailRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader } from "@/ui/card";
+import { Checkbox } from "@/ui/checkbox";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { IconPicker } from "@/ui/icon-picker";
+import { Input } from "@/ui/input";
+import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
+import { cn } from "@/ui/lib/utils";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
 
 /** The most types a project may have; the server holds it to the same. */
 export const MAX_TASK_TYPES = 20;

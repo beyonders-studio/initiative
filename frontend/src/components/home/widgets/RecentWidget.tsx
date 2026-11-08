@@ -17,10 +17,6 @@ import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { HomeWidgetCard, HomeWidgetNotice } from "@/components/home/HomeWidgetCard";
-import { Button } from "@/components/ui/button";
-import { RelativeTime } from "@/components/ui/relative-time";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useRecentlyChangedTools } from "@/hooks/useMyTools";
 import { useRecents } from "@/hooks/usePersonalItems";
@@ -28,6 +24,10 @@ import { communityPath } from "@/lib/communityUrl";
 import { renderRecentIcon } from "@/lib/recentIcon";
 import { recentRoute } from "@/lib/recentRoute";
 import { TOOL_ICONS, toolNavLabelKey, toolRouteSegment } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { RelativeTime } from "@/ui/relative-time";
+import { Skeleton } from "@/ui/skeleton";
+import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 import { ToolsSetting, toolsOf } from "./toolFilter";
 import type { HomeWidgetProps, HomeWidgetSettingsProps } from "./types";

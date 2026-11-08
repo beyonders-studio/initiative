@@ -8,16 +8,10 @@ import { Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { HOME_WIDGETS } from "@/components/home/widgets";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { canAddWidget, type HomeLayout } from "@/lib/home/layout";
 import { HOME_WIDGET_TYPES, type HomeWidgetType } from "@/lib/home/widgetTypes";
-import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { cn } from "@/ui/lib/utils";
 
 export interface AddHomeWidgetDialogProps {
   open: boolean;

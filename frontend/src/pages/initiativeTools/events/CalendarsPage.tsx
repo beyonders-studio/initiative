@@ -32,6 +32,7 @@ import {
   type TaskEntryMeta,
   useCalendarVisibility,
 } from "@/components/calendar";
+import { dateRangeParams } from "@/components/calendar/visibleRange";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
 import { useToolImportAction } from "@/components/imports/ToolImportAction";
@@ -56,27 +57,10 @@ import {
   type PropertyFilterCondition,
 } from "@/components/properties/PropertyFilter";
 import { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
-import {
-  CalendarPageSkeleton,
-  CardGridSkeleton,
-  SkeletonRegion,
-} from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { TaskStatusPriorityFilters } from "@/components/tasks/TaskStatusPriorityFilters";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { Button } from "@/components/ui/button";
-import {
-  DateRangeField,
-  dateRangeBounds,
-  dateRangeParams,
-  isDateRangeSet,
-  type LocalDateRange,
-} from "@/components/ui/date-range-field";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useAuth } from "@/hooks/useAuth";
 import { useCalendarEntries } from "@/hooks/useCalendarEntries";
 import { useUpdateCalendarEvent } from "@/hooks/useCalendarEvents";
 import { useCalendar, useCalendarsList } from "@/hooks/useCalendars";
@@ -115,6 +99,18 @@ import { CALENDAR_PRESETS, type Preset, presetName, presetsOf } from "@/lib/layo
 import { getProjectColor } from "@/lib/projectColor";
 import { browserTimezone } from "@/lib/timezones";
 import { eventRoute, taskRoute, toolListRoute, toolSettingsRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import {
+  DateRangeField,
+  dateRangeBounds,
+  isDateRangeSet,
+  type LocalDateRange,
+} from "@/ui/date-range-field";
+import { DropdownMenuItem } from "@/ui/dropdown-menu";
+import { useWeekStart } from "@/ui/host";
+import { Label } from "@/ui/label";
+import { CalendarPageSkeleton, CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { Switch } from "@/ui/switch";
 
 /** Where a calendar page keeps one person's view: the initiative's calendar,
  *  one community calendar, or the community's calendars together. What an
@@ -168,7 +164,6 @@ export const CalendarsView = ({
 }: CalendarsViewProps) => {
   const { t } = useTranslation(["calendars", "tasks", "common", "access", "exports", "projects"]);
   const router = useRouter();
-  const { user } = useAuth();
   const gp = useCommunityPath();
   const communityId = useActiveCommunityId();
   const searchParams = useSearch({ strict: false }) as {
@@ -181,7 +176,7 @@ export const CalendarsView = ({
     initiativeId?: string;
   };
 
-  const weekStartsOn = (user?.week_starts_on ?? 0) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  const weekStartsOn = useWeekStart();
 
   const solo = soloCalendar != null;
   // Both community surfaces show community-level content only. What separates them is

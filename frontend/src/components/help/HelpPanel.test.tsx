@@ -123,14 +123,15 @@ describe("Help", () => {
     const user = userEvent.setup();
 
     await user.type(search, "invite link");
-    expect(screen.getByRole("link", { name: /My invite link doesn't work/ })).toHaveAttribute(
-      "href",
-      docsUrl("en/faq/#my-invite-link-doesnt-work")
-    );
+    expect(
+      await screen.findByRole("link", { name: /My invite link doesn't work/ })
+    ).toHaveAttribute("href", docsUrl("en/faq/#my-invite-link-doesnt-work"));
 
     await user.clear(search);
     await user.type(search, "zebra");
-    expect(screen.getByText("Nothing in the user guide matches “zebra”.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Nothing in the user guide matches “zebra”.")
+    ).toBeInTheDocument();
   });
 
   it("asks the team with the search as the start of the request", async () => {

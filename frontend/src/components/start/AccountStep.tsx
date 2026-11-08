@@ -5,12 +5,12 @@ import { CaptchaWidget } from "@/components/auth/CaptchaWidget";
 import { LegalNotice } from "@/components/auth/LegalNotice";
 import { NewPasswordFields } from "@/components/auth/NewPasswordFields";
 import { StepField } from "@/components/start/stepParts";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useLegalIndex } from "@/hooks/useLegalDocuments";
 import { passkeysRunHere } from "@/lib/passkeys";
 import { checkNewPassword } from "@/lib/passwordPolicy";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
 
 /**
  * The ways in this deployment offers: an address with a password and/or a

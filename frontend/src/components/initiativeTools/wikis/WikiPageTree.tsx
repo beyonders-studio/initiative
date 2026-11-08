@@ -24,12 +24,12 @@ import {
   type WikiPageSummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
-import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/sidebar/sidebar";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { fileIcon } from "@/lib/fileIcon";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
+import { cn } from "@/ui/lib/utils";
 
 /** Which of a row's three bands a dragged page is over. */
 type DropIntent = "before" | "into" | "after";

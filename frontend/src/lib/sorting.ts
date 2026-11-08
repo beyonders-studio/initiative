@@ -1,7 +1,7 @@
 import type { RowData } from "@tanstack/react-table";
 
 import { TaskPriority } from "@/api/generated/initiativeAPI.schemas";
-import type { AppRow } from "@/lib/table";
+import type { AppRow } from "@/ui/lib/table";
 
 const toTimestamp = (value: unknown): number | null => {
   if (!value) {

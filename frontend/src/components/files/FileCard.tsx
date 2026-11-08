@@ -4,19 +4,19 @@ import { useTranslation } from "react-i18next";
 import { type FileSummary, FileType, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
 import { nonEmptyPropertySummaries } from "@/components/properties/propertyHelpers";
-import { LazyImage } from "@/components/shared/LazyImage";
 import { TagBadgeList } from "@/components/tags/TagBadge";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { fileIcon } from "@/lib/fileIcon";
 import { isStoredFileType } from "@/lib/fileTypes";
-import { filePicture, getFileTypeLabel } from "@/lib/fileUtils";
 import { matchSmartLinkProvider } from "@/lib/smartLinkProviders";
 import { toolDetailRoute } from "@/lib/tools";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/ui/badge";
+import { LazyImage } from "@/ui/lazy-image";
+import { filePicture, getFileTypeLabel } from "@/ui/lib/fileUtils";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { cn } from "@/ui/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
 interface FileCardProps {
   file: FileSummary;

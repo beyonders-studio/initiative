@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
 
 import { ContinueButton, StepField } from "@/components/start/stepParts";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import type { StartAnswers } from "@/lib/startFlow";
+import { Input } from "@/ui/input";
+import { Textarea } from "@/ui/textarea";
 
 /** The names a new community starts with: a space and its first list for
  *  Personal, a community and its first initiative for Shared. */

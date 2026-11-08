@@ -32,18 +32,6 @@ import { useTranslation } from "react-i18next";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { MultiSelect } from "@/components/ui/multi-select";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useProjects, useTaskTypesOf } from "@/hooks/useProjects";
 import { useProperties } from "@/hooks/useProperties";
 import { useTags } from "@/hooks/useTags";
@@ -60,6 +48,12 @@ import {
   isRelativeDate,
   optionLabelKey,
 } from "@/lib/widgets/conditions";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { MultiSelect } from "@/ui/multi-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Switch } from "@/ui/switch";
 
 export interface FilterBuilderProps {
   value: FilterNode[];

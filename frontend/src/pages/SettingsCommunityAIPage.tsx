@@ -4,8 +4,6 @@ import {
   AIConnectionManager,
   type ConnectionMutations,
 } from "@/components/settings/AIConnectionManager";
-import { FormSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import {
   useCommunityConnections,
@@ -18,6 +16,8 @@ import {
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityAuthSettings } from "@/hooks/useCommunityAuthPolicy";
 import { getProvidersForScope } from "@/lib/ai-providers";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 
 /**
  * The seat's AI surface: the community's own AI connections when the platform

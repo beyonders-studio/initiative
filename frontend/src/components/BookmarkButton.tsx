@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { useIsBookmarked, useToggleBookmark } from "@/hooks/usePersonalItems";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 interface BookmarkButtonProps {
   tool: Tool;

@@ -1,11 +1,11 @@
 import { useTranslation } from "react-i18next";
 
 import { useReadStorageUsage } from "@/api/generated/storage/storage";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
-import { formatBytes } from "@/lib/fileUtils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { formatBytes } from "@/ui/lib/fileUtils";
+import { Progress } from "@/ui/progress";
 
 /** Percentage 0–100 of `used` against a cap, or null when the cap is
  * unlimited (null) — a null ratio renders no progress bar. */

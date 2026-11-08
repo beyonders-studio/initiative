@@ -10,11 +10,11 @@ import {
   type PropertyDefinitionRead,
   type PropertyOption,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { type MetadataOwner, ownerColumns, useCreateProperty } from "@/hooks/useProperties";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
 
 import { CounterSettingsFields, counterSettingsValid } from "./CounterSettingsFields";
 import { CurrencySelect, useDefaultCurrency } from "./CurrencySelect";

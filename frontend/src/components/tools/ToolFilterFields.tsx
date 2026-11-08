@@ -25,17 +25,11 @@ import type {
 import { FileKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { PropertyFilterParam } from "@/components/properties/PropertyFilter";
 import { TagFilterPicker } from "@/components/tags/TagFilterPicker";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toolCamelPlural } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** Each tool's list params, as its list route takes them. */
 type ToolListParams = {

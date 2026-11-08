@@ -4,19 +4,19 @@ import { useTranslation } from "react-i18next";
 
 import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
 import { ConfirmPhraseField, EligibilityStep } from "@/components/account/DeletionSteps";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import { useMyDeletionEligibility } from "@/hooks/useOperatorUsers";
 import { useDeleteOwnAccount } from "@/hooks/useUsers";
 import { useWizard } from "@/hooks/useWizard";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import type { DialogWithSuccessProps } from "@/types/dialog";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Button } from "@/ui/button";
+import { DialogFooter } from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/ui/radio-group";
+import { WizardDialog } from "@/ui/wizard-dialog";
 
 /**
  * Self-deletion is constrained to two actions:

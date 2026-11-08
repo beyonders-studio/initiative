@@ -21,30 +21,20 @@ import { CommandCenter } from "@/components/CommandCenter";
 import { ConfirmBirthdate } from "@/components/ConfirmBirthdate";
 import { CommunityAccessBanner } from "@/components/communities/CommunityAccessBanner";
 import { DemoBannerOrTabs } from "@/components/demo/DemoBanner";
+import { DocumentOutlineScope } from "@/components/editor/DocumentOutline";
 import { DeviceVerificationDialog } from "@/components/messages/DeviceVerificationDialog";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { CreateActionProvider } from "@/components/navigation/CreateActionContext";
 import { PushPermissionPrompt } from "@/components/notifications/PushPermissionPrompt";
 import { OfflineBanner } from "@/components/offline/OfflineBanner";
 import { RecentTabsBar } from "@/components/recents/RecentTabsBar";
-import { PageSkeleton } from "@/components/skeletons/PageSkeletons";
+import { SidebarProvider } from "@/components/sidebar/sidebar";
 import { StartFlow } from "@/components/start/StartFlow";
 import { CreateTaskWizard } from "@/components/tasks/CreateTaskWizard";
 import { FeedbackHost } from "@/components/tickets/FeedbackSheet";
 import { CreateToolWizard } from "@/components/tools/CreateToolWizard";
 import { UpdatedNotice } from "@/components/UpdatedNotice";
 import { UpdateReadyToast } from "@/components/UpdateReadyToast";
-import { Button } from "@/components/ui/button";
-import { DocumentOutlineScope } from "@/components/ui/editor/DocumentOutline";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import { SidebarProvider } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { useBackButton } from "@/hooks/useBackButton";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -67,7 +57,17 @@ import { chooseNoCommunityLayout } from "@/lib/noCommunityLayout";
 import { canAccessPlatformAreas } from "@/lib/permissions";
 import { activityScope, getActiveRecentKey } from "@/lib/recentRoute";
 import { returnPath } from "@/lib/returnPath";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/ui/empty";
+import { cn } from "@/ui/lib/utils";
+import { PageSkeleton } from "@/ui/page-skeletons";
 
 /**
  * Loading fallback for lazy-loaded pages inside the main layout.

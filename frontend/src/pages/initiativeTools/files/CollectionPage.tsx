@@ -47,12 +47,6 @@ import { ToolListToolbar } from "@/components/initiativeTools/shared/ToolListToo
 import { LayoutsOverview } from "@/components/layouts/LayoutList";
 import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
-import { Lightbox, type LightboxItem } from "@/components/shared/Lightbox";
-import {
-  CardGridSkeleton,
-  DetailHeaderSkeleton,
-  SkeletonRegion,
-} from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
 import { ToolChest } from "@/components/tools/ToolChest";
 import {
@@ -63,26 +57,6 @@ import {
 import type { ToolIndexRow } from "@/components/tools/ToolIndexPage";
 import { TABLE_SORT_FIELDS, ToolIndexTable } from "@/components/tools/ToolIndexTable";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Label } from "@/components/ui/label";
-import { RelativeTime } from "@/components/ui/relative-time";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCanonicalInitiativeId } from "@/hooks/useCanonicalInitiativeId";
 import {
@@ -96,7 +70,6 @@ import {
   useUpdateCollection,
 } from "@/hooks/useCollections";
 import { useCollectionUploader } from "@/hooks/useCollectionUploader";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { type GridToggleOptions, useGridSelection } from "@/hooks/useGridSelection";
 import { type ListViewSpec, NO_PART_VIEW, useListView, viewKey } from "@/hooks/useListView";
 import { useReadOnOpen } from "@/hooks/useNotifications";
@@ -120,6 +93,17 @@ import { toast } from "@/lib/mascotToast";
 import { browserTimezone } from "@/lib/timezones";
 import { collectionRoute, toolDetailRoute, toolListRoute } from "@/lib/tools";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { DropdownMenuItem } from "@/ui/dropdown-menu";
+import { Label } from "@/ui/label";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { Lightbox, type LightboxItem } from "@/ui/lightbox";
+import { CardGridSkeleton, DetailHeaderSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { RelativeTime } from "@/ui/relative-time";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
 
 /** A file as the wall and the table both list it. */
 type FileRow = CollectionFileSummary & { card: null };

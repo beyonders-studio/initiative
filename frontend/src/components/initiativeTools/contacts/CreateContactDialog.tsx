@@ -13,8 +13,12 @@ import {
   ContactDetailsFields,
   ContactKindToggle,
 } from "@/components/initiativeTools/contacts/ContactDetailsFields";
-import { AsyncCombobox } from "@/components/ui/async-combobox";
-import { Button } from "@/components/ui/button";
+import { useContactsList, useCreateContact } from "@/hooks/useContacts";
+import { useRelate } from "@/hooks/useRelationships";
+import { type ContactDetails, filledDetails, NO_DETAILS } from "@/lib/contacts";
+import type { DialogProps } from "@/types/dialog";
+import { AsyncCombobox } from "@/ui/async-combobox";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -22,13 +26,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useContactsList, useCreateContact } from "@/hooks/useContacts";
-import { useRelate } from "@/hooks/useRelationships";
-import { type ContactDetails, filledDetails, NO_DETAILS } from "@/lib/contacts";
-import type { DialogProps } from "@/types/dialog";
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 /** An organization a person can be part of. */
 type Organization = { id: number; name: string };

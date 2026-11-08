@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import type { ContactGrantRead } from "@/api/generated/initiativeAPI.schemas";
 import { HandleField } from "@/components/connections/HandleField";
 import { PersonRow } from "@/components/connections/PersonRow";
-import { Button } from "@/components/ui/button";
 import {
   useConnections,
   useRemoveConnection,
@@ -11,6 +10,7 @@ import {
 } from "@/hooks/useDirectMessages";
 import { formatDate } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
 
 interface ConnectionsSectionProps {
   /** Show the "connect by handle" field. Off where the page is a directory. */

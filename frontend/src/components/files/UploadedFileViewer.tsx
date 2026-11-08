@@ -17,11 +17,6 @@ import { Document, Page, pdfjs } from "react-pdf";
 
 import { FileKind, FileType, type FileVersionRead } from "@/api/generated/initiativeAPI.schemas";
 import { Markdown } from "@/components/Markdown";
-import { Lightbox } from "@/components/shared/Lightbox";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   useConvertFile,
   useDeleteFileVersion,
@@ -29,14 +24,19 @@ import {
   usePutVideoThumbnail,
   useUploadFileVersion,
 } from "@/hooks/useFiles";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { fileIcon } from "@/lib/fileIcon";
 import { FILE_TYPE_KINDS } from "@/lib/fileTypes";
-import { formatBytes, getFileExtension, getFileTypeLabel } from "@/lib/fileUtils";
-import { numberFormat } from "@/lib/intl";
 import { resolveFileDownloadUrl, resolveFileVersionDownloadUrl } from "@/lib/uploadUrl";
-import { cn } from "@/lib/utils";
 import { drawVideoFrame } from "@/lib/videoFrame";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { formatBytes, getFileExtension, getFileTypeLabel } from "@/ui/lib/fileUtils";
+import { numberFormat } from "@/ui/lib/intl";
+import { useRelativeTime } from "@/ui/lib/useRelativeTime";
+import { cn } from "@/ui/lib/utils";
+import { Lightbox } from "@/ui/lightbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";

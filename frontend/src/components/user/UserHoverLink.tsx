@@ -1,10 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { type MiniProfileSummary, UserMiniProfile } from "@/components/user/UserMiniProfile";
 import { getUrlHandle } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hover-card";
+import { cn } from "@/ui/lib/utils";
 
 interface UserHoverLinkProps {
   /** Who is being named. `undefined` where the page has not resolved them —

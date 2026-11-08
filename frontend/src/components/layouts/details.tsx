@@ -24,7 +24,6 @@ import { PropertyFilter } from "@/components/properties/PropertyFilter";
 import { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { TaskFilters } from "@/components/tasks/TaskFilters";
 import { TaskStatusPriorityFilters } from "@/components/tasks/TaskStatusPriorityFilters";
-import { Button } from "@/components/ui/button";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useCalendarEntries } from "@/hooks/useCalendarEntries";
@@ -48,6 +47,7 @@ import { taskLayoutFor } from "@/lib/layouts/tasks";
 import type { LayoutNode } from "@/lib/layouts/tree";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
 import type { TranslateFn } from "@/types/i18n";
+import { Button } from "@/ui/button";
 
 import { editablePresets } from "./LayoutPresets";
 import type { LayoutProject } from "./LayoutSettingsPanel";

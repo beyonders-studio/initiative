@@ -18,7 +18,9 @@ import {
   holdWhyBody,
   holdWhyReady,
 } from "@/components/moderation/HoldFields";
-import { Button } from "@/components/ui/button";
+import { usePlaceHold } from "@/hooks/useHolds";
+import { toast } from "@/lib/mascotToast";
+import { Button } from "@/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -26,9 +28,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { usePlaceHold } from "@/hooks/useHolds";
-import { toast } from "@/lib/mascotToast";
+} from "@/ui/dialog";
 
 export interface HoldDialogProps {
   open: boolean;

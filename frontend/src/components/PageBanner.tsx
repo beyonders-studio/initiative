@@ -26,7 +26,7 @@ import { type CSSProperties, type ReactNode, useLayoutEffect, useRef, useState }
 
 import type { CommunityBannerRead } from "@/api/generated/initiativeAPI.schemas";
 import { readableTextShadow } from "@/lib/contrastColor";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 /**
  * Widens an element from the padded, centred column a page is rendered in to

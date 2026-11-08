@@ -2,9 +2,9 @@ import { AlertCircle, Loader2 } from "lucide-react";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/ui/alert";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
 
 interface EligibilityStepProps {
   checking: boolean;

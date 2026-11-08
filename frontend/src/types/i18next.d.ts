@@ -43,6 +43,7 @@ import type stats from "../../public/locales/en/stats.json";
 import type tags from "../../public/locales/en/tags.json";
 import type tasks from "../../public/locales/en/tasks.json";
 import type trash from "../../public/locales/en/trash.json";
+import type ui from "../../public/locales/en/ui.json";
 import type wikis from "../../public/locales/en/wikis.json";
 
 declare module "i18next" {
@@ -96,6 +97,7 @@ declare module "i18next" {
       tags: typeof tags;
       tasks: typeof tasks;
       trash: typeof trash;
+      ui: typeof ui;
     };
   }
 }

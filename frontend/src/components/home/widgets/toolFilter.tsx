@@ -7,10 +7,10 @@
 import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
-import { Label } from "@/components/ui/label";
-import { MultiSelect } from "@/components/ui/multi-select";
 import type { HomeWidgetOptions } from "@/lib/home/layout";
 import { TOOLS, toolNavLabelKey } from "@/lib/tools";
+import { Label } from "@/ui/label";
+import { MultiSelect } from "@/ui/multi-select";
 
 /** The kinds picked, in registry order; none picked is every kind. */
 export const toolsOf = (options: HomeWidgetOptions): Tool[] => {

@@ -2,9 +2,9 @@ import { useTranslation } from "react-i18next";
 
 import { BirthdateField } from "@/components/auth/BirthdateField";
 import { useAgeConfirmation } from "@/components/auth/useAgeConfirmation";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 /**
  * The screen an account meets once, when no date of birth is on file.

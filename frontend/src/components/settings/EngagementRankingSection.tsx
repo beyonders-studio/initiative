@@ -1,11 +1,11 @@
 import { useTranslation } from "react-i18next";
 
 import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
-import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import { useUpdateCurrentUser } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Switch } from "@/ui/switch";
 
 /**
  * Whether what this person opens and changes counts toward the levels their

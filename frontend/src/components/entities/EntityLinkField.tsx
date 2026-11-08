@@ -3,8 +3,8 @@ import { useTranslation } from "react-i18next";
 import type { EndpointRef } from "@/api/generated/initiativeAPI.schemas";
 import { EntityCard } from "@/components/entities/EntityCard";
 import { EntityPicker } from "@/components/entities/EntityPicker";
-import { Label } from "@/components/ui/label";
 import { type LinkedRef, refKey } from "@/lib/relationships";
+import { Label } from "@/ui/label";
 
 interface EntityLinkFieldProps {
   label: string;

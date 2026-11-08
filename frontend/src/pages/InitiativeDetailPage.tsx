@@ -6,20 +6,16 @@ import { useTranslation } from "react-i18next";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeMembersPeek } from "@/components/initiatives/InitiativeMembersPeek";
 import { Markdown } from "@/components/Markdown";
-import { StatusMessage } from "@/components/StatusMessage";
-import {
-  InitiativePageSkeleton,
-  SkeletonRegion,
-  ToolListSkeleton,
-} from "@/components/skeletons/PageSkeletons";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { resolveInitiativeColor } from "@/lib/initiativeColors";
 import { initiativeRoute, TOOLS, toolCamelPlural, toolListRoute } from "@/lib/tools";
-import { cn } from "@/lib/utils";
+import { Button } from "@/ui/button";
+import { cn } from "@/ui/lib/utils";
+import { PageHeaderSkeleton, SkeletonRegion, ToolListSkeleton } from "@/ui/page-skeletons";
+import { StatusMessage } from "@/ui/status-message";
+import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/ui/tabs";
 
 import { ContactsView } from "./initiativeTools/contacts/ContactsPage";
 import { CounterGroupsView } from "./initiativeTools/counters/CounterGroupsPage";
@@ -112,7 +108,13 @@ export const InitiativeDetailPage = ({ tool }: InitiativeDetailPageProps = {}) =
   }
 
   if (initiativeQuery.isLoading) {
-    return <InitiativePageSkeleton label={t("detail.loadingInitiative")} />;
+    // Its header, the tool tabs, and the first tab's list.
+    return (
+      <SkeletonRegion label={t("detail.loadingInitiative")} className="space-y-4 sm:space-y-6">
+        <PageHeaderSkeleton dot description meta action tabs={TOOLS.length} />
+        <ToolListSkeleton className="pt-2" />
+      </SkeletonRegion>
+    );
   }
 
   if (!initiative) {

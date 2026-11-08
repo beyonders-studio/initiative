@@ -6,7 +6,7 @@
 
 import { cellsFromLayout, type PixelLayout } from "@/components/effects/svg/pixelLayout";
 import type { StartPath } from "@/lib/startFlow";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 interface Scene {
   layout: PixelLayout;

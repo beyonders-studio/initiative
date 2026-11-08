@@ -8,7 +8,6 @@ import i18n from "@/__tests__/helpers/i18n-test";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { MetadataType, type TaskListRead } from "@/api/generated/initiativeAPI.schemas";
-import { numberFormat } from "@/lib/intl";
 import { canRequire } from "@/lib/layouts/draft";
 import {
   fieldsInParts,
@@ -20,6 +19,7 @@ import {
 import { TASK_LAYOUT, taskFields } from "@/lib/layouts/tasks";
 import { type LayoutNode, LayoutTree } from "@/lib/layouts/tree";
 import type { TranslateFn } from "@/types/i18n";
+import { numberFormat } from "@/ui/lib/intl";
 
 const definition = {
   endpoints: [

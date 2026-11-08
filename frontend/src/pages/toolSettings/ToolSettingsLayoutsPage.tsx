@@ -14,10 +14,10 @@ import { useTranslation } from "react-i18next";
 import { LayoutsOverview } from "@/components/layouts/LayoutList";
 import { useToolSettings } from "@/components/tools/settings/ToolSettingsContext";
 import { ToolSettingsPermissionRequired } from "@/components/tools/settings/ToolSettingsGuard";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { instanceTarget, useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toolDetailRoute } from "@/lib/tools";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 export const ToolSettingsLayoutsPage = () => {
   const { tool, entity } = useToolSettings();

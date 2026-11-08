@@ -9,11 +9,11 @@
 import { useTranslation } from "react-i18next";
 
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { usePlatformAuthSettings, useUpdatePlatformAuthSettings } from "@/hooks/useSettings";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { Label } from "@/ui/label";
+import { Switch } from "@/ui/switch";
 
 export const BreachedPasswordCheckSection = () => {
   const { t } = useTranslation("settings");

@@ -14,9 +14,9 @@
 
 import { memo } from "react";
 
-import { cn } from "@/lib/utils";
 import type { SceneNode } from "@/lib/widgets/sceneSpec";
 import { toneTextClass } from "@/lib/widgets/tone";
+import { cn } from "@/ui/lib/utils";
 
 import { BoardNode } from "./BoardNode";
 import { FunnelNode } from "./FunnelNode";

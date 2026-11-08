@@ -38,19 +38,6 @@ import { useTranslation } from "react-i18next";
 
 import type { ChecklistItem, ChecklistProgress } from "@/api/generated/initiativeAPI.schemas";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
 import {
   useGenerateChecklist,
@@ -62,6 +49,19 @@ import { newChecklistItemId } from "@/lib/checklist";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { toast } from "@/lib/mascotToast";
 import { entityRefRoute } from "@/lib/tools";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { Checkbox } from "@/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Textarea } from "@/ui/textarea";
 
 /** A checklist as the server holds it, in one comparable string. */
 const fingerprint = (items: ChecklistItem[]) =>

@@ -10,9 +10,9 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { HomeWidgetCard, HomeWidgetNotice } from "@/components/home/HomeWidgetCard";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useUserStats } from "@/hooks/useUserStats";
-import { numberFormat } from "@/lib/intl";
+import { numberFormat } from "@/ui/lib/intl";
+import { Skeleton } from "@/ui/skeleton";
 
 const Stat = ({
   icon: Icon,

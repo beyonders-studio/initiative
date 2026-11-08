@@ -26,21 +26,15 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { ownProperties } from "@/components/properties/propertyHelpers";
 import { TagBadge, TagPicker } from "@/components/tags";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useArchiveEntity, useUnarchiveEntity } from "@/hooks/useArchive";
 import { propertySaves } from "@/hooks/useProperties";
 import { useSetToolTags } from "@/hooks/useToolTags";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { PropertiesField } from "@/lib/layouts/fieldEditors";
 import { toast } from "@/lib/mascotToast";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
+import { ScrollArea, ScrollBar } from "@/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 export interface ToolChestEntity {
   id: number;

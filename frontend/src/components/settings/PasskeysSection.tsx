@@ -15,19 +15,6 @@ import type {
   PasskeyRead,
   PasskeyRegisterFinishCredential,
 } from "@/api/generated/initiativeAPI.schemas";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { WizardDialog } from "@/components/ui/wizard-dialog";
 import { useAnnounceHeld } from "@/hooks/useHeldChange";
 import { useServer } from "@/hooks/useServer";
 import { useWizard } from "@/hooks/useWizard";
@@ -37,6 +24,19 @@ import { toast } from "@/lib/mascotToast";
 import { hasReservedSigil } from "@/lib/mentions";
 import { createCredential } from "@/lib/passkeys";
 import { queryClient } from "@/lib/queryClient";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { WizardDialog } from "@/ui/wizard-dialog";
 
 /** The form, then the wait for the browser's own prompt. */
 type AddStep = "details" | "prompting";

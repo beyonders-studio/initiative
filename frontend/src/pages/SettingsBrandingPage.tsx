@@ -1,24 +1,17 @@
 import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
-import { FormSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import { useServerForm } from "@/hooks/useServerForm";
 import { useInterfaceSettings, useUpdateInterfaceSettings } from "@/hooks/useSettings";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/ui/card";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { Label } from "@/ui/label";
+import { FormSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { Switch } from "@/ui/switch";
 
 export const SettingsBrandingPage = () => {
   const { t } = useTranslation("settings");

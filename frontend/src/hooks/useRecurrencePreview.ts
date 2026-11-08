@@ -2,7 +2,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import type { RecurrencePreviewRequest } from "@/api/generated/initiativeAPI.schemas";
 import { previewRecurrence } from "@/api/generated/recurrence/recurrence";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 
 /**
  * A repeat's next starts, from the engine the calendar uses, asked once the

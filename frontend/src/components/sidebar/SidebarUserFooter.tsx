@@ -19,9 +19,17 @@ import { useTitleBarHeight } from "@/components/DesktopTitleBar";
 import { ThoughtBubble } from "@/components/icons/ThoughtBubble";
 import { AppearanceMenuItems, ThemeIcon } from "@/components/ModeToggle";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { SidebarFooter } from "@/components/sidebar/sidebar";
 import { openFeedback, useFeedbackOffered } from "@/components/tickets/FeedbackSheet";
 import { UserHandle } from "@/components/UserHandle";
-import { Button } from "@/components/ui/button";
+import { PresenceDot } from "@/components/user/PresenceDot";
+import { PresenceMenuItems } from "@/components/user/PresenceMenuItems";
+import { ProfileAvatar } from "@/components/user/ProfileAvatar";
+import { isStatusEmpty, StatusBubble, StatusEditor } from "@/components/user/ProfileStatus";
+import { presenceLabelKey } from "@/lib/presence";
+import { decorationSrc, resolveDecoration } from "@/lib/profileDecorations";
+import { getUrlHandle, getUserDisplayName } from "@/lib/userDisplay";
+import { Button } from "@/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,17 +41,9 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
-import { SidebarFooter } from "@/components/ui/sidebar";
-import { PresenceDot } from "@/components/user/PresenceDot";
-import { PresenceMenuItems } from "@/components/user/PresenceMenuItems";
-import { ProfileAvatar } from "@/components/user/ProfileAvatar";
-import { isStatusEmpty, StatusBubble, StatusEditor } from "@/components/user/ProfileStatus";
-import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
-import { presenceLabelKey } from "@/lib/presence";
-import { decorationSrc, resolveDecoration } from "@/lib/profileDecorations";
-import { getUrlHandle, getUserDisplayName } from "@/lib/userDisplay";
+} from "@/ui/dropdown-menu";
+import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
+import { Popover, PopoverAnchor, PopoverContent } from "@/ui/popover";
 
 export interface SidebarUserFooterProps {
   /** The signed-in account, or null while it is still being fetched. */

@@ -132,6 +132,11 @@ class PlanSummary(BaseModel):
     next_charge: PlanCharge | None = None
     scheduled_change: PlanChange | None = None
     payment_failed: bool = False
+    #: The portal offers a plan above this one. A community billing has never
+    #: seen is on the plan every community starts on, with plans above it.
+    can_upgrade: bool = True
+    #: The portal can cancel this plan: a card subscription is running.
+    can_cancel: bool = False
 
 
 def build_plan_summary_query(guild_ref: str) -> tuple[str, bytes, dict[str, str]]:

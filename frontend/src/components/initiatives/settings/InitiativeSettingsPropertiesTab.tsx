@@ -20,31 +20,6 @@ import { CurrencySelect, useDefaultCurrency } from "@/components/properties/Curr
 import { PROPERTY_TYPES } from "@/components/properties/NewPropertyForm";
 import { normalizeOptionList, typeRequiresOptions } from "@/components/properties/propertyHelpers";
 import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   type MetadataOwner,
   ownerColumns,
@@ -56,8 +31,26 @@ import {
   usePropertyGroups,
   useUpdateProperty,
 } from "@/hooks/useProperties";
-import { collator } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Checkbox } from "@/ui/checkbox";
+import { ColorPickerPopover } from "@/ui/color-picker-popover";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { collator } from "@/ui/lib/intl";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
 
 const DEFAULT_COLOR = "#64748B";
 

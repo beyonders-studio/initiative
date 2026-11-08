@@ -2,13 +2,13 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { UserHoverLink } from "@/components/user/UserHoverLink";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInitiativeRoster, useInitiativeRosterPages } from "@/hooks/useInitiatives";
 import { getUserDisplayName } from "@/lib/userDisplay";
+import { Input } from "@/ui/input";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 /** Online faces shown in the row; past this many they fold into a count. */
 const FACES = 10;

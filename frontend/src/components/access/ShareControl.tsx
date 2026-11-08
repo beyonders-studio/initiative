@@ -7,8 +7,13 @@ import type {
   ResourceGrantSchema,
 } from "@/api/generated/initiativeAPI.schemas";
 import { type MemberLike, useSeenMembers } from "@/components/members/MemberSearchSelect";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
+import { useInitiativeRoles } from "@/hooks/useInitiativeRoles";
+import { type MemberSearchScope, useMemberSearch } from "@/hooks/useUsers";
+import { resolveArtworkUrl } from "@/lib/uploadUrl";
+import { getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
 import {
   Command,
   CommandEmpty,
@@ -16,23 +21,12 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { useInitiativeRoles } from "@/hooks/useInitiativeRoles";
-import { type MemberSearchScope, useMemberSearch } from "@/hooks/useUsers";
-import { resolveArtworkUrl } from "@/lib/uploadUrl";
-import { getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
+} from "@/ui/command";
+import { Label } from "@/ui/label";
+import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { cn } from "@/ui/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 

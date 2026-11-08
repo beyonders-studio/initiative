@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { PixelSparkle } from "@/components/effects/svg/PixelSparkle";
 import { ContinueButton, SkipButton } from "@/components/start/stepParts";
 import type { CatalogTier } from "@/hooks/useBillingCatalog";
-import { cn } from "@/lib/utils";
+import { cn } from "@/ui/lib/utils";
 
 /** The catalog's plans as cards, the entry plan picked until another is. */
 export const PlanStep = ({

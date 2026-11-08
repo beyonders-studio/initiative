@@ -2,15 +2,15 @@ import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
 import type { CollectionRead } from "@/api/generated/initiativeAPI.schemas";
-import { LazyImage } from "@/components/shared/LazyImage";
 import { TagBadgeList } from "@/components/tags/TagBadge";
-import { Badge } from "@/components/ui/badge";
 import { COLLECTION_ICON } from "@/lib/collections";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { fileIcon } from "@/lib/fileIcon";
 import { collectionRoute } from "@/lib/tools";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/ui/badge";
+import { LazyImage } from "@/ui/lazy-image";
+import { cn } from "@/ui/lib/utils";
 
 interface CollectionCardProps {
   collection: CollectionRead;

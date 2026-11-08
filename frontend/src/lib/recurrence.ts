@@ -1,7 +1,7 @@
 import type { RecurrenceStrategy } from "@/api/generated/initiativeAPI.schemas";
-import { dateTimeFormat, listFormat } from "@/lib/intl";
 import { browserTimezone } from "@/lib/timezones";
 import type { TranslateFn } from "@/types/i18n";
+import { dateTimeFormat, listFormat } from "@/ui/lib/intl";
 
 /** The task's rule, completion strategy and optional daily maximum change together. */
 export type TaskRecurrenceValue = {
