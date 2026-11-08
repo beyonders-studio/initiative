@@ -26,10 +26,11 @@ import {
   NO_GROUP,
   offeredGroupings,
   type ServedGroups,
-  uniqueTasksFromRows,
+  uniqueItemsFromRows,
   viewGrouping,
   withGroupShown,
 } from "@/lib/layouts/grouping";
+import { BOARD_COLUMNS, taskGroups } from "@/lib/layouts/taskGroupings";
 import { taskFields } from "@/lib/layouts/tasks";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -55,8 +56,8 @@ const sprint = buildPropertyDefinition({
 const note = buildPropertyDefinition({ name: "Note", type: MetadataType.text });
 const sprintField = propertyFieldId(sprint.id);
 
-const all = groupables(TASK_GROUPINGS, taskFields([sprint, note]), t);
-const choices = catalogChoices(TASK_GROUPINGS);
+const all = groupables(TASK_GROUPINGS, taskFields([sprint, note]), t, BOARD_COLUMNS);
+const choices = catalogChoices(TASK_GROUPINGS, BOARD_COLUMNS);
 
 const offered = (
   groupings: LayoutGrouping[] | null,
@@ -70,8 +71,8 @@ const offered = (
     all,
     groupings,
     kind,
-    statuses: buildDefaultTaskStatuses(),
-    tasks,
+    items: tasks,
+    own: taskGroups({ statuses: buildDefaultTaskStatuses(), tasks, t }),
     served,
     t,
   });
@@ -171,7 +172,7 @@ describe("a grouping the server worked out", () => {
   });
 
   it("collapses a task's rows back to the task the list holds", () => {
-    const selected = uniqueTasksFromRows(
+    const selected = uniqueItemsFromRows(
       groupRows([tagged], tags()),
       new Map([[tagged.id, tagged]])
     );
@@ -239,7 +240,7 @@ describe("boardBands", () => {
 
     const bands = boardBands(priorities, [low, urgent]);
 
-    expect(bands.map((band) => [band.key, band.tasks])).toEqual([
+    expect(bands.map((band) => [band.key, band.items])).toEqual([
       ["urgent", [urgent]],
       ["medium", []],
       ["low", [low]],

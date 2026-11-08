@@ -125,7 +125,7 @@ const draw = (
     env: {
       t: i18n.getFixedT(null, ["projects", "dates", "relations"]) as TranslateFn,
       communityPath: (path: string) => path,
-      taskHref: ({ id }: TaskListRead) => `/tasks/${id}`,
+      itemHref: ({ id }: TaskListRead) => `/tasks/${id}`,
     },
   };
   return renderWithProviders(<LayoutTree node={card} item={item} view={view} />);

@@ -81,6 +81,7 @@ import {
 import { isGanttScale } from "@/lib/gantt";
 import { activeGrouping, catalogChoices } from "@/lib/layouts/grouping";
 import { presetName } from "@/lib/layouts/presets";
+import { BOARD_COLUMNS } from "@/lib/layouts/taskGroupings";
 import { blankTask, TASK_DETAIL } from "@/lib/layouts/taskLayout";
 import type { LayoutNode } from "@/lib/layouts/tree";
 import { toast } from "@/lib/mascotToast";
@@ -261,7 +262,7 @@ export const ProjectTasksSection = ({
       layout?.definition.groupings,
       kind,
       grouping,
-      catalogChoices(groupingCatalog)
+      catalogChoices(groupingCatalog, BOARD_COLUMNS)
     );
     return {
       ...(fields.length > 0 && { sorting: fields }),

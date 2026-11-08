@@ -2,7 +2,7 @@ import type { AppColumnDef } from "@/ui/lib/table";
 import { PropertyColumnHeader } from "@/ui/properties/propertyColumns";
 import { SortHeader } from "@/ui/sort-icon";
 
-import { FIELD_RENDERERS, type FieldDef, type LayoutEnv, type LayoutItem } from "./fields";
+import { type FieldDef, fieldRenderer, type LayoutEnv, type LayoutItem } from "./fields";
 
 // A table's column for a field, where its id is not the field's: what stored
 // visibility, grouping and sorting are keyed by.
@@ -30,7 +30,7 @@ export const fieldColumn = <T extends LayoutItem>(
   env: LayoutEnv,
   { id = fieldColumnId(field.id), sortBy = field.value, ...column }: FieldColumnOptions<T> = {}
 ): AppColumnDef<T> => {
-  const Renderer = FIELD_RENDERERS[field.kind];
+  const Renderer = fieldRenderer(field);
   const label = field.source === "builtin" ? env.t(field.label) : field.label;
   const sortable = column.sortFn !== undefined;
   return {

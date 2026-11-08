@@ -1,19 +1,19 @@
 import type { PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
 
 import { at, detailLayoutSpec, type Region } from "./detailLayout";
-import type { FieldDef, FieldKind } from "./fields";
-import { propertyFields } from "./tasks";
+import { type FieldDef, type FieldKind, propertyFields } from "./fields";
 import type { LayoutNode } from "./tree";
 
-/** An event's fields, each with its label's key and the kind of value it is. */
+/** An event's fields, each with its label's key and, where it is one, the
+ *  kind of value it is. */
 export const EVENT_FIELDS = {
   title: { label: "calendars:eventTitle", kind: "title" },
   description: { label: "calendars:eventPage.description", kind: "excerpt" },
   location: { label: "calendars:location", kind: "excerpt" },
-  recurrence: { label: "calendars:repeat", kind: "recurrence" },
-  attendees: { label: "calendars:attendees", kind: "people" },
-  tags: { label: "common:toolSettings.tags", kind: "tags" },
-} as const satisfies Record<string, { label: string; kind: FieldKind }>;
+  recurrence: { label: "calendars:repeat" },
+  attendees: { label: "calendars:attendees" },
+  tags: { label: "common:toolSettings.tags" },
+} as const satisfies Record<string, { label: string; kind?: FieldKind }>;
 
 /** What a person fills in on an event, beside its title, which every event
  *  has. */
@@ -35,10 +35,9 @@ export const eventFields = (
   new Map(
     [
       ...Object.entries(EVENT_FIELDS).map(
-        ([id, { label, kind }]): FieldDef => ({
+        ([id, field]): FieldDef => ({
           id,
-          kind,
-          label,
+          ...field,
           source: "builtin",
           hideable: id !== "title",
           requireable: EVENT_REQUIREABLE.has(id),

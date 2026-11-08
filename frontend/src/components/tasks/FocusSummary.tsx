@@ -3,7 +3,6 @@ import { ChevronDown, Crosshair, Pin, PinOff, Settings2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { TaskListRead, TaskStatusCategory } from "@/api/generated/initiativeAPI.schemas";
-import { DateCell } from "@/components/tasks/TaskDateCell";
 import { NO_TASK_COLUMN_LIMITS, type TaskColumnLimits } from "@/hooks/useColumnLimits";
 import { FOCUS_HORIZON_ANY, FOCUS_PRIORITIES, type useFocusSummary } from "@/hooks/useFocusSummary";
 import { communityPath } from "@/lib/communityUrl";
@@ -13,6 +12,7 @@ import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader } from "@/ui/card";
 import { Checkbox } from "@/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
+import { DateCell } from "@/ui/date-cell";
 import { Label } from "@/ui/label";
 import { cn } from "@/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";

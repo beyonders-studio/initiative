@@ -24,6 +24,7 @@ import type { RelationsLayout } from "@/components/entities/RelationsSection";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { type FieldSaveKind, ItemDraftContext, itemSaves } from "@/hooks/useFieldSave";
+import { useProjectLayoutEnv } from "@/hooks/useLayoutEnv";
 import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 import { useCommunityPath } from "@/lib/communityUrl";
 import type { LinkedRef } from "@/lib/relationships";
@@ -45,7 +46,7 @@ import {
 } from "./detailLayout";
 import { indexPaths } from "./draft";
 import { PlacedPropertyField, PropertiesField } from "./fieldEditors";
-import { type FieldDef, PROPERTY_FIELD_PREFIX, useProjectLayoutEnv } from "./fields";
+import { type FieldDef, PROPERTY_FIELD_PREFIX } from "./fields";
 import {
   FieldsInParts,
   fieldsInParts,

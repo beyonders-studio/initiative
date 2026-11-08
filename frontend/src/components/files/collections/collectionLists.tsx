@@ -47,16 +47,16 @@ const LINE = 22;
 const SPACE = 4;
 const ABOVE = 6;
 
-const NO_TASK_HREF = () => "";
+const NO_HREF = () => "";
 
 /** What a collection's fields are drawn with: the files namespace beside the
  *  layouts', and the community's paths. A file is opened from its picture or
- *  its name's own link, not through a task's. */
+ *  its name's own link, not through a title's. */
 const useCollectionEnv = (stepCounter?: LayoutEnv["stepCounter"]): LayoutEnv => {
   const { t } = useTranslation(["files", ...LAYOUT_NAMESPACES]);
   const communityPath = useCommunityPath();
   return useMemo(
-    () => ({ t: t as TranslateFn, communityPath, taskHref: NO_TASK_HREF, stepCounter }),
+    () => ({ t: t as TranslateFn, communityPath, itemHref: NO_HREF, stepCounter }),
     [t, communityPath, stepCounter]
   );
 };

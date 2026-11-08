@@ -18,7 +18,7 @@ import { filledBy, PlacedProperties } from "./detailLayout";
 import { ReadField } from "./editing";
 import { PlacedPropertyField } from "./fieldEditors";
 import {
-  FIELD_RENDERERS,
+  fieldRenderer,
   isEmptyValue,
   type LayoutEnv,
   type LayoutItem,
@@ -99,10 +99,10 @@ const FileField = ({
   const item = file as unknown as LayoutItem;
   const value = field?.value(item);
   if (!field || isEmptyValue(value)) return null;
-  if (field.kind === "fileName") {
+  if (id === "name") {
     return <h2 className="min-w-0 break-words font-semibold text-lg">{file.name}</h2>;
   }
-  const Renderer = FIELD_RENDERERS[field.kind];
+  const Renderer = fieldRenderer(field);
   return (
     <ReadField label={t(field.label)}>
       <Renderer value={value} item={item} field={field} variant="cell" env={view.env} />

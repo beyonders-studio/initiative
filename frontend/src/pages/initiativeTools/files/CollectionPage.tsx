@@ -63,6 +63,7 @@ import {
 } from "@/hooks/useCollections";
 import { useCollectionUploader } from "@/hooks/useCollectionUploader";
 import { type GridToggleOptions, useGridSelection } from "@/hooks/useGridSelection";
+import { useCounterSteps } from "@/hooks/useLayoutEnv";
 import { type ListViewSpec, NO_PART_VIEW, useListView, viewKey } from "@/hooks/useListView";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
@@ -78,7 +79,7 @@ import {
 import { useCommunityPath } from "@/lib/communityUrl";
 import { DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
 import { requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
-import { useCounterSteps, withDisplays } from "@/lib/layouts/fields";
+import { withDisplays } from "@/lib/layouts/fields";
 import { FILE_DETAIL } from "@/lib/layouts/fileLayout";
 import { collectionFileFields } from "@/lib/layouts/files";
 import { toast } from "@/lib/mascotToast";

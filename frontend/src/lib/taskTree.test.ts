@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildTask } from "@/__tests__/factories";
 import type { TaskListRead } from "@/api/generated/initiativeAPI.schemas";
-import type { TaskGroupRow } from "@/lib/layouts/grouping";
+import type { TaskGroupRow } from "@/lib/layouts/taskGroupings";
 import { flattenTaskTree, nestTaskRows, type TaskTreeRow, treeParents } from "@/lib/taskTree";
 
 const task = (id: number, parent?: number): TaskListRead =>
