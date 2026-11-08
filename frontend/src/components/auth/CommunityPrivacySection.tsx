@@ -140,14 +140,8 @@ export const CommunityPrivacySection = ({
           <SettingsRow
             key={row.key}
             label={row.label}
-            description={
-              <>
-                <span className="text-foreground">
-                  {row.on ? t("communityAuth.on") : t("communityAuth.off")}
-                </span>
-                {row.platform ? ` · ${row.platform}` : null}
-              </>
-            }
+            value={row.on ? t("settingsSection.on") : t("settingsSection.off")}
+            description={row.platform}
             action={<Badge variant="secondary">{t("communityAuth.setByServer")}</Badge>}
           />
         ) : (

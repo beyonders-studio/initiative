@@ -14,6 +14,17 @@
     "goToLogin": "Zur Anmeldung",
     "version": "Initiative v{{version}}"
   },
+  "settingsSection": {
+    "whenYouSave": "Beim Speichern",
+    "change": "Ändern",
+    "changeRule": "{{rule}} ändern",
+    "on": "An",
+    "off": "Aus",
+    "days_one": "{{count}} Tag",
+    "days_other": "{{count}} Tage",
+    "hours_one": "{{count}} Stunde",
+    "hours_other": "{{count}} Stunden"
+  },
   "communityLayout": {
     "title": "Community-Einstellungen",
     "permissionDenied": "Du benötigst zusätzliche Berechtigungen, um diese Seite anzuzeigen.",
@@ -671,8 +682,6 @@
   "captcha": {
     "title": "Captcha",
     "description": "Eine Prüfung, dass die Person, die sich registriert oder einen Anmeldecode per E-Mail anfordert, kein Bot ist.",
-    "on": "An",
-    "off": "Aus",
     "providerLabel": "Anbieter",
     "providers": {
       "off": "Keiner",
@@ -685,8 +694,7 @@
     "secretKeySet": "••••••••",
     "secretKeyHelp": "Leer lassen, um den gespeicherten geheimen Schlüssel zu behalten.",
     "incomplete": "Das Captcha ist aktiv, sobald Anbieter, Websiteschlüssel und geheimer Schlüssel gespeichert sind.",
-    "save": "Captcha-Einstellungen speichern",
-    "saving": "Speichern…",
+    "missingKeys": "erst aktiv, wenn Websiteschlüssel und geheimer Schlüssel gespeichert sind",
     "saved": "Captcha-Einstellungen gespeichert",
     "error": "Captcha-Einstellungen konnten nicht gespeichert werden"
   },
@@ -718,7 +726,7 @@
       "communitiesRequire_one": "{{count}} Community verlangt eine Anmeldung über einen eigenen Anbieter.",
       "communitiesRequire_other": "{{count}} Communities verlangen eine Anmeldung über einen eigenen Anbieter.",
       "totp": {
-        "label": "Zwei-Faktor-Authentifizierung aktivieren",
+        "label": "Authenticator-App",
         "help": "Lass Leute ihr Konto mit einem Code aus einer Authenticator-App schützen. Einschalten tut das jede Person für sich; hier geht es darum, ob der Server es überhaupt anbietet."
       },
       "passkey": {
@@ -731,7 +739,7 @@
       }
     },
     "sessionLifetime": {
-      "title": "Wie lange Personen angemeldet bleiben",
+      "title": "Sitzungsdauer",
       "description": "Die längste Zeit, die jemand ohne erneute Anmeldung auskommt, unabhängig von der Nutzung. Unabhängig davon, bei Nichtnutzung abgemeldet zu werden.",
       "label": "Stunden",
       "placeholder": "Kein Limit",
@@ -740,21 +748,23 @@
       "error": "Das Sitzungslimit konnte nicht gespeichert werden.",
       "idleLabel": "Leerlauf (Minuten)",
       "idlePlaceholder": "Kein Limit",
+      "idleDetail_one": "ungenutzte Sitzungen enden nach {{count}} Minute",
+      "idleDetail_other": "ungenutzte Sitzungen enden nach {{count}} Minuten",
+      "idleDefault": "ungenutzte Sitzungen enden nach dem beim Deployment gesetzten Fenster",
       "idleHint": "Wie lange eine Sitzung unberührt bleiben darf, bevor sie endet. Leer lassen, um das beim Deployment gesetzte Fenster zu behalten. Die App zu benutzen zählt als Berührung, die Zeit läuft also erst, wenn jemand aufhört. Eine Community, die dem Compliance-Standard folgt, verkürzt es für ihre Mitglieder weiter."
     },
     "breachedPasswordCheck": {
-      "title": "Kompromittierte Passwörter",
-      "description": "Ein neues Passwort ablehnen, das bereits in einem Datenleck aufgetaucht ist.",
-      "label": "Neue Passwörter mit bekannten Datenlecks abgleichen",
-      "onHelp": "Nur die ersten fünf Zeichen des Passwort-Hashes verlassen diesen Server. Das Passwort selbst nie.",
-      "offHelp": "Neue Passwörter werden nicht geprüft. Schalte dies nur aus, wenn dieser Server das Internet nicht erreichen kann.",
+      "title": "Prüfung auf kompromittierte Passwörter",
+      "description": "Lehnt ein neues Passwort ab, das bereits in einem Datenleck aufgetaucht ist. Nur die ersten fünf Zeichen seines Hashes verlassen diesen Server, das Passwort selbst nie.",
+      "onLabel": "Neue Passwörter mit bekannten Datenlecks abgleichen",
+      "offLabel": "Nicht prüfen, für einen Server ohne Internetzugang",
       "enabledToast": "Neue Passwörter werden mit bekannten Datenlecks abgeglichen.",
       "disabledToast": "Neue Passwörter werden nicht mehr mit bekannten Datenlecks abgeglichen.",
       "error": "Die Prüfung auf kompromittierte Passwörter konnte nicht geändert werden."
     },
     "secondFactorRequirement": {
-      "title": "Zwei-Faktor-Authentifizierung",
-      "description": "Ob Personen hier zusätzlich zur Anmeldung einen zweiten Faktor besitzen müssen — eine Authenticator-App oder einen Passkey.",
+      "title": "Zweiter Faktor",
+      "description": "Wer zusätzlich zur Anmeldung einen zweiten Faktor besitzen muss, eine Authenticator-App oder einen Passkey.",
       "levels": {
         "nobody": {
           "label": "Niemand muss",
@@ -776,18 +786,19 @@
       "present": "Code eingeben",
       "saved": "Gespeichert. Betroffene werden bei ihrer nächsten Anfrage gefragt.",
       "error": "Das konnte nicht gespeichert werden.",
-      "noMethod": "Erlaube zuerst die Authenticator-App oder Passkeys — ohne eines von beiden gibt es nichts zu verlangen.",
+      "noMethod": "Biete zuerst die Authenticator-App oder Passkeys an. Ohne eines von beiden gibt es nichts zu verlangen.",
       "providers": {
         "title": "Anbieter, deren Anmeldung zählt",
         "help": "Eine Anmeldung über einen davon erfüllt die obige Anforderung, da der Anbieter meldet, selbst einen zweiten Faktor geprüft zu haben. Dieselbe Angabe wie auf der Seite des Anbieters."
       }
     },
     "factorMethods": {
-      "title": "Zwei-Faktor-Authentifizierung",
-      "description": "Was dieser Server als zweiten Faktor anbietet. Ob ihn jemand haben muss, ist die nächste Einstellung.",
+      "title": "Angebotene zweite Faktoren",
+      "description": "Welche zweiten Faktoren Personen einrichten können. Ob ihn jemand haben muss, legt die Regel „Zweiter Faktor“ fest.",
       "saved": "Zwei-Faktor-Authentifizierung aktualisiert.",
       "saveError": "Zwei-Faktor-Authentifizierung konnte nicht geändert werden.",
-      "followsWaysIn": "Ein Passkey weist Gerät und Person in einem Schritt nach und beantwortet dies daher ebenso, wie er eine Sitzung eröffnet. Ob Passkeys angeboten werden, wird unter „Zugangswege“ entschieden."
+      "setUnderWaysIn": "Festgelegt unter Zugangswege",
+      "none": "Keine"
     }
   },
   "platformUsers": {
@@ -1681,11 +1692,6 @@
     },
     "setByServer": "Von deinem Server festgelegt",
     "intro": "Wie man sich bei {{community}} anmeldet, was man zum Hereinkommen braucht und was die Community verlässt.",
-    "change": "Ändern",
-    "changeRule": "{{rule}} ändern",
-    "on": "An",
-    "off": "Aus",
-    "whenYouSave": "Beim Speichern",
     "signInRules": {
       "title": "Anmelderegeln",
       "description": "Was man braucht, bevor man {{community}} öffnen kann.",
@@ -1703,11 +1709,11 @@
     "description": "Die Single-Sign-on-Anbieter, mit denen sich Personen anmelden. Jeder erhält eine eigene Schaltfläche auf der Anmeldeseite.",
     "addProvider": "Anbieter hinzufügen",
     "empty": "Noch keine Anbieter konfiguriert.",
-    "disabledBadge": "Deaktiviert",
     "editTitle": "Anmeldeanbieter bearbeiten",
     "dialogDescription": "OpenID-Connect-Anbieterdetails. Die Callback-URL für Ihren IdP lautet /api/v1/auth/{slug}/callback auf diesem Server.",
     "slugLabel": "Kürzel",
     "slugHelp": "Kleinbuchstaben, Zahlen und Bindestriche. Nach dem Erstellen unveränderlich — es bildet die Anmelde-URLs.",
+    "slugFixed": "Unveränderlich, sobald der Anbieter hinzugefügt ist, weil seine Anmeldeadressen daraus gebildet werden.",
     "slugInvalid": "Nur Kleinbuchstaben, Zahlen und Bindestriche; kein Bindestrich am Anfang oder Ende.",
     "displayNameLabel": "Anzeigename",
     "issuerLabel": "Issuer-URL",
@@ -1740,7 +1746,6 @@
     "claimPathPlaceholder": "groups",
     "claimPathHelp": "Wo dieser Anbieter die Gruppen einer Person im Token ablegt. Keycloak verschachtelt sie unter realm_access.roles, die meisten anderen nutzen groups oder roles. Die Regeln jeder Community lesen ihn.",
     "test": "Testen",
-    "testing": "Test läuft…",
     "verify": "Prüfen",
     "verifying": "Wird geprüft…",
     "verifyError": "Diese Adresse konnte nicht geprüft werden",
@@ -1858,6 +1863,7 @@
     "ageGateOffConfirm": "Hier sind alle mindestens 18",
     "defaultDmLabel": "Direktnachrichten für neue Konten",
     "defaultDmHelpText": "Die Einstellung, mit der ein Konto startet. Sie wird einmal gelesen, wenn das Konto erstellt wird – eine Änderung öffnet kein bestehendes Konto und schließt auch keines. „Privat“ ist die Voreinstellung; damit werden Personen nach und nach erreichbar, sobald sie es selbst wählen.",
+    "whileMessagesOff": "gilt, sobald Direktnachrichten an sind",
     "directMessagesLabel": "Direktnachrichten zwischen Mitgliedern erlauben",
     "directMessagesHelpText": "Meine Nachrichten sowie die dahinterliegenden Verbindungen und Anfragen. Nachrichten sind Ende-zu-Ende-verschlüsselt, niemand im Betrieb dieser Installation kann sie lesen – deaktivieren Sie dies dort, wo private Nachrichten nicht hingehören, nicht um sie zu beaufsichtigen.",
     "directMessagesReversibleNote": "Deaktivieren blendet Meine Nachrichten aus und weist neue ab; gelöscht wird nichts. Unterhaltungen, Verbindungen und Einstellungen sind beim Wiedereinschalten unverändert vorhanden.",
@@ -1875,8 +1881,7 @@
       "neverHint": "Nichts wird nach Ablauf einer Frist gelöscht. Eine Community bleibt pausiert, bis jemand die Pause aufhebt oder sie löscht.",
       "saved_one": "Pausierte Communitys werden nach {{count}} Tag gelöscht.",
       "saved_other": "Pausierte Communitys werden nach {{count}} Tagen gelöscht.",
-      "savedNever": "Pausierte Communitys werden nie automatisch gelöscht.",
-      "save": "Frist für pausierte Communitys speichern"
+      "savedNever": "Pausierte Communitys werden nie automatisch gelöscht."
     },
     "retention": {
       "title": "Gelöschte Communitys aufbewahren",
@@ -1887,8 +1892,7 @@
       "neverHint": "Nichts wird nach Ablauf einer Frist entfernt. Gelöschte Communitys bleiben in der Liste unten, bis jemand eine wiederherstellt.",
       "saved_one": "Gelöschte Communitys werden {{count}} Tag aufbewahrt.",
       "saved_other": "Gelöschte Communitys werden {{count}} Tage aufbewahrt.",
-      "savedNever": "Gelöschte Communitys werden unbegrenzt aufbewahrt.",
-      "save": "Aufbewahrungsdauer für Communitys speichern"
+      "savedNever": "Gelöschte Communitys werden unbegrenzt aufbewahrt."
     },
     "accountRetention": {
       "title": "Gelöschte Konten aufbewahren",
@@ -1899,8 +1903,7 @@
       "neverHint": "Nichts wird nach Ablauf einer Frist gelöscht. Gelöschte Konten bleiben in der Nutzertabelle, bis jemand zurückkommt oder eines wiederherstellt.",
       "saved_one": "Gelöschte Konten werden {{count}} Tag aufbewahrt.",
       "saved_other": "Gelöschte Konten werden {{count}} Tage aufbewahrt.",
-      "savedNever": "Gelöschte Konten werden unbegrenzt aufbewahrt.",
-      "save": "Aufbewahrungsdauer für Konten speichern"
+      "savedNever": "Gelöschte Konten werden unbegrenzt aufbewahrt."
     },
     "engagementRankingLabel": "Communities erlauben, Ergebnisse nach Beteiligung zu ordnen",
     "engagementRankingHelpText": "Ausgeschaltet ordnet keine Community auf diesem Server nach Beteiligung, unabhängig von ihrer eigenen Einstellung.",
@@ -1910,9 +1913,10 @@
     "guestsEnabledHelpText": "Communities können Personen für eine festgelegte Anzahl von Tagen einladen. Gäste belegen keinen Platz und sehen nur, was ihnen gegeben wurde. Solange dies aus ist, kommt kein Gast hinein.",
     "guestsEnabledToast": "Communities können Gäste haben.",
     "guestsDisabledToast": "Gäste sind ausgeschaltet.",
+    "maxGuestDaysTitle": "Längster Gastaufenthalt",
     "maxGuestDaysLabel": "Längster Aufenthalt eines Gastes (Tage)",
     "maxGuestDaysHelpText": "Kein Gast bleibt länger als das, egal was eine Community einstellt.",
-    "maxGuestDaysSave": "Längsten Gastaufenthalt speichern",
+    "whileGuestsOff": "gilt, sobald Gäste erlaubt sind",
     "maxGuestDaysSaved_one": "Gäste bleiben höchstens {{count}} Tag.",
     "maxGuestDaysSaved_other": "Gäste bleiben höchstens {{count}} Tage.",
     "joinAndCreateTitle": "Wer beitreten und erstellen darf",
@@ -1924,18 +1928,24 @@
     "communityCreationHelpText": "Wenn aus, können nur Personen, die auf diesem Server Communities verwalten, eine erstellen, und nur Eingeladene können sich registrieren.",
     "communityCreationEnabledToast": "Jeder kann eine Community erstellen.",
     "communityCreationDisabledToast": "Nur Personen, die Communities verwalten, können eine erstellen.",
+    "creationDailyLimitTitle": "Tageslimit pro Konto",
     "creationDailyLimitLabel": "Communities pro Konto und Tag",
     "creationDailyLimitHelpText": "0 bedeutet kein Limit. Für Personen, die Communities verwalten, gilt es nicht.",
-    "creationDailyLimitSave": "Tageslimit für Communities speichern",
+    "whileCreationOff": "gilt, sobald alle eine Community erstellen dürfen",
+    "creationDailyLimitValue_one": "{{count}} Community pro Tag",
+    "creationDailyLimitValue_other": "{{count}} Communities pro Tag",
     "creationDailyLimitSaved_one": "Jedes Konto kann {{count}} Community pro Tag erstellen.",
     "creationDailyLimitSaved_other": "Jedes Konto kann {{count}} Communities pro Tag erstellen.",
     "creationDailyLimitSavedNone": "Für neue Communities gibt es kein Tageslimit.",
+    "exportAndDeletionTitle": "Exporte und Löschung",
     "exportCooldownLabel": "Stunden zwischen Community-Exporten",
     "exportCooldownHelpText": "Wie lange eine Community wartet, bevor sie wieder alles exportieren kann. 0 bedeutet keine Wartezeit.",
-    "exportCooldownSave": "Zeit zwischen Community-Exporten speichern",
     "exportCooldownSaved_one": "Communities warten {{count}} Stunde zwischen Exporten.",
     "exportCooldownSaved_other": "Communities warten {{count}} Stunden zwischen Exporten.",
-    "exportCooldownSavedNone": "Communities können ohne Wartezeit exportieren."
+    "exportCooldownSavedNone": "Communities können ohne Wartezeit exportieren.",
+    "noLimit": "Kein Limit",
+    "noWait": "Keine Wartezeit",
+    "exportCooldownTitle": "Zeit zwischen Exporten"
   },
   "account": {
     "passwordTitle": "Passwort",
@@ -2118,7 +2128,11 @@
     "valuesHint": "Mehrere durch Kommas trennen. Die eigene Verbindung einer Community ersetzt dies vollständig; nichts hiervon wird mit ihren Angaben zusammengeführt."
   },
   "platformSecurity": {
-    "description": "Wie lange jemand angemeldet bleiben darf, welches Captcha neuen Personen gestellt wird und was eine Benachrichtigung mitnimmt, wenn sie die App verlässt."
+    "description": "Wie lange jemand angemeldet bleiben darf, welches Captcha neuen Personen gestellt wird und was eine Benachrichtigung mitnimmt, wenn sie die App verlässt.",
+    "signInRules": {
+      "title": "Anmelderegeln",
+      "description": "Was jedes Konto auf diesem Server bei der Anmeldung gefragt wird."
+    }
   },
   "notificationDelivery": {
     "title": "Benachrichtigungen, die die App verlassen",

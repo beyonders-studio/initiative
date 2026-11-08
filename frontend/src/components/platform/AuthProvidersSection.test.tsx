@@ -1,4 +1,5 @@
 import { fireEvent, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "@/__tests__/helpers/render";
@@ -69,6 +70,13 @@ const reachable: AuthProviderProbeResult = {
 
 const rowFor = (name: string) => screen.getByText(name).closest("li") as HTMLElement;
 
+/** Choose one of a provider row's actions from its menu. */
+const choose = async (provider: string, action: string) => {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: `Actions for ${provider}` }));
+  await user.click(screen.getByRole("menuitem", { name: action }));
+};
+
 /** Answer the next Verify with `result`. */
 const verifyWith = (result: AuthProviderProbeResult) =>
   discoverMutate.mockImplementation((_vars, options) => options?.onSuccess?.(result));
@@ -83,13 +91,21 @@ describe("AuthProvidersSection", () => {
     providersData = [platformRow, corpRow];
   });
 
-  it("offers every provider the same actions", () => {
+  it("offers every provider the same actions, and says whether it is on", async () => {
+    providersData = [platformRow, { ...corpRow, enabled: false }];
+    const user = userEvent.setup();
     renderWithProviders(<AuthProvidersSection />);
 
-    // The row an install started with is a row. Two providers, two of each.
-    expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: "Delete" })).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: "Test" })).toHaveLength(2);
+    expect(within(rowFor("Okta")).getByText("On")).toBeInTheDocument();
+    expect(within(rowFor("Corp SSO")).getByText("Off")).toBeInTheDocument();
+
+    // The row an install started with is a row: the same menu on each.
+    await user.click(screen.getByRole("button", { name: "Actions for Okta" }));
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+      "Test",
+      "Edit",
+      "Delete",
+    ]);
   });
 
   it("shows each provider the address its IdP sends the browser back to", () => {
@@ -105,10 +121,10 @@ describe("AuthProvidersSection", () => {
     ).toBeInTheDocument();
   });
 
-  it("tests a saved provider against the address on its row", () => {
+  it("tests a saved provider against the address on its row", async () => {
     renderWithProviders(<AuthProvidersSection />);
 
-    fireEvent.click(within(rowFor("Corp SSO")).getByRole("button", { name: "Test" }));
+    await choose("Corp SSO", "Test");
 
     // By id: the address is the server's to read off the row, not ours to send.
     expect(testMutate).toHaveBeenCalledTimes(1);
@@ -307,7 +323,7 @@ describe("AuthProvidersSection", () => {
   it("keeps the stored secret when the edit form leaves it blank", async () => {
     renderWithProviders(<AuthProvidersSection />);
 
-    fireEvent.click(within(rowFor("Corp SSO")).getByRole("button", { name: "Edit" }));
+    await choose("Corp SSO", "Edit");
     const secret = (await screen.findByLabelText("Client secret")) as HTMLInputElement;
     expect(secret.value).toBe("");
     expect(secret.placeholder).toMatch(/keep the current secret/i);
@@ -327,7 +343,7 @@ describe("AuthProvidersSection", () => {
     verifyWith(reachable);
     renderWithProviders(<AuthProvidersSection />);
 
-    fireEvent.click(within(rowFor("Corp SSO")).getByRole("button", { name: "Edit" }));
+    await choose("Corp SSO", "Edit");
     fireEvent.click(await screen.findByRole("button", { name: "Verify" }));
 
     expect(await screen.findByText("Reachable")).toBeInTheDocument();
@@ -337,7 +353,7 @@ describe("AuthProvidersSection", () => {
   it("deletes after confirmation", async () => {
     renderWithProviders(<AuthProvidersSection />);
 
-    fireEvent.click(within(rowFor("Corp SSO")).getByRole("button", { name: "Delete" }));
+    await choose("Corp SSO", "Delete");
     const dialog = await screen.findByRole("alertdialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
 

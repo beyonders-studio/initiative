@@ -15,13 +15,12 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { LoginMethod } from "@/api/generated/initiativeAPI.schemas";
-import { SettingsSection } from "@/components/settings/SettingsSection";
+import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { usePlatformAuthSettings, useUpdatePlatformAuthSettings } from "@/hooks/useSettings";
 import { getErrorCode, getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Checkbox } from "@/ui/checkbox";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
-import { Label } from "@/ui/label";
 
 /** The two refusals that come with a number to acknowledge. */
 const ACKNOWLEDGEABLE = new Set([
@@ -88,56 +87,51 @@ export const PlatformAuthSection = () => {
   return (
     <>
       <SettingsSection title={t("auth.methods.title")} description={t("auth.methods.description")}>
-        <div className="space-y-4">
-          {methods
-            .filter((entry) => entry.primary)
-            .map((entry) => {
-              // The last permitted way in cannot be withdrawn: the deployment
-              // must keep at least one, which the server holds too.
-              const isLastEnabled = entry.enabled && enabled.length === 1;
-              return (
-                <div key={entry.method} className="flex items-start gap-3">
+        {methods
+          .filter((entry) => entry.primary)
+          .map((entry) => {
+            // The last permitted way in cannot be withdrawn: the deployment
+            // must keep at least one, which the server holds too. Its row
+            // states that it is on rather than offering a box to untick.
+            const isLastEnabled = entry.enabled && enabled.length === 1;
+            const id = `login-method-${entry.method}`;
+            const notes = (
+              <>
+                {isLastEnabled ? (
+                  <p className="text-muted-foreground text-xs">{t("auth.methods.lastRemaining")}</p>
+                ) : null}
+                {entry.enabled && entry.would_strand > 0 ? (
+                  <p className="text-amber-600 text-xs dark:text-amber-500">
+                    {t("auth.methods.wouldStrand", { count: entry.would_strand })}
+                  </p>
+                ) : null}
+                {entry.method === "sso" && entry.enabled && communities_requiring_sign_in > 0 ? (
+                  <p className="text-amber-600 text-xs dark:text-amber-500">
+                    {t("auth.methods.communitiesRequire", { count: communities_requiring_sign_in })}
+                  </p>
+                ) : null}
+              </>
+            );
+            return (
+              <SettingsRow
+                key={entry.method}
+                htmlFor={isLastEnabled ? undefined : id}
+                label={t(`auth.methods.${entry.method}.label`)}
+                value={isLastEnabled ? t("settingsSection.on") : undefined}
+                description={t(`auth.methods.${entry.method}.help`)}
+                below={notes}
+              >
+                {isLastEnabled ? null : (
                   <Checkbox
-                    id={`login-method-${entry.method}`}
+                    id={id}
                     checked={entry.enabled}
-                    disabled={busy || isLastEnabled}
+                    disabled={busy}
                     onCheckedChange={(checked) => toggleMethod(entry.method, Boolean(checked))}
-                    className="mt-0.5"
                   />
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor={`login-method-${entry.method}`}
-                      className="cursor-pointer font-medium"
-                    >
-                      {t(`auth.methods.${entry.method}.label`)}
-                    </Label>
-                    <p className="text-muted-foreground text-sm">
-                      {t(`auth.methods.${entry.method}.help`)}
-                    </p>
-                    {isLastEnabled ? (
-                      <p className="text-muted-foreground text-xs">
-                        {t("auth.methods.lastRemaining")}
-                      </p>
-                    ) : null}
-                    {entry.enabled && entry.would_strand > 0 ? (
-                      <p className="text-amber-600 text-xs dark:text-amber-500">
-                        {t("auth.methods.wouldStrand", { count: entry.would_strand })}
-                      </p>
-                    ) : null}
-                    {entry.method === "sso" &&
-                    entry.enabled &&
-                    communities_requiring_sign_in > 0 ? (
-                      <p className="text-amber-600 text-xs dark:text-amber-500">
-                        {t("auth.methods.communitiesRequire", {
-                          count: communities_requiring_sign_in,
-                        })}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-        </div>
+                )}
+              </SettingsRow>
+            );
+          })}
       </SettingsSection>
 
       <ConfirmDialog

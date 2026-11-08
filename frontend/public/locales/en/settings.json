@@ -14,6 +14,17 @@
     "goToLogin": "Go to login",
     "version": "Initiative v{{version}}"
   },
+  "settingsSection": {
+    "whenYouSave": "When you save",
+    "change": "Change",
+    "changeRule": "Change {{rule}}",
+    "on": "On",
+    "off": "Off",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "hours_one": "{{count}} hour",
+    "hours_other": "{{count}} hours"
+  },
   "communityLayout": {
     "title": "Community settings",
     "permissionDenied": "You need additional permissions to view this page.",
@@ -671,8 +682,6 @@
   "captcha": {
     "title": "Captcha",
     "description": "A check that the person signing up, or asking for an emailed sign-in code, is not a bot.",
-    "on": "On",
-    "off": "Off",
     "providerLabel": "Provider",
     "providers": {
       "off": "None",
@@ -685,8 +694,7 @@
     "secretKeySet": "••••••••",
     "secretKeyHelp": "Leave blank to keep the saved secret key.",
     "incomplete": "The captcha comes on once a provider, a site key and a secret key are all saved.",
-    "save": "Save captcha settings",
-    "saving": "Saving…",
+    "missingKeys": "not on until its site key and secret key are saved",
     "saved": "Captcha settings saved",
     "error": "Unable to save captcha settings"
   },
@@ -718,7 +726,7 @@
       "communitiesRequire_one": "{{count}} community requires a sign-in through a provider of its own.",
       "communitiesRequire_other": "{{count}} communities require a sign-in through a provider of their own.",
       "totp": {
-        "label": "Enable two-factor authentication",
+        "label": "Authenticator app",
         "help": "Let people protect their account with a code from an authenticator app. Each person turns it on for themselves; this is whether the server offers it at all."
       },
       "passkey": {
@@ -731,7 +739,7 @@
       }
     },
     "sessionLifetime": {
-      "title": "How long people stay signed in",
+      "title": "Session length",
       "description": "The longest anybody may go before signing in again, however much they use the app. Separate from being signed out for not using it.",
       "label": "Hours",
       "placeholder": "No limit",
@@ -740,21 +748,23 @@
       "error": "We couldn't save the session limit.",
       "idleLabel": "Idle minutes",
       "idlePlaceholder": "No limit",
+      "idleDetail_one": "idle sessions end after {{count}} minute",
+      "idleDetail_other": "idle sessions end after {{count}} minutes",
+      "idleDefault": "idle sessions end on the window set when the server was deployed",
       "idleHint": "How long a session may sit untouched before it ends. Leave blank to keep the window set when the server was deployed. Using the app counts as touching it, so this only runs down once somebody has stopped. A community held to the compliance standard shortens it further for its own members."
     },
     "breachedPasswordCheck": {
-      "title": "Breached passwords",
-      "description": "Turn away a new password that has already turned up in a data breach.",
-      "label": "Check new passwords against known breaches",
-      "onHelp": "Only the first five characters of the password's hash leave this server. The password itself never does.",
-      "offHelp": "New passwords are not checked. Turn this off only where this server cannot reach the internet.",
+      "title": "Breached password check",
+      "description": "Turns away a new password that has already turned up in a data breach. Only the first five characters of its hash leave this server, never the password itself.",
+      "onLabel": "Check new passwords against known breaches",
+      "offLabel": "Don't check, for a server that cannot reach the internet",
       "enabledToast": "New passwords are checked against known breaches.",
       "disabledToast": "New passwords are no longer checked against known breaches.",
       "error": "We couldn't change the breached password check."
     },
     "secondFactorRequirement": {
-      "title": "Two-factor authentication",
-      "description": "Whether people here have to hold a second factor — an authenticator app or a passkey — as well as a way to sign in.",
+      "title": "Second factor",
+      "description": "Who has to hold a second factor, an authenticator app or a passkey, as well as a way to sign in.",
       "levels": {
         "nobody": {
           "label": "Nobody has to",
@@ -776,18 +786,19 @@
       "present": "Enter a code",
       "saved": "Saved. People this covers are asked at their next request.",
       "error": "We couldn't save that.",
-      "noMethod": "Permit the authenticator app or passkeys first — with neither offered there is nothing to ask people for.",
+      "noMethod": "Offer the authenticator app or passkeys first. With neither offered, there is nothing to ask people for.",
       "providers": {
         "title": "Providers whose sign-in counts",
         "help": "A sign-in through one of these answers the requirement above, because the provider reports running a second factor of its own. The same answer as on the provider's own page."
       }
     },
     "factorMethods": {
-      "title": "Two-factor authentication",
-      "description": "What this server offers as a second factor. Whether anybody has to hold one is the next setting.",
+      "title": "Second factors offered",
+      "description": "Which second factors people can set up. Whether anybody has to hold one is the Second factor rule.",
       "saved": "Two-factor authentication updated.",
       "saveError": "Could not change two-factor authentication.",
-      "followsWaysIn": "A passkey proves the device and the person in one go, so it answers this as well as opening a session. Whether passkeys are offered is decided under Ways in."
+      "setUnderWaysIn": "Set under Ways in",
+      "none": "None"
     }
   },
   "platformUsers": {
@@ -1681,11 +1692,6 @@
     },
     "setByServer": "Set by your server",
     "intro": "How people sign in to {{community}}, what they need to get in, and what leaves the community.",
-    "change": "Change",
-    "changeRule": "Change {{rule}}",
-    "on": "On",
-    "off": "Off",
-    "whenYouSave": "When you save",
     "signInRules": {
       "title": "Sign-in rules",
       "description": "What somebody needs before they can open {{community}}.",
@@ -1703,11 +1709,11 @@
     "description": "The single sign-on providers people sign in with. Each one gets its own button on the sign-in page.",
     "addProvider": "Add provider",
     "empty": "No providers configured yet.",
-    "disabledBadge": "Disabled",
     "editTitle": "Edit sign-in provider",
     "dialogDescription": "OpenID Connect provider details. The callback URL for your IdP is /api/v1/auth/{slug}/callback on this server.",
     "slugLabel": "Slug",
     "slugHelp": "Lowercase letters, numbers, and dashes. Fixed after creation — it forms the sign-in URLs.",
+    "slugFixed": "Fixed once the provider is added, because its sign-in addresses are made from it.",
     "slugInvalid": "Use lowercase letters, numbers, and dashes; no leading or trailing dash.",
     "displayNameLabel": "Display name",
     "issuerLabel": "Issuer URL",
@@ -1740,7 +1746,6 @@
     "claimPathPlaceholder": "groups",
     "claimPathHelp": "Where this provider puts a person's groups in the token. Keycloak nests them at realm_access.roles; most others use groups or roles. Each community's rules read it.",
     "test": "Test",
-    "testing": "Testing…",
     "verify": "Verify",
     "verifying": "Checking…",
     "verifyError": "Could not check that address",
@@ -1858,6 +1863,7 @@
     "ageGateOffConfirm": "Everyone here is 18 or older",
     "defaultDmLabel": "Direct messages for new accounts",
     "defaultDmHelpText": "The policy an account starts on. Read once, when the account is made — changing it opens no account that already exists and closes none either. “Private” is the shipped default; on it, people become reachable one at a time as they choose to be.",
+    "whileMessagesOff": "used once direct messages are on",
     "directMessagesLabel": "Let people message each other",
     "directMessagesHelpText": "My Messages, and the connections and requests behind it. Messages are end-to-end encrypted, so nobody running this deployment can read them — turn this off where private messaging does not belong rather than to oversee it.",
     "directMessagesReversibleNote": "Turning this off hides My Messages and refuses new ones; it deletes nothing. Conversations, connections and settings are all still there if you turn it back on.",
@@ -1875,8 +1881,7 @@
       "neverHint": "Nothing is deleted on a timer. A community stays on hold until somebody lifts the hold or deletes it.",
       "saved_one": "Communities on hold are deleted after {{count}} day.",
       "saved_other": "Communities on hold are deleted after {{count}} days.",
-      "savedNever": "Communities on hold are never deleted automatically.",
-      "save": "Save how long communities stay on hold"
+      "savedNever": "Communities on hold are never deleted automatically."
     },
     "retention": {
       "title": "Keeping deleted communities",
@@ -1887,8 +1892,7 @@
       "neverHint": "Nothing is destroyed on a timer. Deleted communities stay in the list below until somebody restores one.",
       "saved_one": "Deleted communities are kept for {{count}} day.",
       "saved_other": "Deleted communities are kept for {{count}} days.",
-      "savedNever": "Deleted communities are kept indefinitely.",
-      "save": "Save how long communities are kept"
+      "savedNever": "Deleted communities are kept indefinitely."
     },
     "accountRetention": {
       "title": "Keeping deleted accounts",
@@ -1899,8 +1903,7 @@
       "neverHint": "Nothing is erased on a timer. Deleted accounts stay in the users table until somebody comes back or restores one.",
       "saved_one": "Deleted accounts are kept for {{count}} day.",
       "saved_other": "Deleted accounts are kept for {{count}} days.",
-      "savedNever": "Deleted accounts are kept indefinitely.",
-      "save": "Save how long accounts are kept"
+      "savedNever": "Deleted accounts are kept indefinitely."
     },
     "engagementRankingLabel": "Let communities rank results by engagement",
     "engagementRankingHelpText": "When off, no community on this server ranks by engagement, whatever its own setting.",
@@ -1910,9 +1913,10 @@
     "guestsEnabledHelpText": "Communities can invite people for a set number of days. Guests take no seat and see only what they were given. While this is off, no guest gets in.",
     "guestsEnabledToast": "Communities can have guests.",
     "guestsDisabledToast": "Guests are turned off.",
+    "maxGuestDaysTitle": "Longest guest stay",
     "maxGuestDaysLabel": "Longest a guest may stay (days)",
     "maxGuestDaysHelpText": "No guest stays longer than this, whatever a community sets.",
-    "maxGuestDaysSave": "Save the longest guest stay",
+    "whileGuestsOff": "used once guests are allowed",
     "maxGuestDaysSaved_one": "Guests stay {{count}} day at most.",
     "maxGuestDaysSaved_other": "Guests stay {{count}} days at most.",
     "joinAndCreateTitle": "Who may join and create",
@@ -1924,18 +1928,24 @@
     "communityCreationHelpText": "When off, only people who manage communities on this server can create one, and only invited people can sign up.",
     "communityCreationEnabledToast": "Anyone can create a community.",
     "communityCreationDisabledToast": "Only people who manage communities can create one.",
+    "creationDailyLimitTitle": "Daily limit per account",
     "creationDailyLimitLabel": "Communities one account may create per day",
     "creationDailyLimitHelpText": "0 means no limit. People who manage communities are not held to it.",
-    "creationDailyLimitSave": "Save the daily community limit",
+    "whileCreationOff": "used once anyone can create a community",
+    "creationDailyLimitValue_one": "{{count}} community a day",
+    "creationDailyLimitValue_other": "{{count}} communities a day",
     "creationDailyLimitSaved_one": "Each account may create {{count}} community a day.",
     "creationDailyLimitSaved_other": "Each account may create {{count}} communities a day.",
     "creationDailyLimitSavedNone": "There is no daily limit on new communities.",
+    "exportAndDeletionTitle": "Exports and deletion",
     "exportCooldownLabel": "Hours between community exports",
     "exportCooldownHelpText": "How long a community waits before it can export everything again. 0 means no wait.",
-    "exportCooldownSave": "Save the time between community exports",
     "exportCooldownSaved_one": "Communities wait {{count}} hour between exports.",
     "exportCooldownSaved_other": "Communities wait {{count}} hours between exports.",
-    "exportCooldownSavedNone": "Communities can export without waiting."
+    "exportCooldownSavedNone": "Communities can export without waiting.",
+    "noLimit": "No limit",
+    "noWait": "No wait",
+    "exportCooldownTitle": "Time between exports"
   },
   "account": {
     "passwordTitle": "Password",
@@ -2118,7 +2128,11 @@
     "valuesHint": "Separate several with commas. A community's own connection replaces this outright, so nothing here is merged with what a community says."
   },
   "platformSecurity": {
-    "description": "How long anybody may stay signed in, the captcha asked of anybody new, and what a notification may leave the app carrying."
+    "description": "How long anybody may stay signed in, the captcha asked of anybody new, and what a notification may leave the app carrying.",
+    "signInRules": {
+      "title": "Sign-in rules",
+      "description": "What every account on this server is asked when it signs in."
+    }
   },
   "notificationDelivery": {
     "title": "Notifications that leave the app",
