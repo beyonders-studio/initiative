@@ -133,13 +133,13 @@
     "replyError": "Votre réponse n'a pas pu être envoyée. Réessayez dans un instant.",
     "closedNote": "Ce ticket est clôturé. Si autre chose se présente, demandez de l'aide à nouveau.",
     "noConversation": "Merci pour le signalement. L'équipe examine chacun d'eux, mais ne répond pas aux signalements ici.",
-    "staffFirst": "Merci de nous en avoir parlé. Vous pourrez répondre ici une fois que l'équipe vous aura écrit.",
     "empty": "Vous n'avez envoyé aucun ticket. Quand vous demandez de l'aide, elle apparaît ici pour que vous puissiez la suivre.",
     "loadError": "Impossible de charger vos tickets."
   },
   "case": {
     "filedBy": "Envoyé par",
     "noFiler": "Ouvert automatiquement",
+    "noContact": "Ne souhaite pas être contacté",
     "theyCalledIt": "Son objet :",
     "noConversation": "Ce type de dossier n'ouvre pas de conversation avec la personne qui l'a envoyé.",
     "staffFirst": "Cette personne pourra répondre une fois que l'équipe lui aura écrit.",
@@ -221,9 +221,7 @@
     "heading": "Pièces jointes",
     "reveal": "Afficher {{name}}",
     "view": "Voir {{name}}",
-    "open": "Ouvrir {{name}}",
-    "dropped_one": "{{names}} a été retiré : ce formulaire ne l'accepte pas.",
-    "dropped_other": "{{names}} ont été retirés : ce formulaire ne les accepte pas."
+    "open": "Ouvrir {{name}}"
   },
   "security": {
     "action": "Signaler un problème de sécurité",
@@ -246,28 +244,34 @@
     "error": "Impossible d'envoyer. Réessayez dans un instant."
   },
   "feedback": {
-    "action": "Envoyer un avis",
-    "title": "Envoyer un avis",
-    "description": "Dites à celles et ceux qui gèrent ce serveur ce que vous en pensez. Vous pouvez le suivre dans Mes tickets.",
-    "typeLabel": "De quel type d'avis s'agit-il ?",
-    "typePlaceholder": "Choisissez une option",
-    "topics": {
-      "idea": "Une idée",
-      "problem": "Un problème",
-      "praise": "Un compliment",
-      "other": "Autre chose"
+    "title": "Dites-nous ce que vous en pensez",
+    "kindLabel": "Type d'avis",
+    "kinds": {
+      "idea": {
+        "label": "Proposer une idée",
+        "question": "Que voudriez-vous qu'Initiative fasse ?",
+        "placeholder": "L'idée, et ce qu'elle vous permettrait de faire."
+      },
+      "problem": {
+        "label": "Quelque chose ne va pas",
+        "question": "Qu'est-ce qui vous a gêné ?",
+        "placeholder": "Ce que vous faisiez, et ce qui s'est passé."
+      },
+      "praise": {
+        "label": "Faire un compliment",
+        "question": "Qu'est-ce que vous aimez ?",
+        "placeholder": "Ce dont vous parleriez à un ami."
+      }
     },
-    "bodyLabel": "Que voulez-vous leur dire ?",
-    "bodyPlaceholder": "Ce que vous aimeriez, ce qui vous a gêné ou ce qui vous a plu.",
-    "needsAnswer": "J'ai besoin d'une réponse",
-    "needsAnswerHelp": "L'envoie plutôt comme demande d'aide, pour que quelqu'un vous réponde.",
-    "submit": "Envoyer l'avis",
-    "thanks": "Merci ! Celles et ceux qui gèrent ce serveur le liront.",
-    "error": "Impossible d'envoyer. Réessayez dans un instant.",
+    "addPicture": "Ajouter une image",
+    "contactable": "Vous pouvez me contacter si vous avez des questions à ce sujet",
+    "stuck": "Besoin que quelqu'un s'en occupe ? Demander de l'aide",
     "context": {
-      "title": "Envoyé avec",
-      "help": "Où en était l'application, pour qu'ils voient ce que vous avez vu. Rien ici ne vous nomme, ni rien de ce que vous avez ouvert.",
-      "remove": "Retirer",
+      "on": "Inclut la version de l'application et la page où vous êtes.",
+      "off": "Sans la version de l'application ni la page.",
+      "switch": "Inclure la version de l'application et la page",
+      "show": "Voir le détail",
+      "hide": "Masquer",
       "fields": {
         "app_version": "Version",
         "platform": "Plateforme",
@@ -276,7 +280,14 @@
         "route": "Page",
         "viewport": "Fenêtre"
       }
-    }
+    },
+    "discard": "Abandonner",
+    "writeSomething": "Écrivez quelque chose pour l'envoyer.",
+    "submit": "Envoyer l'avis",
+    "thanks": "Merci pour votre avis !",
+    "thanksBody": "L'équipe lit chaque message.",
+    "done": "Terminé",
+    "error": "Impossible d'envoyer. Réessayez dans un instant."
   },
   "moderationTopics": {
     "appeal": "Recours contre votre suspension"

@@ -139,7 +139,8 @@ class FeedbackContext(SanitizedBaseModel):
 
 
 class FeedbackTicketCreate(SanitizedBaseModel):
-    """Telling whoever runs this server what somebody thinks."""
+    """Telling the team what somebody thinks: an idea, something that got in
+    their way, or what they love."""
 
     stream: Literal["feedback"]
     type: FeedbackTopic
@@ -147,6 +148,9 @@ class FeedbackTicketCreate(SanitizedBaseModel):
     body: Annotated[str, AfterValidator(_said_something)] = PydanticField(
         min_length=1, max_length=BODY_LENGTH
     )
+    #: Whether the team may write to them about it. Theirs to offer; off unless
+    #: they tick it.
+    contactable: bool = False
     #: Where the app was, where they chose to send it.
     context: Optional[FeedbackContext] = None
 

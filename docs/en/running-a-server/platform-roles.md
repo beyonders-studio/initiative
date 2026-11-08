@@ -139,7 +139,7 @@ Operators and owners can write **announcements** — notices shown in a dialog t
 
 Questions about somebody's own account — signing in, billing, anything else — don't depend on it. Once support is bound, anybody signed in can ask those from anywhere, inside a community or not: a person locked out of something has no community to ask from. With support not bound, the button gives the support address from [Who to contact](#who-to-contact), or isn't shown at all if there isn't one.
 
-Each support case carries the topic its asker chose, shown on the case beside its stream. A suspension appeal is a moderation case with the topic **Suspension appeal**, which — unlike a report — is a conversation: reply to the requester from the case as you would on support. One account has one appeal open at a time. **Feedback** cases carry the app's context in their description, where the sender kept it.
+Each support case carries the topic its asker chose, shown on the case beside its stream. A suspension appeal is a moderation case with the topic **Suspension appeal**, which — unlike a report — is a conversation: reply to the requester from the case as you would on support. One account has one appeal open at a time. **Feedback** cases are titled by their kind (an idea, a problem or praise) and carry the app's context in their description, where the sender kept it. Where the sender ticked that you may contact them, their answers open a conversation you can reply to; otherwise their answers are in the description and there's nobody to write to.
 
 ### A community's status
 

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Send feedback starts from what you want to say:** suggest an idea, something's not right, or give a compliment, each with its own question. It docks beside the page on a wide screen, keeps your draft when you close it, and takes a screenshot pasted into it. Feedback goes one way unless you tick that the team can contact you with questions; **Something's not right** points you to **Ask for help** for anything you need sorted out.
 - **Each AI connection has its own on/off switch** on its row under **Integrations**, in place of the Enabled field in its dialog. A community's **Allow AI features** switch moved to the **Security** tab, beside its other restrictions. When AI goes off, whether the community or the server turns it off, the community's connections go off with it, and none can be turned on again until AI is back on.
 - **The desktop app on Windows and Linux hides its menu bar.** The File, Edit, View and Window row no longer takes space under the title bar; press Alt to show it. Zoom, reload and full screen keep their shortcuts.
 - **Search forgives typos.** The command palette, the icon picker and every list you pick from find what you meant through a swapped, wrong or extra letter (one in a word of four to seven letters, two from eight), and the words of a name in any order, with an exact name first. A table's filter is exact: it keeps the rows that hold what you typed, in any case.

@@ -253,7 +253,8 @@ export const CasePanel = ({ taskId, canEdit, assigneeIds }: CasePanelProps) => {
               {" · "}
             </>
           ) : (
-            <>{t("case.noFiler")} · </>
+            // Feedback has no filer where its sender did not offer to be contacted.
+            <>{t(found.stream === "feedback" ? "case.noContact" : "case.noFiler")} · </>
           )}
           {filed}
         </p>

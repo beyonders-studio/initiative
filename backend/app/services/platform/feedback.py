@@ -1,15 +1,13 @@
-"""Telling whoever runs this server what somebody thinks.
+"""Feedback: an idea, something that got in somebody's way, or what they love,
+filed as a case on the team's board.
 
-Feedback is one-way until the team answers: a case in the feedback stream that
-its sender follows under their tickets, and may write on once the team has
-written to them. Where the app was when they sent it travels with it, as they
-saw it before sending and could remove: the version, the platform, the
-language, the theme, the page's route with every id left out, and the width
-of the window.
+A sender who ticks that the team may contact them is the case's filer: the team
+starts the conversation, and the case reaches their tickets once the team has
+written to them. Any other sender's words are the case's description.
 
-A problem that needs an answer is not feedback. The sheet sends that to
-support instead, before it is filed, so nothing here moves a case between
-streams.
+The app context they chose to send goes into the description: the version,
+the platform, the language, the theme, the page's route with every id left
+out, and the width of the window.
 """
 
 from __future__ import annotations
@@ -43,19 +41,34 @@ class NowhereToSend(Exception):
     """No project is bound to receive feedback."""
 
 
-def _title(topic: FeedbackTopic, body: str) -> str:
-    """The case's name on the board: the kind, and how what they wrote
-    begins."""
+async def send(
+    *,
+    sender: User,
+    topic: FeedbackTopic,
+    body: str,
+    contactable: bool,
+    context: Optional["FeedbackContext"] = None,
+    evidence: Sequence["PreparedEvidence"] = (),
+    now: Optional[datetime] = None,
+) -> None:
+    """File feedback as a case on the team's board, titled by its kind and how
+    what they wrote begins. Their words open the conversation with a
+    contactable sender and go into the description for any other."""
+    moment = now or datetime.now(timezone.utc)
     first = body.strip().splitlines()[0].strip()
     if len(first) > TITLE_LENGTH:
         first = first[: TITLE_LENGTH - 1].rstrip() + "…"
-    return f"{topic.value.capitalize()}: {first}"
 
-
-def _description(
-    filer: User, topic: FeedbackTopic, context: Optional["FeedbackContext"]
-) -> str:
-    lines = [f"Feedback ({topic.value}) from account {filer.id}."]
+    lines = [
+        f"Feedback ({topic.value}) from account {sender.id}, who "
+        + (
+            "may be contacted about it."
+            if contactable
+            else "did not offer to be contacted."
+        )
+    ]
+    if not contactable:
+        lines += ["", body]
     if context is not None:
         sent = [
             f"- {label}: `{value}`"
@@ -64,34 +77,21 @@ def _description(
         ]
         if sent:
             lines += ["", "Where the app was:", *sent]
-    return "\n".join(lines)
 
-
-async def send(
-    *,
-    filer: User,
-    topic: FeedbackTopic,
-    body: str,
-    context: Optional["FeedbackContext"] = None,
-    evidence: Sequence["PreparedEvidence"] = (),
-    now: Optional[datetime] = None,
-) -> int:
-    """File feedback as a case its sender follows. Returns the case's task id.
-
-    Their words open the case, said to them; the description is the
-    platform's summary, with the app's context where they sent it.
-    """
-    moment = now or datetime.now(timezone.utc)
     outcome = await open_case(
         IntakeStream.feedback,
-        title=_title(topic, body),
-        body=_description(filer, topic, context),
-        refs=CaseRefs(subject_user=filer.id, reported_at=moment),
+        title=f"{topic.value.capitalize()}: {first}",
+        body="\n".join(lines),
+        refs=CaseRefs(subject_user=sender.id, reported_at=moment),
         now=moment,
-        filer=CaseFiler(user_id=filer.id, subject=None, words=body),
+        filer=(
+            CaseFiler(user_id=sender.id, subject=None, words=body)
+            if contactable
+            else None
+        ),
         evidence=evidence,
+        evidence_by=sender.id,
         topic=topic.value,
     )
     if outcome is None:
         raise NowhereToSend
-    return outcome.task_id

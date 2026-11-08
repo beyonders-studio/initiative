@@ -56,7 +56,8 @@ class Conversation(str, Enum):
     #: Nobody writes back. The filer is told the case arrived, and nothing of
     #: what is decided — a report, which is not a conversation.
     none = "none"
-    #: The filer may answer once somebody handling it has written to them.
+    #: The team starts it: the case is its filer's to follow, and to answer,
+    #: once somebody handling it has written to them.
     staff_first = "staff_first"
     #: Either side may write first.
     open = "open"
@@ -102,7 +103,6 @@ class FeedbackTopic(str, Enum):
     idea = "idea"
     problem = "problem"
     praise = "praise"
-    other = "other"
 
 
 #: The one moderation case a person files about themselves: asking for their

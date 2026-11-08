@@ -28,12 +28,16 @@ from app.db import cohorts
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.platform.notification import NotificationType
-from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.services.platform import notice_outbox, ticket_stream
 from app.services.platform.intake import configured_operations_guild_id
-from app.services.platform.tickets import FilerState, derive_state
+from app.services.platform.tickets import (
+    FilerState,
+    derive_state,
+    latest_reply,
+    reaches_filer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,21 +46,8 @@ logger = logging.getLogger(__name__)
 TICKET_NOTICE_POLL_SECONDS = 30
 
 
-def _latest_reply():
-    """The newest comment said to the filer by anybody but the filer."""
-    return (
-        select(func.max(Comment.id))
-        .where(Comment.task_id == IntakeCase.task_id)
-        .where(Comment.audience == CommentAudience.filer)
-        .where(Comment.deleted_at.is_(None))  # type: ignore[union-attr]
-        .where(Comment.created_by.is_distinct_from(IntakeCase.filer_user_id))  # type: ignore[union-attr]
-        .correlate(IntakeCase)
-        .scalar_subquery()
-    )
-
-
 async def _moved(session: AsyncSession) -> list[Any]:
-    latest = _latest_reply().label("latest_reply")
+    latest = latest_reply().label("latest_reply")
     closed = or_(
         Task.deleted_at.is_not(None),  # type: ignore[union-attr]
         TaskStatus.category == TaskStatusCategory.done,
@@ -74,6 +65,7 @@ async def _moved(session: AsyncSession) -> list[Any]:
         .join(TaskStatus, TaskStatus.id == Task.task_status_id)
         .outerjoin(IntakeBinding, IntakeBinding.stream == IntakeCase.stream)
         .where(IntakeCase.filer_user_id.is_not(None))  # type: ignore[union-attr]
+        .where(reaches_filer())
         .where(
             or_(
                 # Not yet settled as closed: its state may have moved.

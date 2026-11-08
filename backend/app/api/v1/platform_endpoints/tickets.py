@@ -245,9 +245,10 @@ async def _send_feedback(
 ) -> TicketAccepted:
     try:
         await feedback_service.send(
-            filer=sender,
+            sender=sender,
             topic=payload.type,
             body=payload.body,
+            contactable=payload.contactable,
             context=payload.context,
             evidence=attached,
         )
