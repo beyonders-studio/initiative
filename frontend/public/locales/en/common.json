@@ -61,7 +61,6 @@
   "submitting": "Sending…",
   "clear": "Clear",
   "previous": "Previous",
-  "pageOf": "Page {{current}} of {{total}}",
   "selectAll": "Select all",
   "selectRow": "Select row",
   "noResultsDot": "No results.",

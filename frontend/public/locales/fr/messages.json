@@ -33,7 +33,6 @@
     "empty": "Personne dans vos communautés n'a encore activé les messages.",
     "noCommunities": "Personne à afficher. Vous ne partagez encore de communauté avec personne.",
     "unreachable": "Injoignable",
-    "showMore": "Afficher plus",
     "addToGroup": "Ajouter {{name}} à un groupe",
     "removeFromGroup": "Retirer {{name}}",
     "groupHint": "Tout le monde ici sera invité avant de rejoindre.",

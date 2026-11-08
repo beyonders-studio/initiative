@@ -66,6 +66,8 @@ vi.mock("@/hooks/useModeration", async (importOriginal) => {
         data: {
           items: state.items,
           page: state.page,
+          page_size: 50,
+          total_count: state.items.length,
           has_next: state.hasNext,
           has_prev: state.page > 1,
         },
@@ -404,10 +406,10 @@ describe("ModerationPage", () => {
     render();
     const user = userEvent.setup();
 
-    const older = await screen.findByRole("button", { name: "Older" });
-    expect(screen.getByRole("button", { name: "Newer" })).toBeDisabled();
+    const next = await screen.findByRole("button", { name: "Next" });
+    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
 
-    await user.click(older);
+    await user.click(next);
     expect(state.page).toBe(2);
   });
 
@@ -415,7 +417,7 @@ describe("ModerationPage", () => {
     state.items = [report()];
     render();
     await screen.findByRole("region", { name: "A comment" });
-    expect(screen.queryByRole("button", { name: "Older" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
   });
 
   it("reads the initiative's roster a page at a time, each member with their role", async () => {

@@ -199,8 +199,7 @@
     "noInitiatives": "No se encontraron iniciativas en esta comunidad.",
     "noProjects": "No se encontraron proyectos en esta iniciativa.",
     "back": "Atrás",
-    "searchProjects": "Buscar proyectos…",
-    "loadMore": "Cargar más"
+    "searchProjects": "Buscar proyectos…"
   },
   "bulkEdit": {
     "title": "Editar tareas",

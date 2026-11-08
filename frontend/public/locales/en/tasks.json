@@ -199,8 +199,7 @@
     "noInitiatives": "No initiatives found in this community.",
     "noProjects": "No projects found in this initiative.",
     "back": "Back",
-    "searchProjects": "Search projects…",
-    "loadMore": "Load more"
+    "searchProjects": "Search projects…"
   },
   "bulkEdit": {
     "title": "Edit tasks",

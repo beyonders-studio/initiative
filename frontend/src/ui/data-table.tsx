@@ -51,6 +51,7 @@ import {
   appTableFeatures,
 } from "@/ui/lib/table";
 import { cn } from "@/ui/lib/utils";
+import { PaginationBar } from "@/ui/pagination-bar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
 
@@ -121,7 +122,8 @@ interface DataTableProps<TData extends RowData> {
    */
   pageIndex?: number;
   onPaginationChange?: (pagination: PaginationState) => void;
-  onPrefetchPage?: (pageIndex: number) => void;
+  /** Warm a page, counted from 1, before it is asked for. */
+  onPrefetchPage?: (page: number) => void;
   manualSorting?: boolean;
   /**
    * Controlled sorting, for a caller that keeps the order somewhere of its own
@@ -159,7 +161,6 @@ export interface DataTableRowWrapperProps<TData extends RowData> {
 }
 
 const DEFAULT_PAGE_SIZE = 20;
-const DEFAULT_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 const GROUPING_NONE_VALUE = "__none__";
 
 export function DataTable<TData extends RowData>({
@@ -286,15 +287,6 @@ export function DataTable<TData extends RowData>({
   if (enablePagination) {
     computedInitialState.pagination = initialPaginationRef.current;
   }
-  const resolvedPageSizeOptions = useMemo(() => {
-    const baseOptions =
-      pageSizeOptions && pageSizeOptions.length > 0 ? pageSizeOptions : DEFAULT_PAGE_SIZE_OPTIONS;
-    const sanitized = Array.from(
-      new Set(baseOptions.filter((option) => Number.isFinite(option) && option > 0))
-    );
-    return sanitized.length > 0 ? sanitized : [DEFAULT_PAGE_SIZE];
-  }, [pageSizeOptions]);
-
   const columnsWithSelection = useMemo(() => {
     if (!enableRowSelection || !selectionModeActive) {
       return columns;
@@ -435,13 +427,6 @@ export function DataTable<TData extends RowData>({
   const tableRef = useRef(table);
   tableRef.current = table;
 
-  const pageSize = table.state.pagination?.pageSize ?? DEFAULT_PAGE_SIZE;
-  const pageSizeChoices = useMemo(() => {
-    const options = resolvedPageSizeOptions.includes(pageSize)
-      ? resolvedPageSizeOptions
-      : [...resolvedPageSizeOptions, pageSize];
-    return [...options].sort((a, b) => a - b);
-  }, [resolvedPageSizeOptions, pageSize]);
   const normalizedGroupingOptions = useMemo<GroupingOption[]>(() => {
     if (!groupingOptions || groupingOptions.length === 0) {
       return [];
@@ -1023,65 +1008,17 @@ export function DataTable<TData extends RowData>({
           </TableBody>
         </Table>
         {showPagination && (
-          <div className="pp4 flex flex-wrap items-center justify-between gap-3 p-4">
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground text-sm">{t("table.rowsPerPage")}</span>
-              <Select
-                value={String(pageSize)}
-                onValueChange={(value) => {
-                  const nextSize = Number(value);
-                  if (Number.isFinite(nextSize) && nextSize > 0) {
-                    table.setPageSize(nextSize);
-                  }
-                }}
-              >
-                <SelectTrigger className="w-24" aria-label={t("table.rowsPerPage")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent align="end">
-                  {pageSizeChoices.map((option) => (
-                    <SelectItem key={option} value={String(option)}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              {manualPagination && externalPageCount !== undefined && (
-                <span className="text-muted-foreground text-sm">
-                  {t("table.pageOf", {
-                    current: table.state.pagination.pageIndex + 1,
-                    total: Math.max(externalPageCount, 1),
-                  })}
-                </span>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-                onMouseEnter={() => {
-                  const prevIndex = table.state.pagination.pageIndex - 1;
-                  if (prevIndex >= 0 && onPrefetchPage) onPrefetchPage(prevIndex);
-                }}
-              >
-                {t("previous")}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-                onMouseEnter={() => {
-                  const nextIndex = table.state.pagination.pageIndex + 1;
-                  if (table.getCanNextPage() && onPrefetchPage) onPrefetchPage(nextIndex);
-                }}
-              >
-                {t("next")}
-              </Button>
-            </div>
-          </div>
+          <PaginationBar
+            className="p-4"
+            page={table.state.pagination.pageIndex + 1}
+            pageSize={table.state.pagination.pageSize}
+            totalCount={table.getRowCount()}
+            hasNext={table.getCanNextPage()}
+            onPageChange={(page) => table.setPageIndex(page - 1)}
+            onPageSizeChange={(size) => table.setPageSize(size)}
+            pageSizeOptions={pageSizeOptions}
+            onPrefetchPage={onPrefetchPage}
+          />
         )}
       </div>
     </div>

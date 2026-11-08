@@ -374,7 +374,6 @@
     "inbox": {
       "title": "Notificaciones",
       "empty": "Aquí no hay nada todavía.",
-      "loadMore": "Cargar más",
       "markRead": "Marcar como leída",
       "markUnread": "Marcar como no leída",
       "dismiss": "Descartar",
@@ -574,7 +573,6 @@
     "noDescription": "Todavía no hay descripción.",
     "resultCount_one": "{{count}} comunidad",
     "resultCount_other": "{{count}} comunidades",
-    "showMore": "Mostrar más",
     "emptyTitle": "Aún no hay comunidades",
     "emptyDescription": "Ninguna comunidad de aquí aparece en el directorio. Un administrador de comunidad puede publicarla desde los ajustes de la comunidad.",
     "noResultsTitle": "Sin resultados",

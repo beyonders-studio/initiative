@@ -4,8 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import type { ProjectRead } from "@/api/generated/initiativeAPI.schemas";
 import { useGlobalProjects } from "@/hooks/useProjects";
-import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
+import { LoadMore } from "@/ui/load-more";
 
 interface ProjectPickerStepProps {
   communityId: number;
@@ -99,18 +99,11 @@ export function ProjectPickerStep({ communityId, initiativeId, onPick }: Project
               <span className="font-medium text-sm">{project.name}</span>
             </button>
           ))}
-          {hasMoreProjects && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full"
-              onClick={() => setProjectPage((p) => p + 1)}
-              disabled={projectsQuery.isFetching}
-            >
-              {projectsQuery.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {t("createWizard.loadMore")}
-            </Button>
-          )}
+          <LoadMore
+            hasMore={hasMoreProjects}
+            loading={projectsQuery.isFetching}
+            onLoadMore={() => setProjectPage((p) => p + 1)}
+          />
         </>
       )}
     </div>

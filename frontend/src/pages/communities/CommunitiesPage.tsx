@@ -43,7 +43,7 @@ import {
   subscribeSavedNear,
 } from "@/lib/directoryNear";
 import { getErrorCode } from "@/lib/errorMessage";
-import { Button } from "@/ui/button";
+import { LoadMore } from "@/ui/load-more";
 import { Skeleton } from "@/ui/skeleton";
 import { StatusMessage } from "@/ui/status-message";
 
@@ -177,17 +177,12 @@ export function CommunitiesPage() {
               <CommunityCard key={community.id} community={community} />
             ))}
           </div>
-          {directory.hasNextPage ? (
-            <div className="flex justify-center pt-2">
-              <Button
-                variant="outline"
-                onClick={() => void directory.fetchNextPage()}
-                disabled={directory.isFetchingNextPage}
-              >
-                {t("communities:community.showMore")}
-              </Button>
-            </div>
-          ) : null}
+          <LoadMore
+            className="pt-2"
+            hasMore={directory.hasNextPage}
+            loading={directory.isFetchingNextPage}
+            onLoadMore={directory.fetchNextPage}
+          />
         </>
       ) : (
         <StatusMessage

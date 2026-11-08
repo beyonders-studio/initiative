@@ -354,6 +354,30 @@ describe("DataTable pagination", () => {
     expect(screen.getByText("Row 01")).toBeInTheDocument();
   });
 
+  it("offers the caller's page sizes, with the size in use among them", async () => {
+    const user = userEvent.setup();
+    render(
+      <DataTable
+        columns={columns}
+        data={manyRows}
+        enablePagination
+        pageSizeOptions={[5, 10]}
+        initialState={{ pagination: { pageIndex: 0, pageSize: 20 } }}
+      />
+    );
+    expect(screen.getByText("1–20 of 25")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("combobox", { name: "Per page:" }));
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "5",
+      "10",
+      "20",
+    ]);
+    await user.click(screen.getByRole("option", { name: "5" }));
+    expect(bodyRows()).toHaveLength(5);
+    expect(screen.getByText("1–5 of 25")).toBeInTheDocument();
+  });
+
   it("leaves paging to the caller under manualPagination", () => {
     // The caller has already sliced `data`; the table must render it as given
     // rather than paginate it a second time.
@@ -366,10 +390,11 @@ describe("DataTable pagination", () => {
         manualPagination
         pageCount={5}
         rowCount={25}
+        initialState={{ pagination: { pageIndex: 0, pageSize: 5 } }}
       />
     );
     expect(bodyRows()).toHaveLength(5);
-    expect(screen.getByText("Page 1 of 5")).toBeInTheDocument();
+    expect(screen.getByText("1–5 of 25")).toBeInTheDocument();
   });
 });
 
@@ -461,7 +486,7 @@ describe("DataTable virtualization", () => {
     const next = screen.queryByRole("button", { name: "Next" });
     if (enableVirtualization) {
       expect(next).not.toBeInTheDocument();
-      expect(screen.queryByLabelText("Rows per page:")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Per page:")).not.toBeInTheDocument();
     } else {
       expect(next).toBeInTheDocument();
     }

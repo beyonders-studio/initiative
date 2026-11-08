@@ -9,7 +9,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -100,6 +100,7 @@ import { DropdownMenuItem } from "@/ui/dropdown-menu";
 import { Label } from "@/ui/label";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { Lightbox, type LightboxItem } from "@/ui/lightbox";
+import { LoadMore } from "@/ui/load-more";
 import { CardGridSkeleton, DetailHeaderSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 import { RelativeTime } from "@/ui/relative-time";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
@@ -287,21 +288,6 @@ export function CollectionPage() {
     [feed.data]
   );
   const { fetchNextPage, hasNextPage, isFetchingNextPage } = feed;
-
-  // The bottom of the list asks for the next page as it comes into view.
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const element = sentinelRef.current;
-    if (!element || !hasNextPage || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !isFetchingNextPage) void fetchNextPage();
-      },
-      { rootMargin: "800px" }
-    );
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   // Putting files in: dropped or uploaded, or picked from the initiative's.
   const uploader = useCollectionUploader(collection);
@@ -706,12 +692,14 @@ export function CollectionPage() {
             )}
           />
         ) : null}
-        <div ref={sentinelRef} className="h-px" />
-        {isFetchingNextPage ? (
-          <div className="flex justify-center py-4">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
-          </div>
-        ) : null}
+        {/* The bottom of the list asks for the next page as it comes into view. */}
+        <LoadMore
+          auto
+          rootMargin="800px"
+          hasMore={hasNextPage}
+          loading={isFetchingNextPage}
+          onLoadMore={fetchNextPage}
+        />
       </CollectionDropzone>
 
       {/* A shelf, like a project's: a collection's links are browsed along

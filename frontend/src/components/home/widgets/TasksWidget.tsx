@@ -259,7 +259,7 @@ export const TasksWidget = ({ options, onOptionsChange, onConfigure }: HomeWidge
                   table.setPage(pag.pageIndex + 1);
                 }
               }}
-              onPrefetchPage={(pageIndex) => table.prefetchPage(pageIndex + 1)}
+              onPrefetchPage={table.prefetchPage}
               manualSorting
               onSortingChange={table.handleSortingChange}
               enableResetSorting

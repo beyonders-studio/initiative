@@ -61,7 +61,6 @@
   "submitting": "Wird gesendet…",
   "clear": "Leeren",
   "previous": "Zurück",
-  "pageOf": "Seite {{current}} von {{total}}",
   "selectAll": "Alle auswählen",
   "selectRow": "Zeile auswählen",
   "noResultsDot": "Keine Ergebnisse.",

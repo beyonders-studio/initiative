@@ -60,7 +60,6 @@
   "submitting": "Envoi en cours…",
   "clear": "Effacer",
   "previous": "Précédent",
-  "pageOf": "Page {{current}} sur {{total}}",
   "selectAll": "Tout sélectionner",
   "selectRow": "Sélectionner la ligne",
   "noResultsDot": "Aucun résultat.",

@@ -1,5 +1,4 @@
-import { Loader2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
@@ -8,6 +7,7 @@ import { useInitiativeRoster, useInitiativeRosterPages } from "@/hooks/useInitia
 import { getUserDisplayName } from "@/lib/userDisplay";
 import { Input } from "@/ui/input";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { LoadMore } from "@/ui/load-more";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
 /** Online faces shown in the row; past this many they fold into a count. */
@@ -32,19 +32,6 @@ const RosterList = ({
   const debounced = useDebouncedValue(search);
   const roster = useInitiativeRosterPages(initiativeId, debounced, true, online);
   const members = roster.data?.pages.flatMap((page) => page.items) ?? [];
-  const end = useRef<HTMLLIElement>(null);
-  const { hasNextPage, isFetchingNextPage, fetchNextPage } = roster;
-
-  // The next page when the bottom of the list comes into view.
-  useEffect(() => {
-    const node = end.current;
-    if (!node || !hasNextPage) return;
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry?.isIntersecting && !isFetchingNextPage) void fetchNextPage();
-    });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return (
     <>
@@ -58,39 +45,45 @@ const RosterList = ({
           className="h-8"
         />
       </div>
-      <ul className="max-h-80 overflow-y-auto p-1">
-        {members.map((member) => (
-          <li key={member.user.id} className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
-            <ProfileAvatar
-              user={member.user}
-              decorations={member.user.profile_decorations}
-              presence={member.presence}
-              className="h-7 w-7"
-            />
-            <UserHoverLink
-              user={{ ...member.user, presence: member.presence }}
-              className="min-w-0 truncate text-sm"
-            >
-              {getUserDisplayName(member.user)}
-            </UserHoverLink>
-            {member.role_display_name || member.guest_until ? (
-              <span className="ml-auto shrink-0 text-muted-foreground text-xs">
-                {[member.guest_until ? t("detail.guest") : null, member.role_display_name]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </span>
-            ) : null}
-          </li>
-        ))}
-        {roster.isSuccess && members.length === 0 ? (
-          <li className="px-2 py-1.5 text-muted-foreground text-sm">{t("common:noResultsDot")}</li>
-        ) : null}
-        {hasNextPage || roster.isLoading ? (
-          <li ref={end} className="flex justify-center py-2 text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          </li>
-        ) : null}
-      </ul>
+      <div className="max-h-80 overflow-y-auto p-1">
+        <ul>
+          {members.map((member) => (
+            <li key={member.user.id} className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
+              <ProfileAvatar
+                user={member.user}
+                decorations={member.user.profile_decorations}
+                presence={member.presence}
+                className="h-7 w-7"
+              />
+              <UserHoverLink
+                user={{ ...member.user, presence: member.presence }}
+                className="min-w-0 truncate text-sm"
+              >
+                {getUserDisplayName(member.user)}
+              </UserHoverLink>
+              {member.role_display_name || member.guest_until ? (
+                <span className="ml-auto shrink-0 text-muted-foreground text-xs">
+                  {[member.guest_until ? t("detail.guest") : null, member.role_display_name]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              ) : null}
+            </li>
+          ))}
+          {roster.isSuccess && members.length === 0 ? (
+            <li className="px-2 py-1.5 text-muted-foreground text-sm">
+              {t("common:noResultsDot")}
+            </li>
+          ) : null}
+        </ul>
+        {/* The next page as the bottom of the list comes into view. */}
+        <LoadMore
+          auto
+          hasMore={roster.hasNextPage}
+          loading={roster.isFetchingNextPage || roster.isLoading}
+          onLoadMore={roster.fetchNextPage}
+        />
+      </div>
     </>
   );
 };

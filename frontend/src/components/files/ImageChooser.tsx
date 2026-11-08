@@ -7,11 +7,11 @@ import { CollectionFilterField } from "@/components/files/collections/Collection
 import { useFilesFeed } from "@/hooks/useFiles";
 import { useInitiatives } from "@/hooks/useInitiatives";
 import { isToolEnabled } from "@/lib/tools";
-import { Button } from "@/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/ui/dialog";
 import { Input } from "@/ui/input";
 import { Label } from "@/ui/label";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
+import { LoadMore } from "@/ui/load-more";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 /** A picture taken from Files: the address of the version picked, and the
@@ -140,19 +140,12 @@ export const ImageChooser = ({ initiativeId, onPick, picked = null }: ImageChoos
             ))}
           </div>
         )}
-        {feed.hasNextPage ? (
-          <div className="flex justify-center pt-3">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={feed.isFetchingNextPage}
-              onClick={() => void feed.fetchNextPage()}
-            >
-              {t("imageChooser.more")}
-            </Button>
-          </div>
-        ) : null}
+        <LoadMore
+          className="pt-3"
+          hasMore={feed.hasNextPage}
+          loading={feed.isFetchingNextPage}
+          onLoadMore={feed.fetchNextPage}
+        />
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 {
   "loading": "Loading…",
+  "loadMore": "Show more",
   "clear": "Clear",
   "next": "Next",
   "previous": "Previous",
@@ -98,8 +99,6 @@
     "rowsSelected": "{{selected}} of {{total}} row(s) selected",
     "rowsSelectedFiltered": "{{selected}} selected ({{total}} match filter)",
     "noResults": "No results.",
-    "rowsPerPage": "Rows per page:",
-    "pageOf": "Page {{current}} of {{total}}",
     "filter": "Filter…"
   },
   "wizard": {

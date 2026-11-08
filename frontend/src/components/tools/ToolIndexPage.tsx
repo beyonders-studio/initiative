@@ -505,15 +505,12 @@ const useListPage = (tool: Tool) => {
   }, [search.page]);
 
   const setPage = useCallback(
-    (updater: number | ((prev: number) => number)) => {
-      setPageState((prev) => {
-        const next = typeof updater === "function" ? updater(prev) : updater;
-        void router.navigate({
-          to: ".",
-          search: { ...searchRef.current, page: next <= 1 ? undefined : next },
-          replace: true,
-        });
-        return next;
+    (next: number) => {
+      setPageState(next);
+      void router.navigate({
+        to: ".",
+        search: { ...searchRef.current, page: next <= 1 ? undefined : next },
+        replace: true,
       });
     },
     [router]

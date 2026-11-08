@@ -60,7 +60,6 @@
   "submitting": "Enviando…",
   "clear": "Limpiar",
   "previous": "Anterior",
-  "pageOf": "Página {{current}} de {{total}}",
   "selectAll": "Seleccionar todo",
   "selectRow": "Seleccionar fila",
   "noResultsDot": "Sin resultados.",

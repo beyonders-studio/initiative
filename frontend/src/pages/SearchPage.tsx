@@ -31,10 +31,10 @@ import {
   type SearchCategory,
   TOOL_ENTITY_TYPES,
 } from "@/lib/searchResults";
-import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { ListSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { PaginationBar } from "@/ui/pagination-bar";
 import { StatusMessage } from "@/ui/status-message";
 import { Switch } from "@/ui/switch";
 import { Tabs, TabsContent } from "@/ui/tabs";
@@ -227,8 +227,11 @@ export function SearchPage() {
                     </p>
                   )}
                   <SearchResultList hits={items} />
-                  <Pager
+                  <PaginationBar
+                    className="pt-2"
                     page={page}
+                    pageSize={PAGE_SIZE}
+                    totalCount={results.data?.total_count ?? 0}
                     hasNext={results.data?.has_next ?? false}
                     onPageChange={setPage}
                   />
@@ -294,39 +297,6 @@ function NoResults({ query }: { query: string }) {
   );
 }
 
-function Pager({
-  page,
-  hasNext,
-  onPageChange,
-}: {
-  page: number;
-  hasNext: boolean;
-  onPageChange: (page: number) => void;
-}) {
-  const { t } = useTranslation("common");
-  if (page === 1 && !hasNext) return null;
-  return (
-    <div className="flex justify-end gap-2 pt-2">
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={page <= 1}
-        onClick={() => onPageChange(page - 1)}
-      >
-        {t("previous")}
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={!hasNext}
-        onClick={() => onPageChange(page + 1)}
-      >
-        {t("next")}
-      </Button>
-    </div>
-  );
-}
-
 /** The member roster's own total, once it belongs to this query. */
 function settledMemberTotal(members: ReturnType<typeof useUserSearch>): number | undefined {
   if (members.isPlaceholderData || !members.isFetched) return undefined;
@@ -363,7 +333,14 @@ function MemberResults({
       {items.map((member) => (
         <MemberResultRow key={member.id} member={member} />
       ))}
-      <Pager page={page} hasNext={Boolean(members.data?.has_next)} onPageChange={onPageChange} />
+      <PaginationBar
+        className="pt-2"
+        page={page}
+        pageSize={PAGE_SIZE}
+        totalCount={members.data?.total_count ?? 0}
+        hasNext={Boolean(members.data?.has_next)}
+        onPageChange={onPageChange}
+      />
     </>
   );
 }

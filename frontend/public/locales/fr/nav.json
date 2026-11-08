@@ -6,7 +6,6 @@
   "people": "Personnes",
   "peopleEmpty": "Personne n'apparaît encore ici. Les personnes à qui cette communauté ne peut pas envoyer de messages n'apparaissent pas dans cette liste.",
   "peopleGroup": "{{label}} — {{count}}",
-  "peopleMore": "Afficher plus",
   "peopleError": "La liste des personnes n'a pas pu être chargée.",
   "peopleReaderHidden": "Vous n'apparaissez pas dans cette liste, car les personnes d'ici ne peuvent pas vous envoyer de messages.",
   "peopleReaderHiddenLink": "Modifier",
