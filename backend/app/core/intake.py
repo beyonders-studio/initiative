@@ -56,7 +56,8 @@ class Conversation(str, Enum):
     #: Nobody writes back. The filer is told the case arrived, and nothing of
     #: what is decided — a report, which is not a conversation.
     none = "none"
-    #: The filer may answer once somebody handling it has written to them.
+    #: The team starts it: the case is its filer's to follow, and to answer,
+    #: once somebody handling it has written to them.
     staff_first = "staff_first"
     #: Either side may write first.
     open = "open"
@@ -94,15 +95,6 @@ class SupportTopic(str, Enum):
 COMMUNITY_SUPPORT_TOPICS = frozenset(
     {SupportTopic.community, SupportTopic.data_request}
 )
-
-
-class FeedbackTopic(str, Enum):
-    """What kind of feedback somebody is sending."""
-
-    idea = "idea"
-    problem = "problem"
-    praise = "praise"
-    other = "other"
 
 
 #: The one moderation case a person files about themselves: asking for their
@@ -315,6 +307,9 @@ class CaseField(str, Enum):
     tracker_key = "tracker_key"
     #: The law an ``illegal`` report or hold names (``LegalBasis``).
     legal_basis = "legal_basis"
+    #: How it is working for whoever sent feedback: a scale, a fifth for each
+    #: of the stars they gave it.
+    rating = "rating"
     #: A link that opens what the case is about, in the community it is in,
     #: built from ``subject_guild``, ``resource_type`` and ``resource_id``. It
     #: opens only for somebody who can read it there: a grant still decides.
@@ -335,6 +330,7 @@ CASE_FIELD_TYPES: dict[CaseField, str] = {
     CaseField.tracker_key: "text",
     CaseField.legal_basis: "text",
     CaseField.subject_link: "url",
+    CaseField.rating: "scale",
 }
 
 #: Which fields each stream's blueprint defines. ``tracker_key`` is security's
@@ -368,5 +364,6 @@ STREAM_FIELDS: dict[IntakeStream, tuple[CaseField, ...]] = {
         CaseField.subject_user,
         CaseField.subject_guild,
         CaseField.reported_at,
+        CaseField.rating,
     ),
 }

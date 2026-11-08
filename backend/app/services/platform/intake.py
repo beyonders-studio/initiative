@@ -103,6 +103,8 @@ class CaseRefs:
     reported_at: Optional[datetime] = None
     severity: Optional[str] = None
     legal_basis: Optional[str] = None
+    #: On the scale's 0 to 100.
+    rating: Optional[int] = None
 
     def subject_link(self) -> Optional[str]:
         """Where what the case is about opens, as an address in the app:
@@ -133,6 +135,7 @@ class CaseRefs:
             CaseField.reported_at: self.reported_at,
             CaseField.severity: self.severity,
             CaseField.legal_basis: self.legal_basis,
+            CaseField.rating: self.rating,
             CaseField.subject_link: self.subject_link(),
         }
         return {field: value for field, value in named.items() if value is not None}
