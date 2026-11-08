@@ -17,8 +17,6 @@ const onDate = (iso: string) => {
 afterEach(() => {
   vi.useRealTimers();
   delete document.documentElement.dataset.eventTheme;
-  delete document.documentElement.dataset.eventGradient;
-  document.documentElement.style.removeProperty("--event-gradient");
   removeItem("initiative-event-themes");
 });
 

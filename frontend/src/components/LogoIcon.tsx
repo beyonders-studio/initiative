@@ -7,7 +7,7 @@ type LogoIconProps = SVGProps<SVGSVGElement>;
 
 export const LogoIcon = ({ className, ...props }: LogoIconProps) => {
   const { active: event } = useEventTheme();
-  const colors = event?.colors;
+  const colors = event?.logoColors;
   // useId() embeds colons that break `url(#…)` references in some engines.
   const gradientId = `event-logo-${useId().replace(/:/g, "")}`;
   const fill = colors ? `url(#${gradientId})` : "currentColor";
@@ -56,7 +56,7 @@ export const LogoIcon = ({ className, ...props }: LogoIconProps) => {
         opacity=".25"
         fill={fill}
       />
-      {event?.logoDecoration?.({ date: new Date(), fill })}
+      {event?.logoDecoration?.(new Date())}
     </svg>
   );
 };

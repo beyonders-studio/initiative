@@ -12,19 +12,18 @@ import {
 import { getItem, setItem } from "@/lib/storage";
 
 /**
- * An event the app dresses up for while it runs. Its colours, if it has any,
- * paint the logo, the wordmark and the primary buttons' borders as a flowing
- * gradient; its decoration, if it has one, is drawn over the logo.
+ * An event the app dresses up for while it runs. Its wordmark and primary
+ * buttons are dressed by styles.css under `html[data-event-theme="<id>"]`; the
+ * logo by `logoColors` and `logoDecoration` here.
  */
 export interface EventTheme {
   id: "pride" | "christmas" | "newYear";
   /** Whether the event is running on this (local) date. */
   isOn: (date: Date) => boolean;
-  /** Gradient stops, in order, each colour once. */
-  colors?: string[];
-  /** Drawn over the mark, in the logo's 438×471 view box. `fill` is the logo's
-   *  own paint. */
-  logoDecoration?: (props: { date: Date; fill: string }) => ReactNode;
+  /** Paints the mark as a gradient of these, in order, each colour once. */
+  logoColors?: string[];
+  /** Drawn over the mark, in the logo's 438×471 view box. */
+  logoDecoration?: (date: Date) => ReactNode;
 }
 
 /** Snowflakes over the logo: across, size, seconds to fall, start offset, and
@@ -40,12 +39,23 @@ const SNOWFLAKES = [
   { x: 400, r: 14, fall: 4.3, delay: -2.2, rest: 330 },
 ];
 
+/** Four-pointed sparkles around the logo: centre, reach, start offset. */
+const SPARKLES = [
+  { x: 52, y: 52, s: 36, delay: 0 },
+  { x: 392, y: 40, s: 28, delay: -0.9 },
+  { x: 410, y: 250, s: 24, delay: -1.6 },
+  { x: 26, y: 262, s: 22, delay: -0.5 },
+];
+
+const sparklePath = ({ x, y, s }: { x: number; y: number; s: number }) =>
+  `M${x} ${y - s}Q${x} ${y} ${x + s} ${y}Q${x} ${y} ${x} ${y + s}Q${x} ${y} ${x - s} ${y}Q${x} ${y} ${x} ${y - s}Z`;
+
 export const EVENT_THEMES: EventTheme[] = [
   {
-    // Pride Month.
+    // Pride Month: the rainbow, flowing everywhere.
     id: "pride",
     isOn: (date) => date.getMonth() === 5,
-    colors: ["#e40303", "#ff8c00", "#ffed00", "#008026", "#004dff", "#750787"],
+    logoColors: ["#e40303", "#ff8c00", "#ffed00", "#008026", "#004dff", "#750787"],
   },
   {
     // December, up to Boxing Day.
@@ -85,16 +95,25 @@ export const EVENT_THEMES: EventTheme[] = [
     isOn: (date) =>
       (date.getMonth() === 11 && date.getDate() >= 26) ||
       (date.getMonth() === 0 && date.getDate() === 1),
-    // The year being rung in, on a banner across the foot of the mark.
-    logoDecoration: ({ date, fill }) => (
+    // The year being rung in on a gold plaque, with sparkles twinkling round it.
+    logoDecoration: (date) => (
       <g>
+        {SPARKLES.map((sparkle) => (
+          <path
+            key={sparkle.x}
+            className="event-sparkle"
+            d={sparklePath(sparkle)}
+            fill="#f5c542"
+            style={{ animationDelay: `${sparkle.delay}s` }}
+          />
+        ))}
         <rect
           x="34"
           y="318"
           width="370"
           height="146"
           rx="56"
-          fill={fill}
+          fill="#e2b13c"
           style={{ stroke: "var(--background)" }}
           strokeWidth="16"
         />
@@ -105,7 +124,7 @@ export const EVENT_THEMES: EventTheme[] = [
           dominantBaseline="central"
           fontSize="124"
           fontWeight="800"
-          fill="#fff"
+          fill="#3a2a00"
         >
           {date.getFullYear() + (date.getMonth() === 11 ? 1 : 0)}
         </text>
@@ -135,17 +154,6 @@ const applyEventTheme = (event: EventTheme | null) => {
     root.dataset.eventTheme = event.id;
   } else {
     delete root.dataset.eventTheme;
-  }
-  if (event?.colors) {
-    root.dataset.eventGradient = "";
-    // The first stop again at the end, so the flowing gradient wraps seamlessly.
-    root.style.setProperty(
-      "--event-gradient",
-      `linear-gradient(90deg, ${[...event.colors, event.colors[0]].join(", ")})`
-    );
-  } else {
-    delete root.dataset.eventGradient;
-    root.style.removeProperty("--event-gradient");
   }
 };
 

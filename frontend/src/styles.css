@@ -83,10 +83,37 @@
     radial-gradient(ellipse 60% 40% at 10% 60%, oklch(0.4 0.18 300 / 0.25), transparent);
 }
 
-/* Event themes — while an event with colours runs, a flowing gradient on the
-   logo, wordmark and primary-button borders. useEventTheme.tsx sets
-   `data-event-theme` (the event) and `data-event-gradient` with
-   `--event-gradient` (its colours) on the root. */
+/* Event themes. useEventTheme.tsx sets `data-event-theme` on the root while
+   an event runs; each event below picks what its wordmark and primary-button
+   border wear (`--event-wordmark`, `--event-border`), and the shared rules
+   after them flow that across. The logo is dressed in LogoIcon. */
+html[data-event-theme="pride"] {
+  /* LogoIcon paints the mark in the same flag colours. */
+  --event-wordmark: linear-gradient(
+    90deg,
+    #e40303,
+    #ff8c00,
+    #ffed00,
+    #008026,
+    #004dff,
+    #750787,
+    #e40303
+  );
+  --event-border: var(--event-wordmark);
+}
+
+/* Christmas: a slow red, gold and green wordmark, and candy-cane borders. */
+html[data-event-theme="christmas"] {
+  --event-wordmark: linear-gradient(90deg, #d42426, #f8b229, #1f8a3b, #f8b229, #d42426);
+  --event-border: repeating-linear-gradient(-45deg, #d42426 0 6px, #fff 6px 12px);
+}
+
+/* New Year: gold foil, with a glint sweeping across it. */
+html[data-event-theme="newYear"] {
+  --event-wordmark: linear-gradient(90deg, #a87b00, #d4a017 30%, #fff1a8 50%, #d4a017 70%, #a87b00);
+  --event-border: var(--event-wordmark);
+}
+
 @keyframes event-hue {
   from {
     filter: hue-rotate(0deg) drop-shadow(0 0 5px oklch(0.7 0.2 30 / 0.45));
@@ -112,20 +139,16 @@
   }
 }
 
-/* The mark is painted with the event's static gradient and a soft glow. */
+/* A mark painted in a gradient (Pride's) cycles its hue so it shimmers, with a
+   soft glow. */
 .event-logo {
-  filter: drop-shadow(0 0 4px oklch(0.7 0.18 320 / 0.3));
-}
-
-/* Pride's rainbow also cycles its hue, so the mark shimmers through every colour. */
-html[data-event-theme="pride"] .event-logo {
   animation: event-hue 8s linear infinite;
 }
 
 /* Brand wordmark rendered as flowing gradient text. The class is harmless when
-   no event runs — only the `data-event-gradient` rule activates it. */
-html[data-event-gradient] .event-wordmark {
-  background-image: var(--event-gradient);
+   no event runs. */
+html[data-event-theme] .event-wordmark {
+  background-image: var(--event-wordmark);
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
@@ -135,13 +158,13 @@ html[data-event-gradient] .event-wordmark {
 }
 
 /* Primary (default-variant) buttons keep their solid, legible fill but gain an
-   animated gradient border: a solid padding-box layer over a gradient
-   border-box layer, so the gradient shows only in the 2px transparent border. */
-html[data-event-gradient] [data-slot="button"].bg-primary {
+   animated border: a solid padding-box layer over the event's border-box
+   layer, so it shows only in the 2px transparent border. */
+html[data-event-theme] [data-slot="button"].bg-primary {
   border: 2px solid transparent;
   background:
     linear-gradient(var(--primary), var(--primary)) padding-box,
-    var(--event-gradient) border-box;
+    var(--event-border) border-box;
   background-size:
     auto,
     200% auto;
@@ -149,11 +172,11 @@ html[data-event-gradient] [data-slot="button"].bg-primary {
 }
 
 /* Preserve a hover affordance (the gradient fill hides the usual bg darken). */
-html[data-event-gradient] [data-slot="button"].bg-primary:hover {
+html[data-event-theme] [data-slot="button"].bg-primary:hover {
   filter: brightness(1.08);
 }
 
-/* Snow falling over the logo (LogoIcon draws the flakes at the top). */
+/* Christmas: snow falling over the logo (LogoIcon draws the flakes at its top). */
 @keyframes event-snowfall {
   from {
     transform: translate(0, -30px);
@@ -170,15 +193,42 @@ html[data-event-gradient] [data-slot="button"].bg-primary:hover {
   animation: event-snowfall linear infinite;
 }
 
+/* New Year: sparkles round the logo, each twinkling in its own time. */
+@keyframes event-twinkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1) rotate(45deg);
+  }
+}
+
+.event-sparkle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: event-twinkle 2.4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .event-logo {
+    animation: none;
+    filter: drop-shadow(0 0 4px oklch(0.7 0.18 320 / 0.3));
+  }
+
   .event-snowflake {
     animation: none;
     transform: translateY(var(--rest));
   }
 
-  html[data-event-theme="pride"] .event-logo,
-  html[data-event-gradient] .event-wordmark,
-  html[data-event-gradient] [data-slot="button"].bg-primary {
+  .event-sparkle {
+    animation: none;
+  }
+
+  html[data-event-theme] .event-wordmark,
+  html[data-event-theme] [data-slot="button"].bg-primary {
     animation: none;
   }
 }
