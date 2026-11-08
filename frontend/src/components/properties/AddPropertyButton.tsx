@@ -6,7 +6,7 @@ import type { PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schem
 import { Button } from "@/ui/button";
 import { Combobox } from "@/ui/combobox";
 
-import { NewPropertyForm } from "./NewPropertyForm";
+import { type CreateProperty, NewPropertyForm } from "./NewPropertyForm";
 import { iconForPropertyType } from "./propertyTypeIcons";
 
 export interface AddPropertyButtonProps {
@@ -20,6 +20,8 @@ export interface AddPropertyButtonProps {
   /** The project whose metadata the item may also hold (a task's), offered
    *  beside the properties and made from here as well. */
   owner?: ComponentProps<typeof NewPropertyForm>["owner"];
+  /** Makes a property named from here. */
+  create: CreateProperty;
   currentPropertyIds: number[];
   onAdd: (definition: PropertyDefinitionRead) => void;
   disabled?: boolean;
@@ -35,6 +37,7 @@ export const AddPropertyButton = ({
   loading = false,
   initiativeId,
   owner,
+  create,
   currentPropertyIds,
   onAdd,
   disabled = false,
@@ -101,6 +104,7 @@ export const AddPropertyButton = ({
         <NewPropertyForm
           initiativeId={initiativeId}
           owner={owner}
+          create={create}
           name={newName}
           onCreated={(created) => {
             onAdd(created);

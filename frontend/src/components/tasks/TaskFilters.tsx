@@ -15,9 +15,13 @@ import {
   type PropertyFilterCondition,
 } from "@/components/properties/PropertyFilter";
 import { TagPicker } from "@/components/tags/TagPicker";
-import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
+import {
+  NO_DEFINITIONS,
+  useAppendPropertyOption,
+  useOwnedDefinitions,
+} from "@/hooks/useProperties";
 import { useTags } from "@/hooks/useTags";
-import type { MemberSearchScope } from "@/hooks/useUsers";
+import { type MemberSearchScope, useSearchMembers } from "@/hooks/useUsers";
 import {
   ASSIGNEE_ME,
   ASSIGNEE_NONE,
@@ -86,6 +90,8 @@ export const TaskFilters = ({ scope, value, onChange, stacked = false }: TaskFil
   const taskStatuses = project?.statuses ?? [];
   const field = stacked ? "w-full space-y-2" : "w-full space-y-2 sm:w-48";
   const { data: tags = [] } = useTags({ enabled: project !== null });
+  const appendOption = useAppendPropertyOption();
+  const searchMembers = useSearchMembers();
   const { data: definitions = NO_DEFINITIONS } = useOwnedDefinitions({
     initiativeId: project?.initiativeId,
     owner: project?.projectId ? { kind: "project", id: project.projectId } : undefined,
@@ -343,6 +349,8 @@ export const TaskFilters = ({ scope, value, onChange, stacked = false }: TaskFil
       <PropertyFilter
         value={value.properties}
         definitions={definitions}
+        appendOption={appendOption}
+        searchMembers={searchMembers}
         plugins={{ fields: pluginFields, value: value.plugins }}
         onChange={(properties: PropertyFilterCondition[], plugins) =>
           patch({ properties, plugins })

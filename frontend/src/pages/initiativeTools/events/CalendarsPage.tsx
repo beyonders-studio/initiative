@@ -82,11 +82,16 @@ import {
 } from "@/hooks/useListView";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
-import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
+import {
+  NO_DEFINITIONS,
+  useAppendPropertyOption,
+  useOwnedDefinitions,
+} from "@/hooks/useProperties";
 import { useRouteId } from "@/hooks/useRouteId";
 import { useUpdateTask } from "@/hooks/useTasks";
 import { listLayouts, sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
+import { useSearchMembers } from "@/hooks/useUsers";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { getErrorMessage } from "@/lib/errorMessage";
 import {
@@ -307,6 +312,8 @@ export const CalendarsView = ({
 
   // What the property filters offer: the initiative's properties, or every
   // initiative's where none is selected. Community surfaces have no filters.
+  const appendOption = useAppendPropertyOption();
+  const searchMembers = useSearchMembers();
   const { data: propertyDefinitions = NO_DEFINITIONS } = useOwnedDefinitions({
     initiativeId: initiativeId ?? undefined,
     enabled: !communityOnly,
@@ -867,6 +874,8 @@ export const CalendarsView = ({
                 value={propertyFilters}
                 onChange={setPropertyFilters}
                 definitions={propertyDefinitions}
+                appendOption={appendOption}
+                searchMembers={searchMembers}
               />
             </div>
           </div>

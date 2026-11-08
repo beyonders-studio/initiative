@@ -1,4 +1,5 @@
-import { keepPreviousData } from "@tanstack/react-query";
+import { keepPreviousData, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 
 import type {
   SearchCommunityParams,
@@ -7,6 +8,8 @@ import type {
   SuggestCommunityParams,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
+  getRecentCommunityQueryOptions,
+  getSuggestCommunityQueryOptions,
   useRecentCommunity,
   useSearchCommunity,
   useSuggestCommunity,
@@ -171,4 +174,24 @@ export const useCommunityPickerSuggestions = (
     isLoading: active.isLoading,
     isFetching: active.isFetching,
   };
+};
+
+/**
+ * What a picker offers, as `useCommunityPickerSuggestions` asks it (the recent
+ * things until words are typed, then what they match), asked when the picker
+ * wants an answer rather than while it draws, and answered from the same
+ * cache: for a picker that takes its lookup as a function.
+ */
+export const usePickerSuggestionsNow = () => {
+  const communityId = useActiveCommunityId();
+  const queryClient = useQueryClient();
+  return useCallback(
+    (query: string, filters: SuggestFilters): Promise<SearchSuggestion[]> =>
+      query.trim()
+        ? queryClient.fetchQuery(
+            getSuggestCommunityQueryOptions(communityId, { ...filters, search: query })
+          )
+        : queryClient.fetchQuery(getRecentCommunityQueryOptions(communityId, filters)),
+    [communityId, queryClient]
+  );
 };

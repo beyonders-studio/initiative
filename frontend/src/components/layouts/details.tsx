@@ -21,6 +21,7 @@ import {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { PropertyFilter } from "@/components/properties/PropertyFilter";
+import type { PropertyInputProps } from "@/components/properties/PropertyInput";
 import { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { TaskFilters } from "@/components/tasks/TaskFilters";
 import { TaskStatusPriorityFilters } from "@/components/tasks/TaskStatusPriorityFilters";
@@ -426,7 +427,10 @@ export const taskPresets = (project: LayoutProject) =>
 /** The initiative calendar's presets: what its tasks are, and the properties
  *  its events and tasks carry (the initiative's `definitions`), as its page
  *  filters them. */
-export const calendarPresets = (definitions: PropertyDefinitionRead[]) =>
+export const calendarPresets = (
+  definitions: PropertyDefinitionRead[],
+  input: Pick<PropertyInputProps, "appendOption" | "searchMembers">
+) =>
   editablePresets<CalendarFilters>({
     kind: CALENDAR_PRESETS,
     empty: EMPTY_CALENDAR_FILTERS,
@@ -442,6 +446,8 @@ export const calendarPresets = (definitions: PropertyDefinitionRead[]) =>
           value={value.properties}
           onChange={(properties) => onChange({ ...value, properties })}
           definitions={definitions}
+          appendOption={input.appendOption}
+          searchMembers={input.searchMembers}
         />
       </div>
     ),

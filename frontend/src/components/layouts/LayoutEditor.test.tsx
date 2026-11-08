@@ -59,7 +59,10 @@ const PROJECT = { id: 1, initiativeId: 1, statuses: STATUSES, types: [TASK_TYPE]
 const PROJECT_DETAILS = taskDetails(PROJECT);
 const CALENDAR_DETAILS = [eventDetail(1)];
 const PROJECT_PRESETS = taskPresets(PROJECT);
-const CALENDAR_PRESETS = calendarPresets([]);
+const CALENDAR_PRESETS = calendarPresets([], {
+  appendOption: async () => ({ value: "", label: "" }),
+  searchMembers: async () => [],
+});
 
 type Write = ListLayoutWrite | DetailLayoutWrite;
 

@@ -8,6 +8,7 @@ import type {
   PropertyValueInput,
   TagSummary,
 } from "@/api/generated/initiativeAPI.schemas";
+import { useFileFieldFiles } from "@/components/files/useFileFieldFiles";
 import { PropertyInput } from "@/components/properties/PropertyInput";
 import { isEmptyPropertyValue } from "@/components/properties/propertyHelpers";
 import { TagPicker } from "@/components/tags";
@@ -103,6 +104,7 @@ export const RequiredValues = ({
   const { t } = useTranslation("common");
   const appendOption = useAppendPropertyOption();
   const searchMembers = useSearchMembers();
+  const files = useFileFieldFiles(initiativeId);
   const byId = new Map(definitions.map((definition) => [definition.id, definition]));
   return keys.map((key) => {
     const id = `${idPrefix}-${key.replace(":", "-")}`;
@@ -130,6 +132,7 @@ export const RequiredValues = ({
           initiativeId={initiativeId}
           appendOption={appendOption}
           searchMembers={searchMembers}
+          files={files}
         />
       </Asked>
     );

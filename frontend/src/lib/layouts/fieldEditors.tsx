@@ -26,6 +26,7 @@ import {
   type UserSummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import { usePersonMention } from "@/components/comments/usePersonMention";
+import { useFileFieldFiles } from "@/components/files/useFileFieldFiles";
 import { MentionComposer } from "@/components/markdown/MentionComposer";
 import { AddPropertyButton } from "@/components/properties/AddPropertyButton";
 import { PropertyInput } from "@/components/properties/PropertyInput";
@@ -56,7 +57,12 @@ import {
   useItemFieldSave,
 } from "@/hooks/useFieldSave";
 import { usePastedImages } from "@/hooks/usePastedImages";
-import { NO_DEFINITIONS, useAppendPropertyOption, useOwnedDefinitions } from "@/hooks/useProperties";
+import {
+  NO_DEFINITIONS,
+  useAppendPropertyOption,
+  useCreateProperty,
+  useOwnedDefinitions,
+} from "@/hooks/useProperties";
 import { type MemberSearchScope, useSearchMembers } from "@/hooks/useUsers";
 import { getHttpStatus } from "@/lib/errorMessage";
 import { currentServerKey } from "@/lib/offlineSession";
@@ -357,6 +363,7 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
   const appendOption = useAppendPropertyOption();
   const searchMembers = useSearchMembers();
   const adding = useContext(ItemDraftContext) !== null;
+  const files = useFileFieldFiles(initiativeId);
   const saved = normalizePropertyValue(property);
   const person = userReferenceValue(property);
   const edit = (value: unknown): ItemEdit<I, P> => ({
@@ -431,6 +438,7 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
         searchMembers={searchMembers}
         selectedUser={person && hasDisplayName(person) ? toMember(person) : null}
         updatedAt={updatedAt}
+        files={files}
       />
     </FieldFrame>
   );
@@ -569,6 +577,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
   const label = t(props.owner ? "titleWithMetadata" : "title");
   const none = t(props.owner ? "noPropertiesOrMetadata" : "noMetadata");
   const save = useItemFieldSave(kind, id, label);
+  const createProperty = useCreateProperty();
   const add = (definition: PropertyDefinitionRead) => {
     if (properties.some((p) => p.property_id === definition.id)) return;
     void save.save({
@@ -633,6 +642,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
         loading={definitions.isLoading}
         initiativeId={initiativeId ?? 0}
         owner={props.owner}
+        create={createProperty.mutateAsync}
         currentPropertyIds={[...listed.map((p) => p.property_id), ...(except ?? [])]}
         onAdd={add}
         disabled={readOnly || !initiativeId}
