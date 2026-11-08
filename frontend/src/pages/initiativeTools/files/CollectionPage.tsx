@@ -821,7 +821,6 @@ export function CollectionPage() {
         title={t("collections.trashTitle")}
         description={t("collections.trashDescription")}
         confirmLabel={t("collections.trash")}
-        cancelLabel={t("common:cancel")}
         isLoading={trash.isPending}
         destructive
         onConfirm={() => trash.mutate(parsedId)}

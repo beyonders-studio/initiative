@@ -80,7 +80,6 @@ export const InitiativeSettingsDetailsTab = ({
                   value={color}
                   onChange={setColor}
                   disabled={!canManageMembers || isSaving}
-                  triggerLabel="Adjust"
                 />
               </div>
             </div>

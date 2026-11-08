@@ -100,9 +100,31 @@
     "rowsSelectedFiltered": "{{selected}} sélectionnée(s) ({{total}} correspondent au filtre)",
     "noResults": "Aucun résultat.",
     "rowsPerPage": "Lignes par page :",
-    "pageOf": "Page {{current}} sur {{total}}"
+    "pageOf": "Page {{current}} sur {{total}}",
+    "filter": "Filtrer…"
   },
   "wizard": {
     "stepOf": "Étape {{current}} sur {{total}}"
+  },
+  "cancel": "Annuler",
+  "close": "Fermer",
+  "breadcrumb": "Fil d'Ariane",
+  "confirm": {
+    "continue": "Continuer",
+    "working": "Veuillez patienter…"
+  },
+  "carousel": {
+    "previous": "Diapositive précédente",
+    "next": "Diapositive suivante"
+  },
+  "colorPicker": {
+    "pick": "Choisir une couleur",
+    "mode": "Mode"
+  },
+  "iconPicker": {
+    "search": "Rechercher une icône…",
+    "placeholder": "Sélectionner une icône",
+    "empty": "Aucune icône trouvée",
+    "other": "Autre"
   }
 }

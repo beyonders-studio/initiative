@@ -15,6 +15,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
@@ -308,12 +309,13 @@ export type ColorPickerOutputProps = ComponentProps<typeof SelectTrigger>;
 const formats = ["hex", "rgb", "css", "hsl"];
 
 export const ColorPickerOutput = ({ className, ...props }: ColorPickerOutputProps) => {
+  const { t } = useTranslation("ui");
   const { mode, setMode } = useColorPicker();
 
   return (
     <Select onValueChange={setMode} value={mode}>
       <SelectTrigger className={cn("h-8 w-20 shrink-0 text-xs", className)} {...props}>
-        <SelectValue placeholder="Mode" />
+        <SelectValue placeholder={t("colorPicker.mode")} />
       </SelectTrigger>
       <SelectContent>
         {formats.map((format) => (

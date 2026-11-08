@@ -333,7 +333,6 @@ export const SettingsCommunityRolesPage = () => {
         title={t("customRoles.deleteTitle", { name: deleting?.name ?? "" })}
         description={t("customRoles.deleteDescription")}
         confirmLabel={t("common:delete")}
-        cancelLabel={t("common:cancel")}
         destructive
         isLoading={deleteRole.isPending}
         onConfirm={() => {

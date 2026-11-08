@@ -2,6 +2,7 @@ import * as SheetPrimitive from "@radix-ui/react-dialog";
 import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 
 import { cn } from "@/ui/lib/utils";
 
@@ -59,6 +60,7 @@ const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
 >(({ side = "right", className, children, ...props }, ref) => {
+  const { t } = useTranslation("ui");
   const modal = React.useContext(SheetModalContext);
   const content = (
     <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
@@ -71,7 +73,7 @@ const SheetContent = React.forwardRef<
         }
       >
         <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
+        <span className="sr-only">{t("close")}</span>
       </SheetPrimitive.Close>
       {children}
     </SheetPrimitive.Content>

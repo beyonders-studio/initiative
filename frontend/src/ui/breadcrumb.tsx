@@ -1,6 +1,7 @@
 import { Slot } from "@radix-ui/react-slot";
 import { ChevronRight } from "lucide-react";
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 
 import { cn } from "@/ui/lib/utils";
 
@@ -9,7 +10,10 @@ const Breadcrumb = React.forwardRef<
   React.ComponentPropsWithoutRef<"nav"> & {
     separator?: React.ReactNode;
   }
->(({ ...props }, ref) => <nav ref={ref} aria-label="breadcrumb" {...props} />);
+>(({ ...props }, ref) => {
+  const { t } = useTranslation("ui");
+  return <nav ref={ref} aria-label={t("breadcrumb")} {...props} />;
+});
 Breadcrumb.displayName = "Breadcrumb";
 
 const BreadcrumbList = React.forwardRef<HTMLOListElement, React.ComponentPropsWithoutRef<"ol">>(

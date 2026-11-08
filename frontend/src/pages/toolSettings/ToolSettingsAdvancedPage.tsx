@@ -92,7 +92,6 @@ export const ToolSettingsAdvancedPage = () => {
         title={t("toolSettings.deleteConfirmTitle", { name: entity.name })}
         description={t("toolSettings.deleteConfirmDescription")}
         confirmLabel={t("delete")}
-        cancelLabel={t("cancel")}
         onConfirm={handleDelete}
         isLoading={remove.isPending}
         destructive

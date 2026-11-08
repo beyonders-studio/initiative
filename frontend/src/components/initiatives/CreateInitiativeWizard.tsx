@@ -295,12 +295,7 @@ export const CreateInitiativeWizard = ({
           </div>
           <div className="space-y-2">
             <Label htmlFor="new-initiative-color">{t("createDialog.colorLabel")}</Label>
-            <ColorPickerPopover
-              id="new-initiative-color"
-              value={color}
-              onChange={setColor}
-              triggerLabel="Adjust"
-            />
+            <ColorPickerPopover id="new-initiative-color" value={color} onChange={setColor} />
             <p className="text-muted-foreground text-xs">{t("createDialog.colorHint")}</p>
           </div>
           {footer({ label: t("createWizard.nextTools"), disabled: !trimmedName, submit: true })}

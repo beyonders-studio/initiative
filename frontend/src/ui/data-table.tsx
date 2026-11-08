@@ -168,7 +168,7 @@ export function DataTable<TData extends RowData>({
   rowWrapper,
   groupRowWrapper,
   enableFilterInput = false,
-  filterInputPlaceholder = "Filter...",
+  filterInputPlaceholder,
   filterInputColumnKey = "name",
   filterValue,
   onFilterValueChange,
@@ -736,7 +736,7 @@ export function DataTable<TData extends RowData>({
               )}
               {enableFilterInput && (
                 <Input
-                  placeholder={filterInputPlaceholder}
+                  placeholder={filterInputPlaceholder ?? t("table.filter")}
                   value={
                     onFilterValueChange
                       ? (filterValue ?? "")

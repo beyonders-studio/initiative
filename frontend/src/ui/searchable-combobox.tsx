@@ -1,5 +1,6 @@
 import { Check, ChevronsUpDown, type LucideIcon } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { cn } from "@/ui/lib/utils";
 
@@ -45,13 +46,14 @@ export const SearchableCombobox = ({
   items,
   value,
   onValueChange,
-  placeholder = "Select an option",
-  emptyMessage = "No results found.",
+  placeholder,
+  emptyMessage,
   className,
   buttonClassName,
   disabled = false,
   "aria-label": ariaLabel,
 }: SearchableComboboxProps) => {
+  const { t } = useTranslation("ui");
   const [open, setOpen] = useState(false);
   const [internalValue, setInternalValue] = useState(value ?? "");
 
@@ -84,14 +86,14 @@ export const SearchableCombobox = ({
             className={cn("w-full justify-between", buttonClassName)}
             disabled={disabled}
           >
-            {selectedItem?.label ?? placeholder}
+            {selectedItem?.label ?? placeholder ?? t("combobox.placeholder")}
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[320px] p-0">
           <Command>
-            <CommandInput placeholder="Search..." disabled={disabled} />
-            <CommandEmpty>{emptyMessage}</CommandEmpty>
+            <CommandInput placeholder={t("combobox.search")} disabled={disabled} />
+            <CommandEmpty>{emptyMessage ?? t("combobox.noResults")}</CommandEmpty>
             <CommandGroup className="max-h-64 overflow-y-auto">
               {items.map((item) => (
                 <CommandItem

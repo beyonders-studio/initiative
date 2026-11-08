@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tabs past the edge of a narrow window can be reached with a mouse.** A row of tabs wider than the page, such as **Platform settings** on a narrow screen, shows a thin scrollbar under it to drag.
 - **The arrow keys move through what `[[` offers.** They stayed on the first match; now they step through the list, as they do for `@` and `#`.
 - **Progress bars tell a screen reader how far along they are,** as a percent in your language, where they read as busy with no value.
+- **Confirmations, pickers and tables speak your language.** Cancel, Continue, Please wait, a picker's placeholder, a table's filter and the labels a screen reader hears were English in every language.
 
 ## [0.78.0] - 2026-11-06
 
