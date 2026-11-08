@@ -216,6 +216,7 @@ async def start_export(
             .select_from(DataJob)
             .where(
                 DataJob.direction == DataJobDirection.export,
+                DataJob.created_by_kind == ActorKind.member,
                 DataJob.created_by == user.id,
                 col(DataJob.status).in_((DataJobStatus.queued, DataJobStatus.running)),
             )

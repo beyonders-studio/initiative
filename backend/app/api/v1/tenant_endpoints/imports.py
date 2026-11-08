@@ -43,6 +43,7 @@ from app.core.body_limit import MULTIPART_SLACK_BYTES, max_body
 from app.core.messages import ImportEngineMessages, ResumableMessages
 from app.core.version import get_version
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.schemas.tenant.atlassian import (
     AtlassianConnectRequest,
@@ -636,7 +637,7 @@ async def confirm_import(
         require_seat(
             guild_context, detail=ImportEngineMessages.IMPORT_SUPERADMIN_REQUIRED
         )
-    elif job.created_by != current_user.id:
+    elif job.created_by_kind != ActorKind.member or job.created_by != current_user.id:
         # RLS lets a guild admin read the row; answering somebody else's
         # people step is a different thing from being able to see it.
         raise HTTPException(

@@ -23,6 +23,6 @@ class CreatedByRead(SanitizedBaseModel):
 
     @model_validator(mode="after")
     def _install(self) -> Self:
-        if self.created_by_kind is ActorKind.plugin:
+        if self.created_by_kind is ActorKind.plugin and self.created_by is not None:
             self.created_by_install, self.created_by = self.created_by, None
         return self

@@ -9,11 +9,13 @@ that never pass through a flush.
 
 from datetime import UTC, datetime
 
-from sqlalchemy import insert
+import pytest
+from sqlalchemy import insert, text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.counter import Counter, CounterGroup
 from app.testing import route_as, route_system
 from app.testing.factories import (
@@ -103,7 +105,12 @@ async def test_an_explicit_author_is_kept(session: AsyncSession):
 
     await _route(session, guild.id, actor.id)
     counter = await create_counter(
-        session, group, name="imported", created_by=original.id, commit=False
+        session,
+        group,
+        name="imported",
+        created_by=original.id,
+        created_by_kind=ActorKind.member,
+        commit=False,
     )
     await session.flush()
 
@@ -161,3 +168,29 @@ async def test_content_a_plugin_writes_may_name_no_author(session: AsyncSession)
         await session.exec(select(CounterGroup).where(CounterGroup.id == written.id))
     ).one()
     assert reloaded.created_by is None
+
+
+@pytest.mark.always
+async def test_every_author_table_has_the_trigger(session: AsyncSession):
+    """``created_by_kind`` is NOT NULL, so a table that carries it without the
+    trigger refuses every write that names no author."""
+    missing = (
+        await session.exec(
+            text(
+                """
+                SELECT c.relname FROM pg_class c
+                JOIN pg_namespace n
+                  ON n.oid = c.relnamespace AND n.nspname = 'guild_template'
+                JOIN pg_attribute a
+                  ON a.attrelid = c.oid AND a.attname = 'created_by_kind'
+                WHERE c.relkind = 'r' AND NOT EXISTS (
+                    SELECT 1 FROM pg_trigger t
+                    WHERE t.tgrelid = c.oid
+                      AND t.tgfoid = 'public.fn_set_created_by'::regproc
+                )
+                ORDER BY 1
+                """
+            )
+        )
+    ).all()
+    assert missing == []

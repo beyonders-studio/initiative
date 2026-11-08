@@ -10,30 +10,30 @@ Running your own server comes with two chores: keeping a copy of everything, and
 
 | What | Where it is | Why |
 |---|---|---|
-| The database | The `db` container, in the `postgres_data` volume | Every project, task, comment, document and setting |
-| The database's roles | The same PostgreSQL, outside the database | The logins and per-community roles the data is granted to |
+| The database | The `db` container, in the `postgres_data` volume | Every project, task, comment, document and setting, and the logins and per-community roles they're granted to |
 | Uploads | `./uploads` beside the compose file, unless they're in [object storage](object-storage.md) | Every file people attached or uploaded |
 | `SECRET_KEY` | Your `.env` | Without it, a restored database can't read what it encrypted |
 
-Back up the first three together and on a schedule, and keep the copies somewhere that isn't the server. Keep `SECRET_KEY` somewhere safe and separate, with your other secrets. An export Initiative wrote to `EXPORT_DESTINATION_DIR` is yours to collect too; Initiative never deletes it.
+Back up the first two together and on a schedule, and keep the copies somewhere that isn't the server. Keep `SECRET_KEY` somewhere safe and separate, with your other secrets. An export Initiative wrote to `EXPORT_DESTINATION_DIR` is yours to collect too; Initiative never deletes it.
 
 On a [native package](native-packages.md), the uploads are in `/var/lib/initiative/uploads` and the settings, `SECRET_KEY` included, in `/etc/initiative/server.env`.
 
 ### The database
 
-From the folder with your compose file, with the user and database the compose file uses (`initiative` and `initiative`, unless you set `POSTGRES_USER` or `POSTGRES_DB`):
+From the folder with your compose file, with the user the compose file uses (`initiative`, unless you set `POSTGRES_USER`):
 
 ```bash
-docker compose exec -T db pg_dump -U initiative initiative > initiative-$(date +%F).sql
-docker compose exec -T db pg_dumpall -U initiative --roles-only > initiative-roles-$(date +%F).sql
+docker compose exec -T db pg_dumpall -U initiative > initiative-$(date +%F).sql
 ```
 
-`pg_dump` takes a consistent snapshot while Initiative runs, so there's no need to stop anything. The roles file holds the logins' password hashes, so keep it as safe as the dump.
+`pg_dumpall` copies the whole `db` container into one file: the database, and the logins and per-community roles Initiative grants it to. It takes a consistent snapshot while Initiative runs, so there's no need to stop anything. The file holds the logins' password hashes, so keep it as safe as `SECRET_KEY`.
+
+On a [native package](native-packages.md), run `pg_dumpall` against the PostgreSQL that holds Initiative, as a user allowed to read its roles.
 
 Run it nightly and keep a couple of weeks. As a crontab line, writing into a `backups` folder you've made beside the compose file, with the `%` escaped the way cron needs:
 
 ```text
-0 3 * * * cd /srv/initiative && docker compose exec -T db pg_dump -U initiative initiative | gzip > backups/initiative-$(date +\%F).sql.gz
+0 3 * * * cd /srv/initiative && docker compose exec -T db pg_dumpall -U initiative | gzip > backups/initiative-$(date +\%F).sql.gz
 ```
 
 ### Uploads
@@ -56,25 +56,27 @@ Restore a backup once, on another machine or a VM, so you know it works before t
     docker compose up -d db
     ```
 
-2. Put the roles back. It says role `initiative` already exists, which is fine.
+2. Put the database back, roles and all:
 
     ```bash
-    docker compose exec -T db psql -U initiative -d postgres < initiative-roles-2026-11-07.sql
+    docker compose exec -T db psql -U initiative -d postgres < initiative-2026-11-07.sql
     ```
 
-3. Put the database back:
+    For a nightly copy, unzip it on the way in:
 
     ```bash
-    docker compose exec -T db psql -U initiative -d initiative < initiative-2026-11-07.sql
+    gunzip -c backups/initiative-2026-11-07.sql.gz | docker compose exec -T db psql -U initiative -d postgres
     ```
 
-4. Put the uploads back beside the compose file:
+    It says role `initiative` and database `initiative` already exist, which is fine: the compose file made both when the database first started. It also sets the `initiative` login's password back to the one in the backup, which is why the restore wants the same `.env`.
+
+3. Put the uploads back beside the compose file:
 
     ```bash
     tar -xzf uploads-2026-11-07.tar.gz
     ```
 
-5. Start Initiative:
+4. Start Initiative:
 
     ```bash
     docker compose up -d

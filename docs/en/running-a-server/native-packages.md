@@ -132,7 +132,7 @@ ReadWritePaths=/srv/initiative-files
 
 ## Upgrades and removal
 
-Before upgrading, back up the database, its roles, `/etc/initiative/server.env` and the uploads, as [Backups & updates](backups-and-updates.md) describes. Then install the new package the same way as the first. It stops the running service so no old process keeps running against replaced files, and leaves your configuration and uploads alone. Read the release notes, then start the service again, which applies the migrations.
+Before upgrading, back up the database, `/etc/initiative/server.env` and the uploads, as [Backups & updates](backups-and-updates.md) describes. Then install the new package the same way as the first. It stops the running service so no old process keeps running against replaced files, and leaves your configuration and uploads alone. Read the release notes, then start the service again, which applies the migrations.
 
 Installing an older package doesn't undo a migration. To run an older version on a database a newer one changed, restore the backup taken before the upgrade first.
 
