@@ -70,6 +70,14 @@ class CustomRoleClaimRuleCreate(SanitizedBaseModel):
     role_id: int
 
 
+class CustomRoleClaimRuleUpdate(SanitizedBaseModel):
+    """Change the group a rule reads or the role it gives. Its provider and
+    its place in the order are not changed here."""
+
+    claim_value: Optional[str] = Field(default=None, min_length=1, max_length=500)
+    role_id: Optional[int] = None
+
+
 class CustomRoleClaimRuleRead(SanitizedBaseModel):
     id: int
     provider_id: int

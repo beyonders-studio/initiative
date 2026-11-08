@@ -50,6 +50,7 @@ from app.schemas.platform.settings import (
     CommunityClaimRuleCreate,
     CommunityClaimRuleRead,
     CommunityClaimRulesResponse,
+    CommunityClaimRuleUpdate,
     CommunityProviderConnectionCreate,
     CommunityProviderConnectionRead,
     CommunityProviderConnectionUpdate,
@@ -58,6 +59,7 @@ from app.schemas.tenant.custom_role import (
     CustomRoleClaimRuleCreate,
     CustomRoleClaimRuleOrder,
     CustomRoleClaimRuleRead,
+    CustomRoleClaimRuleUpdate,
 )
 from app.services import audit as audit_service
 from app.services.auth import guild_claim_rules as claim_rules
@@ -226,6 +228,28 @@ async def create_community_claim_rule(
     )
 
 
+@router.patch(
+    "/{community_id}/auth/rules/{rule_id}", response_model=CommunityClaimRuleRead
+)
+async def update_community_claim_rule(
+    guild_id: CommunityIdPath,
+    rule_id: int,
+    payload: CommunityClaimRuleUpdate,
+    _session: SeatWriteSessionDep,
+    system_session: SystemSessionDep,
+    current_user: CurrentUserDep,
+) -> CommunityClaimRuleRead:
+    """Change the group a rule reads or where it places people."""
+    await _require_connection_option(system_session, guild_id)
+    return await claim_rules.update_rule(
+        system_session,
+        guild_id=guild_id,
+        rule_id=rule_id,
+        payload=payload,
+        actor_user_id=current_user.id,
+    )
+
+
 @router.delete(
     "/{community_id}/auth/rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT
 )
@@ -364,6 +388,68 @@ async def order_custom_role_claim_rules(
         _role_rule_read(rule)
         for rule in await custom_roles_service.claim_rules(session)
     ]
+
+
+@router.patch(
+    "/{community_id}/auth/role-rules/{rule_id}",
+    response_model=CustomRoleClaimRuleRead,
+    dependencies=[_ROLE_RULES_OPEN],
+)
+async def update_custom_role_claim_rule(
+    guild_id: CommunityIdPath,
+    rule_id: int,
+    payload: CustomRoleClaimRuleUpdate,
+    session: SeatWriteSessionDep,
+    system_session: SystemSessionDep,
+    current_user: CurrentUserDep,
+) -> CustomRoleClaimRuleRead:
+    """Change the group a rule reads or the role it gives. Whoever holds a
+    role by it is given the new one at their next sign-in through that
+    provider."""
+    await _require_connection_option(system_session, guild_id)
+    rule = await session.get(CustomRoleClaimRule, rule_id)
+    if rule is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=AuthProviderMessages.RULE_NOT_FOUND,
+        )
+    if (
+        payload.role_id is not None
+        and await session.get(CustomRole, payload.role_id) is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=CustomRoleMessages.CUSTOM_ROLE_NOT_FOUND,
+        )
+    before = {"claim_value": rule.claim_value, "role_id": rule.role_id}
+    if payload.claim_value is not None:
+        rule.claim_value = payload.claim_value.strip()
+    if payload.role_id is not None:
+        rule.role_id = payload.role_id
+    session.add(rule)
+    try:
+        await session.flush()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=AuthProviderMessages.RULE_EXISTS,
+        ) from None
+    changed = audit_service.changed_fields(
+        before, {"claim_value": rule.claim_value, "role_id": rule.role_id}
+    )
+    if changed["changed"]:
+        await audit_service.record(
+            session,
+            event_type=AuditEventType.CLAIM_RULE_UPDATED,
+            actor_user_id=current_user.id,
+            guild_id=guild_id,
+            target_type="custom_role_claim_rule",
+            target_id=rule.id,
+            detail=changed,
+        )
+    await session.commit()
+    return _role_rule_read(rule)
 
 
 @router.delete(

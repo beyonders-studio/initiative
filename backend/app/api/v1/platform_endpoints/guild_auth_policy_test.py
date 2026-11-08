@@ -3,6 +3,7 @@ session-satisfaction enforcement inside the guild RLS."""
 
 import json
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from collections.abc import Awaitable, Callable
 
 import pytest
@@ -24,7 +25,9 @@ from app.models.platform.guild import Guild, CommunityRole
 from app.core.login_methods import LoginMethod
 from app.core.rules import SetBy, SignInRequirement
 from app.models.platform.rule import CommunityRule
-from app.models.platform.user import User, UserRole
+from app.models.platform.user import User, UserRole, UserStatus
+from app.models.platform.user_passkey import UserPasskey
+from app.models.platform.user_totp import UserTotp
 from app.models.tenant.project import Project
 from app.services.auth.assurance import SECOND_FACTOR_AMR
 from app.services.platform import api_keys as api_keys_service
@@ -34,6 +37,7 @@ from app.testing.factories import (
     satisfied_claims_for,
     create_access_grant,
     create_auth_provider,
+    create_federated_identity,
     create_file,
     create_guest,
     create_guild,
@@ -123,6 +127,59 @@ async def test_the_seat_sets_reads_and_clears_the_policy(
     assert cleared.json()["auth_policy"]["policy"] == "open"
     session.expire_all()
     assert await _both_open(session, guild_id)
+
+
+async def test_the_seat_reads_how_many_each_rule_would_ask(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """Counted per part of the community, from the accounts' own credentials
+    and links, so a dialog can say what a rule asks before it is written."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin)
+    guild_id = seat.guild.id
+    provider = await create_auth_provider(session, slug="corp")
+    await create_guild_provider_connection(session, guild=seat.guild, provider=provider)
+    linked = await create_user(session)
+    await create_guild_membership(session, user=linked, guild=seat.guild)
+    session.add(UserTotp(user_id=linked.id, confirmed_at=datetime.now(timezone.utc)))
+    await create_federated_identity(session, linked, provider=provider)
+    keyed = await create_user(session)
+    await create_guild_membership(session, user=keyed, guild=seat.guild)
+    session.add(
+        UserPasskey(
+            user_id=keyed.id,
+            credential_id=b"figures-key",
+            public_key=b"public-key-bytes",
+            rp_id="localhost",
+            sign_count=0,
+            transports=["internal"],
+            name="Laptop",
+        )
+    )
+    # Not counted: an account that cannot sign in.
+    away = await create_user(session, status=UserStatus.suspended)
+    await create_guild_membership(session, user=away, guild=seat.guild)
+    await create_guest(session, seat.guild)
+    await session.commit()
+
+    body = (
+        await client.get(
+            _settings(guild_id), headers=_bearer(get_auth_token(seat.user))
+        )
+    ).json()
+    assert body["member_figures"] == {
+        "total": 3,
+        "without_factor": 1,
+        "without_passkey": 2,
+        "never_through_any": 2,
+        "never_through": [{"provider_id": provider.id, "count": 2}],
+    }
+    assert body["guest_figures"] == {
+        "total": 1,
+        "without_factor": 1,
+        "without_passkey": 1,
+        "never_through_any": 1,
+        "never_through": [{"provider_id": provider.id, "count": 1}],
+    }
 
 
 async def test_a_guest_is_asked_the_guests_rule_and_a_member_the_members(
