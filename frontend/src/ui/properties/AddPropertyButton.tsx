@@ -42,7 +42,7 @@ export const AddPropertyButton = ({
   onAdd,
   disabled = false,
 }: AddPropertyButtonProps) => {
-  const { t } = useTranslation(["properties", "common"]);
+  const { t } = useTranslation("properties");
   const [open, setOpen] = useState(false);
   // The new property's name while it is being made, in place of the list.
   const [newName, setNewName] = useState<string | null>(null);
@@ -65,13 +65,9 @@ export const AddPropertyButton = ({
         value: String(definition.id),
         label: definition.name,
         icon: iconForPropertyType(definition.type),
-        sublabel: t(`properties:types.${definition.type}`),
+        sublabel: t(`types.${definition.type}`),
         group: owner
-          ? t(
-              isOwned(definition)
-                ? `properties:picker.owner.${owner.kind}`
-                : "properties:picker.owner.initiative"
-            )
+          ? t(isOwned(definition) ? `picker.owner.${owner.kind}` : "picker.owner.initiative")
           : undefined,
       }))}
       onValueChange={(value) => {
@@ -81,11 +77,11 @@ export const AddPropertyButton = ({
       open={open}
       onOpenChange={handleOpenChange}
       // Offered whatever was typed: a new property starts from the search.
-      typedLabel={() => t("properties:picker.createHeading")}
+      typedLabel={() => t("picker.createHeading")}
       onCreate={setNewName}
       loading={loading}
-      searchPlaceholder={t("properties:picker.placeholder")}
-      emptyMessage={t("properties:picker.empty")}
+      searchPlaceholder={t("picker.placeholder")}
+      emptyMessage={t("picker.empty")}
       disabled={disabled}
       trigger={
         <Button
@@ -96,7 +92,7 @@ export const AddPropertyButton = ({
           disabled={disabled}
         >
           <Plus className="h-4 w-4" />
-          {t(owner ? "properties:addPropertyOrMetadata" : "properties:addMetadata")}
+          {t(owner ? "addPropertyOrMetadata" : "addMetadata")}
         </Button>
       }
     >

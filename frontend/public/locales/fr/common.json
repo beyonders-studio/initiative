@@ -301,10 +301,6 @@
     "none": "Aucun",
     "template": "Modèle"
   },
-  "days": {
-    "today": "Aujourd'hui",
-    "yesterday": "Hier"
-  },
   "fieldSave": {
     "saving": "Enregistrement…",
     "saved": "Enregistré",

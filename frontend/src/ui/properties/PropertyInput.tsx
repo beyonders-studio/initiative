@@ -318,7 +318,7 @@ const MemberInput = ({
   disabled: boolean;
   className?: string;
 }) => {
-  const { t } = useTranslation(["properties", "common"]);
+  const { t } = useTranslation("properties");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [found, setFound] = useState<Member[]>([]);
@@ -377,14 +377,14 @@ const MemberInput = ({
     shown ??
     (value === null
       ? null
-      : { id: value, name: t("common:userWithId", { id: value }), initials: "?" });
+      : { id: value, name: t("input.userWithId", { id: value }), initials: "?" });
 
   return (
     <Combobox
       items={[
         // Clearing is listed first while there is something to clear: "" is
         // no member's id.
-        ...(value !== null ? [{ value: "", label: t("common:clear"), icon: X }] : []),
+        ...(value !== null ? [{ value: "", label: t("input.clear"), icon: X }] : []),
         ...found.map((member) => ({
           value: String(member.id),
           label: member.name,
@@ -400,8 +400,8 @@ const MemberInput = ({
       onSearchChange={setQuery}
       onOpenChange={setOpen}
       loading={loading && found.length === 0}
-      searchPlaceholder={t("properties:input.userPlaceholder")}
-      emptyMessage={t("properties:input.textPlaceholder")}
+      searchPlaceholder={t("input.userPlaceholder")}
+      emptyMessage={t("input.textPlaceholder")}
       disabled={disabled}
       trigger={
         <Button
@@ -412,9 +412,7 @@ const MemberInput = ({
         >
           <span className="flex min-w-0 items-center gap-2">
             {drawn ? <MemberAvatar member={drawn} className="h-5 w-5 text-3xs" /> : null}
-            <span className="truncate">
-              {drawn ? drawn.name : t("properties:input.userPlaceholder")}
-            </span>
+            <span className="truncate">{drawn ? drawn.name : t("input.userPlaceholder")}</span>
           </span>
           <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -441,7 +439,7 @@ export const PropertyInput = ({
   files,
   updatedAt,
 }: PropertyInputProps) => {
-  const { t } = useTranslation(["properties", "common"]);
+  const { t } = useTranslation("properties");
 
   const options = useMemo<PropertyOption[]>(
     () => (definition.options ?? []) as PropertyOption[],
@@ -458,7 +456,7 @@ export const PropertyInput = ({
             const next = e.target.value;
             onChange(next === "" ? null : next);
           }}
-          placeholder={t("properties:input.textPlaceholder")}
+          placeholder={t("input.textPlaceholder")}
           disabled={disabled}
           className={cn("bg-transparent", className)}
         />
@@ -480,7 +478,7 @@ export const PropertyInput = ({
             const parsed = Number(raw);
             onChange(Number.isFinite(parsed) ? parsed : null);
           }}
-          placeholder={t("properties:input.numberPlaceholder")}
+          placeholder={t("input.numberPlaceholder")}
           disabled={disabled}
           className={cn("bg-transparent", className)}
         />
@@ -501,7 +499,7 @@ export const PropertyInput = ({
               const parsed = Number(raw);
               onChange(raw === "" || !Number.isFinite(parsed) ? null : parsed);
             }}
-            placeholder={t("properties:input.numberPlaceholder")}
+            placeholder={t("input.numberPlaceholder")}
             disabled={disabled}
             className="bg-transparent"
           />
@@ -559,7 +557,7 @@ export const PropertyInput = ({
             const next = e.target.value;
             onChange(next === "" ? null : next);
           }}
-          placeholder={t("properties:input.urlPlaceholder")}
+          placeholder={t("input.urlPlaceholder")}
           disabled={disabled}
           className={cn("bg-transparent", className)}
         />
@@ -574,7 +572,7 @@ export const PropertyInput = ({
           includeTime={false}
           onChange={(next) => onChange(next === "" ? null : next)}
           disabled={disabled}
-          clearLabel={t("properties:input.clear")}
+          clearLabel={t("input.clear")}
         />
       );
     }
@@ -602,7 +600,7 @@ export const PropertyInput = ({
             onChange(date.toISOString());
           }}
           disabled={disabled}
-          clearLabel={t("properties:input.clear")}
+          clearLabel={t("input.clear")}
         />
       );
     }
@@ -685,7 +683,7 @@ export const PropertyInput = ({
       // Exhaustiveness check — fall back to a read-only rendering.
       return (
         <span className="text-muted-foreground text-sm">
-          {String(value ?? t("properties:input.textPlaceholder"))}
+          {String(value ?? t("input.textPlaceholder"))}
         </span>
       );
     }
@@ -729,7 +727,7 @@ const PropertyOptionPicker = ({
   disabled,
   className,
 }: PropertyOptionPickerProps) => {
-  const { t } = useTranslation(["properties", "common"]);
+  const { t } = useTranslation("properties");
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
 
@@ -766,9 +764,7 @@ const PropertyOptionPicker = ({
       known: knownValues.has(option.value),
     }));
 
-  const placeholder = isMulti
-    ? t("properties:input.multiSelectPlaceholder")
-    : t("properties:input.selectPlaceholder");
+  const placeholder = isMulti ? t("input.multiSelectPlaceholder") : t("input.selectPlaceholder");
 
   const shared = {
     items: options.map((option) => ({
@@ -780,11 +776,11 @@ const PropertyOptionPicker = ({
     })),
     open,
     onOpenChange: setOpen,
-    typedLabel: (typed: string) => typed && t("properties:input.createOption", { label: typed }),
+    typedLabel: (typed: string) => typed && t("input.createOption", { label: typed }),
     onCreate: handleCreate,
     loading: adding,
-    searchPlaceholder: t("properties:input.searchOptions"),
-    emptyMessage: t("properties:picker.empty"),
+    searchPlaceholder: t("input.searchOptions"),
+    emptyMessage: t("picker.empty"),
     disabled,
     trigger: (
       <Button
@@ -818,16 +814,15 @@ const PropertyOptionPicker = ({
                   />
                 ) : null}
                 <span className="truncate">
-                  {option.known
-                    ? option.label
-                    : t("properties:input.unknownOption", { value: option.value })}
+                  {option.known ? option.label : t("input.unknownOption", { value: option.value })}
                 </span>
                 {isMulti ? (
-                  // biome-ignore lint/a11y/useSemanticElements: can't nest a <button> inside the parent PopoverTrigger button; span+role is the workaround
+                  // A <button> can't sit inside the trigger's own button, so a span
+                  // takes the button's role.
                   <span
                     role="button"
                     tabIndex={0}
-                    aria-label={t("properties:input.clear")}
+                    aria-label={t("input.clear")}
                     className="shrink-0 text-muted-foreground hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();

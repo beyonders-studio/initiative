@@ -158,7 +158,7 @@ export const CounterValue = ({
           {segments >= 2 && segments <= MAX_CLOCK_SEGMENTS ? (
             Array.from({ length: segments }, (_, index) => (
               <path
-                // biome-ignore lint/suspicious/noArrayIndexKey: a clock's segments are its places
+                // A clock's segments are its places.
                 key={index}
                 d={wedge(index / segments, (index + 1) / segments)}
                 className={cn(
@@ -425,7 +425,8 @@ export const PropertyValueCell = ({
         </>
       );
       body = nested ? (
-        // biome-ignore lint/a11y/useSemanticElements: a <button> is also invalid interactive content nested inside the wrapping card <a>; a role=button span avoids the nested-anchor while staying keyboard-accessible.
+        // A <button> can't sit inside the card's wrapping <a> either, so a span
+        // takes the button's role and keys.
         <span
           role="button"
           tabIndex={0}

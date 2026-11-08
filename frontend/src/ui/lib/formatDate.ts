@@ -78,8 +78,8 @@ export const formatDayHeading = (value: string, t: (key: string) => string): str
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
   const key = dayKeyOf(date);
-  if (key === dayKeyOf(today)) return t("common:days.today");
-  if (key === dayKeyOf(yesterday)) return t("common:days.yesterday");
+  if (key === dayKeyOf(today)) return t("ui:days.today");
+  if (key === dayKeyOf(yesterday)) return t("ui:days.yesterday");
   return dateTimeFormat(undefined, {
     weekday: "short",
     year: "numeric",

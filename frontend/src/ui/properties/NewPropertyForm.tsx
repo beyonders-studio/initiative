@@ -84,7 +84,7 @@ export const NewPropertyForm = ({
   /** Told when creating starts and ends. */
   onPendingChange?: (pending: boolean) => void;
 }) => {
-  const { t } = useTranslation(["properties", "common"]);
+  const { t } = useTranslation(["properties", "ui"]);
   const [newName, setNewName] = useState(startName);
   const [newType, setNewType] = useState<MetadataType>(startType);
   // An owner's metadata, until the initiative's property is asked for.
@@ -245,7 +245,6 @@ export const NewPropertyForm = ({
               // ``option.value``/``label`` remounts the input on every
               // keystroke and steals focus. Inputs are controlled and
               // rows only change via add/remove, so the index is correct.
-              // biome-ignore lint/suspicious/noArrayIndexKey: controlled rows with no stable id; keying on the edited field steals focus
               <li key={index} className="flex items-center gap-2">
                 <Input
                   value={option.label}
@@ -289,7 +288,7 @@ export const NewPropertyForm = ({
           {t("properties:picker.createButton")}
         </Button>
         <Button type="button" size="sm" variant="outline" onClick={onCancel} disabled={pending}>
-          {t("common:cancel")}
+          {t("ui:cancel")}
         </Button>
       </div>
     </div>
