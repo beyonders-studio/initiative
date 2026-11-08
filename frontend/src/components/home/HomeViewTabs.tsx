@@ -150,7 +150,6 @@ export function HomeViewTabs({
         title={t("views.deleteTitle", { name: deleting?.name ?? "" })}
         description={t("views.deleteDescription")}
         confirmLabel={t("views.deleteConfirm")}
-        cancelLabel={t("common:cancel")}
         destructive
         onConfirm={() => {
           if (deleting) onDelete(deleting.id);

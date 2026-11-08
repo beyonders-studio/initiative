@@ -353,7 +353,6 @@ export const CommunityClaimRulesSection = ({ communityId }: { communityId: numbe
           group: removing?.claim_value ?? "",
         })}
         confirmLabel={t("communityAuth.rules.remove")}
-        cancelLabel={t("authProviders.cancel")}
         destructive
         isLoading={deleteRule.isPending}
         onConfirm={() => {

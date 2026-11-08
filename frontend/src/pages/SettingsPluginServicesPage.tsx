@@ -374,7 +374,6 @@ export const SettingsPluginServicesPage = () => {
         title={t("pluginServices.disableTitle", { name: disabling?.public_id ?? "" })}
         description={t("pluginServices.disableDescription")}
         confirmLabel={t("pluginServices.disableConfirm")}
-        cancelLabel={t("pluginServices.cancel")}
         destructive
         isLoading={updateService.isPending}
         onConfirm={() => {
@@ -390,7 +389,6 @@ export const SettingsPluginServicesPage = () => {
         title={t("pluginServices.deleteTitle", { name: deleting?.public_id ?? "" })}
         description={t("pluginServices.deleteDescription")}
         confirmLabel={t("pluginServices.delete")}
-        cancelLabel={t("pluginServices.cancel")}
         destructive
         confirmationText={deleting?.public_id}
         confirmationLabel={t("pluginServices.deleteConfirmLabel")}

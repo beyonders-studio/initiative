@@ -489,7 +489,6 @@ export const UploadedFileViewer = ({
         description={convertNote ? t(convertNote) : undefined}
         confirmLabel={t("convert.confirm")}
         loadingLabel={t("convert.converting")}
-        cancelLabel={t("common:cancel")}
         onConfirm={() => convert.mutate(fileId)}
         isLoading={convert.isPending}
       >
@@ -518,7 +517,6 @@ export const UploadedFileViewer = ({
             : undefined
         }
         confirmLabel={t("versions.deleteVersion")}
-        cancelLabel={t("common:cancel")}
         onConfirm={handleConfirmDeleteVersion}
         isLoading={deleteVersion.isPending}
         destructive

@@ -11,33 +11,37 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { cn } from "@/ui/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
-interface ColorPickerContextValue {
+type ColorInput = Parameters<typeof Color>[0];
+
+interface Hsla {
   hue: number;
   saturation: number;
   lightness: number;
   alpha: number;
+}
+
+interface ColorPickerContextValue extends Hsla {
+  /** Without transparency: no alpha slider, and every colour is opaque. */
+  opaque: boolean;
   mode: string;
-  setHue: (hue: number) => void;
-  setSaturation: (saturation: number) => void;
-  setLightness: (lightness: number) => void;
-  setAlpha: (alpha: number) => void;
   setMode: (mode: string) => void;
-  setColorValue: (value: string) => void;
+  /** Move to a colour the person chose, and tell the picker's caller. */
+  update: (next: Partial<Hsla>) => void;
 }
 
 const ColorPickerContext = createContext<ColorPickerContextValue | undefined>(undefined);
 
-export const useColorPicker = () => {
+const useColorPicker = () => {
   const context = useContext(ColorPickerContext);
 
   if (!context) {
@@ -45,12 +49,6 @@ export const useColorPicker = () => {
   }
 
   return context;
-};
-
-export type ColorPickerProps = Omit<HTMLAttributes<HTMLDivElement>, "onChange"> & {
-  value?: Parameters<typeof Color>[0];
-  defaultValue?: Parameters<typeof Color>[0];
-  onChange?: (value: number[]) => void;
 };
 
 /**
@@ -63,115 +61,112 @@ export type ColorPickerProps = Omit<HTMLAttributes<HTMLDivElement>, "onChange"> 
  */
 const channel = (...values: number[]) => values.find(Number.isFinite) ?? 0;
 
-export const ColorPicker = ({
+const hslaOf = (value: ColorInput, fallback: ColorInput = "#000000"): Hsla => {
+  const color = Color(value);
+  const backup = Color(fallback);
+  return {
+    hue: channel(color.hue(), backup.hue(), 0),
+    saturation: channel(color.saturationl(), backup.saturationl(), 100),
+    lightness: channel(color.lightness(), backup.lightness(), 50),
+    alpha: channel(color.alpha() * 100, backup.alpha() * 100, 100),
+  };
+};
+
+const colorOf = ({ hue, saturation, lightness, alpha }: Hsla) =>
+  Color.hsl(hue, saturation, lightness).alpha(alpha / 100);
+
+/** Whether a colour handed in is the one on screen: what the picker reported
+ *  comes back as its value, and reading it back would round the hue and move
+ *  the cursor. */
+const showing = (value: ColorInput, hsla: Hsla) => {
+  try {
+    return Color(value).hexa() === colorOf(hsla).hexa();
+  } catch {
+    return true;
+  }
+};
+
+type ColorPickerProps = Omit<HTMLAttributes<HTMLDivElement>, "onChange"> & {
+  value?: ColorInput;
+  defaultValue?: ColorInput;
+  opaque?: boolean;
+  /** Each colour the person moves to, as [r, g, b, alpha 0–1]. Only their own
+   *  changes: a value handed in is never reported back. */
+  onChange?: (value: number[]) => void;
+};
+
+const ColorPicker = ({
   value,
   defaultValue = "#000000",
+  opaque = false,
   onChange,
   className,
   ...props
 }: ColorPickerProps) => {
-  const resolvedValue = value ?? defaultValue;
-  const selectedColor = Color(resolvedValue);
-  const defaultColor = Color(defaultValue);
-
-  const [hue, setHue] = useState(channel(selectedColor.hue(), defaultColor.hue(), 0));
-  const [saturation, setSaturation] = useState(
-    channel(selectedColor.saturationl(), defaultColor.saturationl(), 100)
-  );
-  const [lightness, setLightness] = useState(
-    channel(selectedColor.lightness(), defaultColor.lightness(), 50)
-  );
-  const [alpha, setAlpha] = useState(
-    channel(selectedColor.alpha() * 100, defaultColor.alpha() * 100, 100)
-  );
+  const [hsla, setHsla] = useState(() => hslaOf(value ?? defaultValue, defaultValue));
   const [mode, setMode] = useState("hex");
 
-  const setColorValue = useCallback((nextValue: string) => {
-    try {
-      const color = Color(nextValue);
-      const [nextHue, nextSaturation, nextLightness] = color.hsl().array();
-
-      setHue(nextHue || 0);
-      setSaturation(nextSaturation || 0);
-      setLightness(nextLightness || 0);
-      setAlpha((color.alpha() ?? 1) * 100);
-    } catch (error) {
-      console.error("Invalid color value", error);
-    }
-  }, []);
-
-  // Update color when controlled value changes
+  // A colour handed in from outside replaces the one on screen, unless it is
+  // the one on screen.
   const [prevValue, setPrevValue] = useState(value);
   if (prevValue !== value) {
     setPrevValue(value);
-    if (value) {
-      setColorValue(value as string);
-    }
+    if (value && !showing(value, hsla)) setHsla(hslaOf(value, defaultValue));
   }
 
-  // Notify parent of changes
-  useEffect(() => {
-    if (onChange) {
-      const color = Color.hsl(hue, saturation, lightness).alpha(alpha / 100);
-      const rgba = color.rgb().array();
+  // Several moves can land between renders (a drag reports every pointer
+  // event), so each builds on the last one rather than on the last render.
+  const latest = useRef(hsla);
+  latest.current = hsla;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
-      onChange([rgba[0], rgba[1], rgba[2], alpha / 100]);
-    }
-  }, [hue, saturation, lightness, alpha, onChange]);
+  const update = useCallback(
+    (next: Partial<Hsla>) => {
+      const moved = { ...latest.current, ...next, ...(opaque ? { alpha: 100 } : null) };
+      latest.current = moved;
+      setHsla(moved);
+      const [red, green, blue] = colorOf(moved).rgb().array();
+      onChangeRef.current?.([red, green, blue, moved.alpha / 100]);
+    },
+    [opaque]
+  );
 
   return (
-    <ColorPickerContext.Provider
-      value={{
-        hue,
-        saturation,
-        lightness,
-        alpha,
-        mode,
-        setHue,
-        setSaturation,
-        setLightness,
-        setAlpha,
-        setMode,
-        setColorValue,
-      }}
-    >
+    <ColorPickerContext.Provider value={{ ...hsla, opaque, mode, setMode, update }}>
       <div className={cn("flex size-full flex-col gap-4", className)} {...props} />
     </ColorPickerContext.Provider>
   );
 };
 
-export type ColorPickerSelectionProps = HTMLAttributes<HTMLDivElement>;
+type ColorPickerSelectionProps = HTMLAttributes<HTMLDivElement>;
 
-export const ColorPickerSelection = memo(({ className, ...props }: ColorPickerSelectionProps) => {
+const ColorPickerSelection = memo(({ className, ...props }: ColorPickerSelectionProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [positionX, setPositionX] = useState(0);
-  const [positionY, setPositionY] = useState(0);
-  const { hue, setSaturation, setLightness } = useColorPicker();
+  const { hue, saturation, lightness, update } = useColorPicker();
 
-  const backgroundGradient = useMemo(() => {
-    return `linear-gradient(0deg, rgba(0,0,0,1), rgba(0,0,0,0)),
-            linear-gradient(90deg, rgba(255,255,255,1), rgba(255,255,255,0)),
-            hsl(${hue}, 100%, 50%)`;
-  }, [hue]);
+  // The field paints saturation across and brightness down (HSV), so the
+  // cursor is the colour read the same way: it starts on the colour shown.
+  const [, fieldSaturation, brightness] = Color.hsl(hue, saturation, lightness).hsv().array();
+  const x = fieldSaturation / 100;
+  const y = 1 - brightness / 100;
 
   const handlePointerMove = useCallback(
     (event: PointerEvent) => {
-      if (!(isDragging && containerRef.current)) {
+      if (!containerRef.current) {
         return;
       }
       const rect = containerRef.current.getBoundingClientRect();
-      const x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-      const y = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
-      setPositionX(x);
-      setPositionY(y);
-      setSaturation(x * 100);
-      const topLightness = x < 0.01 ? 100 : 50 + 50 * (1 - x);
-      const lightness = topLightness * (1 - y);
-
-      setLightness(lightness);
+      const nextX = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+      const nextY = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+      // The colour painted under the pointer, in the picker's HSL.
+      const [, nextSaturation, nextLightness] = Color.hsv(hue, nextX * 100, (1 - nextY) * 100)
+        .hsl()
+        .array();
+      update({ saturation: nextSaturation, lightness: nextLightness });
     },
-    [isDragging, setSaturation, setLightness]
+    [hue, update]
   );
 
   useEffect(() => {
@@ -198,34 +193,35 @@ export const ColorPickerSelection = memo(({ className, ...props }: ColorPickerSe
       }}
       ref={containerRef}
       style={{
-        background: backgroundGradient,
+        background: `linear-gradient(0deg, rgba(0,0,0,1), rgba(0,0,0,0)),
+            linear-gradient(90deg, rgba(255,255,255,1), rgba(255,255,255,0)),
+            hsl(${hue}, 100%, 50%)`,
       }}
       {...props}
     >
       <div
         className="pointer-events-none absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white"
         style={{
-          left: `${positionX * 100}%`,
-          top: `${positionY * 100}%`,
+          left: `${x * 100}%`,
+          top: `${y * 100}%`,
           boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
         }}
       />
     </div>
   );
 });
-
 ColorPickerSelection.displayName = "ColorPickerSelection";
 
-export type ColorPickerHueProps = ComponentProps<typeof Slider.Root>;
+type ColorPickerHueProps = ComponentProps<typeof Slider.Root>;
 
-export const ColorPickerHue = ({ className, ...props }: ColorPickerHueProps) => {
-  const { hue, setHue } = useColorPicker();
+const ColorPickerHue = ({ className, ...props }: ColorPickerHueProps) => {
+  const { hue, update } = useColorPicker();
 
   return (
     <Slider.Root
       className={cn("relative flex h-4 w-full touch-none", className)}
       max={360}
-      onValueChange={([hue]) => setHue(hue)}
+      onValueChange={([next]) => update({ hue: next })}
       step={1}
       value={[hue]}
       {...props}
@@ -238,16 +234,16 @@ export const ColorPickerHue = ({ className, ...props }: ColorPickerHueProps) => 
   );
 };
 
-export type ColorPickerAlphaProps = ComponentProps<typeof Slider.Root>;
+type ColorPickerAlphaProps = ComponentProps<typeof Slider.Root>;
 
-export const ColorPickerAlpha = ({ className, ...props }: ColorPickerAlphaProps) => {
-  const { alpha, setAlpha } = useColorPicker();
+const ColorPickerAlpha = ({ className, ...props }: ColorPickerAlphaProps) => {
+  const { alpha, update } = useColorPicker();
 
   return (
     <Slider.Root
       className={cn("relative flex h-4 w-full touch-none", className)}
       max={100}
-      onValueChange={([alpha]) => setAlpha(alpha)}
+      onValueChange={([next]) => update({ alpha: next })}
       step={1}
       value={[alpha]}
       {...props}
@@ -267,23 +263,17 @@ export const ColorPickerAlpha = ({ className, ...props }: ColorPickerAlphaProps)
   );
 };
 
-export type ColorPickerEyeDropperProps = ComponentProps<typeof Button>;
+type ColorPickerEyeDropperProps = ComponentProps<typeof Button>;
 
-export const ColorPickerEyeDropper = ({ className, ...props }: ColorPickerEyeDropperProps) => {
-  const { setHue, setSaturation, setLightness, setAlpha } = useColorPicker();
+const ColorPickerEyeDropper = ({ className, ...props }: ColorPickerEyeDropperProps) => {
+  const { update } = useColorPicker();
 
   const handleEyeDropper = async () => {
     try {
       // @ts-expect-error - EyeDropper API is experimental
       const eyeDropper = new EyeDropper();
       const result = await eyeDropper.open();
-      const color = Color(result.sRGBHex);
-      const [h, s, l] = color.hsl().array();
-
-      setHue(h);
-      setSaturation(s);
-      setLightness(l);
-      setAlpha(100);
+      update({ ...hslaOf(result.sRGBHex), alpha: 100 });
     } catch (error) {
       console.error("EyeDropper failed:", error);
     }
@@ -303,17 +293,18 @@ export const ColorPickerEyeDropper = ({ className, ...props }: ColorPickerEyeDro
   );
 };
 
-export type ColorPickerOutputProps = ComponentProps<typeof SelectTrigger>;
+type ColorPickerOutputProps = ComponentProps<typeof SelectTrigger>;
 
 const formats = ["hex", "rgb", "css", "hsl"];
 
-export const ColorPickerOutput = ({ className, ...props }: ColorPickerOutputProps) => {
+const ColorPickerOutput = ({ className, ...props }: ColorPickerOutputProps) => {
+  const { t } = useTranslation("ui");
   const { mode, setMode } = useColorPicker();
 
   return (
     <Select onValueChange={setMode} value={mode}>
       <SelectTrigger className={cn("h-8 w-20 shrink-0 text-xs", className)} {...props}>
-        <SelectValue placeholder="Mode" />
+        <SelectValue placeholder={t("colorPicker.mode")} />
       </SelectTrigger>
       <SelectContent>
         {formats.map((format) => (
@@ -347,7 +338,7 @@ const PercentageInput = ({ className, ...props }: PercentageInputProps) => {
   );
 };
 
-export type ColorPickerFormatProps = HTMLAttributes<HTMLDivElement>;
+type ColorPickerFormatProps = HTMLAttributes<HTMLDivElement>;
 
 const normalizeHex = (value: string) => {
   const trimmed = value.trim().replace(/^#/, "");
@@ -357,9 +348,9 @@ const normalizeHex = (value: string) => {
   return `#${trimmed.toUpperCase()}`;
 };
 
-export const ColorPickerFormat = ({ className, ...props }: ColorPickerFormatProps) => {
-  const { hue, saturation, lightness, alpha, mode, setColorValue } = useColorPicker();
-  const color = Color.hsl(hue, saturation, lightness, alpha / 100);
+const ColorPickerFormat = ({ className, ...props }: ColorPickerFormatProps) => {
+  const { hue, saturation, lightness, alpha, opaque, mode, update } = useColorPicker();
+  const color = colorOf({ hue, saturation, lightness, alpha });
   const hexValue = color.hex();
   const [hexInput, setHexInput] = useState(hexValue);
   const [prevHexValue, setPrevHexValue] = useState(hexValue);
@@ -367,6 +358,9 @@ export const ColorPickerFormat = ({ className, ...props }: ColorPickerFormatProp
     setPrevHexValue(hexValue);
     setHexInput(hexValue);
   }
+  // The share of the colour that shows, beside its channels; nothing to say
+  // for a picker without transparency.
+  const shown = opaque ? null : <PercentageInput value={alpha} />;
 
   if (mode === "hex") {
     return (
@@ -378,14 +372,14 @@ export const ColorPickerFormat = ({ className, ...props }: ColorPickerFormatProp
         {...props}
       >
         <Input
-          className="h-8 rounded-r-none bg-secondary px-2 text-xs shadow-none"
+          className={cn("h-8 bg-secondary px-2 text-xs shadow-none", !opaque && "rounded-r-none")}
           type="text"
           value={hexInput}
           onChange={(event) => setHexInput(event.target.value)}
           onBlur={() => {
             const normalized = normalizeHex(hexInput);
             if (normalized) {
-              setColorValue(normalized);
+              update(hslaOf(normalized));
             } else {
               setHexInput(color.hex());
             }
@@ -400,7 +394,7 @@ export const ColorPickerFormat = ({ className, ...props }: ColorPickerFormatProp
             }
           }}
         />
-        <PercentageInput value={alpha} />
+        {shown}
       </div>
     );
   }
@@ -429,7 +423,7 @@ export const ColorPickerFormat = ({ className, ...props }: ColorPickerFormatProp
             value={value}
           />
         ))}
-        <PercentageInput value={alpha} />
+        {shown}
       </div>
     );
   }
@@ -446,7 +440,7 @@ export const ColorPickerFormat = ({ className, ...props }: ColorPickerFormatProp
           className="h-8 w-full bg-secondary px-2 text-xs shadow-none"
           readOnly
           type="text"
-          value={`rgba(${rgb.join(", ")}, ${alpha}%)`}
+          value={opaque ? `rgb(${rgb.join(", ")})` : `rgba(${rgb.join(", ")}, ${alpha}%)`}
           {...props}
         />
       </div>
@@ -477,10 +471,39 @@ export const ColorPickerFormat = ({ className, ...props }: ColorPickerFormatProp
             value={value}
           />
         ))}
-        <PercentageInput value={alpha} />
+        {shown}
       </div>
     );
   }
 
   return null;
 };
+
+/**
+ * The whole picker: the colour's value, the field, hue (and transparency,
+ * unless it is opaque), the eyedropper and the value in each format.
+ * `ColorPickerPopover` loads it when it first opens.
+ */
+export const ColorPickerPanel = ({
+  value,
+  opaque,
+  onChange,
+}: {
+  value: string;
+  opaque?: boolean;
+  onChange: (rgba: number[]) => void;
+}) => (
+  <ColorPicker value={value} opaque={opaque} onChange={onChange}>
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="flex-1 rounded-md border px-3 py-2 font-mono text-xs">{value}</div>
+        <ColorPickerOutput />
+        <ColorPickerEyeDropper />
+      </div>
+      <ColorPickerSelection className="h-48 w-full rounded-md border" />
+      <ColorPickerHue />
+      {opaque ? null : <ColorPickerAlpha />}
+      <ColorPickerFormat className="w-full" />
+    </div>
+  </ColorPicker>
+);

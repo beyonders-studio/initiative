@@ -230,7 +230,6 @@ export const CommunityAuthProvidersSection = ({
         })}
         description={t("communityAuth.connections.disconnectDescription")}
         confirmLabel={t("communityAuth.connections.disconnect")}
-        cancelLabel={t("authProviders.cancel")}
         destructive
         isLoading={disconnect.isPending}
         onConfirm={() => {

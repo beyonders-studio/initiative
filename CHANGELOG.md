@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Help leads with the user guide.** The question mark under your name opens a Help panel that links the user guide first and searches it from inside the app, with answers for the page you're on before you type and each FAQ question as its own answer. Where your server takes help requests, **Ask the team** under the results starts one with your search: write first, pick a topic, paste or drop screenshots, and close it whenever you like, as the draft waits. Requests now carry the device details feedback already sends, with a switch to leave them out. **Ask for help** on notices opens the same request. The separate documentation and lifebuoy icons are gone.
 - **Announcements you close stay in your notifications.** Each one leaves a line, already read, that opens it again. It replaces the **Past announcements** page.
 - **Search forgives typos.** The command palette and the icon picker find what you meant through a swapped, wrong or extra letter (one in a word of four to seven letters, two from eight), and the words of a name in any order, with an exact name first. A table's filter is exact: it keeps the rows that hold what you typed, in any case.
+- **One colour picker everywhere.** A spreadsheet's text, fill and border colours and a profile decoration's colours open the same picker as the rest of the app, rather than the system's. The picker opens with its cursor on the current colour, and a single click in its field picks.
 
 ### Fixed
 
@@ -29,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tabs past the edge of a narrow window can be reached with a mouse.** A row of tabs wider than the page, such as **Platform settings** on a narrow screen, shows a thin scrollbar under it to drag.
 - **The arrow keys move through what `[[` offers.** They stayed on the first match; now they step through the list, as they do for `@` and `#`.
 - **Progress bars tell a screen reader how far along they are,** as a percent in your language, where they read as busy with no value.
+- **Confirmations, pickers and tables speak your language.** Cancel, Continue, Please wait, a picker's placeholder, a table's filter and the labels a screen reader hears were English in every language.
 
 ## [0.78.0] - 2026-11-06
 

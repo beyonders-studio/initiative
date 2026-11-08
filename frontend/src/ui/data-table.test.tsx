@@ -107,7 +107,7 @@ describe("DataTable row selection", () => {
     expect(reported()).toBe("1,2");
 
     // Filter to hide the selected rows (show only Echo).
-    const filter = screen.getByPlaceholderText("Filter...");
+    const filter = screen.getByPlaceholderText("Filter…");
     await user.type(filter, "Echo");
 
     // Only Echo is visible now; select it.
@@ -144,7 +144,7 @@ describe("DataTable row selection", () => {
 
     await user.click(getCheckboxes()[0]);
     await user.click(getCheckboxes()[1]);
-    await user.type(screen.getByPlaceholderText("Filter..."), filterText);
+    await user.type(screen.getByPlaceholderText("Filter…"), filterText);
 
     expect(screen.getByText(count)).toBeInTheDocument();
     expect(screen.queryByText("2 of 3 row(s) selected")).not.toBeInTheDocument();
@@ -216,7 +216,7 @@ describe("DataTable filter", () => {
   it("keeps the rows that hold what was typed, whatever its case, and no near ones", async () => {
     const user = userEvent.setup();
     render(<DataTable columns={columns} data={rows} enableFilterInput />);
-    const filter = screen.getByPlaceholderText("Filter...");
+    const filter = screen.getByPlaceholderText("Filter…");
 
     await user.type(filter, "ARL");
     expect(screen.getByText("Charlie")).toBeInTheDocument();
@@ -643,7 +643,7 @@ describe("DataTable nested rows", () => {
     const user = userEvent.setup();
     render(<TreeHarness />);
 
-    await user.type(screen.getByPlaceholderText("Filter..."), "Lights");
+    await user.type(screen.getByPlaceholderText("Filter…"), "Lights");
 
     expect(names()).toEqual(["Post", "Shoot", "Lights"]);
   });

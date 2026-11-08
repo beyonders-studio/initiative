@@ -275,10 +275,16 @@ if (typeof Blob.prototype.stream !== "function") {
 
 // Imported once the test file has registered its mocks and imported what it
 // tests, so the host is filled from the modules that file mocked (a native
-// camera, native storage) rather than from copies this setup loaded first.
+// camera, native storage) rather than from copies this setup loaded first. A
+// file that mocks those modules too thinly for them to load (a router without
+// `Link`, Capacitor without `isNativePlatform`) keeps the kit's own defaults.
 beforeAll(async () => {
-  const { connectKit } = await import("@/lib/kitHost");
-  connectKit();
+  try {
+    const { connectKit } = await import("@/lib/kitHost");
+    connectKit();
+  } catch {
+    // The kit's defaults stand.
+  }
 });
 
 // ---------------------------------------------------------------------------

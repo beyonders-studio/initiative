@@ -52,7 +52,6 @@ export const DeleteInitiativeDialog = ({
       }
       confirmLabel={t("common:delete")}
       loadingLabel={t("settings.deletingInitiative")}
-      cancelLabel={t("common:cancel")}
       onConfirm={onConfirm}
       isLoading={isDeleting}
       destructive
