@@ -31,7 +31,6 @@ class PendingUpload(CreatedByMixin, table=True):
 
     #: The tus id, random and unguessable; the upload's address.
     id: str = Field(sa_column=Column(Text, primary_key=True))
-    created_by: int = Field(foreign_key="users.id", nullable=False)
     #: The endpoint the file is for (``app.services.resumable.purposes``).
     purpose: str = Field(sa_column=Column(Text, nullable=False))
     initiative_id: int | None = Field(default=None, nullable=True)

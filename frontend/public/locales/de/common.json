@@ -1,5 +1,6 @@
 {
   "appName": "Initiative",
+  "aPlugin": "Ein Plug-in",
   "help": "Hilfe",
   "helpDraft": "Entwurf der Hilfeanfrage",
   "deletedUserName": "Gelöschter Benutzer #{{id}}",

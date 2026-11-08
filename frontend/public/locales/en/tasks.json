@@ -53,7 +53,6 @@
     "backToProjects": "← Back to projects",
     "loadProjectError": "Unable to load project context for this task.",
     "createdBy": "Created by {{name}} · {{time}}",
-    "createdAt": "Created {{time}}",
     "readOnlyNoAccess": "You only have read access to this project, so task fields are disabled.",
     "readOnlyArchived": "This project is archived. Unarchive it from project settings to edit tasks.",
     "aiGenerate": "AI Generate",

@@ -13,6 +13,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import {
+  ActorKind,
   type CalendarEventRead,
   type RSVPStatus,
   SearchEntityType,
@@ -673,6 +674,8 @@ export const blankEvent = (
   initiative_id: calendar?.initiative_id ?? null,
   community_id: 0,
   created_by: null,
+  created_by_kind: ActorKind.system,
+  created_by_install: null,
   properties: [],
   tags: [],
   can: { edit: true },

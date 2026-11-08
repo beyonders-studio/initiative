@@ -20,6 +20,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.search import SearchEntityType
 from app.core.tools import Tool, tool_envelope_type
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.initiative import Initiative, PermissionKey
 from app.schemas.tenant.import_envelopes import DashboardEnvelope
@@ -71,6 +72,7 @@ class DashboardImporter(NamesPeopleInPassing):
             description=env.description,
             initiative_id=target_initiative.id,
             created_by=importer.id,
+            created_by_kind=ActorKind.member,
             definition=definition,
             config=config,
             listing_uid=listing_uid,

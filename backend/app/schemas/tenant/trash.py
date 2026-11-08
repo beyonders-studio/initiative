@@ -6,6 +6,7 @@ from enum import Enum
 from pydantic import AliasChoices, ConfigDict, Field
 
 from app.core.tools import TRASH_TARGETS
+from app.models.tenant._mixins import ActorKind
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.query import PageMeta
 
@@ -29,7 +30,10 @@ class TrashItem(SanitizedBaseModel):
     community_id: int = Field(validation_alias=AliasChoices("community_id", "guild_id"))
     name: str
     deleted_at: datetime
+    #: The member's user id or the plug-in's install id, as ``deleted_by_kind``
+    #: says; ``None`` for Initiative.
     deleted_by_id: int | None = None
+    deleted_by_kind: ActorKind
     deleted_by_display: str
     purge_at: datetime | None = None
 

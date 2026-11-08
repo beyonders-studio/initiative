@@ -11,19 +11,20 @@
  * a listing previews on moves them to today, as installing today would.
  */
 
-import type {
-  CounterSettingsOutput,
-  CurrencyCode,
-  MetadataType,
-  PropertyDefinitionRead,
-  PropertyOption,
-  PropertySummary,
-  RecurrenceStrategy,
-  TaskListRead,
-  TaskPriority,
-  TaskStatusCategory,
-  TaskStatusRead,
-  TaskTypeRead,
+import {
+  ActorKind,
+  type CounterSettingsOutput,
+  type CurrencyCode,
+  type MetadataType,
+  type PropertyDefinitionRead,
+  type PropertyOption,
+  type PropertySummary,
+  type RecurrenceStrategy,
+  type TaskListRead,
+  type TaskPriority,
+  type TaskStatusCategory,
+  type TaskStatusRead,
+  type TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { defaultsForCategory } from "@/lib/taskStatusDefaults";
 
@@ -287,6 +288,8 @@ export const projectListingBoard = (
       updated_at: "",
       archived_at: null,
       created_by: null,
+      created_by_kind: ActorKind.system,
+      created_by_install: null,
       assignees: [],
       comment_count: 0,
       blocked_by_open_count: 0,

@@ -182,7 +182,7 @@ GUEST_ROWS: dict[str, str] = {
     # Files of the initiatives they reach, as a member of one reads them, and
     # their own; none that belongs to the whole community.
     "uploads": (
-        f"(uploads.created_by = {_UID}"
+        f"((uploads.created_by_kind = 'member' AND uploads.created_by = {_UID})"
         f" OR uploads.initiative_id = ANY ({_MEMBER_OF})"
         f" OR uploads.initiative_id = ANY ({_P.guest_items}))"
     ),

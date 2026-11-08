@@ -2,13 +2,14 @@ import { Pencil, Reply, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ReactionTarget } from "@/api/generated/initiativeAPI.schemas";
+import { ActorKind, ReactionTarget } from "@/api/generated/initiativeAPI.schemas";
 import { ModerationMenu } from "@/components/moderation/ModerationMenu";
 import { ReportButton } from "@/components/moderation/ReportButton";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
 import { ReactionBar } from "@/components/reactions/ReactionBar";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { UserHoverLink } from "@/components/user/UserHoverLink";
+import { useActorName } from "@/hooks/useActorName";
 import { linkedCommentId } from "@/lib/entityResolver";
 import { getUserDisplayName, isAnonymizedUser } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
@@ -102,6 +103,7 @@ export const CommentThread = ({
   const [isReplying, setIsReplying] = useState(false);
   const [replyContent, setReplyContent] = useState("");
   const [isEditing, setIsEditing] = useState(false);
+  const actorName = useActorName();
   const [editContent, setEditContent] = useState(comment.content);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -112,16 +114,15 @@ export const CommentThread = ({
   // wrote the row rather than whoever said this.
   const importedAuthorName = comment.imported_author_name?.trim() || null;
   const anonymizedAuthor = !importedAuthorName && isAnonymizedUser(comment.author);
-  // A comment a plug-in wrote as its community names no account, and neither
-  // does a note the platform wrote on an operations case; the platform's
-  // notes say what wrote them.
+  // A plug-in or Initiative wrote what no member did; the platform's notes on
+  // an operations case say what wrote them.
   const displayName =
     importedAuthorName ??
-    (comment.created_by == null
-      ? comment.system_kind
+    (comment.created_by_kind === ActorKind.member
+      ? getUserDisplayName(comment.author ?? { id: comment.created_by })
+      : comment.system_kind
         ? t("comments:platformAuthor")
-        : t("comments:pluginAuthor")
-      : getUserDisplayName(comment.author ?? { id: comment.created_by }));
+        : actorName(comment.created_by_kind, comment.created_by_install));
   // The server says who may delete, from the rule the delete route applies.
   const canDelete = comment.can_remove;
   const canEdit = editable && currentUserId === comment.created_by;

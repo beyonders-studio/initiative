@@ -54,6 +54,7 @@ from app.db.session import set_rls_context
 from app.db.soft_delete_filter import select_including_deleted
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.intake import DEDUPE_KEY_LENGTH, IntakeBinding, IntakeCase
 from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
@@ -710,6 +711,7 @@ async def open_case(
                 task_id=task.id,
                 content=filer.words,
                 created_by=filer.user_id,
+                created_by_kind=ActorKind.member,
                 audience=CommentAudience.filer,
             )
             session.add(opening)
@@ -799,6 +801,7 @@ async def add_filer_reply(
             task_id=task_id,
             content=words,
             created_by=filer.id,
+            created_by_kind=ActorKind.member,
             audience=CommentAudience.filer,
         )
         session.add(comment)

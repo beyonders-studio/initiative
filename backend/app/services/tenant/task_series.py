@@ -577,6 +577,7 @@ async def _next_task(
             position=await next_position(session, task.project_id),
             series_id=task.series_id,
             created_by=task.created_by,
+            created_by_kind=task.created_by_kind,
         )
     following.task_status = default_status
     for field in ("title", "description", "priority"):

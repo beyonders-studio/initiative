@@ -611,7 +611,6 @@ async def install_community_plugin(
             listing_version=version.version,
             definition=definition,
             guild_id=guild_context.guild_id,
-            created_by=current_user.id,
             name=name,
             actor_user_id=current_user.id,
             granted_scopes=sorted(granted),

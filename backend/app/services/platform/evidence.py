@@ -51,6 +51,7 @@ from app.db import cohorts
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.db.soft_delete_filter import select_including_deleted
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.evidence import DISPLAY_NAME_LENGTH, Evidence, EvidenceKind
 from app.services import storage as storage_service
 from app.services import upload_scanning
@@ -391,6 +392,7 @@ def store(
             ),
             kek_version=version,
             created_by=created_by,
+            created_by_kind=None if created_by is None else ActorKind.member,
         )
         session.add(row)
         rows.append(row)
@@ -661,6 +663,7 @@ async def transfer(
             ),
             kek_version=version,
             created_by=row.created_by,
+            created_by_kind=row.created_by_kind,
         )
         destination.add(copy)
         carried.append(copy)

@@ -19,6 +19,7 @@ from app.models.platform.user import Presence
 from app.models.tenant.comment import CommentAudience
 from app.schemas.base import RichMentionStr, RichTextStr, SanitizedBaseModel
 from app.schemas.platform.user import PersonShape, ProfileDecorations
+from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.reaction import ReactionGroup
 from app.services.platform import presence
 
@@ -147,7 +148,7 @@ class CommentRemoval(SanitizedBaseModel):
     reason: RemovalReason | None = None
 
 
-class CommentRead(_CommentReadParents):
+class CommentRead(_CommentReadParents, CreatedByRead):
     """One comment. ``project_id`` is its own for a comment on a project and
     the task's for a task comment (filled by the service's serializer)."""
 
@@ -156,7 +157,6 @@ class CommentRead(_CommentReadParents):
     )
 
     id: int
-    created_by: PersonId | None = None
     parent_comment_id: int | None = None
     created_at: datetime
     updated_at: datetime | None = None

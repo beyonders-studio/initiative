@@ -442,7 +442,6 @@ def build_calendar_events(
     content: str,
     calendar_id: int,
     guild_id: int,
-    created_by: int,
     tz: str | None = None,
 ) -> tuple[list[CalendarEvent], list[ICalImportError], int]:
     """Parse .ics content and build CalendarEvent model instances attached to
@@ -483,7 +482,6 @@ def build_calendar_events(
                 all_day=data["all_day"],
                 recurrence=data["recurrence"],
                 recurrence_shift=data["recurrence_shift"],
-                created_by=created_by,
             )
             uid = str(component.get("uid") or "")
             if (original := component.get("recurrence-id")) is not None and uid:

@@ -8,9 +8,10 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
-from app.core.identity_boundary import GuildId, PersonId
+from app.core.identity_boundary import GuildId
 from app.schemas.base import MAX_TITLE_LENGTH, SanitizedBaseModel
 from app.schemas.tenant.archive import ToolState
+from app.schemas.tenant.created_by import CreatedByRead
 from app.schemas.tenant.property import PropertySummary, annotated_properties
 from app.schemas.tenant.resource_grant import ResourceGrantSchema
 from app.schemas.tenant.tag import TagSummary, annotated_tags
@@ -22,7 +23,7 @@ if TYPE_CHECKING:  # pragma: no cover
 _UNSET = object()
 
 
-class ToolSummaryBase(ToolState):
+class ToolSummaryBase(ToolState, CreatedByRead):
     """What every tool's summary reports beside its own fields."""
 
     model_config = ConfigDict(
@@ -34,7 +35,6 @@ class ToolSummaryBase(ToolState):
     community_id: GuildId = Field(
         validation_alias=AliasChoices("community_id", "guild_id")
     )
-    created_by: PersonId | None = None
     created_at: datetime
     updated_at: datetime
     # When false this entity's comment thread is off — the UI renders none

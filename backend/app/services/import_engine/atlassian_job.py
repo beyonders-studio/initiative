@@ -47,6 +47,7 @@ from app.core.messages import ImportEngineMessages
 from app.core.tools import Tool, tool_envelope_type
 from app.core.version import get_version
 from app.models.platform.user import User, UserStatus
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.initiative import Initiative
 from app.schemas.tenant.import_job import (
@@ -215,6 +216,7 @@ async def start_import(
     job = DataJob(
         direction=DataJobDirection.import_,
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         source=SOURCE,
         params={
             "initiative_id": initiative.id,
@@ -292,6 +294,7 @@ async def start_export(
     job = DataJob(
         direction=DataJobDirection.import_,
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         source=SOURCE,
         params={
             "initiative_id": initiative.id,

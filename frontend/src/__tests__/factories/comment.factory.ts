@@ -1,7 +1,8 @@
-import type {
-  CommentRead,
-  ReactionGroup,
-  RecentActivityEntry,
+import {
+  ActorKind,
+  type CommentRead,
+  type ReactionGroup,
+  type RecentActivityEntry,
 } from "@/api/generated/initiativeAPI.schemas";
 
 let counter = 0;
@@ -16,6 +17,8 @@ export function buildComment(overrides: Partial<CommentRead> = {}): CommentRead 
     id: counter,
     content: `Comment content ${counter}`,
     created_by: 1,
+    created_by_kind: ActorKind.member,
+    created_by_install: null,
     task_id: null,
     wiki_page_id: null,
     file_id: null,

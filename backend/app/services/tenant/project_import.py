@@ -33,6 +33,7 @@ from app.core.search import SearchEntityType
 from app.core.task_types import LAYOUT_SHAPES, MAX_TASK_TYPES
 from app.core.tools import TYPED_DETAILS, Tool
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.comment import Comment
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.metadata import MetadataType
@@ -443,6 +444,7 @@ async def _import_task(
         archived_at=envelope_task.archived_at,
         completed_at=envelope_task.completed_at,
         created_by=importer_id,
+        created_by_kind=ActorKind.member,
         # When the work was written down, where the envelope says so. An
         # envelope that carries neither leaves the model's own default — the
         # moment of the import, which is the only time this row can honestly
@@ -602,6 +604,7 @@ async def _import_task(
                 initiative_member_handles=initiative_member_handles,
             ),
             created_by=author_id,
+            created_by_kind=ActorKind.member,
             imported_author_name=source_name,
             parent_comment_id=written.get(envelope_comment.reply_to_ref or ""),
             created_at=envelope_comment.created_at or datetime.now(UTC),

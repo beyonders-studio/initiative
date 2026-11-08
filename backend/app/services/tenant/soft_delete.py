@@ -45,7 +45,7 @@ from app.db.frozen import PARK, RELEASED_NAMES
 from app.db.query import ids_in
 from app.db.session import raise_flag
 from app.db.soft_delete_filter import select_including_deleted
-from app.models.tenant._mixins import SoftDeleteMixin
+from app.models.tenant._mixins import ActorKind, SoftDeleteMixin
 from app.models.tenant.batched_notice import BatchedNotice
 from app.models.tenant.comment import Comment
 from app.models.tenant.file import File
@@ -214,6 +214,7 @@ async def soft_delete_entity(
     values = {
         "deleted_at": deleted_at,
         "deleted_by": deleted_by_user_id,
+        "deleted_by_kind": None if deleted_by_user_id is None else ActorKind.member,
         "purge_at": _compute_purge_at(deleted_at, retention_days),
     }
 
@@ -258,7 +259,12 @@ async def restore_entity(
     levels = await subtree_levels(
         session, [entity], where=lambda model: model.deleted_at == matching
     )
-    cleared = {"deleted_at": None, "deleted_by": None, "purge_at": None}
+    cleared = {
+        "deleted_at": None,
+        "deleted_by": None,
+        "deleted_by_kind": None,
+        "purge_at": None,
+    }
     for level in levels:
         await _write_level(session, level, cleared)
     _settle_collections(session, levels, "restored_files")
@@ -391,6 +397,7 @@ async def _leave_tombstones(session: AsyncSession, ids: set[int]) -> set[str]:
         comment.removal_id = None
         comment.deleted_at = None
         comment.deleted_by = None
+        comment.deleted_by_kind = None
         comment.purge_at = None
         session.add(comment)
     await session.flush()

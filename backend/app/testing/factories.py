@@ -62,6 +62,7 @@ from app.models.platform.oidc_claim_mapping import (
 from app.models.platform.plugin_service_registration import PluginServiceRegistration
 from app.models.platform.publisher import Publisher, publisher_prefix
 from app.models.platform.user import User, UserRole, UserStatus
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
 from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
@@ -783,6 +784,7 @@ async def create_project(
         # for a freshly made project: the column below records who made it, the
         # grant further down records who owns it.
         "created_by": owner.id,
+        "created_by_kind": ActorKind.member,
     }
 
     project_data = {**defaults, **overrides}
@@ -1165,6 +1167,7 @@ async def create_calendar(
     defaults = {
         "initiative_id": initiative.id,
         "created_by": creator.id,
+        "created_by_kind": ActorKind.member,
         "name": name or f"Calendar {datetime.now(UTC).timestamp()}",
     }
 
@@ -1211,6 +1214,7 @@ async def create_guild_calendar(
         **{
             "initiative_id": None,
             "created_by": creator.id,
+            "created_by_kind": ActorKind.member,
             "name": name or "Community calendar",
             **overrides,
         }
@@ -1271,6 +1275,7 @@ async def create_guild_plugin(
             "name": name,
             "definition": definition,
             "created_by": creator.id,
+            "created_by_kind": ActorKind.member,
             **overrides,
         }
     )
@@ -1328,6 +1333,7 @@ async def create_webhook_subscription(
     subscription = WebhookSubscription(
         **{
             "created_by": None if creator is None else creator.id,
+            "created_by_kind": None if creator is None else ActorKind.member,
             "target_url": "https://example.test/hook",
             "hmac_secret": uuid.uuid4().hex,
             "event_types": ["tasks.created"],
@@ -1661,6 +1667,7 @@ async def create_dashboard(
     defaults = {
         "initiative_id": initiative.id,
         "created_by": creator.id,
+        "created_by_kind": ActorKind.member,
         "name": name or f"Dashboard {datetime.now(UTC).timestamp()}",
         "definition": definition
         if definition is not None
@@ -1784,6 +1791,7 @@ async def create_post(
     defaults = {
         "initiative_id": initiative.id,
         "created_by": creator.id,
+        "created_by_kind": ActorKind.member,
         "name": name or f"Post {datetime.now(UTC).timestamp()}",
         "body": body if body is not None else lexical_body("Notice body."),
         # Live by default, like a notice posted rather than scheduled. Pass
@@ -1902,6 +1910,7 @@ async def create_collection(
     defaults = {
         "initiative_id": initiative.id,
         "created_by": creator.id,
+        "created_by_kind": ActorKind.member,
         "name": name or f"Collection {datetime.now(UTC).timestamp()}",
     }
     collection = Collection(**{**defaults, **overrides})
@@ -1951,6 +1960,7 @@ async def create_calendar_event(
     defaults = {
         "calendar_id": calendar.id,
         "created_by": creator.id,
+        "created_by_kind": ActorKind.member,
         "title": title or f"Event {now.timestamp()}",
         "start_at": now,
         "end_at": now + timedelta(hours=1),
@@ -2003,6 +2013,7 @@ async def create_file(
             type_of_media(stored["file_content_type"]) if stored else FileType.lexical
         ),
         "created_by": creator.id,
+        "created_by_kind": ActorKind.member,
     }
     file = File(**{**defaults, **overrides})
     session.add(file)
@@ -2018,7 +2029,13 @@ async def create_file(
         session, file, level=ResourceAccessLevel.owner, user=creator, commit=commit
     )
     if stored:
-        await file_versions.add_version(session, file, created_by=creator.id, **stored)
+        await file_versions.add_version(
+            session,
+            file,
+            created_by=creator.id,
+            created_by_kind=ActorKind.member,
+            **stored,
+        )
         await (session.commit() if commit else session.flush())
 
     return file
@@ -2088,6 +2105,7 @@ async def create_comment(
     defaults = {
         "content": content,
         "created_by": author.id,
+        "created_by_kind": ActorKind.member,
         column: parent.id,
     }
     comment = Comment(**{**defaults, **overrides})
@@ -2121,6 +2139,7 @@ async def create_reaction(
         "target_id": comment.id,
         "emoji": emoji,
         "created_by": user.id,
+        "created_by_kind": ActorKind.member,
     }
     reaction = Reaction(**{**defaults, **overrides})
     session.add(reaction)
@@ -2224,6 +2243,7 @@ async def create_counter_group(
         "initiative_id": initiative.id,
         "name": name or f"Test Counters {datetime.now(UTC).timestamp()}",
         "created_by": creator.id,
+        "created_by_kind": ActorKind.member,
     }
     group = CounterGroup(**{**defaults, **overrides})
     session.add(group)
@@ -2278,6 +2298,7 @@ async def create_upload(
 
     defaults = {
         "created_by": uploader.id,
+        "created_by_kind": ActorKind.member,
         "filename": filename or f"file-{datetime.now(UTC).timestamp()}.txt",
         "size_bytes": 1,
     }
@@ -2300,6 +2321,7 @@ async def create_export_job(
     defaults = {
         "direction": DataJobDirection.export,
         "created_by": creator.id,
+        "created_by_kind": ActorKind.member,
         "source": "tasks",
         "template_id": "task-table",
         "format": "pdf",
@@ -2320,6 +2342,7 @@ async def create_import_job(
         **{
             "direction": DataJobDirection.import_,
             "created_by": creator.id,
+            "created_by_kind": ActorKind.member,
             "source": "backup",
             **overrides,
         }
@@ -2584,6 +2607,7 @@ async def create_wiki(
     defaults = {
         "initiative_id": initiative.id,
         "created_by": creator.id,
+        "created_by_kind": ActorKind.member,
         "name": name or f"Wiki {datetime.now(UTC).timestamp()}",
     }
     wiki = Wiki(**{**defaults, **overrides})
@@ -2623,6 +2647,7 @@ async def create_wiki_page(
     defaults: dict[str, Any] = {
         "wiki_id": wiki.id,
         "created_by": creator.id,
+        "created_by_kind": ActorKind.member,
         "title": page_title,
         "slug": slugify(page_title, fallback=f"page-{stamp}"),
     }
@@ -2655,6 +2680,7 @@ async def create_contact(
     defaults = {
         "initiative_id": initiative.id,
         "created_by": creator.id,
+        "created_by_kind": ActorKind.member,
         "name": name or f"Contact {datetime.now(UTC).timestamp()}",
     }
     contact = Contact(**{**defaults, **overrides})

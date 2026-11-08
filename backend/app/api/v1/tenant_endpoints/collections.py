@@ -209,7 +209,6 @@ async def create_collection(
         initiative_id=initiative.id,
         name=payload.name.strip(),
         description=(payload.description or "").strip() or None,
-        created_by=guild_context.user_id,
     )
     session.add(collection)
     await session.flush()

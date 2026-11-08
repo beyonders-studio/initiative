@@ -131,7 +131,10 @@ class Dashboard(
     initiative: Optional["Initiative"] = Relationship()
     creator: Optional["MemberProfile"] = Relationship(
         sa_relationship_kwargs={
-            "primaryjoin": "foreign(Dashboard.created_by) == MemberProfile.id",
+            "primaryjoin": (
+                "and_(foreign(Dashboard.created_by) == MemberProfile.id,"
+                " Dashboard.created_by_kind == 'member')"
+            ),
             "viewonly": True,
         }
     )

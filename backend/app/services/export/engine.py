@@ -29,6 +29,7 @@ from app.core.user_display import name_here
 from app.core.user_input_validators import resolve_zone
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.services.data_jobs import while_beating
 from app.services.export import limits as export_limits
@@ -226,6 +227,7 @@ async def start_export(
     job = DataJob(
         direction=DataJobDirection.export,
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         source=source,
         template_id=adapter.template_id,
         format=format,

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **What a plug-in makes says which plug-in made it.** A task, post or comment a plug-in creates names the plug-in, and what Initiative makes on its own names Initiative, where they used to name nobody. The trash says the same about who put something there. Existing items keep a person's name; a plug-in's is recovered where its install is on record.
 - **Rules for every initiative read as sentences.** **Settings › Initiatives** lists only the rules your community has set, one line per tool ("Members can view posts but not create them"). **Add a rule** asks plain questions and names the initiatives the rule would change before you save it. In an initiative's settings, a value the community set shows as a lock and its value.
 - **The initiatives table shows who runs each one.** Project managers appear by name, each initiative shows how people join it, archived initiatives have their own view, and Archive and Delete are in each row's menu.
 - **Send feedback goes to the team that makes Initiative, from every server.** On a server other than Initiative Cloud, it opens Cloud's feedback page in the browser, where you sign in to send it, and the server itself sends nothing. A server's owner can switch it off under **Settings → Platform → Intake**, which suits a server that shouldn't reach the internet. A Feedback board set up on a server stops receiving, and its cases stay as ordinary tasks.

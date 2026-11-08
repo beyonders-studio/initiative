@@ -3,6 +3,7 @@
 import pytest
 from fastapi import UploadFile
 
+from app.models.tenant._mixins import ActorKind
 from app.services.tenant.attachments import (
     FileTooLargeError,
     read_upload_bounded,
@@ -114,6 +115,7 @@ async def test_store_upload_writes_the_bytes_and_records_them(
         data=b"bytes",
         content_type=content_type,
         created_by=3,
+        created_by_kind=ActorKind.member,
     )
 
     assert url == "/uploads/7/abc.png"

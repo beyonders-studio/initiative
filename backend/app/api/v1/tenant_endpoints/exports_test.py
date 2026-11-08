@@ -2228,7 +2228,7 @@ async def test_calendar_export_ics_and_json(client: AsyncClient, acting_user, se
     assert body.count("BEGIN:VEVENT") == 4
     assert body.count(f"UID:event-{recurring_event.id}@initiative") == 2
     imported, errors, _ = ical_service.build_calendar_events(
-        body, calendar.id, a.guild.id, a.user.id, tz="Europe/Berlin"
+        body, calendar.id, a.guild.id, tz="Europe/Berlin"
     )
     assert errors == []
     by_title = {event.title: event for event in imported}
@@ -2266,7 +2266,6 @@ async def test_calendar_export_ics_and_json(client: AsyncClient, acting_user, se
         "END:VCALENDAR\r\n",
         calendar.id,
         a.guild.id,
-        a.user.id,
         tz="America/New_York",
     )
     assert errors == []

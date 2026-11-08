@@ -296,7 +296,6 @@ async def create_file(
         initiative_id=initiative.id,
         file_type=file_in.file_type,
         content=normalized_content,
-        created_by=guild_context.user_id,
         featured_image_url=file_in.featured_image_url,
         is_template=file_in.is_template,
     )
@@ -364,7 +363,6 @@ async def upload_file(
         name=name,
         initiative_id=initiative.id,
         content={},  # An uploaded file has no content of its own
-        created_by=guild_context.user_id,
         file_type=type_of_media(stored["file_content_type"]),
     )
     session.add(file)
@@ -385,9 +383,7 @@ async def upload_file(
     # grant exists.
     await session.flush()
 
-    version = await file_versions.add_version(
-        session, file, created_by=guild_context.user_id, **stored
-    )
+    version = await file_versions.add_version(session, file, **stored)
     await file_versions.commit_version(session, guild_context.guild_id, version)
     return await read_after_write(session, file.id, current_user, guild_context)
 
@@ -473,7 +469,6 @@ async def _store_file(
             size=size,
             content_type=mime_type,
             content_hash=None,
-            created_by=guild_context.user_id,
             initiative_id=initiative_id,
         )
     else:
@@ -486,7 +481,6 @@ async def _store_file(
             filename=attachments_service.new_upload_filename(extension),
             data=contents,
             content_type=mime_type,
-            created_by=guild_context.user_id,
             initiative_id=initiative_id,
         )
     return {
@@ -539,15 +533,15 @@ async def upload_file_version(
         initiative_id=file.initiative_id,
         keep_kind=spec_of(file.file_type).kind,
     )
-    version = await file_versions.add_version(
-        session, file, created_by=guild_context.user_id, **stored
-    )
+    version = await file_versions.add_version(session, file, **stored)
     await file_versions.commit_version(
         session,
         guild_context.guild_id,
         version,
         conflict=True,
     )
+    # Its author is the database's to stamp, so it is read back.
+    await session.refresh(version)
     return file_versions.read(FileVersionRead, version, file)
 
 
@@ -566,7 +560,7 @@ async def convert_file(
         session, Tool.file, file_id, current_user, guild_context, access="write"
     )
     gone, pictures = await file_conversion.convert(
-        session, guild_context.guild_id, file, user_id=current_user.id
+        session, guild_context.guild_id, file
     )
     try:
         await session.commit()

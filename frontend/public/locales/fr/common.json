@@ -1,5 +1,6 @@
 {
   "appName": "Initiative",
+  "aPlugin": "Un plug-in",
   "help": "Aide",
   "helpDraft": "Brouillon de la demande d'aide",
   "user": "Utilisateur",

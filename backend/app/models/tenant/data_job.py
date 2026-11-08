@@ -89,7 +89,6 @@ class DataJob(CreatedByMixin, table=True):
     )
 
     id: int | None = Field(default=None, primary_key=True)
-    created_by: int = Field(foreign_key="users.id", nullable=False)
 
     # Plain string columns (no shared PG enum type to provision per schema);
     # both are str-enums, so members compare and bind directly.

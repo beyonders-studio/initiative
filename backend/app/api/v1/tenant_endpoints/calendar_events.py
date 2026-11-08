@@ -248,7 +248,6 @@ async def import_ical_events(
             content=body.ics_content,
             calendar_id=calendar.id,
             guild_id=guild_context.guild_id,
-            created_by=current_user.id,
             tz=body.tz,
         )
     except Exception:
@@ -378,7 +377,6 @@ async def create_calendar_event(
     )
     event = CalendarEvent(
         calendar_id=event_in.calendar_id,
-        created_by=guild_context.user_id,
         title=event_in.title.strip(),
         description=event_in.description,
         location=event_in.location,

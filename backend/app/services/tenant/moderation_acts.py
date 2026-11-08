@@ -32,6 +32,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import status
 from sqlalchemy import func
@@ -58,7 +59,7 @@ from app.db.request_context import SystemGuild
 from app.db.session import routed_guild_id, set_rls_context
 from app.db.soft_delete_filter import select_including_deleted
 from app.models.platform.notification import NotificationType
-from app.models.tenant._mixins import CommentLockMixin, HoldMixin
+from app.models.tenant._mixins import ActorKind, CommentLockMixin, HoldMixin
 from app.models.tenant.comment import Comment
 from app.models.tenant.moderation import ModerationAction
 from app.services import audit as audit_service
@@ -68,6 +69,13 @@ logger = logging.getLogger(__name__)
 
 class ActError(CodedError):
     """An act that can't be done, and why."""
+
+
+def _member_author(row: Any) -> int | None:
+    """The member who wrote ``row``; ``None`` for a plug-in's or Initiative's."""
+    if getattr(row, "created_by_kind", None) != ActorKind.member:
+        return None
+    return row.created_by
 
 
 def may_moderate(context: GuildContext, initiative_id: int | None) -> bool:
@@ -206,6 +214,7 @@ async def _record(
         hold_id=who.hold_id,
         via_grant_id=who.via_grant_id,
         created_by=who.actor_id,
+        created_by_kind=None if who.actor_id is None else ActorKind.member,
     )
     system.add(row)
     await system.flush()
@@ -359,7 +368,7 @@ async def remove_on(
 
     if row.held_at is not None:
         raise ActError(HoldMessages.ALREADY_HELD, status.HTTP_409_CONFLICT)
-    author = getattr(row, "created_by", None)
+    author = _member_author(row)
     # Where the author is sent, read before it goes.
     place = await _place(system, row, target_type, going=not isinstance(row, Comment))
     let_go: set[str] = set()
@@ -467,6 +476,7 @@ async def _restore_on(
         if (
             deleted_at is None
             or deleted_at < removal.created_at
+            or getattr(row, "deleted_by_kind", None) != removal.created_by_kind
             or getattr(row, "deleted_by", None) != removal.created_by
         ):
             raise ActError(ModerationMessages.NOT_REMOVED, status.HTTP_409_CONFLICT)
@@ -646,7 +656,7 @@ async def warn_on(
     message: str,
 ) -> ModerationAction:
     """Warn whoever wrote ``row``, in ``message``. The caller commits."""
-    author = getattr(row, "created_by", None)
+    author = _member_author(row)
     if author is None:
         raise ActError(ModerationMessages.NOBODY_TO_WARN)
     action = await _record(

@@ -150,16 +150,51 @@ _PURGE_GUARD_PREDICATE = f"({IN_POLICY.system} OR {_HOLDS_TRASH})"
 _TRASH_READ_PREDICATE = (
     "deleted_at IS NULL"
     f" OR {IN_POLICY.system_or_admin}"
-    f" OR deleted_by = {gucs.USER_ID.once}"
+    f" OR (deleted_by_kind = 'member' AND deleted_by = {gucs.USER_ID.once})"
 )
+
+#: Who put a row in the trash, as ``created_by`` names who made it: the
+#: request's member, else its plug-in, else Initiative. A caller that names the
+#: deleter names its kind too. Cleared as the row comes back.
+_STAMP_DELETED_BY_FN = f"""
+CREATE OR REPLACE FUNCTION public.fn_stamp_deleted_by() RETURNS trigger
+    LANGUAGE plpgsql AS $stamp_deleted_by$
+BEGIN
+    IF NEW.deleted_at IS NULL THEN
+        NEW.deleted_by := NULL;
+        NEW.deleted_by_kind := NULL;
+    ELSIF (TG_OP = 'INSERT' OR OLD.deleted_at IS NULL)
+          AND NEW.deleted_by_kind IS NULL THEN
+        IF NEW.deleted_by IS NOT NULL THEN
+            RAISE EXCEPTION 'deleted_by names no kind' USING ERRCODE = '23514';
+        END IF;
+        NEW.deleted_by := {gucs.USER_ID.once};
+        IF NEW.deleted_by IS NOT NULL THEN
+            NEW.deleted_by_kind := 'member';
+        ELSE
+            NEW.deleted_by := {gucs.INSTALL_ID.sql};
+            NEW.deleted_by_kind :=
+                CASE WHEN NEW.deleted_by IS NULL THEN 'system' ELSE 'plugin' END;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$stamp_deleted_by$;
+"""
 
 
 def _trash_read_policy(table: str) -> list[str]:
-    """Hide a trashed row from everyone but the admin and whoever deleted it."""
+    """Hide a trashed row from everyone but the admin and whoever deleted it,
+    and stamp who that was as it goes in."""
     return [
         f"DROP POLICY IF EXISTS trashed_read ON {table};",
         f"CREATE POLICY trashed_read ON {table} AS RESTRICTIVE FOR SELECT",
         f"  USING ({_TRASH_READ_PREDICATE});",
+        (
+            f"CREATE OR REPLACE TRIGGER tr_{table}_stamp_deleted_by"
+            f" BEFORE INSERT OR UPDATE OF deleted_at ON {table} FOR EACH ROW"
+            " EXECUTE FUNCTION public.fn_stamp_deleted_by();"
+        ),
     ]
 
 
@@ -382,7 +417,15 @@ def _managed_block(table: str, initiative_expr: str) -> str:
     return "\n".join(lines)
 
 
-_OWN_ROW_OWNER = "{col} = " + gucs.USER_ID.once
+_OWN_ROW_OWNER = "{owner}"
+
+
+def _owner(col: str) -> str:
+    """The row's owner is the requesting user. An author column names a user
+    only when its kind says ``member``."""
+    leg = f"{col} = {gucs.USER_ID.once}"
+    return f"({col}_kind = 'member' AND {leg})" if col == "created_by" else leg
+
 
 #: Who reads an own-row table's rows: the owner, the community's admin, a
 #: settings rung, or the system engine.
@@ -526,8 +569,8 @@ def _own_row_block(table: str, owner_col: str) -> str:
     row's owner or the routed guild admin. INSERT/UPDATE WITH CHECK use the
     write predicate, so a member can't author rows owned by someone else
     either."""
-    read = _OWN_ROW_READ_PREDICATE.format(col=owner_col)
-    write = _OWN_ROW_WRITE_PREDICATE.format(col=owner_col)
+    read = _OWN_ROW_READ_PREDICATE.format(owner=_owner(owner_col))
+    write = _OWN_ROW_WRITE_PREDICATE.format(owner=_owner(owner_col))
     return "\n".join(
         [
             f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;",
@@ -541,7 +584,7 @@ def _private_row_block(table: str, owner_col: str) -> str:
     """RLS for a private-row table: RESTRICTIVE per-command policies admitting
     the row's member or the system engine, on top of its initiative gate. A
     ``PRIVATE_ROW_SHARED_READ`` table leaves reading to that gate."""
-    pred = _PRIVATE_ROW_PREDICATE.format(col=owner_col)
+    pred = _PRIVATE_ROW_PREDICATE.format(owner=_owner(owner_col))
     read = None if table in PRIVATE_ROW_SHARED_READ else pred
     return "\n".join(_policies(table, "private_row", read, pred, restrictive=True))
 
@@ -573,6 +616,11 @@ _AUTHORED_SECTION = """\
 #: Where what someone writes carries them as its author.
 AUTHORED_TABLES: tuple[str, ...] = ("comments", "posts", "reactions")
 
+#: The changed row's author is the member making the request.
+_OLD_AUTHOR_IS_ME = (
+    f"(OLD.created_by_kind = 'member' AND OLD.created_by = {gucs.USER_ID.once})"
+)
+
 #: The requester of a join request, or the system engine.
 _REQUESTER = f"(user_id = {gucs.USER_ID.once} OR {IN_POLICY.system})"
 
@@ -584,11 +632,13 @@ BEGIN
         RETURN NEW;
     END IF;
     IF TG_OP = 'UPDATE' THEN
-        IF NEW.created_by IS DISTINCT FROM OLD.created_by THEN
+        IF (NEW.created_by, NEW.created_by_kind)
+           IS DISTINCT FROM (OLD.created_by, OLD.created_by_kind) THEN
             RAISE EXCEPTION 'an author does not change' USING ERRCODE = '42501';
         END IF;
     ELSIF ({gucs.IMPORTING}) IS NOT TRUE AND {gucs.USER_ID.once} IS NOT NULL THEN
         NEW.created_by := {gucs.USER_ID.once};
+        NEW.created_by_kind := 'member';
     END IF;
     RETURN NEW;
 END;
@@ -602,13 +652,15 @@ DECLARE
     lifecycle text[] := ARRAY[{", ".join(f"'{c}'" for c in LIFECYCLE_COLUMNS)}];
 BEGIN
     IF {IN_POLICY.system} OR ({_HOLDS_TRASH} AND {gucs.PURGING})
-       OR OLD.created_by = {gucs.USER_ID.once} THEN
+       OR {_OLD_AUTHOR_IS_ME} THEN
         RETURN NEW;
     END IF;
     IF (to_jsonb(NEW) - lifecycle) IS NOT DISTINCT FROM (to_jsonb(OLD) - lifecycle) AND (
         (OLD.deleted_at IS NULL AND NEW.deleted_by = {gucs.USER_ID.once})
         OR (NEW.deleted_at IS NULL
-            AND ({_HOLDS_TRASH} OR OLD.deleted_by = {gucs.USER_ID.once}))
+            AND ({_HOLDS_TRASH}
+                 OR (OLD.deleted_by_kind = 'member'
+                     AND OLD.deleted_by = {gucs.USER_ID.once})))
     ) THEN
         RETURN NEW;
     END IF;
@@ -629,7 +681,7 @@ _COMMENT_TRASH_FOLLOWS_FN = f"""
 CREATE OR REPLACE FUNCTION public.fn_comment_trash_follows() RETURNS trigger
     LANGUAGE plpgsql AS $trash_follows$
 BEGIN
-    IF {IN_POLICY.system} OR OLD.created_by = {gucs.USER_ID.once}
+    IF {IN_POLICY.system} OR {_OLD_AUTHOR_IS_ME}
        OR {_trashed_with("comments", "parent_comment_id")}
        OR {" OR ".join(_trashed_with(p.table, p.column) for p in COMMENT_PARENTS.values())} THEN
         RETURN NULL;
@@ -672,7 +724,7 @@ def _authored_block() -> str:
             _STAMP_AUTHOR_FN,
             *(
                 f"CREATE OR REPLACE TRIGGER tr_{t}_stamp_author"
-                f" BEFORE INSERT OR UPDATE OF created_by ON {t} FOR EACH ROW"
+                f" BEFORE INSERT OR UPDATE OF created_by, created_by_kind ON {t} FOR EACH ROW"
                 " EXECUTE FUNCTION public.fn_stamp_author();"
                 for t in AUTHORED_TABLES
             ),
@@ -1869,6 +1921,8 @@ def render_guild_rls_ddl() -> str:
         + render_frozen_parent_guard_fn()
         + "\n"
         + render_frozen_ancestor_fn()
+        + "\n"
+        + _STAMP_DELETED_BY_FN
         + "\n"
         + "\n\n".join(blocks)
     )

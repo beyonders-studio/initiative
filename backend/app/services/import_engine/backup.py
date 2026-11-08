@@ -47,6 +47,7 @@ from app.core.tools import BULK_EXPORT_TOOLS, Tool, tool_envelope_type
 from app.db import gucs
 from app.db.session import raise_flag, routed_guild_id
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
@@ -340,6 +341,7 @@ async def stage_backup_job(
     job = DataJob(
         direction=DataJobDirection.import_,
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         source="backup",
         params=params,
         file_ref=payload_ref,
@@ -986,6 +988,7 @@ async def _apply_collections(
             description=record.description,
             cover_file_id=files.get(record.cover_file_id or 0),
             created_by=user.id,
+            created_by_kind=ActorKind.member,
         )
         session.add(collection)
         await session.flush()
@@ -1103,6 +1106,7 @@ async def _apply_initiative_structure(session, initiative, user: User, payload) 
             override_share_restrictions=bool(raw.get("override_share_restrictions")),
             position=int(raw.get("position") or 0),
             created_by=user.id,
+            created_by_kind=ActorKind.member,
         )
         session.add(role)
         await session.flush()
@@ -1188,6 +1192,7 @@ async def _uploaded_file(
         content={},
         initiative_id=initiative.id,
         created_by=user.id,
+        created_by_kind=ActorKind.member,
     )
     stored = {
         "file_url": f"/uploads/{routed_guild_id(session)}/{storage_key}",
@@ -1298,7 +1303,11 @@ async def _apply_gallery_entry(
                     importer=user,
                 )
                 await file_versions.add_version(
-                    session, file, created_by=user.id, **stored
+                    session,
+                    file,
+                    created_by=user.id,
+                    created_by_kind=ActorKind.member,
+                    **stored,
                 )
                 await tags.attach(file, picture.tags)
                 await props.attach(file, picture.properties)
@@ -1315,6 +1324,7 @@ async def _apply_gallery_entry(
                     description=gallery.description,
                     cover_file_id=cover,
                     created_by=user.id,
+                    created_by_kind=ActorKind.member,
                 )
                 session.add(collection)
                 await session.flush()
@@ -1421,6 +1431,7 @@ async def _apply_file_entry(
             content={"schema_version": 3, "kind": "spreadsheet", "sheets": sheets},
             initiative_id=initiative.id,
             created_by=user.id,
+            created_by_kind=ActorKind.member,
         )
     else:
         # The original name lives in the manifest's asset record — the
@@ -1457,7 +1468,11 @@ async def _apply_file_entry(
             )
             if stored:
                 await file_versions.add_version(
-                    session, file, created_by=user.id, **stored
+                    session,
+                    file,
+                    created_by=user.id,
+                    created_by_kind=ActorKind.member,
+                    **stored,
                 )
 
             await TagRestore(session).attach(file, entry.tags)

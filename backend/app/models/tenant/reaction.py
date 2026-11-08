@@ -5,7 +5,6 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     DateTime,
-    ForeignKey,
     Integer,
     String,
     Text,
@@ -60,11 +59,6 @@ class Reaction(CreatedByMixin, table=True):
     #: rather than a shortcode so the display needs no lookup table, and
     #: validated on the way in (see ``app.schemas.tenant.reaction``).
     emoji: str = Field(sa_column=Column(Text, nullable=False))
-    #: Who reacted. Part of the unique key, so it is set explicitly by the
-    #: service rather than left to the ``created_by`` fill trigger.
-    created_by: int = Field(
-        sa_column=Column(Integer, ForeignKey("users.id"), nullable=False),
-    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False),
@@ -75,7 +69,10 @@ class Reaction(CreatedByMixin, table=True):
     # which carries no foreign key.
     reactor: Optional["MemberProfile"] = Relationship(
         sa_relationship_kwargs={
-            "primaryjoin": "foreign(Reaction.created_by) == MemberProfile.id",
+            "primaryjoin": (
+                "and_(foreign(Reaction.created_by) == MemberProfile.id,"
+                " Reaction.created_by_kind == 'member')"
+            ),
             "viewonly": True,
         },
     )

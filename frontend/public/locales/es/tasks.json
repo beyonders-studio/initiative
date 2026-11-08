@@ -53,7 +53,6 @@
     "backToProjects": "← Volver a proyectos",
     "loadProjectError": "No se pudo cargar el contexto del proyecto para esta tarea.",
     "createdBy": "Creada por {{name}} · {{time}}",
-    "createdAt": "Creada {{time}}",
     "readOnlyNoAccess": "Solo tienes acceso de lectura a este proyecto, por lo que los campos de la tarea están deshabilitados.",
     "readOnlyArchived": "Este proyecto está archivado. Desarchívalo desde la configuración del proyecto para editar tareas.",
     "aiGenerate": "Generar con IA",

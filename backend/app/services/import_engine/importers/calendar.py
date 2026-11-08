@@ -21,6 +21,7 @@ from app.core.search import SearchEntityType
 from app.core.tools import Tool, tool_envelope_type
 from app.db.session import routed_guild_id
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.calendar import DEFAULT_CALENDAR_COLOR, Calendar
 from app.models.tenant.calendar_event import (
     CalendarEvent,
@@ -112,6 +113,7 @@ class CalendarImporter(NamesPeopleInPassing):
             color=env.color or DEFAULT_CALENDAR_COLOR,
             initiative_id=target_initiative.id,
             created_by=importer.id,
+            created_by_kind=ActorKind.member,
         )
         session.add(calendar)
         await session.flush()
@@ -247,6 +249,7 @@ class CalendarImporter(NamesPeopleInPassing):
             recurrence=repeat,
             recurrence_shift=shift,
             created_by=importer.id,
+            created_by_kind=ActorKind.member,
             # When the event was written down, not when it happens. Absent
             # leaves the model default: the moment of the import.
             **_created_at(item),

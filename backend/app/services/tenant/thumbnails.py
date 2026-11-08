@@ -33,6 +33,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.file_types import spec_of, type_of_media
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.file import File, FileVersion
 from app.services.storage import get_guild_storage
 from app.services.tenant import attachments
@@ -121,6 +122,7 @@ async def _keep(
         data=base64.b64decode(reply["thumbnail"]),
         content_type="image/webp",
         created_by=None,
+        created_by_kind=ActorKind.system,
         initiative_id=initiative_id,
     )
     version.thumbnail_state = "ready"

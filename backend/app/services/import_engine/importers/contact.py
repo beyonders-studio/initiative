@@ -15,6 +15,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool, tool_envelope_type
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.contact import DETAILS, Contact
 from app.models.tenant.initiative import Initiative, PermissionKey
 from app.schemas.tenant.import_envelopes import ContactEnvelope
@@ -53,6 +54,7 @@ class ContactImporter(NamesPeopleInPassing):
         contact = Contact(
             initiative_id=target_initiative.id,
             created_by=importer.id,
+            created_by_kind=ActorKind.member,
             **env.model_dump(include={"name", "is_organization", *DETAILS}),
         )
         session.add(contact)

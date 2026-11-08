@@ -154,7 +154,6 @@ async def create_wiki(
 
     wiki = Wiki(
         initiative_id=initiative.id,
-        created_by=guild_context.user_id,
         name=wiki_in.name.strip(),
         description=(wiki_in.description or "").strip() or None,
     )
@@ -336,7 +335,6 @@ async def add_file_to_wiki(
         source=relationships_service.Endpoint(SearchEntityType.file, file.id),
         relationship_type=RelationshipType.part_of,
         target=relationships_service.Endpoint(SearchEntityType.wiki, wiki.id),
-        created_by=current_user.id,
     )
     await session.commit()
 
@@ -454,7 +452,6 @@ async def create_wiki_page(
 
     page = WikiPage(
         wiki_id=wiki.id,
-        created_by=guild_context.user_id,
         parent_page_id=page_in.parent_page_id,
         position=await wikis_service.next_position(
             session, wiki, page_in.parent_page_id

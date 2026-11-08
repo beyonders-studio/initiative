@@ -1,4 +1,4 @@
-import { type FileSummary, FileType } from "@/api/generated/initiativeAPI.schemas";
+import { ActorKind, type FileSummary, FileType } from "@/api/generated/initiativeAPI.schemas";
 import { FILE_TYPE_KINDS } from "@/lib/fileTypes";
 
 import { ownerCan } from "./can";
@@ -20,6 +20,8 @@ export function buildFileSummary(overrides: Partial<FileSummary> = {}): FileSumm
     featured_image_url: null,
     is_template: false,
     created_by: 1,
+    created_by_kind: ActorKind.member,
+    created_by_install: null,
     created_at: "2026-01-15T00:00:00.000Z",
     updated_at: "2026-01-15T00:00:00.000Z",
     initiative: null,

@@ -33,6 +33,7 @@ from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.session import raise_flag, routed_guild_id
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import User
+from app.models.tenant._mixins import ActorKind
 from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.initiative import Initiative
 from app.schemas.tenant.import_job import BackupPlanPerson, EnvelopeImportPlan
@@ -330,6 +331,7 @@ async def start_envelope_import(
     job = DataJob(
         direction=DataJobDirection.import_,
         created_by=user.id,
+        created_by_kind=ActorKind.member,
         source=envelope_type,
         params={"initiative_id": initiative.id},
         file_ref=payload_ref,

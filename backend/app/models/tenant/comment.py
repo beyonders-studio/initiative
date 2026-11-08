@@ -215,7 +215,10 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
     # out because the target is a view, which carries no foreign key.
     author: Optional["MemberProfile"] = Relationship(
         sa_relationship_kwargs={
-            "primaryjoin": "foreign(Comment.created_by) == MemberProfile.id",
+            "primaryjoin": (
+                "and_(foreign(Comment.created_by) == MemberProfile.id,"
+                " Comment.created_by_kind == 'member')"
+            ),
             "viewonly": True,
         },
     )
