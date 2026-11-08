@@ -1,7 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { Plus } from "lucide-react";
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
@@ -34,6 +33,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/
 import { useDebouncedValue } from "@/ui/lib/useDebouncedValue";
 import { LoadMore } from "@/ui/load-more";
 import { CardGridSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
+import { useVirtualRows } from "@/ui/virtual-rows";
 
 /**
  * A first guess at a card's height, corrected by measurement as each mounts.
@@ -216,49 +216,19 @@ export const PostsView = ({ fixedInitiativeId, canCreate }: PostsViewProps) => {
     keepFilters(null);
   }, [keepFilters]);
 
-  // The page itself scrolls, not a box inside it, so the virtualizer measures
-  // against the app's scroller rather than a container of its own.
+  // The page itself scrolls, not a box inside it, so the cards are measured
+  // against the app's scroller rather than a container of their own.
   const listRef = useRef<HTMLDivElement | null>(null);
-  // Found once and held. The virtualizer asks for the scroller on every scroll
-  // event, and a document-wide query per event is work done during exactly the
-  // frames that must not be busy.
-  const scrollerRef = useRef<HTMLElement | null>(null);
-  const getScrollElement = useCallback(() => {
-    scrollerRef.current ??= document.querySelector<HTMLElement>("[data-app-scroll]");
-    return scrollerRef.current;
-  }, []);
-
-  // How far down the scrolled content the list starts — the toolbar and the
-  // filter panel above it. Measured after layout rather than read during
-  // render, where the ref is still null on the first pass and every offset
-  // would be short by the height of everything above.
-  const [listOffset, setListOffset] = useState(0);
-  useLayoutEffect(() => {
-    const list = listRef.current;
-    const scroller = getScrollElement();
-    if (!list || !scroller) return;
-    setListOffset(
-      list.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop
-    );
-    // The filter panel opens and closes above the list, and the "showing from"
-    // line appears with a jump — both move it, and an offset measured before
-    // either would leave the virtualizer's model shifted by their height.
-  }, [getScrollElement, filtersOpen, anchor]);
-
-  const virtualizer = useVirtualizer({
+  const {
+    virtualizer,
+    items: virtualItems,
+    paddingTop,
+    paddingBottom,
+  } = useVirtualRows(listRef, {
     count: posts.length,
-    getScrollElement,
     estimateSize: () => CARD_ESTIMATE_HEIGHT,
     overscan: VIRTUALIZER_OVERSCAN,
-    scrollMargin: listOffset,
   });
-
-  const virtualItems = virtualizer.getVirtualItems();
-  const paddingTop = virtualItems.length > 0 ? virtualItems[0].start - listOffset : 0;
-  const paddingBottom =
-    virtualItems.length > 0
-      ? virtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end
-      : 0;
 
   // The month at the top of the view, so the rail marks where the reader
   // actually is rather than where they last jumped from.

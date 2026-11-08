@@ -34,7 +34,7 @@ const LISTS = [
   },
   {
     what: "a collection's wall",
-    source: read("../components/files/collections/VirtualRows.tsx"),
+    source: read("../ui/virtual-rows.tsx"),
     gap: "ROW_GAP",
   },
 ];

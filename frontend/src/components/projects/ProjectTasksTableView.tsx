@@ -113,14 +113,12 @@ const rowTone = (task: TaskTreeRow) =>
 const PlainRowWrapper = ({
   row,
   children,
-  virtualStyle,
   virtualIndex,
   measureRef,
 }: DataTableRowWrapperProps<TaskTreeRow>) => {
   return (
     <TableRow
       ref={measureRef}
-      style={virtualStyle}
       className={rowTone(row.original)}
       data-state={row.getIsSelected() && "selected"}
       data-index={virtualIndex}
@@ -137,7 +135,6 @@ const PlainRowWrapper = ({
 const SortableRowWrapperInner = ({
   row,
   children,
-  virtualStyle,
   virtualIndex,
   measureRef,
 }: DataTableRowWrapperProps<TaskTreeRow>) => {
@@ -155,8 +152,7 @@ const SortableRowWrapperInner = ({
   });
 
   const style: React.CSSProperties = {
-    ...virtualStyle,
-    transform: CSS.Transform.toString(transform) || virtualStyle?.transform,
+    transform: CSS.Transform.toString(transform),
     transition,
   };
 
@@ -200,7 +196,6 @@ const SortableRowWrapperInner = ({
 const GroupDragRowWrapper = ({
   row,
   children,
-  virtualStyle,
   virtualIndex,
   measureRef,
 }: DataTableRowWrapperProps<TaskTreeRow>) => {
@@ -226,10 +221,7 @@ const GroupDragRowWrapper = ({
     <SortableRowContext.Provider value={contextValue}>
       <TableRow
         ref={setRefs}
-        style={{
-          ...virtualStyle,
-          transform: CSS.Translate.toString(transform) || virtualStyle?.transform,
-        }}
+        style={{ transform: CSS.Translate.toString(transform) }}
         className={cn(
           rowTone(row.original),
           isDragging && "relative z-10 bg-muted/60",
@@ -736,9 +728,6 @@ const ProjectTasksTableViewComponent = ({
           columns={orderedColumns}
           data={rows}
           enableVirtualization
-          // The screen below the page's header, but never so short that a
-          // landscape phone shows the column headings and no rows.
-          virtualContainerHeight="h-[max(calc(100dvh-20rem),20rem)]"
           virtualRowHeight={52}
           groupingOptions={groupingOptions}
           // The layout editor offers it above the preview.

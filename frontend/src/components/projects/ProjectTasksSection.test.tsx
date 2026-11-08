@@ -23,7 +23,7 @@ import {
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
-import type { ToolLayoutSetRead } from "@/api/generated/initiativeAPI.schemas";
+import type { TaskStatusRead, ToolLayoutSetRead } from "@/api/generated/initiativeAPI.schemas";
 import { ProjectTasksSection } from "@/components/projects/ProjectTasksSection";
 import { toast } from "@/lib/mascotToast";
 import { fireTaskCompletionFeedback } from "@/lib/taskCompletionFeedback";
@@ -50,19 +50,28 @@ const captureTaskRequests = () => {
   );
 };
 
-const section = (options: { routerSearch?: Record<string, unknown> } = {}) =>
+/** The section inside the app's scroller, which its table measures against. */
+const section = ({
+  routerSearch = {},
+  taskStatuses = buildDefaultTaskStatuses(1),
+}: {
+  routerSearch?: Record<string, unknown>;
+  taskStatuses?: TaskStatusRead[];
+} = {}) =>
   renderPage(
     () => (
-      <ProjectTasksSection
-        projectId={1}
-        initiativeId={1}
-        taskStatuses={buildDefaultTaskStatuses(1)}
-        canEditTaskDetails
-        projectIsArchived={false}
-        taskHref={(taskId) => `/tasks/${taskId}`}
-      />
+      <main data-app-scroll="">
+        <ProjectTasksSection
+          projectId={1}
+          initiativeId={1}
+          taskStatuses={taskStatuses}
+          canEditTaskDetails
+          projectIsArchived={false}
+          taskHref={(taskId) => `/tasks/${taskId}`}
+        />
+      </main>
     ),
-    { routerSearch: options.routerSearch ?? {} }
+    { routerSearch }
   );
 
 const fieldsUsed = () => lastConditions.map((entry) => entry.field ?? `group:${entry.logic}`);
@@ -616,19 +625,7 @@ describe("ProjectTasksSection ticking tasks off", () => {
         () => new Promise<Response>((resolve) => replies.push(resolve))
       )
     );
-    return renderPage(
-      () => (
-        <ProjectTasksSection
-          projectId={1}
-          initiativeId={1}
-          taskStatuses={statuses}
-          canEditTaskDetails
-          projectIsArchived={false}
-          taskHref={(taskId) => `/tasks/${taskId}`}
-        />
-      ),
-      { routerSearch: {} }
-    );
+    return section({ taskStatuses: statuses });
   };
 
   const doneBox = async (title: string) => {
@@ -641,8 +638,8 @@ describe("ProjectTasksSection ticking tasks off", () => {
     replies = [];
     vi.mocked(fireTaskCompletionFeedback).mockClear();
     // The table is virtualized, and jsdom gives every element a zero height,
-    // which windows it down to no rows at all. The virtualizer sizes its
-    // scroll element by its client box and each row by its offset box.
+    // which windows it down to no rows at all. The virtualizer sizes the
+    // app's scroller by its client box and each row by its offset box.
     vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(800);
     vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(1200);
     vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(800);
@@ -732,8 +729,8 @@ describe("ProjectTasksSection ticking tasks off", () => {
 describe("ProjectTasksSection table", () => {
   beforeEach(() => {
     // The table is virtualized, and jsdom gives every element a zero height,
-    // which windows it down to no rows at all. The virtualizer sizes its
-    // scroll element by its client box and each row by its offset box.
+    // which windows it down to no rows at all. The virtualizer sizes the
+    // app's scroller by its client box and each row by its offset box.
     vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(800);
     vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(1200);
     vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(800);

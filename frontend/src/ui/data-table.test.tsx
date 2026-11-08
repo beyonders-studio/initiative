@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -466,11 +466,10 @@ const sizedColumns: AppColumnDef<Row>[] = [
 ];
 
 describe("DataTable virtualization", () => {
-  // jsdom gives every element a zero height, so the virtualizer windows down to
-  // no rows at all — which rows render can only be checked in a real browser.
-  // These cover the parts that don't depend on layout.
+  // Which rows it mounts, against the page's scroller, is the collection
+  // page's to show (`CollectionPage.test.tsx`); these cover the table's shape.
   it.each([
-    ["drops the pagination controls, which the scroll container replaces", true],
+    ["drops the pagination controls, which scrolling the page replaces", true],
     ["keeps the pagination controls when virtualization is off", false],
   ])("%s", (_label, enableVirtualization) => {
     render(
@@ -495,11 +494,12 @@ describe("DataTable virtualization", () => {
 
   // With the automatic layout algorithm the browser sizes columns from the
   // cells it can see, and a virtualized table swaps those out on every scroll —
-  // so the widths have to come from the column definitions instead.
+  // so the widths have to come from the column definitions instead, and the
+  // head, drawn apart from the body, takes the same ones.
   it.each([
-    ["pins the column widths while virtualized", true, "40px", true],
-    ["leaves the widths to the browser when virtualization is off", false, undefined, false],
-  ])("%s", (_label, enableVirtualization, firstWidth, fixed) => {
+    ["pins the head's and the body's column widths alike while virtualized", true],
+    ["leaves the widths to the browser when virtualization is off", false],
+  ])("%s", (_label, enableVirtualization) => {
     const { container } = render(
       <DataTable
         columns={sizedColumns}
@@ -509,18 +509,31 @@ describe("DataTable virtualization", () => {
       />
     );
 
-    const table = container.querySelector("table") as HTMLTableElement;
-    expect(table.classList.contains("table-fixed")).toBe(fixed);
-
-    const cols = Array.from(container.querySelectorAll("colgroup col"));
+    const tables = Array.from(container.querySelectorAll("table"));
+    const widths = tables.map((table) =>
+      Array.from(table.querySelectorAll("col"), (col) => col.style.width)
+    );
     if (!enableVirtualization) {
-      expect(cols).toHaveLength(0);
+      expect(tables.map((table) => table.classList.contains("table-fixed"))).toEqual([false]);
+      expect(widths).toEqual([[]]);
       return;
     }
-    expect(cols).toHaveLength(2);
-    expect((cols[0] as HTMLElement).style.width).toBe(firstWidth);
+    expect(tables.map((table) => table.classList.contains("table-fixed"))).toEqual([true, true]);
     // A column that declares no size falls back to the table default.
-    expect((cols[1] as HTMLElement).style.width).toBe("150px");
+    expect(widths).toEqual([
+      ["40px", "150px"],
+      ["40px", "150px"],
+    ]);
+  });
+
+  it("keeps its head over the body's columns as the body scrolls sideways", () => {
+    render(<DataTable columns={sizedColumns} data={manyRows} enableVirtualization />);
+
+    const [head, body] = Array.from(screen.getByRole("table").children) as HTMLElement[];
+    body.scrollLeft = 120;
+    fireEvent.scroll(body);
+
+    expect(head.scrollLeft).toBe(120);
   });
 });
 
