@@ -121,7 +121,6 @@
     "loadingDevices": "Loading devices…",
     "devicesError": "Unable to load devices.",
     "unknownDevice": "Unknown device",
-    "revokeDialogCancel": "Cancel",
     "revoking": "Revoking…",
     "revokeError": "Unable to revoke device access",
     "newKeyTitle": "New API key",

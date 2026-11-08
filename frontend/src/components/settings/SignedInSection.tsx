@@ -23,18 +23,9 @@ import {
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { useEndSignedIn, useMySessions, useRevokeOtherSessions } from "@/hooks/useSecurity";
 import { toast } from "@/lib/mascotToast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/ui/alert-dialog";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { useRelativeTime } from "@/ui/lib/useRelativeTime";
 
 const KIND_ICONS = {
@@ -184,60 +175,38 @@ export const SignedInSection = () => {
         </div>
       )}
 
-      <AlertDialog open={pendingEnd !== null} onOpenChange={() => setPendingEnd(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {removing ? t("security.removeDeviceDialogTitle") : t("security.signOutDialogTitle")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              <Trans
-                i18nKey={
-                  removing
-                    ? "security.removeDeviceDialogDescription"
-                    : "security.signOutDialogDescription"
-                }
-                ns="settings"
-                values={{ deviceName: pendingEnd?.label ?? t("security.unknownDevice") }}
-                components={{ bold: <span className="font-medium" /> }}
-              />
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("security.revokeDialogCancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => pendingEnd && endSignedIn.mutate(pendingEnd)}
-              disabled={endSignedIn.isPending}
-            >
-              {endSignedIn.isPending
-                ? t("security.revoking")
-                : removing
-                  ? t("security.removeDeviceConfirm")
-                  : t("security.signOutConfirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={pendingEnd !== null}
+        onOpenChange={() => setPendingEnd(null)}
+        title={removing ? t("security.removeDeviceDialogTitle") : t("security.signOutDialogTitle")}
+        description={
+          <Trans
+            i18nKey={
+              removing
+                ? "security.removeDeviceDialogDescription"
+                : "security.signOutDialogDescription"
+            }
+            ns="settings"
+            values={{ deviceName: pendingEnd?.label ?? t("security.unknownDevice") }}
+            components={{ bold: <span className="font-medium" /> }}
+          />
+        }
+        confirmLabel={removing ? t("security.removeDeviceConfirm") : t("security.signOutConfirm")}
+        loadingLabel={t("security.revoking")}
+        isLoading={endSignedIn.isPending}
+        onConfirm={() => pendingEnd && endSignedIn.mutate(pendingEnd)}
+      />
 
-      <AlertDialog open={confirmSweep} onOpenChange={() => setConfirmSweep(false)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("security.signOutOthersDialogTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("security.signOutOthersDialogDescription", { count: endable.length })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("security.revokeDialogCancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => revokeOthers.mutate()}
-              disabled={revokeOthers.isPending}
-            >
-              {revokeOthers.isPending ? t("security.revoking") : t("security.signOutOthersConfirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={confirmSweep}
+        onOpenChange={() => setConfirmSweep(false)}
+        title={t("security.signOutOthersDialogTitle")}
+        description={t("security.signOutOthersDialogDescription", { count: endable.length })}
+        confirmLabel={t("security.signOutOthersConfirm")}
+        loadingLabel={t("security.revoking")}
+        isLoading={revokeOthers.isPending}
+        onConfirm={() => revokeOthers.mutate()}
+      />
     </SettingsSection>
   );
 };

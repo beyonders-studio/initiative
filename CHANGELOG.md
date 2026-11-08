@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Search forgives typos.** The command palette, the icon picker and every list you pick from find what you meant through a swapped, wrong or extra letter (one in a word of four to seven letters, two from eight), and the words of a name in any order, with an exact name first. A table's filter is exact: it keeps the rows that hold what you typed, in any case.
 - **Lists you tick several in work from the keyboard.** Task filters, the calendar's and My tools' community filters, dashboard filters, plug-in settings, tags, a property's options and bulk access take the arrow keys and Enter and stay open while you tick, have a search box, and list **Select all** and **Clear all** with the rest. Every picker ticks what's chosen the same way, and offers to create a tag, an option or a property at the top of its list.
 - **A project's task table scrolls with the page,** not in a box of its own, and its column headings stay at the top as you scroll. A collection's table draws only the files near the view, so a long collection keeps up as you scroll through it.
+- **Confirmations look like every other dialog.** They have the same lighter, blurred backdrop (side panels too), rounded corners at every width and a margin on phones. Deleting several tasks or tools at once asks in the app instead of in the browser's prompt.
 - **One colour picker everywhere.** A spreadsheet's text, fill and border colours and a profile decoration's colours open the same picker as the rest of the app, rather than the system's. The picker opens with its cursor on the current colour, and a single click in its field picks.
 
 ### Fixed
@@ -35,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Progress bars tell a screen reader how far along they are,** as a percent in your language, where they read as busy with no value.
 - **The members table no longer offers page sizes that change nothing.** It always shows 25 members a page, and its menu offered 10 to 100.
 - **A collection's grid and timeline, and posts, keep your place as they appear.** Switching to one partway down the page jumped back to the top.
+- **Closing a confirmation puts you back on the button that opened it,** so the keyboard carries on where it left off.
 - **Confirmations, pickers and tables speak your language.** Cancel, Continue, Please wait, a picker's placeholder, a table's filter and the labels a screen reader hears were English in every language.
 
 ## [0.78.0] - 2026-11-06

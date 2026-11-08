@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 
+import { dialogOverlayClassName, dialogSurfaceClassName } from "@/ui/dialog";
 import { cn } from "@/ui/lib/utils";
 
 // Radix draws a dialog's overlay only when it is modal, so the content can sit
@@ -24,7 +25,10 @@ const SheetOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/80 data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:duration-300 data-[state=open]:duration-500",
+      // The overlay fades for as long as the sheet slides, so it never goes
+      // before the sheet drawn inside it has finished leaving.
+      dialogOverlayClassName,
+      "data-[state=closed]:duration-300 data-[state=open]:duration-500",
       className
     )}
     {...props}
@@ -34,7 +38,7 @@ const SheetOverlay = React.forwardRef<
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
-  "fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:duration-300 data-[state=open]:duration-500",
+  `${dialogSurfaceClassName} fixed transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500`,
   {
     variants: {
       side: {

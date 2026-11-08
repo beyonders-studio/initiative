@@ -1,4 +1,3 @@
-import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -8,16 +7,7 @@ import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunities } from "@/hooks/useCommunities";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/ui/alert-dialog";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 
 interface RemoveCommunityMemberDialogProps {
   open: boolean;
@@ -69,35 +59,18 @@ export const RemoveCommunityMemberDialog = ({
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{t("removeMember.title")}</AlertDialogTitle>
-        </AlertDialogHeader>
-        <div className="space-y-3">
-          <AlertDialogDescription>
-            {t("removeMember.description", { email })}
-          </AlertDialogDescription>
-          <p className="text-muted-foreground text-sm">{t("removeMember.ownershipReleased")}</p>
-        </div>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={removing}>{t("common:cancel")}</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleRemove}
-            disabled={removing}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            {removing ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("removeMember.removing")}
-              </>
-            ) : (
-              t("removeMember.removeButton")
-            )}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t("removeMember.title")}
+      description={t("removeMember.description", { email })}
+      confirmLabel={t("removeMember.removeButton")}
+      loadingLabel={t("removeMember.removing")}
+      isLoading={removing}
+      destructive
+      onConfirm={handleRemove}
+    >
+      <p className="text-muted-foreground text-sm">{t("removeMember.ownershipReleased")}</p>
+    </ConfirmDialog>
   );
 };

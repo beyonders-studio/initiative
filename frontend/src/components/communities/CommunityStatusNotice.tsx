@@ -8,16 +8,7 @@ import type { CommunityEntry } from "@/hooks/useCommunities";
 import { useCommunityPaymentIssue } from "@/hooks/useCommunityPaymentIssue";
 import { useTicketAvailability } from "@/hooks/useTickets";
 import { getSessionItem, setSessionItem } from "@/lib/storage";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/ui/alert-dialog";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 
 // The key keeps its old name, so a notice already seen stays dismissed.
 const SEEN_KEY_PREFIX = "guild-status-notice:";
@@ -66,58 +57,46 @@ export const CommunityStatusNotice = ({ community }: { community: CommunityEntry
     setStage("closed");
   };
 
+  const offersPayment = paymentFailed && canSell;
+
+  // Closing the notice, by either button, is what marks it seen.
   return (
-    <AlertDialog open onOpenChange={(open) => !open && dismiss()}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>
-            {paymentFailed
-              ? t("statusNotice.paymentTitle", { name: community.name })
-              : t("statusNotice.title")}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
+    <ConfirmDialog
+      open
+      onOpenChange={(open) => !open && dismiss()}
+      title={
+        paymentFailed
+          ? t("statusNotice.paymentTitle", { name: community.name })
+          : t("statusNotice.title")
+      }
+      description={
+        <>
+          <span className="block">
             {paymentFailed
               ? canSell
                 ? t("statusNotice.paymentDescription")
                 : t("statusNotice.paymentDescriptionInApp")
               : t("statusNotice.description")}
-          </AlertDialogDescription>
-          <AlertDialogDescription>{t("statusNotice.readOnly")}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          {paymentFailed && canSell ? (
-            <>
-              <AlertDialogCancel onClick={dismiss}>{t("statusNotice.notNow")}</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  markSeenThisSession(seenKey);
-                  void openPortal(community.id, "manage");
-                }}
-              >
-                {t("statusNotice.updatePayment")}
-              </AlertDialogAction>
-            </>
-          ) : canAskForHelp ? (
-            <>
-              <AlertDialogCancel onClick={dismiss}>{t("common:ok")}</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  markSeenThisSession(seenKey);
-                  setStage("closed");
-                  // Asked about this community where it takes requests; its
-                  // address, at the foot of Help's search, where it gave one.
-                  if (contact) openHelp();
-                  else openHelp({ topic: SupportTopic.community, communityId: community.id });
-                }}
-              >
-                {t("statusNotice.contactSupport")}
-              </AlertDialogAction>
-            </>
-          ) : (
-            <AlertDialogAction onClick={dismiss}>{t("common:ok")}</AlertDialogAction>
-          )}
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </span>
+          <span className="mt-2 block">{t("statusNotice.readOnly")}</span>
+        </>
+      }
+      cancelLabel={offersPayment ? t("statusNotice.notNow") : t("common:ok")}
+      confirmLabel={
+        offersPayment ? t("statusNotice.updatePayment") : t("statusNotice.contactSupport")
+      }
+      onConfirm={
+        offersPayment
+          ? () => void openPortal(community.id, "manage")
+          : canAskForHelp
+            ? () =>
+                // Asked about this community where it takes requests; its
+                // address, at the foot of Help's search, where it gave one.
+                contact
+                  ? openHelp()
+                  : openHelp({ topic: SupportTopic.community, communityId: community.id })
+            : undefined
+      }
+    />
   );
 };

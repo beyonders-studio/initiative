@@ -11,16 +11,7 @@ import { useCommunities } from "@/hooks/useCommunities";
 import { toast } from "@/lib/mascotToast";
 import type { DialogProps } from "@/types/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/ui/alert-dialog";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 
 interface LeaveCommunityDialogProps extends DialogProps {
   community: CommunityRead;
@@ -134,50 +125,33 @@ export const LeaveCommunityDialog = ({
       );
     }
 
-    return (
-      <div className="space-y-3">
-        <AlertDialogDescription>
+    return <p className="text-muted-foreground text-sm">{t("leave.ownershipReleased")}</p>;
+  };
+
+  const canShowLeaveButton = !loading && !error && eligibility && !hasHardBlocker;
+
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t("leave.title", { name: community.name })}
+      description={
+        canShowLeaveButton ? (
           <Trans
             i18nKey="leave.description"
             ns="communities"
             values={{ name: community.name }}
             components={{ bold: <strong /> }}
           />
-        </AlertDialogDescription>
-        <p className="text-muted-foreground text-sm">{t("leave.ownershipReleased")}</p>
-      </div>
-    );
-  };
-
-  const canShowLeaveButton = !loading && !error && eligibility && !hasHardBlocker;
-
-  return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{t("leave.title", { name: community.name })}</AlertDialogTitle>
-        </AlertDialogHeader>
-        {renderContent()}
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={leaving}>{t("common:cancel")}</AlertDialogCancel>
-          {canShowLeaveButton && (
-            <AlertDialogAction
-              onClick={handleLeave}
-              disabled={leaving}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {leaving ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("leave.leaving")}
-                </>
-              ) : (
-                t("leave.leaveButton")
-              )}
-            </AlertDialogAction>
-          )}
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+        ) : undefined
+      }
+      confirmLabel={t("leave.leaveButton")}
+      loadingLabel={t("leave.leaving")}
+      isLoading={leaving}
+      destructive
+      onConfirm={canShowLeaveButton ? handleLeave : undefined}
+    >
+      {renderContent()}
+    </ConfirmDialog>
   );
 };
