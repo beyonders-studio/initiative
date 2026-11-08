@@ -13,12 +13,12 @@ import { useTranslation } from "react-i18next";
 
 import type { InitiativeUpdate, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeSettingsDetailsTab } from "@/components/initiatives/settings/InitiativeSettingsDetailsTab";
-import { InitiativeSettingsPermissionRequired } from "@/components/initiatives/settings/InitiativeSettingsGuard";
 import {
   type ToolAudience,
   ToolDisableDialog,
   ToolEnableDialog,
 } from "@/components/initiatives/ToolAudienceDialogs";
+import { SettingsPermissionRequired } from "@/components/settings/SettingsPermissionRequired";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useGrantToolToRoles, useInitiativeRoles } from "@/hooks/useInitiativeRoles";
 import { useInitiativeSettings } from "@/hooks/useInitiativeSettings";
@@ -147,7 +147,7 @@ export const InitiativeSettingsDetailsPage = () => {
   };
 
   if (!canManageMembers) {
-    return <InitiativeSettingsPermissionRequired />;
+    return <SettingsPermissionRequired scope="initiative" />;
   }
 
   if (!initiative) {
