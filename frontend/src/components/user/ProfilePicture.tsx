@@ -75,14 +75,15 @@ export const ProfilePicture = ({
     setMode(linked(user.avatar_url) ? "url" : "upload");
   }
 
-  const saveLink = useUpdateCurrentUser({
-    onSuccess: async () => {
-      setOpen(false);
-      await onChanged?.();
+  const saveLink = useUpdateCurrentUser(
+    {
+      onSuccess: async () => {
+        setOpen(false);
+        await onChanged?.();
+      },
     },
-    onError: (error: unknown) =>
-      toast.error(getErrorMessage(error, "settings:profile.updateError")),
-  });
+    "settings:profile.updateError"
+  );
 
   const picture = useApiMutation(
     { mutationFn: (work: () => Promise<unknown>) => work() },

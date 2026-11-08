@@ -175,6 +175,7 @@ const useDecorationPackMutation = (
         // the account the form reads from has changed too.
         void invalidate(q.currentUser());
       },
+      errorKey: "profiles:store.failed",
     },
     options
   );
@@ -369,11 +370,16 @@ export type { UserSummary };
 
 type UpdateCurrentUserVars = Parameters<typeof updateMe>[0];
 
-export const useUpdateCurrentUser = (options?: MutationOpts<UserRead, UpdateCurrentUserVars>) =>
+export const useUpdateCurrentUser = (
+  options?: MutationOpts<UserRead, UpdateCurrentUserVars>,
+  /** What a failure says. Omit where the caller reports it itself. */
+  errorKey?: string
+) =>
   useApiMutation<UserRead, UpdateCurrentUserVars>(
     {
       mutationFn: (data) => updateMe(data),
       invalidate: () => invalidate(q.currentUser()),
+      errorKey,
     },
     options
   );
@@ -384,6 +390,7 @@ export const useDeleteOwnAccount = (
   useApiMutation<AccountDeletionResponse, AccountDeletionRequest>(
     {
       mutationFn: (data) => deleteOwnAccount(data),
+      errorKey: "settings:deleteAccount.deleteError",
     },
     options
   );
@@ -400,6 +407,7 @@ export const useUpdateCommunityMembership = (
           role: data.role,
         } as Parameters<typeof updateCommunityMembership>[2]),
       invalidate: () => invalidate(q.communityMembers()),
+      errorKey: "communities:users.failedToUpdateRole",
     },
     options
   );
@@ -431,6 +439,7 @@ export const useSetMemberApiAccess = (options?: MutationOpts<void, SetMemberApiA
         );
         return invalidate(q.communityMembers());
       },
+      errorKey: "communities:users.apiAccessError",
     },
     options
   );
@@ -445,6 +454,7 @@ export const useExtendGuest = (options?: MutationOpts<void, GuestVars & { days: 
       mutationFn: ({ communityId, userId, days }) =>
         extendCommunityGuest(communityId, userId, { days }),
       invalidate: () => invalidate(q.communityMembers()),
+      errorKey: "communities:guests.extendError",
     },
     options
   );
@@ -462,6 +472,7 @@ export const useMakeGuestAMember = (options?: MutationOpts<void, GuestVars>) => 
         void refreshCommunities();
         return invalidate(q.communityMembers());
       },
+      errorKey: "communities:guests.makeMemberError",
     },
     options
   );
@@ -486,6 +497,7 @@ export const useSetMemberDisplayName = (options?: MutationOpts<void, SetDisplayN
       },
       invalidate: () =>
         invalidate(q.communityContent(), q.communityMembers(), q.people(), q.allCommunities()),
+      errorKey: "communities:displayName.saveFailed",
     },
     options
   );
@@ -509,6 +521,7 @@ export const useExportCommunityUsersCsv = (
         })) as Blob;
         downloadBlob(blob, filename);
       },
+      errorKey: "communities:users.exportError",
     },
     options
   );

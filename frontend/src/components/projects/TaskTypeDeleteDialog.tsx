@@ -11,7 +11,6 @@ import type { TaskTypeRead } from "@/api/generated/initiativeAPI.schemas";
 import { byPosition } from "@/components/projects/DefinitionTable";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { useDeleteTaskType, useProjectTaskTypes } from "@/hooks/useProjects";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import {
   Dialog,
@@ -57,9 +56,6 @@ export const TaskTypeDeleteDialog = ({
     onSuccess: () => {
       toast.success(t("taskTypes.deleted"));
       onClose();
-    },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "projects:taskTypes.deleteError"));
     },
   });
 

@@ -6,7 +6,6 @@ import { useListPasskeys } from "@/api/generated/auth/auth";
 import { useReadHeldChange } from "@/api/generated/users/users";
 import { useAuth } from "@/hooks/useAuth";
 import { useApplyHeldChange, useCancelHeldChange } from "@/hooks/useHeldChange";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { describePasskeyPromptError, passkeysRunHere } from "@/lib/passkeys";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
@@ -35,11 +34,9 @@ export const HeldChangeNotice = () => {
 
   const cancel = useCancelHeldChange({
     onSuccess: () => toast.success(t("heldChange.cancelled")),
-    onError: (error) => toast.error(getErrorMessage(error, "settings:heldChange.cancelFailed")),
   });
   const apply = useApplyHeldChange({
     onSuccess: () => toast.success(t("heldChange.applied")),
-    onError: (error) => toast.error(getErrorMessage(error, "settings:heldChange.applyFailed")),
   });
 
   if (!held) return null;

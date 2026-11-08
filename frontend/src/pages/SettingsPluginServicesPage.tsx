@@ -129,8 +129,6 @@ export const SettingsPluginServicesPage = () => {
           toast.success(t("pluginServices.created"));
           closeDialog();
         },
-        onError: (error) =>
-          toast.error(getErrorMessage(error, "settings:pluginServices.saveError")),
       }
     );
   };
@@ -397,8 +395,6 @@ export const SettingsPluginServicesPage = () => {
                 setDeleting(null);
                 toast.success(t("pluginServices.deleted"));
               },
-              onError: (error) =>
-                toast.error(getErrorMessage(error, "settings:pluginServices.deleteError")),
             });
           }
         }}

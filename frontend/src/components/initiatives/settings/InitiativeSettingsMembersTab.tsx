@@ -25,7 +25,6 @@ import {
   useInitiativeMemberSearch,
   useUserSearch,
 } from "@/hooks/useUsers";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { isAdminRole } from "@/lib/permissions";
 import { getUserDisplayName } from "@/lib/userDisplay";
@@ -145,35 +144,25 @@ export const InitiativeSettingsMembersTab = ({
   const addingAdmin = isAdminRole(pickedUser?.community_role);
   const effectiveRoleId = addingAdmin && adminRole ? String(adminRole.id) : selectedRoleId;
 
-  const addMember = useAddInitiativeMember({
-    onSuccess: () => {
-      toast.success(t("settings.memberAdded"));
-      setSelectedUserId("");
+  const addMember = useAddInitiativeMember(
+    {
+      onSuccess: () => {
+        toast.success(t("settings.memberAdded"));
+        setSelectedUserId("");
+      },
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "initiatives:settings.addMemberError"));
-    },
-  });
+    "initiatives:settings.addMemberError"
+  );
 
-  const removeMember = useRemoveInitiativeMember({
-    onSuccess: () => {
-      toast.success(t("settings.memberRemoved"));
-    },
-    // Surfaces the backend's specific reason (e.g. removing the last project
-    // manager — INITIATIVE_MUST_HAVE_MANAGER) instead of a generic failure.
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "initiatives:settings.removeMemberError"));
-    },
-  });
+  const removeMember = useRemoveInitiativeMember(
+    { onSuccess: () => toast.success(t("settings.memberRemoved")) },
+    "initiatives:settings.removeMemberError"
+  );
 
-  const updateMemberRole = useUpdateInitiativeMember({
-    onSuccess: () => {
-      toast.success(t("settings.roleUpdated"));
-    },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, "initiatives:settings.roleUpdateError"));
-    },
-  });
+  const updateMemberRole = useUpdateInitiativeMember(
+    { onSuccess: () => toast.success(t("settings.roleUpdated")) },
+    "initiatives:settings.roleUpdateError"
+  );
 
   const handleAddMember = () => {
     if (!selectedUserId || !effectiveRoleId) {

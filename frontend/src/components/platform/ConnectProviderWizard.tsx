@@ -42,7 +42,7 @@ import {
   presetFor,
   suggestScopes,
 } from "@/lib/authProviderPresets";
-import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
+import { messageForCode } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { isValidProviderSlug } from "@/lib/providerSlug";
 import { Button } from "@/ui/button";
@@ -61,10 +61,7 @@ const STEP_ORDER: Step[] = ["choose", "address", "credentials", "options"];
 /** The mutation surface, satisfied structurally by either registry's hooks so
  *  the operator and community wrappers plug in without sharing a hook signature. */
 export interface WizardMutation<TVariables, TResult = unknown> {
-  mutate: (
-    variables: TVariables,
-    options?: { onSuccess?: (data: TResult) => void; onError?: (error: unknown) => void }
-  ) => void;
+  mutate: (variables: TVariables, options?: { onSuccess?: (data: TResult) => void }) => void;
   isPending: boolean;
 }
 
@@ -155,8 +152,6 @@ export const ConnectProviderWizard = ({
           // What it says it offers is a better starting point than our guess.
           if (result.ok) setScopes(suggestScopes(result.scopes_supported));
         },
-        onError: (error) =>
-          toast.error(getErrorMessage(error, "settings:authProviders.verifyError")),
       }
     );
   };
@@ -194,7 +189,6 @@ export const ConnectProviderWizard = ({
           toast.success(t("authProviders.created"));
           closeWizard();
         },
-        onError: (error) => toast.error(getErrorMessage(error, "settings:authProviders.saveError")),
       }
     );
   };

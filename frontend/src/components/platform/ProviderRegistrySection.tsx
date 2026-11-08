@@ -11,7 +11,7 @@ import type {
 import { ProviderMark } from "@/components/auth/ProviderMark";
 import { ConnectProviderWizard, ProbeReport } from "@/components/platform/ConnectProviderWizard";
 import { SettingsSection } from "@/components/settings/SettingsSection";
-import { getErrorMessage, messageForCode } from "@/lib/errorMessage";
+import { messageForCode } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
@@ -37,10 +37,7 @@ import { Switch } from "@/ui/switch";
 // React Query mutation objects the wrappers' domain hooks return, so the
 // operator and community registries plug in without sharing hook signatures.
 interface RegistryMutation<TVariables, TResult = unknown> {
-  mutate: (
-    variables: TVariables,
-    options?: { onSuccess?: (data: TResult) => void; onError?: (error: unknown) => void }
-  ) => void;
+  mutate: (variables: TVariables, options?: { onSuccess?: (data: TResult) => void }) => void;
   isPending: boolean;
   /** Which row a shared mutation is currently busy with. */
   variables?: TVariables;
@@ -99,8 +96,6 @@ export const ProviderRegistrySection = ({
         }
         toast.error(messageForCode(result.error_code, "settings:authProviders.probe.failed"));
       },
-      onError: (error) =>
-        toast.error(getErrorMessage(error, "settings:authProviders.probe.failed")),
     });
   };
 
@@ -224,8 +219,6 @@ export const ProviderRegistrySection = ({
                 toast.success(t("authProviders.deleted"));
                 setDeleting(null);
               },
-              onError: (error) =>
-                toast.error(getErrorMessage(error, "settings:authProviders.deleteError")),
             });
           }
         }}
@@ -263,14 +256,7 @@ const ProviderEditForm = ({
 
   /** Check the address in the form, without saving it. */
   const verify = () => {
-    discoverIssuer.mutate(
-      { issuer: form.issuer },
-      {
-        onSuccess: setProbe,
-        onError: (error) =>
-          toast.error(getErrorMessage(error, "settings:authProviders.verifyError")),
-      }
-    );
+    discoverIssuer.mutate({ issuer: form.issuer }, { onSuccess: setProbe });
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -300,7 +286,6 @@ const ProviderEditForm = ({
           toast.success(t("authProviders.saved"));
           onDone();
         },
-        onError: (error) => toast.error(getErrorMessage(error, "settings:authProviders.saveError")),
       }
     );
   };

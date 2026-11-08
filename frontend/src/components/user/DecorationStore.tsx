@@ -10,7 +10,6 @@ import {
   useInstallDecorationPack,
   useRemoveDecorationPack,
 } from "@/hooks/useUsers";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { decorationSrc, resolveDecoration } from "@/lib/profileDecorations";
 import { Button } from "@/ui/button";
@@ -147,20 +146,12 @@ export const DecorationStore = ({ user }: { user: UserRead }) => {
   const { data, isLoading } = useDecorationPacks();
   const [pending, setPending] = useState<DecorationPack | null>(null);
 
-  const onError = (error: unknown) => toast.error(getErrorMessage(error, "profiles:store.failed"));
   const install = useInstallDecorationPack({
     onSuccess: () => toast.success(t("profiles:store.got")),
-    onError,
   });
   const remove = useRemoveDecorationPack({
-    onSuccess: () => {
-      setPending(null);
-      toast.success(t("profiles:myPacks.removed"));
-    },
-    onError: (error: unknown) => {
-      setPending(null);
-      onError(error);
-    },
+    onSuccess: () => toast.success(t("profiles:myPacks.removed")),
+    onSettled: () => setPending(null),
   });
 
   if (isLoading) {

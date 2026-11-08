@@ -15,7 +15,6 @@ import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSect
 import { useAuth } from "@/hooks/useAuth";
 import { useServerForm } from "@/hooks/useServerForm";
 import { usePushSettings, useUpdatePushSettings } from "@/hooks/useSettings";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { Button } from "@/ui/button";
@@ -63,7 +62,6 @@ export const SettingsPushPage = () => {
       toast.success(t("push.saved"));
       setServiceAccount("");
     },
-    onError: (err) => toast.error(getErrorMessage(err, "settings:push.error")),
   });
 
   if (!canManagePlatformConfig) {

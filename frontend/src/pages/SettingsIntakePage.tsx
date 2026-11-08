@@ -94,9 +94,7 @@ export const SettingsIntakePage = () => {
 
   const [clearing, setClearing] = useState(false);
 
-  const updateCommunity = useUpdateOperationsCommunity({
-    onError: (err) => toast.error(getErrorMessage(err, "intake:community.saveError")),
-  });
+  const updateCommunity = useUpdateOperationsCommunity();
 
   if (!isOwner) {
     return <p className="text-muted-foreground text-sm">{t("ownerOnly")}</p>;
@@ -193,9 +191,7 @@ export const SettingsIntakePage = () => {
 /** Whether people here may send feedback to the Initiative team. */
 const FeedbackCard = ({ enabled, settled }: { enabled: boolean; settled: boolean }) => {
   const { t } = useTranslation("intake");
-  const update = useUpdateFeedbackSwitch({
-    onError: (err) => toast.error(getErrorMessage(err, "intake:feedbackSwitch.error")),
-  });
+  const update = useUpdateFeedbackSwitch();
   return (
     <SettingsSection
       title={t("feedbackSwitch.title")}
@@ -316,14 +312,10 @@ const StreamCard = ({ binding, initiatives, settled }: StreamCardProps) => {
 
   const importBlueprint = useImportIntakeBlueprint({
     onSuccess: (result) => toast.success(t("stream.createdToast", { name: result.project_name })),
-    onError: (err) => toast.error(getErrorMessage(err, "intake:stream.saveError")),
   });
-  const upsert = useUpsertIntakeBinding({
-    onError: (err) => toast.error(getErrorMessage(err, "intake:stream.saveError")),
-  });
+  const upsert = useUpsertIntakeBinding();
   const remove = useDeleteIntakeBinding({
     onSuccess: () => toast.success(t("stream.unboundToast")),
-    onError: (err) => toast.error(getErrorMessage(err, "intake:stream.saveError")),
   });
 
   // Every project in the community, flattened, labelled by its initiative —

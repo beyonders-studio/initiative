@@ -45,7 +45,7 @@ import { Switch } from "@/ui/switch";
 export function PluginUpdatesPanel({ plugin }: { plugin: CommunityPluginDetail }) {
   const { t } = useTranslation(["plugins", "common"]);
   const update = useUpdateCommunityPlugin(plugin.id);
-  const upgrade = useUpgradePlugin(plugin.id);
+  const upgrade = useUpgradePlugin(plugin.id, "plugins:error");
   const pending = plugin.update_version ?? null;
   const asks = plugin.pending_update ?? null;
   const refused = plugin.update_refused ?? null;
@@ -69,7 +69,6 @@ export function PluginUpdatesPanel({ plugin }: { plugin: CommunityPluginDetail }
                   toast.success(
                     checked ? t("plugins:manage.autoUpdateOn") : t("plugins:manage.autoUpdateOff")
                   ),
-                onError: (error) => toast.error(getErrorMessage(error, "plugins:error")),
               }
             )
           }
@@ -89,7 +88,6 @@ export function PluginUpdatesPanel({ plugin }: { plugin: CommunityPluginDetail }
               upgrade.mutate(undefined, {
                 onSuccess: (updated) =>
                   toast.success(t("plugins:manage.upgraded", { version: updated.listing_version })),
-                onError: (error) => toast.error(getErrorMessage(error, "plugins:error")),
               })
             }
           >

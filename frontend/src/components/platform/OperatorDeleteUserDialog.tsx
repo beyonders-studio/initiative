@@ -6,7 +6,6 @@ import type { OperatorUserRead } from "@/api/generated/initiativeAPI.schemas";
 import { ConfirmPhraseField, EligibilityStep } from "@/components/account/DeletionSteps";
 import { useOperatorDeleteUser, useUserDeletionEligibility } from "@/hooks/useOperatorUsers";
 import { useWizard } from "@/hooks/useWizard";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import type { DialogWithSuccessProps } from "@/types/dialog";
@@ -132,9 +131,6 @@ export function OperatorDeleteUserDialog({
         toast.success(data.message);
         onSuccess();
         onOpenChange(false);
-      },
-      onError: (error: unknown) => {
-        toast.error(getErrorMessage(error, "settings:operatorDeleteUser.deleteError"));
       },
     },
     caseTaskId

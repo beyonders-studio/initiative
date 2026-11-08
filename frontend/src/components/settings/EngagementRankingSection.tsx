@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { SettingsRow, SettingsSection } from "@/components/settings/SettingsSection";
 import { useAuth } from "@/hooks/useAuth";
 import { useUpdateCurrentUser } from "@/hooks/useUsers";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { Switch } from "@/ui/switch";
 
@@ -15,13 +14,15 @@ import { Switch } from "@/ui/switch";
 export const EngagementRankingSection = () => {
   const { t } = useTranslation("settings");
   const { user, acceptUser } = useAuth();
-  const update = useUpdateCurrentUser({
-    onSuccess: (saved) => {
-      acceptUser(saved);
-      toast.success(t("privacy.engagementRanking.saved"));
+  const update = useUpdateCurrentUser(
+    {
+      onSuccess: (saved) => {
+        acceptUser(saved);
+        toast.success(t("privacy.engagementRanking.saved"));
+      },
     },
-    onError: (err) => toast.error(getErrorMessage(err, "settings:privacy.engagementRanking.error")),
-  });
+    "settings:privacy.engagementRanking.error"
+  );
 
   if (!user) return null;
 

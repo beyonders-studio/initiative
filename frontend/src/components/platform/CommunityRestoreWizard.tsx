@@ -28,7 +28,6 @@ import { usePlatformUsers } from "@/hooks/useOperatorUsers";
 import { useRestoreCommunity } from "@/hooks/useSettings";
 import { useWizard } from "@/hooks/useWizard";
 import { OPERATOR_SETTABLE_STATUSES } from "@/lib/communityStatus";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { getUserHandle } from "@/lib/userDisplay";
 import { Button } from "@/ui/button";
@@ -70,9 +69,6 @@ export const CommunityRestoreWizard = ({
     onSuccess: (row) => {
       toast.success(t("communities.restore.done", { name: row.name }));
       onOpenChange(false);
-    },
-    onError: (err) => {
-      toast.error(getErrorMessage(err, "settings:communities.restore.error"));
     },
   });
 

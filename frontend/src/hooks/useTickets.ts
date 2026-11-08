@@ -93,13 +93,18 @@ export const useTicketAvailability = (
   return useReadTicketAvailability(params, { query: { staleTime: 5 * 60 * 1000, ...options } });
 };
 
-export const useFileTicket = (options?: MutationOpts<TicketAccepted, TicketFiling>) =>
+export const useFileTicket = (
+  options?: MutationOpts<TicketAccepted, TicketFiling>,
+  /** What a failure says. Omit where the caller reads the refusal itself. */
+  errorKey?: string
+) =>
   useApiMutation<TicketAccepted, TicketFiling>(
     {
       // The ticket travels as JSON beside the files: one multipart body.
       mutationFn: ({ ticket, files }) => fileTicket({ payload: JSON.stringify(ticket), files }),
       // A filing with somebody to answer it joins the reader's own tickets.
       invalidate: () => invalidate(q.filedTickets()),
+      errorKey,
     },
     options
   );

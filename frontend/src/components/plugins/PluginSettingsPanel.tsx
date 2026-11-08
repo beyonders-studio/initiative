@@ -16,7 +16,6 @@ import { useTranslation } from "react-i18next";
 
 import type { CommunityPluginSettingRead } from "@/api/generated/initiativeAPI.schemas";
 import { useUpdatePluginSetting } from "@/hooks/useCommunityPluginDetail";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { localized } from "@/lib/widgets/widgetMeta";
 import { Button } from "@/ui/button";
@@ -76,7 +75,6 @@ function SettingField({
           setDraft(null);
           toast.success(t("plugins:installSettings.saved"));
         },
-        onError: (error) => toast.error(getErrorMessage(error, "plugins:error")),
       }
     );
   };

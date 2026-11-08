@@ -16,8 +16,6 @@ import { UserHandle } from "@/components/UserHandle";
 import { useAuth } from "@/hooks/useAuth";
 import { useExportPlatformUsersCsv, usePlatformUsers } from "@/hooks/useOperatorUsers";
 import { useServerTableState } from "@/hooks/useServerTableState";
-import { getErrorMessage } from "@/lib/errorMessage";
-import { toast } from "@/lib/mascotToast";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { getUserHandle } from "@/lib/userDisplay";
 import { Badge } from "@/ui/badge";
@@ -60,11 +58,7 @@ export const SettingsPlatformUsersPage = () => {
   // what was actually persisted.
   const managing = rows.find((row) => row.id === managingId) ?? null;
 
-  const exportPlatformUsers = useExportPlatformUsersCsv({
-    onError: (err) => {
-      toast.error(getErrorMessage(err, "settings:platformUsers.exportError"));
-    },
-  });
+  const exportPlatformUsers = useExportPlatformUsersCsv();
 
   const exportUserCsv = (platformUser: OperatorUserRead) => {
     // Named by handle. The address never arrives here in full any more, and a

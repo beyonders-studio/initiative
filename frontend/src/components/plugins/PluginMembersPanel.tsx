@@ -41,7 +41,6 @@ import {
   useRevokeMemberConsents,
 } from "@/hooks/useCommunityPluginDetail";
 import { useUserSearch } from "@/hooks/useUsers";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { getUserDisplayName } from "@/lib/userDisplay";
 import { localized } from "@/lib/widgets/widgetMeta";
@@ -157,7 +156,6 @@ export function PluginMembersPanel({ pluginId, enabled }: PluginMembersPanelProp
               toast.success(t("plugins:members.revokedAll"));
               setConfirmingRevokeAll(false);
             },
-            onError: (error) => toast.error(getErrorMessage(error, "plugins:error")),
           })
         }
       />
@@ -264,7 +262,6 @@ function MemberConsents({
                       onClick={() =>
                         revoke.mutate(userId, {
                           onSuccess: () => toast.success(t("plugins:consent.memberRevoked")),
-                          onError: (error) => toast.error(getErrorMessage(error, "plugins:error")),
                         })
                       }
                     >
@@ -304,7 +301,6 @@ function MemberConsents({
               toast.success(t("plugins:consent.revokedAll"));
               setConfirming(false);
             },
-            onError: (error) => toast.error(getErrorMessage(error, "plugins:error")),
           })
         }
       />
@@ -329,24 +325,21 @@ function ConnectionMembers({
 
   const name = localized(summary.label, i18n.language) ?? summary.connection_id;
 
-  // Takes the translated message rather than a key, so every call site spells
-  // its key as a literal and a missing one is a type error there instead of a
-  // raw key surfacing in a toast.
-  const notify = (message: string) => ({
-    onSuccess: () => toast.success(message),
-    onError: (error: unknown) => toast.error(getErrorMessage(error, "plugins:error")),
-  });
-
   const revokeMember = (item: CommunityPluginMemberConnection) =>
     revoke.mutate(
       { userId: item.user_id, connectionId: item.connection_id },
-      notify(t("plugins:members.revoked"))
+      { onSuccess: () => toast.success(t("plugins:members.revoked")) }
     );
 
   const toggleBlock = (item: CommunityPluginMemberConnection) =>
     block.mutate(
       { userId: item.user_id, connectionId: item.connection_id, blocked: item.blocked },
-      notify(t(item.blocked ? "plugins:members.unblocked" : "plugins:members.blockedDone"))
+      {
+        onSuccess: () =>
+          toast.success(
+            t(item.blocked ? "plugins:members.unblocked" : "plugins:members.blockedDone")
+          ),
+      }
     );
 
   return (

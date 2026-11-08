@@ -114,6 +114,7 @@ export const useAgreeCommunityNarrowing = (
       mutationFn: ({ connectionId, agreed }) =>
         agreeCommunityNarrowing(communityId, connectionId, { agreed }),
       invalidate: () => invalidate(q.communityNarrowings(communityId)),
+      errorKey: "settings:communities.sheet.narrowings.error",
     },
     options
   );
@@ -176,6 +177,7 @@ export const useCreateAuthProvider = (
     {
       mutationFn: (data) => createAuthProvider(data),
       invalidate: () => invalidate(q.authProviders()),
+      errorKey: "settings:authProviders.saveError",
     },
     options
   );
@@ -187,6 +189,7 @@ export const useUpdateAuthProvider = (
     {
       mutationFn: ({ providerId, data }) => updateAuthProvider(providerId, data),
       invalidate: () => invalidate(q.authProviders()),
+      errorKey: "settings:authProviders.saveError",
     },
     options
   );
@@ -196,6 +199,7 @@ export const useDeleteAuthProvider = (options?: MutationOpts<void, number>) =>
     {
       mutationFn: (providerId) => deleteAuthProvider(providerId),
       invalidate: () => invalidate(q.authProviders()),
+      errorKey: "settings:authProviders.deleteError",
     },
     options
   );
@@ -206,7 +210,10 @@ export const useDiscoverAuthProvider = (
   options?: MutationOpts<AuthProviderProbeResult, { issuer: string }>
 ) =>
   useApiMutation<AuthProviderProbeResult, { issuer: string }>(
-    { mutationFn: (data) => discoverAuthProvider(data) },
+    {
+      mutationFn: (data) => discoverAuthProvider(data),
+      errorKey: "settings:authProviders.verifyError",
+    },
     options
   );
 
@@ -215,6 +222,7 @@ export const useTestAuthProvider = (options?: MutationOpts<AuthProviderProbeResu
   useApiMutation<AuthProviderProbeResult, number>(
     {
       mutationFn: (providerId) => testAuthProvider(providerId),
+      errorKey: "settings:authProviders.probe.failed",
     },
     options
   );
@@ -257,6 +265,7 @@ export const useUpdateCommunitySettings = (
       mutationFn: (data) =>
         updateCommunitySettings(data as Parameters<typeof updateCommunitySettings>[0]),
       invalidate: () => invalidate(q.appConfig(), q.communitySettings()),
+      errorKey: "settings:community.saveError",
     },
     options
   );
@@ -283,6 +292,7 @@ export const useUpdateNotificationSettings = (
     {
       mutationFn: (data) => updateNotificationSettings(data),
       invalidate: () => invalidate(q.notificationSettings()),
+      errorKey: "settings:notificationDelivery.error",
     },
     options
   );
@@ -298,12 +308,15 @@ export const usePlatformAuthSettings = (options?: QueryOpts<PlatformAuthSettings
  * from there to decide whether to offer the password form.
  */
 export const useUpdatePlatformAuthSettings = (
-  options?: MutationOpts<PlatformAuthSettingsResponse, PlatformAuthSettingsUpdate>
+  options?: MutationOpts<PlatformAuthSettingsResponse, PlatformAuthSettingsUpdate>,
+  /** What a failure says. Omit where the caller reads the refusal itself. */
+  errorKey?: string
 ) =>
   useApiMutation<PlatformAuthSettingsResponse, PlatformAuthSettingsUpdate>(
     {
       mutationFn: (data) => updatePlatformAuthSettings(data),
       invalidate: () => invalidate(q.platformAuthSettings(), q.authSettings(), q.appConfig()),
+      errorKey,
     },
     options
   );
@@ -319,6 +332,7 @@ export const useUpdateCaptchaSettings = (
     {
       mutationFn: (data) => updateCaptchaSettings(data),
       invalidate: () => invalidate(q.captchaSettings(), q.appConfig()),
+      errorKey: "settings:captcha.error",
     },
     options
   );
@@ -334,6 +348,7 @@ export const useUpdatePushSettings = (
     {
       mutationFn: (data) => updatePushSettings(data),
       invalidate: () => invalidate(q.pushSettings(), q.fcmConfig()),
+      errorKey: "settings:push.error",
     },
     options
   );
@@ -407,6 +422,7 @@ export const useRestoreCommunity = (
     {
       mutationFn: ({ communityId, data }) => restorePlatformCommunity(communityId, data),
       invalidate: () => invalidate(q.platformCommunities()),
+      errorKey: "settings:communities.restore.error",
     },
     options
   );
@@ -415,7 +431,9 @@ export const useUpdateCommunityStorage = (
   options?: MutationOpts<
     PlatformCommunityStorageRead,
     { communityId: number; data: PlatformCommunityStorageUpdate }
-  >
+  >,
+  /** What a failure says. */
+  errorKey = "settings:communities.saveError"
 ) =>
   useApiMutation<
     PlatformCommunityStorageRead,
@@ -429,6 +447,7 @@ export const useUpdateCommunityStorage = (
         ),
       // The help-request switch decides what "Ask for help" offers.
       invalidate: () => invalidate(q.platformCommunities(), q.ticketAvailability()),
+      errorKey,
     },
     options
   );
@@ -450,6 +469,7 @@ export const useSetCommunitySuspension = (
     {
       mutationFn: ({ communityId, data }) => setPlatformCommunitySuspension(communityId, data),
       invalidate: () => invalidate(q.platformCommunities()),
+      errorKey: "settings:communities.statusSaveError",
     },
     options
   );

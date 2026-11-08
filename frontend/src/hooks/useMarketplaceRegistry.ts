@@ -7,7 +7,7 @@
  * and every community's marketplace listings.
  */
 
-import { type QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 
 import type { RegistryRefreshRead, RegistrySettings } from "@/api/generated/initiativeAPI.schemas";
 import {
@@ -16,6 +16,7 @@ import {
   updateRegistrySettings,
   uploadRegistryBundle,
 } from "@/api/generated/marketplace/marketplace";
+import { useApiMutation } from "@/hooks/useApiMutation";
 import type { MutationOpts } from "@/types/mutation";
 
 const invalidateRegistry = (queryClient: QueryClient) => {
@@ -33,48 +34,49 @@ export const useUpdateRegistrySettings = (
   options?: MutationOpts<RegistrySettings, RegistrySettings>
 ) => {
   const queryClient = useQueryClient();
-  const { onSuccess, ...rest } = options ?? {};
-  return useMutation<RegistrySettings, Error, RegistrySettings>({
-    ...rest,
-    mutationFn: (data) => updateRegistrySettings(data),
-    onSuccess: (...args) => {
-      invalidateRegistry(queryClient);
-      onSuccess?.(...args);
+  return useApiMutation<RegistrySettings, RegistrySettings>(
+    {
+      mutationFn: (data) => updateRegistrySettings(data),
+      invalidate: () => invalidateRegistry(queryClient),
+      errorKey: "settings:marketplaceRegistry.saveError",
     },
-  });
+    options
+  );
 };
 
 export const useRefreshRegistry = (options?: MutationOpts<RegistryRefreshRead, void>) => {
   const queryClient = useQueryClient();
-  const { onSuccess, onError, ...rest } = options ?? {};
-  return useMutation<RegistryRefreshRead, Error, void>({
-    ...rest,
-    mutationFn: () => refreshRegistryNow(),
-    onSuccess: (...args) => {
-      invalidateRegistry(queryClient);
-      onSuccess?.(...args);
+  return useApiMutation<RegistryRefreshRead, void>(
+    {
+      mutationFn: () => refreshRegistryNow(),
+      invalidate: () => invalidateRegistry(queryClient),
+      errorKey: "settings:marketplaceRegistry.refreshError",
     },
-    // A refusal is recorded on the status too, so it is refetched either way.
-    onError: (...args) => {
-      invalidateRegistry(queryClient);
-      onError?.(...args);
-    },
-  });
+    {
+      ...options,
+      // A refusal is recorded on the status too, so it is refetched either way.
+      onError: (...args) => {
+        invalidateRegistry(queryClient);
+        options?.onError?.(...args);
+      },
+    }
+  );
 };
 
 export const useUploadRegistryBundle = (options?: MutationOpts<RegistryRefreshRead, File>) => {
   const queryClient = useQueryClient();
-  const { onSuccess, onError, ...rest } = options ?? {};
-  return useMutation<RegistryRefreshRead, Error, File>({
-    ...rest,
-    mutationFn: (file) => uploadRegistryBundle({ file }),
-    onSuccess: (...args) => {
-      invalidateRegistry(queryClient);
-      onSuccess?.(...args);
+  return useApiMutation<RegistryRefreshRead, File>(
+    {
+      mutationFn: (file) => uploadRegistryBundle({ file }),
+      invalidate: () => invalidateRegistry(queryClient),
+      errorKey: "settings:marketplaceRegistry.bundleError",
     },
-    onError: (...args) => {
-      invalidateRegistry(queryClient);
-      onError?.(...args);
-    },
-  });
+    {
+      ...options,
+      onError: (...args) => {
+        invalidateRegistry(queryClient);
+        options?.onError?.(...args);
+      },
+    }
+  );
 };

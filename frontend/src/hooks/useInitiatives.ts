@@ -375,7 +375,9 @@ export const useAddInitiativeMember = (
       initiativeId: number;
       data: Parameters<typeof addInitiativeMember>[2];
     }
-  >
+  >,
+  /** What a failure says. */
+  errorKey?: string
 ) =>
   useCommunityMutation<
     InitiativeRead,
@@ -388,12 +390,15 @@ export const useAddInitiativeMember = (
       mutationFn: (communityId, { initiativeId, data }) =>
         addInitiativeMember(communityId, initiativeId, data),
       invalidate: (_data, { initiativeId }) => invalidateInitiativeMembersAndList(initiativeId),
+      errorKey,
     },
     options
   );
 
 export const useRemoveInitiativeMember = (
-  options?: MutationOpts<void, { initiativeId: number; userId: number }>
+  options?: MutationOpts<void, { initiativeId: number; userId: number }>,
+  /** What a failure says. Omit where the caller reports it itself. */
+  errorKey?: string
 ) =>
   useCommunityMutation<void, { initiativeId: number; userId: number }>(
     {
@@ -401,6 +406,7 @@ export const useRemoveInitiativeMember = (
         await removeInitiativeMember(communityId, initiativeId, userId);
       },
       invalidate: (_data, { initiativeId }) => invalidateInitiativeMembersAndList(initiativeId),
+      errorKey,
     },
     options
   );
@@ -413,7 +419,9 @@ export const useUpdateInitiativeMember = (
       userId: number;
       data: Parameters<typeof updateInitiativeMember>[3];
     }
-  >
+  >,
+  /** What a failure says. */
+  errorKey?: string
 ) =>
   useCommunityMutation<
     InitiativeRead,
@@ -427,6 +435,7 @@ export const useUpdateInitiativeMember = (
       mutationFn: (communityId, { initiativeId, userId, data }) =>
         updateInitiativeMember(communityId, initiativeId, userId, data),
       invalidate: (_data, { initiativeId }) => invalidateInitiativeMembersAndList(initiativeId),
+      errorKey,
     },
     options
   );

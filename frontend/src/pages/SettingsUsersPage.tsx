@@ -28,7 +28,6 @@ import {
   useUpdateCommunityMembership,
   useUsers,
 } from "@/hooks/useUsers";
-import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import { assignableCommunityRoles, isAdminRole } from "@/lib/permissions";
 import { getUrlHandle, getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
@@ -102,18 +101,10 @@ export const SettingsUsersPage = () => {
   const assignCustomRole = useAssignCustomRole();
   const customRolesClosed = Boolean(activeCommunity?.closed_surfaces?.includes("custom_roles"));
 
-  const updateCommunityMembership = useUpdateCommunityMembership({
-    onError: (error: unknown) => {
-      const message = getErrorMessage(error, "communities:users.failedToUpdateRole");
-      toast.error(message);
-    },
-  });
+  const updateCommunityMembership = useUpdateCommunityMembership();
 
   const setMemberApiAccess = useSetMemberApiAccess({
     onSuccess: () => toast.success(t("users.apiAccessSaved")),
-    onError: (error: unknown) => {
-      toast.error(getErrorMessage(error, "communities:users.apiAccessError"));
-    },
   });
 
   const handleRoleChange = (userId: number, role: CommunityRole) => {
@@ -126,11 +117,7 @@ export const SettingsUsersPage = () => {
     setDeleteUserConfirm({ userId, email });
   };
 
-  const exportCommunityUsers = useExportCommunityUsersCsv({
-    onError: (err) => {
-      toast.error(getErrorMessage(err, "communities:users.exportError"));
-    },
-  });
+  const exportCommunityUsers = useExportCommunityUsersCsv();
 
   const exportUserCsv = (communityMember: UserCommunityMember) => {
     const safeHandle = communityMember.username.replace(/[^a-zA-Z0-9._-]+/g, "_");
