@@ -107,9 +107,9 @@ class CalendarEvent(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
 
     calendar: Optional["Calendar"] = Relationship(back_populates="events")
     # Set on an override built before its series has an id (an import), so
-    # the flush writes ``series_id``; never loaded.
+    # the flush writes ``series_id``; never loaded, so reading it raises.
     series: Optional["CalendarEvent"] = Relationship(
-        sa_relationship_kwargs={"remote_side": "CalendarEvent.id", "lazy": "noload"}
+        sa_relationship_kwargs={"remote_side": "CalendarEvent.id", "lazy": "raise"}
     )
     creator: Optional["MemberProfile"] = Relationship(
         sa_relationship_kwargs={
