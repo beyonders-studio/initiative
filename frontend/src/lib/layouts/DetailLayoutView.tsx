@@ -23,7 +23,8 @@ import { EntityLinkField } from "@/components/entities/EntityLinkField";
 import type { RelationsLayout } from "@/components/entities/RelationsSection";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { type FieldSaveKind, ItemDraftContext } from "@/hooks/useFieldSave";
+import { type FieldSaveKind, ItemDraftContext, itemSaves } from "@/hooks/useFieldSave";
+import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 import { useCommunityPath } from "@/lib/communityUrl";
 import type { LinkedRef } from "@/lib/relationships";
 import type { ToolRelationEntity } from "@/lib/tools";
@@ -141,8 +142,9 @@ const useDrawn = (): Drawn => {
 /** What the page drawing the item gave its detail. */
 export const useItemContext = <C,>(): C => useDrawn().context as C;
 
-const propertiesOf = (item: Item, home: ItemHome<Item, unknown>) => ({
-  kind: home.saves,
+const propertiesOf = (item: Item, home: ItemHome<Item, unknown>, view: LayoutContext) => ({
+  saves: itemSaves(home.saves, item.id),
+  env: view.env.properties,
   id: item.id,
   properties: item.properties,
   readOnly: home.readOnly,
@@ -160,7 +162,7 @@ const ItemField = ({ id, item, view }: { id: string; item: Item; view: LayoutCon
   if (id.startsWith(PROPERTY_FIELD_PREFIX)) {
     return home.initiativeId === null ? null : (
       <PlacedPropertyField
-        {...propertiesOf(item, home)}
+        {...propertiesOf(item, home, view)}
         propertyId={Number(id.slice(PROPERTY_FIELD_PREFIX.length))}
       />
     );
@@ -175,13 +177,13 @@ const ItemField = ({ id, item, view }: { id: string; item: Item; view: LayoutCon
 
 /** Its properties, but for those the layout places on their own. A reader
  *  sees none where it holds none; a community's own tool has none to offer. */
-const ItemProperties = ({ item }: { item: Item }) => {
+const ItemProperties = ({ item, view }: { item: Item; view: LayoutContext }) => {
   const { home } = useDrawn();
   const placed = useContext(PlacedProperties);
   if (home.initiativeId === null) return null;
   if (home.readOnly && ownProperties(item.properties).every((each) => placed.has(each.property_id)))
     return null;
-  return <PropertiesField {...propertiesOf(item, home)} except={placed} />;
+  return <PropertiesField {...propertiesOf(item, home, view)} except={placed} />;
 };
 
 const ItemRelations = () => {
@@ -346,7 +348,9 @@ const partsOf = <I extends Item>(own: Parts<I> = {}, adding?: readonly string[])
     field: (node: LayoutNode, item: I, view: LayoutContext) => (
       <ItemField id={String(node.props?.field)} item={item} view={view} />
     ),
-    properties: (_node: LayoutNode, item: I) => <ItemProperties item={item} />,
+    properties: (_node: LayoutNode, item: I, view: LayoutContext) => (
+      <ItemProperties item={item} view={view} />
+    ),
     relations: () => (adding ? <LinksToMake /> : <ItemRelations />),
     actions: () => <ItemActions />,
     ...own,
@@ -400,7 +404,13 @@ const ItemDetail = <I extends Item, C, P>({
     (taskId: number) => (taskRoute ? gp(taskRoute(item, context, taskId)) : ""),
     [taskRoute, gp, item, context]
   );
-  const env = useProjectLayoutEnv(taskHref);
+  const projectEnv = useProjectLayoutEnv(taskHref);
+  const properties = usePropertyEnv({
+    initiativeId: home.initiativeId,
+    owner: home.owner,
+    enabled: !home.readOnly,
+  });
+  const env = useMemo(() => ({ ...projectEnv, properties }), [projectEnv, properties]);
   const plugins = usePluginsOnItems(home.initiativeId, true, pluginKindOf(spec.kind));
   const adding = useContext(ItemDraftContext) !== null;
   const upFront = adding ? detail.addingUpFront : undefined;

@@ -26,7 +26,9 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { TagBadge, TagPicker } from "@/components/tags";
 import { useArchiveEntity, useUnarchiveEntity } from "@/hooks/useArchive";
+import { itemSaves } from "@/hooks/useFieldSave";
 import { propertySaves } from "@/hooks/useProperties";
+import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 import { useSetToolTags } from "@/hooks/useToolTags";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { PropertiesField } from "@/lib/layouts/fieldEditors";
@@ -99,6 +101,10 @@ export const ToolChest = ({ tool, entity, template, kind, children }: ToolChestP
   // Definitions belong to an initiative, so a community-level tool has none.
   const hasProperties = entity.initiative_id !== null;
   const propertyCount = ownProperties(entity.properties ?? []).length;
+  const propertyEnv = usePropertyEnv({
+    initiativeId: entity.initiative_id,
+    enabled: canEdit && propertiesOpen,
+  });
 
   return (
     <div className="border-y bg-background/60 md:rounded-lg md:border md:bg-card">
@@ -177,7 +183,8 @@ export const ToolChest = ({ tool, entity, template, kind, children }: ToolChestP
       {hasProperties && propertiesOpen ? (
         <div className="border-t py-3 pr-[var(--chest-gutter-right,1rem)] pl-[var(--chest-gutter,1rem)]">
           <PropertiesField
-            kind={kind?.properties ?? propertySaves[PropertyTarget[tool]]}
+            saves={itemSaves(kind?.properties ?? propertySaves[PropertyTarget[tool]], entity.id)}
+            env={propertyEnv}
             id={entity.id}
             properties={entity.properties ?? []}
             readOnly={!canEdit}

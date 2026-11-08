@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
+import type { ComponentProps } from "react";
 import { describe, expect, it } from "vitest";
 
 import { buildPropertyDefinition, buildPropertySummary } from "@/__tests__/factories/properties";
@@ -14,7 +15,9 @@ import {
   PropertyTarget,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
+import { itemSaves } from "@/hooks/useFieldSave";
 import { propertySaves } from "@/hooks/useProperties";
+import { usePropertyEnv } from "@/hooks/usePropertyEnv";
 
 import { PropertiesField } from "./fieldEditors";
 
@@ -30,6 +33,25 @@ const owner = buildPropertySummary({
   type: MetadataType.text,
   value: "Ada",
 });
+
+type Row = { properties: PropertySummary[] };
+
+/** The field as a page draws it, with what it reads and changes through. */
+const Field = ({
+  target,
+  ...props
+}: Omit<ComponentProps<typeof PropertiesField<Row, never>>, "saves" | "env"> & {
+  target: PropertyTarget;
+}) => {
+  const env = usePropertyEnv({
+    initiativeId: props.initiativeId,
+    owner: props.owner,
+    enabled: !props.readOnly,
+  });
+  return (
+    <PropertiesField {...props} saves={itemSaves(propertySaves[target], props.id)} env={env} />
+  );
+};
 
 /** Each write to the row's properties, as sent; answered with what the row
  *  then holds. */
@@ -47,8 +69,8 @@ const writes = (answer: PropertySummary[] = []) => {
 
 const panel = (saved: PropertySummary[], readOnly = false, queryClient?: QueryClient) =>
   renderWithProviders(
-    <PropertiesField
-      kind={propertySaves[PropertyTarget.file]}
+    <Field
+      target={PropertyTarget.file}
       id={10}
       properties={saved}
       readOnly={readOnly}
@@ -129,8 +151,8 @@ describe("a row's properties, saved one at a time", () => {
 
     // The panel moves to another row: its Retry would add Size there.
     rerender(
-      <PropertiesField
-        kind={propertySaves[PropertyTarget.file]}
+      <Field
+        target={PropertyTarget.file}
         id={11}
         properties={[{ ...status, value: "draft" }]}
         readOnly={false}
@@ -182,8 +204,8 @@ describe("a row's properties, saved one at a time", () => {
 
   it("names a task's panel for its project's metadata as well", () => {
     renderWithProviders(
-      <PropertiesField
-        kind={propertySaves[PropertyTarget.task]}
+      <Field
+        target={PropertyTarget.task}
         id={10}
         properties={[]}
         readOnly

@@ -43,6 +43,7 @@ import { cn } from "@/ui/lib/utils";
 import { PropertyValueCell } from "@/ui/properties/PropertyValueCell";
 import type { FieldDisplay } from "@/ui/properties/propertyHelpers";
 
+import type { PropertyEnv } from "./fieldEditors";
 import { PluginField, type PluginFieldDecl, type PluginOnItems } from "./plugins";
 
 /** What a view draws: tasks, and a collection's files, which its own fields
@@ -193,6 +194,10 @@ export type LayoutEnv = {
     item: LayoutItem,
     definition: PropertyDefinitionRead
   ) => ((up: boolean) => Promise<PropertySummary[]>) | null;
+
+  /** What its property editors read and change through: a detail's. Left
+   *  out, its properties are read, not changed. */
+  properties?: PropertyEnv;
 };
 
 // The namespaces a layout's names are in, loaded together so none shows as a

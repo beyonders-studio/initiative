@@ -23,10 +23,12 @@ import {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { CommentSection } from "@/components/comments/CommentSection";
+import { usePersonMention } from "@/components/comments/usePersonMention";
 import type { Written } from "@/components/layouts/AddItemDialog";
 import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import type { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
+import { TagsField } from "@/components/tags/TagsField";
 import { SmartTitleHints } from "@/components/tasks/SmartTitleHints";
 import { PART_MARK, SmartTitleParts } from "@/components/tasks/SmartTitleParts";
 import { TaskChecklist } from "@/components/tasks/TaskChecklist";
@@ -82,6 +84,7 @@ import { useRelativeTime } from "@/ui/lib/useRelativeTime";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
+import { DescriptionField } from "./DescriptionField";
 import { type DetailKind, useItemContext } from "./DetailLayoutView";
 import {
   filledBy,
@@ -93,7 +96,7 @@ import {
   sentOr,
 } from "./detailLayout";
 import { FieldFrame, sameIds, sameJson, useFieldDraft } from "./editing";
-import { DescriptionField, TagsField, TitleField } from "./fieldEditors";
+import { TitleField, type TypeaheadField } from "./fieldEditors";
 import { PROPERTY_FIELD_PREFIX } from "./fields";
 import { TASK_LAYOUT, taskFields, taskLayoutFor } from "./tasks";
 
@@ -187,6 +190,13 @@ const SmartTitleEditor = ({ item: task, label }: EditorProps) => {
       return save.save({ patch: { ...edit.patch, title }, shows: edit.shows }, undo);
     },
   };
+  // `@` offers the project's people, and writes the picked one's handle.
+  const usePeople = (field: TypeaheadField) =>
+    usePersonMention({
+      ...field,
+      members: { type: "canOpen", tool: Tool.project, id: task.project_id },
+      onPick: smart.picked,
+    });
   const parts = smart.reading?.parts ?? [];
   return (
     <TitleField
@@ -199,10 +209,7 @@ const SmartTitleEditor = ({ item: task, label }: EditorProps) => {
       marks={parts.map((part) => ({ ...part, className: PART_MARK[part.type] }))}
       below={<SmartTitleParts reading={smart.reading} onKeep={smart.keep} className="px-3 pt-1" />}
       trailing={<SmartTitleHints />}
-      mention={{
-        members: { type: "canOpen", tool: Tool.project, id: task.project_id },
-        onPick: smart.picked,
-      }}
+      useTypeahead={usePeople}
     />
   );
 };
