@@ -27,8 +27,10 @@ import { EditorSkeleton, SkeletonRegion } from "@/ui/page-skeletons";
 export const WikiDetailPage = () => {
   const { t } = useTranslation(["wikis", "common"]);
   const gp = useCommunityPath();
-  const wikiId = useRouteId("wikiId");
   const initiativeId = useRouteId("initiativeId");
+  // Without its initiative the address names no wiki to read or write in.
+  const routeWikiId = useRouteId("wikiId");
+  const wikiId = initiativeId === null ? null : routeWikiId;
 
   const wikiQuery = useWiki(wikiId);
   const pagesQuery = useWikiPages(wikiId);

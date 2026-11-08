@@ -73,8 +73,10 @@ export type CreateToolDialogProps = DialogProps & {
   extra?: {
     field: ReactNode;
     payload: Record<string, unknown>;
-    /** Fills the description whenever it changes: the chosen template's. */
-    description?: string;
+    /** Fills the description each time what it comes from changes, such as
+     *  the chosen template: `from` names it, so a refetch of the same one
+     *  leaves an edited description be. */
+    description?: { from: string; text: string };
     /** Holds the submit back while the fields hold something unsendable. */
     invalid?: boolean;
   };
@@ -113,10 +115,10 @@ export const CreateToolDialog = ({
   );
   const [grants, setGrants] = useState<ResourceGrantSchema[]>([...DEFAULT_GRANTS]);
 
-  const [filledDescription, setFilledDescription] = useState(extra?.description);
-  if (filledDescription !== extra?.description) {
-    setFilledDescription(extra?.description);
-    if (extra?.description !== undefined) setDescription(extra.description);
+  const [filledFrom, setFilledFrom] = useState(extra?.description?.from);
+  if (filledFrom !== extra?.description?.from) {
+    setFilledFrom(extra?.description?.from);
+    if (extra?.description) setDescription(extra.description.text);
   }
 
   const initiativesQuery = useInitiatives();

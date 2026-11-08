@@ -91,7 +91,7 @@ export const WikiPageView = () => {
   const { edit } = useSearch({ strict: false }) as { edit?: true };
   const editWanted = edit === true;
 
-  const validIds = wikiId !== null && pageId !== null;
+  const validIds = wikiId !== null && pageId !== null && initiativeId !== null;
 
   // The newest body regardless of whether it has been sent, which is what the
   // reading view is shown the moment somebody stops writing. The server hears

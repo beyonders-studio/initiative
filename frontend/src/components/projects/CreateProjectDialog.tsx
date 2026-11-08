@@ -78,7 +78,9 @@ export const CreateProjectDialog = ({
           ...(template ? { template_id: template.id } : {}),
         },
         // Picking a template starts the description from the template's own.
-        description: template ? (template.description ?? "") : undefined,
+        description: template
+          ? { from: String(template.id), text: template.description ?? "" }
+          : undefined,
         invalid: datesInverted,
         field: (
           <>
