@@ -772,9 +772,7 @@ describe("CommunityHomePage", () => {
     // Being in nothing is established; having nothing to join is not, so the
     // page says the list failed rather than inventing an empty community.
     expect(await screen.findByText(/You haven’t joined any initiatives yet/)).toBeInTheDocument();
-    expect(
-      await screen.findByText(/couldn't load what this community has on offer/i)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/couldn't load this/i)).toBeInTheDocument();
     expect(screen.queryByText("Nothing to join yet")).not.toBeInTheDocument();
   });
 

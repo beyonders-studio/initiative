@@ -110,7 +110,7 @@ function buildDefaultAuth(): React.ComponentProps<typeof AuthContext.Provider>["
     stepUpWithPasskey: vi.fn(),
     stepUpWithEmailCode: vi.fn(),
     logout: vi.fn(),
-    refreshUser: vi.fn(),
+    refreshUser: vi.fn().mockResolvedValue(undefined),
     acceptUser: vi.fn(),
     applySignIn: vi.fn(),
   };
