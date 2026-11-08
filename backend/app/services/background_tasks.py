@@ -129,6 +129,10 @@ def start_background_tasks() -> list[asyncio.Task]:
         HOLD_SWEEP_POLL_SECONDS,
         process_due_holds,
     )
+    from app.services.platform.ideas import (
+        IDEA_NOTICE_POLL_SECONDS,
+        process_idea_notices,
+    )
     from app.services.platform.ticket_notices import (
         TICKET_NOTICE_POLL_SECONDS,
         process_ticket_notices,
@@ -245,6 +249,11 @@ def start_background_tasks() -> list[asyncio.Task]:
         asyncio.create_task(
             Loop("ticket-notices", interval=TICKET_NOTICE_POLL_SECONDS).run(
                 process_ticket_notices
+            )
+        ),
+        asyncio.create_task(
+            Loop("idea-notices", interval=IDEA_NOTICE_POLL_SECONDS).run(
+                process_idea_notices
             )
         ),
     ]

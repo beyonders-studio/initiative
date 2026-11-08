@@ -260,6 +260,13 @@ HELD_SURFACES = Guc("app.held_surfaces", Kind.NAMES, standing=True)
 #: to read ``intake_cases`` back — whose own policy reads ``tasks``.
 FILER_CASES = Guc("app.filer_cases", Kind.IDS, read_once=True)
 
+# --- Somebody reading the published ideas --------------------------------------
+#: The tasks the Ideas board published, read by the ideas seam through the
+#: ideas role's own row on ``ideas``. What the ideas policies on a task and its
+#: votes admit, so none has to read ``ideas`` back — whose own policy reads
+#: ``tasks``.
+IDEA_TASKS = Guc("app.idea_tasks", Kind.IDS, read_once=True)
+
 # --- Per-transaction flags ----------------------------------------------------
 #: Transaction-local flag marking a transaction as a purge.
 #:

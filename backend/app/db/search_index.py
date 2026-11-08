@@ -569,6 +569,8 @@ NOT_SEARCHABLE: dict[str, str] = {
     "moderation_report_reporters": "who reported a thing; never a search result",
     "moderation_actions": "the moderation log, reached from its own surface",
     "intake_cases": "the key -> task map; the task it names is what is indexed",
+    "ideas": "whether an idea is published; its task is what is indexed",
+    "idea_votes": "who voted for an idea; never a search result",
     "evidence": "files attached to a report or a case, opened only through it",
     "personal_items": "one member's own opens, bookmarks and subscriptions",
     "engagement_levels": "how widely an item was engaged with, not content",

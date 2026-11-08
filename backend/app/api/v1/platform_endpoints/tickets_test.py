@@ -110,7 +110,7 @@ async def operations(session):
     session.add(IntakeBinding(stream=IntakeStream.support, project_id=ops_project.id))
     await session.commit()
     await set_rls_context(session, Unattributed())
-    return {"guild": ops_guild, "project": ops_project}
+    return {"guild": ops_guild, "project": ops_project, "staff": staff}
 
 
 async def test_support_is_off_until_the_operator_turns_it_on(client, acting_user):

@@ -59,6 +59,7 @@ from app.db.public_rls import PLATFORM_SUSPENDED
 from app.db.request_context import (
     ContentGrantee,
     Filer,
+    IdeaReader,
     Install,
     Member,
     Platform,
@@ -1434,6 +1435,48 @@ async def establish_filer_access(session: AsyncSession, user: User) -> int:
                 guild_id=guild_id,
                 user_id=int(user.id),
                 cases=tuple(row[0] for row in cases),
+            ),
+        )
+    except DBAPIError as exc:
+        clear_rls_context(session)
+        await session.rollback()
+        raise FilerAccessError("operations community cannot be routed") from exc
+    return guild_id
+
+
+async def establish_ideas_access(session: AsyncSession, user: Optional[User]) -> int:
+    """Route ``session`` as whoever reads the published ideas, ``user`` or
+    nobody signed in — the establishment seam for the ideas, beside
+    :func:`establish_filer_access`.
+
+    Into the operations community's ``guild_<id>_ideas`` role, which is what
+    decides what they read. ``session`` comes from that community's cohort on
+    the request engine. Returns the community's id.
+
+    Raises :class:`FilerAccessError` where no operations community is set, or
+    it has no ideas role to assume.
+    """
+    from app.services.platform.intake import configured_operations_guild_id
+
+    guild_id = await configured_operations_guild_id()
+    if guild_id is None:
+        raise FilerAccessError("no operations community")
+    user_id = int(user.id) if user is not None else None
+    try:
+        await set_rls_context(session, IdeaReader(guild_id=guild_id, user_id=user_id))
+        # The published ideas, read through the role's own row on ideas: the
+        # one read the other ideas rows are then keyed on.
+        tasks = (
+            await session.exec(sa_text("SELECT task_id FROM ideas ORDER BY task_id"))
+        ).all()
+        # End the transaction, which leaves the role, before routing again.
+        await session.rollback()
+        await set_rls_context(
+            session,
+            IdeaReader(
+                guild_id=guild_id,
+                user_id=user_id,
+                tasks=tuple(row[0] for row in tasks),
             ),
         )
     except DBAPIError as exc:

@@ -21,7 +21,13 @@ from fastapi import HTTPException, status as http_status
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.intake import Conversation, IntakeStream, meta, offered_streams
+from app.core.intake import (
+    Conversation,
+    IntakeStream,
+    Source,
+    meta,
+    offered_streams,
+)
 from app.core.tools import Tool
 from app.core.messages import GuildMessages, InitiativeMessages, IntakeMessages
 from app.db import cohorts, operations_schema
@@ -159,7 +165,11 @@ async def contacts(session: AsyncSession) -> tuple[Optional[str], dict[str, str]
     row = (await session.exec(select(AppSetting).where(AppSetting.id == 1))).first()
     if row is None:
         return None, {}
-    taken = {stream.value for stream in offered_streams()}
+    taken = {
+        stream.value
+        for stream in offered_streams()
+        if Source.submitted in meta(stream).sources
+    }
     own = {k: v for k, v in (row.intake_contacts or {}).items() if k in taken}
     return row.intake_general_contact, own
 
