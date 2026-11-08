@@ -1,9 +1,9 @@
 /**
  * "Report this" wherever something can be reported.
  *
- * The flag, the dialog, and the one rule that holds everywhere: you cannot
- * report your own work. Deleting or editing it is already there, and a report
- * about yourself is somebody else's time.
+ * The flag, the sheet it opens, and the one rule that holds everywhere: you
+ * cannot report your own work. Deleting or editing it is already there, and a
+ * report about yourself is somebody else's time.
  *
  * Every surface passes what the thing is and which one — nothing else. Where
  * the report goes is the server's decision, so a caller never has to know
@@ -11,10 +11,10 @@
  */
 
 import { Flag } from "lucide-react";
-import { useState } from "react";
+import { Suspense, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
-import { FileTicketDialog } from "@/components/tickets/FileTicketDialog";
+import { FileTicketSheet } from "@/components/tickets/FileTicketSheet";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/ui/button";
@@ -33,6 +33,46 @@ export interface ReportButtonProps {
   size?: "sm" | "icon";
 }
 
+interface Report {
+  targetType: string;
+  targetId: number;
+  communityId: number | null;
+}
+
+// The report being written, kept outside React so one sheet, drawn by the app
+// shell, serves every button: reporting another thing replaces it.
+let current: Report | null = null;
+const listeners = new Set<() => void>();
+const setReport = (report: Report | null) => {
+  current = report;
+  for (const listener of listeners) listener();
+};
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
+
+/** The report sheet, drawn once by the app shell. */
+export const ReportHost = () => {
+  const report = useSyncExternalStore(subscribe, () => current);
+  if (!report) return null;
+  return (
+    // Its own boundary: the first opening loads the sheet's translations.
+    <Suspense fallback={null}>
+      <FileTicketSheet
+        // Another thing reported starts a report of its own.
+        key={`${report.targetType}:${report.targetId}`}
+        open
+        onOpenChange={(open) => {
+          if (!open) setReport(null);
+        }}
+        ticket={{ stream: "moderation", targetType: report.targetType, targetId: report.targetId }}
+        communityId={report.communityId}
+      />
+    </Suspense>
+  );
+};
+
 export const ReportButton = ({
   targetType,
   targetId,
@@ -44,41 +84,36 @@ export const ReportButton = ({
   const { t } = useTranslation("moderation");
   const { user } = useAuth();
   const activeCommunityId = useActiveCommunityId();
-  const [open, setOpen] = useState(false);
 
   // Signed in, and not the author. A signed-out reader has nothing to report
   // with, and the author has delete instead.
   if (!user || (authorId != null && authorId === user.id)) return null;
 
   return (
-    <>
-      {/* Its own provider: there is none at the app root, and this button is
-          dropped into five different trees. */}
-      <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size={size}
-              className={className}
-              aria-label={t("report.action")}
-              onClick={() => setOpen(true)}
-            >
-              <Flag className="h-4 w-4" aria-hidden="true" />
-              {size === "sm" && <span className="sr-only">{t("report.action")}</span>}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t("report.action")}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-      {open && (
-        <FileTicketDialog
-          open={open}
-          onOpenChange={setOpen}
-          ticket={{ stream: "moderation", targetType, targetId }}
-          communityId={(communityId === undefined ? activeCommunityId : communityId) ?? null}
-        />
-      )}
-    </>
+    // Its own provider: there is none at the app root, and this button is
+    // dropped into five different trees.
+    <TooltipProvider delayDuration={300}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size={size}
+            className={className}
+            aria-label={t("report.action")}
+            onClick={() =>
+              setReport({
+                targetType,
+                targetId,
+                communityId: (communityId === undefined ? activeCommunityId : communityId) ?? null,
+              })
+            }
+          >
+            <Flag className="h-4 w-4" aria-hidden="true" />
+            {size === "sm" && <span className="sr-only">{t("report.action")}</span>}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{t("report.action")}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 };

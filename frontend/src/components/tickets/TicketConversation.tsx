@@ -16,13 +16,13 @@ import {
   type TicketMessageRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { CommentContent } from "@/components/comments/CommentContent";
-import { EvidenceList, EvidencePicker, filedEvidenceUrl } from "@/components/tickets/Evidence";
+import { EvidenceList, filedEvidenceUrl } from "@/components/tickets/Evidence";
+import { TicketComposer } from "@/components/tickets/TicketComposer";
 import { useReplyToTicket } from "@/hooks/useTickets";
 import { Button } from "@/ui/button";
 import { Card, CardContent } from "@/ui/card";
 import { useRelativeTime } from "@/ui/lib/useRelativeTime";
 import { cn } from "@/ui/lib/utils";
-import { Textarea } from "@/ui/textarea";
 
 const Message = ({ message, taskId }: { message: TicketMessageRead; taskId: number }) => {
   const { t } = useTranslation("intake");
@@ -89,18 +89,15 @@ export const TicketConversation = ({ ticket }: { ticket: FiledTicketDetailRead }
       {ticket.can_reply ? (
         <Card>
           <CardContent className="space-y-3 pt-6">
-            <Textarea
+            <TicketComposer
               value={reply}
               onChange={(event) => setReply(event.target.value)}
               placeholder={t("tickets.replyPlaceholder")}
               aria-label={t("tickets.replyLabel")}
               rows={4}
-              disabled={replyMutation.isPending}
-            />
-            <EvidencePicker
               policy={ticket.evidence}
               files={files}
-              onChange={setFiles}
+              onFilesChange={setFiles}
               disabled={replyMutation.isPending}
             />
             <div className="flex justify-end">

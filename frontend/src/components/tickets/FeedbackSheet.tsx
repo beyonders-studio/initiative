@@ -28,7 +28,7 @@ import talkingSvg from "@/assets/yonder/talking.svg";
 import { HelpLink } from "@/components/support/HelpLink";
 import { ContactDialog } from "@/components/tickets/ContactDialog";
 import { DeviceContextSwitch, useDeviceContext } from "@/components/tickets/DeviceContext";
-import { EvidencePicker } from "@/components/tickets/Evidence";
+import { TicketComposer } from "@/components/tickets/TicketComposer";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useServer } from "@/hooks/useServer";
@@ -41,7 +41,6 @@ import { Label } from "@/ui/label";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import { cn } from "@/ui/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/ui/sheet";
-import { Textarea } from "@/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 /** Match the column behind it, so the box stops where the server would. */
@@ -234,7 +233,7 @@ const FeedbackSheet = () => {
               </ToggleGroup>
               <div className="space-y-1.5">
                 <Label htmlFor="feedback-body">{t(`feedback.kinds.${form.kind}.question`)}</Label>
-                <Textarea
+                <TicketComposer
                   ref={box}
                   id="feedback-body"
                   rows={4}
@@ -242,17 +241,12 @@ const FeedbackSheet = () => {
                   value={form.body}
                   onChange={(event) => change({ body: event.target.value })}
                   placeholder={t(`feedback.kinds.${form.kind}.placeholder`)}
+                  policy={feedback.evidence}
+                  files={form.files}
+                  onFilesChange={(files) => change({ files })}
                   disabled={pending}
                 />
               </div>
-              <EvidencePicker
-                policy={feedback.evidence}
-                files={form.files}
-                onChange={(files) => change({ files })}
-                disabled={pending}
-                label={t("feedback.addPicture")}
-                takeFrom={box}
-              />
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="feedback-contactable"

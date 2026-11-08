@@ -16,7 +16,7 @@
 
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Check, ExternalLink } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useReadHelpIndex } from "@/api/generated/help/help";
@@ -37,7 +37,7 @@ import {
   useDeviceContext,
   useRouteTemplate,
 } from "@/components/tickets/DeviceContext";
-import { EvidencePicker } from "@/components/tickets/Evidence";
+import { TicketComposer } from "@/components/tickets/TicketComposer";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -74,7 +74,6 @@ import { commandFilter } from "@/ui/lib/fuzzyMatch";
 import { atLeast, useWidthClass } from "@/ui/lib/useWidthClass";
 import { cn } from "@/ui/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/ui/sheet";
-import { Textarea } from "@/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
 
 /** Matches the column behind it. */
@@ -305,7 +304,7 @@ const AskView = ({
   draft: HelpDraft;
   communityId: number | null;
   topics: SupportTopic[];
-  policy: React.ComponentProps<typeof EvidencePicker>["policy"];
+  policy: React.ComponentProps<typeof TicketComposer>["policy"];
 }) => {
   const { t } = useTranslation(["intake", "common"]);
   const context = useDeviceContext();
@@ -317,9 +316,6 @@ const AskView = ({
     : offered.length === 1
       ? offered[0]
       : "";
-
-  // A screenshot pasted into what is being written is attached, as though chosen.
-  const box = useRef<HTMLTextAreaElement>(null);
 
   const file = useFileTicket({
     onSuccess: () =>
@@ -355,8 +351,7 @@ const AskView = ({
     <>
       <PanelHeader title={t("help.panel.askTeam")} onBack={() => updateHelp({ view: "search" })} />
       <div className="grid min-h-0 flex-1 content-start gap-3 overflow-y-auto px-4 pb-3">
-        <Textarea
-          ref={box}
+        <TicketComposer
           autoFocus
           value={draft.text}
           onChange={(event) => setHelpDraft({ text: event.target.value })}
@@ -370,13 +365,10 @@ const AskView = ({
           placeholder={t("help.bodyPlaceholder")}
           rows={6}
           maxLength={BODY_MAX}
-        />
-        <EvidencePicker
           policy={policy}
           files={draft.files}
-          onChange={(files) => setHelpDraft({ files })}
+          onFilesChange={(files) => setHelpDraft({ files })}
           disabled={file.isPending}
-          takeFrom={box}
         />
         {offered.length > 1 ? (
           <div className="grid gap-2">

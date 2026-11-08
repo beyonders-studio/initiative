@@ -1,17 +1,16 @@
 /**
- * Files a person attaches to a ticket or a report, and showing them again.
+ * Showing the files that came with a ticket or a report. Choosing them is the
+ * box they are written in (`TicketComposer`).
  *
- * Choosing is held to what the stream takes — how many, how large, of which
- * kinds — so a refusal is said before anything is sent; the server still
- * reads every file for itself. Each stored file is fetched by its own route,
- * which checks the reader against the file's row every time, so nothing here
- * keeps a link that outlives their access.
+ * Each stored file is fetched by its own route, which checks the reader against
+ * the file's row every time, so nothing here keeps a link that outlives their
+ * access.
  */
-import { Download, Eye, FileText, Paperclip, X } from "lucide-react";
-import { type RefObject, useEffect, useId, useRef, useState } from "react";
+import { Download, Eye, FileText } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { EvidencePolicyRead, EvidenceRead } from "@/api/generated/initiativeAPI.schemas";
+import type { EvidenceRead } from "@/api/generated/initiativeAPI.schemas";
 import { resolveHeaderlessApiUrl } from "@/lib/uploadUrl";
 import { Button } from "@/ui/button";
 import { formatBytes } from "@/ui/lib/fileUtils";
@@ -23,23 +22,6 @@ const SHOWN_IN_PLACE = new Set(["image/png", "image/jpeg", "image/gif", "image/w
 
 export const isPicture = (contentType: string) => SHOWN_IN_PLACE.has(contentType);
 
-/**
- * Whether the stream may take ``file``, as far as the browser can tell. An
- * unnamed type is left to the server, which reads the bytes; any text is
- * taken as text, as the server takes it.
- */
-const mayTake = (file: File, types: string[]) =>
-  !file.type ||
-  types.includes(file.type) ||
-  (file.type.startsWith("text/") && types.includes("text/plain"));
-
-/** What the file chooser offers: the stream's types, and any text where it takes text. */
-const acceptFor = (types: string[]) =>
-  (types.includes("text/plain") ? [...types, "text/*"] : types).join(",");
-
-/** One chosen file, told apart from the rest without its place in the list. */
-const fileKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
-
 /** Where a file the reader filed is fetched from. */
 export const filedEvidenceUrl = (taskId: number, evidenceId: number) =>
   resolveHeaderlessApiUrl(`/api/v1/me/tickets/${taskId}/evidence/${evidenceId}`);
@@ -47,165 +29,6 @@ export const filedEvidenceUrl = (taskId: number, evidenceId: number) =>
 /** Where a file in a community is fetched from, by the people working it. */
 export const communityEvidenceUrl = (communityId: number, evidenceId: number) =>
   resolveHeaderlessApiUrl(`/api/v1/c/${communityId}/evidence/${evidenceId}`);
-
-interface EvidencePickerProps {
-  /** What the stream takes. Nothing to choose while it is not known. */
-  policy: EvidencePolicyRead | null | undefined;
-  files: File[];
-  onChange: (files: File[]) => void;
-  disabled?: boolean;
-  /** The button's words. "Attach files" when not given. */
-  label?: string;
-  /** Where files pasted in or dropped on are taken as though chosen: the box
-   *  a screenshot goes into. */
-  takeFrom?: RefObject<HTMLElement | null>;
-}
-
-/** Choose files to send, held to what the stream takes. */
-export const EvidencePicker = ({
-  policy,
-  files,
-  onChange,
-  disabled,
-  label,
-  takeFrom,
-}: EvidencePickerProps) => {
-  const { t } = useTranslation("intake");
-  const input = useRef<HTMLInputElement>(null);
-  const hintId = useId();
-  const [refusal, setRefusal] = useState<string | null>(null);
-  const [dropping, setDropping] = useState(false);
-  const taking = Boolean(policy && policy.max_files > 0 && !disabled);
-
-  const add = (chosen: File[]) => {
-    if (!policy) return;
-    const next = [...files];
-    let said: string | null = null;
-    for (const file of chosen) {
-      if (next.some((held) => fileKey(held) === fileKey(file))) {
-        // Chosen twice: it is sent once.
-      } else if (!mayTake(file, policy.types)) {
-        said = t("evidence.notAllowed", { name: file.name });
-      } else if (file.size > policy.max_bytes) {
-        said = t("evidence.tooLarge", { name: file.name, size: formatBytes(policy.max_bytes, 0) });
-      } else if (next.length >= policy.max_files) {
-        said = t("evidence.tooMany", { count: policy.max_files });
-      } else {
-        next.push(file);
-      }
-    }
-    setRefusal(said);
-    onChange(next);
-    // The same file can be chosen again after it is taken back out.
-    if (input.current) input.current.value = "";
-  };
-
-  // Bound again each render, so a paste or a drop adds to the files as they
-  // are now. Only a drag carrying files is taken; dragged text drops as text.
-  useEffect(() => {
-    const target = takeFrom?.current;
-    if (!target || !taking) return;
-    const onPaste = (event: ClipboardEvent) => {
-      const pasted = Array.from(event.clipboardData?.files ?? []);
-      if (pasted.length === 0) return;
-      event.preventDefault();
-      add(pasted);
-    };
-    const carriesFiles = (event: DragEvent) =>
-      Array.from(event.dataTransfer?.types ?? []).includes("Files");
-    const onDragOver = (event: DragEvent) => {
-      if (!carriesFiles(event)) return;
-      event.preventDefault();
-      setDropping(true);
-    };
-    const onDragLeave = () => setDropping(false);
-    const onDrop = (event: DragEvent) => {
-      if (!carriesFiles(event)) return;
-      event.preventDefault();
-      setDropping(false);
-      add(Array.from(event.dataTransfer?.files ?? []));
-    };
-    target.addEventListener("paste", onPaste);
-    target.addEventListener("dragover", onDragOver);
-    target.addEventListener("dragleave", onDragLeave);
-    target.addEventListener("drop", onDrop);
-    return () => {
-      target.removeEventListener("paste", onPaste);
-      target.removeEventListener("dragover", onDragOver);
-      target.removeEventListener("dragleave", onDragLeave);
-      target.removeEventListener("drop", onDrop);
-    };
-  });
-
-  if (!policy || policy.max_files <= 0) return null;
-  const size = formatBytes(policy.max_bytes, 0);
-
-  return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          ref={input}
-          type="file"
-          multiple
-          className="sr-only"
-          accept={acceptFor(policy.types)}
-          onChange={(event) => add(Array.from(event.target.files ?? []))}
-          disabled={disabled}
-          aria-describedby={hintId}
-          data-testid="evidence-input"
-          tabIndex={-1}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={disabled || files.length >= policy.max_files}
-          onClick={() => input.current?.click()}
-        >
-          <Paperclip className="h-4 w-4" aria-hidden="true" />
-          {label ?? t("evidence.attach")}
-        </Button>
-        <span id={hintId} className="text-muted-foreground text-xs">
-          {dropping
-            ? t("evidence.dropHere")
-            : t("evidence.limits", { count: policy.max_files, size })}
-        </span>
-      </div>
-      {files.length > 0 ? (
-        <ul className="flex flex-wrap gap-2">
-          {files.map((file, index) => (
-            <li
-              key={fileKey(file)}
-              className="flex max-w-full items-center gap-1 rounded-md border bg-muted/40 py-0.5 pr-1 pl-2 text-xs"
-            >
-              <span className="truncate">{file.name}</span>
-              <span className="shrink-0 text-muted-foreground">{formatBytes(file.size)}</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 shrink-0"
-                disabled={disabled}
-                aria-label={t("evidence.remove", { name: file.name })}
-                onClick={() => {
-                  setRefusal(null);
-                  onChange(files.filter((_, i) => i !== index));
-                }}
-              >
-                <X className="h-3 w-3" aria-hidden="true" />
-              </Button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {refusal ? (
-        <p className="text-destructive text-xs" role="alert">
-          {refusal}
-        </p>
-      ) : null}
-    </div>
-  );
-};
 
 /** One picture's thumbnail: blurred until the reader chooses to look, and
  *  opened full size either way. */

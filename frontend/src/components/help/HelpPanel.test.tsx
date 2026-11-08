@@ -195,7 +195,7 @@ describe("Help", () => {
     fireEvent.drop(screen.getByRole("textbox", { name: "What happened?" }), {
       dataTransfer: { types: ["Files"], files: [shot] },
     });
-    expect(await screen.findByText("shot.png")).toBeInTheDocument();
+    expect(await screen.findByRole("img", { name: "shot.png" })).toBeInTheDocument();
   });
 
   it("names no community about the account, and leaves the device out when asked", async () => {
