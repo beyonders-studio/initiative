@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An error shows once.** Saving or deleting an initiative's settings, changing a plug-in, assigning yourself from a task's quick actions and changing a status in My Tasks no longer show the same error twice, and deleting a tag from its page says so once. Pinning a project, reordering projects or tasks, and closing tabs now say when they fail.
 - **Every passkey button works in the apps.** Signing in, creating an account, adding a passkey, a community's passkey ask, making a waiting change now, breaking glass and the billing console open your browser for the passkey and carry on in the app, with no second sign-in. The Android and Windows apps do the same for a server they can't use passkeys with directly.
 - **Messages fit the screen.** The conversation takes the page and scrolls on its own, on phones too, with the message box always in view, and it stays on the newest message as you type. The page title is gone, and the encryption note is a shield beside the person's name.
 - **A plug-in update that asks for more access can be answered.** Its row in **Settings › Integrations** shows **Update waiting**, the notice opens that row, and what the version asks for comes first. A newer version this server can't run says why instead of **Up to date**, and nobody is asked while whoever runs the server manages your plug-ins.
